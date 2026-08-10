@@ -229,10 +229,26 @@ export function acquireStatementLock(host: {
  * connection's own reentrant `synchronize` cannot serve — a `Promise.all` of
  * writes inside one transaction shares its lock owner and re-enters.
  *
- * This is the live primitive `execute` / `executeMutation` delegate to. It is
- * written against the async `SqliteStatement` / `SqliteConnection` driver
- * abstraction (array binds, promise-returning, multi-driver) rather than
- * better-sqlite3's native sync API, so it is reachable from the adapter.
+ * This is the live primitive `raw_execute` — and, in trails, `execute` /
+ * `executeMutation` — delegate to. It is written against the async
+ * `SqliteStatement` / `SqliteConnection` driver abstraction (array binds,
+ * promise-returning, multi-driver) rather than better-sqlite3's native sync
+ * API, so it is reachable from the adapter.
+ *
+ * Two deviations, both forced by that driver abstraction and by the
+ * `execute`/`executeMutation` split (justified once at the `executeMutation`
+ * declaration in abstract-adapter.ts):
+ *
+ * - Rails returns an `ActiveRecord::Result` (`:82-107`); this returns the rows
+ *   plus the two counters, because `executeMutation` needs the affected-row
+ *   count and insert rowid as RETURNED locals — reading them back off the
+ *   shared fields after its own await re-opens the concurrent-write race.
+ *   `castResult` is the identity here either way, as it is in Rails (`:113`).
+ * - Rails' unprepared arm guards `stmt.bind_params` with
+ *   `unless binds.nil? || binds.empty?` (`:96-98`); binds reach this driver as
+ *   a call argument rather than a separate `bind_params` round-trip, so an
+ *   empty array already means "bind nothing" and the guard has nothing to
+ *   guard. `binds` stays in the signature at Rails' position regardless.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
  * @internal

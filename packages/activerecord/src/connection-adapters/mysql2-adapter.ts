@@ -632,9 +632,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           { allowRetry: options?.allowRetry ?? false },
           async (conn) => {
             const mysqlConn = conn as unknown as mysql.Connection;
-            // Rails' internal_exec_query is `cast_result(raw_execute(...))`
-            // (abstract/database_statements.rb:527-534) — one perform_query
-            // primitive per adapter, not a second inline driver call.
+            // Rails' internal_exec_query is `cast_result(internal_execute(...))`
+            // (abstract/database_statements.rb:545-547), which reaches
+            // `raw_execute` → `perform_query` (`:588-591` → `:552-558`) — one
+            // perform_query primitive per adapter, not a second inline driver call.
             const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], driverBinds, {
               prepare: options?.prepare,
               notificationPayload: payload,
@@ -1729,9 +1730,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Read pending warnings for `conn`, filter via {@link isWarningIgnored},
-   * and dispatch per the configured `dbWarningsAction`. Runs after every
-   * successful query in {@link execute}/{@link executeMutation} while the
-   * connection is still held — warnings are connection-scoped.
+   * and dispatch per the configured `dbWarningsAction`. Called from
+   * `performQuery` where Rails calls it (mysql2/database_statements.rb:102),
+   * while the connection is still held — warnings are connection-scoped.
+   *
+   * Rails reads `@raw_connection` for the SHOW WARNINGS round-trip, a field the
+   * adapter holds because ruby-mysql2 owns one socket per adapter. trails hands
+   * connections out of the pool per query, so the connection is a trailing
+   * optional parameter rather than a field; the Rails parameter and its
+   * position are unchanged, and an absent one is the base class's no-op.
    *
    * Mirrors: AbstractMysqlAdapter#handle_warnings.
    * @internal
