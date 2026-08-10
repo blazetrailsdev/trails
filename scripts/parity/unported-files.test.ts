@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, it, expect } from "vitest";
 
@@ -9,7 +11,7 @@ import {
   isTestCaseUnported,
   isTestFileUnported,
   UNPORTED_FILES,
-} from "./unported-files.js";
+} from "./unported-files/index.js";
 
 async function walkRb(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -103,6 +105,39 @@ describe("isSourceUnported package scoping", () => {
 
   it("does not match unrelated source files", () => {
     expect(isSourceUnported("some/unrelated/file.rb", "did-you-mean")).toBe(false);
+  });
+});
+
+const BASELINE: unknown[] = JSON.parse(
+  readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "unported-files", "baseline.json"),
+    "utf8",
+  ),
+);
+
+describe("UNPORTED_FILES per-package split", () => {
+  // `unported-files/baseline.json` is a verbatim snapshot of `UNPORTED_FILES`
+  // as it stood before it was split into per-package modules. Merging the
+  // shards must still yield every one of those entries, byte-identical: an
+  // entry silently dropped by a shard, or one that gains or loses a `package`
+  // field on the way into a differently-named file, changes what parity:api
+  // and parity:test exclude, and nothing else in the suite would notice.
+  //
+  // Only-shrink, like the call-mismatch baselines: adding a new exclusion does
+  // not touch this file. Genuinely retiring a pre-split entry does — delete
+  // that one row from baseline.json, in the same commit, by hand.
+  //
+  // Entries are compared as a set, not a sequence: the predicates are `.some()`
+  // existence checks, so pinning order would only forbid adding a shard.
+  it("still carries every entry the pre-split register had", () => {
+    const key = (e: unknown) => JSON.stringify(e);
+    const merged = new Set(UNPORTED_FILES.map(key));
+    expect(BASELINE.map(key).filter((e) => !merged.has(e))).toEqual([]);
+  });
+
+  it("does not double-count an entry across shards", () => {
+    const seen = new Set(UNPORTED_FILES.map((e) => JSON.stringify(e)));
+    expect(seen.size).toBe(UNPORTED_FILES.length);
   });
 });
 

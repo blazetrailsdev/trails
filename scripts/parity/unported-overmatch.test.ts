@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { testPathsManifest } from "../../vendor/sources.js";
-import { UNPORTED_FILES } from "./unported-files.js";
+import { UNPORTED_FILES } from "./unported-files/index.js";
 
 // Recurrence guard for the bare-filename substring overmatch bug (PR #4891):
 // a whole-file `testFile` keyed by a bare basename matches by plain substring
