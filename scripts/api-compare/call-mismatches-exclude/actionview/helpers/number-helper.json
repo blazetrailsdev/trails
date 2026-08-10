@@ -5,7 +5,11 @@
     "rubyName": "number_to_currency",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToCurrency", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToCurrency",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +18,11 @@
     "rubyName": "number_to_human",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToHuman", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToHuman",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -23,7 +31,11 @@
     "rubyName": "number_to_human_size",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToHumanSize", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToHumanSize",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -32,7 +44,11 @@
     "rubyName": "number_to_percentage",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToPercentage", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToPercentage",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -41,7 +57,11 @@
     "rubyName": "number_with_delimiter",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToDelimited", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToDelimited",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -50,7 +70,11 @@
     "rubyName": "number_with_precision",
     "call": "delegate_number_helper_method",
     "kind": "args",
-    "rubyArgs": ["str:numberToRounded", "ref:number", "ref:options"],
+    "rubyArgs": [
+      "str:numberToRounded",
+      "ref:number",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

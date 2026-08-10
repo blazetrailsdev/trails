@@ -5,7 +5,10 @@
     "rubyName": "attempt",
     "call": "find_file",
     "kind": "args",
-    "rubyArgs": ["ref:pathInfo", "kwargs{acceptEncoding=ref:acceptEncoding}"],
+    "rubyArgs": [
+      "ref:pathInfo",
+      "kwargs{acceptEncoding=ref:acceptEncoding}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -21,7 +24,9 @@
     "rubyName": "file_readable?",
     "call": "file?",
     "kind": "args",
-    "rubyArgs": ["ref:filePath"],
+    "rubyArgs": [
+      "ref:filePath"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -30,7 +35,11 @@
     "rubyName": "find_file",
     "call": "try_files",
     "kind": "args",
-    "rubyArgs": ["ref:filepath", "ref:contentType", "kwargs{acceptEncoding=ref:acceptEncoding}"],
+    "rubyArgs": [
+      "ref:filepath",
+      "ref:contentType",
+      "kwargs{acceptEncoding=ref:acceptEncoding}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -53,7 +62,11 @@
     "rubyName": "try_files",
     "call": "try_precompressed_files",
     "kind": "args",
-    "rubyArgs": ["ref:filepath", "ref:headers", "kwargs{acceptEncoding=ref:acceptEncoding}"],
+    "rubyArgs": [
+      "ref:filepath",
+      "ref:headers",
+      "kwargs{acceptEncoding=ref:acceptEncoding}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

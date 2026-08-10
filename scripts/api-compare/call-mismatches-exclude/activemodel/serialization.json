@@ -5,7 +5,9 @@
     "rubyName": "serializable_attributes",
     "call": "read_attribute_for_serialization",
     "kind": "args",
-    "rubyArgs": ["ref:n"],
+    "rubyArgs": [
+      "ref:n"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -30,7 +32,9 @@
     "rubyName": "serializable_hash",
     "call": "serializable_add_includes",
     "kind": "args",
-    "rubyArgs": ["ref:options"],
+    "rubyArgs": [
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -39,7 +43,9 @@
     "rubyName": "serializable_hash",
     "call": "serializable_attributes",
     "kind": "args",
-    "rubyArgs": ["ref:attributeNames"],
+    "rubyArgs": [
+      "ref:attributeNames"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

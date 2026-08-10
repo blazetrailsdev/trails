@@ -33,7 +33,10 @@
     "rubyName": "initialize_type_map",
     "call": "lookup",
     "kind": "args",
-    "rubyArgs": ["str:string", "kwargs{adapter=str:mysql2,limit=ref:limit}"],
+    "rubyArgs": [
+      "str:string",
+      "kwargs{adapter=str:mysql2,limit=ref:limit}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -42,7 +45,10 @@
     "rubyName": "initialize_type_map",
     "call": "lookup",
     "kind": "args",
-    "rubyArgs": ["str:string", "kwargs{adapter=str:mysql2}"],
+    "rubyArgs": [
+      "str:string",
+      "kwargs{adapter=str:mysql2}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

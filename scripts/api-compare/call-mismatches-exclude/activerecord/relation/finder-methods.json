@@ -54,7 +54,9 @@
     "rubyName": "find_some",
     "call": "find_some_ordered",
     "kind": "args",
-    "rubyArgs": ["ref:ids"],
+    "rubyArgs": [
+      "ref:ids"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -70,7 +72,11 @@
     "rubyName": "find_some",
     "call": "raise_record_not_found_exception!",
     "kind": "args",
-    "rubyArgs": ["ref:ids", "ref:size", "ref:expectedSize"],
+    "rubyArgs": [
+      "ref:ids",
+      "ref:size",
+      "ref:expectedSize"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -86,7 +92,11 @@
     "rubyName": "find_some_ordered",
     "call": "raise_record_not_found_exception!",
     "kind": "args",
-    "rubyArgs": ["ref:ids", "ref:size", "ref:size"],
+    "rubyArgs": [
+      "ref:ids",
+      "ref:size",
+      "ref:size"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -123,7 +133,9 @@
     "rubyName": "find_with_ids",
     "call": "find_some",
     "kind": "args",
-    "rubyArgs": ["ref:ids"],
+    "rubyArgs": [
+      "ref:ids"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

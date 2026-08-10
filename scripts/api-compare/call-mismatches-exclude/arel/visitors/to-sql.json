@@ -5,7 +5,11 @@
     "rubyName": "aggregate",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:expressions", "ref:collector", "str:, "],
+    "rubyArgs": [
+      "ref:expressions",
+      "ref:collector",
+      "str:, "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +18,11 @@
     "rubyName": "collect_nodes_for",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:nodes", "ref:collector", "ref:connector"],
+    "rubyArgs": [
+      "ref:nodes",
+      "ref:collector",
+      "ref:connector"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -37,7 +45,11 @@
     "rubyName": "infix_value_with_paren",
     "call": "grouping_parentheses",
     "kind": "args",
-    "rubyArgs": ["ref:left", "ref:collector", "bool:false"],
+    "rubyArgs": [
+      "ref:left",
+      "ref:collector",
+      "bool:false"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -46,7 +58,11 @@
     "rubyName": "infix_value_with_paren",
     "call": "grouping_parentheses",
     "kind": "args",
-    "rubyArgs": ["ref:right", "ref:collector", "bool:false"],
+    "rubyArgs": [
+      "ref:right",
+      "ref:collector",
+      "bool:false"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -55,7 +71,12 @@
     "rubyName": "infix_value_with_paren",
     "call": "infix_value_with_paren",
     "kind": "args",
-    "rubyArgs": ["ref:left", "ref:collector", "ref:value", "bool:true"],
+    "rubyArgs": [
+      "ref:left",
+      "ref:collector",
+      "ref:value",
+      "bool:true"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -64,7 +85,12 @@
     "rubyName": "infix_value_with_paren",
     "call": "infix_value_with_paren",
     "kind": "args",
-    "rubyArgs": ["ref:right", "ref:collector", "ref:value", "bool:true"],
+    "rubyArgs": [
+      "ref:right",
+      "ref:collector",
+      "ref:value",
+      "bool:true"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -101,7 +127,11 @@
     "rubyName": "visit_Arel_Nodes_Except",
     "call": "infix_value",
     "kind": "args",
-    "rubyArgs": ["ref:o", "ref:collector", "str: EXCEPT "],
+    "rubyArgs": [
+      "ref:o",
+      "ref:collector",
+      "str: EXCEPT "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -110,7 +140,11 @@
     "rubyName": "visit_Arel_Nodes_Fragments",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:values", "ref:collector", "str: "],
+    "rubyArgs": [
+      "ref:values",
+      "ref:collector",
+      "str: "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -126,7 +160,11 @@
     "rubyName": "visit_Arel_Nodes_Intersect",
     "call": "infix_value",
     "kind": "args",
-    "rubyArgs": ["ref:o", "ref:collector", "str: INTERSECT "],
+    "rubyArgs": [
+      "ref:o",
+      "ref:collector",
+      "str: INTERSECT "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -135,7 +173,11 @@
     "rubyName": "visit_Arel_Nodes_JoinSource",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:right", "ref:collector", "str: "],
+    "rubyArgs": [
+      "ref:right",
+      "ref:collector",
+      "str: "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -144,7 +186,11 @@
     "rubyName": "visit_Arel_Nodes_NamedFunction",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:expressions", "ref:collector", "str:, "],
+    "rubyArgs": [
+      "ref:expressions",
+      "ref:collector",
+      "str:, "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -167,7 +213,11 @@
     "rubyName": "visit_Arel_Nodes_SelectCore",
     "call": "collect_nodes_for",
     "kind": "args",
-    "rubyArgs": ["ref:groups", "ref:collector", "str: GROUP BY "],
+    "rubyArgs": [
+      "ref:groups",
+      "ref:collector",
+      "str: GROUP BY "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -176,7 +226,12 @@
     "rubyName": "visit_Arel_Nodes_SelectCore",
     "call": "collect_nodes_for",
     "kind": "args",
-    "rubyArgs": ["ref:havings", "ref:collector", "str: HAVING ", "str: AND "],
+    "rubyArgs": [
+      "ref:havings",
+      "ref:collector",
+      "str: HAVING ",
+      "str: AND "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -185,7 +240,11 @@
     "rubyName": "visit_Arel_Nodes_SelectCore",
     "call": "collect_nodes_for",
     "kind": "args",
-    "rubyArgs": ["ref:projections", "ref:collector", "str: "],
+    "rubyArgs": [
+      "ref:projections",
+      "ref:collector",
+      "str: "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -194,7 +253,12 @@
     "rubyName": "visit_Arel_Nodes_SelectCore",
     "call": "collect_nodes_for",
     "kind": "args",
-    "rubyArgs": ["ref:wheres", "ref:collector", "str: WHERE ", "str: AND "],
+    "rubyArgs": [
+      "ref:wheres",
+      "ref:collector",
+      "str: WHERE ",
+      "str: AND "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -203,7 +267,11 @@
     "rubyName": "visit_Arel_Nodes_SelectCore",
     "call": "collect_nodes_for",
     "kind": "args",
-    "rubyArgs": ["ref:windows", "ref:collector", "str: WINDOW "],
+    "rubyArgs": [
+      "ref:windows",
+      "ref:collector",
+      "str: WINDOW "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -226,7 +294,11 @@
     "rubyName": "visit_Arel_Nodes_Union",
     "call": "infix_value_with_paren",
     "kind": "args",
-    "rubyArgs": ["ref:o", "ref:collector", "str: UNION "],
+    "rubyArgs": [
+      "ref:o",
+      "ref:collector",
+      "str: UNION "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -235,7 +307,11 @@
     "rubyName": "visit_Arel_Nodes_UnionAll",
     "call": "infix_value_with_paren",
     "kind": "args",
-    "rubyArgs": ["ref:o", "ref:collector", "str: UNION ALL "],
+    "rubyArgs": [
+      "ref:o",
+      "ref:collector",
+      "str: UNION ALL "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -265,7 +341,11 @@
     "rubyName": "visit_Arel_Nodes_Window",
     "call": "inject_join",
     "kind": "args",
-    "rubyArgs": ["ref:orders", "ref:collector", "str:, "],
+    "rubyArgs": [
+      "ref:orders",
+      "ref:collector",
+      "str:, "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

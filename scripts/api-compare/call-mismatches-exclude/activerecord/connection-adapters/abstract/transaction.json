@@ -5,7 +5,10 @@
     "rubyName": "after_rollback",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["str:afterRollback", "ref:block"],
+    "rubyArgs": [
+      "str:afterRollback",
+      "ref:block"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -12,7 +12,9 @@
     "rubyName": "accepts",
     "call": "get_header",
     "kind": "args",
-    "rubyArgs": ["str:HTTP_ACCEPT"],
+    "rubyArgs": [
+      "str:HTTP_ACCEPT"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -21,7 +23,10 @@
     "rubyName": "accepts",
     "call": "set_header",
     "kind": "args",
-    "rubyArgs": ["ref:k", "ref:v"],
+    "rubyArgs": [
+      "ref:k",
+      "ref:v"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -37,7 +42,9 @@
     "rubyName": "content_mime_type",
     "call": "get_header",
     "kind": "args",
-    "rubyArgs": ["str:CONTENT_TYPE"],
+    "rubyArgs": [
+      "str:CONTENT_TYPE"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -46,7 +53,10 @@
     "rubyName": "content_mime_type",
     "call": "set_header",
     "kind": "args",
-    "rubyArgs": ["ref:k", "ref:v"],
+    "rubyArgs": [
+      "ref:k",
+      "ref:v"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

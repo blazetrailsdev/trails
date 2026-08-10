@@ -33,7 +33,9 @@
     "rubyName": "add_length_validation_for_encrypted_columns",
     "call": "validate_column_size",
     "kind": "args",
-    "rubyArgs": ["ref:attributeName"],
+    "rubyArgs": [
+      "ref:attributeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -42,7 +44,9 @@
     "rubyName": "build_decrypt_attribute_assignments",
     "call": "ciphertext_for",
     "kind": "args",
-    "rubyArgs": ["ref:attributeName"],
+    "rubyArgs": [
+      "ref:attributeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -65,7 +69,9 @@
     "rubyName": "ciphertext_for",
     "call": "encrypted_attribute?",
     "kind": "args",
-    "rubyArgs": ["ref:attributeName"],
+    "rubyArgs": [
+      "ref:attributeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -165,7 +171,9 @@
     "rubyName": "encrypt_attribute",
     "call": "preserve_original_encrypted",
     "kind": "args",
-    "rubyArgs": ["ref:name"],
+    "rubyArgs": [
+      "ref:name"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -243,7 +251,10 @@
     "rubyName": "preserve_original_encrypted",
     "call": "override_accessors_to_preserve_original",
     "kind": "args",
-    "rubyArgs": ["ref:name", "ref:originalAttributeName"],
+    "rubyArgs": [
+      "ref:name",
+      "ref:originalAttributeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

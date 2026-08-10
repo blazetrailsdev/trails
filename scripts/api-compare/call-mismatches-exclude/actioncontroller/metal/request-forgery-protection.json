@@ -21,7 +21,10 @@
     "rubyName": "any_authenticity_token_valid?",
     "call": "valid_authenticity_token?",
     "kind": "args",
-    "rubyArgs": ["ref:session", "ref:token"],
+    "rubyArgs": [
+      "ref:session",
+      "ref:token"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -30,7 +33,9 @@
     "rubyName": "compare_with_global_token",
     "call": "global_csrf_token",
     "kind": "args",
-    "rubyArgs": ["ref:session"],
+    "rubyArgs": [
+      "ref:session"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -39,7 +44,9 @@
     "rubyName": "compare_with_real_token",
     "call": "real_csrf_token",
     "kind": "args",
-    "rubyArgs": ["ref:session"],
+    "rubyArgs": [
+      "ref:session"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -48,7 +55,11 @@
     "rubyName": "csrf_token_hmac",
     "call": "digest",
     "kind": "args",
-    "rubyArgs": ["ref:constructor", "ref:realCsrfToken", "ref:identifier"],
+    "rubyArgs": [
+      "ref:constructor",
+      "ref:realCsrfToken",
+      "ref:identifier"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -57,7 +68,9 @@
     "rubyName": "csrf_token_hmac",
     "call": "real_csrf_token",
     "kind": "args",
-    "rubyArgs": ["ref:session"],
+    "rubyArgs": [
+      "ref:session"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -66,7 +79,10 @@
     "rubyName": "global_csrf_token",
     "call": "csrf_token_hmac",
     "kind": "args",
-    "rubyArgs": ["ref:session", "const:GLOBAL_CSRF_TOKEN_IDENTIFIER"],
+    "rubyArgs": [
+      "ref:session",
+      "const:GLOBAL_CSRF_TOKEN_IDENTIFIER"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -105,7 +121,9 @@
     "rubyName": "masked_authenticity_token",
     "call": "normalize_action_path",
     "kind": "args",
-    "rubyArgs": ["ref:action"],
+    "rubyArgs": [
+      "ref:action"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -121,7 +139,11 @@
     "rubyName": "masked_authenticity_token",
     "call": "per_form_csrf_token",
     "kind": "args",
-    "rubyArgs": ["nil", "ref:actionPath", "ref:method"],
+    "rubyArgs": [
+      "nil",
+      "ref:actionPath",
+      "ref:method"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -130,7 +152,9 @@
     "rubyName": "normalize_action_path",
     "call": "normalize_relative_action_path",
     "kind": "args",
-    "rubyArgs": ["ref:path"],
+    "rubyArgs": [
+      "ref:path"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -139,7 +163,9 @@
     "rubyName": "real_csrf_token",
     "call": "fetch",
     "kind": "args",
-    "rubyArgs": ["const:CSRF_TOKEN"],
+    "rubyArgs": [
+      "const:CSRF_TOKEN"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -180,7 +206,9 @@
     "rubyName": "valid_authenticity_token?",
     "call": "compare_with_global_token",
     "kind": "args",
-    "rubyArgs": ["ref:csrfToken"],
+    "rubyArgs": [
+      "ref:csrfToken"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -189,7 +217,9 @@
     "rubyName": "valid_authenticity_token?",
     "call": "compare_with_real_token",
     "kind": "args",
-    "rubyArgs": ["ref:csrfToken"],
+    "rubyArgs": [
+      "ref:csrfToken"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -198,7 +228,9 @@
     "rubyName": "valid_authenticity_token?",
     "call": "compare_with_real_token",
     "kind": "args",
-    "rubyArgs": ["ref:maskedToken"],
+    "rubyArgs": [
+      "ref:maskedToken"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -207,7 +239,9 @@
     "rubyName": "valid_authenticity_token?",
     "call": "valid_per_form_csrf_token?",
     "kind": "args",
-    "rubyArgs": ["ref:csrfToken"],
+    "rubyArgs": [
+      "ref:csrfToken"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -216,7 +250,11 @@
     "rubyName": "valid_per_form_csrf_token?",
     "call": "per_form_csrf_token",
     "kind": "args",
-    "rubyArgs": ["ref:session", "ref:chomp", "ref:requestMethod"],
+    "rubyArgs": [
+      "ref:session",
+      "ref:chomp",
+      "ref:requestMethod"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

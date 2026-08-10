@@ -5,7 +5,9 @@
     "rubyName": "_default_attributes",
     "call": "apply_pending_attribute_modifications",
     "kind": "args",
-    "rubyArgs": ["ref:attributeSet"],
+    "rubyArgs": [
+      "ref:attributeSet"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +16,9 @@
     "rubyName": "_default_attributes",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:attributesHash"],
+    "rubyArgs": [
+      "ref:attributesHash"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

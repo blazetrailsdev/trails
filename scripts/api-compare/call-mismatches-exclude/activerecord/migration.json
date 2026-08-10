@@ -33,7 +33,9 @@
     "rubyName": "check_all_pending!",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{pendingMigrations=ref:migrations}"],
+    "rubyArgs": [
+      "kwargs{pendingMigrations=ref:migrations}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -42,7 +44,9 @@
     "rubyName": "check_pending_migrations",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{pendingMigrations=ref:migrations}"],
+    "rubyArgs": [
+      "kwargs{pendingMigrations=ref:migrations}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -144,7 +148,9 @@
     "rubyName": "validate",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:name"],
+    "rubyArgs": [
+      "ref:name"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -153,7 +159,9 @@
     "rubyName": "with_advisory_lock",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["const:RELEASE_LOCK_FAILED_MESSAGE"],
+    "rubyArgs": [
+      "const:RELEASE_LOCK_FAILED_MESSAGE"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

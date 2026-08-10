@@ -32,7 +32,10 @@
     "rubyName": "encryptor",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:pack", "kwargs{cipher=const:CIPHER,serializer=const:Marshal}"],
+    "rubyArgs": [
+      "ref:pack",
+      "kwargs{cipher=const:CIPHER,serializer=const:Marshal}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -48,7 +51,9 @@
     "rubyName": "read",
     "call": "decrypt",
     "kind": "args",
-    "rubyArgs": ["ref:strip"],
+    "rubyArgs": [
+      "ref:strip"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -78,7 +83,9 @@
     "rubyName": "write",
     "call": "encrypt",
     "kind": "args",
-    "rubyArgs": ["ref:contents"],
+    "rubyArgs": [
+      "ref:contents"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

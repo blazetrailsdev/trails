@@ -5,7 +5,9 @@
     "rubyName": "add_check_constraint",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +16,9 @@
     "rubyName": "add_column",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -23,7 +27,9 @@
     "rubyName": "add_foreign_key",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:fromTable"],
+    "rubyArgs": [
+      "ref:fromTable"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -32,7 +38,9 @@
     "rubyName": "add_timestamps",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -41,7 +49,11 @@
     "rubyName": "alter_table",
     "call": "move_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:alteredTableName", "ref:merge"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:alteredTableName",
+      "ref:merge"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -50,7 +62,10 @@
     "rubyName": "begin_db_transaction",
     "call": "internal_begin_transaction",
     "kind": "args",
-    "rubyArgs": ["str:immediate", "nil"],
+    "rubyArgs": [
+      "str:immediate",
+      "nil"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -59,7 +74,10 @@
     "rubyName": "begin_isolated_db_transaction",
     "call": "internal_begin_transaction",
     "kind": "args",
-    "rubyArgs": ["str:deferred", "ref:isolation"],
+    "rubyArgs": [
+      "str:deferred",
+      "ref:isolation"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -75,7 +93,9 @@
     "rubyName": "change_column",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -84,7 +104,9 @@
     "rubyName": "change_column_default",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -93,7 +115,9 @@
     "rubyName": "change_column_null",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -116,7 +140,11 @@
     "rubyName": "check_constraints",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:expression", "kwargs{name=ref:name}"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:expression",
+      "kwargs{name=ref:name}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -229,7 +257,9 @@
     "rubyName": "get_database_version",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:queryValue"],
+    "rubyArgs": [
+      "ref:queryValue"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -252,7 +282,9 @@
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{connectionPool=ref:pool}"],
+    "rubyArgs": [
+      "kwargs{connectionPool=ref:pool}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -302,7 +334,9 @@
     "rubyName": "remove_column",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -311,7 +345,9 @@
     "rubyName": "remove_columns",
     "call": "alter_table",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -397,7 +433,10 @@
     "rubyName": "translate_exception",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:exception", "kwargs{connectionPool=ref:pool}"],
+    "rubyArgs": [
+      "ref:exception",
+      "kwargs{connectionPool=ref:pool}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -406,7 +445,10 @@
     "rubyName": "translate_exception",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:message", "kwargs{binds=ref:binds,connectionPool=ref:pool,sql=ref:sql}"],
+    "rubyArgs": [
+      "ref:message",
+      "kwargs{binds=ref:binds,connectionPool=ref:pool,sql=ref:sql}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

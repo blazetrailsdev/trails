@@ -19,7 +19,9 @@
     "rubyName": "get",
     "call": "file?",
     "kind": "args",
-    "rubyArgs": ["ref:path"],
+    "rubyArgs": [
+      "ref:path"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -49,7 +51,10 @@
     "rubyName": "serving",
     "call": "fail",
     "kind": "args",
-    "rubyArgs": ["num:416", "str:Byte range unsatisfiable"],
+    "rubyArgs": [
+      "num:416",
+      "str:Byte range unsatisfiable"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -65,7 +70,11 @@
     "rubyName": "serving",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:path", "ref:ranges", "kwargs{mimeType=ref:mimeType,size=ref:size}"],
+    "rubyArgs": [
+      "ref:path",
+      "ref:ranges",
+      "kwargs{mimeType=ref:mimeType,size=ref:size}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

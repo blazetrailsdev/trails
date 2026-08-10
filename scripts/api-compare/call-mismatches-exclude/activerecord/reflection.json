@@ -49,7 +49,9 @@
     "rubyName": "check_validity_of_inverse!",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:this"],
+    "rubyArgs": [
+      "ref:this"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -90,7 +92,9 @@
     "rubyName": "inverse_which_updates_counter_cache",
     "call": "reflect_on_all_associations",
     "kind": "args",
-    "rubyArgs": ["str:belongsTo"],
+    "rubyArgs": [
+      "str:belongsTo"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -108,7 +112,10 @@
     "rubyName": "join_scope",
     "call": "join_scopes",
     "kind": "args",
-    "rubyArgs": ["ref:table", "ref:predicateBuilder"],
+    "rubyArgs": [
+      "ref:table",
+      "ref:predicateBuilder"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -117,7 +124,10 @@
     "rubyName": "join_scope",
     "call": "klass_join_scope",
     "kind": "args",
-    "rubyArgs": ["ref:table", "ref:predicateBuilder"],
+    "rubyArgs": [
+      "ref:table",
+      "ref:predicateBuilder"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

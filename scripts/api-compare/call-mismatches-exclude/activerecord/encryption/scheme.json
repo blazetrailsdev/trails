@@ -12,7 +12,9 @@
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{compress=ref:compress}"],
+    "rubyArgs": [
+      "kwargs{compress=ref:compress}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -21,7 +23,9 @@
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{compressor=ref:compressor}"],
+    "rubyArgs": [
+      "kwargs{compressor=ref:compressor}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

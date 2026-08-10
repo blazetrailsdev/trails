@@ -63,7 +63,10 @@
     "rubyName": "foreign_key_options",
     "call": "foreign_key_name",
     "kind": "args",
-    "rubyArgs": ["ref:fromTable", "ref:options"],
+    "rubyArgs": [
+      "ref:fromTable",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -130,7 +133,10 @@
     "rubyName": "index_name_for_remove",
     "call": "index_name",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:columnName"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columnName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -139,7 +145,10 @@
     "rubyName": "index_name_for_remove",
     "call": "index_name",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:columns"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columns"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -148,7 +157,9 @@
     "rubyName": "index_name_for_remove",
     "call": "join",
     "kind": "args",
-    "rubyArgs": ["str:, "],
+    "rubyArgs": [
+      "str:, "
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -178,7 +189,10 @@
     "rubyName": "remove_foreign_key",
     "call": "foreign_key_exists?",
     "kind": "args",
-    "rubyArgs": ["ref:fromTable", "ref:toTable"],
+    "rubyArgs": [
+      "ref:fromTable",
+      "ref:toTable"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -203,7 +217,9 @@
     "rubyName": "tables",
     "call": "data_source_sql",
     "kind": "args",
-    "rubyArgs": ["kwargs{type=str:BASE TABLE}"],
+    "rubyArgs": [
+      "kwargs{type=str:BASE TABLE}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -219,7 +235,9 @@
     "rubyName": "views",
     "call": "data_source_sql",
     "kind": "args",
-    "rubyArgs": ["kwargs{type=str:VIEW}"],
+    "rubyArgs": [
+      "kwargs{type=str:VIEW}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

@@ -5,7 +5,9 @@
     "rubyName": "parse_group",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:node"],
+    "rubyArgs": [
+      "ref:node"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +16,9 @@
     "rubyName": "parse_star",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:constructor"],
+    "rubyArgs": [
+      "ref:constructor"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -23,7 +27,10 @@
     "rubyName": "parse_star",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:lastString", "const:GREEDY_EXP"],
+    "rubyArgs": [
+      "ref:lastString",
+      "const:GREEDY_EXP"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

@@ -12,7 +12,9 @@
     "rubyName": "callback",
     "call": "callbacks_for",
     "kind": "args",
-    "rubyArgs": ["ref:method"],
+    "rubyArgs": [
+      "ref:method"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -121,7 +123,11 @@
     "rubyName": "replace_common_records_in_memory",
     "call": "replace_on_target",
     "kind": "args",
-    "rubyArgs": ["ref:record", "ref:skipCallbacks", "kwargs{replace=bool:true}"],
+    "rubyArgs": [
+      "ref:record",
+      "ref:skipCallbacks",
+      "kwargs{replace=bool:true}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

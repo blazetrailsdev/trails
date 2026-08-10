@@ -12,7 +12,12 @@
     "rubyName": "build_from_database",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:values", "ref:types", "ref:additionalTypes", "ref:defaultAttributes"],
+    "rubyArgs": [
+      "ref:values",
+      "ref:types",
+      "ref:additionalTypes",
+      "ref:defaultAttributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

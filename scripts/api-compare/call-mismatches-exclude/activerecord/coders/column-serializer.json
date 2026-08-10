@@ -12,7 +12,10 @@
     "rubyName": "dump",
     "call": "assert_valid_value",
     "kind": "args",
-    "rubyArgs": ["ref:object", "kwargs{action=str:dump}"],
+    "rubyArgs": [
+      "ref:object",
+      "kwargs{action=str:dump}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -21,7 +24,10 @@
     "rubyName": "load",
     "call": "assert_valid_value",
     "kind": "args",
-    "rubyArgs": ["ref:object", "kwargs{action=str:load}"],
+    "rubyArgs": [
+      "ref:object",
+      "kwargs{action=str:load}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

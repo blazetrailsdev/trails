@@ -12,7 +12,9 @@
     "rubyName": "process_action",
     "call": "round",
     "kind": "args",
-    "rubyArgs": ["num:1"],
+    "rubyArgs": [
+      "num:1"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

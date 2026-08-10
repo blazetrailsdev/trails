@@ -5,7 +5,9 @@
     "rubyName": "accepts_nested_attributes_for",
     "call": "define_autosave_validation_callbacks",
     "kind": "args",
-    "rubyArgs": ["ref:reflection"],
+    "rubyArgs": [
+      "ref:reflection"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +16,10 @@
     "rubyName": "accepts_nested_attributes_for",
     "call": "generate_association_writer",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:type"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:type"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -37,7 +42,10 @@
     "rubyName": "assign_nested_attributes_for_collection_association",
     "call": "reject_new_record?",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -53,7 +61,10 @@
     "rubyName": "assign_nested_attributes_for_one_to_one_association",
     "call": "call_reject_if",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -69,7 +80,10 @@
     "rubyName": "assign_nested_attributes_for_one_to_one_association",
     "call": "reject_new_record?",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -78,7 +92,10 @@
     "rubyName": "call_reject_if",
     "call": "will_be_destroyed?",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -101,7 +118,10 @@
     "rubyName": "reject_new_record?",
     "call": "call_reject_if",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -110,7 +130,10 @@
     "rubyName": "reject_new_record?",
     "call": "will_be_destroyed?",
     "kind": "args",
-    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "rubyArgs": [
+      "ref:associationName",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -119,7 +142,9 @@
     "rubyName": "will_be_destroyed?",
     "call": "allow_destroy?",
     "kind": "args",
-    "rubyArgs": ["ref:associationName"],
+    "rubyArgs": [
+      "ref:associationName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

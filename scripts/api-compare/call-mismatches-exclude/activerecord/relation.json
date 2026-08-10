@@ -19,7 +19,10 @@
     "rubyName": "annotate",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -326,7 +329,9 @@
     "rubyName": "current_scope_restoring_block",
     "call": "current_scope",
     "kind": "args",
-    "rubyArgs": ["bool:true"],
+    "rubyArgs": [
+      "bool:true"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -384,7 +389,9 @@
     "rubyName": "distinct",
     "call": "distinct!",
     "kind": "args",
-    "rubyArgs": ["ref:value"],
+    "rubyArgs": [
+      "ref:value"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -393,7 +400,10 @@
     "rubyName": "eager_load",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -409,7 +419,9 @@
     "rubyName": "exec_explain",
     "call": "join",
     "kind": "args",
-    "rubyArgs": ["str:<n>"],
+    "rubyArgs": [
+      "str:<n>"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -656,7 +668,9 @@
     "rubyName": "exists?",
     "call": "apply_join_dependency",
     "kind": "args",
-    "rubyArgs": ["kwargs{eagerLoading=bool:false}"],
+    "rubyArgs": [
+      "kwargs{eagerLoading=bool:false}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -736,7 +750,10 @@
     "rubyName": "group",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -840,7 +857,10 @@
     "rubyName": "includes",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -876,7 +896,10 @@
     "rubyName": "joins",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -934,7 +957,10 @@
     "rubyName": "optimizer_hints",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -943,7 +969,10 @@
     "rubyName": "order",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -980,7 +1009,10 @@
     "rubyName": "preload",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1017,7 +1049,10 @@
     "rubyName": "references",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:tableNames"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:tableNames"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1047,7 +1082,10 @@
     "rubyName": "regroup",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1056,7 +1094,10 @@
     "rubyName": "reorder",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1065,7 +1106,10 @@
     "rubyName": "reselect",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1081,7 +1125,11 @@
     "rubyName": "select",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:fields", "str:Call `select' with at least one field."],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:fields",
+      "str:Call `select' with at least one field."
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1104,7 +1152,9 @@
     "rubyName": "size",
     "call": "count",
     "kind": "args",
-    "rubyArgs": ["str:all"],
+    "rubyArgs": [
+      "str:all"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1190,7 +1240,10 @@
     "rubyName": "unscope",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1199,7 +1252,10 @@
     "rubyName": "update",
     "call": "update",
     "kind": "args",
-    "rubyArgs": ["ref:id", "ref:attributes"],
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1208,7 +1264,10 @@
     "rubyName": "update!",
     "call": "update!",
     "kind": "args",
-    "rubyArgs": ["ref:id", "ref:attributes"],
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1287,7 +1346,10 @@
     "rubyName": "with",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -1296,7 +1358,10 @@
     "rubyName": "with_recursive",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
-    "rubyArgs": ["ref:__callee__", "ref:args"],
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

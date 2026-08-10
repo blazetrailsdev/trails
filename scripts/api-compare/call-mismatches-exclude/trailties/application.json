@@ -5,7 +5,9 @@
     "rubyName": "config",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:findRoot"],
+    "rubyArgs": [
+      "ref:findRoot"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -28,7 +30,11 @@
     "rubyName": "find_root",
     "call": "find_root_with_flag",
     "kind": "args",
-    "rubyArgs": ["str:config.ru", "ref:from", "ref:pwd"],
+    "rubyArgs": [
+      "str:config.ru",
+      "ref:from",
+      "ref:pwd"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -37,7 +43,9 @@
     "rubyName": "key_generator",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:constructor"],
+    "rubyArgs": [
+      "ref:constructor"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -46,7 +54,10 @@
     "rubyName": "key_generator",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:secretKeyBase", "kwargs{iterations=num:1000}"],
+    "rubyArgs": [
+      "ref:secretKeyBase",
+      "kwargs{iterations=num:1000}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

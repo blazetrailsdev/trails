@@ -21,7 +21,10 @@
     "rubyName": "find_signed",
     "call": "verified",
     "kind": "args",
-    "rubyArgs": ["ref:signedId", "kwargs{purpose=ref:combineSignedIdPurposes}"],
+    "rubyArgs": [
+      "ref:signedId",
+      "kwargs{purpose=ref:combineSignedIdPurposes}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -37,7 +40,10 @@
     "rubyName": "find_signed!",
     "call": "verify",
     "kind": "args",
-    "rubyArgs": ["ref:signedId", "kwargs{purpose=ref:combineSignedIdPurposes}"],
+    "rubyArgs": [
+      "ref:signedId",
+      "kwargs{purpose=ref:combineSignedIdPurposes}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -65,7 +71,10 @@
     "rubyName": "signed_id_verifier",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:secret", "kwargs{digest=str:SHA256,serializer=const:JSON,urlSafe=bool:true}"],
+    "rubyArgs": [
+      "ref:secret",
+      "kwargs{digest=str:SHA256,serializer=const:JSON,urlSafe=bool:true}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

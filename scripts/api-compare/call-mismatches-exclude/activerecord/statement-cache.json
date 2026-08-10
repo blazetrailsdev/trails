@@ -12,7 +12,11 @@
     "rubyName": "create",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:queryBuilder", "ref:bindMap", "ref:model"],
+    "rubyArgs": [
+      "ref:queryBuilder",
+      "ref:bindMap",
+      "ref:model"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -35,7 +39,9 @@
     "rubyName": "partial_query",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:values"],
+    "rubyArgs": [
+      "ref:values"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -44,7 +50,9 @@
     "rubyName": "query",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:sql"],
+    "rubyArgs": [
+      "ref:sql"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

@@ -152,7 +152,9 @@
     "rubyName": "unshift",
     "call": "unshift",
     "kind": "args",
-    "rubyArgs": ["ref:buildMiddleware"],
+    "rubyArgs": [
+      "ref:buildMiddleware"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -175,7 +177,9 @@
     "rubyName": "use",
     "call": "push",
     "kind": "args",
-    "rubyArgs": ["ref:buildMiddleware"],
+    "rubyArgs": [
+      "ref:buildMiddleware"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

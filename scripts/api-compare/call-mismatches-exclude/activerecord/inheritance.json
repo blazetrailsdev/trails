@@ -19,7 +19,9 @@
     "rubyName": "discriminate_class_for_record",
     "call": "using_single_table_inheritance?",
     "kind": "args",
-    "rubyArgs": ["ref:record"],
+    "rubyArgs": [
+      "ref:record"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -49,7 +51,9 @@
     "rubyName": "find_sti_class",
     "call": "sti_class_for",
     "kind": "args",
-    "rubyArgs": ["ref:typeName"],
+    "rubyArgs": [
+      "ref:typeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -74,7 +78,9 @@
     "rubyName": "polymorphic_class_for",
     "call": "compute_type",
     "kind": "args",
-    "rubyArgs": ["ref:name"],
+    "rubyArgs": [
+      "ref:name"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -92,7 +98,9 @@
     "rubyName": "sti_class_for",
     "call": "compute_type",
     "kind": "args",
-    "rubyArgs": ["ref:typeName"],
+    "rubyArgs": [
+      "ref:typeName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -110,7 +118,9 @@
     "rubyName": "subclass_from_attributes",
     "call": "find_sti_class",
     "kind": "args",
-    "rubyArgs": ["ref:subclassName"],
+    "rubyArgs": [
+      "ref:subclassName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -72,7 +72,9 @@
     "rubyName": "delete_through_records",
     "call": "through_records_for",
     "kind": "args",
-    "rubyArgs": ["ref:record"],
+    "rubyArgs": [
+      "ref:record"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -88,7 +90,9 @@
     "rubyName": "save_through_record",
     "call": "build_through_record",
     "kind": "args",
-    "rubyArgs": ["ref:record"],
+    "rubyArgs": [
+      "ref:record"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -148,7 +152,9 @@
     "rubyName": "through_records_for",
     "call": "construct_join_attributes",
     "kind": "args",
-    "rubyArgs": ["ref:record"],
+    "rubyArgs": [
+      "ref:record"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

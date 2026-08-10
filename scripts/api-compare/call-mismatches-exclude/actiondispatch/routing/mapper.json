@@ -175,7 +175,9 @@
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{pathNames=ref:resourcesPathNames}"],
+    "rubyArgs": [
+      "kwargs{pathNames=ref:resourcesPathNames}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -240,7 +242,10 @@
     "rubyName": "mount",
     "call": "define_generate_prefix",
     "kind": "args",
-    "rubyArgs": ["ref:app", "ref:targetAs"],
+    "rubyArgs": [
+      "ref:app",
+      "ref:targetAs"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -389,7 +394,9 @@
     "rubyName": "resource",
     "call": "get",
     "kind": "args",
-    "rubyArgs": ["str:new"],
+    "rubyArgs": [
+      "str:new"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -470,7 +477,9 @@
     "rubyName": "resources",
     "call": "get",
     "kind": "args",
-    "rubyArgs": ["str:index"],
+    "rubyArgs": [
+      "str:index"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -614,7 +623,9 @@
     "rubyName": "with_default_scope",
     "call": "scope",
     "kind": "args",
-    "rubyArgs": ["ref:scope"],
+    "rubyArgs": [
+      "ref:scope"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

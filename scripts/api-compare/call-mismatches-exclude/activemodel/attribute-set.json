@@ -19,7 +19,9 @@
     "rubyName": "deep_dup",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:transformValues"],
+    "rubyArgs": [
+      "ref:transformValues"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -42,7 +44,9 @@
     "rubyName": "map",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:newAttributes"],
+    "rubyArgs": [
+      "ref:newAttributes"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -72,7 +76,9 @@
     "rubyName": "write_cast_value",
     "call": "with_cast_value",
     "kind": "args",
-    "rubyArgs": ["ref:value"],
+    "rubyArgs": [
+      "ref:value"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

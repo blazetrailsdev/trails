@@ -5,7 +5,9 @@
     "rubyName": "decrypt",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["const:CIPHER_TYPE"],
+    "rubyArgs": [
+      "const:CIPHER_TYPE"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +16,9 @@
     "rubyName": "encrypt",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["const:CIPHER_TYPE"],
+    "rubyArgs": [
+      "const:CIPHER_TYPE"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -23,7 +27,9 @@
     "rubyName": "encrypt",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{payload=ref:encryptedData}"],
+    "rubyArgs": [
+      "kwargs{payload=ref:encryptedData}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -39,7 +45,11 @@
     "rubyName": "generate_deterministic_iv",
     "call": "digest",
     "kind": "args",
-    "rubyArgs": ["ref:constructor", "ref:secret", "ref:clearText"],
+    "rubyArgs": [
+      "ref:constructor",
+      "ref:secret",
+      "ref:clearText"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -12,7 +12,10 @@
     "rubyName": "iso8601",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:utc", "ref:this"],
+    "rubyArgs": [
+      "ref:utc",
+      "ref:this"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -28,7 +31,11 @@
     "rubyName": "local",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["nil", "ref:this", "ref:time"],
+    "rubyArgs": [
+      "nil",
+      "ref:this",
+      "ref:time"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -44,7 +51,10 @@
     "rubyName": "rfc3339",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:utc", "ref:this"],
+    "rubyArgs": [
+      "ref:utc",
+      "ref:this"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -61,7 +61,10 @@
     "rubyName": "arel_column_with_table",
     "call": "resolve_arel_attribute",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:columnName"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columnName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -282,7 +285,9 @@
     "rubyName": "build_subquery",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:subquery"],
+    "rubyArgs": [
+      "ref:subquery"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -298,7 +303,9 @@
     "rubyName": "build_where_clause",
     "call": "build_from_hash",
     "kind": "args",
-    "rubyArgs": ["ref:opts"],
+    "rubyArgs": [
+      "ref:opts"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -358,7 +365,9 @@
     "rubyName": "build_with_join_node",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:name"],
+    "rubyArgs": [
+      "ref:name"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -402,7 +411,9 @@
     "rubyName": "excluding!",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:predicates"],
+    "rubyArgs": [
+      "ref:predicates"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -446,7 +457,10 @@
     "rubyName": "preprocess_order_args",
     "call": "disallow_raw_sql!",
     "kind": "args",
-    "rubyArgs": ["ref:flattenedArgs", "kwargs{permit=ref:columnNameWithOrderMatcher}"],
+    "rubyArgs": [
+      "ref:flattenedArgs",
+      "kwargs{permit=ref:columnNameWithOrderMatcher}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -490,7 +504,9 @@
     "rubyName": "unscope!",
     "call": "join",
     "kind": "args",
-    "rubyArgs": ["str:, :"],
+    "rubyArgs": [
+      "str:, :"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

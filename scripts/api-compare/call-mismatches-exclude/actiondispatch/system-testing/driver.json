@@ -26,7 +26,9 @@
     "rubyName": "register",
     "call": "register_cuprite",
     "kind": "args",
-    "rubyArgs": ["ref:app"],
+    "rubyArgs": [
+      "ref:app"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -35,7 +37,9 @@
     "rubyName": "register",
     "call": "register_playwright",
     "kind": "args",
-    "rubyArgs": ["ref:app"],
+    "rubyArgs": [
+      "ref:app"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -44,7 +48,9 @@
     "rubyName": "register",
     "call": "register_rack_test",
     "kind": "args",
-    "rubyArgs": ["ref:app"],
+    "rubyArgs": [
+      "ref:app"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -53,7 +59,9 @@
     "rubyName": "register",
     "call": "register_selenium",
     "kind": "args",
-    "rubyArgs": ["ref:app"],
+    "rubyArgs": [
+      "ref:app"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -69,7 +77,10 @@
     "rubyName": "register_cuprite",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:app", "ref:merge"],
+    "rubyArgs": [
+      "ref:app",
+      "ref:merge"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

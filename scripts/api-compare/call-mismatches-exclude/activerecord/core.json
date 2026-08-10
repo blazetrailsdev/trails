@@ -12,7 +12,10 @@
     "rubyName": "arel_table",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "kwargs{klass=ref:this}"],
+    "rubyArgs": [
+      "ref:tableName",
+      "kwargs{klass=ref:this}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -142,7 +145,10 @@
     "rubyName": "predicate_builder",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:this", "ref:arelTable"],
+    "rubyArgs": [
+      "ref:this",
+      "ref:arelTable"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -165,7 +171,10 @@
     "rubyName": "strict_loading_violation!",
     "call": "instrument",
     "kind": "args",
-    "rubyArgs": ["ref:name", "kwargs{owner=ref:owner,reflection=ref:reflection}"],
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{owner=ref:owner,reflection=ref:reflection}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

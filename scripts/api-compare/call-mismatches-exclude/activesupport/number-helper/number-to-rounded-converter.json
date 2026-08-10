@@ -5,7 +5,10 @@
     "rubyName": "convert",
     "call": "convert",
     "kind": "args",
-    "rubyArgs": ["ref:formattedString", "ref:options"],
+    "rubyArgs": [
+      "ref:formattedString",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -14,7 +17,9 @@
     "rubyName": "convert",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:options"],
+    "rubyArgs": [
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

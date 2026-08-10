@@ -53,7 +53,9 @@
     "rubyName": "ignore_default_scope?",
     "call": "ignore_default_scope",
     "kind": "args",
-    "rubyArgs": ["ref:baseClass"],
+    "rubyArgs": [
+      "ref:baseClass"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -82,7 +82,10 @@
     "rubyName": "data_source_sql",
     "call": "quoted_scope",
     "kind": "args",
-    "rubyArgs": ["ref:name", "kwargs{type=ref:type}"],
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{type=ref:type}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -201,7 +204,9 @@
     "rubyName": "foreign_tables",
     "call": "data_source_sql",
     "kind": "args",
-    "rubyArgs": ["kwargs{type=str:FOREIGN TABLE}"],
+    "rubyArgs": [
+      "kwargs{type=str:FOREIGN TABLE}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -26,7 +26,9 @@
     "rubyName": "case_insensitive_comparison",
     "call": "lower",
     "kind": "args",
-    "rubyArgs": ["ref:value"],
+    "rubyArgs": [
+      "ref:value"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -35,7 +37,9 @@
     "rubyName": "column_for_attribute",
     "call": "columns_hash",
     "kind": "args",
-    "rubyArgs": ["ref:tableName"],
+    "rubyArgs": [
+      "ref:tableName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -44,7 +48,9 @@
     "rubyName": "disconnect!",
     "call": "clear_cache!",
     "kind": "args",
-    "rubyArgs": ["kwargs{newConnection=bool:true}"],
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -151,7 +157,9 @@
     "rubyName": "reconnect!",
     "call": "clear_cache!",
     "kind": "args",
-    "rubyArgs": ["kwargs{newConnection=bool:true}"],
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -160,7 +168,9 @@
     "rubyName": "reset!",
     "call": "clear_cache!",
     "kind": "args",
-    "rubyArgs": ["kwargs{newConnection=bool:true}"],
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -169,7 +179,9 @@
     "rubyName": "select_all",
     "call": "empty",
     "kind": "args",
-    "rubyArgs": ["kwargs{async=ref:async}"],
+    "rubyArgs": [
+      "kwargs{async=ref:async}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -185,7 +197,12 @@
     "rubyName": "select_one",
     "call": "select_all",
     "kind": "args",
-    "rubyArgs": ["ref:arel", "ref:name", "ref:binds", "kwargs{async=ref:async}"],
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -194,7 +211,12 @@
     "rubyName": "select_rows",
     "call": "select_all",
     "kind": "args",
-    "rubyArgs": ["ref:arel", "ref:name", "ref:binds", "kwargs{async=ref:async}"],
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -203,7 +225,12 @@
     "rubyName": "select_value",
     "call": "select_rows",
     "kind": "args",
-    "rubyArgs": ["ref:arel", "ref:name", "ref:binds", "kwargs{async=ref:async}"],
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

@@ -68,7 +68,12 @@
     "rubyName": "change_column_null",
     "call": "change_column",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:columnName", "nil", "kwargs{null=ref:null}"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columnName",
+      "nil",
+      "kwargs{null=ref:null}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -91,7 +96,11 @@
     "rubyName": "check_constraints",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["ref:tableName", "ref:expression", "ref:options"],
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:expression",
+      "ref:options"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -191,7 +200,9 @@
     "rubyName": "mismatched_foreign_key",
     "call": "mismatched_foreign_key_details",
     "kind": "args",
-    "rubyArgs": ["kwargs{message=ref:message,sql=ref:sql}"],
+    "rubyArgs": [
+      "kwargs{message=ref:message,sql=ref:sql}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {

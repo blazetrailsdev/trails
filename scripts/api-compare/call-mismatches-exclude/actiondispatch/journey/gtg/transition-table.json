@@ -5,7 +5,11 @@
     "rubyName": "visualizer",
     "call": "join",
     "kind": "args",
-    "rubyArgs": ["ref:__dir__", "str:..", "str:visualizer"],
+    "rubyArgs": [
+      "ref:__dir__",
+      "str:..",
+      "str:visualizer"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

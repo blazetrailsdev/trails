@@ -5,7 +5,9 @@
     "rubyName": "format",
     "call": "new",
     "kind": "args",
-    "rubyArgs": ["kwargs{disposition=ref:disposition,filename=ref:filename}"],
+    "rubyArgs": [
+      "kwargs{disposition=ref:disposition,filename=ref:filename}"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

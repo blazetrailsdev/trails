@@ -224,7 +224,9 @@
     "rubyName": "perform_calculation",
     "call": "distinct_select?",
     "kind": "args",
-    "rubyArgs": ["ref:columnName"],
+    "rubyArgs": [
+      "ref:columnName"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -233,7 +235,9 @@
     "rubyName": "perform_calculation",
     "call": "distinct_select?",
     "kind": "args",
-    "rubyArgs": ["ref:selectForCount"],
+    "rubyArgs": [
+      "ref:selectForCount"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -242,7 +246,11 @@
     "rubyName": "perform_calculation",
     "call": "execute_grouped_calculation",
     "kind": "args",
-    "rubyArgs": ["ref:operation", "ref:columnName", "ref:distinct"],
+    "rubyArgs": [
+      "ref:operation",
+      "ref:columnName",
+      "ref:distinct"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
@@ -251,7 +259,11 @@
     "rubyName": "perform_calculation",
     "call": "execute_simple_calculation",
     "kind": "args",
-    "rubyArgs": ["ref:operation", "ref:columnName", "ref:distinct"],
+    "rubyArgs": [
+      "ref:operation",
+      "ref:columnName",
+      "ref:distinct"
+    ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
