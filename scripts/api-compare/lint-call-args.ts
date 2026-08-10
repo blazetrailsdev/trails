@@ -157,6 +157,7 @@ export function renderUnseeded(rows: CallArgKey[], dir: string): string {
 export async function main(write: boolean): Promise<number> {
   const artifact = await loadArtifact();
   const current: CallArgKey[] = gatedRows(artifact);
+  const naming = artifact.mismatches.length - current.length;
 
   // Determinism guard (RFC 0044): an artifact covering fewer packages than CI
   // must neither seed nor pass a gate. Shared with the call-set ratchet.
@@ -178,8 +179,7 @@ export async function main(write: boolean): Promise<number> {
     await writeSplitBaseline(next);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call-argument ` +
-        `mismatch(es) (shape only; ${artifact.mismatches.length - current.length} naming row(s) ` +
-        "are report-only)",
+        `mismatch(es) (shape only; ${naming} naming row(s) are report-only)`,
     );
     return 0;
   }
