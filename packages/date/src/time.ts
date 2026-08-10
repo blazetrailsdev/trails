@@ -17,6 +17,7 @@ import {
   cCivilToJd,
   dfLocalToUtc,
   decodeYear,
+  fToR,
   jdLocalToUtc,
   of2str,
   strftime,
@@ -180,17 +181,24 @@ function tzdataAbbreviation(zoned: Temporal.ZonedDateTime): string {
 }
 
 /**
- * The nanoseconds MRI's `Time#nsec` answers for a `Float` `sec` argument: the
- * *exact* value of the double, truncated at nine digits rather than rounded —
+ * The nanoseconds MRI's `Time#nsec` answers for a `sec` argument: the *exact*
+ * value, truncated at nine digits rather than rounded —
  * `Time.utc(2008, 3, 1, 6, 0, 0.3).nsec` is `299999999`, because the nearest
- * double to `0.3` is `0.29999999999999998889...`. Reading the digits off
- * `toFixed(20)` is what keeps that truncation exact; `Math.floor(frac * 1e9)`
- * rounds the product first and answers `300000000`.
+ * double to `0.3` is `0.29999999999999998889...`, and
+ * `Time.utc(2008, 3, 1, 6, 0, 7.456789).nsec` is `456788999` for the same
+ * reason.
+ *
+ * MRI's `::Time` holds the second as a Rational (`time.c` `time_timespec`,
+ * over `rb_time_magnify`), so a `Rational` argument is exact at any
+ * denominator: `Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).nsec` is
+ * `333333333`. A `number` becomes its own exact ratio through `Float#to_r`
+ * ({@link fToR}) first, so one path serves both and the truncation is the
+ * floored `Rational` quotient rather than a decimal-string slice.
  */
-function subsecNanoseconds(sec: number): number {
-  const fraction = sec - Math.floor(sec);
-  if (fraction === 0) return 0;
-  return Number(fraction.toFixed(20).split(".")[1].slice(0, 9));
+function subsecNanoseconds(sec: number | Rational): number {
+  const fraction = (sec instanceof Rational ? sec : fToR(sec)).mod(1);
+  if (fraction.isZero()) return 0;
+  return fraction.mul(1_000_000_000).div(1);
 }
 
 /**
@@ -224,8 +232,24 @@ export class Time {
    * MRI's seventh positional is the microsecond, not a zone — `Time.utc` names
    * its zone in the method — so it folds into `sec` here.
    */
-  static utc(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, usec = 0): Time {
-    return new Time(year, month, day, hour, min, sec + usec / 1_000_000, "UTC");
+  static utc(
+    year: number,
+    month: number,
+    day: number,
+    hour = 0,
+    min = 0,
+    sec: number | Rational = 0,
+    usec = 0,
+  ): Time {
+    return new Time(
+      year,
+      month,
+      day,
+      hour,
+      min,
+      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+      "UTC",
+    );
   }
 
   /**
@@ -239,10 +263,17 @@ export class Time {
     day: number,
     hour = 0,
     min = 0,
-    sec = 0,
+    sec: number | Rational = 0,
     usec = 0,
   ): Time {
-    return new Time(year, month, day, hour, min, sec + usec / 1_000_000);
+    return new Time(
+      year,
+      month,
+      day,
+      hour,
+      min,
+      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+    );
   }
 
   /**
@@ -250,6 +281,20 @@ export class Time {
    * which builds a time in the *local* zone unless `zone` gives an offset.
    * `Time.utc` is the UTC entry point, as in Ruby, and `zone` takes the
    * spellings MRI's `utc_offset` argument takes — see `utcOffsetArgument`.
+   *
+   * `sec` takes the `Rational` MRI's does — the form `datetime_to_time`
+   * (`date_core.c:9053-9055`) itself passes as
+   * `f_add(INT2FIX(m_sec(dat)), m_sf_in_sec(dat))`.
+   *
+   * MRI admits a 60th second and, with no leap-second table loaded, rolls it
+   * into the next minute: `Time.utc(2015, 6, 30, 23, 59, 60)` is
+   * `2015-07-01 00:00:00 UTC` and its `#sec` is `0`. `Temporal` rejects the
+   * value outright (`RejectTime`: `0 <= 60 <= 59`), so the roll is spelled here
+   * rather than in the slot. A 61st second is `ArgumentError` there and here.
+   * That MRI reading is why `Time#toDatetime`'s `s == 60` fold
+   * (`date_core.c:8913-8915`) is unreachable through the constructor on both
+   * runtimes; the C carries it for a `right/`-zoneinfo build, which is not a
+   * shape trails has.
    */
   constructor(
     year: number,
@@ -257,21 +302,24 @@ export class Time {
     day: number,
     hour = 0,
     min = 0,
-    sec = 0,
+    sec: number | Rational = 0,
     zone: string | number | null = null,
   ) {
     const nsec = subsecNanoseconds(sec);
-    this.#plain = new Temporal.PlainDateTime(
+    const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
+    if (wholeSec > 60) throw new ArgumentError("sec out of range");
+    const plain = new Temporal.PlainDateTime(
       year,
       month,
       day,
       hour,
       min,
-      Math.floor(sec),
+      wholeSec === 60 ? 59 : wholeSec,
       Math.floor(nsec / 1_000_000),
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
     );
+    this.#plain = wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#utcOffset =
@@ -386,7 +434,10 @@ export class Time {
    * `date_core.c:8901-8935`), the same `GREGORIAN`-then-`set_sg` build as
    * {@link Time#toDate} with the time of day, the sub-second and the receiver's
    * `utc_offset` carried across. A leap second — `sec == 60` — is stored as
-   * `59`, which the gem's `DateTime` has no room for.
+   * `59`, which the gem's `DateTime` has no room for. That fold is unreachable
+   * from the constructor on MRI too — a `::Time` built without a `right/`
+   * zoneinfo rolls the 60th second into the next minute and `#sec` answers `0`
+   * (see the constructor) — and is kept for the same reason the C keeps it.
    *
    * The C reaches `d_complex_new_internal` directly, so the whole second, the
    * sub-second `sf` in NANOSECONDS and the offset `of` in SECONDS each land in
