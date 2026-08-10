@@ -63,16 +63,16 @@ interface GemRoot {
  */
 const CLOSURE_PACKAGES = ["activesupport", "date", "i18n", "globalid", "did-you-mean"];
 
-function gemRoots(): GemRoot[] {
+function gemRoots(rootDir: string): GemRoot[] {
   const roots: GemRoot[] = [];
   for (const source of SOURCES) {
     for (const pkg of source.packages) {
       if (!CLOSURE_PACKAGES.includes(pkg.name)) continue;
-      const packageRoot = path.join(ROOT_DIR, "vendor", source.name, pkg.libPath);
+      const packageRoot = path.join(rootDir, "vendor", source.name, pkg.libPath);
       const segments = pkg.libPath.split("/");
       const libIndex = segments.lastIndexOf("lib");
       if (libIndex === -1) continue;
-      const libDir = path.join(ROOT_DIR, "vendor", source.name, ...segments.slice(0, libIndex + 1));
+      const libDir = path.join(rootDir, "vendor", source.name, ...segments.slice(0, libIndex + 1));
       roots.push({ package: pkg.name, libDir, packageRoot });
     }
   }
@@ -112,14 +112,20 @@ export interface ArClosure {
   files: Record<string, string[]>;
 }
 
-/** Walk the AR/AM requires transitively and return the support-gem file set. */
-export function deriveArClosure(): ArClosure {
-  const roots = gemRoots();
-  const seeds: string[] = SEED_FILES.map((f) => path.join(ROOT_DIR, "vendor/rails", f)).filter(
-    (f) => fs.existsSync(f),
+/**
+ * Walk the AR/AM requires transitively and return the support-gem file set.
+ *
+ * `rootDir` is the repo root the vendored gems hang off; the tests point it at
+ * a synthetic vendor tree so the derivation is asserted without a populated
+ * `vendor/rails` (the Unit Tests job does not fetch one).
+ */
+export function deriveArClosure(rootDir: string = ROOT_DIR): ArClosure {
+  const roots = gemRoots(rootDir);
+  const seeds: string[] = SEED_FILES.map((f) => path.join(rootDir, "vendor/rails", f)).filter((f) =>
+    fs.existsSync(f),
   );
   for (const dir of SEED_DIRS) {
-    seeds.push(...walkRubyFiles(path.join(ROOT_DIR, "vendor/rails", dir)));
+    seeds.push(...walkRubyFiles(path.join(rootDir, "vendor/rails", dir)));
   }
 
   const visited = new Set<string>();
