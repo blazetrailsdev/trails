@@ -119,7 +119,7 @@ export function buildColumnTypes(
 interface PerformQueryHost {
   _affectedRowsBeforeWarnings?: number;
   _statements?: Map<string, unknown>;
-  handleWarnings?(sql: string, conn?: unknown): void | Promise<void>;
+  handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   _shouldPrepare?(binds: unknown[]): boolean;
   _trackPrepared?(conn: unknown, sql: string): void;
@@ -297,7 +297,7 @@ export async function performQuery(
   }
 
   this.verified?.();
-  await this.handleWarnings?.(sql, rawConnection);
+  await this.handleWarnings?.(sql);
 
   return { rows, fields: fieldList, affectedRows, insertId };
 }
