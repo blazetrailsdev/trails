@@ -1207,6 +1207,23 @@ describe("Date", () => {
     expect(d.isEql("2002-03-19")).toBe(false);
   });
 
+  it("raises on a Bignum year to_time cannot narrow, where MRI's NUM2LONG raises", () => {
+    // ruby 3.3.11:
+    //   Date.new(10 ** 20).year.class #=> Integer (Bignum)
+    //   Date.new(10 ** 20).to_time    #=> RangeError: bignum too big to convert into `long'
+    // `m_real_year` (date_core.c:1746-1762) answers the Bignum, and
+    // `date_to_time`'s `f_local3` (date_core.c:8949-8971) hands it straight to
+    // `Time.local`, which cannot take it. Narrowing it through a JS `number`
+    // instead would answer some other year entirely.
+    const d = new RubyDate(10n ** 20n);
+    expect(typeof d.year).toBe("bigint");
+    expect(() => d.toTime()).toThrow(RangeError);
+    expect(() => d.toTime()).toThrow("bignum too big to convert into `long'");
+    expect(() => new RubyDateTime(10n ** 20n, 1, 1, 6, 30, 0).toTime()).toThrow(
+      "bignum too big to convert into `long'",
+    );
+  });
+
   it("hashes eql?-equal dates alike", () => {
     expect(new RubyDate(2002, 3, 19).hash()).toBe(new RubyDate(2002, 3, 19).hash());
     expect(new RubyDate(2002, 3, 19).hash()).not.toBe(new RubyDate(2002, 3, 20).hash());
@@ -1789,6 +1806,45 @@ describe("Time", () => {
   it("picks the meridian off the hour", () => {
     expect(RubyTime.utc(2008, 3, 1, 6, 0).strftime("%p%P")).toBe("AMam");
     expect(RubyTime.utc(2008, 3, 1, 18, 0).strftime("%p%P")).toBe("PMpm");
+  });
+
+  it("hands to_datetime's seat the whole second, the sub-second and the offset apart", () => {
+    // ruby 3.3.11:
+    //   Time.new(2008, 3, 1, 6, 0, 7.25, 3600).to_datetime.strftime("%H:%M:%S.%6N%:z")
+    //     #=> "06:00:07.250000+01:00"
+    //   Time.new(2008, 3, 1, 6, 0, 7.25, -1800).to_datetime.zone #=> "-00:30"
+    // `time_to_datetime` (date_core.c:8901-8935) passes `s`, `sf` in
+    // nanoseconds and `of` in SECONDS as three separate fields of
+    // `d_complex_new_internal`; folding `s` into `sf` or spelling `of` as a
+    // fraction of a day is a lossier hand-over of the same values. A HALF-hour
+    // offset is the one that catches the fraction spelling: `Rational(1800,
+    // 86400)` and the seconds it came from only agree when nothing rounds.
+    const dt = new RubyTime(2008, 3, 1, 6, 0, 7.25, 3600).toDatetime();
+    expect((dt as Temporal.ZonedDateTime).offset).toBe("+01:00");
+    expect((dt as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
+      "2008-03-01T06:00:07.25",
+    );
+
+    const west = new RubyTime(2008, 3, 1, 6, 0, 7.25, -1800).toDatetime();
+    expect((west as Temporal.ZonedDateTime).offset).toBe("-00:30");
+    expect((west as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
+      "2008-03-01T06:00:07.25",
+    );
+  });
+
+  it("keeps the day the offset carries across midnight", () => {
+    // ruby 3.3.11:
+    //   Time.new(2008, 3, 1, 23, 30, 0, 3600).to_datetime.to_s  #=> "2008-03-01T23:30:00+01:00"
+    //   Time.new(2008, 3, 1, 0, 30, 0, -3600).to_datetime.to_s   #=> "2008-03-01T00:30:00-01:00"
+    // The seat stores the day already taken to UTC (`jd_local_to_utc`), so a
+    // local time within `of` of a day boundary is where a dropped conversion
+    // would show up.
+    expect(new RubyTime(2008, 3, 1, 23, 30, 0, 3600).toDatetime().toString()).toBe(
+      "2008-03-01T23:30:00+01:00[+01:00]",
+    );
+    expect(new RubyTime(2008, 3, 1, 0, 30, 0, -3600).toDatetime().toString()).toBe(
+      "2008-03-01T00:30:00-01:00[-01:00]",
+    );
   });
 });
 

@@ -8,7 +8,20 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { ArgumentError, Date, DateTime, Rational, of2str, strftime } from "./date.js";
+import {
+  ArgumentError,
+  Date,
+  DateTime,
+  Rational,
+  SEAT,
+  cCivilToJd,
+  dfLocalToUtc,
+  decodeYear,
+  jdLocalToUtc,
+  of2str,
+  strftime,
+  timeToDf,
+} from "./date.js";
 
 /**
  * The `utc_offset` argument MRI's `Time.new` accepts: `"UTC"`, an offset —
@@ -375,29 +388,57 @@ export class Time {
    * `utc_offset` carried across. A leap second — `sec == 60` — is stored as
    * `59`, which the gem's `DateTime` has no room for.
    *
-   * The C reaches `d_complex_new_internal` directly and so hands it `s` and
-   * `sf` as separate fields, and `of` as seconds. That seat is private to
-   * `./date.ts`; the public constructor is the same one `DateTime.now` uses,
-   * and it takes the whole second and its fraction as one `second` and the
-   * offset as a fraction of a day — hence the two `Rational`s here.
+   * The C reaches `d_complex_new_internal` directly, so the whole second, the
+   * sub-second `sf` in NANOSECONDS and the offset `of` in SECONDS each land in
+   * their own field — and this goes through the same {@link SEAT}, rather than
+   * the public constructor, for that reason: that one takes the second and its
+   * fraction as one `second` and the offset as a fraction of a day, which is a
+   * lossy spelling of what the C hands over exactly.
+   *
+   * **The `HAVE_CIVIL | HAVE_TIME` the C's flags word names is not observable
+   * on the result, and this is why the seat below is the `HAVE_JD | HAVE_DF`
+   * one.** `time_to_datetime`'s very next statement is
+   * `set_sg(dat, DEFAULT_SG)`, and `set_sg` (`date_core.c:5787-5800`) is not a
+   * field assignment: on the complex arm it runs `get_c_jd(x)`, `get_c_df(x)`
+   * and `clear_civil(x)` *before* storing the new `sg`. So the civil triple and
+   * the time of day the flags word promised are resolved to a day and a
+   * day-fraction and then discarded, under the `GREGORIAN` the build used —
+   * `c_virtual_sg` still reads it at that point — and never under `DEFAULT_SG`.
+   * That eager resolve is exactly `jd_local_to_utc(c_civil_to_jd(ry, m, d,
+   * GREGORIAN), time_to_df(h, min, s), of)` and `df_local_to_utc(time_to_df(h,
+   * min, s), of)` (`get_c_jd`, `date_core.c:1264-1294`; `get_c_df`,
+   * `date_core.c:1208-1225`), which is what the two calls below are. Handing a
+   * civil seat the triple and deferring instead would resolve it under
+   * `Date.ITALY` on first read and answer a different day for every date before
+   * the reform — `Time.utc(1582, 10, 13).to_datetime` is `1582-10-03`, which is
+   * the `GREGORIAN` reading, not the `ITALY` one.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const y = this.year;
+    const m = this.mon;
+    const d = this.day;
+
+    const h = this.hour;
+    const min = this.min;
     let s = this.sec;
     if (s === 60) s = 59;
-    const sf = new Rational(BigInt(s) * 1_000_000_000n + BigInt(this.nsec), 1_000_000_000n);
+
+    const sf = new Rational(this.nsec, 1);
     const of = this.utcOffset;
+
+    const [nth, ry] = decodeYear(y, -1);
+
+    const jd = cCivilToJd(ry, m, d, Date.GREGORIAN);
+    const df = timeToDf(h, min, s);
     return new DateTime(
-      this.year,
-      this.mon,
-      this.day,
-      this.hour,
-      this.min,
+      SEAT,
+      nth,
+      jdLocalToUtc(jd, df, of),
+      dfLocalToUtc(df, of),
       sf,
-      new Rational(of, 86400),
-      Date.GREGORIAN,
-    )
-      .newStart()
-      .toDatetime();
+      of,
+      Date.ITALY,
+    ).toDatetime();
   }
 
   /**

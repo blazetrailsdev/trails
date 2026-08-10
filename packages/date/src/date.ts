@@ -3177,7 +3177,7 @@ function nsToDay(n: Rational): Rational {
  * `0...DAY_IN_SECONDS`. The day the fold crosses is carried by
  * {@link jdLocalToUtc}, which reads the *unfolded* value for that reason.
  */
-function dfLocalToUtc(df: number, of: number): number {
+export function dfLocalToUtc(df: number, of: number): number {
   df -= of;
   if (df < 0) df += DAY_IN_SECONDS;
   else if (df >= DAY_IN_SECONDS) df -= DAY_IN_SECONDS;
@@ -3196,7 +3196,7 @@ function dfUtcToLocal(df: number, of: number): number {
  * @internal `date_core.c` `jd_local_to_utc` (`date_core.c:922-932`), the day
  * half of the same move, on the Julian day the C itself carries.
  */
-function jdLocalToUtc(jd: number, df: number, of: number): number {
+export function jdLocalToUtc(jd: number, df: number, of: number): number {
   df -= of;
   if (df < 0) return jd - 1;
   if (df >= DAY_IN_SECONDS) return jd + 1;
@@ -3212,7 +3212,7 @@ function jdUtcToLocal(jd: number, df: number, of: number): number {
 }
 
 /** @internal `date_core.c` `time_to_df` (`date_core.c:944-948`). */
-function timeToDf(h: number, min: number, s: number): number {
+export function timeToDf(h: number, min: number, s: number): number {
   return h * HOUR_IN_SECONDS + min * MINUTE_IN_SECONDS + s;
 }
 
@@ -3263,7 +3263,7 @@ function dfToTime(df: number): [h: number, min: number, s: number] {
  * the Julian calendar. The C's `ns` out-parameter reports which side of the
  * reform the answer landed on; nothing here reads it, so it is not returned.
  */
-function cCivilToJd(y: number, m: number, d: number, sg = DEFAULT_SG): number {
+export function cCivilToJd(y: number, m: number, d: number, sg = DEFAULT_SG): number {
   if (m <= 2) {
     y -= 1;
     m += 12;
@@ -3527,7 +3527,7 @@ function bigNorm(n: bigint): number | bigint {
  * in a JS number, and the second is exact only for a `bigint` argument — a
  * `double` that large has already lost the low bits before this is reached.
  */
-function decodeYear(y: number | bigint, style: number): [nth: bigint, ry: number] {
+export function decodeYear(y: number | bigint, style: number): [nth: bigint, ry: number] {
   const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
   if (typeof y === "number" && fixnumP(y) && y < Number.MAX_SAFE_INTEGER - 4712) {
     let it = y + 4712; /* shift */
@@ -3556,6 +3556,24 @@ function encodeYear(nth: bigint, y: number, style: number): number | bigint {
   const period = style < 0 ? CM_PERIOD_GCY : CM_PERIOD_JCY;
   if (nth === 0n) return y;
   return bigNorm(BigInt(period) * nth + BigInt(y));
+}
+
+/**
+ * @internal The `NUM2LONG` MRI performs on `m_real_year` (`date_core.c:1746-1762`)
+ * when `date_to_time` (`date_core.c:8949-8971`) and `datetime_to_time`
+ * (`date_core.c:9032-9062`) hand the year to `Time.local` / `Time.new`.
+ * `m_real_year` answers a Bignum once {@link Date#nth} is nonzero, and a Bignum
+ * past a machine word raises there rather than converting — so the year is
+ * carried as the `bigint` it is up to this point and narrowed only here, where
+ * MRI narrows it. Ruby's `RangeError` is JS's, and the message is MRI's own
+ * (`bignum too big to convert into 'long'`, `numeric.c`).
+ */
+function realYearToLong(year: number | bigint): number {
+  if (typeof year === "number") return year;
+  if (year < BigInt(Number.MIN_SAFE_INTEGER) || year > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new RangeError("bignum too big to convert into `long'");
+  }
+  return Number(year);
 }
 
 /**
@@ -3709,7 +3727,7 @@ function plainDateFromJd(rjd: number, sg = DEFAULT_SG): Temporal.PlainDate {
  * brand that keeps the seam out of the public signature. It spells no Ruby
  * Symbol — nothing reads it as a value.
  */
-const SEAT: unique symbol = Symbol("d_simple_new_internal");
+export const SEAT: unique symbol = Symbol("d_simple_new_internal");
 
 /**
  * @internal `date_core.c` `c_valid_time_p` (`date_core.c:870-886`), which folds
@@ -6084,7 +6102,10 @@ export class Date {
    * `f_local3(rb_cTime, m_real_year, m_mon, m_mday)`. A Julian receiver is
    * taken through `d_lite_gregorian` first, which is why
    * `Date.new(2001, 2, 3, Date::JULIAN).to_time` is the 16th — the civil
-   * reading moves, the day does not.
+   * reading moves, the day does not. `m_real_year` answers a Bignum once
+   * {@link Date#nth} is nonzero, and {@link realYearToLong} raises on one too
+   * big for a `long` exactly where MRI's `NUM2LONG` does, rather than
+   * truncating it through a `number`.
    *
    * trails' `::Time` value is `Temporal.ZonedDateTime` (RFC 0088's mapping
    * table): `Time.local` is a zoned wall-clock time, so the local zone is named
@@ -6095,9 +6116,11 @@ export class Date {
    */
   toTime(): Temporal.ZonedDateTime {
     const self: Date = this.isJulian ? this.gregorian() : this;
-    return new Temporal.PlainDateTime(Number(self.year), self.mon, self.day).toZonedDateTime(
-      Temporal.Now.timeZoneId(),
-    );
+    return new Temporal.PlainDateTime(
+      realYearToLong(self.year),
+      self.mon,
+      self.day,
+    ).toZonedDateTime(Temporal.Now.timeZoneId());
   }
 
   /**
@@ -6949,6 +6972,9 @@ export class DateTime extends DateWithoutParseStatics {
    * proleptic-Gregorian arm may have stored neither.
    * `Init_date_core` gives it to `::DateTime` alone (`:10018`). TS has
    * no `dup_obj`, so the copy is made here; see {@link DateTime#newStart}.
+   * `m_jd` / `m_df` are the `get_c_jd` / `get_c_df` readers, not the raw
+   * fields: on the proleptic-Gregorian arm those are still unset, which is
+   * where a raw read hands the seat an `undefined` day.
    */
   newOffset(offset: number | bigint | Rational | string = 0): this {
     const rof = val2off(offset);
@@ -6980,7 +7006,9 @@ export class DateTime extends DateWithoutParseStatics {
    * `date_core.c:9032-9062`), `Time.new(y, m, d, h, min, sec + m_sf_in_sec, of)`
    * — the receiver's own offset carried across, where {@link Date#toTime}'s
    * `f_local3` has none to carry. A Julian receiver goes through
-   * `d_lite_gregorian` first, as it does there. The C's `if (m_julian_p(dat))
+   * `d_lite_gregorian` first, as it does there, and the Bignum year
+   * `m_real_year` can answer goes through {@link realYearToLong} there too.
+   * The C's `if (m_julian_p(dat))
    * { self = g; }` reassignment is a conditional binding here — the repo's
    * `@typescript-eslint/no-this-alias` forbids `let self = this`.
    */
@@ -6988,7 +7016,7 @@ export class DateTime extends DateWithoutParseStatics {
     const self: DateTime = this.isJulian ? this.gregorian() : this;
     const ns = Number(self.#sf.numerator / self.#sf.denominator);
     return new Temporal.PlainDateTime(
-      Number(self.year),
+      realYearToLong(self.year),
       self.mon,
       self.day,
       self.hour,
