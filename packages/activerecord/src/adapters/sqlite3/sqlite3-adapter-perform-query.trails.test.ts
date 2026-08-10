@@ -208,6 +208,33 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(closing.isOpen).toBe(false);
   });
 
+  it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
+    // Ruby's `@lock.synchronize` blocks (abstract_adapter.rb:696-701), so
+    // `active?` is already false the moment `disconnect!` returns. JS cannot
+    // block, so the close lands on `_statementLock`'s tail — and `active()`,
+    // the awaitable surface, drains it rather than reporting the open handle
+    // Rails never exposes.
+    const closing = new BetterSQLite3Adapter(":memory:");
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await closing.exec(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
+    const release = await acquireStatementLock(closing);
+    const held = closing._statementLock;
+
+    const queued = closing.executeMutation(`INSERT INTO "dc2" DEFAULT VALUES`);
+    for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
+
+    closing.disconnectBang();
+    // Asked WHILE the close is still queued behind the statement — the window
+    // Rails does not have. It must not answer until the handle is closed.
+    const answered = closing.active();
+
+    release();
+    await expect(queued).resolves.toBe(1);
+
+    expect(await answered).toBe(false);
+    expect(closing.isOpen).toBe(false);
+  });
+
   it("returns the rowid of each of two RETURNING inserts issued together", async () => {
     const ids = await Promise.all([
       adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`),
