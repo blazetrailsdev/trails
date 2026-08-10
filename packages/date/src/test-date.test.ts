@@ -32,10 +32,14 @@ describe("TestDate", () => {
     expect(RubyDate.ABBR_DAYNAMES.length).toEqual(7);
 
     expect(Object.isFrozen(RubyDate.MONTHNAMES)).toEqual(true);
+    expect(Object.isFrozen(RubyDate.MONTHNAMES[1])).toEqual(true);
     expect(Object.isFrozen(RubyDate.DAYNAMES)).toEqual(true);
+    expect(Object.isFrozen(RubyDate.DAYNAMES[0])).toEqual(true);
 
     expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES)).toEqual(true);
+    expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES[1])).toEqual(true);
     expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES)).toEqual(true);
+    expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES[0])).toEqual(true);
   });
 
   it("eql p", () => {
