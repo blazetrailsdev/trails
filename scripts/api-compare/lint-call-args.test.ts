@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import type { CallArgExcludeEntry } from "./call-args-baseline.js";
-import { loadBaseline, renderKey, renderUnseeded } from "./lint-call-args.js";
+import { loadBaseline, renderKey } from "./lint-call-args.js";
 import { writeSplitBaseline } from "./lint-call-mismatches.js";
 import { rowsOfKind } from "./call-mismatch-baseline.js";
 
@@ -83,9 +83,6 @@ describe("the split call-argument baseline", () => {
   });
 });
 
-it("prints the argument list that makes a row its own key, and names the seeding story", () => {
+it("prints the argument list that makes a row its own key", () => {
   expect(renderKey(entry())).toContain("visit(ref:o, ref:collector)");
-  const out = renderUnseeded([entry()]);
-  expect(out).toContain("UNSEEDED");
-  expect(out).toContain("call-args-baseline-seed");
 });
