@@ -177,21 +177,32 @@ export async function internalBeginTransaction(
  * service order, and there is no window in which two callers can both observe
  * a free lock and claim it.
  *
- * Callers take it AFTER preparing the statement: preparing connects on demand,
- * and a connection's `configure_connection` PRAGMAs re-enter the primitive.
+ * An UNCONTENDED acquisition answers synchronously — Ruby's `@lock.synchronize`
+ * doesn't yield when nobody holds the monitor, and a gratuitous `await` here
+ * does: it hands the event loop to whatever is queued, which on the
+ * transaction-control path is enough for a pool `disconnect` to close the
+ * handle between the acquisition and the statement. Hence the union return
+ * type; the queue drains back to `null` so the fast path stays reachable.
  * @internal
  */
-export async function acquireStatementLock(host: {
+export function acquireStatementLock(host: {
   _statementLock: Promise<void> | null;
-}): Promise<() => void> {
-  const ahead = host._statementLock ?? Promise.resolve();
+}): (() => void) | Promise<() => void> {
+  const ahead = host._statementLock;
   let release!: () => void;
   const mine = new Promise<void>((resolve) => {
     release = resolve;
   });
-  host._statementLock = ahead.then(() => mine);
-  await ahead;
-  return release;
+  const tail = ahead ? ahead.then(() => mine) : mine;
+  host._statementLock = tail;
+  const drain = (): void => {
+    // Only the last queued caller clears the tail; a later arrival has already
+    // published its own and must keep waiting on this one.
+    if (host._statementLock === tail) host._statementLock = null;
+    release();
+  };
+  if (!ahead) return drain;
+  return ahead.then(() => drain);
 }
 
 /**
@@ -252,7 +263,12 @@ export async function performQuery(
     : prepare
       ? await this._cachedStatement(sql)
       : await this._freshStatement(sql);
-  const release = await acquireStatementLock(this);
+  // An uncontended acquisition answers synchronously, so don't `await` it —
+  // `await` on a plain value still yields a microtask, and on the
+  // transaction-control path that is enough for a pool `disconnect` to close
+  // the handle before the statement runs.
+  const acquired = acquireStatementLock(this);
+  const release = typeof acquired === "function" ? acquired : await acquired;
   let rows: Record<string, unknown>[];
   let affectedRows: number;
   let insertRowid: number | bigint;
