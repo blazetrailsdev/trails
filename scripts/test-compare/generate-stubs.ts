@@ -211,7 +211,7 @@ function main() {
       const content = generateStubContent(testsToStub);
 
       if (!write) {
-        console.log(`  [dry-run] ${tsFullPath} (${testsToStub.length} tests)`);
+        console.log(`  [report] ${tsFullPath} (${testsToStub.length} tests)`);
       } else {
         const dir = path.dirname(tsFullPath);
         fs.mkdirSync(dir, { recursive: true });
