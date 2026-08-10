@@ -3076,7 +3076,7 @@ export function main() {
 
     // Advisory call-argument artifact (RFC 0095), flat across packages, in the
     // shape of call-mismatches.json above — including the `packages` field its
-    // own ratchet will read to reject a partial-scope artifact. Written under
+    // own ratchet (lint-call-args.ts) reads to reject a partial-scope artifact. Written under
     // `--calls` for the same reason: a plain run computes no call arguments and
     // would overwrite this with an empty result.
     const callArgsPath = path.join(OUTPUT_DIR, `call-arg-mismatches${modeSuffix}.json`);
@@ -3088,7 +3088,7 @@ export function main() {
       JSON.stringify(
         {
           generatedAt: new Date().toISOString(),
-          note: "Advisory, ungated. Arguments a matched TS call site passes vs the Ruby one, normalized (identifiers camelized, literals through literals.ts). `shape` = count/order/value/kwarg-key difference; `naming` = a ref: identifier spelled differently.",
+          note: "Arguments a matched TS call site passes vs the Ruby one, normalized (identifiers camelized, literals through literals.ts). `shape` = count/order/value/kwarg-key difference, gated by lint-call-args.ts; `naming` = a ref: identifier spelled differently, report-only (RFC 0096).",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           compared: results.reduce((n, r) => n + r.callArgs.compared, 0),
           mismatched: callArgsFlat.length,
