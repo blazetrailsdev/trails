@@ -76,6 +76,7 @@ import {
   buildTruncateStatement as sqliteBuildTruncateStatement,
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
+  acquireStatementLock,
   performQuery as sqlitePerformQuery,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
@@ -260,7 +261,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return 999;
   }
 
-  private driver!: SqliteConnection;
+  /**
+   * @internal Rails' `raw_connection`. Non-private so the extracted
+   * `performQuery` can read `changes` / `last_insert_row_id` off it through
+   * `PerformQueryHost`.
+   */
+  driver!: SqliteConnection;
   /**
    * True after construction when the bound driver is async-only and the
    * connection has not yet been established. Cleared by `completeAsyncConnect`.
@@ -297,6 +303,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _inTransaction = false;
   private _readonly: boolean;
   private _strict: boolean;
+  /**
+   * @internal Tail of the FIFO queue `performQuery` joins to hold the
+   * connection across a statement and its `sqlite3_changes()` readback —
+   * Rails' `@lock` around `perform_query`. `null` while the queue is empty.
+   */
+  _statementLock: Promise<void> | null = null;
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
@@ -473,9 +485,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * live implementation lives in the Rails-layout file
    * `sqlite3/database-statements.ts` (`performQuery`) so api:compare's
    * `perform_query` coverage points at reachable code; it is bound here with
-   * `this` as the adapter, whose `_cachedStatement` / `isWriteQuery` /
-   * `verifiedBang` / `dirtyCurrentTransaction` and `_last*` fields satisfy the
-   * `PerformQueryHost` interface.
+   * `this` as the adapter, whose `_cachedStatement` / `driver` /
+   * `verifiedBang` / `dirtyCurrentTransaction` and `_statementLock` / `_last*`
+   * fields satisfy the `PerformQueryHost` interface.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
    */
@@ -579,8 +591,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * deliberate trails deviation justified once at the `AbstractAdapter`
    * declaration (abstract-adapter.ts, `executeMutation` on the
    * DatabaseStatements signature block) — read it there before changing this.
-   * In particular, this cannot be rerouted through `execute`: better-sqlite3
-   * `.all()` throws on a non-reader statement.
+   * In particular, this cannot be rerouted through `execute`: the two share
+   * one `_performQuery` and differ only in what they answer — rows here, the
+   * affected-row count or insert rowid there.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
     // preprocessQuery runs Rails' check_if_write_query, which raises
@@ -798,20 +811,25 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
             ? this._cachedStatement(processed)
             : this._freshStatement(processed));
           let result: Result;
-          if (!stmt.reader) {
-            await stmt.run(driverBinds);
-            result = Result.empty();
-          } else {
-            const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-            this._narrowSpilledBigInts(stmt, rows);
-            payload.row_count = rows.length;
-            result =
-              rows.length > 0
-                ? Result.fromRowHashes(rows)
-                : new Result(
-                    stmt.columns().map((c) => c.name),
-                    [],
-                  );
+          const release = await acquireStatementLock(this);
+          try {
+            if (!stmt.reader) {
+              await stmt.run(driverBinds);
+              result = Result.empty();
+            } else {
+              const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+              this._narrowSpilledBigInts(stmt, rows);
+              payload.row_count = rows.length;
+              result =
+                rows.length > 0
+                  ? Result.fromRowHashes(rows)
+                  : new Result(
+                      stmt.columns().map((c) => c.name),
+                      [],
+                    );
+            }
+          } finally {
+            release();
           }
           return this.castResult(result);
         } catch (e: any) {
@@ -1279,14 +1297,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   castResult(result: Result): Result {
     return sqliteCastResult(result);
-  }
-
-  /** Rails: `execute(build_truncate_statement(table_name), name)`. SQLite's
-   *  `execute` is a read-only `.all()` cursor, so the `DELETE FROM` statement
-   *  must run through `executeMutation` (the write primitive, which also dirties
-   *  the query cache). PG/MySQL keep the abstract `execute` path. */
-  override async truncate(tableName: string, name?: string | null): Promise<unknown> {
-    return this.executeMutation(this.buildTruncateStatement(tableName), [], name ?? "SQL");
   }
 
   async supportsInsertOnConflict(): Promise<boolean> {
@@ -1894,10 +1904,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
     await this.ensureConnected();
-    const pragmaValue = async (sql: string): Promise<unknown> =>
-      Object.values((await this.execute(sql))[0] ?? {})[0];
-    const oldForeignKeys = await pragmaValue("PRAGMA foreign_keys");
-    const oldDeferForeignKeys = await pragmaValue("PRAGMA defer_foreign_keys");
+    const oldForeignKeys = await this.queryValue("PRAGMA foreign_keys");
+    const oldDeferForeignKeys = await this.queryValue("PRAGMA defer_foreign_keys");
     try {
       await this.execute("PRAGMA defer_foreign_keys = ON");
       await this.execute("PRAGMA foreign_keys = OFF");
@@ -3061,18 +3069,13 @@ function translateException(
 // query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
 // not on AbstractAdapter, or the override would run unwrapped. The write methods
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
-// `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
+// `truncate`/`truncateTables`/`restartDbTransaction`) are wired once on
+// AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
 // `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
-dirtiesQueryCache(
-  SQLite3Adapter,
-  "execInsert",
-  "rollbackDbTransaction",
-  "rollbackToSavepoint",
-  "truncate",
-);
+dirtiesQueryCache(SQLite3Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
 // Snapshot the unwrapped `execute` first: schema reflection routes through it
 // (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
 // `internal_exec_query`.

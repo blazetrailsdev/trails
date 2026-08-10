@@ -120,6 +120,27 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     return stmt.all();
   }
 
+  /**
+   * `sqlite3_changes()` / `sqlite3_last_insert_rowid()` — the ruby sqlite3
+   * gem's `Database#changes` / `#last_insert_row_id`, which Rails'
+   * `perform_query` reads after every statement. No driver here exposes them
+   * as an API, so they are read with the SQL functions of the same names: a
+   * pure read, which leaves both counters alone. The prepared statements are
+   * cached because `perform_query` reads them on EVERY statement.
+   */
+  changes(): number {
+    this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
+    return (this.#changesStmt.get() as { v: number }).v;
+  }
+
+  lastInsertRowId(): number | bigint {
+    this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
+    return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+  }
+
+  #changesStmt?: import("node:sqlite").StatementSync;
+  #lastInsertRowIdStmt?: import("node:sqlite").StatementSync;
+
   close(): void {
     this._open = false;
     this.raw.close();

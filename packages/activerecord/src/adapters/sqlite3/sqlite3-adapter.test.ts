@@ -772,6 +772,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       prepare: () => fakeStmt,
       exec: () => {},
       pragma: () => [],
+      changes: () => 0,
+      lastInsertRowId: () => 0,
       close: () => {},
       isOpen: () => true,
       raw: null,
