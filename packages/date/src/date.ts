@@ -359,6 +359,33 @@ function subsecDigits(nsec: Rational, precision: number): string {
   return digits;
 }
 
+/** @internal C's `INT_MAX` from `limits.h`, the first half of `date_strftime.c:579`'s
+ *  precision rejection. */
+const INT_MAX = 2147483647;
+
+/**
+ * Ruby `Errno::ERANGE`, the `SystemCallError` `date_strftime_alloc` raises
+ * through `rb_sys_fail(format)` (`date_core.c:7095`) when the formatter cannot
+ * render a directive inside the buffer it is willing to grow to.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core, like the `Rational` above. Rails
+ * defines no `Errno`; it inherits Ruby's, and `Date#strftime` raises this one.
+ */
+export class ERANGE extends Error {
+  constructor(format: string) {
+    super(format);
+    this.name = "Errno::ERANGE";
+  }
+}
+
+/**
+ * Ruby's `Errno` module at the name Ruby nests {@link ERANGE} under, so a
+ * caller spells the rescue `Errno.ERANGE` as Ruby spells `Errno::ERANGE`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core; see {@link ERANGE}.
+ */
+export const Errno = { ERANGE };
+
 /**
  * @internal Ruby routes `Date#strftime` and `Time#strftime` through the same C
  * formatter, so trails has one implementation rather than a copy per class.
@@ -396,6 +423,14 @@ function subsecDigits(nsec: Rational, precision: number): string {
  *
  * A `Temporal` value is accepted in place of the subject and read through
  * {@link temporalSubject} — the fields Ruby's `::Date`/`::Time` answer natively.
+ *
+ * `maxsize` is `1024 * flen`, the size `date_strftime_alloc` doubles its buffer
+ * up to before it gives up and `rb_sys_fail`s (`date_core.c:7081-7097`). A JS
+ * string grows on its own, so that bound is the only part of the C's buffer
+ * machinery that is observable — and it is observable, as the two
+ * {@link ERANGE} arms are what `test_strftime` asserts: a precision past it
+ * (`date_strftime.c:577-582`) and a rendered field past it
+ * (`FILL_PADDING`, `date_strftime.c:124-126`).
  */
 export function strftime(
   value:
@@ -414,6 +449,7 @@ export function strftime(
       ? temporalSubject(value)
       : value;
   const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
+  const maxsize = 1024 * format.length;
   let out = "";
   let f = 0;
 
@@ -478,6 +514,7 @@ export function strftime(
       if (c !== undefined && isdigit(c)) {
         if (c === "0") padding = "0";
         const [prec, e] = strtoul(format, g);
+        if (prec > INT_MAX || prec > maxsize) throw new ERANGE(format);
         precision = prec;
         g = e;
         continue;
@@ -674,6 +711,7 @@ export function strftime(
       f = spec === undefined ? format.length : g + 1;
       continue;
     }
+    if (formatted.length > maxsize) throw new ERANGE(format);
     out += formatted;
     f = g + 1;
   }
@@ -4370,6 +4408,18 @@ function offsetToSec(vof: number | bigint | Rational | string): number | null {
 }
 
 /**
+ * @internal `date_core.c`'s `add_frac()` macro (`date_core.c:3313-3317`), the
+ * tail every `Date` class method shares: a nonzero day-fraction makes the
+ * answer `d_lite_plus(ret, fr2)` — a `Date` backed by `ComplexDateData` — and a
+ * zero one leaves `ret` alone. The C spells it as a macro over a fixed `ret` /
+ * `fr2` pair, which is why it takes no arguments there and two here.
+ */
+function addFracTo(ret: Date, fr2: number | Rational): Date {
+  if (fr2 instanceof Rational ? fr2.isZero() : fr2 === 0) return ret;
+  return ret.plus(fr2);
+}
+
+/**
  * @internal `date_core.c` `val2off` (`date_core.c:5071-5077`), the macro every
  * user-facing `offset` argument is read through: whatever `offset_to_sec`
  * rejects warns `"invalid offset is ignored"` and becomes `0`.
@@ -5054,8 +5104,24 @@ export class Date {
    * Ruby `Date.new(year = -4712, month = 1, mday = 1)` (ruby/date,
    * `date_core.c` `date_s_civil`), which raises `Date::Error` on a civil date
    * `c_valid_civil_p` rejects.
+   *
+   * `mday` is the only argument `date_initialize` reads a fraction off —
+   * `num2int_with_frac(d, positive_inf)` (`date_core.c:3524`), whose
+   * `positive_inf` is why it never raises `"invalid fraction"`. That fraction
+   * comes back in DAYS here (a `unitInSeconds` of `1`) because its consumer is
+   * `d_lite_plus`, which takes days; the {@link DateTime} constructor scales to
+   * seconds instead because its consumer is {@link addFrac}.
+   *
+   * `add_frac()` (`date_core.c:3557`, the macro at `:3313-3317`) then answers
+   * `d_lite_plus(self, fr2)` — a DIFFERENT object from the one being
+   * initialized, carrying `ComplexDateData` for the day-fraction. Ruby returns
+   * it because `date_s_civil` returns `date_initialize`'s `ret` rather than the
+   * allocated receiver, and a JS constructor may override its own result the
+   * same way. So `Date.new(2001, 1, 1) + Rational(1, 2)` and
+   * `Date.new(2001, 1, Rational(3, 2))` are both a `Date` with a
+   * `day_fraction`, and neither is a `DateTime`.
    */
-  constructor(year?: number | bigint, month?: number, day?: number, start?: number);
+  constructor(year?: number | bigint, month?: number, day?: number | Rational, start?: number);
   /**
    * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:3036-3050`),
    * which writes an already-resolved day straight into a fresh
@@ -5076,7 +5142,7 @@ export class Date {
   constructor(
     year: number | bigint | typeof SEAT = -4712,
     month: number | bigint = 1,
-    day = 1,
+    day: number | Rational = 1,
     start = DEFAULT_SG,
     df?: number,
     sf?: Rational,
@@ -5084,7 +5150,7 @@ export class Date {
   ) {
     if (typeof year === "symbol") {
       this.nth = month as bigint;
-      this.#jd = day;
+      this.#jd = day as number;
       this.#sg = start;
       this.#df = df;
       this.#sf = sf;
@@ -5095,21 +5161,24 @@ export class Date {
     checkNumeric(month, "month");
     checkNumeric(year, "year");
     const sg = val2sg(start);
+    const [d, fr2] = num2intWithFrac(day, 1, false);
     if (guessStyle(year, sg) < 0) {
-      const r = validGregorianP(year, month as number, day);
+      const r = validGregorianP(year, month as number, d);
       if (r === null) throw new DateError("invalid date");
       const [nth, ry, rm, rd] = r;
       this.nth = nth;
       this.#sg = sg;
       this.#civil = [ry, rm, rd];
     } else {
-      const r = validCivilP(year, month as number, day, sg);
+      const r = validCivilP(year, month as number, d, sg);
       if (r === null) throw new DateError("invalid date");
       const [nth, rjd] = r;
       this.nth = nth;
       this.#jd = rjd;
       this.#sg = sg;
     }
+
+    return addFracTo(this, fr2);
   }
 
   /**
@@ -5278,10 +5347,12 @@ export class Date {
    * leaves the civil date to `get_s_civil`; there is one representation here,
    * so the conversion happens at the call.
    */
-  static jd(jd: number | bigint = 0, start = DEFAULT_SG): Temporal.PlainDate {
+  static jd(jd: number | bigint | Rational = 0, start = DEFAULT_SG): Temporal.PlainDate {
     checkNumeric(jd, "jd");
-    const [nth, rjd] = decodeJd(jd);
-    return new Date(SEAT, nth, rjd, val2sg(start)).toDate();
+    const [j, fr2] = num2numWithFrac(jd, 1, false);
+    const [nth, rjd] = decodeJd(j);
+    const ret = new Date(SEAT, nth, rjd, val2sg(start));
+    return addFracTo(ret, fr2).toDate();
   }
 
   /**
@@ -5290,13 +5361,18 @@ export class Date {
    * `c_valid_ordinal_p` rejects. A negative `yday` counts back from the last day
    * of the year, so `Date.ordinal(2001, -1)` is 2001-12-31.
    */
-  static ordinal(year = -4712, yday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+  static ordinal(
+    year = -4712,
+    yday: number | Rational = 1,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDate {
     checkNumeric(yday, "yday");
     checkNumeric(year, "year");
     const sg = val2sg(start);
-    const r = cValidOrdinalP(year, yday, sg);
+    const [d, fr2] = num2intWithFrac(yday, 1, false);
+    const r = cValidOrdinalP(year, d, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, 0n, r, sg).toDate();
+    return addFracTo(new Date(SEAT, 0n, r, sg), fr2).toDate();
   }
 
   /**
@@ -5306,7 +5382,25 @@ export class Date {
    * counts back from December and a negative `mday` from the month's end, so
    * `Date.civil(2001, -1, -1)` is 2001-12-31.
    */
-  static civil(year = -4712, month = 1, mday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+  /**
+   * Ruby `Date.today(start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `date_s_today`, `date_core.c:3789-3826`): the current date in the LOCAL
+   * zone, built from `localtime_r`'s `tm_year`/`tm_mon`/`tm_mday` and stored
+   * `HAVE_CIVIL` under `GREGORIAN` before `set_sg` writes the requested reform
+   * in. `Temporal.Now.plainDateISO()` is the same reading — the local wall date
+   * — where `Temporal.Now.instant()` would be the UTC one.
+   */
+  static today(start = DEFAULT_SG): Temporal.PlainDate {
+    const now = Temporal.Now.plainDateISO();
+    return new Date(now.year, now.month, now.day, val2sg(start)).toDate();
+  }
+
+  static civil(
+    year = -4712,
+    month = 1,
+    mday: number | Rational = 1,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDate {
     return new Date(year, month, mday, start).toDate();
   }
 
@@ -5317,14 +5411,20 @@ export class Date {
    * `cwday` counts back from Sunday and a negative `cweek` back from the end of
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
-  static commercial(cwyear = -4712, cweek = 1, cwday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+  static commercial(
+    cwyear = -4712,
+    cweek = 1,
+    cwday: number | Rational = 1,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDate {
     checkNumeric(cwday, "cwday");
     checkNumeric(cweek, "cweek");
     checkNumeric(cwyear, "year");
     const sg = val2sg(start);
-    const r = cValidCommercialP(cwyear, cweek, cwday, sg);
+    const [d, fr2] = num2intWithFrac(cwday, 1, false);
+    const r = cValidCommercialP(cwyear, cweek, d, sg);
     if (r === null) throw new DateError("invalid date");
-    return new Date(SEAT, 0n, r, sg).toDate();
+    return addFracTo(new Date(SEAT, 0n, r, sg), fr2).toDate();
   }
 
   /**
@@ -7405,6 +7505,11 @@ export class DateTime extends DateWithoutParseStatics {
    * `DateTime.parse("...00.9999999999").strftime("%N")` at `"999999999"` when
    * the stored `sf` sits a fraction of a nanosecond above it — and what lets
    * `%12N` answer `"999999999900"`, reaching past the nanosecond for the tail.
+   *
+   * `dt_lite_strftime` (`date_core.c:8721-8726`) is a distinct C function from
+   * `d_lite_strftime` (`:7245-7249`) only for its default format, which is why
+   * `DateTime.new(2001,2,3).strftime` carries the time of day where
+   * `Date#strftime` stops at the day.
    */
   override strftime(format = "%Y-%m-%dT%H:%M:%S%:z"): string {
     return strftime(

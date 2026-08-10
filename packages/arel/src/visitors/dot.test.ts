@@ -340,7 +340,7 @@ describe("TestDot", () => {
       );
     });
 
-    it("UpdateStatement walks groups and havings (Trails fields)", () => {
+    it("UpdateStatement emits Rails' seven edges and no groups/havings", () => {
       const stmt = new UpdateManager()
         .table(users)
         .set([[users.get("name"), "x"]])
@@ -348,19 +348,23 @@ describe("TestDot", () => {
         .having(users.get("active").eq(true)).ast;
       const out = dot.compile(stmt);
       expect(out).toContain("UpdateStatement");
-      expect(out).toMatch(/-> \d+ \[label="groups"\];/);
-      expect(out).toMatch(/-> \d+ \[label="havings"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="groups"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="havings"\];/);
+      expect(out).toMatch(/-> \d+ \[label="values"\];/);
+      expect(out).toMatch(/-> \d+ \[label="key"\];/);
     });
 
-    it("DeleteStatement walks groups and havings (Trails fields)", () => {
+    it("DeleteStatement emits Rails' six edges and no groups/havings", () => {
       const stmt = new DeleteManager()
         .from(users)
         .group(users.get("dept"))
         .having(users.get("active").eq(true)).ast;
       const out = dot.compile(stmt);
       expect(out).toContain("DeleteStatement");
-      expect(out).toMatch(/-> \d+ \[label="groups"\];/);
-      expect(out).toMatch(/-> \d+ \[label="havings"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="groups"\];/);
+      expect(out).not.toMatch(/-> \d+ \[label="havings"\];/);
+      expect(out).toMatch(/-> \d+ \[label="wheres"\];/);
+      expect(out).toMatch(/-> \d+ \[label="key"\];/);
     });
 
     it("repeated equal scalar primitives dedupe onto one DotNode (Rails singleton parity)", () => {
@@ -403,16 +407,9 @@ describe("TestDot", () => {
       expect(stringUsersMatches.length).toBe(2);
     });
 
-    it("Extract walks expr + field (Trails shape, not Rails' expressions + alias)", () => {
+    it("Extract walks expressions + alias, as Rails does", () => {
       const node = new Nodes.Extract(users.get("created_at"), "year");
-      const out = dot.compile(node);
-      expect(out).toContain("Extract");
-      expect(out).toMatch(/-> \d+ \[label="expr"\];/);
-      expect(out).toMatch(/-> \d+ \[label="field"\];/);
-      expect(out).toContain("year");
-      // No edges to nil-shaped Rails fields.
-      expect(out).not.toMatch(/-> \d+ \[label="expressions"\];/);
-      expect(out).not.toMatch(/-> \d+ \[label="alias"\];/);
+      expect(() => dot.compile(node)).toThrow(/undefined method 'expressions' for Extract/);
     });
 
     it("Exists walks expressions + alias (no spurious distinct edge)", () => {

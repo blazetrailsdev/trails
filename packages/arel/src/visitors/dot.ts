@@ -194,14 +194,9 @@ export class Dot extends Visitor {
     this.visitNoEdges(o);
   }
 
-  /**
-   * Trails' Extract extends Unary with `expr` + `field` (rather than Rails'
-   * Function-shaped `expressions` + `alias`). Walk the actual fields so the
-   * graph reflects the AST instead of emitting nil edges.
-   */
   protected visitArelNodesExtract(o: Nodes.Extract): void {
-    this.visitEdge(o, "expr");
-    this.visitEdge(o, "field");
+    this.visitEdge(o, "expressions");
+    this.visitEdge(o, "alias");
   }
 
   protected visitArelNodesNamedFunction(o: Nodes.NamedFunction): void {
@@ -243,8 +238,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "relation");
     this.visitEdge(o, "wheres");
     this.visitEdge(o, "values");
-    this.visitEdge(o, "groups");
-    this.visitEdge(o, "havings");
     this.visitEdge(o, "orders");
     this.visitEdge(o, "limit");
     this.visitEdge(o, "offset");
@@ -254,8 +247,6 @@ export class Dot extends Visitor {
   protected visitArelNodesDeleteStatement(o: Nodes.DeleteStatement): void {
     this.visitEdge(o, "relation");
     this.visitEdge(o, "wheres");
-    this.visitEdge(o, "groups");
-    this.visitEdge(o, "havings");
     this.visitEdge(o, "orders");
     this.visitEdge(o, "limit");
     this.visitEdge(o, "offset");
