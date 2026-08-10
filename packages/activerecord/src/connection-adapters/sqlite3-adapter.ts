@@ -74,6 +74,7 @@ import { getFs, getPath, pluralize, runLoadHooks, trailsRoot } from "@blazetrail
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
+  executeBatch as sqliteExecuteBatch,
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
   performQuery as sqlitePerformQuery,
@@ -713,34 +714,67 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       materializeTransactions = true,
       binds = [],
       prepare = false,
-    }: { materializeTransactions?: boolean; binds?: unknown[]; prepare?: boolean } = {},
+    }: {
+      materializeTransactions?: boolean;
+      binds?: unknown[];
+      prepare?: boolean;
+    } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
+    return this.rawExecute(sql, name, binds, prepare, false, false, materializeTransactions);
+  }
+
+  /**
+   * Mirrors: DatabaseStatements#raw_execute (abstract/database_statements.rb:552)
+   * — `log` around `perform_query`, and the only entry point that takes
+   * `batch:`, which is how `execute_batch` reaches the batch arm
+   * (sqlite3/database_statements.rb:126-129). `with_raw_connection` is not
+   * routed through: this adapter materializes and dirties around the whole
+   * call itself (Rails' `ensure dirty_current_transaction if
+   * materialize_transactions`, abstract_adapter.rb:1046), keeping
+   * transaction-control SQL on its byte-identical no-materialize path.
+   *
+   * @internal
+   */
+  override async rawExecute(
+    sql: string,
+    name: string | null = "SQL",
+    binds: unknown[] = [],
+    prepare = false,
+    _async = false,
+    _allowRetry = false,
+    materializeTransactions = true,
+    batch = false,
+  ): Promise<unknown> {
     await this.ensureConnected();
     try {
       if (materializeTransactions) await this.materializeTransactions();
       const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-      return await this.log(sql, name, binds, this.typeCastedBinds(binds), false, async () => {
-        try {
-          // Rails' perform_query prepares (pooling only on the `prepare` branch)
-          // and binds type_casted_binds before stepping
-          // (sqlite3/database_statements.rb:81-107). The bare `exec` arm below
-          // has no Rails counterpart: it carries the multi-statement
-          // transaction-control SQL that better-sqlite3's single-statement
-          // `prepare` rejects, and it is reachable only with no binds.
-          if (prepare || binds.length > 0) {
+      return await this.log(
+        sql,
+        name ?? "SQL",
+        binds,
+        this.typeCastedBinds(binds),
+        false,
+        async () => {
+          try {
+            // perform_query's three arms (sqlite3/database_statements.rb:78-108):
+            // batch, prepared (pooled), unprepared (prepared fresh). `exec` is
+            // better-sqlite3's `execute_batch2`.
+            if (batch) {
+              await this.driver.exec(sql);
+              return 0;
+            }
             const stmt = await (prepare ? this._cachedStatement(sql) : this._freshStatement(sql));
             if (stmt.reader) await stmt.all(driverBinds);
             else await stmt.run(driverBinds);
             return 0;
+          } catch (e: any) {
+            const translated = this._translateException(e, sql, binds);
+            throw translated;
           }
-          await this.driver.exec(sql);
-          return 0;
-        } catch (e: any) {
-          const translated = this._translateException(e, sql, binds);
-          throw translated;
-        }
-      });
+        },
+      );
     } finally {
       if (materializeTransactions) this.dirtyCurrentTransaction();
     }
@@ -1263,6 +1297,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return sqliteReturningColumnValues(result);
+  }
+
+  /** Mirrors: SQLite3::DatabaseStatements#execute_batch
+   *  (sqlite3/database_statements.rb:126-129).
+   * @internal
+   */
+  override async executeBatch(statements: string[], name?: string | null): Promise<void> {
+    return sqliteExecuteBatch.call(this, statements, name);
   }
 
   /** SQLite has no TRUNCATE; emit `DELETE FROM`.

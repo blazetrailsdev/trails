@@ -1476,31 +1476,32 @@ describeIfPg("PostgreSQLAdapter#active", () => {
     }
   });
   // Regression: `schemaQuery -> internalExecQuery -> castResult -> getOidType ->
-  // loadAdditionalTypes -> schemaQuery` is a cycle. Rails cannot reach it because
-  // initialize_type_map preloads the common OIDs at connect
-  // (postgresql_adapter.rb:558-608); trails resolves the map lazily, so
-  // getOidType carries a reentrancy guard. Pre-fix this recursed until timeout.
-  it("getOidType does not re-enter loadAdditionalTypes", async () => {
+  // loadAdditionalTypes -> schemaQuery` was a cycle. Rails cannot reach it
+  // because `load_additional_types` runs the pg_type query through the UNCAST
+  // `internal_execute` (postgresql_adapter.rb:870), which never consults the
+  // type map — so `get_oid_type` is a two-line body with no reentrancy branch.
+  // Pre-fix trails ran it through `schemaQuery` and recursed until timeout.
+  it("loadAdditionalTypes runs uncast, so it cannot re-enter getOidType", async () => {
     const adapter = new PostgreSQLAdapter(PG_TEST_URL);
     try {
       await adapter.execute("SELECT 1");
       const internals = adapter as unknown as {
-        _loadingAdditionalTypes: boolean;
-        loadAdditionalTypes(oids?: number[]): Promise<void>;
         typeMap: { has(oid: number): boolean };
       };
-      const spy = vi.spyOn(internals, "loadAdditionalTypes");
-      const unknownOid = 987654321;
-      internals._loadingAdditionalTypes = true;
-      try {
-        const type = await adapter.getOidType(unknownOid, -1, "col");
-        expect(type).toBeTruthy();
-      } finally {
-        internals._loadingAdditionalTypes = false;
-      }
-      expect(spy).not.toHaveBeenCalled();
-      // And no poisoning fallback was registered, so a later real load still runs.
-      expect(internals.typeMap.has(unknownOid)).toBe(false);
+      const getOidTypeSpy = vi.spyOn(adapter, "getOidType");
+      // A live, non-preloaded OID: the pg_type row for `pg_type` itself.
+      const rows = await adapter.execute("SELECT 'regprocedure'::regtype::oid AS oid");
+      const oid = Number((rows[0] as { oid: number | string }).oid);
+      getOidTypeSpy.mockClear();
+
+      await adapter.loadAdditionalTypes([oid]);
+
+      // The pg_type query resolved no column types of its own — the cycle's
+      // first edge is gone, so no depth of recursion is possible.
+      expect(getOidTypeSpy).not.toHaveBeenCalled();
+      // And no poisoning fallback was registered for an OID pg_type never
+      // returned (see lookupCastTypeFromColumn).
+      expect(internals.typeMap.has(987654321)).toBe(false);
     } finally {
       await adapter.close();
     }
