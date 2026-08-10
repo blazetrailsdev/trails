@@ -133,7 +133,7 @@ describe("SQLite adapter driver binding", () => {
     const driver = asyncDriver(async (config) => {
       const conn = await openVia(config);
       return new Proxy(conn, {
-        get(target, prop, receiver) {
+        get(target, prop) {
           if (prop === "close") {
             return async () => {
               await closeGate;
@@ -141,7 +141,11 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          return Reflect.get(target, prop, receiver);
+          // Resolve against the target, not the proxy: the driver's readback
+          // methods (`changes`, `lastInsertRowId`) keep their statement handles
+          // in private fields, which a proxy receiver cannot reach.
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       });
     });
@@ -266,7 +270,7 @@ describe("SQLite adapter driver binding", () => {
     const driver = asyncDriver(async (config) => {
       const conn = await openVia(config);
       return new Proxy(conn, {
-        get(target, prop, receiver) {
+        get(target, prop) {
           if (prop === "close") {
             return async () => {
               await closeGate;
@@ -274,7 +278,11 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          return Reflect.get(target, prop, receiver);
+          // Resolve against the target, not the proxy: the driver's readback
+          // methods (`changes`, `lastInsertRowId`) keep their statement handles
+          // in private fields, which a proxy receiver cannot reach.
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       });
     });
@@ -343,7 +351,7 @@ describe("SQLite adapter driver binding", () => {
     const driver = asyncDriver(async (config) => {
       const conn = await openVia(config);
       return new Proxy(conn, {
-        get(target, prop, receiver) {
+        get(target, prop) {
           if (prop === "close") {
             return async () => {
               await gate;
@@ -351,7 +359,11 @@ describe("SQLite adapter driver binding", () => {
               closed = true;
             };
           }
-          return Reflect.get(target, prop, receiver);
+          // Resolve against the target, not the proxy: the driver's readback
+          // methods (`changes`, `lastInsertRowId`) keep their statement handles
+          // in private fields, which a proxy receiver cannot reach.
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       });
     });

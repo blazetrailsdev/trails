@@ -1368,6 +1368,11 @@ export async function rawExecQuery(
     throw new Error("rawExecQuery requires rawExecute on the adapter");
   }
   const sqlName = name ?? "SQL";
+  // Rails is `cast_result(raw_execute(...))` and nothing else
+  // (abstract/database_statements.rb:540-542): `raw_execute` is the single
+  // logging site (`:553`) and materializes through `with_raw_connection`
+  // (`:555`), so wrapping it again here would emit two `sql.active_record`
+  // events for one query.
   const rawResult = await this.rawExecute(sql, sqlName, binds);
   return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
 }
@@ -1376,13 +1381,11 @@ export async function rawExecQuery(
  * Executes a query via internal_execute and returns an ActiveRecord::Result.
  * Delegates to internalExecute + castResult.
  *
- * Unlike `rawExecQuery` above, this one still wraps in `log`, where Rails'
- * `internal_exec_query` (database_statements.rb:546-548) leaves the logging to
- * `raw_execute`. Dropping it is tracked by
- * 0076-execute-primitive-convergence/wire-raw-execute-through-log: this
- * body is reached only by an adapter that overrides `internalExecute` but NOT
- * `internalExecQuery`, and for such a host `log`'s rescue is the only thing
- * attaching `set_query` context to a translated StatementInvalid.
+ * Like `rawExecQuery` above, this leaves logging to `raw_execute`, which
+ * `internal_execute` reaches (database_statements.rb:546-548, :588-591) — the
+ * `log` rescue's `set_query` included, so a translated StatementInvalid still
+ * carries its query for the one host shape this body serves (an adapter that
+ * overrides `internalExecute` but not `internalExecQuery`).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_exec_query
  */
@@ -1394,33 +1397,33 @@ export async function internalExecQuery(
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
   const sqlName = name ?? "SQL";
-  return logSql(this, sql, sqlName, binds, async () => {
-    // Materialize lazy transactions before executing SQL
-    const tm = (this as any)._transactionManager as TransactionManager | undefined;
-    if (tm && (options?.materializeTransactions ?? true)) await tm.materializeTransactions();
-    if (this?.internalExecute) {
-      // Thread binds and exec options through so a bound INSERT ... RETURNING
-      // reaches the driver and allow_retry / materialize_transactions survive
-      // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
-      // trails carries all of them in the opts object rather than positionally.
-      const rawResult = await this.internalExecute(sql, sqlName, {
-        binds,
-        prepare: options?.prepare,
-        allowRetry: options?.allowRetry,
-        materializeTransactions: options?.materializeTransactions,
-      });
-      return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
-    }
-    if (binds && binds.length > 0) {
-      throw new Error(
-        "internalExecQuery requires internalExecute on the adapter when binds are provided",
-      );
-    }
-    // Fallback: delegate through this.execute only when there are no binds
-    const doExecute = this?.execute?.bind(this) ?? execute;
-    const result = await doExecute(sql);
-    return normalizeResult(result);
-  });
+  // Rails is `cast_result(internal_execute(...))` and nothing else
+  // (abstract/database_statements.rb:545-547). `internal_execute` reaches
+  // `raw_execute` (`:588-591` → `:552-558`), which both logs (`:553`) and
+  // materializes through `with_raw_connection` (`:555`) — including the `log`
+  // rescue's `set_query`, so neither belongs here.
+  if (this?.internalExecute) {
+    // Thread binds and exec options through so a bound INSERT ... RETURNING
+    // reaches the driver and allow_retry / materialize_transactions survive
+    // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
+    // trails carries all of them in the opts object rather than positionally.
+    const rawResult = await this.internalExecute(sql, sqlName, {
+      binds,
+      prepare: options?.prepare,
+      allowRetry: options?.allowRetry,
+      materializeTransactions: options?.materializeTransactions,
+    });
+    return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
+  }
+  if (binds && binds.length > 0) {
+    throw new Error(
+      "internalExecQuery requires internalExecute on the adapter when binds are provided",
+    );
+  }
+  // Fallback: delegate through this.execute only when there are no binds
+  const doExecute = this?.execute?.bind(this) ?? execute;
+  const result = await doExecute(sql);
+  return normalizeResult(result);
 }
 
 // --- Private helpers ---

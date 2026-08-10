@@ -100,14 +100,17 @@ interface InternalBeginTransactionHost {
 
 // The state performQuery reads/writes on the adapter. Mirrors the members
 // Rails' perform_query touches on the SQLite3Adapter instance: the statement
-// pool (via _cachedStatement), @last_affected_rows / last insert rowid, the
-// write-query predicate, and the verified!/dirty transaction bookkeeping that
-// with_raw_connection performs around the round-trip.
+// pool (via _cachedStatement), @last_affected_rows / last insert rowid, and
+// the verified! bookkeeping with_raw_connection performs around the
+// round-trip. Dirtying the current transaction is the CALLER's — Rails does it
+// in with_raw_connection's ensure gated on materialize_transactions
+// (abstract_adapter.rb:1046), which `raw_execute`'s PRAGMA callers pass false
+// for; doing it here would mark a reconnect's configure_connection as a write
+// and make the transaction stack unrestorable.
 interface PerformQueryHost {
   _cachedStatement(sql: string): Promise<SqliteStatement>;
-  readonly driver: SqliteConnection;
+  _freshStatement(sql: string): Promise<SqliteStatement>;
   verifiedBang(): void;
-  dirtyCurrentTransaction(): void;
   _statementLock: Promise<void> | null;
   _lastAffectedRows: number;
   _lastInsertRowid: number | bigint;
@@ -174,21 +177,32 @@ export async function internalBeginTransaction(
  * service order, and there is no window in which two callers can both observe
  * a free lock and claim it.
  *
- * Callers take it AFTER preparing the statement: preparing connects on demand,
- * and a connection's `configure_connection` PRAGMAs re-enter the primitive.
+ * An UNCONTENDED acquisition answers synchronously — Ruby's `@lock.synchronize`
+ * doesn't yield when nobody holds the monitor, and a gratuitous `await` here
+ * does: it hands the event loop to whatever is queued, which on the
+ * transaction-control path is enough for a pool `disconnect` to close the
+ * handle between the acquisition and the statement. Hence the union return
+ * type; the queue drains back to `null` so the fast path stays reachable.
  * @internal
  */
-export async function acquireStatementLock(host: {
+export function acquireStatementLock(host: {
   _statementLock: Promise<void> | null;
-}): Promise<() => void> {
-  const ahead = host._statementLock ?? Promise.resolve();
+}): (() => void) | Promise<() => void> {
+  const ahead = host._statementLock;
   let release!: () => void;
   const mine = new Promise<void>((resolve) => {
     release = resolve;
   });
-  host._statementLock = ahead.then(() => mine);
-  await ahead;
-  return release;
+  const tail = ahead ? ahead.then(() => mine) : mine;
+  host._statementLock = tail;
+  const drain = (): void => {
+    // Only the last queued caller clears the tail; a later arrival has already
+    // published its own and must keep waiting on this one.
+    if (host._statementLock === tail) host._statementLock = null;
+    release();
+  };
+  if (!ahead) return drain;
+  return ahead.then(() => drain);
 }
 
 /**
@@ -215,63 +229,96 @@ export async function acquireStatementLock(host: {
  * connection's own reentrant `synchronize` cannot serve — a `Promise.all` of
  * writes inside one transaction shares its lock owner and re-enters.
  *
- * This is the live primitive `execute` / `executeMutation` delegate to. It is
- * written against the async `SqliteStatement` / `SqliteConnection` driver
- * abstraction (array binds, promise-returning, multi-driver) rather than
- * better-sqlite3's native sync API, so it is reachable from the adapter.
+ * This is the live primitive `raw_execute` — and, in trails, `execute` /
+ * `executeMutation` — delegate to. It is written against the async
+ * `SqliteStatement` / `SqliteConnection` driver abstraction (array binds,
+ * promise-returning, multi-driver) rather than better-sqlite3's native sync
+ * API, so it is reachable from the adapter.
+ *
+ * Two deviations, both forced by that driver abstraction and by the
+ * `execute`/`executeMutation` split (justified once at the `executeMutation`
+ * declaration in abstract-adapter.ts):
+ *
+ * - Rails returns an `ActiveRecord::Result` (`:82-107`); this returns the rows
+ *   plus the two counters, because `executeMutation` needs the affected-row
+ *   count and insert rowid as RETURNED locals — reading them back off the
+ *   shared fields after its own await re-opens the concurrent-write race.
+ *   `castResult` is the identity here either way, as it is in Rails (`:113`).
+ * - Rails' unprepared arm guards `stmt.bind_params` with
+ *   `unless binds.nil? || binds.empty?` (`:96-98`); binds reach this driver as
+ *   a call argument rather than a separate `bind_params` round-trip, so an
+ *   empty array already means "bind nothing" and the guard has nothing to
+ *   guard. `binds` stays in the signature at Rails' position regardless.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
  * @internal
  */
 export async function performQuery(
   this: PerformQueryHost,
+  rawConnection: SqliteConnection,
   sql: string,
-  driverBinds: SqliteBinds,
-  notificationPayload: Record<string, unknown>,
+  binds: unknown[],
+  typeCastedBinds: SqliteBinds,
+  options: {
+    prepare?: boolean;
+    notificationPayload?: Record<string, unknown>;
+    batch?: boolean;
+  } = {},
 ): Promise<{
   rows: Record<string, unknown>[];
   affectedRows: number;
   insertRowid: number | bigint;
 }> {
-  // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
-  // gated only on materialize_transactions — NOT on read/write, and it runs
-  // even when the query raises. execute/executeMutation (the only callers)
-  // both materialize unconditionally, so dirty in a finally regardless of
-  // outcome, mirroring this adapter's `exec`. `verified!` (below), by
-  // contrast, is on Rails' success path only.
+  const { prepare = false, notificationPayload, batch = false } = options;
+  // Rails' three arms (sqlite3/database_statements.rb:78-108): batch, which
+  // hands the whole multi-statement string to `execute_batch2`; prepared,
+  // which takes the statement from the pool; and unprepared, which prepares a
+  // fresh statement rather than caching it.
+  const stmt = batch
+    ? null
+    : prepare
+      ? await this._cachedStatement(sql)
+      : await this._freshStatement(sql);
+  // An uncontended acquisition answers synchronously, so don't `await` it —
+  // `await` on a plain value still yields a microtask, and on the
+  // transaction-control path that is enough for a pool `disconnect` to close
+  // the handle before the statement runs.
+  const acquired = acquireStatementLock(this);
+  const release = typeof acquired === "function" ? acquired : await acquired;
+  let rows: Record<string, unknown>[];
+  let affectedRows: number;
+  let insertRowid: number | bigint;
   try {
-    const stmt = await this._cachedStatement(sql);
-    const release = await acquireStatementLock(this);
-    let rows: Record<string, unknown>[];
-    let affectedRows: number;
-    let insertRowid: number | bigint;
-    try {
-      if (stmt.reader) {
-        rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-      } else {
-        await stmt.run(driverBinds);
-        rows = [];
-      }
-      affectedRows = await this.driver.changes();
-      insertRowid = await this.driver.lastInsertRowId();
-    } finally {
-      release();
+    if (stmt === null) {
+      await rawConnection.exec(sql);
+      rows = [];
+    } else if (stmt.reader) {
+      rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
+    } else {
+      await stmt.run(typeCastedBinds);
+      rows = [];
     }
-    // Persist for the affected_rows() port / public accessor. The RETURNED
-    // locals — not these fields — are what executeMutation uses for its return
-    // value: reading `this._lastInsertRowid` back after the caller's await
-    // would race, since a concurrent write's performQuery can overwrite it
-    // between this assignment and that read.
-    this._lastAffectedRows = affectedRows;
-    this._lastInsertRowid = insertRowid;
-    // Rails' perform_query: `verified!` after @last_affected_rows, success
-    // path only — a successful round-trip proves the connection is live.
-    this.verifiedBang();
-    notificationPayload.row_count = rows.length;
-    return { rows, affectedRows, insertRowid };
+    affectedRows = await rawConnection.changes();
+    insertRowid = await rawConnection.lastInsertRowId();
   } finally {
-    this.dirtyCurrentTransaction();
+    release();
+    // Rails closes the uncached statement in its own ensure
+    // (sqlite3/database_statements.rb:93-107); the pooled one on the `prepare`
+    // arm is the pool's to close. `finalize` is the driver's `close`.
+    if (!prepare && stmt !== null) await stmt.finalize?.();
   }
+  // Persist for the affected_rows() port / public accessor. The RETURNED
+  // locals — not these fields — are what executeMutation uses for its return
+  // value: reading `this._lastInsertRowid` back after the caller's await
+  // would race, since a concurrent write's performQuery can overwrite it
+  // between this assignment and that read.
+  this._lastAffectedRows = affectedRows;
+  this._lastInsertRowid = insertRowid;
+  // Rails' perform_query: `verified!` after @last_affected_rows, success
+  // path only — a successful round-trip proves the connection is live.
+  this.verifiedBang();
+  if (notificationPayload) notificationPayload.row_count = rows.length;
+  return { rows, affectedRows, insertRowid };
 }
 
 /** @internal */

@@ -98,7 +98,7 @@ function isPrivateFieldBrandCheck(error: unknown): boolean {
  *
  * Depth stops there, deliberately. Self-binding the recorded functions so that
  * *every* hop inside an adapter method is recorded drags in the whole adapter
- * internals — 44 further members (`_performQuery`, `materializeTransactions`,
+ * internals — 44 further members (`performQuery`, `materializeTransactions`,
  * `verifiedBang`, `ensureConnected`, …), none of which is a surface a cover
  * stubs, and exempting them one by one would turn NON_EMITTING into the blanket
  * exemption its own staleness rule exists to prevent. The boundary this pins is

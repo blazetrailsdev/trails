@@ -227,7 +227,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   _databaseTimezone: "utc" | "local" = "utc";
 
   /**
-   * Rows affected by the most recent write, recorded by {@link _performQuery}.
+   * Rows affected by the most recent write, recorded by {@link performQuery}.
    * Rails takes the statement result in `affected_rows` and ignores it, reading
    * `@affected_rows` (set inside `perform_query`) instead — this is that field.
    */
@@ -290,7 +290,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * cache (statement_pool.rb:31-33), so there is nothing for this gate to
    * degrade around.
    */
-  private _shouldPrepare(binds: unknown[]): boolean {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // mysql2/database-statements.ts can reach it through PerformQueryHost.
+  _shouldPrepare(binds: unknown[]): boolean {
     return this.preparedStatements && binds.length > 0;
   }
 
@@ -303,7 +305,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * none: its `[]=` raises on the empty cache (statement_pool.rb:31-33), so a
    * limit of 0 is unsupported rather than a caching switch.
    */
-  private _trackPrepared(conn: mysql.Connection, sql: string): void {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // mysql2/database-statements.ts can reach it through PerformQueryHost.
+  _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool(conn);
     // Use `get` (not `has`) so an already-cached entry is moved to
     // the MRU end of the LRU. Otherwise a hot statement executed
@@ -628,17 +632,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           { allowRetry: options?.allowRetry ?? false },
           async (conn) => {
             const mysqlConn = conn as unknown as mysql.Connection;
-            // Rails' internal_exec_query is `cast_result(raw_execute(...))`
-            // (abstract/database_statements.rb:527-534) — one perform_query
-            // primitive per adapter, not a second inline driver call.
-            const raw = await this._performQuery(
-              mysqlConn,
-              driverSql,
-              binds ?? [],
-              driverBinds,
-              payload,
-              options?.prepare,
-            );
+            // Rails' internal_exec_query is `cast_result(internal_execute(...))`
+            // (abstract/database_statements.rb:545-547), which reaches
+            // `raw_execute` → `perform_query` (`:588-591` → `:552-558`) — one
+            // perform_query primitive per adapter, not a second inline driver call.
+            const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], driverBinds, {
+              prepare: options?.prepare,
+              notificationPayload: payload,
+            });
             return this.castResult(raw);
           },
         );
@@ -861,45 +862,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * The single SQL primitive `execute` / `executeMutation` delegate to: track
-   * the prepared statement, run the statement through the shared array-mode
-   * `performQuery` seam (which records the affected-row count in
-   * `_affectedRowsBeforeWarnings`), fetch warnings, and set the notification
-   * payload's row count. Returns the raw `{ rows, fields, affectedRows,
-   * insertId }` — `execute` rebuilds row objects from it, `executeMutation`
-   * reads the affected rows / insert id. mysql2 hands back a ResultSetHeader
-   * (with `affectedRows` / `insertId`) rather than rows for a non-row-returning
-   * statement, so the read/write split is which shape came back, not a driver
-   * throw.
+   * The single SQL primitive `raw_execute` — and, in trails, `execute` /
+   * `executeMutation` — delegate to. Assigned to the prototype below so
+   * `raw_execute`'s virtual `perform_query` dispatch resolves here; declared
+   * with `declare` so call sites type-check against the port's signature.
+   * Returns the raw `{ rows, fields, affectedRows, insertId }` — `execute`
+   * rebuilds row objects from it, `executeMutation` reads the affected rows /
+   * insert id. mysql2 hands back a ResultSetHeader (with `affectedRows` /
+   * `insertId`) rather than rows for a non-row-returning statement, so the
+   * read/write split is which shape came back, not a driver throw.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
+   * @internal
    */
-  private async _performQuery(
-    conn: mysql.Connection,
-    driverSql: string,
-    binds: unknown[],
-    driverBinds: unknown[],
-    payload: Record<string, unknown>,
-    // Rails' `raw_execute` takes `prepare:` and forwards it to `perform_query`;
-    // when the caller does not state one, fall back to `_shouldPrepare`.
-    prepare: boolean = this._shouldPrepare(binds),
-  ): Promise<Mysql2RawResult> {
-    // Track the SQL in our statement pool first so LRU eviction sends
-    // COM_STMT_CLOSE (via unprepare) when we exceed `statement_limit`.
-    if (prepare) this._trackPrepared(conn, driverSql);
-    // Hand the payload to the port so it records both keys the way Rails'
-    // perform_query does (database_statements.rb:97-98):
-    // `affected_rows = @affected_rows_before_warnings` and
-    // `row_count = result&.size || 0` — the latter is 0 for a non-row-returning
-    // statement (mysql2 hands back a header, not a result set), so a write's
-    // row_count stays 0 and its count is reported only via affected_rows.
-    const raw = await mysql2PerformQuery.call(this as any, conn, driverSql, binds, driverBinds, {
-      prepare,
-      notificationPayload: payload,
-    });
-    await this._handleWarningsOn(conn, driverSql);
-    return raw;
-  }
+  declare performQuery: typeof mysql2PerformQuery;
 
   /**
    * Assigned onto the prototype below; declared here so `internal_exec_query`'s
@@ -947,7 +923,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this._performQuery(mysqlConn, driverSql, binds, driverBinds, payload);
+          const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+            notificationPayload: payload,
+          });
           // A non-row-returning statement (DML passed to execute) has null rows.
           // Rebuild hash-keyed row objects from the array-mode positional rows +
           // field descriptors `perform_query` returns — the same objects a
@@ -990,7 +968,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this._performQuery(mysqlConn, driverSql, binds, driverBinds, payload);
+          const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+            notificationPayload: payload,
+          });
           // Source affected rows through the `affected_rows` port (reads the
           // `_affectedRowsBeforeWarnings` field `perform_query` set) rather than
           // off the statement result, mirroring Rails' `affected_rows`. The
@@ -1198,16 +1178,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               const conn = rawConn as unknown as mysql.Connection;
               // Rails' internal_execute forwards `prepare:` to raw_execute →
               // perform_query (abstract/database_statements.rb:552-558, 589-591).
-              const prepare = prepareOption ?? this._shouldPrepare(binds);
-              if (prepare) this._trackPrepared(conn, driverSql);
-              const rawResult = await mysql2PerformQuery.call(
-                this as any,
-                conn,
-                driverSql,
-                binds,
-                driverBinds,
-                { prepare },
-              );
+              const rawResult = await this.performQuery(conn, driverSql, binds, driverBinds, {
+                prepare: prepareOption,
+              });
               payload.row_count = rawResult.affectedRows;
               return rawResult;
             },
@@ -1757,17 +1730,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Read pending warnings for `conn`, filter via {@link isWarningIgnored},
-   * and dispatch per the configured `dbWarningsAction`. Runs after every
-   * successful query in {@link execute}/{@link executeMutation} while the
-   * connection is still held — warnings are connection-scoped.
+   * and dispatch per the configured `dbWarningsAction`. Called from
+   * `performQuery` where Rails calls it (mysql2/database_statements.rb:102),
+   * while the connection is still held — warnings are connection-scoped.
+   *
+   * Rails reads `@raw_connection` for the SHOW WARNINGS round-trip, a field the
+   * adapter holds because ruby-mysql2 owns one socket per adapter. trails hands
+   * connections out of the pool per query, so the connection is a trailing
+   * optional parameter rather than a field; the Rails parameter and its
+   * position are unchanged, and an absent one is the base class's no-op.
    *
    * Mirrors: AbstractMysqlAdapter#handle_warnings.
    * @internal
    */
-  protected async _handleWarningsOn(
-    conn: mysql.Connection | undefined,
-    sql: string,
-  ): Promise<void> {
+  override async handleWarnings(sql: string, conn?: mysql.Connection): Promise<void> {
     if (!conn) return;
     const ctor = this.constructor as typeof Mysql2Adapter;
     const action = ctor.dbWarningsAction;
@@ -2054,6 +2030,11 @@ dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbac
 // `internal_exec_query`.
 captureUnwrappedExecute(Mysql2Adapter);
 dirtiesQueryCache(Mysql2Adapter, "execQuery", "execute");
+
+// Mirrors `include Mysql2::DatabaseStatements` — `perform_query` is an instance
+// method of the adapter, so `raw_execute`'s `this.performQuery(...)` dispatch
+// resolves here (mysql2/database_statements.rb:41).
+Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`

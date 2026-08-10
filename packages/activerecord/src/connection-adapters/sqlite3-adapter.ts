@@ -472,28 +472,49 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // `execute` path now receives non-empty bind arrays where it received
     // empty ones before.
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    return this.log(sql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (payload) => {
-      try {
-        return (await this._performQuery(sql, driverBinds, payload)).rows;
-      } catch (e: any) {
-        const translated = this._translateException(e, sql, binds);
-        throw translated;
-      }
-    });
+    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
+    // gated only on materialize_transactions — which this path always does —
+    // and it runs even when the query raises.
+    try {
+      return await this.log(
+        sql,
+        name,
+        binds,
+        this.typeCastedBinds(binds) ?? [],
+        false,
+        async (payload) => {
+          try {
+            return (
+              await this.performQuery(this.driver, sql, binds, driverBinds, {
+                prepare: this.preparedStatements,
+                notificationPayload: payload,
+              })
+            ).rows;
+          } catch (e: any) {
+            const translated = this._translateException(e, sql, binds);
+            throw translated;
+          }
+        },
+      );
+    } finally {
+      this.dirtyCurrentTransaction();
+    }
   }
 
   /**
-   * The single SQL primitive `execute` / `executeMutation` delegate to. The
-   * live implementation lives in the Rails-layout file
-   * `sqlite3/database-statements.ts` (`performQuery`) so api:compare's
-   * `perform_query` coverage points at reachable code; it is bound here with
-   * `this` as the adapter, whose `_cachedStatement` / `driver` /
-   * `verifiedBang` / `dirtyCurrentTransaction` and `_statementLock` / `_last*`
-   * fields satisfy the `PerformQueryHost` interface.
+   * The single SQL primitive `raw_execute` — and, in trails, `execute` /
+   * `executeMutation` — delegate to. The live implementation lives in the
+   * Rails-layout file `sqlite3/database-statements.ts` (`performQuery`) so
+   * api:compare's `perform_query` coverage points at reachable code; it is
+   * assigned to the prototype below with `this` as the adapter, whose
+   * `_cachedStatement` / `_freshStatement` / `verifiedBang` /
+   * `dirtyCurrentTransaction` and `_statementLock` / `_last*` fields satisfy
+   * the `PerformQueryHost` interface.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
+   * @internal
    */
-  private _performQuery = sqlitePerformQuery;
+  declare performQuery: typeof sqlitePerformQuery;
 
   /**
    * Rows affected by the most recent write. Rails takes the statement result
@@ -504,7 +525,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // The arg is optional because this is only trails' public accessor for the
   // tracked count now — Rails' framework-internal `affected_rows(result)` call
   // site (exec_delete/exec_update) has no analogue here: executeMutation returns
-  // the count as a local from _performQuery rather than re-reading the shared
+  // the count as a local from performQuery rather than re-reading the shared
   // field through this port, which would re-open the concurrent-write race. The
   // port ignores the arg either way (reads @last_affected_rows).
   /** @internal */
@@ -514,7 +535,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // A statement prepared outside the pool — Rails' non-`prepare` branch, which
   // prepares a fresh statement per call rather than caching it.
-  private async _freshStatement(sql: string): Promise<SqliteStatement> {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // sqlite3/database-statements.ts can reach it through PerformQueryHost.
+  async _freshStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
     const stmt = await this.driver.prepare(sql);
     this._maybeEnableReadBigInts(sql, stmt);
@@ -594,7 +617,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * declaration (abstract-adapter.ts, `executeMutation` on the
    * DatabaseStatements signature block) — read it there before changing this.
    * In particular, this cannot be rerouted through `execute`: the two share
-   * one `_performQuery` and differ only in what they answer — rows here, the
+   * one `performQuery` and differ only in what they answer — rows here, the
    * affected-row count or insert rowid there.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
@@ -604,28 +627,48 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.ensureConnected();
     await this.materializeTransactions();
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    return this.log(sql, name, binds, this.typeCastedBinds(binds) ?? [], false, async (payload) => {
-      try {
-        // Use the values RETURNED by _performQuery, not this._last* — those
-        // fields are shared and a concurrent write can overwrite them before
-        // this post-await continuation reads them (the Promise.all insert race).
-        const { affectedRows, insertRowid } = await this._performQuery(sql, driverBinds, payload);
-        // perform_query reports the returned-row count (0 for a write); this
-        // path has always reported affected rows, and subscribers rely on it.
-        payload.row_count = affectedRows;
+    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
+    // gated only on materialize_transactions — which this path always does —
+    // and it runs even when the query raises.
+    try {
+      return await this.log(
+        sql,
+        name,
+        binds,
+        this.typeCastedBinds(binds) ?? [],
+        false,
+        async (payload) => {
+          try {
+            // Use the values RETURNED by performQuery, not this._last* — those
+            // fields are shared and a concurrent write can overwrite them before
+            // this post-await continuation reads them (the Promise.all insert race).
+            const { affectedRows, insertRowid } = await this.performQuery(
+              this.driver,
+              sql,
+              binds,
+              driverBinds,
+              { prepare: this.preparedStatements, notificationPayload: payload },
+            );
+            // perform_query reports the returned-row count (0 for a write); this
+            // path has always reported affected rows, and subscribers rely on it.
+            payload.row_count = affectedRows;
 
-        // For INSERT, return the last inserted rowid
-        if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-          return Number(insertRowid);
-        }
+            // For INSERT, return the last inserted rowid
+            if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
+              return Number(insertRowid);
+            }
 
-        // For UPDATE/DELETE, return affected rows
-        return affectedRows;
-      } catch (e: any) {
-        const translated = this._translateException(e, sql, binds);
-        throw translated;
-      }
-    });
+            // For UPDATE/DELETE, return affected rows
+            return affectedRows;
+          } catch (e: any) {
+            const translated = this._translateException(e, sql, binds);
+            throw translated;
+          }
+        },
+      );
+    } finally {
+      this.dirtyCurrentTransaction();
+    }
   }
 
   /**
@@ -770,19 +813,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         binds,
         this.typeCastedBinds(binds),
         false,
-        async () => {
+        async (payload) => {
           try {
-            // perform_query's three arms (sqlite3/database_statements.rb:78-108):
-            // batch, prepared (pooled), unprepared (prepared fresh). `exec` is
-            // better-sqlite3's `execute_batch2`.
-            if (batch) {
-              await this.driver.exec(sql);
-              return 0;
-            }
-            const stmt = await (prepare ? this._cachedStatement(sql) : this._freshStatement(sql));
-            if (stmt.reader) await stmt.all(driverBinds);
-            else await stmt.run(driverBinds);
-            return 0;
+            return await this.performQuery(this.driver, sql, binds, driverBinds, {
+              prepare,
+              notificationPayload: payload,
+              batch,
+            });
           } catch (e: any) {
             const translated = this._translateException(e, sql, binds);
             throw translated;
@@ -3153,6 +3190,11 @@ dirtiesQueryCache(SQLite3Adapter, "execInsert", "rollbackDbTransaction", "rollba
 // `internal_exec_query`.
 captureUnwrappedExecute(SQLite3Adapter);
 dirtiesQueryCache(SQLite3Adapter, "execQuery", "execute");
+
+// Mirrors `include SQLite3::DatabaseStatements` — `perform_query` is an
+// instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`
+// dispatch resolves here (sqlite3/database_statements.rb:78).
+SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
