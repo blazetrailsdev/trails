@@ -1381,7 +1381,7 @@ export class PostgreSQLAdapter
       }
     }
     try {
-      await this.configureConnection(client);
+      await this.configureConnection();
       // Re-check teardown after every await: a concurrent reconnect
       // can null _rawConnection while configure is in flight.
       if (this._closed || this._rawConnection !== client) {
@@ -2902,7 +2902,7 @@ export class PostgreSQLAdapter
           // Rails' reset! ends in configure_connection
           // (postgresql_adapter.rb:371), so the dispatch goes through the
           // public, overridable hook.
-          return this.configureConnection(live).catch((error: unknown) => {
+          return this.configureConnection().catch((error: unknown) => {
             if (this._rawConnection === live) {
               this._rawConnection = null;
               this._connectionConfigured = false;
@@ -2935,13 +2935,11 @@ export class PostgreSQLAdapter
    * persistent client is configured exactly once per connection.
    *
    * Rails' `configure_connection` (postgresql_adapter.rb:956) is argless and
-   * operates on `@raw_connection`, so the argless call configures the current
-   * raw connection here too. The optional `client` parameter is the node-pg
-   * acquire-ordering escape hatch: `_acquireFreshClient` must configure the
-   * freshly-opened socket *before* installing it as `_rawConnection`, and libpq
-   * has no equivalent window because Rails' `connect` assigns `@raw_connection`
-   * first. Passing it is the only deviation, and it names the same connection
-   * Rails' body would have read.
+   * operates on `@raw_connection`, so this one is too. `_doAcquire` publishes
+   * the freshly-opened socket as `_rawConnection` before dispatching here, the
+   * way Rails' `connect` assigns `@raw_connection` before calling
+   * `configure_connection` — there is no pre-install window to configure
+   * through, and no parameter naming one.
    *
    * The inherited `reconnectBang` lifecycle calls this argless after the raw
    * `reconnect()` has nulled `_rawConnection`; PG opens the new connection
@@ -2950,8 +2948,8 @@ export class PostgreSQLAdapter
    *
    * @internal
    */
-  async configureConnection(client?: pg.Client): Promise<void> {
-    const conn = client ?? this._rawConnection;
+  async configureConnection(): Promise<void> {
+    const conn = this._rawConnection;
     if (!conn) return;
     return this._maybeConfigureConnection(conn);
   }

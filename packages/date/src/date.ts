@@ -1534,6 +1534,15 @@ function parseDay(str: string, hash: DateParts): string | null {
 const NUMBER = "(?<!\\d)\\d";
 
 /**
+ * @internal Onig's `\b` over a UTF-8 String is Unicode-aware, so it closes a
+ * zone spelled in non-ASCII letters (`test_parse_utf8`'s `"日本"`); JS's `\b` is
+ * defined over ASCII `\w` alone and would not. This is that boundary, in the
+ * one position — the end of `parse_time`'s alphabetic zone alternatives
+ * (`date_parse.c:720-723`) — where the difference is observable.
+ */
+const WORD_BOUNDARY = "(?![\\p{L}\\p{N}_])";
+
+/**
  * @internal `date_parse.c` `parse_time2_cb` (`date_parse.c:613-653`): the hour/minute/second of the time
  * text `parse_time` matched, with `p`/`pm` moving the hour into the afternoon.
  */
@@ -1598,6 +1607,10 @@ function parseTimeCb(m: RegExpExecArray, hash: DateParts): number {
  * Ruby turns `IGNORECASE` back off around the two alphabetic zone spellings
  * (`(?-i:…)`); the groups it guards are character classes that already span
  * both cases, so the ported pattern is the same language without the flag.
+ *
+ * Onig's `[[:alpha:]]` is Unicode-aware over a UTF-8 String, so a zone spelled
+ * in non-ASCII letters — `test_parse_utf8`'s `"日本"` — is a zone there. `\p{Alpha}`
+ * under the `u` flag is the JS class with that repertoire; `[A-Za-z]` is not.
  */
 function parseTime(str: string, hash: DateParts): string | null {
   const patSource =
@@ -1626,12 +1639,14 @@ function parseTime(str: string, hash: DateParts): string | null {
     "(" +
     "(?:gmt|utc?)?[-+]\\d+(?:[,.:]\\d+(?::\\d+)?)?" +
     "|" +
-    "[A-Za-z.\\s]+(?:standard|daylight)\\stime\\b" +
+    "[\\p{Alpha}.\\s]+(?:standard|daylight)\\stime" +
+    WORD_BOUNDARY +
     "|" +
-    "[A-Za-z]+(?:\\sdst)?\\b" +
+    "[\\p{Alpha}]+(?:\\sdst)?" +
+    WORD_BOUNDARY +
     ")" +
     ")?";
-  return subx(str, " ", new RegExp(patSource, "i"), hash, parseTimeCb);
+  return subx(str, " ", new RegExp(patSource, "iu"), hash, parseTimeCb);
 }
 
 /**
@@ -5436,7 +5451,7 @@ export class Date {
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
    */
-  static parse(str: string, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
+  static parse(str = JULIAN_EPOCH_DATE, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
     return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
   }
 
@@ -7100,7 +7115,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `Date._parse` followed by the DateTime-shaped build.
    */
   static parse(
-    str: string,
+    str = JULIAN_EPOCH_DATETIME,
     comp = true,
     start = DEFAULT_SG,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
