@@ -361,6 +361,12 @@ export class Time {
    * {@link Time#toDate} with the time of day, the sub-second and the receiver's
    * `utc_offset` carried across. A leap second — `sec == 60` — is stored as
    * `59`, which the gem's `DateTime` has no room for.
+   *
+   * The C reaches `d_complex_new_internal` directly and so hands it `s` and
+   * `sf` as separate fields, and `of` as seconds. That seat is private to
+   * `./date.ts`; the public constructor is the same one `DateTime.now` uses,
+   * and it takes the whole second and its fraction as one `second` and the
+   * offset as a fraction of a day — hence the two `Rational`s here.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     let s = this.sec;

@@ -742,12 +742,11 @@ function rbFloat(val: unknown): number {
  * @internal Ruby `Numeric#coerce` (`numeric.c` `num_coerce`), which is what
  * {@link DateInfinity#coerce}'s `else` arm reaches through `super`
  * (ruby/date, `lib/date.rb:54`). Note the pair comes back `[y, x]` — the
- * OTHER operand first — on both arms.
+ * OTHER operand first — on both arms. `CLASS_OF` is total in Ruby (nil's class
+ * is `NilClass`) where `Object.getPrototypeOf(null)` raises, so a nullish `y`
+ * short-circuits to the unequal-classes arm that `Float()` then rejects.
  */
 function numCoerce(x: unknown, y: unknown): [number, number] {
-  // `CLASS_OF` is total in Ruby — nil's class is NilClass — where
-  // `Object.getPrototypeOf(null)` raises, so the nullish operand short-circuits
-  // to the unequal-classes arm `Float()` then rejects.
   if (y != null && Object.getPrototypeOf(x) === Object.getPrototypeOf(y))
     return [y as number, x as number];
   return [rbFloat(y), rbFloat(x)];
@@ -5710,14 +5709,12 @@ export class Date {
    * trails' `::Time` value is `Temporal.ZonedDateTime` (RFC 0088's mapping
    * table): `Time.local` is a zoned wall-clock time, so the local zone is named
    * rather than an offset frozen in, and the class is not `./time.ts`'s `Time`
-   * because that module imports this one.
+   * because that module imports this one. The C's `if (m_julian_p(adat))
+   * { self = g; }` reassignment is a conditional binding here — the repo's
+   * `@typescript-eslint/no-this-alias` forbids `let self = this`.
    */
   toTime(): Temporal.ZonedDateTime {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let self: Date = this;
-    if (self.isJulian) {
-      self = self.gregorian();
-    }
+    const self: Date = this.isJulian ? this.gregorian() : this;
     return new Temporal.PlainDateTime(Number(self.year), self.mon, self.day).toZonedDateTime(
       Temporal.Now.timeZoneId(),
     );
@@ -6477,14 +6474,12 @@ export class DateTime extends DateWithoutParseStatics {
    * `date_core.c:9032-9062`), `Time.new(y, m, d, h, min, sec + m_sf_in_sec, of)`
    * — the receiver's own offset carried across, where {@link Date#toTime}'s
    * `f_local3` has none to carry. A Julian receiver goes through
-   * `d_lite_gregorian` first, as it does there.
+   * `d_lite_gregorian` first, as it does there. The C's `if (m_julian_p(dat))
+   * { self = g; }` reassignment is a conditional binding here — the repo's
+   * `@typescript-eslint/no-this-alias` forbids `let self = this`.
    */
   override toTime(): Temporal.ZonedDateTime {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let self: DateTime = this;
-    if (self.isJulian) {
-      self = self.gregorian();
-    }
+    const self: DateTime = this.isJulian ? this.gregorian() : this;
     const ns = Number(self.#sf.numerator / self.#sf.denominator);
     return new Temporal.PlainDateTime(
       Number(self.year),

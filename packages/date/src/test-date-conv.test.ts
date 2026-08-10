@@ -27,8 +27,6 @@ describe("TestDateConv", () => {
       expect(o.toTime()).toBeInstanceOf(Temporal.ZonedDateTime);
       expect(o.toDate()).toBeInstanceOf(Temporal.PlainDate);
     }
-    // trails' `::DateTime` value is a `PlainDateTime`, or a `ZonedDateTime`
-    // once an offset is carried — a local-zone `Time` carries one.
     const isDatetime = (v: unknown): boolean =>
       v instanceof Temporal.PlainDateTime || v instanceof Temporal.ZonedDateTime;
     expect(isDatetime(new DateTime(2004, 9, 19, 1, 2, 3).toDatetime())).toBe(true);
@@ -71,8 +69,8 @@ describe("TestDateConv", () => {
     expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
       1582, 10, 15, 0, 0, 0, 0,
     ]);
-    expect(toDateOf(t).equals(d.toDate())).toBe(true);
-    expect(jdOf(t)).toBe(d.jd);
+    expect(timeToDate(t).toDate().equals(d.toDate())).toBe(true);
+    expect(timeToDate(t).jd).toBe(d.jd);
   });
 
   it("to time to date roundtrip  from julian date", () => {
@@ -81,8 +79,8 @@ describe("TestDateConv", () => {
     expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
       1582, 10, 14, 0, 0, 0, 0,
     ]);
-    expect(toDateOf(t).equals(d.toDate())).toBe(true);
-    expect(jdOf(t)).toBe(d.jd);
+    expect(timeToDate(t).toDate().equals(d.toDate())).toBe(true);
+    expect(timeToDate(t).jd).toBe(d.jd);
   });
 
   it("to date  from time", () => {
@@ -95,7 +93,7 @@ describe("TestDateConv", () => {
     expect([d.year, d.month, d.day]).toEqual([2004, 9, 19]);
 
     t = Time.utc(1582, 10, 13, 1, 2, 3, 456789);
-    d = t.toDate(); // using ITALY
+    d = t.toDate();
     expect([d.year, d.month, d.day]).toEqual([1582, 10, 3]);
   });
 
@@ -115,7 +113,7 @@ describe("TestDateConv", () => {
     expect(offsetSeconds(d)).toBe(0);
 
     t = Time.utc(1582, 10, 13, 1, 2, 3, 456789);
-    d = t.toDatetime(); // using ITALY
+    d = t.toDatetime();
     expect([d.year, d.month, d.day, d.hour, d.minute, d.second, usec(d)]).toEqual([
       1582, 10, 3, 1, 2, 3, 456789,
     ]);
@@ -133,12 +131,13 @@ function offsetSeconds(d: Temporal.ZonedDateTime | Temporal.PlainDateTime): numb
   return d instanceof Temporal.ZonedDateTime ? d.offsetNanoseconds / 1_000_000_000 : 0;
 }
 
-/** Ruby `Time#to_date`, off the `Temporal.ZonedDateTime` `to_time` answers. */
-function toDateOf(t: Temporal.ZonedDateTime): Temporal.PlainDate {
-  return new Time(t.year, t.month, t.day, t.hour, t.minute, t.second).toDate();
-}
-
-/** Ruby `Time#to_date.jd`. */
-function jdOf(t: Temporal.ZonedDateTime): number | bigint {
-  return new Date(t.year, t.month, t.day, Date.GREGORIAN).newStart().jd;
+/**
+ * Ruby `Time#to_date`, as the gem-shaped `Date` rather than the `PlainDate`
+ * {@link Time#toDate} answers — the roundtrip tests assert on `jd`, which only
+ * the gem object carries. The receiver is the `Temporal.ZonedDateTime` that is
+ * trails' `::Time` value, so it goes back through `Time` first.
+ */
+function timeToDate(t: Temporal.ZonedDateTime): Date {
+  const time = new Time(t.year, t.month, t.day, t.hour, t.minute, t.second);
+  return new Date(time.year, time.mon, time.day, Date.GREGORIAN).newStart();
 }

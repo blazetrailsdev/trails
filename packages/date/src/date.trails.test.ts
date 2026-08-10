@@ -1194,7 +1194,6 @@ describe("Date", () => {
     expect(d.isEql(new RubyDateTime(2002, 3, 19, 0, 0, 0))).toBe(true);
     expect(d.isEql(new RubyDateTime(2002, 3, 19, 0, 0, 1))).toBe(false);
 
-    // `==` reaches `cmp_gen`'s Numeric arm; `eql?` stops at `!k_date_p`.
     expect(d.equals(d.ajd)).toBe(true);
     expect(d.isEql(d.ajd)).toBe(false);
     expect(d.isEql("2002-03-19")).toBe(false);
@@ -1815,9 +1814,6 @@ describe("Date::Infinity", () => {
   });
 
   it("builds from a NaN and stores Ruby's nil, raising per reader off it", () => {
-    // `lib/date.rb:19` is `@d = d <=> 0`, and `Float::NAN <=> 0` is nil, so the
-    // object BUILDS. Every reader that calls a method on `@d` then raises
-    // NoMethodError at its own call site, as Ruby does.
     const nan = new RubyDate.Infinity(Number.NaN);
     expect(() => nan.isInfinite()).toThrow("undefined method 'nonzero?' for nil");
     expect(() => nan.isNan()).toThrow("undefined method 'zero?' for nil");
@@ -1826,13 +1822,11 @@ describe("Date::Infinity", () => {
     expect(() => nan.coerce(1)).toThrow("undefined method '-@' for nil");
     expect(() => nan.toF()).toThrow("undefined method '>' for nil");
 
-    // `<=>` is the one operator nil answers, so these do not raise.
     expect(nan.compareTo(1000)).toBeNull();
     expect(nan.compareTo(Number.POSITIVE_INFINITY)).toBeNull();
     expect(nan.compareTo(new RubyDate.Infinity())).toBeNull();
     expect(nan.compareTo(new RubyDate.Infinity(Number.NaN))).toBe(0);
 
-    // `zero?`, `finite?` and `abs` never read `@d`.
     expect(nan.isZero()).toBe(false);
     expect(nan.isFinite()).toBe(false);
     expect(nan.abs().toF()).toBe(Number.POSITIVE_INFINITY);
@@ -1881,8 +1875,6 @@ describe("Date::Infinity", () => {
     expect(new RubyDate.Infinity().coerce(1)).toEqual([-1, 1]);
     expect(new RubyDate.Infinity(-1).coerce(new Rational(1, 2))).toEqual([1, -1]);
 
-    // The `else` arm is `super` — `Numeric#coerce`, `[Float(other), Float(self)]`,
-    // where `Float(self)` goes through `to_f` and so answers an infinity.
     expect(new RubyDate.Infinity().coerce("1.5")).toEqual([1.5, Number.POSITIVE_INFINITY]);
     expect(() => new RubyDate.Infinity().coerce("foo")).toThrow('invalid value for Float(): "foo"');
     expect(() => new RubyDate.Infinity().coerce(null)).toThrow("can't convert nil into Float");
