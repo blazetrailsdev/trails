@@ -73,12 +73,10 @@ describe("reseed", () => {
     expect(reseed([key()], [entry()], "SEED")[0].reason).toBe("reviewed");
   });
 
-  it("seeds a new row with the default reason", () => {
-    expect(reseed([key({ call: "quote" })], [entry()], "SEED")[0].reason).toBe("SEED");
-  });
-
-  it("drops a baseline entry that no longer flags", () => {
-    expect(reseed([], [entry()], "SEED")).toEqual([]);
+  it("seeds a new row with the default reason, dropping the entry that no longer flags", () => {
+    expect(reseed([key({ call: "quote" })], [entry()], "SEED")).toEqual([
+      { ...key({ call: "quote" }), reason: "SEED" },
+    ]);
   });
 
   it("collapses duplicate keys into one entry", () => {
