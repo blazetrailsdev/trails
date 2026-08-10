@@ -2456,13 +2456,16 @@ export function main() {
       // receives; computed only under `--calls`, the mode that writes it.
       const checkCallArgs = (rubyName: string, tsName: string, tsFile: string) => {
         if (!callsGate) return;
-        // Same population as checkCalls, weak calls and all (dropWeakCalls above):
-        // a name whose every occurrence had an inert receiver (`xs.map`,
-        // `opts.fetch`) collides with an unrelated ported method and says
-        // nothing about the port. The call-argument stream carries no per-site
-        // weak marking, so the method's weak NAMES are what filters it.
-        const weakCalls = new Set(rubyWeakCallsByName.get(rubyName) ?? []);
-        const rubySites = rubyCallArgsByName.get(rubyName)?.filter((s) => !weakCalls.has(s.name));
+        // Same exclusion checkCalls makes through `dropWeakCalls`: a call on an
+        // inert receiver (`xs.map`, `opts.fetch`) collides by name with an
+        // unrelated ported method and says nothing about the port. Filtered per
+        // SITE, on the flag extract-ruby-api.rb#record_call_site records from
+        // `inert_receiver?` — the call-set gate has no per-site identity and can
+        // only drop whole NAMES, but here a name that is weak at one site and a
+        // genuine call at another would lose both sites to a name filter.
+        const rubySites = rubyCallArgsByName
+          .get(rubyName)
+          ?.filter((s) => !s.flags.includes("weak"));
         if (!rubySites || rubySites.length === 0) return;
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a

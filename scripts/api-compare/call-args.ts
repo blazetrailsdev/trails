@@ -259,7 +259,27 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
     if (argKeysEqual(rubyArgs[i], tsArgs[i])) continue;
     if (!rubyArgs[i].startsWith("ref:") || !tsArgs[i].startsWith("ref:")) return "shape";
   }
-  return "naming";
+  // A list carrying the SAME refs in a different order is the reordering this
+  // comment promises, not a rename: `inject_join(list, collector, join_str)`
+  // ported as `injectJoin(nodes, connector, collector)` (to_sql.rb:897) reads
+  // ref-for-ref as two renames and is the argument-ORDER defect RFC 0095 exists
+  // to catch. Only the gated class sees it, so it must not fall through to
+  // `naming`.
+  return isPermutation(rubyArgs, tsArgs) ? "shape" : "naming";
+}
+
+/** Whether the two lists hold the same argument keys in a different order.
+ *  Greedy, not a set difference: {@link argKeysEqual} is not transitive (a Ruby
+ *  `empty?` matches both `isEmpty` and `empty`), so a key must be consumed by
+ *  the partner it matched. */
+function isPermutation(rubyArgs: string[], tsArgs: string[]): boolean {
+  const remaining = [...tsArgs];
+  for (const rubyArg of rubyArgs) {
+    const i = remaining.findIndex((tsArg) => argKeysEqual(rubyArg, tsArg));
+    if (i === -1) return false;
+    remaining.splice(i, 1);
+  }
+  return true;
 }
 
 /** Drop the leading `this` the mixin idiom adds — only when doing so is what

@@ -1,46 +1,29 @@
 #!/usr/bin/env npx tsx
 /**
- * Read-only grouping of the advisory call-argument artifact (RFC 0095),
- * mirroring `lint-call-mismatches.ts --report`.
+ * Read-only grouping of the call-argument artifact (RFC 0095), mirroring
+ * `lint-call-mismatches.ts --report`.
  *
  *   pnpm tsx scripts/api-compare/report-call-args.ts --report [--top=N]
  *
  * Reports output/call-arg-mismatches.json, which compare.ts writes only under
- * `--calls` (see its callsGate block). There is no gate and no baseline yet:
- * RFC 0095 lands the artifact advisory-first, and the ratchet
- * (call-mismatches-args-exclude/) arrives with the seeding story. So this is a
- * `report-*` script, not a `lint-*` one — it never fails a build, and the
- * `--report` flag is required so the invocation reads the same as the
- * call-mismatches one it mirrors, and so a future gating mode can take the
- * default.
+ * `--calls` (see its callsGate block). It stays a `report-*` script — one that
+ * never fails a build — even though the dimension now has a ratchet
+ * (lint-call-args.ts): the gate covers `shape` rows only, so this is where the
+ * `naming` half of the population is visible. {@link renderReport} is what
+ * `lint-call-args.ts --report` renders, so the two spellings cannot drift.
  */
 import * as path from "path";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import type { CallArgArtifact } from "./call-args-baseline.js";
 import { parseTop, section, tally } from "./lint-call-mismatches.js";
+
+export { parseTop };
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 
-interface CallArgRow {
-  package: string;
-  rubyFile: string;
-  tsFile: string;
-  rubyName: string;
-  tsName: string;
-  call: string;
-  class: string;
-  rubyArgs: string[];
-  tsArgs: string[];
-}
-
-interface Artifact {
-  compared: number;
-  mismatched: number;
-  mismatches: CallArgRow[];
-}
-
-export function renderReport(artifact: Artifact, top: number): string {
+export function renderReport(artifact: CallArgArtifact, top: number): string {
   const rows = artifact.mismatches;
   const files = new Set(rows.map((r) => `${r.package} ${r.tsFile}`)).size;
   return [
@@ -68,9 +51,9 @@ export function renderReport(artifact: Artifact, top: number): string {
 }
 
 async function reportMain(top: number): Promise<number> {
-  let artifact: Artifact;
+  let artifact: CallArgArtifact;
   try {
-    artifact = JSON.parse(await readFile(ARTIFACT_PATH, "utf8")) as Artifact;
+    artifact = JSON.parse(await readFile(ARTIFACT_PATH, "utf8")) as CallArgArtifact;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     console.error(

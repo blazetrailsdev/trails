@@ -1,0 +1,141 @@
+/**
+ * Shared machinery for the call-ARGUMENT parity ratchet (RFC 0095, gate:
+ * lint-call-args.ts): the row shape, the key grain the baseline is recorded at,
+ * and the diff/reseed/sort primitives the gate agrees on.
+ *
+ * This mirrors call-mismatch-baseline.ts (the call-SET ratchet, RFC 0047) and
+ * deliberately does NOT reuse its key: that key is
+ * `package + tsFile + rubyName + call`, which has no argument component, so two
+ * differently-wrong argument lists at the same call would collapse into one
+ * row. RFC 0084 also measures that baseline's ROW COUNT as the call-set debt
+ * metric, and folding a second dimension into it corrupts the measurement. So
+ * the two trees stay separate, and only the pieces that are genuinely
+ * dimension-neutral — the split-file writer's primitives in baseline-json.ts,
+ * the pre-gate regeneration in gate-regen.ts, the partial-scope guard in
+ * call-mismatch-baseline.ts — are shared.
+ *
+ * Only `shape` rows are gated (RFC 0095 §4): argument count, order, literal
+ * values and kwarg keys. `naming` rows — lists differing only in how a `ref:`
+ * identifier is spelled — are the local/parameter-identifier dimension
+ * surfacing through the argument comparison, and stay report-only until the
+ * disposition story gives them a burndown of their own.
+ *
+ * Hard rules: no node:* imports, no process.*, async fs only.
+ */
+
+/** One flagged call site, at the grain the baseline records. `rubyArgs` is part
+ *  of the key: the same call in the same method can be wrong in two different
+ *  ways at two sites, and each converges separately. */
+export interface CallArgKey {
+  package: string;
+  tsFile: string;
+  rubyName: string;
+  call: string;
+  rubyArgs: string[];
+}
+
+export interface CallArgExcludeEntry extends CallArgKey {
+  reason: string;
+}
+
+/** One `mismatches` row of output/call-arg-mismatches.json (compare.ts). */
+export interface CallArgRow extends CallArgKey {
+  rubyFile: string;
+  tsName: string;
+  class: string;
+  tsArgs: string[];
+}
+
+export interface CallArgArtifact {
+  /** The packages the run compared; absent on an artifact predating the field,
+   *  which `missingScope` reads as the partial scope it is. */
+  packages?: string[];
+  compared: number;
+  mismatched: number;
+  mismatches: CallArgRow[];
+}
+
+/** The gated class (RFC 0095 §4). */
+export const GATED_CLASS = "shape";
+
+export function keyOf(k: CallArgKey): string {
+  return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call} ${k.rubyArgs.join(",")}`;
+}
+
+/** The artifact rows the gate ratchets: `shape` only. */
+export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
+  return artifact.mismatches.filter((m) => m.class === GATED_CLASS);
+}
+
+export interface CallArgDiff {
+  added: CallArgKey[]; // flagged now, not in baseline — the ratchet failure
+  stale: CallArgExcludeEntry[]; // in baseline, no longer flags — only-shrink
+}
+
+export function diffAgainstBaseline(
+  current: CallArgKey[],
+  baseline: CallArgExcludeEntry[],
+): CallArgDiff {
+  const currentKeys = new Set(current.map(keyOf));
+  const baselineKeys = new Set(baseline.map(keyOf));
+  return {
+    added: current.filter((k) => !baselineKeys.has(keyOf(k))),
+    stale: baseline.filter((e) => !currentKeys.has(keyOf(e))),
+  };
+}
+
+/**
+ * Total order on baseline entries: ascending UTF-16 code-unit order of
+ * `keyOf`. Deliberately NOT `localeCompare`, for the reason spelled out in
+ * call-mismatch-baseline.ts#compareKeys — ICU collation is locale- and
+ * ICU-version-dependent, so a reseed run by one agent reorders another's files.
+ */
+export function compareKeys(a: CallArgKey, b: CallArgKey): number {
+  const ka = keyOf(a);
+  const kb = keyOf(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
+export function sortKeys<T extends CallArgKey>(entries: T[]): T[] {
+  return [...entries].sort(compareKeys);
+}
+
+/**
+ * Rebuild the baseline from the live artifact: keep each still-flagging row,
+ * reusing a prior reason when present and seeding new ones with
+ * `defaultReason`. Dropped rows are the stale entries the gate rejects.
+ */
+export function reseed(
+  current: CallArgKey[],
+  baseline: CallArgExcludeEntry[],
+  defaultReason: string,
+): CallArgExcludeEntry[] {
+  const reasons = new Map(baseline.map((e) => [keyOf(e), e.reason]));
+  const byKey = new Map<string, CallArgExcludeEntry>();
+  for (const k of current) {
+    const key = keyOf(k);
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      package: k.package,
+      tsFile: k.tsFile,
+      rubyName: k.rubyName,
+      call: k.call,
+      rubyArgs: k.rubyArgs,
+      reason: reasons.get(key) ?? defaultReason,
+    });
+  }
+  return sortKeys([...byKey.values()]);
+}
+
+/** Baseline keys recorded twice — malformed, because the diff would then
+ *  tolerate one of the pair going stale forever. */
+export function findDuplicateKeys(baseline: CallArgExcludeEntry[]): string[] {
+  const seen = new Set<string>();
+  const dups = new Set<string>();
+  for (const e of baseline) {
+    const k = keyOf(e);
+    if (seen.has(k)) dups.add(k);
+    seen.add(k);
+  }
+  return [...dups];
+}

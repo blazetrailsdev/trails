@@ -2375,6 +2375,14 @@ class ApiExtractor
     name = call_site_name(callee)
     if name
       site_flags = flags.dup
+      # The per-SITE half of walk_for_calls' `weak` tally, from the same
+      # inert_receiver? verdict: `xs.map` says nothing about the port. Recorded
+      # per site rather than folded into a per-method weak NAME set, because a
+      # name that is weak at one site can be a genuine ported-collaborator call
+      # at another (`Nodes::Union.new` in select_manager.rb#union), and a name
+      # filter drops both.
+      site_flags << "weak" if (callee[0] == :call || callee[0] == :command_call) &&
+                              inert_receiver?(callee[1])
       descriptors = describe_args(args, site_flags)
       sites << { name: name, args: descriptors, flags: site_flags.uniq }
     end

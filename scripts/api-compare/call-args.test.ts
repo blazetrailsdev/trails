@@ -206,6 +206,15 @@ describe("compareCallArgs", () => {
     expect(result.class).toBe("naming");
   });
 
+  it("flags a reordering of the same identifiers as shape, not naming", () => {
+    const result = compareCallArgs(
+      site("inject_join", ["id:nodes", "id:collector", "id:connector"]),
+      site("injectJoin", ["id:nodes", "id:connector", "id:collector"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
   it("skips a splat on either side", () => {
     expect(
       compareCallArgs(site("build", ["*splat"], ["splat"]), site("build", ["id:x"])).verdict,

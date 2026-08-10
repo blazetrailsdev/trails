@@ -317,6 +317,21 @@ write.
    exclude tree and buries the one row you meant to retire in an unreviewable
    diff.
 
+   **Also run the call-ARGUMENT gate**, which the call-set one cannot see past
+   — a body that calls what Rails calls, with a different argument list, is
+   green on `parity:api:calls`:
+
+   ```bash
+   pnpm parity:api:calls:args   # the call-argument ratchet (RFC 0095)
+   ```
+
+   Same only-shrink contract, same no-reseed rule, over its own tree
+   (`call-mismatches-args-exclude/`, keyed with the argument list). It gates
+   `shape` rows — count, order, literal values, kwarg keys; `naming` rows (a
+   `ref:` identifier spelled differently) are report-only via
+   `pnpm parity:api:calls:args:report`. New row? Pass what Rails passes;
+   baselining is the fallback and costs a reviewed one-line `reason`.
+
 3. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
    Rails-matched file with no Ruby counterpart. Anything you added and can't
