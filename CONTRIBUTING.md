@@ -121,12 +121,12 @@ packages byte-identical.)
 Any PR that converges a visitor or method body toward Rails can trip this, so
 run the ratchet locally whenever you change a ported method body.
 
-#### The call-ARGUMENT ratchet (`pnpm api:calls:args`)
+#### The call-ARGUMENT ratchet (`pnpm parity:api:calls:args`)
 
 RFC 0095 adds a second, independent gate over the same `--calls` extraction:
 `api:calls` compares the SET OF CALL NAMES a body makes, so a port can call
 `where` where Rails calls `where`, hand it a completely different argument list,
-and stay green. `pnpm api:calls:args` (`lint-call-args.ts`, CI step
+and stay green. `pnpm parity:api:calls:args` (`lint-call-args.ts`, CI step
 "Call-argument ratchet") ratchets `output/call-arg-mismatches.json` against its
 own tree, `scripts/api-compare/call-mismatches-args-exclude/`, keyed
 `package + tsFile + rubyName + call + rubyArgs` and sharded per source file.
@@ -142,7 +142,7 @@ Two things are specific to it:
   keys. `naming` rows, where the two lists differ only in how a `ref:`
   identifier is spelled, are the local/parameter-identifier dimension surfacing
   through the argument comparison; they are report-only, and
-  `pnpm api:calls:args:report` is the only place they are visible.
+  `pnpm parity:api:calls:args:report` is the only place they are visible.
 - **A reordering is `shape`, not `naming`.** The same identifiers in a different
   order is an argument-ORDER defect (`inject_join(list, collector, join_str)`
   ported as `injectJoin(nodes, connector, collector)`), and it is gated.

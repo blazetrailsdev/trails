@@ -33,7 +33,7 @@
  * thing — a fully converged dimension is a real state and stays gated.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
- * `pnpm api:compare --calls` (see gate-regen.ts): gating a stale artifact is
+ * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
  * what makes a sibling PR's deleted method surface as a STALE row on a branch
  * that never touched it. CI opts out — it runs the extraction step separately
  * and must not pay for it twice.
@@ -134,7 +134,7 @@ async function loadArtifact(): Promise<CallArgArtifact> {
   );
   if (!exists) {
     throw new Error(
-      `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm api:compare --calls\` ` +
+      `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm parity:api --calls\` ` +
         "first to write it.",
     );
   }
@@ -168,7 +168,7 @@ export async function main(write: boolean): Promise<number> {
         "It covers fewer packages than CI (an unfetched vendor source, a " +
         "`--package`-filtered run, or a stale artifact); reseeding or gating " +
         "from it would desync local vs CI. Regenerate the full surface:\n" +
-        "  API_COMPARE_FORCE=1 pnpm api:compare --calls\n",
+        "  API_COMPARE_FORCE=1 pnpm parity:api --calls\n",
     );
     return 1;
   }
