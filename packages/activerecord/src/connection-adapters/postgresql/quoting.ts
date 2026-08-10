@@ -77,12 +77,30 @@ export interface CastTypeLookup {
     | Promise<{ serialize?(value: unknown): unknown } | null>;
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting::QUOTED_COLUMN_NAMES / QUOTED_TABLE_NAMES
+ * (postgresql/quoting.rb:9-10) — the `Concurrent::Map`s the class-side quoters memoize
+ * through. Keyed on the name exactly as passed, as in Ruby (postgresql/quoting.rb:46-56).
+ */
+const QUOTED_COLUMN_NAMES = new Map<string, string>();
+const QUOTED_TABLE_NAMES = new Map<string, string>();
+
 export function quoteTableName(name: string): string {
-  return ArelVisitors.quoteSchemaQualifiedName(name);
+  let quoted = QUOTED_TABLE_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = ArelVisitors.quoteSchemaQualifiedName(name);
+    QUOTED_TABLE_NAMES.set(name, quoted);
+  }
+  return quoted;
 }
 
 export function quoteColumnName(name: string): string {
-  return `"${name.replace(/"/g, '""')}"`;
+  let quoted = QUOTED_COLUMN_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `"${name.replace(/"/g, '""')}"`;
+    QUOTED_COLUMN_NAMES.set(name, quoted);
+  }
+  return quoted;
 }
 
 /**

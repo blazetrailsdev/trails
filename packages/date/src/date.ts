@@ -2531,22 +2531,6 @@ function dateHttpdate(str: string): DateParts {
   return hash;
 }
 
-/**
- * @internal `date_core.c` `rt_complete_frags` (`date_core.c:3878-4036`), which
- * decides what kind of date the fields name — the entry of its table with the
- * most of them present wins, ties going to the earliest — and then fills the
- * ones the string left out: the fields above the highest it named come from
- * `Date.today`, the ones below it are `1`. `"Feb 3rd".to_date` is this year's 3
- * February — the case Rails tests at
- * `activesupport/test/core_ext/string_ext_test.rb:775` — and `"102".to_date` is
- * this year's 102nd day.
- *
- * The week-numbered entries win on a string that names a `:year`, a `:wday`
- * and a time — four fields against the civil entry's two — so `"wed 10:00:00
- * '01"` is the Wednesday of `:wnum0` week `0` of 2001 rather than a 1 January
- * date. `:time` names no date, so it has no completion branch here — Ruby's
- * only fills a `:jd` for `DateTime` — and the string goes on to raise.
- */
 /** `date_core.c`'s `JULIAN_EPOCH_DATE` (`date_core.c:251`). */
 const JULIAN_EPOCH_DATE = "-4712-01-01";
 
@@ -3179,6 +3163,20 @@ function rtRewriteFrags(hash: DateParts): DateParts {
  * is read only by the `time` block below — `f_le_p(klass, cDateTime)`
  * (`:4098`), which is what makes a time-only frag set answer TODAY's date
  * through `DateTime.strptime` and stay a `Date::Error` through `Date.strptime`.
+ *
+ * It decides what kind of date the fields name — the entry of its table with
+ * the most of them present wins, ties going to the earliest — and then fills
+ * the ones the string left out: the fields above the highest it named come
+ * from `Date.today`, the ones below it are `1`. `"Feb 3rd".to_date` is this
+ * year's 3 February — the case Rails tests at
+ * `activesupport/test/core_ext/string_ext_test.rb:775` — and `"102".to_date`
+ * is this year's 102nd day.
+ *
+ * The week-numbered entries win on a string that names a `:year`, a `:wday`
+ * and a time — four fields against the civil entry's two — so `"wed 10:00:00
+ * '01"` is the Wednesday of `:wnum0` week `0` of 2001 rather than a 1 January
+ * date. `:time` names no date, so it has no completion branch here — Ruby's
+ * only fills a `:jd` for `DateTime` — and the string goes on to raise.
  */
 function completeFrags(klass: typeof Date | typeof DateTime, parts: DateParts): void {
   const tab: [string | null, DateFrag[]][] = [

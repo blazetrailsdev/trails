@@ -44,34 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "exec_delete",
-    "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "exec_delete",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "exec_update",
-    "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
-    "rubyName": "exec_update",
-    "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/database-statements.ts",
     "rubyName": "execute",
     "call": "internal_execute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
