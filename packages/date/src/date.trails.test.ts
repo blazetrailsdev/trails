@@ -1796,9 +1796,7 @@ describe("DateTime", () => {
   });
 
   // `test_date_arith.rb`'s `test_new_offset` only reads `#offset` back, so it
-  // never forces the deferred civil seat that `set_of` (`date_core.c:5890-5898`)
-  // runs `get_c_jd`/`get_c_df` for. A civil-built receiver carries no stored
-  // day or day-fraction until then.
+  // never forces the deferred day/day-fraction that `set_of` materialises.
   it("forces the deferred civil seat before copying it under the new offset", () => {
     const d = new RubyDateTime(2002, 3, 14);
     const shifted = d.newOffset("+0900");
