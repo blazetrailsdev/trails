@@ -4445,7 +4445,10 @@ export class DateInfinity {
    * `coerce`. Ruby spells that fallback `rescue NoMethodError`; the equivalent
    * here is the presence check rather than a `catch`, because JS reports a
    * missing method as the same `TypeError` a real `coerce` would raise from
-   * inside itself, and Ruby lets that one through.
+   * inside itself, and Ruby lets that one through. The pair it answers goes
+   * back through `l <=> r` (`lib/date.rb:43`) — the same nil-producing
+   * {@link spaceship} the arms above use, so an incomparable or NaN-ish pair
+   * answers `nil` rather than a `NaN` a raw `Math.sign` would let out.
    */
   compareTo(other: unknown): number | null {
     if (other instanceof DateInfinity) return spaceship(this.d(), other.d());
@@ -4455,7 +4458,7 @@ export class DateInfinity {
     const coerce = (other as { coerce?: (x: unknown) => [number, number] } | null)?.coerce;
     if (typeof coerce === "function") {
       const [l, r] = coerce.call(other, this);
-      return Math.sign(l - r);
+      return spaceship(l, r);
     }
     return null;
   }

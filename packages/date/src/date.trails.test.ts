@@ -1869,6 +1869,17 @@ describe("Date::Infinity", () => {
     const coercible = { coerce: () => [-1, 1] as [number, number] };
     expect(new RubyDate.Infinity().compareTo(coercible)).toBe(-1);
     expect(new RubyDate.Infinity().compareTo("foo")).toBeNull();
+
+    const equal = { coerce: () => [1, 1] as [number, number] };
+    expect(new RubyDate.Infinity().compareTo(equal)).toBe(0);
+
+    const incomparable = { coerce: () => [Number.NaN, 1] as [number, number] };
+    expect(new RubyDate.Infinity().compareTo(incomparable)).toBeNull();
+
+    const bothInfinite = {
+      coerce: () => [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY] as [number, number],
+    };
+    expect(new RubyDate.Infinity().compareTo(bothInfinite)).toBe(0);
   });
 
   it("coerces a Numeric to the pair Ruby answers, and supers to Numeric#coerce otherwise", () => {
