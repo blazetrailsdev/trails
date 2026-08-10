@@ -6594,9 +6594,9 @@ export class Date {
    * the raise. The Rational arm keeps the C's `wholenum_p` / `rb_rational_num`
    * / `goto again` re-dispatch (`:6179-6182`) as {@link wholenumP} over
    * {@link bigNorm}, since a Rational whose denominator reduced to one is an
-   * Integer to Ruby before the switch ever runs. `modf` splits off a Float's fractional part and
-   * leaves the whole one in its out-parameter; JS has no `modf`, so the two
-   * halves are taken separately.
+   * Integer to Ruby before the switch ever runs. `modf` splits off a Float's
+   * fractional part and leaves the whole one in its out-parameter; JS has no
+   * `modf`, so the two halves are taken separately.
    *
    * Both fractional arms end at `d_simple_new_internal` rather than
    * `d_complex_new_internal` only when `!df && f_zero_p(sf) && !m_of(dat)`;
