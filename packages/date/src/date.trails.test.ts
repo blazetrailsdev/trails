@@ -1148,6 +1148,25 @@ describe("Date", () => {
     expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
       "3232350070754114273-01-08T01:02:03+00:00",
     );
+
+    // A year one CM_PERIOD_GCY (584388) past the residue is the smallest such
+    // day, and it is the one the residue reading answered a plausible date for
+    // — 600000 came back spelled "+015600-..." from every one of these.
+    //   Date.civil(600000, 2, 29).to_s      #=> "600000-02-29"
+    //   Date.ordinal(600000, 60).to_s       #=> "600000-02-29"
+    //   Date.commercial(600000, 9, 6).to_s  #=> "600000-03-04"
+    //   Date.civil(600000, 2, 29).jd        #=> 220866619
+    for (const build of [
+      () => RubyDate.civil(600000, 2, 29),
+      () => RubyDate.ordinal(600000, 60),
+      () => RubyDate.commercial(600000, 9, 6),
+      () => RubyDate.weeknum(600000, 9, 6),
+    ]) {
+      expect(build).toThrow(RubyDate.Error);
+      expect(build).toThrow("invalid date");
+    }
+    expect(dNewByFrags({ year: 600000, yday: 60 }).toS()).toBe("600000-02-29");
+    expect(dNewByFrags({ year: 600000, yday: 60 }).jd).toBe(220866619);
   });
 
   it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
@@ -2143,5 +2162,35 @@ describe("Date's second registration names", () => {
     expect(RubyDate.isLeap(1900)).toBe(false);
     expect(RubyDate.isLeap(2004)).toBe(true);
     expect(() => RubyDate.isLeap("2000")).toThrow(TypeError);
+  });
+});
+
+/**
+ * `rational.c`'s `rb_rational_canonicalize` folds a denominator of one back to
+ * an Integer, so a reducible Rational reaches `date_core.c`'s `FIXNUM_P` /
+ * `wholenum_p` branches as an Integer. The gem's own tests pass Integers
+ * throughout and never exercise it, which is why these live here.
+ */
+describe("Rational canonicalization at the C's Integer branches", () => {
+  it("takes d_lite_rshift's FIXNUM_P arm for a reducible f_mul(n, 12)", () => {
+    // ruby 3.3.11 -rdate:
+    //   Date.new(2000,1,31).next_year(Rational(1,2)).to_s #=> "2000-07-31"
+    //   (Date.new(2000,1,31) >> Rational(1,2)).to_s       #=> "2000-01-31"
+    //   (Date.new(2000,1,31) >> Rational(3,2)).to_s       #=> "2000-02-29"
+    //   Date.new(2000,1,31).next_year(Rational(4,2)).to_s #=> "2002-01-31"
+    expect(new RubyDate(2000, 1, 31).nextYear(new Rational(1, 2)).toS()).toBe("2000-07-31");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(1, 2)).toS()).toBe("2000-01-31");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(3, 2)).toS()).toBe("2000-02-29");
+    expect(new RubyDate(2000, 1, 31).nextYear(new Rational(4, 2)).toS()).toBe("2002-01-31");
+  });
+
+  it("takes d_lite_plus's wholenum_p re-dispatch for a whole Rational", () => {
+    // ruby 3.3.11 -rdate: a Rational(2,1) addend is the Integer 2, so the day
+    // is whole and the result is a simple Date — no day_fraction at all.
+    //   (Date.new(2001,1,1) + Rational(2,1)).to_s        #=> "2001-01-03"
+    //   (Date.new(2001,1,1) + Rational(2,1)).jd           #=> 2451913
+    const d = new RubyDate(2001, 1, 1).plus(new Rational(2, 1));
+    expect(d.toS()).toBe("2001-01-03");
+    expect(d.jd).toBe(2451913);
   });
 });

@@ -43,6 +43,16 @@ pre-split entry means deleting that one row by hand in the same commit.
   mark contract that `lint-assertion-mismatches.ts` enforces, and is not itself
   an entry point.
 
+## The legacy-spelling gate
+
+`lint-legacy-script-names.ts` (`pnpm parity:legacy-names`, and a step in the
+`Rails API/Test Comparison` job) fails on any retired compare-script spelling
+anywhere outside `vendor/rails/` and build output. The deprecated aliases in
+the root `package.json` keep out-of-repo callers working; they are not a
+licence to write the old names in a comment, a doc or a script. The fix for a
+hit is always the `parity:*` spelling — the three-entry allowlist in
+`legacy-script-names.ts` is closed.
+
 ## Baselines, marks and excludes
 
 Every file below records **known, unfixed divergence**. They are all

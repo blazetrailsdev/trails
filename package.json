@@ -41,6 +41,7 @@
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
     "parity:api:pins:all": "API_COMPARE_FORCE=1 pnpm parity:api && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
     "parity:api:moves": "pnpm tsx scripts/api-compare/moves.ts",
+    "parity:legacy-names": "pnpm tsx scripts/parity/lint-legacy-script-names.ts",
     "parity:api:conventions": "pnpm tsx scripts/parity/conventions-doc.ts",
     "parity:api:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "parity:test": "bash scripts/test-compare/run.sh",

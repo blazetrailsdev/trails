@@ -1387,6 +1387,13 @@ jobs:
         # api-compare manifests the step above already wrote. No --exclude-glob:
         # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
+      - name: Legacy compare-script name gate
+        # RFC 0092. Fails on any retired compare-script spelling reintroduced
+        # anywhere outside vendor/rails and build output — the aliases in the
+        # root package.json are a shim for out-of-repo callers, not a licence to
+        # write the old names. The fix is the parity:* spelling, never a new
+        # allowlist row. Read-only; needs no Ruby or artifact.
+        run: pnpm exec tsx scripts/parity/lint-legacy-script-names.ts
       - name: Arity excludes gate
         # Fails on a malformed or STALE entry in
         # scripts/api-compare/arity-exclude.json (the reasoned suppression file

@@ -21,7 +21,13 @@ interface TableRebuildInternals {
   ): Promise<void>;
 }
 
-fixtures([]);
+fixtures([], {
+  // ATTACH/DETACH are refused inside the savepoint-pinned wrapper ("database
+  // aux is locked"), so the ATTACHed-schema case runs uncovered.
+  usesTransaction: [
+    "copyTableIndexes qualifies the INDEX name, not the table, for an ATTACHed schema",
+  ],
+});
 
 describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   let db: SQLite3Adapter;
@@ -75,6 +81,24 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
     await db.addIndex("customers", ["name"], { order: { name: "desc" } });
     await internals().copyTable("customers", "customers2");
     expect(await copiedIndexSql("customers2", "name")).toMatch(/"name"\s+DESC/i);
+  });
+
+  it("copyTableIndexes qualifies the INDEX name, not the table, for an ATTACHed schema", async () => {
+    await db.execute("ATTACH DATABASE ':memory:' AS aux");
+    try {
+      await db.execute(`CREATE TABLE aux.customers (id integer primary key, name varchar(255))`);
+      await db.addIndex("aux.customers", ["name"], { name: "index_customers_on_name" });
+      await internals().copyTable("aux.customers", "aux.customers2");
+      const rows = (await db.execute(
+        `SELECT sql FROM aux.sqlite_master WHERE type='index' AND tbl_name='customers2'`,
+      )) as Array<{ sql: string | null }>;
+      // SQLite takes the schema on the index name and rejects it on the table.
+      expect(rows[0]?.sql).toMatch(/ON\s+"customers2"/i);
+      expect(rows[0]?.sql).not.toMatch(/ON\s+"aux"/i);
+    } finally {
+      await db.dropTable("aux.customers", "aux.customers2", { ifExists: true });
+      await db.execute("DETACH DATABASE aux");
+    }
   });
 
   it("copyTable keeps a column's SQL function default", async () => {

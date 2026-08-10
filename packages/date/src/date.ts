@@ -1134,8 +1134,11 @@ function iGcd(x: bigint, y: bigint): bigint {
  * fractional-hour offset needs: `rb_rational_new` canonicalizes to lowest terms
  * (`rational.c` `nurat_s_canonicalize_internal`), `+` adds an Integer
  * (`rational.c` `nurat_add`), and `numerator`/`denominator` read the parts back
- * out. A Rational never becomes an Integer on its own in Ruby — the caller asks
- * whether the denominator is one and takes the numerator itself.
+ * out. Ruby DOES fold a Rational back to an Integer on its own — every result
+ * passes through `rb_rational_canonicalize` and `Rational(1,2) * 12` is the
+ * Integer `6` — but a TS constructor answers its own class, so the fold lives
+ * in {@link rbRationalCanonicalize} / {@link wholenumP} instead and the ported
+ * bodies that branch on it apply it where the C's `FIXNUM_P` sees it.
  *
  * @noRailsEquivalent PERMANENT — Ruby core, like the `::Date` below it. Rails
  * defines no Rational; it inherits Ruby's, and `Date._parse` answers one for a
@@ -1266,6 +1269,43 @@ export class Rational {
   inspect(): string {
     return `(${this.toString()})`;
   }
+}
+
+/**
+ * @internal `date_core.c` `wholenum_p` (`date_core.c:3183-3206`), true for an
+ * Integer, for a Float that rounds to itself, and for a Rational whose
+ * denominator is one. A JS number is Ruby's Fixnum, Bignum and Float at once,
+ * so `Number.isInteger` is all three of those arms.
+ */
+function wholenumP(x: number | bigint | Rational): boolean {
+  if (typeof x === "number") return Number.isInteger(x);
+  if (typeof x === "bigint") return true;
+  return x.denominator === 1n;
+}
+
+/**
+ * @internal `rational.c` `rb_rational_canonicalize`, which every Rational
+ * arithmetic result passes through: a reduced denominator of one is an INTEGER
+ * to Ruby, not a Rational. `Rational(1,2) * 12` is `6`, and `Rational(9,3)` is
+ * `3` the moment it is built.
+ *
+ * TS cannot spell that in the constructor — a class constructor answers its
+ * class — so a {@link Rational} here stays one and the canonicalization is
+ * applied where Ruby's is observable: to the RESULT of the arithmetic a ported
+ * body then branches on with `FIXNUM_P` ({@link Date#rshift}'s `f_add3`).
+ * Without it that branch has to hand-roll `denominator === 1n`, which is the
+ * shape that made `Date.new(2000,1,31).next_year(Rational(1,2))` read as a
+ * trails-specific workaround rather than as the C's own test.
+ *
+ * A body that tests the ARGUMENT instead branches on {@link wholenumP}, the
+ * name the C uses there (`d_lite_plus`'s `T_RATIONAL` arm, `:6179-6182`).
+ *
+ * The Integer it answers goes through {@link bigNorm}: Ruby has one Integer,
+ * and a numerator past a JS number's exact range is a `bigint` here.
+ */
+function rbRationalCanonicalize(x: number | bigint | Rational): number | bigint | Rational {
+  if (x instanceof Rational && wholenumP(x)) return bigNorm(x.numerator);
+  return x;
 }
 
 /**
@@ -4114,8 +4154,18 @@ function validNthKdayP(
  * and only the conversion to the `Temporal` seat has nowhere to put it.
  *
  * Not exported: it is the seam between the C's Julian day and the substrate.
+ *
+ * The Julian day it takes is the WHOLE one — `encode_jd`'s
+ * (`date_core.c:1404-1412`), not the residue `m_jd` carries. `decode_jd`
+ * (`date_core.c:1393-1402`) splits it back, and a nonzero `nth` is a day at
+ * least one `CM_PERIOD` — `CM_PERIOD_GCY` (584388) Gregorian years — off the
+ * residue, so no `Temporal.PlainDate` (±271821) can hold it and it raises with
+ * the rest. Reading the residue instead silently answers a different,
+ * valid-looking date: `Date.civil(600000, 2, 29)` spelled `+015600-02-29`.
  */
-function plainDateFromJd(rjd: number, sg = DEFAULT_SG): Temporal.PlainDate {
+function plainDateFromJd(jd: number | bigint, sg = DEFAULT_SG): Temporal.PlainDate {
+  const [nth, rjd] = decodeJd(jd);
+  if (nth !== 0n) throw new DateError("invalid date");
   const [y, m, d] = cJdToCivil(rjd, sg);
   try {
     return Temporal.PlainDate.from({ year: y, month: m, day: d }, { overflow: "reject" });
@@ -6642,7 +6692,9 @@ export class Date {
         sf = sf.mul(-1);
       }
     } else {
-      if (other.denominator === 1n) return this.plus(Number(other.numerator));
+      // `wholenum_p(other)` / `rb_rational_num` / `goto again` (`:6179-6182`):
+      // a denominator of one is an Integer to Ruby before the switch ever runs.
+      if (wholenumP(other)) return this.plus(bigNorm(other.numerator));
 
       let s: number;
       if (other.numerator > 0n) s = +1;
@@ -6880,7 +6932,8 @@ export class Date {
    * `Date.new(2000,1,31) >> 1` is 2000-02-29.
    *
    * `other` is any Numeric, so `t` is carried as a {@link Rational}: Ruby
-   * canonicalizes a denominator of 1 back to an Integer, which is what puts
+   * canonicalizes a denominator of 1 back to an Integer
+   * ({@link rbRationalCanonicalize}), which is what puts
    * `Date.new(2000,1,31).next_year(Rational(1,2))` — `f_mul(n, 12)` is `(6/1)`,
    * so `t` is an Integer — on the C's `FIXNUM_P(t)` arm and answers 2000-07-31.
    * The `else` arm is the C's `f_idiv` / `f_mod` pair. Its `FIX2INT` is the
@@ -6893,13 +6946,15 @@ export class Date {
    * same integers off it that the C's Float arithmetic does.
    */
   rshift(other: number | bigint | Rational): this {
-    const t = new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(
-      typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other,
+    const t = rbRationalCanonicalize(
+      new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(
+        typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other,
+      ),
     );
     let y: number | bigint;
     let m: number;
-    if (t.denominator === 1n) {
-      const it = t.numerator;
+    if (!(t instanceof Rational)) {
+      const it = BigInt(t);
       y = bigNorm(div(it, 12));
       m = Number(mod(it, 12)) + 1;
     } else {
@@ -7182,7 +7237,7 @@ export class Date {
    * seat, not a seat.
    */
   toDate(): Temporal.PlainDate {
-    return plainDateFromJd(this.mLocalJd(), this.#sg);
+    return plainDateFromJd(encodeJd(this.nth, this.mLocalJd()), this.#sg);
   }
 
   /**
