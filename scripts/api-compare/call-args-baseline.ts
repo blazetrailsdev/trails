@@ -9,16 +9,11 @@
  * differently-wrong argument lists at the same call would collapse into one
  * row. RFC 0084 also measures that baseline's ROW COUNT as the call-set debt
  * metric, and folding a second dimension into it corrupts the measurement. So
- * the two trees stay separate, and only the pieces that are genuinely
- * dimension-neutral — the split-file writer's primitives in baseline-json.ts,
- * the pre-gate regeneration in gate-regen.ts, the partial-scope guard in
- * call-mismatch-baseline.ts — are shared.
+ * the two trees stay separate, and only the dimension-neutral pieces are shared
+ * — baseline-json.ts, gate-regen.ts, and the partial-scope guard in
+ * call-mismatch-baseline.ts.
  *
- * Only `shape` rows are gated (RFC 0095 §4): argument count, order, literal
- * values and kwarg keys. `naming` rows — lists differing only in how a `ref:`
- * identifier is spelled — are the local/parameter-identifier dimension
- * surfacing through the argument comparison, and stay report-only until the
- * disposition story gives them a burndown of their own.
+ * Only `shape` rows are gated (RFC 0095 §4); `naming` rows stay report-only.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */

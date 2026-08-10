@@ -11,24 +11,18 @@
  * Same only-shrink contract as lint-call-mismatches.ts, which is the template
  * throughout: a committed baseline lists the currently-known mismatches keyed
  * by `package + tsFile + rubyName + call + rubyArgs`, each with a one-line
- * `reason`, and CI fails on
+ * `reason`, and CI fails on a NEW mismatch absent from it (the ratchet) or a
+ * STALE entry that no longer flags (only-shrink — a converged call site must be
+ * REMOVED). The baseline is its own tree, call-mismatches-args-exclude/,
+ * sharded per source file (`<package>/<tsFile .ts→.json>`) so the
+ * merge-conflict boundary matches the unit of work; it cannot fold into
+ * call-mismatches-exclude/, and call-args-baseline.ts says why.
  *
- *   - any NEW mismatch absent from the baseline (the ratchet);
- *   - any STALE baseline entry that no longer flags (only-shrink — a converged
- *     call site must be REMOVED from the baseline).
- *
- * The baseline is its own tree, call-mismatches-args-exclude/, sharded per
- * source file the same way (`<package>/<tsFile .ts→.json>`) so the
- * merge-conflict boundary matches the unit of work. It cannot fold into
- * call-mismatches-exclude/: see call-args-baseline.ts for why.
- *
- * ── `shape` only ────────────────────────────────────────────────────────────
- * Per RFC 0095 §4 the gate ratchets `shape` rows — argument count, order,
- * literal values, kwarg keys. `naming` rows (lists differing only in how a
- * `ref:` identifier is spelled, e.g. Rails' `o` ported as `node`) are ~55% of
- * the population and are the local/parameter-identifier dimension surfacing
- * through the argument comparison rather than an argument defect. They stay
- * report-only, reachable through `--report`, until their own burndown lands.
+ * Per RFC 0095 §4 the gate ratchets `shape` rows only — argument count, order,
+ * literal values, kwarg keys. `naming` rows (differing only in how a `ref:`
+ * identifier is spelled) are the local/parameter-identifier dimension surfacing
+ * through the argument comparison rather than an argument defect; they stay
+ * report-only, reachable through `--report`, until RFC 0096 drains them.
  *
  * ── Before the seed ─────────────────────────────────────────────────────────
  * The baseline is seeded by its own `main`-only PR (RFC 0095
@@ -36,9 +30,8 @@
  * branch drifts from what CI measures. Until then the tree does not exist, and
  * an absent tree is reported as UNSEEDED and exits 0 rather than failing every
  * PR on the merge train with the whole population. The arm is self-closing: the
- * moment the seed lands the tree exists and every arm below is live. An EMPTY
- * tree is not the same thing — a fully converged dimension is a real state and
- * stays gated.
+ * moment the seed lands every arm below is live. An EMPTY tree is not the same
+ * thing — a fully converged dimension is a real state and stays gated.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm api:compare --calls` (see gate-regen.ts): gating a stale artifact is
