@@ -3237,11 +3237,10 @@ function cJdToCivil(jd: number, sg = DEFAULT_SG): [ry: number, rm: number, rdom:
 /**
  * @internal `date_core.c` `canonicalize_jd` (`date_core.c:1144-1154`), the
  * macro that folds a Julian day back into `0...CM_PERIOD` and carries the whole
- * periods it crossed onto `nth`. The macro mutates both of its arguments in
- * place; TS has no out-parameters, so the pair comes back as the tuple. This is
- * the free-standing reading `d_lite_plus` needs over a local `nth`/`jd` pair,
- * where {@link Date#mCanonicalizeJd} is `m_canonicalize_jd`, the C's other
- * caller, running the same fold over the receiver's own stored state.
+ * periods it crossed onto `nth`. The macro mutates both arguments in place; TS
+ * has no out-parameters, so the pair comes back as the tuple. This is the
+ * free-standing reading `d_lite_plus` needs over a local `nth`/`jd` pair, where
+ * {@link Date#mCanonicalizeJd} is `m_canonicalize_jd`, the C's other caller.
  */
 function canonicalizeJd(nth: bigint, jd: number): [nth: bigint, jd: number] {
   if (jd < 0) {
@@ -3257,10 +3256,9 @@ function canonicalizeJd(nth: bigint, jd: number): [nth: bigint, jd: number] {
 
 /**
  * @internal `date_core.c` `c_nth_kday_to_jd` (`date_core.c:635-650`), the
- * Julian day of the `n`th weekday `k` of month `m` of year `y` — the 2nd Sunday
- * of January 2001 — counting back from the month's end when `n` is negative.
- * The C's `ns` out-parameter reports which side of the calendar reform the
- * answer landed on and has no bearer here, as on {@link cCivilToJd}.
+ * Julian day of the `n`th weekday `k` of month `m` of year `y`, counting back
+ * from the month's end when `n` is negative. The C's `ns` out-parameter reports
+ * which side of the reform the answer landed on and has no bearer here.
  */
 function cNthKdayToJd(y: number, m: number, n: number, k: number, sg = DEFAULT_SG): number {
   let rjd2: number;
@@ -3797,8 +3795,7 @@ function cFindLdoy(y: number, sg = DEFAULT_SG): number | null {
 /**
  * @internal `date_core.c` `c_find_fdom` (`date_core.c:478-489`), the Julian day
  * of the first day of month `m` of year `y`, scanned forward from the 1st for
- * the same reason as {@link cFindFdoy}: October 1582 has no 5th under
- * `Date::ITALY`.
+ * the same reason as {@link cFindFdoy}: October 1582 has no 5th under ITALY.
  */
 function cFindFdom(y: number, m: number, sg = DEFAULT_SG): number | null {
   for (let d = 1; d < 31; d++) {
@@ -4558,15 +4555,15 @@ export class Date {
   /**
    * @internal `ComplexDateData`'s `df`, `sf` and `of` (`date_core.c:215-231`) —
    * the day fraction in seconds, the sub-second in nanoseconds, and the UTC
-   * offset in seconds. They are `undefined` exactly when the data is a
-   * `SimpleDateData`, which is the `flags` bit {@link Date#complexDatP} reads.
+   * offset in seconds. They are `undefined` exactly when the data is
+   * `SimpleDateData`, the `flags` bit {@link Date#complexDatP} reads.
    *
    * A `::Date` really can carry them: `d_lite_plus`'s fractional arms build
    * `d_complex_new_internal(rb_obj_class(self), ...)` (`date_core.c:6145`,
    * `date_core.c:6250`), so `Date.new(2001, 1, 1) + Rational(1, 2)` is a `Date`
    * whose `day_fraction` is `(1/2)`. The time-of-day READERS stay on
-   * {@link DateTime} — `d_lite_hour` and friends are defined on `cDateTime`
-   * alone (`date_core.c:9928-9934`) — so such a `Date` answers
+   * {@link DateTime} (`d_lite_hour` and friends are defined on `cDateTime`
+   * alone, `date_core.c:9928-9934`), so such a `Date` answers
    * `respond_to?(:hour)` false, as MRI's does.
    */
   #df?: number;
@@ -4928,8 +4925,7 @@ export class Date {
    * Ruby `Date#mday` (ruby/date, `date_core.c` `d_lite_mday`,
    * `date_core.c:5348-5354`, over `m_mday`, `date_core.c:1785-1790`), the day
    * of the month — the same C function `Date#day` is defined over
-   * (`date_core.c:9730-9731`), which is why {@link Date#day} above reads the
-   * same field.
+   * (`date_core.c:9730-9731`).
    */
   get mday(): number {
     return this.#getCCivil()[2];
@@ -4950,8 +4946,7 @@ export class Date {
   /**
    * Ruby `Date#cwyear` (ruby/date, `date_core.c` `d_lite_cwyear`,
    * `date_core.c:5378-5390`, over `m_real_cwyear`, `date_core.c:1861-1875`):
-   * the commercial-date year, which is not the civil one at the turn of the
-   * year — `Date.new(2000, 1, 1).cwyear` is 1999.
+   * the commercial-date year — `Date.new(2000, 1, 1).cwyear` is 1999.
    */
   get cwyear(): number | bigint {
     const nth = this.nth;
@@ -5001,8 +4996,7 @@ export class Date {
   /**
    * Ruby `Date#mjd` (ruby/date, `date_core.c` `d_lite_mjd`,
    * `date_core.c:5265-5270`), the modified Julian day: the local Julian day
-   * less 2400001, so it is a whole number adjusted by the offset as the local
-   * time, where {@link Date#ajd} is not.
+   * less 2400001, a whole number adjusted by the offset where `ajd` is not.
    */
   get mjd(): number | bigint {
     const r = this.jd;
@@ -5070,8 +5064,7 @@ export class Date {
    * Ruby `Date#nth_kday?(n, k)` (ruby/date, `date_core.c`
    * `d_lite_nth_kday_p`, `date_core.c:5552-5568`), true when the date is the
    * `n`th weekday `k` of its own month — `Date.new(2001, 1, 14).nth_kday?(2, 0)`
-   * is the 2nd Sunday of January 2001. A negative `n` counts back from the
-   * month's end, so the same day is also its 3rd-from-last Sunday.
+   * is the 2nd Sunday of January 2001. A negative `n` counts back from the end.
    */
   isNthKday(n: number, k: number): boolean {
     if (k !== this.wday) return false;
@@ -5124,10 +5117,10 @@ export class Date {
   /**
    * Ruby `Date#leap?` (ruby/date, `date_core.c` `d_lite_leap_p`,
    * `date_core.c:5705-5726`), true when the date's YEAR is a leap year under
-   * the date's own calendar. The Julian arm does not test the year's residue at
-   * all: it asks the calendar for the day before 1 March and reads its day of
-   * the month, which is 29 in a Julian leap year and is what makes 1500 a leap
-   * year under `Date::ITALY` and not under `Date::GREGORIAN`.
+   * the date's own calendar. The Julian arm does not test the residue at all:
+   * it asks the calendar for the day before 1 March and reads its day of the
+   * month, 29 in a Julian leap year — which makes 1500 leap under
+   * `Date::ITALY` and not under `Date::GREGORIAN`.
    */
   get isLeap(): boolean {
     if (this.isGregorian) return cGregorianLeapP(this.#getCCivil()[0]);
@@ -5223,10 +5216,9 @@ export class Date {
    * which sends `to_r` to anything else and re-dispatches, has no counterpart:
    * the parameter type is already the numeric union. The Rational arm keeps the
    * C's `wholenum_p` re-dispatch, since a Rational whose denominator reduced to
-   * one is an Integer to Ruby.
-   *
-   * `modf` splits off a Float's fractional part and leaves the whole one in its
-   * out-parameter; JS has no `modf`, so the two halves are taken separately.
+   * one is an Integer to Ruby. `modf` splits off a Float's fractional part and
+   * leaves the whole one in its out-parameter; JS has no `modf`, so the two
+   * halves are taken separately.
    *
    * Both fractional arms end at `d_simple_new_internal` rather than
    * `d_complex_new_internal` only when `!df && f_zero_p(sf) && !m_of(dat)`;
@@ -5506,10 +5498,7 @@ export class Date {
    * RECEIVER's own class: the C picks it or `d_complex_new_internal`
    * (`date_core.c:3055-3071`) on `simple_dat_p`, under `rb_obj_class(self)`.
    * TS has no `rb_obj_class`, so — as at {@link Date#newStart} — this method IS
-   * that branch, and {@link DateTime} overrides it with the complex arm. The
-   * simple arm drops `df`, `sf` and `of` — `d_simple_new_internal` has no such
-   * parameters at all — which its callers have already established are zero on
-   * a `Date`, hence the `_` the lint wants on them here.
+   * that branch, and {@link DateTime} overrides it with the complex arm.
    */
   dNewInternal(nth: bigint, rjd: number, df: number, sf: Rational, of: number): this {
     if (!df && sf.isZero() && !of) return new Date(SEAT, nth, rjd, this.start) as this;
@@ -5635,11 +5624,10 @@ export class Date {
    * are no-ops on a `VALUE` — only `of`'s `%+d` and `sg`'s `%.0f` do anything —
    * which is why the day and the sub-second carry no sign here either.
    *
-   * `%"PRIsVALUE` renders `m_sf(x)` through `to_s`, so an `sf` exact at a
-   * denominator past one prints as the Rational it is: `DateTime.new(2001,1,1)
-   * + Rational(1, 86400*3)` inspects with `1000000000/3n`. Storage here is
-   * uniformly a {@link Rational} where MRI's is an Integer until it isn't, so
-   * `denominator === 1n` is MRI's Integer arm and prints the numerator alone.
+   * `%"PRIsVALUE` renders `m_sf(x)` through `to_s`, so an exact `sf` prints as
+   * the Rational it is — `DateTime.new(2001,1,1) + Rational(1, 86400*3)` gives
+   * `1000000000/3n`. Storage here is uniformly a {@link Rational} where MRI's
+   * is an Integer until it isn't, so `denominator === 1n` is that Integer arm.
    */
   inspect(): string {
     const of = this.mOf();
