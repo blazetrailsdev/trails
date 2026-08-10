@@ -56,14 +56,17 @@ export type CallArgVerdict = "match" | "mismatch" | "skip";
  *  because it is the local-identifier dimension surfacing here. */
 export type CallArgClass = "shape" | "naming";
 
-export interface CallArgResult {
-  verdict: CallArgVerdict;
-  /** Present only on a `mismatch`. */
-  class?: CallArgClass;
-  /** The normalized lists the verdict was reached on — what a row reports. */
-  rubyArgs: string[];
-  tsArgs: string[];
-}
+/** A `class` rides on the `mismatch` arm only, so a consumer that has narrowed
+ *  the verdict reads it without asserting it is there. */
+export type CallArgResult =
+  | {
+      verdict: "skip" | "match";
+      class?: undefined;
+      /** The normalized lists the verdict was reached on — what a row reports. */
+      rubyArgs: string[];
+      tsArgs: string[];
+    }
+  | { verdict: "mismatch"; class: CallArgClass; rubyArgs: string[]; tsArgs: string[] };
 
 /**
  * The comparison key for one identifier or nested call name.
@@ -282,6 +285,44 @@ function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
   );
 }
 
+/** Every TS spelling a Ruby call name can faithfully take, through the same
+ *  table {@link refKeysEqual} asks — so a `?` / `!` / `=` name pairs against the
+ *  spelling the port actually chose. `new` is `constructor`, exactly as the
+ *  call-set gate credits `new Foo()` (extract-ts-api.ts#callSiteName). */
+function tsCallNameKeys(rubyName: string): string[] {
+  if (rubyName === "new") return ["constructor"];
+  if (/[?!=]$/.test(rubyName)) return rubyMethodToTsIgnoringSkip(rubyName) ?? [];
+  return [snakeToCamel(rubyName)];
+}
+
+/**
+ * Pair the call sites of one already name-matched (Ruby, TS) method pair: the
+ * nth Ruby site named `x` against the nth TS site whose name is a faithful
+ * spelling of `x`, both streams in source order. No new METHOD matching is
+ * introduced — the method pair is the one checkCalls already received; this is
+ * only which site within the two bodies compares against which.
+ *
+ * A Ruby site with no unconsumed TS counterpart is dropped rather than
+ * reported: "the port makes no such call" is the call-set gate's finding
+ * (call-mismatches.json), and re-reporting it here as an argument mismatch
+ * would double-count one divergence in two artifacts.
+ */
+export function pairCallSites(
+  rubySites: readonly CallSite[],
+  tsSites: readonly CallSite[],
+): { ruby: CallSite; ts: CallSite }[] {
+  const consumed = new Set<number>();
+  const pairs: { ruby: CallSite; ts: CallSite }[] = [];
+  for (const ruby of rubySites) {
+    const keys = new Set(tsCallNameKeys(ruby.name));
+    const i = tsSites.findIndex((ts, idx) => !consumed.has(idx) && keys.has(ts.name));
+    if (i === -1) continue;
+    consumed.add(i);
+    pairs.push({ ruby, ts: tsSites[i] });
+  }
+  return pairs;
+}
+
 /** Compare one name-matched pair of call sites, mirroring
  *  literals.ts#compareLiteral's verdict shape. "skip" whenever the two
  *  languages cannot agree on the site at all — a splat / double-splat /
@@ -298,11 +339,6 @@ export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
   const tsArgs = normalizeArgs(stripMixinReceiver(ruby.args, ts.args));
   if (rubyArgs === null || tsArgs === null) return empty;
 
-  const verdict = argsEqual(rubyArgs, tsArgs) ? "match" : "mismatch";
-  return {
-    verdict,
-    ...(verdict === "mismatch" ? { class: classify(rubyArgs, tsArgs) } : {}),
-    rubyArgs,
-    tsArgs,
-  };
+  if (argsEqual(rubyArgs, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
+  return { verdict: "mismatch", class: classify(rubyArgs, tsArgs), rubyArgs, tsArgs };
 }

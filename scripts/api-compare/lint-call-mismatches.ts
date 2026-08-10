@@ -319,7 +319,7 @@ export function bucketFor(key: CallMismatchKey, index: TsMemberIndex): CauseBuck
     : "same-file zero-arg member";
 }
 
-function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
+export function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
   const counts = new Map<string, number>();
   for (const item of items) {
     const k = keyFn(item);
@@ -328,7 +328,7 @@ function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
   return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 
-function section(title: string, rows: [string, number][], top?: number): string {
+export function section(title: string, rows: [string, number][], top?: number): string {
   const shown = top === undefined ? rows : rows.slice(0, top);
   const head =
     rows.length > shown.length
