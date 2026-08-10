@@ -35,7 +35,7 @@ describe("snakeToCamel", () => {
   });
 
   it("collapses underscore-before-Capital so Rails dot-notation names camelCase cleanly", () => {
-    // Drives the api:compare bridge that lets `visit_Arel_Nodes_X` Ruby
+    // Drives the parity:api bridge that lets `visit_Arel_Nodes_X` Ruby
     // methods match `visitArelNodesX` TS methods.
     expect(snakeToCamel("visit_Arel_Nodes_SelectStatement")).toBe("visitArelNodesSelectStatement");
     expect(snakeToCamel("visit_Arel_Table")).toBe("visitArelTable");
@@ -69,7 +69,7 @@ describe("snakeToCamel", () => {
     // Mirrors the `visit_Arel_Nodes_X` dot-notation pattern: Ruby methods that
     // walk constants embed module names verbatim as snake segments. ERB-token
     // constants (both ALL-CAPS like `ERB` and PascalCase like `Erb`) must
-    // rename the same way for api:compare to match the TS counterpart.
+    // rename the same way for parity:api to match the TS counterpart.
     expect(snakeToCamel("visit_ERB")).toBe("visitTSE");
     expect(snakeToCamel("visit_ERB_Template")).toBe("visitTSETemplate");
     expect(snakeToCamel("visit_Erb_Node")).toBe("visitTseNode");
@@ -78,7 +78,7 @@ describe("snakeToCamel", () => {
   it("renames `rb` token to `js` (a Ruby source file is a JS one)", () => {
     // I18n::Backend::Base#load_rb evaluates a locale file written as executable
     // source in the host language; its port loads a `.js` locale module, so
-    // `load_rb` has to resolve to `loadJs` for api:compare to match it.
+    // `load_rb` has to resolve to `loadJs` for parity:api to match it.
     expect(snakeToCamel("load_rb")).toBe("loadJs");
     expect(snakeToCamel("rb")).toBe("js");
     expect(snakeToCamel("rb_handler")).toBe("jsHandler");
@@ -204,7 +204,7 @@ describe("rubyMethodToTs", () => {
 describe("rubyMethodToTs predicates", () => {
   it("strips the redundant is-prefix when the Ruby name already starts with is_", () => {
     // No `isPrefixed` fallback — that would let trails authors land
-    // isIsNumber and still get api:compare credit, defeating the rule.
+    // isIsNumber and still get parity:api credit, defeating the rule.
     expect(rubyMethodToTs("is_number?")).toEqual(["isNumber"]);
     expect(rubyMethodToTs("is_integer?")).toEqual(["isInteger"]);
     expect(rubyMethodToTs("is_hexadecimal_literal?")).toEqual(["isHexadecimalLiteral"]);

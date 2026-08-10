@@ -10,7 +10,7 @@ gaps into "really unported" / "mis-attributed" / "out of scope" before anyone
 sized porting work.
 
 Measured on 2026-08-04 from `scripts/api-compare/output/` after a full
-`pnpm build` + `pnpm api:compare`:
+`pnpm build` + `pnpm parity:api`:
 
 ```
 Data layer: 7729/7816 methods (98.9%)  |  files: 409/409

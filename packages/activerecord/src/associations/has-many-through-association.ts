@@ -391,7 +391,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // Rails' counter-cache tail (has_many_through_association.rb:159-173). Kept
     // inline (rather than in a helper) so the ported `delete_records` body makes
     // the same calls Rails' does — `decrement_counter`, `map`,
-    // `update_through_counter?` — for the api:compare call-set ratchet.
+    // `update_through_counter?` — for the parity:api call-set ratchet.
     const ctor = this.owner.constructor as {
       _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
     };

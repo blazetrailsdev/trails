@@ -4,7 +4,7 @@ TypeScript packages that mirror the Ruby on Rails API.
 
 The goal is **100% API compatible with Rails**, with behavior matched **test for test** against the Rails source. If you can read the [Rails API docs](https://api.rubyonrails.org/), you already know how to use this — class names, method signatures, and behavior are designed to match Rails as closely as TypeScript allows, while adding the type safety that Ruby can't.
 
-> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`api:compare` 4969/4969). Behavior parity (test-for-test) continues — the post-100% Rails-fidelity work is tracked as stories in the tasks repo (`pnpm tasks ready`).
+> **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`parity:api` 4969/4969). Behavior parity (test-for-test) continues — the post-100% Rails-fidelity work is tracked as stories in the tasks repo (`pnpm tasks ready`).
 
 ## Zero-declare models — `trails-tsc`
 
@@ -171,7 +171,7 @@ post.comments[0];
 Full reference: [**Trails Idioms**](packages/website/docs/guides/idioms.md) —
 async conventions, keyword args → options objects, and the rest of the
 Ruby-to-TypeScript translation table. The exact name-matching rules used by
-`api:compare` are generated from the comparison source into
+`parity:api` are generated from the comparison source into
 [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 
 ## Packages
@@ -202,7 +202,7 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 | `@blazetrails/actionview`    | [ActionView](https://api.rubyonrails.org/classes/ActionView.html)             | **9.6%**  | **9.3%**  | Templates, rendering, view helpers                         |
 | `@blazetrails/trailties`     | [Railties](https://api.rubyonrails.org/classes/Rails.html)                    | **35.3%** | **5.2%**  | CLI, generators, application bootstrap                     |
 
-**Tests** = `test:compare` — matches our test names against the Rails test suite. **API** = `pnpm api:compare -- --public-only` — matches individual public methods against Rails source (method-level, not class/module wrappers). The default `api:compare` mode also includes Rails-private/internal helpers; this README reports the public-surface filter so the headline percentages reflect contract coverage.
+**Tests** = `parity:test` — matches our test names against the Rails test suite. **API** = `pnpm parity:api -- --public-only` — matches individual public methods against Rails source (method-level, not class/module wrappers). The default `parity:api` mode also includes Rails-private/internal helpers; this README reports the public-surface filter so the headline percentages reflect contract coverage.
 
 **66.4%** overall public API coverage (7,264 / 10,936 methods). CI runs both comparisons on every push.
 
@@ -231,19 +231,19 @@ pnpm run build
 ```bash
 # Compare test coverage against the Rails test suite
 # Matches our test file names and it()/it.skip() descriptions against Ruby test names
-pnpm run test:compare
+pnpm run parity:test
 
 # Compare full API surface against Rails (public + private/protected)
-pnpm run api:compare
+pnpm run parity:api
 
 # Public-surface only (matches the percentages reported in this README)
-pnpm run api:compare -- --public-only
+pnpm run parity:api -- --public-only
 
 # Generate stub tests for any unmatched Rails tests
-pnpm run test:stubs
+pnpm run parity:test:stubs
 ```
 
-CI runs `test:compare` and `api:compare` on every push to ensure we don't regress.
+CI runs `parity:test` and `parity:api` on every push to ensure we don't regress.
 
 ### Database Adapters
 

@@ -172,7 +172,7 @@ export function _processFormat(_format: unknown): void {
  * The instance-field names excluded from `viewAssigns`. Mirrors Rails'
  * private `_protected_ivars` (which simply returns the
  * `DEFAULT_PROTECTED_INSTANCE_VARIABLES` constant). Exported as a
- * function so subclasses can override and so `api:compare` matches.
+ * function so subclasses can override and so `parity:api` matches.
  *
  * @internal
  */

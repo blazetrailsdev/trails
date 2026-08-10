@@ -14,7 +14,7 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 // in Rails as `class UnsupportedVisitError < StandardError`). Trails
 // declares the class in ../errors.ts so it can sit on the ArelError
 // hierarchy alongside BindError/EmptyJoinError, but re-exports it from
-// here so api:compare finds it where Rails defines it.
+// here so parity:api finds it where Rails defines it.
 export { UnsupportedVisitError };
 
 export type { ArelConnection } from "./connection.js";

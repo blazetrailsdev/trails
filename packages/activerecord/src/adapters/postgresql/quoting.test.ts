@@ -119,7 +119,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     // unit-tested in connection-adapters/postgresql/quoting.test.ts, and the
     // bytea round-trip is covered by bytea.test.ts (Rails bytea_test.rb). The
     // phantom-named stub that used to sit here was removed to avoid an
-    // unmatched test:compare entry.
+    // unmatched parity:test entry.
 
     it("quote bit string", () => {
       // binary path

@@ -507,7 +507,7 @@ export function enumMethod(
 }
 
 // Alias the Base.enum implementation under the Rails-idiomatic name so
-// api:compare can match `ActiveRecord::Enum#enum` to this file. The runtime
+// parity:api can match `ActiveRecord::Enum#enum` to this file. The runtime
 // binding wired onto Base uses the real (un-reserved-word) internal name.
 export { enumMethod as enum };
 

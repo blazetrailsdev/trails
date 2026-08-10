@@ -1,9 +1,9 @@
 #!/usr/bin/env -S npx tsx
 /**
  * Surface TypeScript files whose public API has drifted *beyond* their Rails
- * counterpart — the inverse of `api:compare`.
+ * counterpart — the inverse of `parity:api`.
  *
- * `api:compare` reports Rails methods missing in TS. This script reports TS
+ * `parity:api` reports Rails methods missing in TS. This script reports TS
  * public methods/functions/getters/setters that don't correspond to any
  * Ruby method in the matched Rails file. It's a fact-finding audit so we
  * can prune toward Rails-faithful shape; it never modifies source.
@@ -56,8 +56,8 @@
  *      Advisory only: the count of tags that never state one is reported so a
  *      batch of new tags is visible, but it does not affect the exit code.
  *
- * Manifests are produced by `pnpm api:compare`; if they're missing the
- * script bails with a hint (same convention as `api:moves`).
+ * Manifests are produced by `pnpm parity:api`; if they're missing the
+ * script bails with a hint (same convention as `parity:api:moves`).
  *
  * Usage:
  *   pnpm tsx scripts/api-compare/extra-surface.ts \
@@ -224,7 +224,7 @@ const MIRROR_CANDIDATE_OVERRIDES: Record<string, string[]> = {
 /**
  * TS candidates for a Ruby method `rubyMethodToTs` refuses to map.
  *
- * `conventions.SKIP` means api:compare never expects a TS counterpart, but the
+ * `conventions.SKIP` means parity:api never expects a TS counterpart, but the
  * Ruby method still EXISTS in the file — so a TS override of it (`freeze`,
  * `inspect`, `to_a`) is Rails-faithful, not drift. Mapping those
  * names here keeps the allowance *file-scoped*: `freeze` is allowed in core.ts
@@ -752,7 +752,7 @@ imports. It covers every otherwise-extra name in that file. The claim is checked
 not trusted — if a Rails file maps onto it, or any name in it scores as moved
 (the name exists in Rails, just elsewhere), the tag is refused and the run fails.
 
-Requires: pnpm api:compare must have run first to produce
+Requires: pnpm parity:api must have run first to produce
   scripts/api-compare/output/{rails-api.json,ts-api.json}.
 `;
 
@@ -1639,7 +1639,7 @@ export function printClassificationBlock(
 function printHumanReport(report: Report, topN: number, maxDetail: number, verbose: boolean): void {
   const { palette: p } = pickPalette();
 
-  console.log(`\n${p.bold}Extra TS surface vs Rails${p.reset}  (the inverse of api:compare)`);
+  console.log(`\n${p.bold}Extra TS surface vs Rails${p.reset}  (the inverse of parity:api)`);
   console.log(
     `${p.dim}Generated ${report.generatedAt}  |  novel = name not found anywhere in Rails;  moved = found, just in a different .rb${p.reset}\n`,
   );
@@ -1920,7 +1920,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const tsPath = path.join(OUTPUT_DIR, "ts-api.json");
   if (!fs.existsSync(rubyPath) || !fs.existsSync(tsPath)) {
     console.error(
-      `Missing ${path.basename(fs.existsSync(rubyPath) ? tsPath : rubyPath)}. Run \`pnpm api:compare\` first to generate the manifests.`,
+      `Missing ${path.basename(fs.existsSync(rubyPath) ? tsPath : rubyPath)}. Run \`pnpm parity:api\` first to generate the manifests.`,
     );
     process.exit(1);
   }
@@ -1934,7 +1934,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error(
       "output/ts-api.json predates the api-compared package sources — it describes a\n" +
         "different checkout.\n" +
-        "Run `pnpm api:compare` to regenerate the manifests before measuring.",
+        "Run `pnpm parity:api` to regenerate the manifests before measuring.",
     );
     process.exit(1);
   }

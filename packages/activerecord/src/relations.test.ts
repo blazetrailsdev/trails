@@ -2576,7 +2576,7 @@ describe("RelationTest", () => {
   // Mirrors the parametrized `test_no_arguments_to_#{method}_raise_errors`
   // block in relations_test.rb: every query method guarded by
   // check_if_method_has_arguments! raises ArgumentError when called with no
-  // arguments. The display name is the Rails method (so test:compare matches),
+  // arguments. The display name is the Rails method (so parity:test matches),
   // while the invoker uses the trails camelCase port.
   const noArgGuardedMethods: Array<[string, (rel: any) => unknown]> = [
     ["references", (rel) => rel.references()],

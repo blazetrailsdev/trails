@@ -13,7 +13,7 @@ import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
 // Aliased so the canonical models read clearly alongside the merge-block usage
-// below and so the `test:compare` `RelationTest` matcher stays unambiguous.
+// below and so the `parity:test` `RelationTest` matcher stays unambiguous.
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
   Comment as CanonComment,
@@ -509,7 +509,7 @@ describe("RelationTest", () => {
 
 // Canonical-model coverage for RelationTest cross-model merge — kept in a
 // dedicated describe so it can run on the canonical schema/fixtures. Same
-// describe name so `test:compare` matches it to Ruby's `RelationTest` in
+// describe name so `parity:test` matches it to Ruby's `RelationTest` in
 // relation_test.rb.
 describe("RelationTest", () => {
   const { authors } = fixtures([

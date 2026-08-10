@@ -29,7 +29,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
 
 // Rails: TransactionIsolationTest, guarded by `supports_transaction_isolation? &&
 // !current_adapter?(:SQLite3Adapter)` (transaction_isolation_test.rb:20-21), which
-// the test:compare Ruby extractor renders as adapters=[mysql,postgresql]
+// the parity:test Ruby extractor renders as adapters=[mysql,postgresql]
 // features=[transaction_isolation]. Each subtest carries the compound skipIf below
 // to mirror both dimensions of Rails' gate (non-SQLite adapter set + the feature).
 //

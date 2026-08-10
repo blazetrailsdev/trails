@@ -492,7 +492,7 @@ Porting the YAML loader, ERB shim, label hashing, polymorphic
 resolution, and connection-pool coordination would be a large surface
 for a feature Trails users would not adopt.
 
-Affected Rails files (skipped in `api:compare` / `test:compare` —
+Affected Rails files (skipped in `parity:api` / `parity:test` —
 see `scripts/api-compare/unported-files.ts`):
 
 - `active_record/fixtures.rb`

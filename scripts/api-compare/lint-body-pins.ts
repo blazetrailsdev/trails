@@ -18,7 +18,7 @@
  * Usage:
  *   pnpm tsx scripts/api-compare/lint-body-pins.ts   # gate (CI)
  *
- * (Run `pnpm api:compare` first so output/body-hashes.json is fresh. Reseed
+ * (Run `pnpm parity:api` first so output/body-hashes.json is fresh. Reseed
  * pins via `tsx scripts/api-compare/body-pins.ts --pin <file>`, not here.)
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
@@ -57,7 +57,7 @@ async function main(): Promise<number> {
       `\nbody-pins gate: artifact compared a PARTIAL scope — missing ${absent.length} ` +
         `package(s): ${absent.join(", ")}.\nIt covers fewer packages than CI, so a ` +
         "pin for an uncompared package would look STALE. Regenerate the full surface:\n" +
-        "  API_COMPARE_FORCE=1 pnpm api:compare\n",
+        "  API_COMPARE_FORCE=1 pnpm parity:api\n",
     );
     return 1;
   }

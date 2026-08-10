@@ -2,7 +2,7 @@
  * Shared machinery for the call-set parity ratchet (RFC 0047, gate:
  * lint-call-mismatches.ts): the artifact/baseline row shapes, the key
  * grain the baselines are recorded at, and the diff/reseed/sort primitives the
- * gate, `api:build` and the unreviewed ratchet all agree on.
+ * gate, `parity:api:build` and the unreviewed ratchet all agree on.
  *
  * `compare.ts --calls` writes output/call-mismatches.json — name-matched
  * (Ruby, TS) method pairs whose ported TS body omits a call Rails' body makes.
@@ -27,7 +27,7 @@
  *
  * ── Gate ONLY from a full, fresh artifact (RFC 0044 determinism) ────────────
  * This gate was environment-non-deterministic: a stale local ts-api cache
- * served call-less manifests, so a local `pnpm api:compare` reported FEWER
+ * served call-less manifests, so a local `pnpm parity:api` reported FEWER
  * call mismatches than CI for the same commit. The dangerous move is reseeding
  * from that artifact: a `--write` rebuilds the baseline from whatever the local
  * run produced, silently DROPPING entries CI still flags and turning a
@@ -41,7 +41,7 @@
  *   2. reseed ONLY through the canonical path, which force-rebuilds every
  *      cache first so the artifact can't be a warm-cache under-report:
  *
- *        pnpm api:calls:reseed
+ *        pnpm parity:api:calls:reseed
  *
  *   3. as a backstop, the artifact records the `packages` it compared and the
  *      gate ABORTS (gate AND `--write`) unless that set covers every
@@ -106,7 +106,7 @@ export interface StaleTag {
 // api-compare package set. (This is a coverage check, not a freshness one:
 // a stale ts-api cache leaves every package PRESENT but under-reports its
 // calls — that mode is closed upstream by the extractor schema token (#4044)
-// and, for reseeds, by the force-rebuild api:calls:reseed path.)
+// and, for reseeds, by the force-rebuild parity:api:calls:reseed path.)
 export function missingScope(artifact: Artifact, expected: readonly string[] = PACKAGES): string[] {
   const present = new Set(artifact.packages ?? []);
   return expected.filter((p) => !present.has(p)).sort();

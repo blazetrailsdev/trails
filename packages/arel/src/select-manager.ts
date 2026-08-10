@@ -634,7 +634,7 @@ export class SelectManager extends TreeManager {
   }
 }
 
-// Surface the inherited FactoryMethods on select-manager.ts so api:compare
+// Surface the inherited FactoryMethods on select-manager.ts so parity:api
 // matches them against select_manager.rb.
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
 

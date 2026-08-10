@@ -10,7 +10,7 @@
  * loading rows through `name(:label)` registry lookups exactly like Rails'
  * `authors(:david)`.
  *
- * Test names mirror the Ruby method names verbatim (`test:compare` matches on
+ * Test names mirror the Ruby method names verbatim (`parity:test` matches on
  * them). The trailing trails-specific cases (sync fail-loud / awaitable
  * contract) have no Rails analog but ride the same canonical tables.
  */

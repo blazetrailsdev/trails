@@ -108,6 +108,6 @@ function findTrailtieUrlHelpers(
 }
 
 // Rails-name alias: `AbstractController::Railties::RoutesHelpers.with(...)`.
-// Exported under the bare name so `api:compare` matches; the descriptive
+// Exported under the bare name so `parity:api` matches; the descriptive
 // `withRoutesHelpers` remains the recommended import for consumers.
 export { withRoutesHelpers as with };

@@ -10,7 +10,7 @@
  * Cases that exercise behavior the engine does not yet implement (scope-body
  * callability guard, reserved/conflicting scope-name guard, positional
  * stats-mutating scopes) are kept as `it.skip` with a one-line note rather than
- * fabricated passing stubs, so their names stay tracked by test:compare.
+ * fabricated passing stubs, so their names stay tracked by parity:test.
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";

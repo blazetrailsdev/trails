@@ -1,6 +1,6 @@
 /**
  * Faithful port of vendor/rails/activerecord/test/cases/instrumentation_test.rb.
- * Test names mirror the Rails `test_*` methods so `test:compare` maps them.
+ * Test names mirror the Rails `test_*` methods so `parity:test` maps them.
  */
 import { describe, it, expect, afterEach } from "vitest";
 

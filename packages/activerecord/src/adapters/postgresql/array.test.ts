@@ -685,7 +685,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   // `*.trails.test.ts` sibling: a second file dropping/creating `pg_arrays` in
   // beforeAll/afterAll would race the mirror on the shared PG database (multi-
   // fork, single PG_TEST_URL). The distinct describe name keeps it out of the
-  // `PostgresqlArrayTest` → Rails test:compare mapping.
+  // `PostgresqlArrayTest` → Rails parity:test mapping.
   describe("array datetime inline-quoting (trails)", () => {
     it("inlines a proleptic-year datetime[] element as a quoted_date BC literal", async () => {
       // Regression guard for the inline INSERT path (base.ts create → adapter

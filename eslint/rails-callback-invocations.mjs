@@ -20,7 +20,7 @@
  *
  * Manifest: eslint/rails-callback-invocations.json, built by
  *   pnpm tsx scripts/build-rails-privates-manifest.ts
- * (refreshed on every `pnpm api:compare`).
+ * (refreshed on every `pnpm parity:api`).
  */
 import fs from "fs";
 import path from "path";

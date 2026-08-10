@@ -4725,7 +4725,7 @@ export class DateInfinity {
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::Date`. Rails never
  * defines the class, only reopens it. The gem does have a counterpart now that
  * it is vendored, but it is C — `vendor/date/ext/date/date_core.c` — and
- * `extract-ruby-api.rb` parses Ruby, so `api:compare` cannot credit it
+ * `extract-ruby-api.rb` parses Ruby, so `parity:api` cannot credit it
  * (RFC 0088 `date-c-source-extractor-decision`: `lib/date.rb` credits 12
  * methods, none of them these). The gem's `test/date/` suite is the fidelity
  * measure instead; see `vendor/sources.ts`'s `date` entry.
@@ -6838,7 +6838,7 @@ const DateWithoutParseStatics: (new (
 /**
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::DateTime`, a `::Date`
  * that also answers `hour`, `min` and `sec`. Defined in C
- * (`vendor/date/ext/date/date_core.c`), so it is outside `api:compare`'s
+ * (`vendor/date/ext/date/date_core.c`), so it is outside `parity:api`'s
  * population for the same reason as `Date` above. Those readers are what route
  * a `localize` lookup to
  * `time.formats` (i18n/lib/i18n/backend/base.rb:105-115), while `%Z` keeps

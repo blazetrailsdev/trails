@@ -75,7 +75,7 @@ export class RoutesProxy implements UrlForHost {
 
   // PolymorphicRoutes mixin — Rails `UrlFor` `include`s it, so it's
   // transitively present on RoutesProxy. Attaching here makes the methods
-  // visible on the instance for `api:compare` and direct callers.
+  // visible on the instance for `parity:api` and direct callers.
   polymorphicUrl = polymorphicUrl;
   polymorphicPath = polymorphicPath;
   editPolymorphicUrl = editPolymorphicUrl;

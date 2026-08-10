@@ -13,7 +13,7 @@ import { RouteSet } from "../routing/route-set.js";
 // the AST string (including format suffix) we inspect `route.path` directly.
 // Scope-option propagation (via:, to:, format:, random keys) and automatic
 // glob-wildcard requirements are not yet wired; those tests are skipped with
-// a "pending:" rationale so test:compare can track them.
+// a "pending:" rationale so parity:test can track them.
 // ==========================================================================
 describe("MapperTest", () => {
   it("initialize", () => {

@@ -7,7 +7,7 @@
  * entry cached BEFORE a new per-method field was added is served verbatim
  * WITHOUT the field. That was the PR #4020 trap: `calls` (the call-set
  * dimension) was added to the extractor in PR #4002 but the cache token was not
- * bumped, so a fresh local `pnpm api:compare` served call-less manifests for
+ * bumped, so a fresh local `pnpm parity:api` served call-less manifests for
  * every package whose source hadn't changed and the call-mismatch gate reported
  * the inverse of reality. Only `API_COMPARE_FORCE=1` recovered fidelity.
  *

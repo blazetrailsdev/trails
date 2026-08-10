@@ -23,7 +23,7 @@ const SLOTS = [
 
 export type AssetPathSlot = (typeof SLOTS)[number];
 
-/** Reified list of slot names — useful for introspection / api:compare. */
+/** Reified list of slot names — useful for introspection / parity:api. */
 export const ASSET_PATH_SLOTS: readonly AssetPathSlot[] = SLOTS;
 
 export interface AssetPathsHost {

@@ -5,7 +5,7 @@
  *
  * Those builders regenerate an ESLint manifest from
  * `scripts/api-compare/output/rails-api.json`, which only exists after
- * `pnpm api:compare` (it needs Ruby + the vendored Rails source). When it is
+ * `pnpm parity:api` (it needs Ruby + the vendored Rails source). When it is
  * absent they used to write `{ files: {} }` and exit 0, so the rule reading
  * the manifest matched nothing and the gate passed silently — a lint job that
  * looks green while enforcing nothing.
@@ -53,7 +53,7 @@ export function railsApiAvailable(options: MissingRailsApiOptions): boolean {
     throw new Error(
       `[${scriptName}] ${railsApiPath} is missing, so ${manifestName} cannot be built ` +
         `and \`blazetrails/${ruleName}\` would silently match nothing.\n` +
-        `Run \`pnpm api:compare\` to generate it (needs Ruby + \`pnpm vendor:fetch\`), ` +
+        `Run \`pnpm parity:api\` to generate it (needs Ruby + \`pnpm vendor:fetch\`), ` +
         `or pass \`--allow-missing\` to accept an inert manifest.`,
     );
   }
@@ -61,7 +61,7 @@ export function railsApiAvailable(options: MissingRailsApiOptions): boolean {
   console.warn(
     `[${scriptName}] ${railsApiPath} missing; wrote an EMPTY ${manifestName}. ` +
       `\`blazetrails/${ruleName}\` is INERT for this run and will report nothing. ` +
-      `Run \`pnpm api:compare\` to regenerate with real data.`,
+      `Run \`pnpm parity:api\` to regenerate with real data.`,
   );
   return false;
 }

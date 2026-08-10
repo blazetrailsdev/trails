@@ -4,8 +4,8 @@
  * implementation (RFC 0083).
  *
  * Consumers:
- *   - api:build (build.ts) — reconciles tags against the wide artifact;
- *   - api:reasons (lint-missing-rails-call-reasons.ts) — gates the contract;
+ *   - parity:api:build (build.ts) — reconciles tags against the wide artifact;
+ *   - parity:api:reasons (lint-missing-rails-call-reasons.ts) — gates the contract;
  *   - the TS extractor (extract-ts-api.ts) — records the tagged calls so
  *     compare.ts's `checkCalls` can suppress them, which is what makes the tag
  *     load-bearing rather than documentation.
@@ -24,7 +24,7 @@ export const TAG = "@missingRailsCall";
  * be blessed by prose nobody wrote. It has to be replaced with real per-entry
  * prose before the call leaves the population.
  *
- * `api:build` no longer MINTS tags carrying it (RFC 0083) — it only writes a
+ * `parity:api:build` no longer MINTS tags carrying it (RFC 0083) — it only writes a
  * tag it has curated prose to migrate — but tags predating that policy still
  * carry it in the tree.
  */
@@ -78,7 +78,7 @@ interface CommentLine {
   sourceIndex: number;
   /** True for a tag lifted out of a one-line comment. Such an entry keeps no
    *  verbatim `rawLines`, so `renderEntry` re-wraps it — which is what turns a
-   *  hand-written one-liner into the block form `api:build` emits — and it
+   *  hand-written one-liner into the block form `parity:api:build` emits — and it
    *  takes no continuation lines, since a one-line comment's reason ends with
    *  its line and whatever follows the comment is code. */
   synthetic: boolean;

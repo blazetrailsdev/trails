@@ -99,7 +99,7 @@ Used by actionpack (HTTP caching) and activerecord (query cache).
 ## Explicitly out (Ruby-isms, no TS analog)
 
 These do not get implemented. They're filtered from the
-`api:compare` denominator below; until that's wired, they inflate the
+`parity:api` denominator below; until that's wired, they inflate the
 "missing" count without representing real work.
 
 | Out                                                                                     | Why                                                                                  |

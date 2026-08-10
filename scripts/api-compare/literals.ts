@@ -1,4 +1,4 @@
-// Literal parameter-default + constant comparison for api:compare (advisory —
+// Literal parameter-default + constant comparison for parity:api (advisory —
 // never changes parity). Diffs a default/constant's literal *value* after
 // normalization absorbing cross-language noise (numeric underscores,
 // symbol→string in either spelling, nil↔null/undefined, escapes); a non-literal

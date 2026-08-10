@@ -25,7 +25,7 @@ const SLOTS = ["defaultStaticExtension", "performCaching", "enableFragmentCacheL
 
 export type CachingSlot = (typeof SLOTS)[number];
 
-/** Reified list of config-slot names — useful for introspection / api:compare. */
+/** Reified list of config-slot names — useful for introspection / parity:api. */
 export const CACHING_SLOTS: readonly CachingSlot[] = SLOTS;
 
 /**
@@ -141,7 +141,7 @@ function expandControllerCacheKey(key: unknown): string {
 
 // Rails `include AbstractController::Caching::Fragments` exposes the fragment
 // API on the `Caching` module itself. The implementations live in `fragments.ts`;
-// these thin wrappers republish them on `caching.ts` so `api:compare` sees the
+// these thin wrappers republish them on `caching.ts` so `parity:api` sees the
 // surface where Rails exposes it. Re-export statements wouldn't suffice — the
 // extractor counts only direct `export function` declarations.
 

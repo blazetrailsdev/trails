@@ -1,6 +1,6 @@
-# Taking a trustworthy `api:compare` / `api:extra` baseline
+# Taking a trustworthy `parity:api` / `parity:api:extra` baseline
 
-Every PR is gated on "the `api:compare` / `test:compare` delta is non-negative",
+Every PR is gated on "the `parity:api` / `parity:test` delta is non-negative",
 which means someone has to measure the same numbers twice: once on the branch
 and once on the branch's base. This documents the supported way to do that and
 the one trap that made the numbers lie.
@@ -10,14 +10,14 @@ the one trap that made the numbers lie.
 ```bash
 # 1. branch measurement
 pnpm build
-pnpm api:compare
-pnpm api:extra
+pnpm parity:api
+pnpm parity:api:extra
 
 # 2. baseline measurement
 git checkout --detach origin/main
 pnpm build
-pnpm api:compare
-pnpm api:extra
+pnpm parity:api
+pnpm parity:api:extra
 
 # 3. back to the branch
 git checkout -
@@ -43,7 +43,7 @@ never touched can move. That is a phantom delta, and it cuts both ways: it can
 force an agent to argue that a delta it just measured is not real, or it can
 mask a real regression.
 
-This is measurable at a single commit. With no package built, `api:extra`
+This is measurable at a single commit. With no package built, `parity:api:extra`
 reports `trailties 147` and `actionview 90`; after `pnpm build`, the same commit
 reports `trailties 149` and `actionview 92` — the extra two in each are the
 surface that only resolves once the sibling's declarations exist. Those are the
@@ -62,15 +62,15 @@ Two guards enforce this, both in `scripts/api-compare/build-freshness.ts` and
 both bypassed by `API_COMPARE_ALLOW_STALE_BUILD=1` (use it only when you are not
 producing a baseline).
 
-### 1. Is the build current? (`pnpm api:compare`)
+### 1. Is the build current? (`pnpm parity:api`)
 
 Before any extraction, `staleBuilds()` asks whether each package's emitted
-output corresponds to its checked-out sources. If not, `pnpm api:compare` fails
+output corresponds to its checked-out sources. If not, `pnpm parity:api` fails
 with the list of stale packages and tsc's verdict for each, instead of emitting
 numbers that cannot be compared to anything:
 
 ```text
-api:compare would measure 1 package(s) against a stale build:
+parity:api would measure 1 package(s) against a stale build:
   packages/arel — OutOfDateWithSelf
 ```
 
@@ -92,7 +92,7 @@ failed all 13 packages on every CI run while contradicting the build that had
 just succeeded.
 
 **What it checks** is the transitive `references` closure of the packages
-`api:compare` extracts — seeded from `apiComparePackageRoots()`
+`parity:api` extracts — seeded from `apiComparePackageRoots()`
 (`scripts/api-compare/config.ts`, derived from `vendor/sources.ts`) and expanded
 by following each `tsconfig.json`'s `references`.
 
@@ -115,9 +115,9 @@ was deleted but whose `tsconfig.tsbuildinfo` survives up to date. A worktree tha
 has never run `pnpm build` therefore measures consistently, which is why the
 guard is silent in a fresh `scripts/start-worktree.sh` checkout.
 
-### 2. Is the manifest current? (`pnpm api:extra`)
+### 2. Is the manifest current? (`pnpm parity:api:extra`)
 
-`pnpm api:extra` reads the manifests `pnpm api:compare` left behind rather than
+`pnpm parity:api:extra` reads the manifests `pnpm parity:api` left behind rather than
 re-extracting, so running it alone after a checkout would report the previous
 commit's totals. `manifestIsStale()` fails the run when `output/ts-api.json` is
 older than the sources it claims to describe.

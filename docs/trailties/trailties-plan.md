@@ -46,7 +46,7 @@ think one is wrong.
 
 - Package: `trailties`. Base class: `Trailtie`. Per-framework files:
   `<package>/src/trailtie.ts`. Engine collection: `engine/trailties.ts`.
-- `api:compare` rename map handles `Railtie` → `Trailtie` and the
+- `parity:api` rename map handles `Railtie` → `Trailtie` and the
   `railties/` → `trailties/` path-segment alias is global.
 
 ### What we are NOT building
@@ -72,7 +72,7 @@ think one is wrong.
 
 | Question                         | Answer                                                                                                  |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Templates: EJS or `.tse`?        | `.tse` (codebase convention). `api:compare`'s `.erb` → `.tse` mapping handles paths.                    |
+| Templates: EJS or `.tse`?        | `.tse` (codebase convention). `parity:api`'s `.erb` → `.tse` mapping handles paths.                     |
 | `Trailtie` subclass registration | Explicit: `Trailtie.register(MyTrailtie)`. No `inherited` hook. Same for `Application.register(klass)`. |
 | `config_for` config format       | TS/JS modules via dynamic `import()`. No YAML.                                                          |
 | `processAdapter` `env` mutation  | Snapshot values are read-only by convention. `setEnv` is the only supported mutation path.              |
@@ -92,7 +92,7 @@ think one is wrong.
 
 ## Boot chain completeness — current state
 
-`api:compare` scores for the files that make up the app boot sequence.
+`parity:api` scores for the files that make up the app boot sequence.
 **Target: 100% on every row before calling the boot chain "done".**
 
 | File                                      | Score   | Key gaps                                                                                                                                                                                                                                                                        |
@@ -126,7 +126,7 @@ think one is wrong.
 
 **Scope:**
 
-- `trailtie.ts` — 4 missing methods. Read `api:compare` output to confirm names before implementing.
+- `trailtie.ts` — 4 missing methods. Read `parity:api` output to confirm names before implementing.
 - `trailtie/configurable.ts` — `configure(block)` class method (Rails class-level DSL entry), instance delegation for `config` (the `Configurable` module exposes `config` via `method_missing` delegating to `instance.config`). Current file has `sealAgainstInheritance`/`assertNotSealed` (our sealed-subclass guard) but no matching of Rails' `configure` / instance surface — hence 0/2.
 - `trailtie/configuration.ts` — 2 missing methods; bundle here.
 - `engine/trailties.ts` — `_all` as public accessor; ensure `Trailties` constructor walks both `Trailtie.subclasses()` **and** `Engine.subclasses()` separately (Rails `Railties` includes both); add matching `initialize` semantics. Currently 1/3.
@@ -245,7 +245,7 @@ collection/array-protocol surface.
 **Finisher current:** 2/5 matched. Missing:
 
 - `FinisherHost` interface — `add_generator_templates`, `define_main_app_helper`,
-  `add_to_prepare_blocks`, `run_prepare_callbacks` initializers. The api:compare
+  `add_to_prepare_blocks`, `run_prepare_callbacks` initializers. The parity:api
   gap is likely that these initializers exist in the TS file but the host
   interface type exported from the module doesn't declare them, so they
   don't match the Ruby public surface.

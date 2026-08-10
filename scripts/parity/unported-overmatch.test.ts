@@ -8,7 +8,7 @@ import { UNPORTED_FILES } from "./unported-files.js";
 // Recurrence guard for the bare-filename substring overmatch bug (PR #4891):
 // a whole-file `testFile` keyed by a bare basename matches by plain substring
 // in isTestFileUnported and can silently drop unrelated, already-ported Rails
-// files from test:compare accounting. Walk the vendored Rails test tree and
+// files from parity:test accounting. Walk the vendored Rails test tree and
 // assert every whole-file entry resolves to at most one file. Directory-prefix
 // entries (trailing "/") are a deliberate bulk exclusion and exempt.
 

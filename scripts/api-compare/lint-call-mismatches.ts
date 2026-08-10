@@ -30,7 +30,7 @@
  *     stale-HIGH mark, so drift used to surface only when the next story
  *     reseeded and found its own before-value was never reproducible. It is a
  *     GATE, not advisory: the mark only shrinks, so tightening is always safe,
- *     and `pnpm api:calls:reseed` fixes it in one command. Baseline ROW
+ *     and `pnpm parity:api:calls:reseed` fixes it in one command. Baseline ROW
  *     drift needs no separate arm — a gating run regenerates the artifact
  *     itself (see below), so a row set that a clean reseed would change already
  *     fails as NEW or STALE entries.
@@ -63,7 +63,7 @@
  *
  * `--set-reason <category>` (RFC 0092) applies one cluster-vetted reason text to
  * every baseline row a named category matches — the bulk-clearance shape the
- * api:calls triage audit asked for, since hand-editing the shard JSON is
+ * parity:api:calls triage audit asked for, since hand-editing the shard JSON is
  * forbidden (serializeBaseline owns the encoding) and `--write` PRESERVES
  * existing reasons rather than setting them. See {@link REASON_CATEGORIES} for
  * the category table, why each one's population is what it is, and why a
@@ -77,13 +77,13 @@
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --no-regen # gate the artifact on disk
  *
  * A plain gating run first regenerates output/call-mismatches.json itself
- * by shelling out to `pnpm api:compare --calls` (RFC 0083). Gating a stale
+ * by shelling out to `pnpm parity:api --calls` (RFC 0083). Gating a stale
  * artifact is what makes a sibling PR's deleted TS method surface here as
  * `STALE baseline entr(ies)` on a branch that never touched it, and the fix was
  * always "re-extract, then re-run". It goes through run.sh rather than
  * compare.ts so the extraction manifests compare.ts reads are refreshed first.
  * `--write` regenerates first too, unless API_COMPARE_FORCE is set, which is
- * how api:calls:reseed signals it already ran the forced regeneration.
+ * how parity:api:calls:reseed signals it already ran the forced regeneration.
  * Opt out with `--no-regen`, API_COMPARE_SKIP_REGEN=1, or any CI value —
  * CI runs the extraction step separately and must not pay for it twice. The
  * partial-scope determinism guard runs unchanged either way.
@@ -248,7 +248,7 @@ async function loadArtifact(): Promise<Artifact> {
   if (!exists) {
     throw new Error(
       `Missing ${path.relative(ROOT_DIR, ARTIFACT_PATH)} — run \`pnpm exec tsx ` +
-        "scripts/api-compare/compare.ts --calls` (or `pnpm api:compare --calls`) first to write it.",
+        "scripts/api-compare/compare.ts --calls` (or `pnpm parity:api --calls`) first to write it.",
     );
   }
   return readJson<Artifact>(ARTIFACT_PATH);
@@ -349,7 +349,7 @@ export function renderStaleTags(staleTags: StaleTag[]): string | null {
     `\ncall-mismatches ratchet: ${staleTags.length} STALE ${TAG} tag(s) whose call is ` +
       "no longer flagged.",
     "A justification only shrinks, exactly like a baseline entry: the TS body now makes " +
-      "the call, so delete the tag from its JSDoc block (or run `pnpm api:build --package " +
+      "the call, so delete the tag from its JSDoc block (or run `pnpm parity:api:build --package " +
       "<pkg>`, which drops it for you).\n",
     ...staleTags.map((t) => `  - ${t.package}  ${t.tsFile}  ${t.tsName}  ${t.call}`),
   ].join("\n");
@@ -576,7 +576,7 @@ export function renderReport(
   parts.push(
     index === undefined
       ? `\nBy cause bucket: SKIPPED — ${path.relative(ROOT_DIR, TS_API_PATH)} is missing ` +
-          "(run `pnpm api:compare` first)."
+          "(run `pnpm parity:api` first)."
       : section(
           "By cause bucket",
           tally(entries, (e) => bucketFor(e, index)),
@@ -618,8 +618,8 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
         "It covers fewer packages than CI (an unfetched vendor source, a " +
         "`--package`-filtered run, or a stale artifact); reseeding or gating " +
         "from it would desync local vs CI. Regenerate the full surface:\n" +
-        "  pnpm api:calls:reseed   (or `API_COMPARE_FORCE=1 pnpm " +
-        "api:compare --calls` then re-run this).\n",
+        "  pnpm parity:api:calls:reseed   (or `API_COMPARE_FORCE=1 pnpm " +
+        "parity:api --calls` then re-run this).\n",
     );
     return 1;
   }
@@ -725,7 +725,7 @@ async function reportMain(top: number, unreviewedOnly: boolean): Promise<number>
   const entries = [...baseline];
   const artifact = await readJsonIfPresent<Artifact>(ARTIFACT_PATH);
   if (artifact === undefined) {
-    console.log("(baseline only — the artifact is missing; run `pnpm api:compare --calls`)");
+    console.log("(baseline only — the artifact is missing; run `pnpm parity:api --calls`)");
   } else {
     // Not-yet-baselined mismatches carry no reason, so they are reported in the
     // groupings without inflating the unreviewed-but-seeded count.

@@ -3,7 +3,7 @@
 // (formatColspec / indexParts), the adapter-introspection dump path
 // (SchemaDumperAdapterTest), async header ordering, and DSL-helper
 // round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
-// test:compare maps cleanly.
+// parity:test maps cleanly.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { Base } from "./base.js";

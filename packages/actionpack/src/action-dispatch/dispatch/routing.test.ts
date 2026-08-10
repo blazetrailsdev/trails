@@ -2488,8 +2488,8 @@ describe("TestRelativeUrlRootGeneration", () => {
 
 describe("TestHttpMethods", () => {
   // Rails generates ~30 tests dynamically: "request method #{method.underscore} can be matched"
-  // for every RFC HTTP method. test:compare cannot statically resolve Ruby interpolation, so
-  // none of these will appear in test:compare counts regardless of stub name.
+  // for every RFC HTTP method. parity:test cannot statically resolve Ruby interpolation, so
+  // none of these will appear in parity:test counts regardless of stub name.
   // Requires RoutedRackApp HTTP dispatch — not ported.
   it.skip("request method get can be matched", () => {});
 });

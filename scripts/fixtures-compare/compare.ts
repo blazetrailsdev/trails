@@ -1,4 +1,4 @@
-// fixtures:compare — diff Rails activerecord/test/fixtures/*.yml against
+// parity:fixtures — diff Rails activerecord/test/fixtures/*.yml against
 // packages/activerecord/src/test-helpers/fixtures/<kebab-name>.ts. Soft
 // failure only per the fixtures port plan (Decision 4); PR 7 flips
 // to hard-fail. ERB stubs adapter_name to "SQLite"; other ERB → skipped.
@@ -808,7 +808,7 @@ export function collectYamlPaths(dir: string, prefix: string = ""): string[] {
 async function main(): Promise<void> {
   const { pkg, filter, models, incomplete, ci } = parseArgs(process.argv.slice(2));
   if (pkg !== "activerecord") {
-    console.error(`fixtures:compare: --package ${pkg} not supported yet`);
+    console.error(`parity:fixtures: --package ${pkg} not supported yet`);
     process.exit(2);
   }
 
@@ -902,7 +902,7 @@ async function main(): Promise<void> {
     if (missingCount > CI_BASELINE.missing)
       failures.push(`missing grew: ${missingCount} > baseline ${CI_BASELINE.missing}`);
     if (failures.length > 0) {
-      for (const f of failures) console.error(`fixtures:compare: ${f}`);
+      for (const f of failures) console.error(`parity:fixtures: ${f}`);
       process.exit(1);
     }
   }

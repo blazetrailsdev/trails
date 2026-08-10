@@ -1,5 +1,5 @@
 // Mirrors rails-html-sanitizer test/sanitizer_test.rb -> SafeListSanitizerTest.
-// Test names track Rails' test_* methods for test:compare alignment.
+// Test names track Rails' test_* methods for parity:test alignment.
 //
 // Rails' suite is heavily intertwined with libxml2 / Loofah specifics
 // (many tests use `acceptable_results = [...]` to span libxml2 versions

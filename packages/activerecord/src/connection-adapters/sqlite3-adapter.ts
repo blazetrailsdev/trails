@@ -505,7 +505,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * The single SQL primitive `raw_execute` — and, in trails, `execute` /
    * `executeMutation` — delegate to. The live implementation lives in the
    * Rails-layout file `sqlite3/database-statements.ts` (`performQuery`) so
-   * api:compare's `perform_query` coverage points at reachable code; it is
+   * parity:api's `perform_query` coverage points at reachable code; it is
    * assigned to the prototype below with `this` as the adapter, whose
    * `_cachedStatement` / `_freshStatement` / `verifiedBang` /
    * `dirtyCurrentTransaction` and `_statementLock` / `_last*` fields satisfy
@@ -2582,7 +2582,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * does this, for every destination Rails can name. The one arm that does not
    * is the schema-qualified one, which Rails has no notion of; it is recorded at
    * that branch, not as a `@missingRailsCall` tag — the tag is per-method, and
-   * `api:calls` fails it as STALE now that the method does make the call.
+   * `parity:api:calls` fails it as STALE now that the method does make the call.
    * @internal
    */
   private async copyTableIndexes(

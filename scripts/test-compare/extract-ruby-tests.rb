@@ -987,7 +987,7 @@ class TestExtractor
   # Raw (non-deduped) count of assertion calls in a test body, folding in calls
   # to same-file non-assertion helpers (recursively, depth-capped, with a
   # per-path cycle guard). This counts every call incl. helper-delegated ones,
-  # which is what test:compare's assertion-count comparison needs (exact-count
+  # which is what parity:test's assertion-count comparison needs (exact-count
   # parity with the Rails counterpart). See extract-ts-core.ts for the TS twin.
   def count_assertions(node)
     count_assertions_expanded(node, [], 0, @class_stack.dup)
@@ -1183,7 +1183,7 @@ class TestExtractor
 
   # Raw (non-deduped) list of assertion *kind* tokens (method names) in a test
   # body — one per call, same length as (and same helper expansion / cycle guard
-  # / depth cap as) count_assertions. Feeds test:compare's assertion-kind
+  # / depth cap as) count_assertions. Feeds parity:test's assertion-kind
   # histogram (assertion-kinds.ts); `assertions` is this list deduped.
   #
   # Returns `[kinds, values]`: `values` is a lockstep array (one per kind) of the

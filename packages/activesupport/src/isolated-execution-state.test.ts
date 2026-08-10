@@ -7,7 +7,7 @@ describe("IsolatedExecutionStateTest", () => {
   // Rails parameterizes isolation as `:fiber` vs `:thread`. trails has no
   // fiber/thread distinction (single-threaded Node + AsyncLocalStorage), so
   // these three Rails tests are not portable; they stay skipped to preserve
-  // the test:compare mapping with the upstream file.
+  // the parity:test mapping with the upstream file.
   it.skip("#[] when isolation level is :fiber");
 
   it.skip("#[] when isolation level is :thread");

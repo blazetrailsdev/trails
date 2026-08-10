@@ -377,6 +377,6 @@ describe("renderSlack", () => {
     expect(msg).toContain("1 file(s)");
     expect(msg).toContain("50 of slack");
     expect(msg).toContain(`  - ${REL}  mark 2837, only 2787 unreviewed`);
-    expect(msg).toContain("pnpm api:calls:reseed");
+    expect(msg).toContain("pnpm parity:api:calls:reseed");
   });
 });

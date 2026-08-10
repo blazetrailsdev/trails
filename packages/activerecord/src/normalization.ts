@@ -5,7 +5,7 @@
  * `normalizeAttribute` are defined on ActiveModel::Model and inherited by
  * ActiveRecord::Base. This file provides the NormalizedValueType wrapper
  * that Rails defines in ActiveRecord::Normalization, and re-exports the
- * methods from Model for api:compare discoverability.
+ * methods from Model for parity:api discoverability.
  *
  * Mirrors: ActiveRecord::Normalization
  */
@@ -17,7 +17,7 @@ import { Model, NormalizesArgs, SerializeCastValue } from "@blazetrails/activemo
  * When cast() is called, the value is first cast by the underlying type,
  * then the normalizer is applied.
  *
- * This is the api:compare mirror of Rails' `ActiveRecord::Normalization::NormalizedValueType`
+ * This is the parity:api mirror of Rails' `ActiveRecord::Normalization::NormalizedValueType`
  * and preserves its method call structure (`serialize` → `cast` + `serialize_cast_value`).
  * The SINGLE live implementation is ActiveModel's `normalizedValueType`
  * (`activemodel/src/type/normalized-value.ts`), which `Model.normalizes` wires onto
@@ -74,7 +74,7 @@ export class NormalizedValueType {
 }
 
 // Wrapper functions that delegate to Model's normalization methods.
-// These exist for api:compare discoverability — the actual implementations
+// These exist for parity:api discoverability — the actual implementations
 // are on ActiveModel::Model, inherited by ActiveRecord::Base.
 
 export function normalizes(modelClass: typeof Model, ...args: NormalizesArgs): void {
@@ -110,7 +110,7 @@ export function normalizeAttribute(record: InstanceType<typeof Model>, name: str
  *
  * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize (private).
  * The live normalization lives in ActiveModel's `normalizedValueType`; this stays
- * for api:compare discoverability and shares its nil-skip semantics.
+ * for parity:api discoverability and shares its nil-skip semantics.
  *
  * @internal
  */

@@ -9,18 +9,18 @@ Forward-only — completed slots live in git. Refresh counts:
 pnpm tsx scripts/api-compare/extract-ts-api.ts
 pnpm tsx scripts/api-compare/compare.ts --package rack --privates | tail -3
 pnpm tsx scripts/api-compare/compare.ts --package rack --missing --incomplete
-pnpm run test:compare 2>&1 | grep "^  rack  —"
+pnpm run parity:test 2>&1 | grep "^  rack  —"
 ```
 
 Current (2026-05-23):
 
-| Signal       | Status                                                                                                |
-| ------------ | ----------------------------------------------------------------------------------------------------- |
-| api:compare  | **459/482 methods (95.2%)** — 42/46 files at 100%, 4 partial (3 in scope for slots 13–14, 1 deferred) |
-| test:compare | **773/773 tests (100%)** — 40/40 files ✓                                                              |
-| inheritance  | 41/43 (95.3%)                                                                                         |
+| Signal      | Status                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| parity:api  | **459/482 methods (95.2%)** — 42/46 files at 100%, 4 partial (3 in scope for slots 13–14, 1 deferred) |
+| parity:test | **773/773 tests (100%)** — 40/40 files ✓                                                              |
+| inheritance | 41/43 (95.3%)                                                                                         |
 
-**16 of the remaining 23 api:compare misses are in `directory.rb` (8),
+**16 of the remaining 23 parity:api misses are in `directory.rb` (8),
 `files.rb` (4), and `static.rb` (4)** — back in scope via slots 13–14 below.
 The other 7 are in `reloader.rb` (indefinitely deferred).
 

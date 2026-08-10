@@ -54,7 +54,7 @@ export class MemCacheStore extends CacheStore {
 // Rails: `include Compatibility; include StaleSessionCheck; include SessionObject`.
 // The CacheStore parent also mixes these in, but Rails registers them on
 // MemCacheStore directly (since the parent there is Rack::Session::Dalli),
-// so api:compare expects the methods on MemCacheStore's own surface.
+// so parity:api expects the methods on MemCacheStore's own surface.
 include(MemCacheStore, Compatibility);
 include(MemCacheStore, StaleSessionCheck);
 include(MemCacheStore, SessionObject);

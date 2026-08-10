@@ -28,7 +28,7 @@
  *                 (every Ruby test matched in the convention TS file, no
  *                 wrong-describe). Misplaced tests are not in this file's
  *                 match count, so a file with misplaced > 0 is always
- *                 incomplete and never hidden. Mirrors `api:compare --incomplete`.
+ *                 incomplete and never hidden. Mirrors `parity:api --incomplete`.
  *   --gates       Print the gate-mismatch report — matched tests whose Rails
  *                 adapter/feature gate diverges from our TS gate (should-gate /
  *                 missing-gate / wrong-gate / over-gated). Advisory: does not
@@ -104,7 +104,7 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
   for (const r of offenders) {
     console.error(`  ${r.package}: ${r.totalGateMismatch} gate-mismatch (must be 0)`);
   }
-  console.error("  Run `pnpm test:compare -- --gates` for the per-test breakdown.");
+  console.error("  Run `pnpm parity:test -- --gates` for the per-test breakdown.");
   process.exit(1);
 }
 
@@ -427,7 +427,7 @@ export function main(args: string[] = process.argv.slice(2)) {
   }
 
   // The dictionary is the TEST-compared population, not the api-compared one:
-  // `date` is enrolled in test:compare and deliberately not in api:compare, so
+  // `date` is enrolled in parity:test and deliberately not in parity:api, so
   // gating on PACKAGES would reject `--package date` for a package this script
   // does report on.
   const comparedPackages = Object.keys(testPathsManifest()).sort();

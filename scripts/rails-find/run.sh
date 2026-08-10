@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Driver for `pnpm rails:find [--refresh] <query>`. Ensures the two manifests the
-# lookup reads exist (building them once via the SAME extractors test:compare /
-# api:compare use), then runs the pure lookup in bin.ts. Subsequent runs are
+# lookup reads exist (building them once via the SAME extractors parity:test /
+# parity:api use), then runs the pure lookup in bin.ts. Subsequent runs are
 # fast — they hit the cached manifests and skip the build. `--refresh` deletes
 # the cached manifests first, forcing a rebuild against the current vendor tree
 # (bin.ts warns when a manifest predates the vendor lockfile).

@@ -1,5 +1,5 @@
 // Port of vendor/did_you_mean/test/test_spell_checker.rb.
-// Test names mirror the Ruby file so test:compare matches.
+// Test names mirror the Ruby file so parity:test matches.
 import { describe, it, expect } from "vitest";
 
 import { SpellChecker } from "./spell-checker.js";

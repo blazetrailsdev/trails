@@ -1,4 +1,4 @@
-// Ruby files intentionally excluded from api:compare / test:compare.
+// Ruby files intentionally excluded from parity:api / parity:test.
 //
 // Two kinds of exclusions:
 //   - pre-1.0 scope: features we haven't committed to porting yet
@@ -9,14 +9,14 @@
 // Each entry must set at least one of:
 //   `pattern`  — substring match against the Ruby SOURCE file path
 //                (from extract-ruby-api.rb, e.g. "promise.rb").
-//                Consumed by isSourceUnported() → api:compare.
+//                Consumed by isSourceUnported() → parity:api.
 //                A leading "/" anchors it to a path boundary, exactly as in
 //                `testFile` below: "/version.rb" matches the top-level
 //                `version.rb` and `<dir>/version.rb`, but NOT `gem_version.rb`.
 //                Omit for test-only entries where the source IS being ported.
 //   `testFile` — substring match against the Ruby TEST file path
 //                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
-//                Consumed by isTestFileUnported() → test:compare.
+//                Consumed by isTestFileUnported() → parity:test.
 //                Omit when there is no corresponding Rails test file.
 //   `package`  — (optional) scopes a `pattern` (source-path) or whole-file
 //                `testFile` (test-path) match to one package. Required when the
@@ -39,7 +39,7 @@ export type UnportedFile = { reason: string } &
     | { pattern?: string; testFile: string; tests?: never; package?: string }
     // `className` narrows a per-test exclusion to one Ruby *Test class within
     // the file, so a GVL-only subclass can be dropped while a portable sibling
-    // sharing a test name stays counted. Per-test entries never touch api:compare.
+    // sharing a test name stays counted. Per-test entries never touch parity:api.
     | { pattern?: never; testFile: string; className?: string; tests: string[]; package?: never }
   );
 
@@ -741,7 +741,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "Backwards-compat path for SGIDs issued by globalid <1.3.0 before " +
       "verifier-validated metadata existed. Trails has no pre-1.3.0 SGIDs " +
       "in circulation; `verifyWithLegacySelfValidatedMetadata` exists as a " +
-      "nominal stub for api:compare parity.",
+      "nominal stub for parity:api parity.",
   },
   {
     testFile: "signed_global_id_test.rb",

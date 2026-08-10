@@ -258,7 +258,7 @@ export class Table extends Node {
   }
 }
 
-// Surface the inherited FactoryMethods on table.ts so api:compare
+// Surface the inherited FactoryMethods on table.ts so parity:api
 // matches them against table.rb (Rails Arel's `Table` includes
 // FactoryMethods directly, expecting the methods to belong here).
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;

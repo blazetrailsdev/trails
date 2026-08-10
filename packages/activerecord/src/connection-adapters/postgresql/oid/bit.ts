@@ -73,7 +73,7 @@ export class Bit extends ValueType<string> {
   }
 
   /**
-   * Rails' OID::Bit#cast_value. Exposed publicly so api:compare matches
+   * Rails' OID::Bit#cast_value. Exposed publicly so parity:api matches
    * the Rails method name and so callers can invoke the hook directly.
    */
   castValue(value: unknown): string | null {

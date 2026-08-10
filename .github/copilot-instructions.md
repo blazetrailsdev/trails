@@ -14,7 +14,7 @@ This is a re-implementation of Rails, not a library inspired by it. When code ha
 - **Decomposition** — if Rails extracts a private helper, so should we, at the Rails name. One Rails method is one TS method.
 - **Member order within the file**, and the file layout itself.
 - **Errors** — same class, same message, same raise site.
-- **No extra abstraction** — no helper, wrapper, indirection layer, or "cleaner" rewrite Rails doesn't have. `pnpm api:extra` measures this; `@noRailsEquivalent <reason>` is the only sanctioned exception.
+- **No extra abstraction** — no helper, wrapper, indirection layer, or "cleaner" rewrite Rails doesn't have. `pnpm parity:api:extra` measures this; `@noRailsEquivalent <reason>` is the only sanctioned exception.
 
 Only a genuine TypeScript language shortcoming justifies a deviation, and only after the settled workaround is ruled out (`setX()` where a Ruby `x=` setter must be async, `include()`/`Included<>` and `this`-typed functions for Ruby `include`). "Cleaner in TS", "more idiomatic", and "the tests pass either way" are not language shortcomings.
 
@@ -37,7 +37,7 @@ Tests live next to source files as `*.test.ts`.
 
 ## Test names are sacred
 
-Test names are derived from the Rails test suite and are how `test:compare` matches our tests to Rails tests. **Never suggest renaming or rewording test names**, even if they contain typos, unusual phrasing, or look wrong. The names must match Rails exactly. If a test name looks like a typo (e.g. "shallow" instead of "swallow", "Text" instead of "Test"), it matches the Rails source and should not be changed.
+Test names are derived from the Rails test suite and are how `parity:test` matches our tests to Rails tests. **Never suggest renaming or rewording test names**, even if they contain typos, unusual phrasing, or look wrong. The names must match Rails exactly. If a test name looks like a typo (e.g. "shallow" instead of "swallow", "Text" instead of "Test"), it matches the Rails source and should not be changed.
 
 If a test is failing or the behavior doesn't match the name, the fix is in the test body or the implementation under test, not the test name.
 
@@ -47,7 +47,7 @@ Many test files define local helper classes or functions instead of importing pr
 
 ## Duplicate tests across describe blocks may be intentional
 
-Some tests appear in multiple `describe` blocks within the same file. This is sometimes needed because `test:compare` matches tests by their full path (describe > test name), and different Ruby test classes may have tests with the same name. Only flag duplicates if they are within the **same** describe block.
+Some tests appear in multiple `describe` blocks within the same file. This is sometimes needed because `parity:test` matches tests by their full path (describe > test name), and different Ruby test classes may have tests with the same name. Only flag duplicates if they are within the **same** describe block.
 
 ## Use the package ecosystem like Rails does
 
@@ -65,4 +65,4 @@ ActiveRecord's power comes from Arel. When building queries, subqueries, or SQL 
 
 ## Measuring progress
 
-Progress is primarily measured by `pnpm run api:compare`, which tracks class/module existence and file placement against Rails source. `pnpm run test:compare` matches our test files and test names against the actual Rails test suite. CI runs both on every push.
+Progress is primarily measured by `pnpm run parity:api`, which tracks class/module existence and file placement against Rails source. `pnpm run parity:test` matches our test files and test names against the actual Rails test suite. CI runs both on every push.

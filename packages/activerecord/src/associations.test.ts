@@ -1608,7 +1608,7 @@ describe("WithAnnotationsTest", () => {
 // AssociationsTest cases that rely on the canonical Rails fixtures
 // (associations_test.rb test_subselect, test_using_limitable_reflections_helper,
 // test_association_with_references). They live in a second `AssociationsTest`
-// describe (same class name, so test:compare still maps them to the Rails
+// describe (same class name, so parity:test still maps them to the Rails
 // AssociationsTest). The canonical model modules are imported dynamically in
 // beforeAll — never at the top level — so their module-level side effects
 // (Company STI subtree registration, Developer type registration) run during

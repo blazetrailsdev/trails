@@ -215,7 +215,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // BENIGN, not drift. RFC 0088 returns `Temporal` types by default where
         // Ruby returns `Date`/`DateTime`/`Time`, so a ported test whose Ruby
         // form asserts `assert_equal Date.new(2001,2,3), Date.parse("…")`
-        // compares a `Temporal.PlainDate` on our side. `test:compare` matches on
+        // compares a `Temporal.PlainDate` on our side. `parity:test` matches on
         // test *names*, so the test still counts. Do not "converge" a
         // Temporal return back to a Ruby-shaped one to silence a value
         // mismatch — that reverses the RFC's headline decision.

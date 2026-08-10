@@ -93,7 +93,7 @@ export const UrlForDefaults = {
  * Rails-shaped class-level `_routes` reader. Returns the route set or
  * `null`. Hosts override by assigning their route set onto the class
  * (trails treats `_routes` as a property, not a method — see
- * `UrlForClassMethods`). Exported here so `api:compare` matches Rails'
+ * `UrlForClassMethods`). Exported here so `parity:api` matches Rails'
  * `module ClassMethods; def _routes; nil; end; end`.
  *
  * @internal

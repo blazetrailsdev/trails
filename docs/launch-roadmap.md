@@ -5,7 +5,7 @@ rewritten in TypeScript" — backed by a working demo and rock-solid core packag
 
 ## Current State (2026-04-19)
 
-Live counts via `pnpm test:compare` (real matches only — stubs don't count).
+Live counts via `pnpm parity:test` (real matches only — stubs don't count).
 
 | Package          | Real matched | Total | Coverage | Status           |
 | ---------------- | ------------ | ----- | -------- | ---------------- |
@@ -19,7 +19,7 @@ Live counts via `pnpm test:compare` (real matches only — stubs don't count).
 | actionview       | —            | —     | 0%       | Not started      |
 | trailties        | —            | —     | —        | Early            |
 
-API-surface coverage is a separate metric (`pnpm api:compare`) — arel +
+API-surface coverage is a separate metric (`pnpm parity:api`) — arel +
 rack are at 100%, activerecord is at 91.5%, activemodel at 99.7%,
 activesupport at 24.8%, actioncontroller at 66.4%, actiondispatch at
 6.1%, actionview at 3.6%.
@@ -70,7 +70,7 @@ a model, run migrations, start a server, hit JSON and HTML endpoints.
 
 1. **ActiveSupport to 100%** — ~1,180 stub tests to unskip, ~817 missing.
    Many are utility functions that can be knocked out methodically.
-2. **ActiveRecord to 100%** — api:compare scoreboard is closed (4969/4969).
+2. **ActiveRecord to 100%** — parity:api scoreboard is closed (4969/4969).
    Post-100% Rails-fidelity work tracked as stories in the tasks repo (`pnpm tasks ready`).
 3. **ActionController basics** — implement the rendering pipeline
    (JSON + EJS), params, filters, and CRUD. See the ActionController

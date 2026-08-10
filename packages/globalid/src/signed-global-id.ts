@@ -170,7 +170,7 @@ export class SignedGlobalID extends GlobalID {
    * Trails has no legacy SGIDs to read; the corresponding Ruby test
    * `parse is backwards compatible with the self validated metadata` is
    * on the permanent skip list (`scripts/api-compare/unported-files.ts`).
-   * This implementation always returns null; kept for api:compare parity.
+   * This implementation always returns null; kept for parity:api parity.
    */
   static verifyWithLegacySelfValidatedMetadata(
     _sgid: string,

@@ -18,11 +18,11 @@ on. Before bumping that pin, run the cross-version API drift report to scope the
 work:
 
 ```sh
-pnpm api:compare          # builds output/rails-api.json (base) + output/ts-api.json (ported)
-pnpm api:drift --ref v8.1.3
+pnpm parity:api             # builds output/rails-api.json (base) + output/ts-api.json (ported)
+pnpm parity:api:drift --ref v8.1.3
 ```
 
-`api:drift` fetches the target ref reproducibly into `output/drift-src-<ref>/`
+`parity:api:drift` fetches the target ref reproducibly into `output/drift-src-<ref>/`
 (its own lock entry in `output/drift.lock.json`, plus the resolved
 `targetSha` in the report — the canonical pin in `sources.ts` stays the single
 active source), extracts its Ruby API to `output/rails-api@<ref>.json`, diffs it

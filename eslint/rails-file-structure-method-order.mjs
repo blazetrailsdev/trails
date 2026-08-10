@@ -53,7 +53,7 @@ const MANIFEST_PATH = path.resolve(__dirname, "rails-file-structure-method-order
  * True when the manifest on disk carries real order data.
  *
  * The manifest is generated from `scripts/api-compare/output/rails-api.json`,
- * which only exists after `pnpm api:compare` (Ruby + vendored Rails). Runs
+ * which only exists after `pnpm parity:api` (Ruby + vendored Rails). Runs
  * without it pass `--allow-missing` to the builder (see
  * scripts/api-compare/require-rails-api.ts) and get an empty manifest, under
  * which this rule would pass every file. `eslint.config.mjs` uses this to

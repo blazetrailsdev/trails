@@ -26,7 +26,7 @@ export class Interval extends ValueType<Duration> {
   }
 
   /**
-   * Rails' cast_value — exposed publicly so api:compare matches the
+   * Rails' cast_value — exposed publicly so parity:api matches the
    * Rails method name and callers can invoke the hook directly.
    */
   castValue(value: unknown): Duration | null {

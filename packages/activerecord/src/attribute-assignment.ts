@@ -8,7 +8,7 @@
  * `multiparameter-attribute-assignment.ts`. The functions exported here are
  * the Rails-private layer (`_assign_attributes`, `assign_multiparameter_attributes`,
  * etc.) that Rails' `assign_attributes` calls internally — they exist here for
- * Rails-layout parity (`api:compare`) and are @internal.
+ * Rails-layout parity (`parity:api`) and are @internal.
  */
 import {
   extractMultiparameterCallstack,

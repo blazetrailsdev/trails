@@ -91,7 +91,7 @@ export class HasOne extends SingularAssociation {
     // `set${cap}` IS the port of Rails' `#{name}=` writer: that writer removes
     // and persists the displaced target inline (has_one_association.rb:59-84),
     // blocking I/O a synchronous JS property setter cannot express but a
-    // promise-returning method can. api:compare scores it as such —
+    // promise-returning method can. parity:api scores it as such —
     // `rubyMethodToTs` offers `set#{Name}` as a candidate for `name=`
     // (scripts/api-compare/conventions.ts).
     //

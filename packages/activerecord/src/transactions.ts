@@ -631,7 +631,7 @@ export function isTriggerTransactionalCallbacks(this: Base): boolean {
 
 // ---------------------------------------------------------------------------
 // Private instance helpers — mirrors ActiveRecord::Transactions private block.
-// Exported so base.ts can wire them into include(Base, {...}) for api:compare.
+// Exported so base.ts can wire them into include(Base, {...}) for parity:api.
 // ---------------------------------------------------------------------------
 
 // Mirrors: attr_reader :_committed_already_called

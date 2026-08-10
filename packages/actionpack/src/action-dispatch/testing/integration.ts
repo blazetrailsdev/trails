@@ -691,7 +691,7 @@ export class IntegrationTest {
   }
 
   // --- Mixin surface (attached via prototype below) ---------------------
-  // Declared as class properties so api:compare sees the names. Real
+  // Declared as class properties so parity:api sees the names. Real
   // implementations live in the imported `this`-typed modules and are
   // wired onto `IntegrationTest.prototype` after the class body. The
   // `_`-prefixed and helper-message slots are Rails-private — keep
@@ -1075,7 +1075,7 @@ export class IntegrationTest {
 // from `Assertions::ResponseAssertions`. trails ports each module as
 // `this`-typed standalone functions (CLAUDE.md "Module mixins" pattern).
 // We declare the surface here and attach the implementations on
-// `IntegrationTest.prototype` so api:compare sees the names and runtime
+// `IntegrationTest.prototype` so parity:api sees the names and runtime
 // callers get a working method.
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;

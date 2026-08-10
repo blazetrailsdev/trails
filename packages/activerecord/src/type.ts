@@ -173,7 +173,7 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   return adapterNameFromConfig(configAdapter);
 }
 
-// currentAdapterName is private in Rails — exposed here for api:compare parity only.
+// currentAdapterName is private in Rails — exposed here for parity:api parity only.
 /** @internal */
 export function currentAdapterName(): AdapterName {
   const base = _currentAdapterResolver?.();

@@ -20,12 +20,12 @@ import { inMemoryDb } from "./adapter-helper.js";
  * `adapter_helper.rb` counterpart — the rest are the adapters' own
  * `supports_*?` methods that Rails tests call straight on the connection, so
  * there is no Rails helper file to fold them into. Keeping the whole set in
- * one feature-keyed table also keeps the test:compare gate extractor reading a
+ * one feature-keyed table also keeps the parity:test gate extractor reading a
  * single source; splitting the adapter_helper-owned keys out would duplicate
  * the resolution logic. `adapter-helper.ts` holds the predicates that ARE
  * `adapter_helper.rb`'s own (`currentAdapter`, `inMemoryDb`, …).
  *
- * Feature keys match Rails' `supports_<key>?` (and the keys the test:compare
+ * Feature keys match Rails' `supports_<key>?` (and the keys the parity:test
  * gate extractor derives), so a flagged `it.skip` of a Rails feature-gated
  * test converts directly to `itIfSupports("<key>", …)`. Add a key when a
  * suite first gates on it; an unknown key throws rather than silently running
@@ -189,7 +189,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   optimizer_hints: withMysql([], mysql.supportsOptimizerHints),
   // `supports_transaction_isolation?`: PostgreSQL + MySQL + SQLite (sqlite3_adapter.rb:147).
   // The Rails test (transaction_isolation_test.rb:20) ANDs this with
-  // !current_adapter?(:SQLite3Adapter). The test:compare extractors keep the
+  // !current_adapter?(:SQLite3Adapter). The parity:test extractors keep the
   // adapter half of such pure-conjunction conditions, so the canonical railsGate
   // is `adapters=[mysql,postgresql] features=[transaction_isolation]`. Match it
   // with `itIfSupports.skipIf(adapterType === "sqlite")("transaction_isolation", …)`.

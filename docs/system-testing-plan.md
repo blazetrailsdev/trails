@@ -127,7 +127,7 @@ HTTP server. Verify `page.goto()` works against it.
 **Test:** Screenshot helper unit test: boot a minimal page, take
 screenshot, verify PNG file exists. SetupAndTeardown lifecycle test.
 
-## Mapping to Rails api:compare methods (56 total)
+## Mapping to Rails parity:api methods (56 total)
 
 | File                                                | Methods | Key methods                                                                                                      |
 | --------------------------------------------------- | ------: | ---------------------------------------------------------------------------------------------------------------- |
@@ -171,10 +171,10 @@ headless flags, driver path resolution). Playwright has none of this
 complexity — `playwright.chromium.launch({ headless: true })` is the
 entire API.
 
-The `Browser` class methods fold into `Driver`. For api:compare, we
+The `Browser` class methods fold into `Driver`. For parity:api, we
 either mark the 9 Browser methods as `@internal` (they're already
 `# :nodoc:` in Rails) or implement thin delegation stubs in a `Browser`
-class if api:compare requires them.
+class if parity:api requires them.
 
 ### 3. Screenshot output modes match Rails exactly
 
@@ -247,7 +247,7 @@ imports from PR 1's types but doesn't modify the same files.
 
 **From #2428 (PR 1 — Driver + Server + SystemTestCase)**
 
-- [ ] ~30 LOC: Browser api:compare stubs (9 methods, 0%). No real Browser abstraction (see "No `Browser` class" above) — thin `@internal` delegation to `Driver`, or mark all 9 as `@internal` skip in api:compare.
+- [ ] ~30 LOC: Browser parity:api stubs (9 methods, 0%). No real Browser abstraction (see "No `Browser` class" above) — thin `@internal` delegation to `Driver`, or mark all 9 as `@internal` skip in parity:api.
 - [ ] `servedBy()` stores `_serverHost`/`_serverPort` but `startApplication()` doesn't consume them. Wire when needed.
 - [ ] `urlHelpers()` returns undefined — needs routing infrastructure wired.
 - [ ] `Driver.use()` is async (Rails is sync via Capybara lazy registration). Idempotency guard added.

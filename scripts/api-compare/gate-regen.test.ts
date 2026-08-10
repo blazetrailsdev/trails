@@ -36,12 +36,12 @@ describe("shouldRegenerate", () => {
 
 describe("regenerateArtifact", () => {
   it("rejects with the failing command when the regeneration exits non-zero", async () => {
-    await expect(regenerateArtifact({ PATH: "" })).rejects.toThrow(/pnpm api:compare|spawn/);
+    await expect(regenerateArtifact({ PATH: "" })).rejects.toThrow(/pnpm parity:api|spawn/);
   });
 
   it("names the calls scope in the failure when the caller passes it", async () => {
     await expect(regenerateArtifact({ PATH: "" }, ["--calls"])).rejects.toThrow(
-      /pnpm api:compare --calls|spawn/,
+      /pnpm parity:api --calls|spawn/,
     );
   });
 });

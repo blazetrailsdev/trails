@@ -143,7 +143,7 @@ export function redirectToUrl(this: TestProcessHost): string | undefined {
 
 /**
  * Namespace object mirroring Rails' `ActionDispatch::TestProcess` module so
- * that `api:compare` can locate the ported methods at the expected layout.
+ * that `parity:api` can locate the ported methods at the expected layout.
  */
 export const TestProcess = {
   fileFixtureUpload,

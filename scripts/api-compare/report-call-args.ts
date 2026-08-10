@@ -75,7 +75,7 @@ async function reportMain(top: number): Promise<number> {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     console.error(
       `call-arg-mismatches report: ${path.relative(ROOT_DIR, ARTIFACT_PATH)} is missing — ` +
-        "run `pnpm api:compare --calls` first.",
+        "run `pnpm parity:api --calls` first.",
     );
     return 2;
   }

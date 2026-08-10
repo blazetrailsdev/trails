@@ -9,7 +9,7 @@
  * against a base-controlled fake adapter (independent of a concrete adapter's
  * raw-connection wiring).
  *
- * They live in a `*.trails.test.ts` file so `test:compare` does not map them
+ * They live in a `*.trails.test.ts` file so `parity:test` does not map them
  * to a Rails test name — the faithful, integration-level `AdapterConnectionTest`
  * port lives in `adapter.test.ts`.
  */

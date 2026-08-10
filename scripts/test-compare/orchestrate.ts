@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 /**
- * In-process orchestrator for `pnpm test:compare` (driver: run.sh).
+ * In-process orchestrator for `pnpm parity:test` (driver: run.sh).
  *
  * The pipeline is a small dependency DAG:
  *
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
  * Prune the shared cache, api-compare's Phase D. The `rails-tests` entries this
  * orchestrator publishes are content-keyed and therefore append-only — every
  * `vendor/sources.lock.json` bump mints a new key and orphans the old multi-MB
- * manifest — so a checkout that runs `test:compare` but never `api:compare`
+ * manifest — so a checkout that runs `parity:test` but never `parity:api`
  * would otherwise grow the shared directory without bound.
  *
  * Unlike api-compare's, this runs *before* the comparison rather than after:

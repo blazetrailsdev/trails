@@ -58,7 +58,7 @@ export async function loadArtifact(file: string = ARTIFACT_PATH): Promise<Compar
   if (!exists) {
     throw new Error(
       `Missing ${path.relative(ROOT_DIR, file)} — run \`pnpm exec tsx ` +
-        "scripts/api-compare/compare.ts` (or `pnpm api:compare`) first to write it.",
+        "scripts/api-compare/compare.ts` (or `pnpm parity:api`) first to write it.",
     );
   }
   return JSON.parse(await fs.readFile(file, "utf-8")) as ComparisonArtifact;
@@ -84,7 +84,7 @@ async function main(): Promise<number> {
       `\ninheritance excludes: artifact compared a PARTIAL scope — missing ` +
         `${absent.length} package(s): ${absent.join(", ")}.\n` +
         "Every other package's excludes would read as stale. Regenerate the " +
-        "full surface with `pnpm api:compare`.\n",
+        "full surface with `pnpm parity:api`.\n",
     );
     return 1;
   }

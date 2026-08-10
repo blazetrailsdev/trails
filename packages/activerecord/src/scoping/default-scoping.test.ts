@@ -6,7 +6,7 @@
  * Every Rails test is ported with a faithful body. Cases that exercise behavior
  * the engine does not yet implement are kept as `it.skip` (the migration
  * backlog) rather than fabricated passing stubs, so their names stay tracked by
- * test:compare; each skip carries a one-line note on the missing capability.
+ * parity:test; each skip carries a one-line note on the missing capability.
  * The `DefaultScopingWithThreadTest` cases are `unless in_memory_db?` in Rails
  * and so do not apply on the in-memory sqlite suite.
  */
@@ -677,7 +677,7 @@ describe("DefaultScopingTest", () => {
 
   // ── Migration backlog: faithful Rails ports awaiting engine support. Kept as
   //    `it.skip` (not fabricated passing stubs) so the Rails test names remain
-  //    tracked by test:compare while the behavior is unimplemented. Each notes
+  //    tracked by parity:test while the behavior is unimplemented. Each notes
   //    the missing capability.
 
   it("default scope with conditions hash", async () => {

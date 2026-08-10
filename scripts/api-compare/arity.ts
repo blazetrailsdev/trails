@@ -1,4 +1,4 @@
-// Arity comparison for api:compare (advisory — never changes the parity %).
+// Arity comparison for parity:api (advisory — never changes the parity %).
 //
 // The matcher (compare.ts) pairs Ruby↔TS methods by *name* only, so a port can
 // have the right name but the wrong signature. These helpers compare the
