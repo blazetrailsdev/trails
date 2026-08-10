@@ -5532,18 +5532,29 @@ export class Date {
    * Sunday-based weeks and `1` for the Monday-based ones. It is a `:nodoc:`
    * singleton method defined only under `#ifndef NDEBUG`, which is why the
    * gem's own test guards it with `Date.respond_to?(:weeknum, true)`.
+   *
+   * `day` carries the fraction (`num2int_with_frac(d, positive_inf)`,
+   * `date_core.c:3691`) and `add_frac` (`:3286-3318`) adds it back as a day
+   * fraction, which is a complex `Date` the `Temporal.PlainDate` seat reads
+   * the day of — a fraction of a day never moves midnight off its own date.
    */
   static weeknum(
     year = -4712,
     week = 0,
-    day = 1,
+    day: number | Rational = 1,
     firstday = 0,
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
     const sg = val2sg(start);
-    const rjd = cValidWeeknumP(year, week, day, firstday, sg);
+    const [d, fr2] = num2intWithFrac(day, DAY_IN_SECONDS, false);
+    const rjd = cValidWeeknumP(year, week, d, firstday, sg);
     if (rjd === null) throw new DateError("invalid date");
-    return new Date(SEAT, 0n, rjd, sg).toDate();
+    const [nth, rrjd] = decodeJd(rjd);
+    const ret = new Date(SEAT, nth, rrjd, sg);
+    if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
+      return ret.plus(fr2 instanceof Rational ? fr2.quo(DAY_IN_SECONDS) : isecToDay(fr2)).toDate();
+    }
+    return ret.toDate();
   }
 
   /**
@@ -5551,13 +5562,26 @@ export class Date {
    * `date_core.c` `date_s_nth_kday`, `date_core.c:3707-3756`, `:9690`), the
    * `n`th weekday `k` of a month — `Date.nth_kday(1992, 2, 5, 6)` is the 5th
    * Saturday of February 1992. `:nodoc:` and `#ifndef NDEBUG`, as
-   * {@link Date.weeknum} is.
+   * {@link Date.weeknum} is, and `k` carries the fraction there too
+   * (`num2int_with_frac(k, positive_inf)`, `date_core.c:3741`).
    */
-  static nthKday(year = -4712, month = 1, n = 1, k = 1, start = DEFAULT_SG): Temporal.PlainDate {
+  static nthKday(
+    year = -4712,
+    month = 1,
+    n = 1,
+    k: number | Rational = 1,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDate {
     const sg = val2sg(start);
-    const rjd = cValidNthKdayP(year, month, n, k, sg);
+    const [rk, fr2] = num2intWithFrac(k, DAY_IN_SECONDS, false);
+    const rjd = cValidNthKdayP(year, month, n, rk, sg);
     if (rjd === null) throw new DateError("invalid date");
-    return new Date(SEAT, 0n, rjd, sg).toDate();
+    const [nth, rrjd] = decodeJd(rjd);
+    const ret = new Date(SEAT, nth, rrjd, sg);
+    if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
+      return ret.plus(fr2 instanceof Rational ? fr2.quo(DAY_IN_SECONDS) : isecToDay(fr2)).toDate();
+    }
+    return ret.toDate();
   }
 
   /**
@@ -7006,19 +7030,18 @@ export class DateTime extends DateWithoutParseStatics {
   ) {
     if (year instanceof Temporal.PlainDateTime || year instanceof Temporal.ZonedDateTime) {
       const sg = val2sg((month as number) ?? DEFAULT_SG);
-      const of = year instanceof Temporal.ZonedDateTime ? year.offsetNanoseconds / 1000000000 : 0;
+      const rof = year instanceof Temporal.ZonedDateTime ? year.offsetNanoseconds / 1000000000 : 0;
       const [nth, ry] = decodeYear(year.year, -1);
       const rjd = cCivilToJd(ry, year.month, year.day, virtualSg(nth, sg));
-      const df = timeToDf(year.hour, year.minute, year.second);
-      const sf = new Rational(
+      const localDf = timeToDf(year.hour, year.minute, year.second);
+      super(SEAT, nth, rjd, sg);
+      this.#jd = jdLocalToUtc(rjd, localDf, rof);
+      this.#df = dfLocalToUtc(localDf, rof);
+      this.#sf = new Rational(
         year.millisecond * 1000000 + year.microsecond * 1000 + year.nanosecond,
         1,
       );
-      super(SEAT, nth, rjd, sg);
-      this.#jd = jdLocalToUtc(rjd, df, of);
-      this.#df = dfLocalToUtc(df, of);
-      this.#sf = sf;
-      this.#of = of;
+      this.#of = rof;
       return;
     }
     if (typeof year === "symbol") {
@@ -7537,10 +7560,13 @@ export class DateTime extends DateWithoutParseStatics {
    * second — `s == 60` — is stored as `59`, and `sf` is nanoseconds.
    *
    * The C builds under `GREGORIAN` and then `set_sg(dat, sg)`, the same shape
-   * {@link Date.today} and `Time#to_datetime` have.
+   * {@link Date.today} and `Time#to_datetime` have. `start` is taken as
+   * `NUM2DBL(vsg)` and NOT through `val2sg` — this is the one builder that
+   * does not screen its `start` (`date_core.c:8147-8150`, against
+   * `date_s_today`'s `val2sg` at `:3799-3802`).
    */
   static now(start = DEFAULT_SG): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const sg = val2sg(start);
+    const sg = start;
     const tm = Temporal.Now.zonedDateTimeISO();
 
     const y = tm.year;

@@ -303,8 +303,6 @@ describe("TestDateNew", () => {
     expect(ymd(dt)).toEqual([-4712, 1, 1]);
     expect([dt.hour, dt.minute, dt.second]).toEqual([0, 0, 0]);
 
-    // Ruby reads `d.jd` off the gem object; the seat answers `Temporal`, so the
-    // day is named by the `Date.jd` that builds it (`date_s_jd`, :3377-3387).
     const d2 = Date.weeknum(2002, 11, 4, 0);
     expect(d2.equals(Date.jd(2452355))).toBe(true);
 
@@ -340,23 +338,16 @@ describe("TestDateNew", () => {
     const t = Time.now();
     const t2 = Time.utc(t.year, t.mon, t.day);
     const t3 = Time.utc(d.year, d.month, d.day);
-    // `assert_in_delta(t2, t3, t - z + 2)` over two `Time`s, which Ruby
-    // subtracts to seconds; `epochSeconds` is that subtraction here.
     expect(Math.abs(epochSeconds(t2) - epochSeconds(t3))).toBeLessThanOrEqual(
       epochSeconds(t) - epochSeconds(z) + 2,
     );
 
-    // `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985), which
-    // is the `Omit` in `DateWithoutParseStatics` — a type error, not a missing
-    // runtime property, since the value side is `Date` itself.
-    // @ts-expect-error DateTime does not respond to `today`.
+    // @ts-expect-error `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985)
     void DateTime.today;
   });
 
   it("now", () => {
-    // `Date.respond_to?(:now)` is false — `now` is a `DateTime` singleton
-    // method alone (date_core.c:9987).
-    // @ts-expect-error Date does not respond to `now`.
+    // @ts-expect-error `now` is a `DateTime` singleton method alone (date_core.c:9987)
     void Date.now;
 
     const z = Time.now();
