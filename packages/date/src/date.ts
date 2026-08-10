@@ -6390,11 +6390,14 @@ export class Date {
    * **This is the opt-in seam RFC 0088 left open**, and it is a conversion
    * method rather than an options argument or a parallel entry point because
    * the gem already names both directions and neither name is invented: the
-   * statics answer Temporal through `to_date` / `to_datetime`, and a caller who
-   * wants the gem-shaped object back hands the Temporal value to the
-   * constructor ({@link Date}'s `PlainDate` overload,
-   * {@link DateTime}'s), which is the same seat `d_simple_new_internal` writes.
-   * The exported {@link dNewByFrags} / {@link dtNewByFrags} answer it directly.
+   * statics answer Temporal through `to_date` / `to_datetime`, and the
+   * exported {@link dNewByFrags} / {@link dtNewByFrags} answer the other
+   * direction — they are the *sole* gem-shaped seat, both ending at
+   * `d_simple_new_internal` (`date_core.c:3036`) exactly as `date_s_jd`
+   * (`:3377-3387`) does. `Date`'s constructor takes only
+   * `(year?, month?, day?, start?)` and the `SEAT` form; handing it a
+   * `Temporal.PlainDate` raises `TypeError: invalid year (not numeric)` from
+   * `check_numeric` (`date_core.c:67-72`).
    */
   toDate(): Temporal.PlainDate {
     return plainDateFromJd(this.mLocalJd(), this.#sg);

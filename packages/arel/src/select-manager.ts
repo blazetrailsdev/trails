@@ -125,22 +125,26 @@ export class SelectManager extends TreeManager {
   /**
    * Add a lock clause (FOR UPDATE by default).
    *
-   * Mirrors: Arel::SelectManager#lock (select_manager.rb:52-63). Rails'
-   * `case`: `true` and the no-arg default both become `Arel.sql("FOR
-   * UPDATE")`, a `SqlLiteral` passes through unwrapped (empty `when` branch),
-   * and a bare `String` is wrapped. `true` is how ActiveRecord's `lock!` /
-   * `with_lock` express the default lock.
+   * Mirrors: Arel::SelectManager#lock (select_manager.rb:52-63). The
+   * `SqlLiteral` arm is Rails' empty `when` — a literal passes through
+   * unwrapped — and it precedes the `String` arm because Ruby's SqlLiteral is
+   * a String subclass. `true` is how ActiveRecord's `lock!` / `with_lock`
+   * express the default lock.
+   *
+   * `Arel.sql` lives in `index.ts`, which re-exports this file; importing it
+   * here would close a module cycle over index.ts's top-level `include()`
+   * side effects, so its one-line body (`new SqlLiteral(...)`) is inlined.
    */
-  lock(lockClause: string | Node | boolean = true): this {
-    const expr =
-      lockClause === true
-        ? new SqlLiteral("FOR UPDATE")
-        : lockClause instanceof SqlLiteral
-          ? lockClause
-          : typeof lockClause === "string"
-            ? new SqlLiteral(lockClause)
-            : lockClause;
-    this.ast.lock = new Lock(expr);
+  lock(locking: string | Node | boolean = new SqlLiteral("FOR UPDATE")): this {
+    if (locking === true) {
+      locking = new SqlLiteral("FOR UPDATE");
+    } else if (locking instanceof SqlLiteral) {
+      // Rails' empty `when Arel::Nodes::SqlLiteral` arm (select_manager.rb:56).
+    } else if (typeof locking === "string") {
+      locking = new SqlLiteral(locking);
+    }
+
+    this.ast.lock = new Lock(locking as Node);
     return this;
   }
 
