@@ -60,18 +60,21 @@ import {
   typeCast as abstractTypeCast,
   quoteString as abstractQuoteString,
   quoteColumnName as abstractQuoteColumnName,
+  quoteTableName as abstractQuoteTableName,
   isSqlLiteral,
   quotedTrue as abstractQuotedTrue,
   quotedFalse as abstractQuotedFalse,
   unquotedTrue as abstractUnquotedTrue,
   unquotedFalse as abstractUnquotedFalse,
   quotedBinary as abstractQuotedBinary,
+  quotedDate as abstractQuotedDate,
+  quotedTime as abstractQuotedTime,
   castBoundValue as abstractCastBoundValue,
   sanitizeAsSqlComment as abstractSanitizeAsSqlComment,
   lookupCastType as abstractLookupCastType,
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
-import type { Quoting } from "./abstract/quoting.js";
+import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
 import { include } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
@@ -979,15 +982,30 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
+  /**
+   * Mirrors: Quoting::ClassMethods#quote_column_name (abstract/quoting.rb:60-63)
+   * — the raise every adapter must override.
+   */
+  static quoteColumnName(name: string): string {
+    return abstractQuoteColumnName(name);
+  }
+
+  /**
+   * Mirrors: Quoting::ClassMethods#quote_table_name (abstract/quoting.rb:65-68)
+   * — `quote_column_name(table_name)`, sent on the class.
+   */
+  static quoteTableName(name: string): string {
+    return abstractQuoteTableName.call(this, name);
+  }
+
   quoteTableName(name: string): string {
-    // Rails: abstract quote_table_name delegates to quote_column_name via
-    // dynamic dispatch (abstract/quoting.rb:66-67), so an adapter that
-    // overrides only quoteColumnName still gets correct table-name quoting.
-    return this.quoteColumnName(name);
+    // Rails: `self.class.quote_table_name(table_name)` (abstract/quoting.rb:140-143).
+    return (this.constructor as typeof AbstractAdapter).quoteTableName(name);
   }
 
   quoteColumnName(name: string): string {
-    return abstractQuoteColumnName(name);
+    // Rails: `self.class.quote_column_name(column_name)` (abstract/quoting.rb:135-138).
+    return (this.constructor as typeof AbstractAdapter).quoteColumnName(name);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {
@@ -1034,6 +1052,23 @@ export class AbstractAdapter implements Quoting {
 
   unquotedFalse(): boolean | number {
     return abstractUnquotedFalse();
+  }
+
+  /**
+   * Rails' `quote` / `type_cast` self-send `quoted_date` and `quoted_time`
+   * (abstract/quoting.rb:84-85, :101-102), so both must be real members of the
+   * receiver here — an adapter override (PostgreSQL's BC-suffixing `quotedDate`,
+   * SQLite's 2000-01-01 `quotedTime`) then resolves off the receiver.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_date (rb:184-199)
+   */
+  quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
+    return abstractQuotedDate(value);
+  }
+
+  /** Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_time (rb:201-204) */
+  quotedTime(value: QuotedTimeValue): string {
+    return abstractQuotedTime.call(this, value);
   }
 
   quotedBinary(value: unknown): string {
@@ -2119,13 +2154,18 @@ export class AbstractAdapter implements Quoting {
     this.disconnectBang();
   }
 
-  // Async to let adapters with async driver-level connect (PostgreSQLAdapter)
-  // eagerly populate `_connection` here — mirroring Rails' `connect!` setting
-  // `@raw_connection` — so `withRawConnection` can yield `_connection` directly
-  // instead of re-acquiring inside the retry loop. The base stays a no-op;
-  // SQLite/MySQL inherit it unchanged (they populate via their own seams).
-  async connectBang(): Promise<void> {
-    // Concrete adapters override to establish the raw connection.
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#connect!
+   * (abstract_adapter.rb:778-781) — `verify!; self`, and nothing more. It is
+   * NOT a bare raw-connect primitive: routing through `verifyBang` is what
+   * promotes an unconfigured pool-opened connection instead of reconnecting,
+   * and what gives a `configure_connection` failure its `connection_retries`
+   * re-attempts through `reconnectBang`'s retry loop (adapter_test.rb:852).
+   * The raw open lives in each adapter's private `connect`, as in Rails.
+   */
+  async connectBang(): Promise<this> {
+    await this.verifyBang();
+    return this;
   }
 
   cleanBang(): void {
@@ -2380,6 +2420,8 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = opts.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
+      // Rails: `connect! if @raw_connection.nil? && reconnect_can_restore_state?`
+      // (abstract_adapter.rb:985), and `connect!` is `verify!` (rb:778-781).
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
       // Drain any deferred connection-readiness work (PostgreSQLAdapter's
       // async reset barrier: ROLLBACK + DISCARD ALL + reconfigure) ONCE here,

@@ -39,7 +39,6 @@ import {
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
-import { dispatchQuotedDate, dispatchQuotedTime } from "./abstract/quoting.js";
 import { Value as TimeValue } from "../type/time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
@@ -856,14 +855,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // (abstract/quoting.rb:103-104), so the microsecond capping comes from
       // this adapter's `quotedDate` rather than a dialect argument.
       if (v instanceof TimeValue || v instanceof Temporal.PlainTime) {
-        v = dispatchQuotedTime(this, v);
+        v = this.quotedTime(v);
       } else if (
         v instanceof Temporal.Instant ||
         v instanceof Temporal.PlainDateTime ||
         v instanceof Temporal.PlainDate ||
         v instanceof Temporal.ZonedDateTime
       ) {
-        v = dispatchQuotedDate(this, v);
+        v = this.quotedDate(v);
       } else if (v instanceof BigDecimal) {
         // Rails: `when BigDecimal then value.to_s("F")` (abstract/quoting.rb:101).
         v = v.toString("F");
@@ -1434,18 +1433,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async connect(): Promise<void> {
     await this._ensureClient();
-  }
-
-  /**
-   * Eager connect — mirrors Rails' `AbstractAdapter#connect!` (`verify!; self`),
-   * which `with_raw_connection` calls when `@raw_connection` is nil. Routing
-   * through `verifyBang` gives a configure_connection failure its
-   * connection_retries re-attempts via `reconnectBang`'s retry loop
-   * (adapter_test.rb:852), exactly as Rails' verify! → reconnect! does.
-   * @internal
-   */
-  override async connectBang(): Promise<void> {
-    await this.verifyBang();
   }
 
   /**

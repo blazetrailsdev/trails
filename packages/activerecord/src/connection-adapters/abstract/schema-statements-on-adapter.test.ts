@@ -79,13 +79,14 @@ class CapturingAdapter extends AbstractAdapter {
 /**
  * SQLite-flavoured capturing stub: records every SQL string so the
  * introspection-PRAGMA arms can be asserted against the exact output. Inherits
- * AbstractAdapter's quote (string literal) and, like SQLite3Adapter, defines
- * its own double-quote `quoteColumnName` — the abstract base raises
- * NotImplementedError there, mirroring Rails.
+ * AbstractAdapter's quote (string literal) and, like Rails' SQLite3 adapter,
+ * defines its own double-quote `quote_column_name` in ClassMethods
+ * (sqlite3/quoting.rb:44) — where the inherited instance methods send it
+ * (quoting.rb:135-143), the abstract one raising NotImplementedError.
  */
 class SqliteCapturingAdapter extends AbstractAdapter {
   allSql: string[] = [];
-  override quoteColumnName(name: string): string {
+  static override quoteColumnName(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
   }
   constructor(private readonly firstRows: Record<string, unknown>[] = []) {
@@ -296,7 +297,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       async supportsCheckConstraints() {
         return true;
       }
-      quoteColumnName(name: string) {
+      static override quoteColumnName(name: string) {
         return `"${name}"`;
       }
       async changeColumnDefault(tableName: string, columnName: string, options: any) {

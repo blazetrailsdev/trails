@@ -124,4 +124,40 @@ describe("QueryCache DDL dirties (trails)", () => {
       });
     },
   );
+
+  // The table-rebuild path (`alter_table` → `copy_table`) is the one DDL route
+  // that does not emit a single ALTER: Rails runs its statements through
+  // `create_table`/`drop_table`/`add_index` (`execute`) and
+  // `copy_table_contents` (`internal_exec_query`), sqlite3_adapter.rb:593-648,
+  // so the clear is a side effect of those primitives. trails used to reach
+  // `driver.exec` and compensate with an explicit `clearQueryCache()` in
+  // `alterTable`; this pins that the primitives now do it, so no compensation
+  // is needed.
+  it.skipIf(!isSqliteRun())(
+    "sqlite change_column's table rebuild dirties the query cache",
+    async () => {
+      const conn = (await Post.leaseConnection()) as never as {
+        _queryCache: { clear(): void };
+        changeColumn(t: string, c: string, ty: string): Promise<void>;
+      };
+
+      await Post.cache(async () => {
+        await Post.find(1);
+        const store = conn._queryCache;
+        const real = store.clear.bind(store);
+        let clears = 0;
+        store.clear = () => {
+          clears++;
+          real();
+        };
+        try {
+          await conn.changeColumn("posts", "title", "text");
+        } finally {
+          store.clear = real;
+          await conn.changeColumn("posts", "title", "string");
+        }
+        expect(clears).toBeGreaterThan(0);
+      });
+    },
+  );
 });

@@ -10,15 +10,16 @@ import {
   columnNameMatcher,
   columnNameWithOrderMatcher,
 } from "./quoting.js";
+import type { QuotingDispatchHost } from "../abstract/quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
-// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
+// `quote` / `typeCast` self-send onto their receiver; bind
 // the adapter prototype so date/time values reach MySQL's quotedDate override
 // and booleans reach its unquotedTrue/unquotedFalse.
-const HOST = Object.create(AbstractMysqlAdapter.prototype) as object;
+const HOST = Object.create(AbstractMysqlAdapter.prototype) as QuotingDispatchHost;
 // Rails' MySQL adapter defines no `quote` (mysql/quoting.rb); MySQL value
-// quoting is the inherited abstract `quote` plus the dispatched overrides.
-const quote = (value: unknown): string => (HOST as { quote(value: unknown): string }).quote(value);
+// quoting is the inherited abstract `quote` plus the overrides it self-sends.
+const quote = (value: unknown): string => HOST.quote(value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("MySQL quoting — quote", () => {

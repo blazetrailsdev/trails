@@ -4,6 +4,7 @@
  * format functions that feed both the text-protocol (quote) and bind paths.
  */
 
+import { quotingHost } from "../../support/quoting-host.js";
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import {
@@ -18,10 +19,11 @@ import {
 import { quote as quoteFn, typeCast as typeCastFn } from "./quoting.js";
 import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
 
-// `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// an empty host so date/time values route through the abstract module helpers.
-const quote = (value: unknown): string => quoteFn.call({}, value);
-const typeCast = (value: unknown): unknown => typeCastFn.call({}, value);
+// `quote` / `typeCast` self-send `quoted_date` / `quoted_time`, so they need a
+// receiver that defines them; an override-free adapter host routes date/time
+// values through the abstract module helpers.
+const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(quotingHost(), value);
 
 describe("formatInstantForSql", () => {
   it("formats a whole-second instant", () => {
@@ -200,7 +202,9 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
 describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for PlainTime", () => {
   it("wraps PlainTime in 2000-01-01 for sqlite", () => {
     const v = Temporal.PlainTime.from("14:23:55.123456");
-    expect(typeCastFn.call({ quotedTime: sqliteQuotedTime }, v)).toBe("2000-01-01 14:23:55.123456");
+    expect(typeCastFn.call(quotingHost({ quotedTime: sqliteQuotedTime }), v)).toBe(
+      "2000-01-01 14:23:55.123456",
+    );
   });
 
   it("returns bare time string for postgres", () => {

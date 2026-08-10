@@ -1,3 +1,4 @@
+import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { minutes, BigDecimal } from "@blazetrails/activesupport";
@@ -21,11 +22,11 @@ import {
   columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 
-// `quote` / `typeCast` / `quotedTime` / `quoteTableName` require a host receiver
-// (no receiver-less dispatch); bind an empty host so date/time values route
-// through the abstract module helpers and table-name dispatch falls to the
-// throwing module-level `quoteColumnName`, as Rails' abstract layer does.
-const HOST = {};
+// `quote` / `typeCast` / `quotedTime` / `quoteTableName` self-send onto their
+// receiver, so bind an override-free adapter host: date/time values route
+// through the abstract module helpers and table-name dispatch reaches the
+// abstract `quoteColumnName`, which raises, as Rails' abstract layer does.
+const HOST = quotingHost();
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
@@ -133,7 +134,9 @@ describe("QuotingTest", () => {
   it("quote table name for assignment", () => {
     // Abstract quote_table_name_for_assignment delegates to quote_table_name,
     // which raises at the abstract layer; adapters override with real behavior.
-    expect(() => quoteTableNameForAssignment("users", "name")).toThrow(NotImplementedError);
+    expect(() => quoteTableNameForAssignment.call(HOST, "users", "name")).toThrow(
+      NotImplementedError,
+    );
   });
 
   it("quote duration", () => {
@@ -149,12 +152,12 @@ describe("QuotingTest", () => {
     // expressible: bind a host whose quoteColumnName is a spy and assert the
     // dispatch reaches it.
     const calls: string[] = [];
-    const host = {
+    const host = quotingHost({
       quoteColumnName(name: string): string {
         calls.push(name);
         return `[${name}]`;
       },
-    };
+    });
     expect(quoteTableNameFn.call(host, "foo")).toBe("[foo]");
     expect(calls).toEqual(["foo"]);
     // Without an override the abstract quote_column_name still raises.
