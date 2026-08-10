@@ -3076,7 +3076,7 @@ export function main() {
 
     // Advisory call-argument artifact (RFC 0095), flat across packages, in the
     // shape of call-mismatches.json above — including the `packages` field its
-    // own ratchet (lint-call-args.ts) reads to reject a partial-scope artifact. Written under
+    // own ratchet will read to reject a partial-scope artifact. Written under
     // `--calls` for the same reason: a plain run computes no call arguments and
     // would overwrite this with an empty result.
     const callArgsPath = path.join(OUTPUT_DIR, `call-arg-mismatches${modeSuffix}.json`);
