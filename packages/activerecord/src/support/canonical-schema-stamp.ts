@@ -93,8 +93,10 @@ async function adapterSpecificHalf(adapter: DatabaseAdapter): Promise<string[]> 
 
 /**
  * The adapter-specific tables the stamping load laid, or `null` if this
- * database carries no snapshot (an unstamped run, or one laid before these keys
- * existed). A `null` puts the caller back on the re-lay-the-arm path.
+ * database carries no snapshot (an unstamped run, one laid before these keys
+ * existed, or one whose chunks are not all there — a half-written snapshot is
+ * re-laid rather than guessed at). A `null` puts the caller back on the
+ * re-lay-the-arm path.
  *
  * @internal
  */
@@ -106,7 +108,6 @@ export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<s
   let encoded = "";
   for (let index = 0; index < Number(count); index++) {
     const chunk = await metadata.get(chunkKey(index));
-    // A missing chunk means a half-written snapshot; re-lay rather than guess.
     if (chunk == null) return null;
     encoded += chunk;
   }
@@ -134,6 +135,12 @@ export async function adapterSpecificTables(adapter: DatabaseAdapter): Promise<s
  * A run without a token (globalSetup disabled) stamps nothing, which leaves
  * every worker on the full load path.
  *
+ * The chunk count is written last, after the chunks themselves: a reader that
+ * catches the write mid-flight sees the previous count and finds a chunk
+ * missing, so {@link adapterSpecificTables} answers `null` rather than splicing
+ * two snapshots together. Chunks a wider snapshot left behind are likewise out
+ * of the count's reach.
+ *
  * @internal
  */
 export async function stampCanonicalSchema(
@@ -150,9 +157,6 @@ export async function stampCanonicalSchema(
   for (let at = 0; at < encoded.length; at += VALUE_CHUNK_LENGTH) {
     chunks.push(encoded.slice(at, at + VALUE_CHUNK_LENGTH));
   }
-  // The count goes in last: a reader that catches this mid-write sees the
-  // previous count, and {@link adapterSpecificTables} answers null for any
-  // chunk it cannot find rather than splicing two snapshots together.
   for (const [index, chunk] of chunks.entries()) {
     await metadata.set(chunkKey(index), chunk);
   }
