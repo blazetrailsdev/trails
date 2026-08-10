@@ -30,6 +30,24 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "add_length_validation_for_encrypted_columns",
+    "call": "validate_column_size",
+    "kind": "args",
+    "rubyArgs": ["ref:attributeName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "build_decrypt_attribute_assignments",
+    "call": "ciphertext_for",
+    "kind": "args",
+    "rubyArgs": ["ref:attributeName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "build_encrypt_attribute_assignments",
     "call": "encrypted_attributes",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -45,8 +63,80 @@
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "ciphertext_for",
+    "call": "encrypted_attribute?",
+    "kind": "args",
+    "rubyArgs": ["ref:attributeName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "ciphertext_for",
     "call": "read_attribute_for_database",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "decrypt",
+    "call": "decrypt_attributes",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "decrypt",
+    "call": "has_encrypted_attributes?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "decrypt_attributes",
+    "call": "build_decrypt_attribute_assignments",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "decrypt_attributes",
+    "call": "validate_encryption_allowed",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "deterministic_encrypted_attributes",
+    "call": "encrypted_attributes",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt",
+    "call": "encrypt_attributes",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt",
+    "call": "has_encrypted_attributes?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -68,6 +158,42 @@
     "rubyName": "encrypt_attribute",
     "call": "order:constructor,schemeFor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt_attribute",
+    "call": "preserve_original_encrypted",
+    "kind": "args",
+    "rubyArgs": ["ref:name"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt_attributes",
+    "call": "build_encrypt_attribute_assignments",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypt_attributes",
+    "call": "validate_encryption_allowed",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "encrypted_attribute?",
+    "call": "encrypted_attributes",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -110,6 +236,15 @@
     "rubyName": "preserve_original_encrypted",
     "call": "encrypts",
     "reason": "Rails' bare `encrypts original_attribute_name` is realized via `encryptAttribute(originalName, {}, buildScheme({}))` so the original_<name> scheme reuses buildScheme's legacy-encryptor shim + defaultEncryptor fallback; the declaration still happens, just not through the public `encrypts` entry."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/encryptable-record.ts",
+    "rubyName": "preserve_original_encrypted",
+    "call": "override_accessors_to_preserve_original",
+    "kind": "args",
+    "rubyArgs": ["ref:name", "ref:originalAttributeName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

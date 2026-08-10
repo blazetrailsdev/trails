@@ -2,6 +2,24 @@
   {
     "package": "activerecord",
     "tsFile": "nested-attributes.ts",
+    "rubyName": "accepts_nested_attributes_for",
+    "call": "define_autosave_validation_callbacks",
+    "kind": "args",
+    "rubyArgs": ["ref:reflection"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "accepts_nested_attributes_for",
+    "call": "generate_association_writer",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:type"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
     "rubyName": "assign_nested_attributes_for_collection_association",
     "call": "order:isRejectNewRecord,association",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
@@ -17,6 +35,15 @@
     "package": "activerecord",
     "tsFile": "nested-attributes.ts",
     "rubyName": "assign_nested_attributes_for_collection_association",
+    "call": "reject_new_record?",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "assign_nested_attributes_for_collection_association",
     "call": "where",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -24,8 +51,35 @@
     "package": "activerecord",
     "tsFile": "nested-attributes.ts",
     "rubyName": "assign_nested_attributes_for_one_to_one_association",
+    "call": "call_reject_if",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "assign_nested_attributes_for_one_to_one_association",
     "call": "order:association,callRejectIf",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "assign_nested_attributes_for_one_to_one_association",
+    "call": "reject_new_record?",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "call_reject_if",
+    "call": "will_be_destroyed?",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -40,5 +94,32 @@
     "rubyName": "raise_nested_attributes_record_not_found!",
     "call": "klass",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "reject_new_record?",
+    "call": "call_reject_if",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "reject_new_record?",
+    "call": "will_be_destroyed?",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName", "ref:attributes"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "nested-attributes.ts",
+    "rubyName": "will_be_destroyed?",
+    "call": "allow_destroy?",
+    "kind": "args",
+    "rubyArgs": ["ref:associationName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

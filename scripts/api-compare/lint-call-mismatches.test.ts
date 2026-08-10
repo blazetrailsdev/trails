@@ -516,9 +516,12 @@ describe("--set-reason categories", () => {
 });
 
 describe("the shared shards", () => {
-  it("holds no args row today, so the call-set row count is what it was before RFC 0095", async () => {
+  it("partitions into exactly the call-set rows and the RFC 0095 args rows", async () => {
     const all = await loadSplitBaseline(BASELINE_DIR);
-    expect(await loadForeignRows()).toEqual([]);
-    expect((await loadBaseline()).length).toBe(all.length);
+    const args = await loadForeignRows();
+    expect(args.every((r) => r.kind === "args")).toBe(true);
+    // The seed of the argument dimension must not move RFC 0084's debt metric:
+    // every shard row is either a call-set row this gate loads or an args row.
+    expect((await loadBaseline()).length + args.length).toBe(all.length);
   });
 });

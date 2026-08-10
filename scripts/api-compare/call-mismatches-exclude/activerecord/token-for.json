@@ -5,5 +5,41 @@
     "rubyName": "generate_token",
     "call": "order:payloadFor,generate",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "token-for.ts",
+    "rubyName": "generate_token_for",
+    "call": "token_definitions",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "token-for.ts",
+    "rubyName": "message_verifier",
+    "call": "generated_token_verifier",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "token-for.ts",
+    "rubyName": "payload_for",
+    "call": "as_json",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "token-for.ts",
+    "rubyName": "payload_for",
+    "call": "block",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

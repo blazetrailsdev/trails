@@ -30,9 +30,36 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
+    "rubyName": "check_all_pending!",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{pendingMigrations=ref:migrations}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "check_pending_migrations",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{pendingMigrations=ref:migrations}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
     "rubyName": "copy",
     "call": "call",
     "reason": "Ruby's `options[:on_skip].call(scope, migration)` is a Proc invocation; TS calls the callback directly as `options.onSkip(scope, source)`, which has no `.call` token."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "copy",
+    "call": "underscore",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -110,6 +137,24 @@
     "rubyName": "validate",
     "call": "find",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "validate",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:name"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
+    "rubyName": "with_advisory_lock",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["const:RELEASE_LOCK_FAILED_MESSAGE"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

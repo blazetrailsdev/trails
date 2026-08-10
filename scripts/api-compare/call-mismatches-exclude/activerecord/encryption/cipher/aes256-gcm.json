@@ -2,9 +2,45 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/cipher/aes256-gcm.ts",
+    "rubyName": "decrypt",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["const:CIPHER_TYPE"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher/aes256-gcm.ts",
+    "rubyName": "encrypt",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["const:CIPHER_TYPE"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher/aes256-gcm.ts",
+    "rubyName": "encrypt",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{payload=ref:encryptedData}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher/aes256-gcm.ts",
     "rubyName": "encrypt",
     "call": "order:generateIv,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher/aes256-gcm.ts",
+    "rubyName": "generate_deterministic_iv",
+    "call": "digest",
+    "kind": "args",
+    "rubyArgs": ["ref:constructor", "ref:secret", "ref:clearText"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

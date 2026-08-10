@@ -9,6 +9,69 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "any_authenticity_token_valid?",
+    "call": "request_authenticity_tokens",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "any_authenticity_token_valid?",
+    "call": "valid_authenticity_token?",
+    "kind": "args",
+    "rubyArgs": ["ref:session", "ref:token"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "compare_with_global_token",
+    "call": "global_csrf_token",
+    "kind": "args",
+    "rubyArgs": ["ref:session"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "compare_with_real_token",
+    "call": "real_csrf_token",
+    "kind": "args",
+    "rubyArgs": ["ref:session"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "csrf_token_hmac",
+    "call": "digest",
+    "kind": "args",
+    "rubyArgs": ["ref:constructor", "ref:realCsrfToken", "ref:identifier"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "csrf_token_hmac",
+    "call": "real_csrf_token",
+    "kind": "args",
+    "rubyArgs": ["ref:session"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "global_csrf_token",
+    "call": "csrf_token_hmac",
+    "kind": "args",
+    "rubyArgs": ["ref:session", "const:GLOBAL_CSRF_TOKEN_IDENTIFIER"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "handle_unverified_request",
     "call": "build",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -31,8 +94,62 @@
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "masked_authenticity_token",
+    "call": "global_csrf_token",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "masked_authenticity_token",
+    "call": "normalize_action_path",
+    "kind": "args",
+    "rubyArgs": ["ref:action"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "masked_authenticity_token",
     "call": "order:perFormCsrfToken,normalizeActionPath",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "masked_authenticity_token",
+    "call": "per_form_csrf_token",
+    "kind": "args",
+    "rubyArgs": ["nil", "ref:actionPath", "ref:method"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "normalize_action_path",
+    "call": "normalize_relative_action_path",
+    "kind": "args",
+    "rubyArgs": ["ref:path"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "real_csrf_token",
+    "call": "fetch",
+    "kind": "args",
+    "rubyArgs": ["const:CSRF_TOKEN"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "request_authenticity_tokens",
+    "call": "form_authenticity_param",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actioncontroller",
@@ -51,6 +168,60 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "unverified_request_warning_message",
+    "call": "valid_request_origin?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "valid_authenticity_token?",
+    "call": "compare_with_global_token",
+    "kind": "args",
+    "rubyArgs": ["ref:csrfToken"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "valid_authenticity_token?",
+    "call": "compare_with_real_token",
+    "kind": "args",
+    "rubyArgs": ["ref:csrfToken"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "valid_authenticity_token?",
+    "call": "compare_with_real_token",
+    "kind": "args",
+    "rubyArgs": ["ref:maskedToken"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "valid_authenticity_token?",
+    "call": "valid_per_form_csrf_token?",
+    "kind": "args",
+    "rubyArgs": ["ref:csrfToken"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "valid_per_form_csrf_token?",
+    "call": "per_form_csrf_token",
+    "kind": "args",
+    "rubyArgs": ["ref:session", "ref:chomp", "ref:requestMethod"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "verified_request?",
     "call": "get?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -61,5 +232,41 @@
     "rubyName": "verified_request?",
     "call": "head?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "verified_request?",
+    "call": "protect_against_forgery?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "verified_request?",
+    "call": "valid_request_origin?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "verify_same_origin_request",
+    "call": "marked_for_same_origin_verification?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/request-forgery-protection.ts",
+    "rubyName": "verify_same_origin_request",
+    "call": "non_xhr_javascript_response?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

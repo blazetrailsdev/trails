@@ -2,6 +2,15 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/debug-exceptions.ts",
+    "rubyName": "call",
+    "call": "render_exception",
+    "kind": "args",
+    "rubyArgs": ["ref:request", "ref:exception", "ref:wrapper"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/debug-exceptions.ts",
     "rubyName": "render",
     "call": "default_charset",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -9,9 +18,27 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/debug-exceptions.ts",
+    "rubyName": "render_exception",
+    "call": "render_for_api_request",
+    "kind": "args",
+    "rubyArgs": ["ref:contentType", "ref:wrapper"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/debug-exceptions.ts",
     "rubyName": "render_for_api_request",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/debug-exceptions.ts",
+    "rubyName": "render_for_api_request",
+    "call": "render",
+    "kind": "args",
+    "rubyArgs": ["ref:statusCode", "ref:formattedBody", "ref:format"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actiondispatch",

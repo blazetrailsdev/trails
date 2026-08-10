@@ -101,6 +101,15 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "decomposed_match",
+    "call": "member",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "decomposed_match",
     "call": "nested",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -164,6 +173,15 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "initialize",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{pathNames=ref:resourcesPathNames}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "initialize",
     "call": "order:resourcesPathNames,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
@@ -215,6 +233,15 @@
     "rubyName": "member",
     "call": "with_scope_level",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "mount",
+    "call": "define_generate_prefix",
+    "kind": "args",
+    "rubyArgs": ["ref:app", "ref:targetAs"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actiondispatch",
@@ -360,6 +387,24 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "resource",
+    "call": "get",
+    "kind": "args",
+    "rubyArgs": ["str:new"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resource",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resource",
     "call": "order:get,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
@@ -418,6 +463,24 @@
     "rubyName": "resources",
     "call": "collection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources",
+    "call": "get",
+    "kind": "args",
+    "rubyArgs": ["str:index"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actiondispatch",
@@ -544,5 +607,14 @@
     "rubyName": "shallow",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "with_default_scope",
+    "call": "scope",
+    "kind": "args",
+    "rubyArgs": ["ref:scope"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

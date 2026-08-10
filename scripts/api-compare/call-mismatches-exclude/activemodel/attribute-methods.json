@@ -37,6 +37,42 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
+    "rubyName": "attribute_method_patterns_cache",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{initialCapacity=num:4}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "attribute_method_prefix",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{parameters=ref:parameters,prefix=ref:prefix}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "attribute_method_suffix",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["kwargs{parameters=ref:parameters,suffix=ref:suffix}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "define_attribute_method",
+    "call": "define_attribute_method_pattern",
+    "kind": "args",
+    "rubyArgs": ["ref:pattern", "ref:attrName", "kwargs{as=ref:as,owner=ref:owner}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
     "rubyName": "define_attribute_method_pattern",
     "call": "define_proxy_call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -47,6 +83,15 @@
     "rubyName": "define_attribute_method_pattern",
     "call": "instance_method_already_implemented?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-methods.ts",
+    "rubyName": "define_attribute_methods",
+    "call": "define_attribute_method",
+    "kind": "args",
+    "rubyArgs": ["ref:attrName", "kwargs{_owner=ref:owner}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activemodel",

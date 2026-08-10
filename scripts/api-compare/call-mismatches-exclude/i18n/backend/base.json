@@ -1,0 +1,56 @@
+[
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "interpolate",
+    "call": "interpolate",
+    "kind": "args",
+    "rubyArgs": ["ref:subject", "ref:values"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "load_file",
+    "call": "tr",
+    "kind": "args",
+    "rubyArgs": ["str:.", "str:"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "translate",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:locale"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "translate",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:locale", "ref:key", "ref:options"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "translate",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:toSym", "ref:entry"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "i18n",
+    "tsFile": "backend/base.ts",
+    "rubyName": "translate",
+    "call": "nil?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

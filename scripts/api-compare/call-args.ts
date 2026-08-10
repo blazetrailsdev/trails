@@ -50,6 +50,28 @@ const LITERAL_KINDS: Record<string, LiteralValue["kind"]> = {
 
 export type CallArgVerdict = "match" | "mismatch" | "skip";
 
+/**
+ * WHY a site was skipped (RFC 0095). The first two are deliberate exclusions
+ * and should stay flat; the last three are population the dimension is LOSING,
+ * and a spike in any of them is the signature of the bug PR #6316 fixed — a
+ * grammar ambiguity that silently dropped whole call sites, invisible because
+ * nothing counted skips by reason.
+ */
+export type CallArgSkipReason =
+  | "excludedCallName"
+  | "uncomparableFlag"
+  | "opaqueRubyArg"
+  | "opaqueTsArg"
+  | "unparseableLiteral";
+
+export const CALL_ARG_SKIP_REASONS: readonly CallArgSkipReason[] = [
+  "excludedCallName",
+  "uncomparableFlag",
+  "opaqueRubyArg",
+  "opaqueTsArg",
+  "unparseableLiteral",
+];
+
 /** `shape` — argument count, order, literal values or kwarg keys differ; the
  *  class RFC 0095 §4 gates. `naming` — the two lists differ only in how a
  *  `ref:` identifier is spelled (Rails' `o` ported as `node`); reported only,
@@ -60,13 +82,28 @@ export type CallArgClass = "shape" | "naming";
  *  the verdict reads it without asserting it is there. */
 export type CallArgResult =
   | {
-      verdict: "skip" | "match";
+      verdict: "skip";
       class?: undefined;
+      /** Why the site is uncomparable — the tally's key (RFC 0095). */
+      reason: CallArgSkipReason;
       /** The normalized lists the verdict was reached on — what a row reports. */
       rubyArgs: string[];
       tsArgs: string[];
     }
-  | { verdict: "mismatch"; class: CallArgClass; rubyArgs: string[]; tsArgs: string[] };
+  | {
+      verdict: "match";
+      class?: undefined;
+      reason?: undefined;
+      rubyArgs: string[];
+      tsArgs: string[];
+    }
+  | {
+      verdict: "mismatch";
+      class: CallArgClass;
+      reason?: undefined;
+      rubyArgs: string[];
+      tsArgs: string[];
+    };
 
 /**
  * The comparison key for one identifier or nested call name.
@@ -121,13 +158,13 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
  * body's control flow turns on Symbol-vs-String — so `":dump"` and `"dump"` are
  * the same value here and must compare equal.
  */
-function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | null {
+function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | ArgFailure {
   const key = normalizeLiteral({ kind, value });
   // A token the numeric arm cannot parse is uncomparable, not the value NaN: the
   // TS extractor records a BigInt literal with its `n` suffix (`123n`), which no
   // Ruby token ever spells, so comparing it would manufacture a shape row.
-  if (key === "num:NaN") return null;
-  if (key === null || !key.startsWith("str:")) return key;
+  if (key === "num:NaN" || key === null) return UNPARSEABLE_LITERAL;
+  if (!key.startsWith("str:")) return key;
   const text = key.slice("str:".length);
   const bare = text.startsWith(":") ? text.slice(1) : text;
   return IDENTIFIER_STRING.test(bare) ? `str:${snakeToCamel(bare)}` : key;
@@ -184,18 +221,30 @@ function unescapeDescriptorText(text: string): string {
  *  significant — a Ruby hash literal and a TS object literal carry the same
  *  kwargs whatever order they are written in — so the pairs are sorted. A pair
  *  with no `=` is the `**splat` marker, which has no comparable arity. */
-function normalizeKwargs(descriptor: string): string | null {
+function normalizeKwargs(descriptor: string): string | ArgFailure {
   const body = descriptor.slice("kwargs{".length, -1);
   const pairs: string[] = [];
   for (const pair of splitPairs(body)) {
     const eq = pair.indexOf("=");
-    if (eq === -1) return null;
-    const value = normalizeArg(pair.slice(eq + 1));
-    if (value === null) return null;
+    if (eq === -1) return OPAQUE;
+    const value = normalizeArgOrFailure(pair.slice(eq + 1));
+    if (typeof value !== "string") return value;
     pairs.push(`${normalizeRubyKey(pair.slice(0, eq))}=${value}`);
   }
   return `kwargs{${pairs.sort().join(",")}}`;
 }
+
+/** Why a descriptor has no comparison key. `opaque` is the deliberate
+ *  exclusion of a form the two languages cannot agree on;
+ *  `unparseableLiteral` is a token {@link normalizeLiteralArg} could not read,
+ *  and the two are tallied apart so a normalization regression in the second is
+ *  visible rather than absorbed into the first (RFC 0095). */
+interface ArgFailure {
+  failure: "opaque" | "unparseableLiteral";
+}
+
+const OPAQUE: ArgFailure = { failure: "opaque" };
+const UNPARSEABLE_LITERAL: ArgFailure = { failure: "unparseableLiteral" };
 
 /**
  * The canonical comparison key for one argument descriptor, or null when the
@@ -205,33 +254,45 @@ function normalizeKwargs(descriptor: string): string | null {
  * tell a local read from a zero-arg self-send, the same information loss the
  * weak-call set already works around (extract-ruby-api.rb#inert_receiver?).
  */
-export function normalizeArg(descriptor: string): string | null {
-  if (OPAQUE_DESCRIPTORS.has(descriptor)) return null;
+function normalizeArgOrFailure(descriptor: string): string | ArgFailure {
+  if (OPAQUE_DESCRIPTORS.has(descriptor)) return OPAQUE;
   if (descriptor === "nil") return "nil";
   if (descriptor.startsWith("kwargs{")) return normalizeKwargs(descriptor);
-  if (descriptor.startsWith("binop:") || descriptor.startsWith("unary")) return null;
+  if (descriptor.startsWith("binop:") || descriptor.startsWith("unary")) return OPAQUE;
 
   const sep = descriptor.indexOf(":");
-  if (sep === -1) return null;
+  if (sep === -1) return OPAQUE;
   const kind = descriptor.slice(0, sep);
   const value = descriptor.slice(sep + 1);
   if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
   if (kind === "const") return `const:${value}`;
   const literalKind = LITERAL_KINDS[kind];
   return literalKind === undefined
-    ? null
+    ? OPAQUE
     : normalizeLiteralArg(literalKind, unescapeDescriptorText(value));
+}
+
+export function normalizeArg(descriptor: string): string | null {
+  const key = normalizeArgOrFailure(descriptor);
+  return typeof key === "string" ? key : null;
+}
+
+/** Normalize a whole argument list, or the failure of its first uncomparable
+ *  member — which reason it was is the tally's key (RFC 0095). */
+function normalizeArgsOrFailure(args: string[]): string[] | ArgFailure {
+  const out: string[] = [];
+  for (const arg of args) {
+    const key = normalizeArgOrFailure(arg);
+    if (typeof key !== "string") return key;
+    out.push(key);
+  }
+  return out;
 }
 
 /** Normalize a whole argument list, or null when any member is opaque. */
 export function normalizeArgs(args: string[]): string[] | null {
-  const out: string[] = [];
-  for (const arg of args) {
-    const key = normalizeArg(arg);
-    if (key === null) return null;
-    out.push(key);
-  }
-  return out;
+  const keys = normalizeArgsOrFailure(args);
+  return Array.isArray(keys) ? keys : null;
 }
 
 /** Names excluded exactly as the call-set gate excludes them (compare.ts):
@@ -351,13 +412,23 @@ export function pairCallSites(
  *  skip: both extractors drop the block from the argument list and flag the
  *  site, so the remaining arguments still compare. */
 export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
-  const empty: CallArgResult = { verdict: "skip", rubyArgs: [], tsArgs: [] };
-  if (isSkippedCallName(ruby.name)) return empty;
-  if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return empty;
+  const skipped = (reason: CallArgSkipReason): CallArgResult => ({
+    verdict: "skip",
+    reason,
+    rubyArgs: [],
+    tsArgs: [],
+  });
+  if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
+  if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 
-  const rubyArgs = normalizeArgs(ruby.args);
-  const tsArgs = normalizeArgs(stripMixinReceiver(ruby.args, ts.args));
-  if (rubyArgs === null || tsArgs === null) return empty;
+  const rubyArgs = normalizeArgsOrFailure(ruby.args);
+  if (!Array.isArray(rubyArgs)) {
+    return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
+  }
+  const tsArgs = normalizeArgsOrFailure(stripMixinReceiver(ruby.args, ts.args));
+  if (!Array.isArray(tsArgs)) {
+    return skipped(tsArgs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
+  }
 
   if (argsEqual(rubyArgs, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
   return { verdict: "mismatch", class: classify(rubyArgs, tsArgs), rubyArgs, tsArgs };

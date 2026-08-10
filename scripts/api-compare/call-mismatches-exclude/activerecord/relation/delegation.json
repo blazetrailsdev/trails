@@ -44,9 +44,27 @@
   {
     "package": "activerecord",
     "tsFile": "relation/delegation.ts",
+    "rubyName": "generate_relation_method",
+    "call": "generated_relation_methods",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/delegation.ts",
     "rubyName": "include_relation_methods",
     "call": "base_class?",
     "reason": "Mechanism divergence (story delegation-generated-methods-per-model-prototype-carrier): trails' per-model prototype-carrier port installs generated methods onto per-model Relation subclass prototypes (relationClassFor / GeneratedRelationMethods.includeInto) rather than replicating Rails' anonymous-module include, so the call-set differs by construction."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/delegation.ts",
+    "rubyName": "include_relation_methods",
+    "call": "generated_relation_methods",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

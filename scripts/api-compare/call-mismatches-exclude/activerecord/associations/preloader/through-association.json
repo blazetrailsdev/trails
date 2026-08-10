@@ -16,8 +16,35 @@
   {
     "package": "activerecord",
     "tsFile": "associations/preloader/through-association.ts",
+    "rubyName": "records_by_owner",
+    "call": "loaded?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/through-association.ts",
     "rubyName": "source_preloaders",
     "call": "scope",
     "reason": "Deliberate: the source Preloader is handed a scope derived from `reflectionScope`/`preloadScope` rather than `scope`, because `throughScope` may already have eager-loaded the source (see the block comment at the call site)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/through-association.ts",
+    "rubyName": "source_records_by_owner",
+    "call": "reduce",
+    "kind": "args",
+    "rubyArgs": ["str:merge"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/preloader/through-association.ts",
+    "rubyName": "through_records_by_owner",
+    "call": "reduce",
+    "kind": "args",
+    "rubyArgs": ["str:merge"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

@@ -2,6 +2,15 @@
   {
     "package": "activesupport",
     "tsFile": "messages/metadata.ts",
+    "rubyName": "deserialize_from_json_safe_string",
+    "call": "decode",
+    "kind": "args",
+    "rubyArgs": ["ref:string", "kwargs{urlSafe=bool:false}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
     "rubyName": "parse_expiry",
     "call": "iso8601",
     "reason": "Rails parses with `Time.iso8601`; trails parses the same ISO 8601 string with `Temporal.Instant.from`."
@@ -19,5 +28,14 @@
     "rubyName": "pick_expiry",
     "call": "advance",
     "reason": "Rails advances a `Time` with `Time.now.utc.advance(seconds:)`; trails' `Time` analogue is `Temporal.Instant`, whose equivalent is `add({ milliseconds })`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "messages/metadata.ts",
+    "rubyName": "serialize_to_json_safe_string",
+    "call": "encode",
+    "kind": "args",
+    "rubyArgs": ["ref:serialize", "kwargs{urlSafe=bool:false}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

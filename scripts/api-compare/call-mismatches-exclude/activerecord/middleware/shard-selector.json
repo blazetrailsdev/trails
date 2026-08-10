@@ -9,6 +9,24 @@
   {
     "package": "activerecord",
     "tsFile": "middleware/shard-selector.ts",
+    "rubyName": "selected_shard",
+    "call": "resolver",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/shard-selector.ts",
+    "rubyName": "set_shard",
+    "call": "connected_to",
+    "kind": "args",
+    "rubyArgs": ["kwargs{shard=ref:toSym}"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/shard-selector.ts",
     "rubyName": "set_shard",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -2,6 +2,33 @@
   {
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
+    "rubyName": "add_autosave_association_callbacks",
+    "call": "around_save",
+    "kind": "args",
+    "rubyArgs": ["str:aroundSaveCollectionAssociation"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "add_autosave_association_callbacks",
+    "call": "define_autosave_validation_callbacks",
+    "kind": "args",
+    "rubyArgs": ["ref:reflection"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "add_autosave_association_callbacks",
+    "call": "define_non_cyclic_method",
+    "kind": "args",
+    "rubyArgs": ["ref:saveMethod"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
     "rubyName": "association_valid?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -19,6 +46,24 @@
     "rubyName": "changed_for_autosave?",
     "call": "marked_for_destruction?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "define_autosave_validation_callbacks",
+    "call": "after_validation",
+    "kind": "args",
+    "rubyArgs": ["str:_ensure_no_duplicate_errors"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "autosave-association.ts",
+    "rubyName": "define_autosave_validation_callbacks",
+    "call": "define_non_cyclic_method",
+    "kind": "args",
+    "rubyArgs": ["ref:validationMethod"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

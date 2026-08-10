@@ -10,7 +10,52 @@
     "package": "activesupport",
     "tsFile": "number-helper/number-to-human-size-converter.ts",
     "rubyName": "convert",
+    "call": "exponent",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-to-human-size-converter.ts",
+    "rubyName": "convert",
     "call": "order:unit,exponent",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-to-human-size-converter.ts",
+    "rubyName": "convert",
+    "call": "smaller_than_base?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-to-human-size-converter.ts",
+    "rubyName": "convert",
+    "call": "unit",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-to-human-size-converter.ts",
+    "rubyName": "exponent",
+    "call": "log",
+    "kind": "args",
+    "rubyArgs": ["ref:base"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-to-human-size-converter.ts",
+    "rubyName": "smaller_than_base?",
+    "call": "abs",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

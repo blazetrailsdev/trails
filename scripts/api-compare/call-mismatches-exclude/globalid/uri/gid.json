@@ -9,6 +9,15 @@
   {
     "package": "globalid",
     "tsFile": "uri/gid.ts",
+    "rubyName": "set_path",
+    "call": "set_model_components",
+    "kind": "args",
+    "rubyArgs": ["ref:path"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "uri/gid.ts",
     "rubyName": "to_s",
     "call": "query",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails uri/gid.rb:104-107 reassembles from app/path/query; trails uri/gid.ts:222-224 toString returns the stored canonical `this.uri` string built at parse time — no query re-read needed."

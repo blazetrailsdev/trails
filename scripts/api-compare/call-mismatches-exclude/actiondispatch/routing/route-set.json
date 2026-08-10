@@ -73,6 +73,15 @@
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
     "rubyName": "generate_extras",
+    "call": "keys",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/route-set.ts",
+    "rubyName": "generate_extras",
     "call": "path",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -82,6 +91,15 @@
     "rubyName": "generate_url_helpers",
     "call": "full_url_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/route-set.ts",
+    "rubyName": "generate_url_helpers",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actiondispatch",
@@ -138,6 +156,15 @@
     "rubyName": "recognize_path",
     "call": "recognize_path_with_request",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/route-set.ts",
+    "rubyName": "recognize_path_with_request",
+    "call": "recognize",
+    "kind": "args",
+    "rubyArgs": ["ref:req"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actiondispatch",

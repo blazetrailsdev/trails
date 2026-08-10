@@ -16,6 +16,15 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
+    "rubyName": "build_count_subquery?",
+    "call": "many?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "distinct!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -208,6 +217,51 @@
     "rubyName": "perform_calculation",
     "call": "any?",
     "reason": "Per-entry verified (RFC 0072 calculation cluster): Rails calculations.rb:447/453 uses `group_values.any?` / `select_values.empty?`; trails relation/calculations.ts performCalculation spells the same tests as `rel._groupColumns.length > 0` and `rel.selectValues.length === 0`, JS's spelling of `#any?`/`#empty?`. Equivalent, not an omission."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "distinct_select?",
+    "kind": "args",
+    "rubyArgs": ["ref:columnName"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "distinct_select?",
+    "kind": "args",
+    "rubyArgs": ["ref:selectForCount"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "execute_grouped_calculation",
+    "kind": "args",
+    "rubyArgs": ["ref:operation", "ref:columnName", "ref:distinct"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "execute_simple_calculation",
+    "kind": "args",
+    "rubyArgs": ["ref:operation", "ref:columnName", "ref:distinct"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "select_for_count",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

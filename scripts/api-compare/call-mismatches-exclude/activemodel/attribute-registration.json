@@ -3,8 +3,26 @@
     "package": "activemodel",
     "tsFile": "attribute-registration.ts",
     "rubyName": "decorate_attributes",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:names", "ref:decorator"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-registration.ts",
+    "rubyName": "decorate_attributes",
     "call": "resolve_attribute_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-registration.ts",
+    "rubyName": "reset_default_attributes",
+    "call": "subclasses",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activemodel",

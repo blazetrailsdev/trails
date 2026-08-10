@@ -2,6 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "associations/builder/belongs-to.ts",
+    "rubyName": "add_counter_cache_callbacks",
+    "call": "safe_constantize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "define_validations",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

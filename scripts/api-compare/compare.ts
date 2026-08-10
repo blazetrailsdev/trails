@@ -115,7 +115,13 @@ import { matchOptionKeysAgainst } from "./options-keys.js";
 // call-args.ts imports NO_JS_CALL_FORM back from this module and reads it at
 // CALL time for exactly that reason (see its isSkippedCallName): the pair is a
 // cycle, and only a module-evaluation-time read of either side would break.
-import { compareCallArgs, pairCallSites, type CallArgClass } from "./call-args.js";
+import {
+  CALL_ARG_SKIP_REASONS,
+  compareCallArgs,
+  pairCallSites,
+  type CallArgClass,
+  type CallArgSkipReason,
+} from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
 import {
   compareDefaults,
@@ -864,7 +870,18 @@ interface CallArgMismatch {
 interface CallArgsResult {
   compared: number;
   mismatched: number;
+  /** Sites the comparison could not reach, by reason (RFC 0095). The last three
+   *  reasons are population the dimension is losing, so a normalization change
+   *  that shrinks the comparable set is countable rather than silent. */
+  skipped: Record<CallArgSkipReason, number>;
   mismatches: CallArgMismatch[];
+}
+
+function emptySkipTally(): Record<CallArgSkipReason, number> {
+  return Object.fromEntries(CALL_ARG_SKIP_REASONS.map((r) => [r, 0])) as Record<
+    CallArgSkipReason,
+    number
+  >;
 }
 
 // Advisory: a default's or constant's literal value differs for a matched pair.
@@ -2234,6 +2251,7 @@ export function main() {
     const suppressedCalls: SuppressedCall[] = [];
     const callSkeletons: CallSkeleton[] = [];
     let callArgsCompared = 0;
+    const callArgsSkipped = emptySkipTally();
     const callArgMismatches: CallArgMismatch[] = [];
     const bodyHashRecords: BodyHashRecord[] = [];
     const fileResults: FileResult[] = [];
@@ -2474,7 +2492,10 @@ export function main() {
         if (tsSites?.length !== 1) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
           const result = compareCallArgs(ruby, ts);
-          if (result.verdict === "skip") continue;
+          if (result.verdict === "skip") {
+            callArgsSkipped[result.reason]++;
+            continue;
+          }
           callArgsCompared++;
           if (result.verdict !== "mismatch") continue;
           callArgMismatches.push({
@@ -2936,6 +2957,7 @@ export function main() {
       callArgs: {
         compared: callArgsCompared,
         mismatched: callArgMismatches.length,
+        skipped: callArgsSkipped,
         mismatches: callArgMismatches,
       },
       bodyHashes: bodyHashRecords,
@@ -3092,6 +3114,12 @@ export function main() {
           packages: [...new Set(results.map((r) => r.package))].sort(),
           compared: results.reduce((n, r) => n + r.callArgs.compared, 0),
           mismatched: callArgsFlat.length,
+          skipped: Object.fromEntries(
+            CALL_ARG_SKIP_REASONS.map((reason) => [
+              reason,
+              results.reduce((n, r) => n + r.callArgs.skipped[reason], 0),
+            ]),
+          ),
           mismatches: callArgsFlat,
         },
         null,

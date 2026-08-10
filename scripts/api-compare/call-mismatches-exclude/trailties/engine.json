@@ -1,0 +1,20 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "engine.ts",
+    "rubyName": "config",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": ["ref:findRoot"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "engine.ts",
+    "rubyName": "find_root_with_flag",
+    "call": "directory?",
+    "kind": "args",
+    "rubyArgs": ["ref:rootPath"],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]
