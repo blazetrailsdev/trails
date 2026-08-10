@@ -39,11 +39,8 @@
  * that never touched it. CI opts out — it runs the extraction step separately
  * and must not pay for it twice.
  *
- * Usage:
- *   pnpm tsx scripts/api-compare/lint-call-args.ts             # gate (CI)
- *   pnpm tsx scripts/api-compare/lint-call-args.ts --write     # reseed baseline
- *   pnpm tsx scripts/api-compare/lint-call-args.ts --report    # read-only grouping
- *   pnpm tsx scripts/api-compare/lint-call-args.ts --no-regen  # gate the artifact on disk
+ * Usage: no flag gates (CI); `--write` reseeds; `--report` groups read-only;
+ * `--no-regen` gates the artifact already on disk.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts), async fs.
@@ -145,7 +142,6 @@ async function loadArtifact(): Promise<CallArgArtifact> {
   return readJson<CallArgArtifact>(ARTIFACT_PATH);
 }
 
-/** One console line for a key, with the argument list that makes it a key. */
 export function renderKey(k: CallArgKey): string {
   return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call}(${k.rubyArgs.join(", ")})`;
 }
