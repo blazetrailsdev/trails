@@ -71,6 +71,16 @@ describe("normalizeArg", () => {
     );
   });
 
+  it("normalizes a kwarg key through the option-key renames", () => {
+    expect(normalizeArg("kwargs{constructor=id:klass}")).toBe(
+      normalizeArg("kwargs{constructorFn=id:klass}"),
+    );
+  });
+
+  it("is uncomparable for a numeric token it cannot parse", () => {
+    expect(normalizeArg("num:123n")).toBeNull();
+  });
+
   it("is uncomparable for an opaque descriptor", () => {
     for (const opaque of ["?", "array", "hash", "str-interp", "ternary", "binop:+", "unaryid:x"]) {
       expect(normalizeArg(opaque)).toBeNull();

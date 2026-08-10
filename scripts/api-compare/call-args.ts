@@ -14,6 +14,7 @@
 import type { CallSite, LiteralValue } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { normalizeLiteral } from "./literals.js";
+import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 
@@ -119,6 +120,10 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
  */
 function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | null {
   const key = normalizeLiteral({ kind, value });
+  // A token the numeric arm cannot parse is uncomparable, not the value NaN: the
+  // TS extractor records a BigInt literal with its `n` suffix (`123n`), which no
+  // Ruby token ever spells, so comparing it would manufacture a shape row.
+  if (key === "num:NaN") return null;
   if (key === null || !key.startsWith("str:")) return key;
   const text = key.slice("str:".length);
   const bare = text.startsWith(":") ? text.slice(1) : text;
@@ -144,8 +149,11 @@ function splitPairs(body: string): string[] {
   return pairs;
 }
 
-/** Keys camelize through the same pipeline option keys do; values recurse, so an
- *  opaque nested value makes the whole descriptor uncomparable. Order is not
+/** Keys go through options-keys.ts#normalizeRubyKey — the same pipeline the
+ *  option-key diff uses, which is camelization PLUS the renames it cannot derive
+ *  (Ruby's `:constructor` option is `constructorFn`, since `constructor` is
+ *  reserved as a JS property name). Values recurse, so an opaque nested value
+ *  makes the whole descriptor uncomparable. Order is not
  *  significant — a Ruby hash literal and a TS object literal carry the same
  *  kwargs whatever order they are written in — so the pairs are sorted. A pair
  *  with no `=` is the `**splat` marker, which has no comparable arity. */
@@ -157,7 +165,7 @@ function normalizeKwargs(descriptor: string): string | null {
     if (eq === -1) return null;
     const value = normalizeArg(pair.slice(eq + 1));
     if (value === null) return null;
-    pairs.push(`${snakeToCamel(pair.slice(0, eq))}=${value}`);
+    pairs.push(`${normalizeRubyKey(pair.slice(0, eq))}=${value}`);
   }
   return `kwargs{${pairs.sort().join(",")}}`;
 }
