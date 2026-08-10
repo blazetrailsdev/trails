@@ -409,7 +409,7 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   return async function cachedSelectAll(
     this: QueryCacheHost,
     arel: string | unknown,
-    name?: string | null,
+    name: string | null = null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {

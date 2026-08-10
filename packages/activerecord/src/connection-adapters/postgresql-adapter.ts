@@ -1039,7 +1039,7 @@ export class PostgreSQLAdapter
   // routes through so cached reads never clear the cache.
   override async execQuery(
     sql: string,
-    name?: string | null,
+    name: string | null = "SQL",
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
@@ -1048,7 +1048,7 @@ export class PostgreSQLAdapter
 
   override async internalExecQuery(
     sql: string,
-    name?: string | null,
+    name: string | null = "SQL",
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result> {
@@ -1067,7 +1067,7 @@ export class PostgreSQLAdapter
     const rewritten = this.rewriteBinds(sql, bindArray);
     const pgResult: ArrayQueryResult = await this.log(
       rewritten,
-      name ?? "SQL",
+      name,
       binds ?? [],
       bindArray,
       false,
@@ -1533,7 +1533,7 @@ export class PostgreSQLAdapter
   private async _instrumentedQueryOnClient(
     client: pg.Client,
     sql: string,
-    name: string,
+    name: string | null,
     binds: unknown[],
   ): Promise<Result> {
     const bindArray = this.typeCastedBinds(binds) ?? [];
@@ -1564,7 +1564,7 @@ export class PostgreSQLAdapter
   async execute(
     sql: string,
     binds: unknown[] = [],
-    name: string = "SQL",
+    name: string | null = "SQL",
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
@@ -1644,7 +1644,11 @@ export class PostgreSQLAdapter
    * declaration (abstract-adapter.ts, `executeMutation` on the
    * DatabaseStatements signature block) — read it there before changing this.
    */
-  async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
+  async executeMutation(
+    sql: string,
+    binds: unknown[] = [],
+    name: string | null = "SQL",
+  ): Promise<number> {
     sql = this.preprocessQuery(sql);
     // Mirrors `type_casted_binds` (abstract/quoting.rb:224). Without the typeCastedBinds unwrap, an INSERT
     // routed through executeMutation would bind a raw QueryAttribute to pg.
@@ -2100,7 +2104,7 @@ export class PostgreSQLAdapter
   // popped RELEASE/ROLLBACK TO SAVEPOINT frame — transaction on every exit.
   override async internalExecute(
     sql: string,
-    name: string = "SQL",
+    name: string | null = "SQL",
     {
       materializeTransactions = true,
       allowRetry = false,
@@ -2414,7 +2418,7 @@ export class PostgreSQLAdapter
    */
   override async execInsert(
     sql: string,
-    name?: string | null,
+    name: string | null = null,
     binds: unknown[] = [],
     pk?: string | false | null,
     sequenceName?: string | null,
@@ -2439,7 +2443,7 @@ export class PostgreSQLAdapter
       sql = this.preprocessQuery(sql);
       return this.withRawConnection(async (conn) => {
         const client = conn as unknown as pg.Client;
-        return this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
+        return this._instrumentedQueryOnClient(client, sql, name, binds);
       });
     }
     if (this._useInsertReturning) {
@@ -2494,7 +2498,7 @@ export class PostgreSQLAdapter
     // run on the same connection. withRawConnection pins both to one client.
     return this.withRawConnection(async (conn) => {
       const client = conn as unknown as pg.Client;
-      const insertResult = await this._instrumentedQueryOnClient(client, sql, name ?? "SQL", binds);
+      const insertResult = await this._instrumentedQueryOnClient(client, sql, name, binds);
       if (!sequenceName) return insertResult;
       const currvalSql = `SELECT currval(${this.quote(sequenceName)})`;
       return this._instrumentedQueryOnClient(client, currvalSql, "SQL", []);

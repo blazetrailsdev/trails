@@ -2621,7 +2621,7 @@ export class AbstractAdapter implements Quoting {
    */
   async log<T>(
     sql: string,
-    name: string | null | undefined = "SQL",
+    name: string | null = "SQL",
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
     isAsync = false,
@@ -2637,7 +2637,7 @@ export class AbstractAdapter implements Quoting {
         "sql.active_record",
         {
           sql,
-          name: name ?? "SQL",
+          name,
           binds,
           type_casted_binds: typeCastedBinds,
           async: isAsync,

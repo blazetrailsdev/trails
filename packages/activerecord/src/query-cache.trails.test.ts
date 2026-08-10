@@ -126,12 +126,17 @@ describe("cacheNotificationInfo payload (trails)", () => {
       });
     });
 
-    // query_cache.rb:313 is `name: name` — a nameless select_all yields a
-    // nameless cached payload, not the "SQL" default that `log`'s signature
-    // supplies on the uncached path.
+    // `select_all(arel, name = nil, ...)` (abstract/database_statements.rb:69)
+    // passes that nil down explicitly, so `log`'s `name = "SQL"` default
+    // (abstract_adapter.rb:1134) never fires and the uncached payload stays
+    // nameless — exactly what query_cache.rb:313's `name: name` records for
+    // the cached one. The two names are the same value.
     const cached = payloads.filter((p) => p.cached);
+    const uncached = payloads.filter((p) => !p.cached);
     expect(cached.length).toBe(1);
-    expect(cached[0].name).toBeUndefined();
+    expect(uncached.length).toBe(1);
+    expect(cached[0].name).toBeNull();
+    expect(uncached[0].name).toBe(cached[0].name);
   });
 });
 
