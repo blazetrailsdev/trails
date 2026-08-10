@@ -6856,7 +6856,15 @@ export class DateTime extends DateWithoutParseStatics {
    */
   newOffset(offset: number | bigint | Rational | string = 0): this {
     const rof = val2off(offset);
-    return new DateTime(SEAT, this.nth, this.#jd, this.#df, this.#sf, rof, this.start) as this;
+    return new DateTime(
+      SEAT,
+      this.nth,
+      this.#getCJd(),
+      this.#getCDf(),
+      this.#sf,
+      rof,
+      this.start,
+    ) as this;
   }
 
   override newStart(start = DEFAULT_SG): this {

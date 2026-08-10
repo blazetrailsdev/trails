@@ -214,16 +214,14 @@ describe("TestDateNew", () => {
     // so a `jd` frag under the same `start` is the same date `Date.jd` names —
     // asserted against `Date.jd` below rather than assumed.
     //
-    // `d -= 1` is `plus(-1)`: `d_lite_minus`'s Fixnum arm IS
-    // `d_lite_plus(self, -other)` (date_core.c:6350-6352). `Date#-` itself is
-    // ported by open PR #6313; this flips to `minus(1)` once that lands.
+    // `d -= 1` is `minus(1)` (`d_lite_minus`, date_core.c:6343-6360).
     let d = dNewByFrags({ jd: Date.ENGLAND }, Date.ENGLAND);
     let dt = dtNewByFrags({ jd: Date.ENGLAND, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ENGLAND);
     expect(d.toDate().equals(Date.jd(Date.ENGLAND, Date.ENGLAND))).toBe(true);
     expect([d.year, d.mon, d.day]).toEqual([1752, 9, 14]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 14]);
-    d = d.plus(-1);
-    dt = dt.plus(-1);
+    d = d.minus(1) as Date;
+    dt = dt.minus(1) as DateTime;
     expect([d.year, d.mon, d.day]).toEqual([1752, 9, 2]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 2]);
 
@@ -231,8 +229,8 @@ describe("TestDateNew", () => {
     dt = dtNewByFrags({ jd: Date.ITALY, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ITALY);
     expect([d.year, d.mon, d.day]).toEqual([1582, 10, 15]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1582, 10, 15]);
-    d = d.plus(-1);
-    dt = dt.plus(-1);
+    d = d.minus(1) as Date;
+    dt = dt.minus(1) as DateTime;
     expect([d.year, d.mon, d.day]).toEqual([1582, 10, 4]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1582, 10, 4]);
   });
