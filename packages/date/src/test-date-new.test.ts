@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { Date, DateTime, Rational } from "./date.js";
+import { Date, DateTime, Rational, dNewByFrags, dtNewByFrags } from "./date.js";
 
 /**
  * `vendor/date/test/date/test_date_new.rb:1-214`, the `Date.jd` / `Date.ordinal`
@@ -205,18 +205,36 @@ describe("TestDateNew", () => {
     expect([...ymd(dt), dt.hour, dt.minute, dt.second]).toEqual([-1, 12, 31, 23, 59, 59]);
   });
 
-  it.skip("civil reform", () => {
-    // Blocked on two seams this PR may not build, not omitted. (1) `Date#-`
-    // (`d_lite_minus`, date_core.c:6343-6360) is ported by OPEN PR #6313, in
-    // the same file — adding it here duplicates an unmerged sibling. (2) The
-    // test's receiver: `d = Date.jd(...)` answers a `Temporal.PlainDate` (RFC
-    // 0088's headline decision, vendor/sources.ts:212-221) which carries no
-    // `-`, `Temporal.subtract` walks the proleptic ISO calendar and lands on
-    // 1752-09-13 rather than the reform's 1752-09-02, and no public seat turns
-    // a Julian day into a `Date` instance — `toDate()`'s JSDoc names a
-    // `Temporal` constructor overload that the class does not declare, and
-    // #6313 reaches `minus` through `new Date(y, m, d)` instead. Tracked as
-    // 0088 `port-test-date-new-civil-reform`, blocked on #6313.
+  it("civil reform", () => {
+    // Ruby's receivers are `Date.jd(...)` / `DateTime.jd(...)`, which answer the
+    // `Temporal` seat here (RFC 0088) and so carry no arithmetic. The gem-shaped
+    // object is reached through the exported `dNewByFrags` / `dtNewByFrags`, the
+    // route `toDate()`'s own JSDoc names: `d_new_by_frags` (date_core.c:4283)
+    // and `date_s_jd` (:3377-3387) both end at `d_simple_new_internal` (:3036),
+    // so a `jd` frag under the same `start` is the same date `Date.jd` names —
+    // asserted against `Date.jd` below rather than assumed.
+    //
+    // `d -= 1` is `plus(-1)`: `d_lite_minus`'s Fixnum arm IS
+    // `d_lite_plus(self, -other)` (date_core.c:6350-6352). `Date#-` itself is
+    // ported by open PR #6313; this flips to `minus(1)` once that lands.
+    let d = dNewByFrags({ jd: Date.ENGLAND }, Date.ENGLAND);
+    let dt = dtNewByFrags({ jd: Date.ENGLAND, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ENGLAND);
+    expect(d.toDate().equals(Date.jd(Date.ENGLAND, Date.ENGLAND))).toBe(true);
+    expect([d.year, d.mon, d.day]).toEqual([1752, 9, 14]);
+    expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 14]);
+    d = d.plus(-1);
+    dt = dt.plus(-1);
+    expect([d.year, d.mon, d.day]).toEqual([1752, 9, 2]);
+    expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 2]);
+
+    d = dNewByFrags({ jd: Date.ITALY }, Date.ITALY);
+    dt = dtNewByFrags({ jd: Date.ITALY, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ITALY);
+    expect([d.year, d.mon, d.day]).toEqual([1582, 10, 15]);
+    expect([dt.year, dt.mon, dt.day]).toEqual([1582, 10, 15]);
+    d = d.plus(-1);
+    dt = dt.plus(-1);
+    expect([d.year, d.mon, d.day]).toEqual([1582, 10, 4]);
+    expect([dt.year, dt.mon, dt.day]).toEqual([1582, 10, 4]);
   });
 
   it("civil ex", () => {
