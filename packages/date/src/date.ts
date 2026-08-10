@@ -4542,10 +4542,11 @@ function expectNumeric(x: unknown): void {
 
 /**
  * @internal `date_core.c` `f_cmp` (`:74-86`), the `<=>` dispatch the C's
- * arithmetic reaches for a non-Fixnum operand. The Fixnum fast path is the
- * `FIXNUM_P(x) && FIXNUM_P(y)` arm; everything else goes through `rb_cmpint`,
- * which raises `ArgumentError` for the `nil` a `<=>` that declines to answer
- * gives back. `test_step__compare`
+ * arithmetic reaches for a non-Fixnum operand. The `FIXNUM_P(x) && FIXNUM_P(y)`
+ * arm is the subtraction below; it is widened to every JS `number` because
+ * Ruby's non-Fixnum Float reaches `Float#<=>`, which answers the same sign.
+ * Everything else goes through `rb_cmpint`, which raises `ArgumentError` for
+ * the `nil` a `<=>` that declines to answer gives back. `test_step__compare`
  * (`vendor/date/test/date/test_date_arith.rb:290-303`) asserts both arms of
  * that through `Date#step`'s step argument.
  */
