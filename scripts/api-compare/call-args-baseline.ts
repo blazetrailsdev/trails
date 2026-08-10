@@ -18,9 +18,8 @@
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
 
-/** One flagged call site, at the grain the baseline records. `rubyArgs` is part
- *  of the key: the same call in the same method can be wrong in two different
- *  ways at two sites, and each converges separately. */
+/** One flagged call site at the grain the baseline records. `rubyArgs` is part
+ *  of the key: one call in one method can be wrong two ways at two sites. */
 export interface CallArgKey {
   package: string;
   tsFile: string;
@@ -60,8 +59,10 @@ export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
 }
 
 export interface CallArgDiff {
-  added: CallArgKey[]; // flagged now, not in baseline — the ratchet failure
-  stale: CallArgExcludeEntry[]; // in baseline, no longer flags — only-shrink
+  /** flagged now, not in baseline — the ratchet failure */
+  added: CallArgKey[];
+  /** in baseline, no longer flags — the only-shrink failure */
+  stale: CallArgExcludeEntry[];
 }
 
 export function diffAgainstBaseline(
@@ -114,8 +115,8 @@ export function reseed(
   return sortKeys([...byKey.values()]);
 }
 
-/** Baseline keys recorded twice — malformed, because the diff would then
- *  tolerate one of the pair going stale forever. */
+/** Baseline keys recorded twice — malformed: the diff would then tolerate one
+ *  of the pair going stale forever. */
 export function findDuplicateKeys(baseline: CallArgExcludeEntry[]): string[] {
   const seen = new Set<string>();
   const dups = new Set<string>();
