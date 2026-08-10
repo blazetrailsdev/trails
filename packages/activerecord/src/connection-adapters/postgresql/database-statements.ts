@@ -8,6 +8,8 @@ import type pg from "pg";
 import type { Type } from "@blazetrails/activemodel";
 import type { Nodes } from "@blazetrails/arel";
 import type { ExplainOption } from "../abstract/database-statements.js";
+import { ActiveSupport } from "@blazetrails/activesupport";
+import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
@@ -90,6 +92,132 @@ interface CancelAnyRunningQueryHost {
  */
 export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
   this._cancelAnyRunningQuery();
+}
+
+/**
+ * node-pg's `query()` overloads do not admit `rowMode` on a QueryConfig and
+ * widen the return to `Submittable`; this narrows both back.
+ */
+function query(
+  rawConnection: pg.Client,
+  config: string | Record<string, unknown>,
+): Promise<pg.QueryResult | pg.QueryResult[]> {
+  return (
+    rawConnection.query as unknown as (
+      c: string | Record<string, unknown>,
+    ) => Promise<pg.QueryResult | pg.QueryResult[]>
+  )(config);
+}
+
+/** @internal */
+export interface PerformQueryHost extends HandleWarningsHost {
+  updateTypemapForDefaultTimezone(): Promise<void>;
+  prepareStatement(sql: string, binds: unknown[], rawConnection: pg.Client): Promise<string>;
+  isCachedPlanFailure(pgerror: unknown): boolean;
+  openTransactions: number;
+  sqlKey(sql: string): string;
+  _poolFor(rawConnection: pg.Client): { delete(key: string): unknown };
+  verifiedBang(): void;
+  /** @internal */
+  handleWarnings(sql: unknown): void;
+  _commandSettled: boolean;
+}
+
+/**
+ * The single SQL primitive: run a statement on `rawConnection` and hand back
+ * the driver result. `execute` / `executeMutation` / `internalExecQuery` /
+ * `internalExecute` all funnel through it, as Rails' `raw_execute` does.
+ *
+ * `rowMode` has no Rails counterpart: a `PG::Result` exposes both the hash and
+ * the positional view of every row, so Rails picks one after the fact, while
+ * node-pg has to be told which shape to decode into before the query runs.
+ * It only selects the decoding of the same result, never which arm runs.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+ * (postgresql/database_statements.rb:135-168)
+ *
+ * @missingRailsCall synchronize — `@lock.synchronize` guards the statement
+ * cache against other Ruby threads (database_statements.rb:151); trails'
+ * adapter is single-threaded and ports no adapter mutex.
+ * @internal
+ */
+export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
+  this: PerformQueryHost,
+  rawConnection: pg.Client,
+  sql: string,
+  binds: unknown[],
+  typeCastedBinds: unknown[],
+  {
+    prepare,
+    notificationPayload,
+    rowMode,
+  }: {
+    prepare: boolean;
+    notificationPayload: Record<string, unknown>;
+    rowMode?: "array";
+  },
+): Promise<R> {
+  await this.updateTypemapForDefaultTimezone();
+  let raw: pg.QueryResult | pg.QueryResult[];
+  if (prepare) {
+    // Rails' `retry` inside the `PG::FeatureNotSupported` rescue
+    // (database_statements.rb:138-158); node-pg raises no typed error class, so
+    // `is_cached_plan_failure?` — which is the whole of Rails' recovery gate —
+    // is checked against every error the arm can raise.
+    for (;;) {
+      try {
+        const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
+        notificationPayload.statement_name = stmtKey;
+        this._commandSettled = false;
+        raw = await query(rawConnection, {
+          name: stmtKey,
+          text: sql,
+          values: typeCastedBinds,
+          rowMode,
+        });
+        break;
+      } catch (error) {
+        if (this.isCachedPlanFailure(error)) {
+          // Nothing we can do if we are in a transaction because all commands
+          // will raise InFailedSQLTransaction
+          // `in_transaction?` is `open_transactions > 0`
+          // (postgresql_adapter.rb:908-910), so an open *lazy* (un-materialized)
+          // frame still counts — a read-only block (`transaction { record.reload }`)
+          // never emits a physical `BEGIN` because reads don't materialize.
+          if (this.openTransactions > 0) {
+            throw new PreparedStatementCacheExpired(
+              (error as { message?: string })?.message ?? "cached plan expired",
+              { sql, binds, cause: error },
+            );
+          } else {
+            // outside of transactions we can simply flush this query and retry
+            await this._poolFor(rawConnection).delete(this.sqlKey(sql));
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
+  } else if (binds == null || binds.length === 0) {
+    this._commandSettled = false;
+    // `async_exec` on a PG::Result carries both row views; node-pg needs the
+    // config form to be told which one, so a caller that asked for positional
+    // rows gets it here too. Without one this stays the bare simple-query call.
+    raw = await query(rawConnection, rowMode ? { text: sql, rowMode } : sql);
+  } else {
+    this._commandSettled = false;
+    raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
+  }
+
+  // A multi-statement string (e.g. disable_referential_integrity's joined
+  // ALTERs) runs under the simple-query protocol, where node-pg returns one
+  // Result per statement, while libpq hands Rails only the last one. Surface
+  // the same one Rails sees.
+  const result = (Array.isArray(raw) ? raw[raw.length - 1] : raw) as R;
+  this.verifiedBang();
+  this.handleWarnings(result);
+  notificationPayload.row_count = result?.rows?.length ?? 0;
+  return result;
 }
 
 /**
@@ -221,39 +349,56 @@ export function suppressCompositePrimaryKey(pk: string | string[] | undefined): 
 const ACTIONABLE_LEVELS = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
 
 /** @internal */
-type SqlWarning = {
-  level?: string;
-  message?: string;
-  code?: string | number;
-  sql?: unknown;
-  [k: string]: unknown;
-};
+type SqlWarning = SQLWarning;
+
+/** Mirrors the values `ActiveRecord.db_warnings_action` accepts. */
+type DbWarningsAction = "ignore" | "log" | "raise" | "report" | ((warning: SqlWarning) => void);
 
 /** @internal */
 interface HandleWarningsHost {
   _noticeReceiverSqlWarnings?: SqlWarning[];
-  // Used to call the abstract adapter's pattern-matcher without risking
-  // recursion if this module's isWarningIgnored is later bound to the class.
-  _abstractIsWarningIgnored?(warning: SqlWarning): boolean;
+  // The base adapter's matcher signature (abstract_adapter.rb:1227), which
+  // PostgreSQL's own `warning_ignored?` override widens with the level check.
+  /** @internal */
+  isWarningIgnored(warning: { message?: string; code?: string | number }): boolean;
+  logger?: unknown;
 }
 
 /**
- * Iterates notice-receiver warnings accumulated during the query and attaches
- * the result object (mirrors Rails attaching the PG::Result).
+ * Iterates notice-receiver warnings accumulated during the query, attaches the
+ * result object (Rails names the parameter `sql` but `perform_query` passes the
+ * PG::Result, database_statements.rb:166), and dispatches each surviving
+ * warning to the configured `db_warnings_action`.
  *
- * Rails also calls `ActiveRecord.db_warnings_action.call(warning)` here.
- * That global hook is not yet wired in TS; warnings are collected and filtered
- * but not dispatched to a user-configured action. Tracked as a follow-up.
+ * Rails' `ActiveRecord.db_warnings_action=` turns the symbol into a Proc once,
+ * at config time (active_record.rb:236-252), and `handle_warnings` only
+ * `.call`s it. trails stores the symbol itself on the adapter class, so the
+ * symbol → behavior mapping lives here, at the one place that calls it.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings
  * @internal
  */
-export function handleWarnings(this: HandleWarningsHost, result: pg.QueryResult): void {
-  if (!this._noticeReceiverSqlWarnings?.length) return;
-  for (const warning of this._noticeReceiverSqlWarnings) {
-    if (isWarningIgnored.call(this, warning)) continue;
-    warning.sql = result;
-    // TODO: dispatch to ActiveRecord.db_warnings_action equivalent once wired
+export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
+  const action = (this.constructor as { dbWarningsAction?: DbWarningsAction }).dbWarningsAction;
+  for (const warning of this._noticeReceiverSqlWarnings ?? []) {
+    if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
+    warning.sql = sql;
+    if (!action || action === "ignore") continue;
+    if (action === "raise") throw warning;
+    if (action === "log") {
+      const codeSuffix = warning.code ? ` (${warning.code})` : "";
+      const message = `[ActiveRecord::SQLWarning] ${warning.message}${codeSuffix}`;
+      const logger = this.logger as { warn?: (msg: string) => void } | null | undefined;
+      if (logger?.warn) logger.warn(message);
+      else console.warn(message);
+    }
+    // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
+    // (active_record.rb:248-249).
+    if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
+    // Rails' `ActiveRecord.db_warnings_action.call(warning)` — the symbol arms
+    // above are the behaviors its setter bakes into that Proc, and a
+    // user-supplied callable is invoked here exactly as Rails invokes it.
+    if (typeof action === "function") action.call(undefined, warning);
   }
 }
 

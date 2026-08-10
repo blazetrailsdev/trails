@@ -244,8 +244,10 @@ describe("PostgreSQLAdapter#sqlKey", () => {
     (adapter as unknown as { _poolFor: (c: unknown) => StatementPool })._poolFor(client);
   const preparedNameFor = (client: unknown, sql: string): Promise<string> =>
     (
-      adapter as unknown as { _preparedNameFor: (c: unknown, s: string) => Promise<string> }
-    )._preparedNameFor(client, sql);
+      adapter as unknown as {
+        prepareStatement: (s: string, b: unknown[], c: unknown) => Promise<string>;
+      }
+    ).prepareStatement(sql, [], client);
 
   it("scopes the pool key to the current schema_search_path", () => {
     setMemo("schema_a, public");

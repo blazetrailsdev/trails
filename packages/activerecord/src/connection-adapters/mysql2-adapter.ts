@@ -1777,7 +1777,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         else console.warn(line);
       }
       // TODO(report): wire Rails.error.report(warning, handled: true) when ErrorReporter
-      // is exposed as a global singleton — same gap as PostgreSQLAdapter._flushWarnings.
+      // is exposed as a global singleton (PostgreSQL's handleWarnings already does).
       if (typeof action === "function") action(warning);
     }
   }

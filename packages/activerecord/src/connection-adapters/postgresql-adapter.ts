@@ -1,6 +1,6 @@
 import pg from "pg";
 import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
-import { singularize, ActiveSupport, runLoadHooks, include } from "@blazetrails/activesupport";
+import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
@@ -106,6 +106,12 @@ const PQTRANS_UNKNOWN = 4;
  * (postgresql/database_statements.rb:124).
  */
 const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
+/**
+ * Mirrors: `PostgreSQLAdapter::FEATURE_NOT_SUPPORTED`
+ * (postgresql_adapter.rb:890) — the SQLSTATE a cached-plan invalidation
+ * arrives under.
+ */
+const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   READ_QUERY,
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -114,6 +120,8 @@ import {
   castResult,
   affectedRows as pgAffectedRows,
   handleWarnings,
+  isWarningIgnored as pgIsWarningIgnored,
+  performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
 import type { CreateDatabaseOptions } from "./postgresql/schema-statements.js";
@@ -451,8 +459,11 @@ export class PostgreSQLAdapter
    * to `true` only by the terminating-message handlers in
    * `_attachReadyForQueryListener`. Miss an issue site and `transactionStatus`
    * answers IDLE/INTRANS while that command is mid-cycle.
+   *
+   * Non-private (underscore-public) so the extracted `performQuery` can keep
+   * the invariant on the arms it issues.
    */
-  private _commandSettled = true;
+  _commandSettled = true;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
@@ -510,12 +521,8 @@ export class PostgreSQLAdapter
   // SQL commands that resetBang fires asynchronously.
   private _inFlightReset: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
-  // Cleared before each query; processed by _flushWarnings after.
-  private _noticeReceiverSqlWarnings: Array<{
-    level?: string;
-    message?: string;
-    code?: string;
-  }> = [];
+  // Cleared before each query; processed by handleWarnings after.
+  _noticeReceiverSqlWarnings: SQLWarning[] = [];
   /**
    * `database.yml`'s `statement_limit`, which Rails reads as
    * `@config[:statement_limit]` inline at StatementPool construction
@@ -844,11 +851,12 @@ export class PostgreSQLAdapter
   private _attachNoticeListener(client: pg.Client): void {
     if ((this.constructor as typeof PostgreSQLAdapter).dbWarningsAction === "ignore") return;
     client.on("notice", (msg: { severity?: string; message?: string; code?: string }) => {
-      this._noticeReceiverSqlWarnings.push({
-        level: msg.severity,
-        message: msg.message,
-        code: msg.code,
-      });
+      // Rails' notice receiver buffers SQLWarning instances themselves
+      // (postgresql_adapter.rb:970), so `handle_warnings` dispatches the very
+      // objects it iterates.
+      this._noticeReceiverSqlWarnings.push(
+        new SQLWarning(msg.message, msg.code ?? null, msg.severity ?? null, undefined, this.pool),
+      );
     });
   }
 
@@ -1057,7 +1065,6 @@ export class PostgreSQLAdapter
     // normalizer, mapping the adapter's `type_cast` over the binds.
     const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
-    this._noticeReceiverSqlWarnings = [];
     const pgResult: ArrayQueryResult = await this.log(
       rewritten,
       name ?? "SQL",
@@ -1081,15 +1088,21 @@ export class PostgreSQLAdapter
               try {
                 // rowMode: "array" returns rows as positional arrays, preserving
                 // duplicate column names and matching the field-index order.
-                // Delegates to `_runQuery` so prepared-statement caching and
-                // in-txn / out-of-txn cached-plan handling stay in one place.
-                return await this._runQuery<ArrayQueryResult>(client, rewritten, bindArray, {
-                  rowMode: "array",
-                  prepareHint: options?.prepare,
-                  onPrepared: (stmtName) => {
-                    payload.statement_name = stmtName;
+                // Rails' internal_exec_query forwards `prepare:` down to
+                // perform_query (abstract/database_statements.rb:552-558); an
+                // explicit `false` hard-disables preparation, while an absent
+                // one still passes through the adapter's own gate.
+                return await this._performQuery<ArrayQueryResult & pg.QueryResult>(
+                  client,
+                  rewritten,
+                  binds ?? [],
+                  bindArray,
+                  {
+                    prepare: options?.prepare === false ? false : this._shouldPrepare(bindArray),
+                    notificationPayload: payload,
+                    rowMode: "array",
                   },
-                });
+                );
               } catch (e: any) {
                 throw this._translateException(e, rewritten, bindArray);
               }
@@ -1105,8 +1118,6 @@ export class PostgreSQLAdapter
     );
 
     const fields = pgResult.fields ?? [];
-    // Flush before loadAdditionalTypes — nested execQuery calls reset the buffer.
-    this._flushWarnings(rewritten);
     if (fields.length === 0) return Result.fromRowHashes([]);
 
     // Batch-load any unknown dataTypeIDs in a single pg_type roundtrip.
@@ -1474,7 +1485,10 @@ export class PostgreSQLAdapter
    * lazily creating it. PG prepared statements are session-scoped;
    * with one persistent client there is exactly one pool per adapter.
    */
-  private _poolFor(client: pg.Client): StatementPool {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // `postgresql/database-statements.ts` can reach the statement cache Rails
+  // names `@statements`.
+  _poolFor(client: pg.Client): StatementPool {
     if (!this._statementPool) {
       this._statementPool = this.buildStatementPool(client);
     }
@@ -1494,97 +1508,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Run a query on `client`, routing through the statement pool when
-   * binds are present and `preparedStatements` is on. On Rails-parity
-   * "invalid cached plan" (SQLSTATE 0A000 + "cached plan" in the
-   * message), purges the pool entry and either re-runs once (outside
-   * a txn) or raises `PreparedStatementCacheExpired` (inside one, so
-   * the transaction machinery can retry the whole txn).
-   *
-   * Shared by execute/executeMutation so every bound path benefits
-   * from prepared-statement reuse — matches Rails where `exec_cache`
-   * backs both exec_query and exec_delete / exec_update / exec_insert.
-   */
-  private async _runQuery<R = pg.QueryResult>(
-    client: pg.Client,
-    sql: string,
-    binds: unknown[],
-    extra: {
-      rowMode?: "array";
-      // A *hint*, not a guarantee: `true` (e.g. `select_all` threading a
-      // preparable SELECT) still passes through `_shouldPrepare`, so PG's own
-      // gates — prepared_statements, non-empty binds, a non-zero pool limit —
-      // decide whether to actually prepare. This avoids forcing a server-side
-      // PREPARE that a disabled (maxSize 0) pool would leak per execution. Only
-      // an explicit `false` hard-disables preparation.
-      prepareHint?: boolean;
-      onPrepared?: (stmtName: string) => void;
-    } = {},
-  ): Promise<R> {
-    const { prepareHint, onPrepared, ...queryExtra } = extra;
-    const prepare = prepareHint === false ? false : this._shouldPrepare(binds);
-    const attempt = async (): Promise<R> => {
-      const stmtName = prepare ? await this._preparedNameFor(client, sql) : null;
-      if (stmtName !== null) onPrepared?.(stmtName);
-      this._commandSettled = false;
-      if (stmtName !== null) {
-        return client.query({
-          name: stmtName,
-          text: sql,
-          values: binds,
-          ...queryExtra,
-        }) as Promise<R>;
-      }
-      if (queryExtra.rowMode) {
-        return client.query({ text: sql, values: binds, ...queryExtra }) as Promise<R>;
-      }
-      return client.query(sql, binds) as Promise<R>;
-    };
-    try {
-      return await attempt();
-    } catch (e) {
-      if (prepare && this._isInvalidCachedPlan(e)) {
-        // Mirrors Rails' `perform_query` rescue
-        // (postgresql/database_statements.rb:143-151): inside a transaction we
-        // can't recover (all commands would raise InFailedSQLTransaction), so
-        // raise `PreparedStatementCacheExpired` and let the transaction machinery
-        // clear the whole cache on rollback; otherwise drop just this entry and
-        // retry. `in_transaction?` is `open_transactions > 0`
-        // (postgresql_adapter.rb:908-910), so an open *lazy* (un-materialized)
-        // frame still counts — a read-only block (`transaction { record.reload }`)
-        // never emits a physical `BEGIN` because reads don't materialize.
-        if (this.openTransactions > 0) {
-          throw new PreparedStatementCacheExpired(
-            (e as { message?: string })?.message ?? "cached plan expired",
-            { sql, binds, cause: e },
-          );
-        }
-        await this._poolFor(client).delete(this.sqlKey(sql));
-        return await attempt();
-      }
-      throw e;
-    }
-  }
-
-  /**
-   * Return the prepared-statement name for `sql` on `client`. Names
-   * are allocated from the per-pool counter (`StatementPool#nextKey`)
-   * so each session has its own `a1`, `a2`, ... sequence. Mirrors
-   * Rails' `PostgreSQL::StatementPool#[]` / `#[]=` — present key →
-   * cached name, absent → `next_key` + store. Awaiting `set` puts the evicted
-   * entry's DEALLOCATE before the query that triggered it (statement_pool.rb:31).
-   */
-  private async _preparedNameFor(client: pg.Client, sql: string): Promise<string> {
-    const pool = this._poolFor(client);
-    const key = this.sqlKey(sql);
-    const existing = pool.get(key);
-    if (existing) return existing.name;
-    const name = pool.nextKey();
-    await pool.set(key, { name });
-    return name;
-  }
-
-  /**
    * True when the adapter should try a named prepared statement for
    * this call. Rails' gate: `prepared_statements && !binds.empty?`
    * (there's no point naming an unparameterized statement — the
@@ -1601,27 +1524,6 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * True if a pg driver error indicates the cached plan has been
-   * invalidated by DDL on a referenced object (typical: `ALTER TABLE`,
-   * `DROP COLUMN`, schema change). PG emits SQLSTATE `0A000`
-   * FEATURE_NOT_SUPPORTED with the server message "cached plan must
-   * not change result type" — Rails checks the source function
-   * `RevalidateCachedQuery`, which the node-pg driver does not expose,
-   * so we fall back to the message substring.
-   *
-   * `26000` (invalid_sql_statement_name) is intentionally NOT included
-   * here: pg-js's own client-side name cache handles the session-lost
-   * case on its own, and retrying behind the driver's back masks
-   * genuine "this name never existed" bugs. Rails' equivalent path
-   * (`exec_cache`) also only retries on cached-plan failure — not on
-   * unknown-statement-name — so this matches the activerecord
-   * contract.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQLAdapter#is_cached_plan_failure?
-   * (postgresql_adapter.rb:901-906).
-   */
-  /** @internal Mirrors: PostgreSQL::DatabaseStatements#handle_warnings */
-  /**
    * Run a single query on an already-acquired client with the same
    * instrumentation, exception translation, and warning flushing that
    * execQuery/executeMutation use. Used when two queries must share a
@@ -1636,10 +1538,13 @@ export class PostgreSQLAdapter
   ): Promise<Result> {
     const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
-    this._noticeReceiverSqlWarnings = [];
     const pgResult = await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
       try {
-        const r = await this._runQuery(client, rewritten, bindArray, { rowMode: "array" });
+        const r = await this._performQuery(client, rewritten, binds, bindArray, {
+          prepare: this._shouldPrepare(bindArray),
+          notificationPayload: payload,
+          rowMode: "array",
+        });
         payload.row_count = r.rowCount ?? 0;
         return r;
       } catch (e: any) {
@@ -1647,51 +1552,7 @@ export class PostgreSQLAdapter
         throw translated;
       }
     });
-    // Mirrors Rails' raw_execute → verified!: a successful round-trip proves the
-    // connection is live, so skip the verify ping on the next withRawConnection.
-    this.verifiedBang();
-    this._flushWarnings(rewritten);
     return castResult.call(this, pgResult);
-  }
-
-  private _flushWarnings(sql?: string): void {
-    const actionable = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);
-    const ctor = this.constructor as typeof PostgreSQLAdapter;
-    const action = ctor.dbWarningsAction;
-    try {
-      if (!action || action === "ignore") return;
-      for (const w of this._noticeReceiverSqlWarnings) {
-        if (!actionable.has(w.level ?? "")) continue;
-        if (this.isWarningIgnored(w)) continue;
-        const sw = new SQLWarning(w.message, w.code ?? null, w.level ?? null);
-        if (sql) sw.sql = sql;
-        if (action === "raise") throw sw;
-        if (action === "log") {
-          const logger = this.logger as { warn?: (msg: string) => void } | null;
-          const codeSuffix = w.code ? ` (${w.code})` : "";
-          const msg = `[ActiveRecord::SQLWarning] ${sw.message}${codeSuffix}`;
-          if (logger?.warn) logger.warn(msg);
-          else console.warn(msg);
-        }
-        if (action === "report") {
-          // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
-          // (active_record.rb:248–249).
-          ActiveSupport.errorReporter.report(sw, { handled: true });
-        }
-        if (typeof action === "function") action(sw);
-      }
-    } finally {
-      this._noticeReceiverSqlWarnings = [];
-    }
-  }
-
-  private _isInvalidCachedPlan(e: unknown): boolean {
-    const err = e as { code?: string; message?: string } | null;
-    if (err?.code !== "0A000") return false;
-    // "cached plan must not change result type" is the only
-    // 0A000 subtype we retry on — other FEATURE_NOT_SUPPORTED
-    // errors (e.g. RETURNING on a view) must surface unchanged.
-    return typeof err.message === "string" && err.message.includes("cached plan");
   }
 
   /**
@@ -1714,63 +1575,49 @@ export class PostgreSQLAdapter
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
     // without re-running rewriteBinds.
-    this._noticeReceiverSqlWarnings = [];
-    // Flush inside the instrumented callback so a warning raise is captured by
-    // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
-    return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
-      try {
-        return await this.withRawConnection({ allowRetry }, async (conn) => {
-          const client = conn as unknown as pg.Client;
-          const result = await this._performQuery(client, rewritten, bindArray, payload);
-          return result?.rows ?? [];
-        });
-      } catch (e: any) {
-        const translated = this._translateException(e, rewritten, bindArray);
-        throw translated;
-      }
-    });
+    try {
+      return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
+        try {
+          return await this.withRawConnection({ allowRetry }, async (conn) => {
+            const client = conn as unknown as pg.Client;
+            const result = await this._performQuery(client, rewritten, binds, bindArray, {
+              prepare: this._shouldPrepare(bindArray),
+              notificationPayload: payload,
+            });
+            return result?.rows ?? [];
+          });
+        } catch (e: any) {
+          const translated = this._translateException(e, rewritten, bindArray);
+          throw translated;
+        }
+      });
+    } finally {
+      // Rails' `execute(...) ... ensure @notice_receiver_sql_warnings = []`
+      // (postgresql/database_statements.rb:39-43). This is the only place the
+      // buffer is reset per query — a warning raised on an internal path
+      // survives into the next `handle_warnings` pass, as it does in Rails.
+      this._noticeReceiverSqlWarnings = [];
+    }
   }
 
   /**
-   * The single SQL primitive: run a statement, mark the connection verified,
-   * flush warnings, record the affected-row count, and set the notification
-   * payload's row count — the shared body of `execute` and `executeMutation`,
-   * mirroring Rails' one `perform_query`. Returns the raw pg result (rows for a
-   * row-returning statement, `rowCount` for a write). Unlike sqlite, node-pg
-   * does not throw on a non-row-returning statement, so there is no branch on a
-   * driver throw — the read/write split lives in the callers' contracts
-   * (`execute` returns `.rows`, `executeMutation` sources affected rows through
-   * the `affectedRows` port).
+   * The single SQL primitive every query path funnels through, extracted to
+   * `postgresql/database-statements.ts` (`performQuery`) so api:compare's
+   * file-level match sees it where Rails puts it.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+   * @internal
    */
-  private async _performQuery(
-    client: pg.Client,
-    sql: string,
-    binds: unknown[],
-    payload: Record<string, unknown>,
-  ): Promise<pg.QueryResult> {
-    // Rails' perform_query first syncs the timestamp typemap / session timezone
-    // when default_timezone changed (database_statements.rb:136 →
-    // update_typemap_for_default_timezone); guarded, so it's a no-op unless the
-    // timezone actually changed.
-    await this.updateTypemapForDefaultTimezone();
-    const queryResult = await this._runQuery(client, sql, binds);
-    // Mirrors Rails' perform_query → verified!: a successful round-trip proves
-    // the connection is live, so skip the verify ping on the next
-    // withRawConnection.
-    this.verifiedBang();
-    // A multi-statement string (e.g. disable_referential_integrity's joined
-    // ALTERs) runs under the simple-query protocol, where node-pg returns one
-    // Result per statement. Mirror Rails' execute and surface the last
-    // command's result.
-    const result = (
-      Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
-    ) as pg.QueryResult;
-    payload.row_count = result?.rows?.length ?? 0;
-    this._flushWarnings(sql);
-    return result;
-  }
+  private _performQuery = pgPerformQuery;
+
+  /**
+   * Dispatch the notices PG raised during the last statement, wired from the
+   * extracted module below.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#handle_warnings
+   * @internal
+   */
+  declare handleWarnings: (sql: unknown) => void;
 
   /**
    * Rows affected by a write, read from its `PG::Result` (`cmd_tuples`).
@@ -1804,7 +1651,6 @@ export class PostgreSQLAdapter
     const originalBinds = binds;
     binds = this.typeCastedBinds(binds) ?? [];
     const pgSql = this.rewriteBinds(sql, binds);
-    this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
     // (and without re-appending RETURNING for bare INSERTs, which isn't
@@ -1836,7 +1682,10 @@ export class PostgreSQLAdapter
                 this._commandSettled = false;
                 await client.query(`SAVEPOINT "${spName}"`);
               }
-              const result = await this._performQuery(client, withReturning, binds, payload);
+              const result = await this._performQuery(client, withReturning, originalBinds, binds, {
+                prepare: this._shouldPrepare(binds),
+                notificationPayload: payload,
+              });
               if (useSavepoint) {
                 this._commandSettled = false;
                 await client.query(`RELEASE SAVEPOINT "${spName}"`);
@@ -1866,7 +1715,10 @@ export class PostgreSQLAdapter
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await this._performQuery(client, pgSql, binds, payload);
+              const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+                prepare: this._shouldPrepare(binds),
+                notificationPayload: payload,
+              });
               const affected = this.affectedRows(result);
               payload.row_count = affected;
               return affected;
@@ -1875,7 +1727,10 @@ export class PostgreSQLAdapter
 
           // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this._performQuery(client, pgSql, binds, payload);
+            const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+              prepare: this._shouldPrepare(binds),
+              notificationPayload: payload,
+            });
             const affected = this.affectedRows(result);
             payload.row_count = affected;
             if (result.rows.length > 0) {
@@ -1885,7 +1740,10 @@ export class PostgreSQLAdapter
           }
 
           // For UPDATE/DELETE, return affected rows
-          const result = await this._performQuery(client, pgSql, binds, payload);
+          const result = await this._performQuery(client, pgSql, originalBinds, binds, {
+            prepare: this._shouldPrepare(binds),
+            notificationPayload: payload,
+          });
           const affected = this.affectedRows(result);
           payload.row_count = affected;
           return affected;
@@ -2264,12 +2122,6 @@ export class PostgreSQLAdapter
       const hasBinds = binds.length > 0;
       const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
-      // A bound query here is the exec_insert RETURNING read-back; mirror
-      // _instrumentedQueryOnClient by resetting the notice buffer up front and
-      // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
-      // dropped or misattributed to the next query. Transaction-control SQL passes
-      // no binds and keeps its byte-identical path (no reset/flush/rewrite).
-      if (hasBinds) this._noticeReceiverSqlWarnings = [];
       const result = await this.log(runSql, name, binds, bindArray, false, (payload) =>
         // materializeTransactions is handled above (not delegated to
         // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
@@ -2286,19 +2138,16 @@ export class PostgreSQLAdapter
           // already-translated error, re-wrap it as StatementInvalid.
           // Rails' internal_execute forwards `prepare:` to raw_execute →
           // perform_query (abstract/database_statements.rb:552-558, 589-591).
-          const runResult = await this._runQuery(client, runSql, bindArray, {
+          const runResult = await this._performQuery(client, runSql, binds, bindArray, {
+            prepare: prepare === false ? false : this._shouldPrepare(bindArray),
+            notificationPayload: payload,
             rowMode: "array",
-            prepareHint: prepare,
-            onPrepared: (stmtName) => {
-              payload.statement_name = stmtName;
-            },
           });
           const count = runResult.rowCount ?? runResult.rows.length;
           payload.row_count = count;
           return runResult;
         }),
       );
-      if (hasBinds) this._flushWarnings(runSql);
       return result;
     } finally {
       // Rails' with_raw_connection `ensure dirty_current_transaction if
@@ -4278,8 +4127,15 @@ export class PostgreSQLAdapter
    */
   isCachedPlanFailure(pgerror: unknown): boolean {
     if (!(pgerror instanceof Error)) return false;
-    const code = (pgerror as { code?: string }).code;
-    return code === "0A000";
+    const err = pgerror as { code?: string; message?: string };
+    if (err.code !== FEATURE_NOT_SUPPORTED) return false;
+    // Rails' second half is `result_error_field(PG_DIAG_SOURCE_FUNCTION) ==
+    // "RevalidateCachedQuery"` (postgresql_adapter.rb:902-903). node-pg exposes
+    // no source-function field, so the server message it emits from that
+    // function — "cached plan must not change result type" — stands in for it.
+    // Without it every FEATURE_NOT_SUPPORTED (e.g. RETURNING on a view) would
+    // be retried as a plan invalidation.
+    return typeof err.message === "string" && err.message.includes("cached plan");
   }
 
   /**
@@ -4309,15 +4165,16 @@ export class PostgreSQLAdapter
    */
   async prepareStatement(sql: string, _binds: unknown[], client: pg.Client): Promise<string> {
     const pool = this._poolFor(client);
-    // Use same cache key as _preparedNameFor so prepared statements created here
-    // are visible to / deduped with the internal query path.
     const key = this.sqlKey(sql);
     const existing = pool.get(key);
     if (existing) return existing.name;
     const name = pool.nextKey();
-    // PREPARE ... AS avoids executing the statement (node-pg's { name, text } form
-    // both prepares and executes in a single roundtrip).
-    await client.query(`PREPARE ${pgQuoteColumnName(name)} AS ${sql}`);
+    // Rails issues `conn.prepare nextkey, sql` here; node-pg has no parse-only
+    // call — its `{ name, text }` form Parses under the name and Executes in
+    // one roundtrip — so the name is allocated here and `perform_query`'s
+    // exec_prepared arm carries the text that Parses it on first use. The
+    // server-side statement is identical either way; only the roundtrip that
+    // creates it differs.
     await pool.set(key, { name });
     return name;
   }
@@ -4924,6 +4781,13 @@ const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?
 
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
 (PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
+// Rails' `warning_ignored?` adds the level threshold on top of the base
+// adapter's db_warnings_ignore matchers via `super`
+// (postgresql/database_statements.rb:225-227); `_abstractIsWarningIgnored` is
+// that `super`.
+(PostgreSQLAdapter.prototype as any)._abstractIsWarningIgnored =
+  AbstractAdapter.prototype.isWarningIgnored;
+(PostgreSQLAdapter.prototype as any).isWarningIgnored = pgIsWarningIgnored;
 // Mirrors: PostgreSQL::DatabaseStatements#build_truncate_statements (database_statements.rb)
 // Combines all table names into a single TRUNCATE TABLE a, b, c statement, so
 // the abstract `truncateTables` emits Rails' combined form instead of N per-table ones.
