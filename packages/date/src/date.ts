@@ -1636,6 +1636,13 @@ function parseTimeCb(m: RegExpExecArray, hash: DateParts): number {
  * Ruby turns `IGNORECASE` back off around the two alphabetic zone spellings
  * (`(?-i:…)`); the groups it guards are character classes that already span
  * both cases, so the ported pattern is the same language without the flag.
+ *
+ * Onig's `[[:alpha:]]` is Unicode-aware over a UTF-8 String, so a zone spelled
+ * in non-ASCII letters — `test_parse_utf8`'s `"日本"` — is a zone there. `\p{Alpha}`
+ * under the `u` flag is the JS class with that repertoire; `[A-Za-z]` is not.
+ * The `\b` that closes each of those two alternatives is Unicode-aware for the
+ * same reason, and JS's is defined over ASCII `\w` alone — so it is spelled as
+ * the equivalent lookahead rather than as `\b`, which would reject `"日本"`.
  */
 function parseTime(str: string, hash: DateParts): string | null {
   const patSource =
@@ -1664,12 +1671,12 @@ function parseTime(str: string, hash: DateParts): string | null {
     "(" +
     "(?:gmt|utc?)?[-+]\\d+(?:[,.:]\\d+(?::\\d+)?)?" +
     "|" +
-    "[A-Za-z.\\s]+(?:standard|daylight)\\stime\\b" +
+    "[\\p{Alpha}.\\s]+(?:standard|daylight)\\stime(?![\\p{L}\\p{N}_])" +
     "|" +
-    "[A-Za-z]+(?:\\sdst)?\\b" +
+    "[\\p{Alpha}]+(?:\\sdst)?(?![\\p{L}\\p{N}_])" +
     ")" +
     ")?";
-  return subx(str, " ", new RegExp(patSource, "i"), hash, parseTimeCb);
+  return subx(str, " ", new RegExp(patSource, "iu"), hash, parseTimeCb);
 }
 
 /**
@@ -5536,7 +5543,7 @@ export class Date {
    * A string that named only a time of day answers no arm of
    * {@link rtValidDateFragsP} and raises.
    */
-  static parse(str: string, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
+  static parse(str = JULIAN_EPOCH_DATE, comp = true, start = DEFAULT_SG): Temporal.PlainDate {
     return dNewByFrags(Date._parse(str, comp), val2sg(start)).toDate();
   }
 
@@ -7200,7 +7207,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `Date._parse` followed by the DateTime-shaped build.
    */
   static parse(
-    str: string,
+    str = JULIAN_EPOCH_DATETIME,
     comp = true,
     start = DEFAULT_SG,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {

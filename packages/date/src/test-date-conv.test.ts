@@ -11,14 +11,19 @@
  * forbids `process.*`. The offset assertion it wraps is made directly instead —
  * a `ZonedDateTime` carries its own offset, so the host zone cannot change it.
  *
- * The five tests that build their subject with `Date#+` — `test_to_date__from_date`,
- * `test_to_datetime__from_date`, `test_to_time__from_datetime`,
- * `test_to_date__from_datetime` and `test_to_datetime__from_datetime` — are not
- * here: `d_lite_plus` (`date_core.c:4967`) is unported, so there is no way to
- * write `Date.new(2004, 9, 19) + 1.to_r/2`. They are filed against RFC 0088.
+ * The five tests that build their subject with `Date#+` read the day fraction
+ * off the gem-shaped receiver rather than off the converted value: MRI's
+ * `to_date` answers `self`, so `d2.day_fraction` there *is* `d.day_fraction`,
+ * while a `Temporal.PlainDate` has no time of day to carry one.
+ *
+ * `test_to_time__from_datetime`'s last block asserts
+ * `t.subsec == Rational(456789123456789123, 10**18)`. `Temporal` holds
+ * nanoseconds, so the sub-nanosecond tail truncates in the seat the way
+ * `Time#nsec` truncates it in MRI (see `DateTime#toDatetime`); that block reads
+ * the nanosecond here.
  */
 import { describe, it, expect } from "vitest";
-import { Temporal, Date, DateTime, Time } from "./index.js";
+import { Temporal, Date, DateTime, Rational, Time } from "./index.js";
 
 describe("TestDateConv", () => {
   it("to class", () => {
@@ -83,6 +88,43 @@ describe("TestDateConv", () => {
     expect(timeToDate(t).jd).toBe(d.jd);
   });
 
+  it("to time  from datetime", () => {
+    let d = new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)).plus(
+      new Rational(456789, 86400000000),
+    );
+    let t = d.toTime();
+    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789,
+    ]);
+    expect(t.offsetNanoseconds / 1_000_000_000).toBe(8 * 60 * 60);
+
+    d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
+    t = d.toTime().withTimeZone("UTC");
+    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789,
+    ]);
+
+    d = new DateTime(1582, 10, 3, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
+    t = d.toTime().withTimeZone("UTC");
+    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, usec(t)]).toEqual([
+      1582, 10, 13, 1, 2, 3, 456789,
+    ]);
+
+    d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789123, 86400000000000));
+    t = d.toTime().withTimeZone("UTC");
+    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, nsec(t)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789123,
+    ]);
+
+    d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(
+      new Rational(456789123456789123n, 86400000000000000000000n),
+    );
+    t = d.toTime().withTimeZone("UTC");
+    expect([t.year, t.month, t.day, t.hour, t.minute, t.second, nsec(t)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789123,
+    ]);
+  });
+
   it("to date  from time", () => {
     let t = Time.mktime(2004, 9, 19, 1, 2, 3, 456789);
     let d = t.toDate();
@@ -95,6 +137,25 @@ describe("TestDateConv", () => {
     t = Time.utc(1582, 10, 13, 1, 2, 3, 456789);
     d = t.toDate();
     expect([d.year, d.month, d.day]).toEqual([1582, 10, 3]);
+  });
+
+  it("to date  from date", () => {
+    const d = new Date(2004, 9, 19).plus(new Rational(1, 2));
+    const d2 = d.toDate();
+    expect([d2.year, d2.month, d2.day]).toEqual([2004, 9, 19]);
+    expect((d.dayFraction as Rational).cmp(new Rational(1, 2))).toBe(0);
+  });
+
+  it("to date  from datetime", () => {
+    let d = new DateTime(2004, 9, 19, 1, 2, 3, new Rational(9, 24)).plus(
+      new Rational(456789, 86400000000),
+    );
+    let d2 = d.toDate();
+    expect([d2.year, d2.month, d2.day]).toEqual([2004, 9, 19]);
+
+    d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
+    d2 = d.toDate();
+    expect([d2.year, d2.month, d2.day]).toEqual([2004, 9, 19]);
   });
 
   it("to datetime  from time", () => {
@@ -119,11 +180,43 @@ describe("TestDateConv", () => {
     ]);
     expect(offsetSeconds(d)).toBe(0);
   });
+
+  it("to datetime  from date", () => {
+    const d = new Date(2004, 9, 19).plus(new Rational(1, 2));
+    const d2 = d.toDatetime();
+    expect([d2.year, d2.month, d2.day, d2.hour, d2.minute, d2.second, usec(d2)]).toEqual([
+      2004, 9, 19, 0, 0, 0, 0,
+    ]);
+    expect(offsetSeconds(d2)).toBe(0);
+  });
+
+  it("to datetime  from datetime", () => {
+    let d = new DateTime(2004, 9, 19, 1, 2, 3, new Rational(9, 24)).plus(
+      new Rational(456789, 86400000000),
+    );
+    let d2 = d.toDatetime();
+    expect([d2.year, d2.month, d2.day, d2.hour, d2.minute, d2.second, usec(d2)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789,
+    ]);
+    expect(offsetSeconds(d2)).toBe(9 * 60 * 60);
+
+    d = new DateTime(2004, 9, 19, 1, 2, 3, 0).plus(new Rational(456789, 86400000000));
+    d2 = d.toDatetime();
+    expect([d2.year, d2.month, d2.day, d2.hour, d2.minute, d2.second, usec(d2)]).toEqual([
+      2004, 9, 19, 1, 2, 3, 456789,
+    ]);
+    expect(offsetSeconds(d2)).toBe(0);
+  });
 });
 
 /** Ruby `Time#usec` / `DateTime#sec_fraction`, off a Temporal value. */
 function usec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return t.millisecond * 1000 + t.microsecond;
+}
+
+/** Ruby `Time#nsec`, off a Temporal value. */
+function nsec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
+  return t.millisecond * 1_000_000 + t.microsecond * 1_000 + t.nanosecond;
 }
 
 /** Ruby `DateTime#offset`, in seconds rather than as a fraction of a day. */
