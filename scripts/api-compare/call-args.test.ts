@@ -28,12 +28,8 @@ describe("normalizeArg", () => {
     expect(normalizeArg("id:@ast")).toBe(normalizeArg("id:ast"));
   });
 
-  it("drops the predicate marker on both spellings", () => {
-    expect(normalizeArg("call:able_to_type_cast?")).toBe(normalizeArg("call:isAbleToTypeCast"));
-    expect(normalizeArg("call:able_to_type_cast?")).toBe(normalizeArg("call:ableToTypeCast"));
-  });
-
   it("keeps a name that merely starts with is", () => {
+    expect(normalizeArg("id:is_valid")).toBe("ref:isValid");
     expect(normalizeArg("id:isolation_level")).toBe("ref:isolationLevel");
   });
 
@@ -149,6 +145,24 @@ describe("compareCallArgs", () => {
     );
     expect(result.verdict).toBe("mismatch");
     expect(result.class).toBe("shape");
+  });
+
+  it("matches a predicate against either candidate spelling", () => {
+    for (const ts of ["isAbleToTypeCast", "ableToTypeCast"]) {
+      expect(
+        compareCallArgs(site("visit", ["call:able_to_type_cast?"]), site("visit", [`call:${ts}`]))
+          .verdict,
+      ).toBe("match");
+    }
+    expect(
+      compareCallArgs(site("save", ["call:save!"]), site("save", ["call:saveBang"])).verdict,
+    ).toBe("match");
+  });
+
+  it("does not hide a rename of a non-predicate is_ identifier", () => {
+    const result = compareCallArgs(site("check", ["id:is_valid"]), site("check", ["id:valid"]));
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("naming");
   });
 
   it("flags a renamed identifier as naming", () => {

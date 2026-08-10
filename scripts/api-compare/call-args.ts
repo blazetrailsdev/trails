@@ -12,7 +12,7 @@
 // 604 activerecord rows).
 
 import type { CallSite, LiteralValue } from "@blazetrails/parity/types";
-import { snakeToCamel } from "@blazetrails/parity/conventions";
+import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { normalizeLiteral } from "./literals.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
@@ -71,18 +71,37 @@ export interface CallArgResult {
  * already credit `new Foo()` (extract-ts-api.ts#callSiteName). Ruby `self` IS
  * TS `this`, and an ivar/cvar/gvar sigil is Ruby punctuation the port has no
  * spelling for (`@ast` is `this.ast`, which the TS extractor records as
- * `id:ast`). A predicate's `?` and the `is` prefix
- * conventions.ts#rubyMethodToTsIgnoringSkip offers for it (`empty?` →
- * `isEmpty`) are both faithful spellings, so the marker is dropped on each side
- * rather than translated onto one of them — translating would make the other
- * read as a rename it is not.
+ * `id:ast`).
+ *
+ * A trailing `?` / `!` / `=` is KEPT: those are the marks
+ * conventions.ts#rubyMethodToTsIgnoringSkip keys its rename candidates off, and
+ * {@link refKeysEqual} resolves them at comparison time, where the Ruby side is
+ * known. Folding them here would have to guess the mark back on from the TS
+ * spelling, and `is_valid` is not a predicate.
  */
 function normalizeRef(rawName: string): string {
   if (rawName === "new") return "constructor";
   const name = rawName.replace(/^[@$]+/, "");
   if (name === "self") return "this";
-  const camel = snakeToCamel(name.endsWith("?") ? name.slice(0, -1) : name);
-  return /^is[A-Z]/.test(camel) ? camel.charAt(2).toLowerCase() + camel.slice(3) : camel;
+  return snakeToCamel(name);
+}
+
+/**
+ * Whether a Ruby `ref:` key and a TS one name the same thing.
+ *
+ * Equal keys aside, a Ruby name carrying a `?` / `!` / `=` has more than one
+ * faithful TS spelling, and the repo already has the table that enumerates them
+ * (`empty?` → `isEmpty` or `empty`; `save!` → `saveBang`; `table_name=` →
+ * `tableName` or `setTableName` — docs/ruby-ts-conventions.md). Asking it is
+ * both narrower and more accurate than folding the `is` prefix away on both
+ * sides, which would read a plain `is_valid` local as `valid` and hide a
+ * genuine rename to it.
+ */
+function refKeysEqual(rubyKey: string, tsKey: string): boolean {
+  if (rubyKey === tsKey) return true;
+  const rubyName = rubyKey.slice("ref:".length);
+  if (!/[?!=]$/.test(rubyName)) return false;
+  return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsKey.slice("ref:".length));
 }
 
 /**
@@ -197,7 +216,7 @@ function hasUncomparableFlag(site: CallSite): boolean {
 function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   if (rubyArgs.length !== tsArgs.length) return "shape";
   for (let i = 0; i < rubyArgs.length; i++) {
-    if (rubyArgs[i] === tsArgs[i]) continue;
+    if (argKeysEqual(rubyArgs[i], tsArgs[i])) continue;
     if (!rubyArgs[i].startsWith("ref:") || !tsArgs[i].startsWith("ref:")) return "shape";
   }
   return "naming";
@@ -213,8 +232,17 @@ function stripMixinReceiver(rubyArgs: string[], tsArgs: string[]): string[] {
   return tsArgs;
 }
 
+/** Two argument keys naming the same value. Only `ref:` keys have more than one
+ *  spelling; a literal key is already canonical. */
+function argKeysEqual(rubyKey: string, tsKey: string): boolean {
+  if (rubyKey.startsWith("ref:") && tsKey.startsWith("ref:")) return refKeysEqual(rubyKey, tsKey);
+  return rubyKey === tsKey;
+}
+
 function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
-  return rubyArgs.length === tsArgs.length && rubyArgs.every((arg, i) => arg === tsArgs[i]);
+  return (
+    rubyArgs.length === tsArgs.length && rubyArgs.every((arg, i) => argKeysEqual(arg, tsArgs[i]))
+  );
 }
 
 /** Compare one name-matched pair of call sites, mirroring
