@@ -35,8 +35,12 @@ function ymd(date: RubyDate | Temporal.PlainDate): string {
 }
 
 describe("Date", () => {
-  it("raises rather than dropping the day fraction Date#+ cannot seat on a Date", () => {
-    expect(() => new RubyDate(2001, 1, 1).plus(new Rational(1, 2))).toThrow(RubyDate.Error);
+  it("keeps a fractional Date#+ a Date backed by complex data, as d_lite_plus does", () => {
+    const d = new RubyDate(2001, 1, 1).plus(new Rational(1, 2));
+    expect(d).toBeInstanceOf(RubyDate);
+    expect(d).not.toBeInstanceOf(RubyDateTime);
+    expect(d.dayFraction).toEqual(new Rational(1, 2));
+    expect("hour" in d).toBe(false);
     expect(new RubyDate(2001, 1, 1).plus(1).toS()).toBe("2001-01-02");
     expect(new RubyDate(2001, 1, 1).plus(-1).toS()).toBe("2000-12-31");
   });

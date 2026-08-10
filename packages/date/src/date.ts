@@ -4418,12 +4418,13 @@ export class DateInfinity {
  * measure instead; see `vendor/sources.ts`'s `date` entry.
  */
 /**
- * @internal `date_core.c` `simple_dat_p` (`date_core.c:1140`), true for the
- * `SimpleDateData` a `Date` carries and false for the `ComplexDateData` a
- * `DateTime` does. The C reads the data's `flags`; TS reads the class.
+ * @internal `date_core.c` `simple_dat_p` (`date_core.c:1140`), true for
+ * `SimpleDateData` and false for `ComplexDateData`. It is the data's shape, not
+ * the class: a `DateTime` is always complex, and a `Date` is too once
+ * `d_lite_plus` has given it a day fraction.
  */
 function simpleDatP(dat: Date): boolean {
-  return !(dat instanceof DateTime);
+  return !dat.complexDatP();
 }
 
 /**
@@ -4555,6 +4556,24 @@ export class Date {
   #jd?: number;
 
   /**
+   * @internal `ComplexDateData`'s `df`, `sf` and `of` (`date_core.c:215-231`) —
+   * the day fraction in seconds, the sub-second in nanoseconds, and the UTC
+   * offset in seconds. They are `undefined` exactly when the data is a
+   * `SimpleDateData`, which is the `flags` bit {@link Date#complexDatP} reads.
+   *
+   * A `::Date` really can carry them: `d_lite_plus`'s fractional arms build
+   * `d_complex_new_internal(rb_obj_class(self), ...)` (`date_core.c:6145`,
+   * `date_core.c:6250`), so `Date.new(2001, 1, 1) + Rational(1, 2)` is a `Date`
+   * whose `day_fraction` is `(1/2)`. The time-of-day READERS stay on
+   * {@link DateTime} — `d_lite_hour` and friends are defined on `cDateTime`
+   * alone (`date_core.c:9928-9934`) — so such a `Date` answers
+   * `respond_to?(:hour)` false, as MRI's does.
+   */
+  #df?: number;
+  #sf?: Rational;
+  #of?: number;
+
+  /**
    * @internal `SimpleDateData`'s `nth` (`date_core.c:203-213`), the count of
    * whole {@link CM_PERIOD}s the Julian day — and, over
    * {@link CM_PERIOD_GCY}/{@link CM_PERIOD_JCY}, the year — sits above zero. It
@@ -4596,17 +4615,31 @@ export class Date {
    * has already established the date is buildable. {@link SEAT} is the brand
    * that selects it.
    */
-  constructor(seat: typeof SEAT, nth: bigint, rjd: number, sg: number);
+  constructor(
+    seat: typeof SEAT,
+    nth: bigint,
+    rjd: number,
+    sg: number,
+    df?: number,
+    sf?: Rational,
+    of?: number,
+  );
   constructor(
     year: number | bigint | typeof SEAT = -4712,
     month: number | bigint = 1,
     day = 1,
     start = DEFAULT_SG,
+    df?: number,
+    sf?: Rational,
+    of?: number,
   ) {
     if (typeof year === "symbol") {
       this.nth = month as bigint;
       this.#jd = day;
       this.#sg = start;
+      this.#df = df;
+      this.#sf = sf;
+      this.#of = of;
       return;
     }
     const sg = val2sg(start);
@@ -4650,7 +4683,40 @@ export class Date {
    * {@link DateTime} overrides this and the simple arm is here.
    */
   mLocalJd(): number {
-    return this.#getSJd();
+    if (simpleDatP(this)) return this.#getSJd();
+    return jdUtcToLocal(this.#getSJd(), this.#df!, this.#of!);
+  }
+
+  /**
+   * @internal `date_core.c` `complex_dat_p` (`date_core.c:1141`), the `flags`
+   * bit that says which arm of the `union DateData` is live. A `DateTime` is
+   * always complex; a `Date` is complex exactly when `d_lite_plus` gave it a
+   * day fraction.
+   */
+  complexDatP(): boolean {
+    return this.#df !== undefined;
+  }
+
+  /**
+   * @internal `date_core.c` `m_local_df` (`date_core.c:1531-1540`), the stored
+   * day fraction read back in local terms. The C's simple arm is `0`.
+   */
+  mLocalDf(): number {
+    if (simpleDatP(this)) return 0;
+    return dfUtcToLocal(this.#df!, this.#of!);
+  }
+
+  /**
+   * @internal `date_core.c` `m_fr` (`date_core.c:1573-1590`), the local day
+   * fraction plus the sub-second, both as fractions of a day. The C's simple
+   * arm is `INT2FIX(0)`.
+   */
+  mFr(): number | Rational {
+    if (simpleDatP(this)) return 0;
+    let fr = isecToDay(this.mLocalDf());
+    const sf = this.mSf();
+    if (!sf.isZero()) fr = fr.add(nsToDay(sf));
+    return fr;
   }
 
   /**
@@ -4877,7 +4943,8 @@ export class Date {
    * Rational; {@link DateTime#dayFraction} is the `m_fr` arm.
    */
   get dayFraction(): number | Rational {
-    return 0;
+    if (simpleDatP(this)) return 0;
+    return this.mFr();
   }
 
   /**
@@ -5099,7 +5166,15 @@ export class Date {
    * `DateTime`.
    */
   newStart(start = DEFAULT_SG): this {
-    return new Date(SEAT, this.nth, this.#getSJd(), val2sg(start)) as this;
+    return new Date(
+      SEAT,
+      this.nth,
+      this.#getSJd(),
+      val2sg(start),
+      this.#df,
+      this.#sf,
+      this.#of,
+    ) as this;
   }
 
   /**
@@ -5154,14 +5229,11 @@ export class Date {
    * out-parameter; JS has no `modf`, so the two halves are taken separately.
    *
    * Both fractional arms end at `d_simple_new_internal` rather than
-   * `d_complex_new_internal` only when `!df && f_zero_p(sf) && !m_of(dat)`.
-   * {@link Date#dNewInternal} is that branch here, and it RAISES rather than
-   * dropping a non-zero `df`/`sf`: `simple_dat_p` is `!(dat instanceof
-   * DateTime)` in this port, so a `Date` backed by `ComplexDateData` — which is
-   * what MRI answers for `Date.new(2001, 1, 1) + Rational(1, 2)`, a `Date`
-   * whose `day_fraction` is `(1/2)` — has no shape to be built as. Moving the
-   * `df`/`sf`/`of` fields down to `Date`, as the C's `union DateData` has them,
-   * is RFC 0088 story `date-union-datedata-on-date`.
+   * `d_complex_new_internal` only when `!df && f_zero_p(sf) && !m_of(dat)`;
+   * {@link Date#dNewInternal} is that branch here. A `Date` on the other side
+   * of it is backed by `ComplexDateData`, exactly as MRI's is:
+   * `Date.new(2001, 1, 1) + Rational(1, 2)` is a `Date` — not a `DateTime` —
+   * whose `day_fraction` is `(1/2)`.
    */
   plus(other: number | bigint | Rational): this {
     if (typeof other === "number" && Number.isInteger(other)) {
@@ -5407,7 +5479,7 @@ export class Date {
    * in seconds. `SimpleDateData` has none, and the C's simple arm answers `0`.
    */
   mDf(): number {
-    return 0;
+    return this.#df ?? 0;
   }
 
   /**
@@ -5416,7 +5488,7 @@ export class Date {
    * `Rational` ({@link DateTime}'s `#sf`), so this is that zero.
    */
   mSf(): Rational {
-    return new Rational(0, 1);
+    return this.#sf ?? new Rational(0, 1);
   }
 
   /**
@@ -5425,7 +5497,7 @@ export class Date {
    * answers `0`.
    */
   mOf(): number {
-    return 0;
+    return this.#of ?? 0;
   }
 
   /**
@@ -5440,8 +5512,8 @@ export class Date {
    * a `Date`, hence the `_` the lint wants on them here.
    */
   dNewInternal(nth: bigint, rjd: number, df: number, sf: Rational, of: number): this {
-    if (df || !sf.isZero() || of) throw new DateError("Date cannot carry a day fraction");
-    return new Date(SEAT, nth, rjd, this.start) as this;
+    if (!df && sf.isZero() && !of) return new Date(SEAT, nth, rjd, this.start) as this;
+    return new Date(SEAT, nth, rjd, this.start, df, sf, of) as this;
   }
 
   /**
@@ -6206,7 +6278,11 @@ export class DateTime extends DateWithoutParseStatics {
    * @internal `date_core.c` `m_local_df` (`date_core.c:1533-1541`) over
    * `local_df` (`date_core.c:1335-1341`).
    */
-  #mLocalDf(): number {
+  override complexDatP(): boolean {
+    return true;
+  }
+
+  override mLocalDf(): number {
     return dfUtcToLocal(this.#df, this.#of);
   }
 
@@ -6226,21 +6302,6 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override get isJulian(): boolean {
     return mJulianP(this.#jd, virtualSg(this.nth, this.start));
-  }
-
-  /**
-   * `m_fr` (`date_core.c:1573-1590`), the complex arm of
-   * {@link Date#dayFraction}: the LOCAL day-fraction as a fraction of a day,
-   * plus the sub-second when there is one. `m_local_df` is what makes
-   * `DateTime.new(2001, 2, 3, 12).day_fraction` `(1/2)` rather than the UTC
-   * reading.
-   */
-  override get dayFraction(): number | Rational {
-    const df = this.#mLocalDf();
-    const sf = this.#sf;
-    let fr = isecToDay(df);
-    if (!sf.isZero()) fr = fr.add(nsToDay(sf));
-    return fr;
   }
 
   override newStart(start = DEFAULT_SG): this {
@@ -6295,7 +6356,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `Time#nsec` does.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    const [h, min, s] = dfToTime(this.#mLocalDf());
+    const [h, min, s] = dfToTime(this.mLocalDf());
     const ns = Number(this.#sf.numerator / this.#sf.denominator);
     const plain = this.toDate().toPlainDateTime({
       hour: h,
@@ -6311,17 +6372,17 @@ export class DateTime extends DateWithoutParseStatics {
 
   /** Ruby `DateTime#hour` (ruby/date, `date_core.c` `d_lite_hour` over `m_hour`, `date_core.c:1919-1932`). */
   get hour(): number {
-    return dfToTime(this.#mLocalDf())[0];
+    return dfToTime(this.mLocalDf())[0];
   }
 
   /** Ruby `DateTime#min` (ruby/date, `date_core.c` `d_lite_min` over `m_min`, `date_core.c:1934-1947`). */
   get min(): number {
-    return dfToTime(this.#mLocalDf())[1];
+    return dfToTime(this.mLocalDf())[1];
   }
 
   /** Ruby `DateTime#sec` (ruby/date, `date_core.c` `d_lite_sec` over `m_sec`, `date_core.c:1949-1962`). */
   get sec(): number {
-    return dfToTime(this.#mLocalDf())[2];
+    return dfToTime(this.mLocalDf())[2];
   }
 
   /**
