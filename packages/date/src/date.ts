@@ -5479,19 +5479,6 @@ export class Date {
    * counts back from December and a negative `mday` from the month's end, so
    * `Date.civil(2001, -1, -1)` is 2001-12-31.
    */
-  /**
-   * Ruby `Date.today(start = Date::ITALY)` (ruby/date, `date_core.c`
-   * `date_s_today`, `date_core.c:3789-3826`): the current date in the LOCAL
-   * zone, built from `localtime_r`'s `tm_year`/`tm_mon`/`tm_mday` and stored
-   * `HAVE_CIVIL` under `GREGORIAN` before `set_sg` writes the requested reform
-   * in. `Temporal.Now.plainDateISO()` is the same reading — the local wall date
-   * — where `Temporal.Now.instant()` would be the UTC one.
-   */
-  static today(start = DEFAULT_SG): Temporal.PlainDate {
-    const now = Temporal.Now.plainDateISO();
-    return new Date(now.year, now.month, now.day, val2sg(start)).toDate();
-  }
-
   static civil(
     year = -4712,
     month = 1,
@@ -5534,9 +5521,10 @@ export class Date {
    * gem's own test guards it with `Date.respond_to?(:weeknum, true)`.
    *
    * `day` carries the fraction (`num2int_with_frac(d, positive_inf)`,
-   * `date_core.c:3691`) and `add_frac` (`:3286-3318`) adds it back as a day
-   * fraction, which is a complex `Date` the `Temporal.PlainDate` seat reads
-   * the day of — a fraction of a day never moves midnight off its own date.
+   * `date_core.c:3691`) and {@link addFracTo} adds it back (`add_frac`,
+   * `:3314-3318`) as the day fraction `d_trunc` left, which is a complex
+   * `Date` the `Temporal.PlainDate` seat reads the day of — a fraction of a
+   * day never moves midnight off its own date.
    */
   static weeknum(
     year = -4712,
@@ -5546,15 +5534,11 @@ export class Date {
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
     const sg = val2sg(start);
-    const [d, fr2] = num2intWithFrac(day, DAY_IN_SECONDS, false);
+    const [d, fr2] = num2intWithFrac(day, 1, false);
     const rjd = cValidWeeknumP(year, week, d, firstday, sg);
     if (rjd === null) throw new DateError("invalid date");
     const [nth, rrjd] = decodeJd(rjd);
-    const ret = new Date(SEAT, nth, rrjd, sg);
-    if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
-      return ret.plus(fr2 instanceof Rational ? fr2.quo(DAY_IN_SECONDS) : isecToDay(fr2)).toDate();
-    }
-    return ret.toDate();
+    return addFracTo(new Date(SEAT, nth, rrjd, sg), fr2).toDate();
   }
 
   /**
@@ -5573,15 +5557,11 @@ export class Date {
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
     const sg = val2sg(start);
-    const [rk, fr2] = num2intWithFrac(k, DAY_IN_SECONDS, false);
+    const [rk, fr2] = num2intWithFrac(k, 1, false);
     const rjd = cValidNthKdayP(year, month, n, rk, sg);
     if (rjd === null) throw new DateError("invalid date");
     const [nth, rrjd] = decodeJd(rjd);
-    const ret = new Date(SEAT, nth, rrjd, sg);
-    if (fr2 instanceof Rational ? !fr2.isZero() : fr2 !== 0) {
-      return ret.plus(fr2 instanceof Rational ? fr2.quo(DAY_IN_SECONDS) : isecToDay(fr2)).toDate();
-    }
-    return ret.toDate();
+    return addFracTo(new Date(SEAT, nth, rrjd, sg), fr2).toDate();
   }
 
   /**
