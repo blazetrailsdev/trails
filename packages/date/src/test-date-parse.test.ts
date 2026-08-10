@@ -19,8 +19,17 @@
  * assert that what `parse('')` raises is both an `ArgumentError` and a
  * `Date::Error`; they are the last two expectations of `parse  ex`.
  */
+import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
-import { ArgumentError, Date, DateTime, Rational, dtNewByFrags, type DateParts } from "./date.js";
+import {
+  ArgumentError,
+  Date,
+  DateTime,
+  Rational,
+  dNewByFrags,
+  dtNewByFrags,
+  type DateParts,
+} from "./date.js";
 
 /** Ruby's `h.values_at(...)` over the frag hash, `nil` for an absent key. */
 function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {
@@ -282,6 +291,84 @@ describe("TestDateParse", () => {
     expect(() => Date.parse("")).toThrow(ArgumentError);
     expect(() => DateTime.parse("")).toThrow(ArgumentError);
   });
+
+  it(" rfc2822", () => {
+    let h = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 UT");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 EST");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, -5 * 3600]);
+    h = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 +0000");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 +0100");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._rfc2822("Sat, 03 Feb 50 04:05:06 +0100");
+    expect(ymdhms(h)).toEqual([1950, 2, 3, 4, 5, 6, 3600]);
+    h = Date._rfc2822("Sat, 03 Feb 49 04:05:06 +0100");
+    expect(ymdhms(h)).toEqual([2049, 2, 3, 4, 5, 6, 3600]);
+    h = Date._rfc2822("Sat, 03 Feb 100 04:05:06 +0100");
+    expect(ymdhms(h)).toEqual([2000, 2, 3, 4, 5, 6, 3600]);
+
+    const h1 = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 UT");
+    const h2 = Date._rfc822("Sat, 3 Feb 2001 04:05:06 UT");
+    expect(h1).toEqual(h2);
+
+    h = Date._rfc2822("");
+    expect(h).toEqual({});
+
+    h = Date._rfc2822(null as unknown as string);
+    expect(h).toEqual({});
+  });
+
+  it(" httpdate", () => {
+    let h = Date._httpdate("Sat, 03 Feb 2001 04:05:06 GMT");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+
+    h = Date._httpdate("Saturday, 03-Feb-01 04:05:06 GMT");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+
+    h = Date._httpdate("Sat Feb  3 04:05:06 2001");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+    h = Date._httpdate("Sat Feb 03 04:05:06 2001");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, null]);
+
+    h = Date._httpdate("");
+    expect(h).toEqual({});
+
+    h = Date._httpdate(null as unknown as string);
+    expect(h).toEqual({});
+  });
+
+  it("rfc2822", () => {
+    expect(Date.rfc2822()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.rfc2822()).toBeInstanceOf(Temporal.PlainDateTime);
+    expect(Date.rfc822()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.rfc822()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    let d = Date.rfc2822("Sat, 3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._rfc2822("Sat, 3 Feb 2001 04:05:06 +0700"))).toBe(Date.ITALY + 10);
+    d = Date.rfc2822("3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._rfc2822("3 Feb 2001 04:05:06 +0700"))).toBe(Date.ITALY + 10);
+
+    let dt = DateTime.rfc2822("Sat, 3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    dt = DateTime.rfc2822("3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+  });
+
+  it("httpdate", () => {
+    expect(Date.httpdate()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.httpdate()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    const d = Date.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._httpdate("Sat, 03 Feb 2001 04:05:06 GMT"))).toBe(Date.ITALY + 10);
+
+    const dt = DateTime.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+00:00").toDatetime())).toBe(true);
+  });
 });
 
 /**
@@ -291,6 +378,19 @@ describe("TestDateParse", () => {
  */
 function dtParse(str: string): DateTime {
   return dtNewByFrags(Date._parse(str));
+}
+
+/** Ruby `h.values_at(:year, :mon, :mday, :hour, :min, :sec, :offset)`. */
+function ymdhms(h: DateParts): unknown[] {
+  return valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "offset");
+}
+
+/**
+ * Ruby asserts `Date::ITALY + 10` came back as the built date's `start`, which
+ * only the gem-shaped receiver carries — RFC 0088's statics answer `Temporal`.
+ */
+function startOf(h: DateParts): number {
+  return dNewByFrags(h, Date.ITALY + 10).start;
 }
 
 /** Ruby `h.values_at(:hour, :min, :sec, :sec_fraction)`. */
