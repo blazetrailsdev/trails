@@ -211,8 +211,8 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
 
   // A multi-statement string (e.g. disable_referential_integrity's joined
   // ALTERs) runs under the simple-query protocol, where node-pg returns one
-  // Result per statement where PG::Result is already the last one. Mirror Rails
-  // and surface the last command's result.
+  // Result per statement, while libpq hands Rails only the last one. Surface
+  // the same one Rails sees.
   const result = (Array.isArray(raw) ? raw[raw.length - 1] : raw) as R;
   this.verifiedBang();
   this.handleWarnings(result);
