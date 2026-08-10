@@ -637,19 +637,15 @@ export class Time {
    * sub-minute offset truncates as MRI's `divmod` does.
    */
   rfc2822(): string {
-    return (
+    const head =
       `${RFC2822_DAY_NAME[this.wday]}, ${pad2(this.day)} ` +
       `${RFC2822_MONTH_NAME[this.mon - 1]} ${padYear(this.year)} ` +
-      `${pad2(this.hour)}:${pad2(this.min)}:${pad2(this.sec)} ` +
-      (this.isUtc()
-        ? "-0000"
-        : (() => {
-            const off = this.utcOffset;
-            const sign = off < 0 ? "-" : "+";
-            const abs = Math.trunc(Math.abs(off) / 60);
-            return `${sign}${pad2(Math.trunc(abs / 60))}${pad2(abs % 60)}`;
-          })())
-    );
+      `${pad2(this.hour)}:${pad2(this.min)}:${pad2(this.sec)} `;
+    if (this.isUtc()) return `${head}-0000`;
+    const off = this.utcOffset;
+    const sign = off < 0 ? "-" : "+";
+    const minutes = Math.trunc(Math.abs(off) / 60);
+    return `${head}${sign}${pad2(Math.trunc(minutes / 60))}${pad2(minutes % 60)}`;
   }
 
   /**
