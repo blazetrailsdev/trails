@@ -18,7 +18,7 @@ import * as path from "path";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
-import { parseTop } from "./lint-call-mismatches.js";
+import { parseTop, section, tally } from "./lint-call-mismatches.js";
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 
@@ -38,28 +38,6 @@ interface Artifact {
   compared: number;
   mismatched: number;
   mismatches: CallArgRow[];
-}
-
-function tally<T>(items: T[], keyFn: (item: T) => string): [string, number][] {
-  const counts = new Map<string, number>();
-  for (const item of items) {
-    const k = keyFn(item);
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-}
-
-function section(title: string, rows: [string, number][], top?: number): string {
-  const shown = top === undefined ? rows : rows.slice(0, top);
-  const head =
-    rows.length > shown.length
-      ? `${title} (top ${shown.length} of ${rows.length})`
-      : `${title} (${rows.length})`;
-  const width = Math.max(0, ...shown.map(([k]) => k.length));
-  return [
-    `\n${head}`,
-    ...shown.map(([k, n]) => `  ${k.padEnd(width)}  ${String(n).padStart(5)}`),
-  ].join("\n");
 }
 
 export function renderReport(artifact: Artifact, top: number): string {
