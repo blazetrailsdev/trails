@@ -2477,7 +2477,20 @@ class ApiExtractor
     return "?" unless parts.is_a?(Array)
     return "str:" if parts.empty?
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
-    "str:#{parts.map { |p| p[1] }.join}"
+    "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
+  end
+
+  # The descriptor grammar is a FLAT string the comparator splits on `,` `=` `{`
+  # `}` (call-args.ts#splitPairs), and a string value can contain every one of
+  # them — `to_sentence(last_word_connector: ", or ")`. Unescaped, that comma
+  # splits `kwargs{…}` into a fragment with no `=` and the whole call site is
+  # silently dropped as uncomparable, losing exactly the SQL-fragment arguments
+  # RFC 0095 §2 calls load-bearing. call-args.ts unescapes after splitting.
+  #
+  # Percent- rather than backslash-escaped so the payload's own backslash
+  # escapes stay intact for literals.ts#normalizeLiteral.
+  def escape_descriptor_text(text)
+    text.gsub(/[%,={}]/) { |c| format("%%%02X", c.ord) }
   end
 
   # A braced `{ … }` is the ObjectLiteralExpression the port writes, and the TS

@@ -1500,6 +1500,23 @@ describe("Ruby extractor call-argument capture", () => {
     ]);
   });
 
+  it("escapes a descriptor delimiter inside a string value", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(list, collector)
+            inject_join(list, collector, ", ")
+            to_sentence(last_word_connector: ", or ", sep: "a=b{c}d")
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "inject_join")).toEqual(["id:list", "id:collector", "str:%2C "]);
+    expect(argsOf(c["Foo#m"], "to_sentence")).toEqual([
+      "kwargs{last_word_connector=str:%2C or ,sep=str:a%3Db%7Bc%7Dd}",
+    ]);
+  });
+
   it("recurses into a nested keyword hash", () => {
     const c = rubyCallArgs({
       "foo.rb": `
