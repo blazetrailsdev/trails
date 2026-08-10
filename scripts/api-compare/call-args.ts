@@ -11,8 +11,9 @@
 // without them (the nested-opaque leak alone was 8 of 17 noise rows, and 94 of
 // 604 activerecord rows).
 
-import type { CallSite } from "@blazetrails/parity/types";
+import type { CallSite, LiteralValue } from "@blazetrails/parity/types";
 import { snakeToCamel } from "@blazetrails/parity/conventions";
+import { normalizeLiteral } from "./literals.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 
@@ -34,6 +35,18 @@ const UNCOMPARABLE_FLAGS = new Set(["splat", "blockpass", "zsuper"]);
  *  That is the settled port shape for Ruby `include`, not a divergence. */
 const MIXIN_RECEIVER = "id:this";
 
+/** The `LiteralValue` kind each value-carrying descriptor prefix denotes, so the
+ *  value goes through literals.ts#normalizeLiteral rather than a second
+ *  implementation of it. `num:` maps to `int` because that arm already parses
+ *  the token numerically, collapsing `1` and `1.0` onto one key the way TS's
+ *  single `number` type does. */
+const LITERAL_KINDS: Record<string, LiteralValue["kind"]> = {
+  num: "int",
+  str: "string",
+  sym: "symbol",
+  bool: "bool",
+};
+
 export type CallArgVerdict = "match" | "mismatch" | "skip";
 
 /** `shape` — argument count, order, literal values or kwarg keys differ; the
@@ -51,30 +64,43 @@ export interface CallArgResult {
   tsArgs: string[];
 }
 
-/** Ruby `new` is the port's `constructor`, exactly as `calls` / `callSeq`
- *  already credit `new Foo()` (extract-ts-api.ts#callSiteName).
+/**
+ * The comparison key for one identifier or nested call name.
  *
- *  A Ruby predicate carries its `?` and its port carries the `is` prefix
- *  conventions.ts#rubyMethodToTsIgnoringSkip offers (`empty?` → `isEmpty`), and
- *  BOTH of that rule's candidates (`isEmpty`, `empty`) are faithful — so the
- *  predicate marker is dropped on each side rather than translated onto one
- *  spelling, which would make the other read as a rename it is not. */
+ * Ruby `new` is the port's `constructor`, exactly as `calls` / `callSeq`
+ * already credit `new Foo()` (extract-ts-api.ts#callSiteName). Ruby `self` IS
+ * TS `this`, and an ivar/cvar/gvar sigil is Ruby punctuation the port has no
+ * spelling for (`@ast` is `this.ast`, which the TS extractor records as
+ * `id:ast`). A predicate's `?` and the `is` prefix
+ * conventions.ts#rubyMethodToTsIgnoringSkip offers for it (`empty?` →
+ * `isEmpty`) are both faithful spellings, so the marker is dropped on each side
+ * rather than translated onto one of them — translating would make the other
+ * read as a rename it is not.
+ */
 function normalizeRef(rawName: string): string {
   if (rawName === "new") return "constructor";
-  // Ruby `self` IS TS `this`, and an ivar/cvar/gvar sigil is Ruby punctuation
-  // the port has no spelling for (`@ast` is `this.ast`, recorded as `id:ast`).
   const name = rawName.replace(/^[@$]+/, "");
   if (name === "self") return "this";
   const camel = snakeToCamel(name.endsWith("?") ? name.slice(0, -1) : name);
   return /^is[A-Z]/.test(camel) ? camel.charAt(2).toLowerCase() + camel.slice(3) : camel;
 }
 
-/** A Ruby Symbol is a JS string, and CLAUDE.md ("Symbols vs strings") keeps the
- *  leading colon where a body's control flow turns on Symbol-vs-String — so
- *  `":dump"` and `"dump"` are the same value here and must compare equal. */
-function normalizeStringValue(value: string): string {
-  const bare = value.startsWith(":") ? value.slice(1) : value;
-  return IDENTIFIER_STRING.test(bare) ? `str:${snakeToCamel(bare)}` : `str:${value}`;
+/**
+ * A literal's key, through literals.ts#normalizeLiteral so escapes, numeric
+ * underscores and symbol-vs-string spellings are absorbed exactly once.
+ *
+ * On top of that key, a string that is identifier-shaped camelizes: it is a
+ * name the port renames by convention, not a value. A Ruby Symbol is a JS
+ * string, and CLAUDE.md ("Symbols vs strings") keeps the leading colon where a
+ * body's control flow turns on Symbol-vs-String — so `":dump"` and `"dump"` are
+ * the same value here and must compare equal.
+ */
+function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | null {
+  const key = normalizeLiteral({ kind, value });
+  if (key === null || !key.startsWith("str:")) return key;
+  const text = key.slice("str:".length);
+  const bare = text.startsWith(":") ? text.slice(1) : text;
+  return IDENTIFIER_STRING.test(bare) ? `str:${snakeToCamel(bare)}` : key;
 }
 
 /** Split a `kwargs{…}` body on its TOP-LEVEL commas — a value can itself be a
@@ -96,15 +122,17 @@ function splitPairs(body: string): string[] {
   return pairs;
 }
 
-/** Keys camelize through the same pipeline option keys do; values recurse. Order
- *  is not significant — a Ruby hash literal and a TS object literal carry the
- *  same kwargs whatever order they are written in — so the pairs are sorted. */
+/** Keys camelize through the same pipeline option keys do; values recurse, so an
+ *  opaque nested value makes the whole descriptor uncomparable. Order is not
+ *  significant — a Ruby hash literal and a TS object literal carry the same
+ *  kwargs whatever order they are written in — so the pairs are sorted. A pair
+ *  with no `=` is the `**splat` marker, which has no comparable arity. */
 function normalizeKwargs(descriptor: string): string | null {
   const body = descriptor.slice("kwargs{".length, -1);
   const pairs: string[] = [];
   for (const pair of splitPairs(body)) {
     const eq = pair.indexOf("=");
-    if (eq === -1) return null; // `**splat`
+    if (eq === -1) return null;
     const value = normalizeArg(pair.slice(eq + 1));
     if (value === null) return null;
     pairs.push(`${snakeToCamel(pair.slice(0, eq))}=${value}`);
@@ -112,8 +140,14 @@ function normalizeKwargs(descriptor: string): string | null {
   return `kwargs{${pairs.sort().join(",")}}`;
 }
 
-/** The canonical comparison key for one argument descriptor, or null when the
- *  descriptor is opaque and the site therefore uncomparable. */
+/**
+ * The canonical comparison key for one argument descriptor, or null when the
+ * descriptor is opaque and the site therefore uncomparable.
+ *
+ * `id:` and `call:` collapse into one `ref:` bucket on both sides: Ripper cannot
+ * tell a local read from a zero-arg self-send, the same information loss the
+ * weak-call set already works around (extract-ruby-api.rb#inert_receiver?).
+ */
 export function normalizeArg(descriptor: string): string | null {
   if (OPAQUE_DESCRIPTORS.has(descriptor)) return null;
   if (descriptor === "nil") return "nil";
@@ -124,28 +158,10 @@ export function normalizeArg(descriptor: string): string | null {
   if (sep === -1) return null;
   const kind = descriptor.slice(0, sep);
   const value = descriptor.slice(sep + 1);
-  switch (kind) {
-    // Ripper cannot tell a local read from a zero-arg self-send, so `id:` and
-    // `call:` collapse into one bucket on both sides — the same information
-    // loss the weak-call set already works around
-    // (extract-ruby-api.rb#inert_receiver?).
-    case "id":
-    case "call":
-      return `ref:${normalizeRef(value)}`;
-    case "sym":
-    case "str":
-      return normalizeStringValue(value);
-    // int/float share one key, as literals.ts#normalizeLiteral does: TS's single
-    // `number` type makes `1` and `1.0` the identical value.
-    case "num":
-      return `num:${Number(value.replace(/_/g, ""))}`;
-    case "bool":
-      return `bool:${value}`;
-    case "const":
-      return `const:${value}`;
-    default:
-      return null;
-  }
+  if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
+  if (kind === "const") return `const:${value}`;
+  const literalKind = LITERAL_KINDS[kind];
+  return literalKind === undefined ? null : normalizeLiteralArg(literalKind, value);
 }
 
 /** Normalize a whole argument list, or null when any member is opaque. */
@@ -187,6 +203,20 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   return "naming";
 }
 
+/** Drop the leading `this` the mixin idiom adds — only when doing so is what
+ *  makes the two lists the same length, so a genuine extra argument still
+ *  reads as one. */
+function stripMixinReceiver(rubyArgs: string[], tsArgs: string[]): string[] {
+  if (tsArgs.length === rubyArgs.length + 1 && tsArgs[0] === MIXIN_RECEIVER) {
+    return tsArgs.slice(1);
+  }
+  return tsArgs;
+}
+
+function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
+  return rubyArgs.length === tsArgs.length && rubyArgs.every((arg, i) => arg === tsArgs[i]);
+}
+
 /** Compare one name-matched pair of call sites, mirroring
  *  literals.ts#compareLiteral's verdict shape. "skip" whenever the two
  *  languages cannot agree on the site at all — a splat / double-splat /
@@ -210,18 +240,4 @@ export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
     rubyArgs,
     tsArgs,
   };
-}
-
-/** Drop the leading `this` the mixin idiom adds — only when doing so is what
- *  makes the two lists the same length, so a genuine extra argument still
- *  reads as one. */
-function stripMixinReceiver(rubyArgs: string[], tsArgs: string[]): string[] {
-  if (tsArgs.length === rubyArgs.length + 1 && tsArgs[0] === MIXIN_RECEIVER) {
-    return tsArgs.slice(1);
-  }
-  return tsArgs;
-}
-
-function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
-  return rubyArgs.length === tsArgs.length && rubyArgs.every((arg, i) => arg === tsArgs[i]);
 }

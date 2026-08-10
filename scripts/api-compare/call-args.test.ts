@@ -54,6 +54,10 @@ describe("normalizeArg", () => {
     expect(normalizeArg("str:AND ")).toBe("str:AND ");
   });
 
+  it("canonicalizes an escape through literals.ts", () => {
+    expect(normalizeArg("str:\\n")).toBe(normalizeArg("str:\n"));
+  });
+
   it("normalizes numbers through one numeric key", () => {
     expect(normalizeArg("num:1.0")).toBe("num:1");
     expect(normalizeArg("num:1_000")).toBe("num:1000");
