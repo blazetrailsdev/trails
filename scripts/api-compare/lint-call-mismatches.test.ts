@@ -520,8 +520,6 @@ describe("the shared shards", () => {
     const all = await loadSplitBaseline(BASELINE_DIR);
     const args = await loadForeignRows();
     expect(args.every((r) => r.kind === "args")).toBe(true);
-    // The seed of the argument dimension must not move RFC 0084's debt metric:
-    // every shard row is either a call-set row this gate loads or an args row.
     expect((await loadBaseline()).length + args.length).toBe(all.length);
   });
 });
