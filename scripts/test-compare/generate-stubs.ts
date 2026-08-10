@@ -7,7 +7,11 @@
  * with properly nested describe blocks matching the Ruby test hierarchy.
  *
  * Usage:
- *   npx tsx scripts/test-compare/generate-stubs.ts [--package activerecord] [--dry-run] [--missing-files-only]
+ * Read-only by default: reports what it would generate and writes nothing.
+ * Pass --write to actually create the stub files.
+ *
+ * Usage:
+ *   npx tsx scripts/test-compare/generate-stubs.ts [--package activerecord] [--write] [--missing-files-only]
  */
 
 import * as fs from "fs";
@@ -118,7 +122,7 @@ function generateStubContent(testCases: TestCaseInfo[]): string {
 function main() {
   const args = process.argv.slice(2);
   const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
-  const dryRun = args.includes("--dry-run");
+  const write = args.includes("--write");
   const missingFilesOnly = args.includes("--missing-files-only");
 
   const railsPath = path.join(OUTPUT_DIR, "rails-tests.json");
@@ -206,7 +210,7 @@ function main() {
 
       const content = generateStubContent(testsToStub);
 
-      if (dryRun) {
+      if (!write) {
         console.log(`  [dry-run] ${tsFullPath} (${testsToStub.length} tests)`);
       } else {
         const dir = path.dirname(tsFullPath);
@@ -231,7 +235,13 @@ function main() {
     }
   }
 
-  console.log(`\n  Total: ${totalGenerated} test stubs across ${totalFiles} files`);
+  const verb = write ? "written" : "would be generated";
+  console.log(`\n  Total: ${totalGenerated} test stubs across ${totalFiles} files ${verb}`);
+  if (!write && totalFiles > 0) {
+    console.log(
+      `  No files written (read-only by default) — re-run with --write to generate them.`,
+    );
+  }
 }
 
 main();

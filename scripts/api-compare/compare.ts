@@ -83,6 +83,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { DATA_LAYER_PACKAGES, writeArClosure } from "./ar-closure.js";
 import {
   hasRubyFileTsOverride,
   isArityOverridden,
@@ -3355,7 +3356,7 @@ function printReport(
   }
 
   // Data layer summary (arel + activemodel + activerecord)
-  const DATA_LAYER = new Set(["arel", "activemodel", "activerecord"]);
+  const DATA_LAYER = new Set(DATA_LAYER_PACKAGES);
   let dataTotal = 0;
   let dataMatched = 0;
   let dataFiles = 0;
@@ -3369,12 +3370,40 @@ function printReport(
     }
   }
 
+  // AR closure summary: the data layer plus only the support-gem files that
+  // ActiveRecord/ActiveModel actually require (RFC 0092). The file set is
+  // regenerated from vendor/rails on every run, so a moved `require` moves the
+  // scope without a code change here.
+  const closure = writeArClosure();
+  let closureTotal = dataTotal;
+  let closureMatched = dataMatched;
+  let closureFiles = dataFiles;
+  let closureFilesExist = dataFilesExist;
+  for (const pkg of results) {
+    const inScope = closure.files[pkg.package];
+    if (!inScope || DATA_LAYER.has(pkg.package)) continue;
+    const inScopeSet = new Set(inScope);
+    for (const f of pkg.files) {
+      if (!inScopeSet.has(f.rubyFile)) continue;
+      closureTotal += f.total;
+      closureMatched += f.matched;
+      closureFiles += 1;
+      if (f.tsFileExists) closureFilesExist += 1;
+    }
+  }
+
   const grandPct = grandTotal > 0 ? Math.round((grandMatched / grandTotal) * 1000) / 10 : 0;
   const dataPct = dataTotal > 0 ? Math.round((dataMatched / dataTotal) * 1000) / 10 : 0;
+  const closurePct = closureTotal > 0 ? Math.round((closureMatched / closureTotal) * 1000) / 10 : 0;
   console.log(`\n${"=".repeat(100)}`);
   if (dataTotal > 0 && dataTotal !== grandTotal) {
     console.log(
       `  Data layer: ${dataMatched}/${dataTotal} methods (${dataPct}%)  |  files: ${dataFilesExist}/${dataFiles}`,
+    );
+  }
+  if (closureTotal > dataTotal) {
+    console.log(
+      `  AR closure: ${closureMatched}/${closureTotal} methods (${closurePct}%)  |  files: ${closureFilesExist}/${closureFiles}`,
     );
   }
   const inhPct =
