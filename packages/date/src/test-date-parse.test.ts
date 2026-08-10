@@ -270,14 +270,13 @@ describe("TestDateParse", () => {
   /**
    * Ruby's `EnvUtil.timeout(3)` guards against the quadratic sub-parser walk
    * the `limit:` here is what makes safe; there is no vitest analogue and the
-   * ported walk is linear, so only the assertions carry over.
+   * ported walk is linear, so only the assertions carry over. Ruby's
+   * `Math.log10(h[:year])` is read off the digit count: JS `Math.log10` takes a
+   * number, which this 100_001-digit year is not.
    */
   it(" parse too long year", () => {
     let str = "Jan 1" + "0".repeat(100_000);
     let h = Date._parse(str, true, { limit: 100_010 });
-    // Ruby's `Math.log10(h[:year])` over a Bignum. JS `Math.log10` takes a
-    // number, which this 100_001-digit year is not, so the same base-ten log is
-    // read off the digit count.
     expect(String(h.year).length - 1).toBe(100_000);
     expect(h.mon).toBe(1);
 

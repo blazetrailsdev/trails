@@ -1095,33 +1095,35 @@ describe("Date", () => {
     expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
   });
 
+  /**
+   * `valid_ordinal_p` / `valid_commercial_p` (date_core.c:2199-2227, :2274-2302)
+   * wrap the int-level `c_valid_*_p` in the same `guess_style` branch
+   * `valid_civil_p` (:2246-2277) has: a year past `REFORM_END_YEAR` is
+   * proleptic Gregorian, so it is `decode_year`d into a `nth` and a residue
+   * year FIRST and validated there. One `CM_PERIOD` is `CM_PERIOD_GCY` = 584388
+   * Gregorian years (date_core.c:207-208), so year 600000 is past one.
+   *
+   * ruby 3.3.11 -rdate:
+   *   Date.ordinal(600000, 60).to_s      #=> "600000-02-29"
+   *   Date.ordinal(600000, 60).jd        #=> 220866619
+   *   Date.commercial(600000, 9, 6).to_s #=> "600000-03-04"
+   *   Date.commercial(600000, 9, 6).jd   #=> 220866623
+   *
+   * The `Temporal` seat reads the RESIDUE day (`m_local_jd`) and so spells the
+   * residue year, which is what `Date.civil` and `Date.weeknum` already answer
+   * for the same day (filed as `date-seat-drops-nth-and-spells-the-residue-year`).
+   * All four agreeing is the point: hardcoding `nth = 0` handed the seat the
+   * WHOLE Julian day and made ordinal/commercial raise instead. The frags path
+   * over the same wrappers (`rt__valid_ordinal_p`, `rt__valid_commercial_p`,
+   * date_core.c:4125-4168) keeps MRI's whole answer, `nth` and all, since it
+   * answers the gem-shaped object.
+   */
   it("takes ordinal's and commercial's nth from valid_*_p, as civil already does", () => {
-    // `valid_ordinal_p` / `valid_commercial_p` (date_core.c:2199-2226, :2273-2301)
-    // wrap the int-level `c_valid_*_p` in the same `guess_style` branch
-    // `valid_civil_p` (:2246-2277) has: a year past REFORM_END_YEAR is
-    // proleptic Gregorian, so it is `decode_year`d into a `nth` and a residue
-    // year FIRST and validated there. One CM_PERIOD is CM_PERIOD_GCY = 584388
-    // Gregorian years (date_core.c:207-208), so year 600000 is past one.
-    //
-    // ruby 3.3.11 -rdate:
-    //   Date.ordinal(600000, 60).to_s     #=> "600000-02-29"
-    //   Date.ordinal(600000, 60).jd       #=> 220866619
-    //   Date.commercial(600000, 9, 6).to_s #=> "600000-03-04"
-    //   Date.commercial(600000, 9, 6).jd   #=> 220866623
-    //
-    // The `Temporal` seat reads the RESIDUE day (`m_local_jd`) and so spells
-    // the residue year, which is what `Date.civil` and `Date.weeknum` already
-    // answer for the same day — the point here is that all four now agree,
-    // where hardcoding `nth = 0` handed the seat the WHOLE Julian day and made
-    // ordinal/commercial raise instead.
     expect(RubyDate.ordinal(600000, 60).toString()).toBe(RubyDate.civil(600000, 2, 29).toString());
     expect(RubyDate.commercial(600000, 9, 6).toString()).toBe(
       RubyDate.civil(600000, 3, 4).toString(),
     );
 
-    // The frags path over the same wrappers (`rt__valid_ordinal_p`,
-    // `rt__valid_commercial_p`, date_core.c:4125-4167) keeps MRI's whole
-    // answer, `nth` and all, since it answers the gem-shaped object.
     const o = dNewByFrags({ year: 600000, yday: 60 });
     expect([o.toS(), o.jd, o.year]).toEqual(["600000-02-29", 220866619, 600000]);
     const c = dNewByFrags({ cwyear: 600000, cweek: 9, cwday: 6 });
@@ -1970,17 +1972,19 @@ describe("strftime over a Temporal subject", () => {
     );
   });
 
+  /**
+   * `date_strftime` writes every field into the ONE buffer
+   * `date_strftime_alloc` sized and gives up against
+   * `char *endp = s + maxsize` (date_strftime.c:54, date_core.c:7081-7097), so
+   * a format whose fields are individually short still fails once their TOTAL
+   * runs past it. Thirteen copies is the smallest count whose precision
+   * (100_000) is itself inside `1024 * flen` (= 106_496); twelve copies raise
+   * on the precision instead.
+   *
+   * ruby 3.3.11 -rdate:
+   *   Date.new(2001, 2, 3).strftime("%100000Y" * 13) #=> Errno::ERANGE
+   */
   it("bounds the accumulated output, not one field, at 1024 * format length", () => {
-    // `date_strftime` writes every field into the ONE buffer
-    // `date_strftime_alloc` sized, and gives up against
-    // `char *endp = s + maxsize` (date_strftime.c:54, date_core.c:7081-7097),
-    // so a format whose fields are individually short still fails once their
-    // TOTAL runs past it. Thirteen copies is the smallest count whose
-    // precision (100_000) is itself inside `1024 * flen` (= 106_496) — twelve
-    // copies raise on the precision instead.
-    //
-    // ruby 3.3.11 -rdate:
-    //   Date.new(2001, 2, 3).strftime("%100000Y" * 13) #=> Errno::ERANGE
     const d = Temporal.PlainDate.from("2001-02-03");
     expect(() => strftime(d, "%100000Y".repeat(13))).toThrow(ERANGE);
   });

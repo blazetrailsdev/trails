@@ -1991,7 +1991,7 @@ function parseJisCb(m: RegExpExecArray, hash: DateParts): number {
 
   const ep = gengo(e[0]);
 
-  hash.year = fAdd(cstr2num(y), ep) as number | bigint;
+  hash.year = fAdd(cstr2num(y), ep);
   hash.mon = Number(mon);
   hash.mday = Number(d);
 
@@ -3110,10 +3110,8 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
   const cent = hash._cent;
   delete hash._cent;
   if (cent !== undefined) {
-    if (hash.cwyear !== undefined) {
-      hash.cwyear = fAdd(hash.cwyear, cent * 100) as number | bigint;
-    }
-    if (hash.year !== undefined) hash.year = fAdd(hash.year, cent * 100) as number | bigint;
+    if (hash.cwyear !== undefined) hash.cwyear = fAdd(hash.cwyear, cent * 100);
+    if (hash.year !== undefined) hash.year = fAdd(hash.year, cent * 100);
   }
 
   const merid = hash._merid;
@@ -3136,6 +3134,11 @@ function dateStrptime(str: string, fmt: string, hash: DateParts): DateParts | nu
  * makes the sum one, which is how an exact `:seconds` survives folding an
  * `:offset` in (`date_core.c:3850`).
  */
+function fAdd(x: number | bigint, y: number | bigint): number | bigint;
+function fAdd(
+  x: number | bigint | Rational,
+  y: number | bigint | Rational,
+): number | bigint | Rational;
 function fAdd(
   x: number | bigint | Rational,
   y: number | bigint | Rational,
@@ -3777,7 +3780,7 @@ function cValidGregorianP(y: number, m: number, d: number): [rm: number, rd: num
 }
 
 /**
- * @internal `date_core.c` `valid_ordinal_p` (`date_core.c:2199-2226`), the
+ * @internal `date_core.c` `valid_ordinal_p` (`date_core.c:2199-2227`), the
  * year-decoding wrapper `Date.ordinal` goes through: it re-reads
  * {@link guessStyle} and either validates the year under the reform
  * ({@link cValidOrdinalP}, whose `int y` this is what supplies) or decodes it
@@ -4026,7 +4029,7 @@ function validCivilP(
 }
 
 /**
- * @internal `date_core.c` `valid_commercial_p` (`date_core.c:2273-2301`), the
+ * @internal `date_core.c` `valid_commercial_p` (`date_core.c:2274-2302`), the
  * week-date counterpart of {@link validOrdinalP} — the same `guess_style`
  * branch over {@link cValidCommercialP}.
  */
@@ -4050,7 +4053,7 @@ function validCommercialP(
 }
 
 /**
- * @internal `date_core.c` `valid_weeknum_p` (`date_core.c:2303-2329`), the
+ * @internal `date_core.c` `valid_weeknum_p` (`date_core.c:2304-2332`), the
  * `:wnum0`/`:wnum1` counterpart of {@link validCommercialP}.
  */
 function validWeeknumP(
@@ -4074,7 +4077,7 @@ function validWeeknumP(
 }
 
 /**
- * @internal `date_core.c` `valid_nth_kday_p` (`date_core.c:2331-2358`), the
+ * @internal `date_core.c` `valid_nth_kday_p` (`date_core.c:2336-2364`), the
  * `n`th-weekday counterpart of {@link validWeeknumP}. `:nodoc:` and
  * `#ifndef NDEBUG` in the C, as {@link Date.nthKday} itself is.
  */
@@ -4495,7 +4498,7 @@ function rtValidJdP(jd: number | bigint): number | bigint {
 
 /**
  * @internal `date_core.c` `rt__valid_ordinal_p` (`date_core.c:4125-4138`) over
- * {@link validOrdinalP} (`date_core.c:2199-2226`), which answers `nil` rather
+ * {@link validOrdinalP} (`date_core.c:2199-2227`), which answers `nil` rather
  * than raising so its caller can fall through to the next kind of date. As in
  * {@link rtValidCivilP}, the `nth` the split leaves goes straight back in
  * through {@link encodeJd} (`date_core.c:4136`).
@@ -4526,7 +4529,7 @@ function rtValidCivilP(
 }
 
 /**
- * @internal `date_core.c` `rt__valid_commercial_p` (`date_core.c:4154-4167`)
+ * @internal `date_core.c` `rt__valid_commercial_p` (`date_core.c:4155-4168`)
  * over {@link validCommercialP}, the same shape as {@link rtValidCivilP}.
  */
 function rtValidCommercialP(
@@ -4541,7 +4544,7 @@ function rtValidCommercialP(
 }
 
 /**
- * @internal `date_core.c` `rt__valid_weeknum_p` (`date_core.c:4169-4182`) over
+ * @internal `date_core.c` `rt__valid_weeknum_p` (`date_core.c:4170-4183`) over
  * {@link validWeeknumP}, the same shape as {@link rtValidCivilP}.
  */
 function rtValidWeeknumP(
@@ -6079,7 +6082,7 @@ export class Date {
    * (`date_parse.c:2172`) and only ever turns false, so an absent one is `comp`,
    * and the year is completed only within `0..99` (`date_parse.c:2267-2287`).
    *
-   * `date_s__parse_internal` (`date_core.c:4481-4499`) {@link checkLimit}s the
+   * `date_s__parse_internal` (`date_core.c:4481-4498`) {@link checkLimit}s the
    * string against the `limit:` kwarg first, so a string past the limit raises
    * `ArgumentError` before `date__parse` runs at all.
    */
@@ -6108,10 +6111,8 @@ export class Date {
     if (/[a-z]/i.test(str)) str = parseBc(str, hash) ?? str;
     if (/\d/.test(str)) parseFrag(str, hash);
     if (hash._bc) {
-      if (hash.cwyear !== undefined) {
-        hash.cwyear = fAdd(fNegate(hash.cwyear), 1) as number | bigint;
-      }
-      if (hash.year !== undefined) hash.year = fAdd(fNegate(hash.year), 1) as number | bigint;
+      if (hash.cwyear !== undefined) hash.cwyear = fAdd(fNegate(hash.cwyear), 1);
+      if (hash.year !== undefined) hash.year = fAdd(fNegate(hash.year), 1);
     }
     delete hash._bc;
     if (comp && hash._comp !== false) {
@@ -7769,7 +7770,7 @@ export class DateTime extends DateWithoutParseStatics {
    * straight to `valid_ordinal_p`.
    */
   static ordinal(
-    year = -4712,
+    year: number | bigint = -4712,
     yday: number | Rational = 1,
     hour?: number | Rational,
     minute?: number | Rational,
@@ -7861,7 +7862,7 @@ export class DateTime extends DateWithoutParseStatics {
    * and `cwyear` is handed straight to `valid_commercial_p`, so neither does.
    */
   static commercial(
-    cwyear = -4712,
+    cwyear: number | bigint = -4712,
     cweek = 1,
     cwday: number | Rational = 1,
     hour?: number | Rational,
@@ -7933,7 +7934,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `firstday` and `year` do not.
    */
   static weeknum(
-    year = -4712,
+    year: number | bigint = -4712,
     week = 0,
     day: number | Rational = 1,
     firstday = 0,
@@ -7999,7 +8000,7 @@ export class DateTime extends DateWithoutParseStatics {
    * (`num2int_with_frac(k, 4)`, `date_core.c:8089-8090`).
    */
   static nthKday(
-    year = -4712,
+    year: number | bigint = -4712,
     month = 1,
     n = 1,
     k: number | Rational = 1,
