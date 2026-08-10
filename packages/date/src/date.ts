@@ -1134,11 +1134,13 @@ function iGcd(x: bigint, y: bigint): bigint {
  * fractional-hour offset needs: `rb_rational_new` canonicalizes to lowest terms
  * (`rational.c` `nurat_s_canonicalize_internal`), `+` adds an Integer
  * (`rational.c` `nurat_add`), and `numerator`/`denominator` read the parts back
- * out. Ruby DOES fold a Rational back to an Integer on its own — every result
- * passes through `rb_rational_canonicalize` and `Rational(1,2) * 12` is the
- * Integer `6` — but a TS constructor answers its own class, so the fold lives
- * in {@link rbRationalCanonicalize} / {@link wholenumP} instead and the ported
- * bodies that branch on it apply it where the C's `FIXNUM_P` sees it.
+ * out. A Rational stays a Rational under arithmetic in Ruby — on ruby 3.3.11
+ * `(Rational(1,2) * 12).class` is `Rational`, `(6/1)`, and so is `Rational(9,3)`
+ * — so a ported `FIXNUM_P` branch is NOT reached by a reducible Rational and
+ * this class matches by staying a Rational too. Only `rb_rational_new`, the C
+ * constructor `Date#day_fraction` and `#sec_fraction` answer through, folds a
+ * denominator of one to an Integer; where a body TESTS for that fold it uses
+ * `wholenum_p` ({@link wholenumP}), which is a predicate, not a conversion.
  *
  * @noRailsEquivalent PERMANENT — Ruby core, like the `::Date` below it. Rails
  * defines no Rational; it inherits Ruby's, and `Date._parse` answers one for a
@@ -1284,31 +1286,6 @@ function wholenumP(x: number | bigint | Rational): boolean {
 }
 
 /**
- * @internal `rational.c` `rb_rational_canonicalize`, which every Rational
- * arithmetic result passes through: a reduced denominator of one is an INTEGER
- * to Ruby, not a Rational. `Rational(1,2) * 12` is `6`, and `Rational(9,3)` is
- * `3` the moment it is built.
- *
- * TS cannot spell that in the constructor — a class constructor answers its
- * class — so a {@link Rational} here stays one and the canonicalization is
- * applied where Ruby's is observable: to the RESULT of the arithmetic a ported
- * body then branches on with `FIXNUM_P` ({@link Date#rshift}'s `f_add3`).
- * Without it that branch has to hand-roll `denominator === 1n`, which is the
- * shape that made `Date.new(2000,1,31).next_year(Rational(1,2))` read as a
- * trails-specific workaround rather than as the C's own test.
- *
- * A body that tests the ARGUMENT instead branches on {@link wholenumP}, the
- * name the C uses there (`d_lite_plus`'s `T_RATIONAL` arm, `:6179-6182`).
- *
- * The Integer it answers goes through {@link bigNorm}: Ruby has one Integer,
- * and a numerator past a JS number's exact range is a `bigint` here.
- */
-function rbRationalCanonicalize(x: number | bigint | Rational): number | bigint | Rational {
-  if (x instanceof Rational && wholenumP(x)) return bigNorm(x.numerator);
-  return x;
-}
-
-/**
  * @internal `date_parse.c` `date_zone_to_diff` (`date_parse.c:415-559`): the
  * `:offset` in seconds a `:zone` names. A trailing `standard`, `daylight` or
  * `dst` word comes off first (and `daylight`/`dst` add an hour), then the
@@ -1322,7 +1299,11 @@ function rbRationalCanonicalize(x: number | bigint | Rational): number | bigint 
  *
  * A fractional-hour offset of more than two decimal places is a `Rational`
  * (`date_parse.c:523-528`), and only an integer once its denominator reduces to
- * one — `+9.5555` is `(171999/5)` where `+9.555` is `34398`.
+ * one — `+9.5555` is `(171999/5)` where `+9.555` is `34398`. The C spells that
+ * fold out inline — `if (rb_rational_den(offset) == INT2FIX(1)) offset =
+ * rb_rational_num(offset);` (`date_parse.c:531-534`) — rather than sending
+ * `wholenum_p`, and the test below is that pair, not a missed helper: it is
+ * the only place the port converts rather than branches.
  */
 function dateZoneToDiff(str: string): number | Rational | null {
   let offset: number | Rational | null = null;
@@ -4893,6 +4874,12 @@ function dayToSec(d: Rational): Rational {
  * `DateTime.new(2000,1,1,0,0,0,Rational(2,1)).zone` is `"+48:00"` — two whole
  * days east — rather than the rejection `±DAY_IN_SECONDS` would suggest.
  *
+ * That arm is LIVE, not dead, and the `denominator === 1n` below is not a
+ * missed {@link wholenumP}: Rational arithmetic in Ruby keeps the Rational, so
+ * `day_to_sec(Rational(2,1))` is `(172800/1)` and `k_rational_p(vs)` holds.
+ * Folding it to an Integer here would route the value through `rounded:`
+ * instead and reject `Rational(2,1)` that MRI accepts.
+ *
  * C's `rb_warning("fraction of offset is ignored")` has no port analogue: it
  * writes to stderr under `$VERBOSE` only and is not part of the value.
  */
@@ -6930,32 +6917,39 @@ export class Date {
    * the last day of it is used — the `while` walking `d` down, which is why
    * `Date.new(2000,1,31) >> 1` is 2000-02-29.
    *
-   * `other` is any Numeric, so `t` is carried as a {@link Rational}: Ruby
-   * canonicalizes a denominator of 1 back to an Integer
-   * ({@link rbRationalCanonicalize}), which is what puts
-   * `Date.new(2000,1,31).next_year(Rational(1,2))` — `f_mul(n, 12)` is `(6/1)`,
-   * so `t` is an Integer — on the C's `FIXNUM_P(t)` arm and answers 2000-07-31.
-   * The `else` arm is the C's `f_idiv` / `f_mod` pair. Its `FIX2INT` is the
-   * non-Fixnum `rb_num2int`, which TRUNCATES: `f_mod` is a floor-mod, so the
-   * remainder is non-negative and the truncation is the bigint division below.
-   * That is what keeps `Date.new(2000,1,31) >> Rational(1,2)` on 2000-01-31 and
-   * puts `>> Rational(3,2)` on 2000-02-29 rather than walking into February by
-   * the fraction. A non-integral Float takes the same arm through
-   * {@link fToR}, since `Float#to_r` is exact and `f_idiv` / `f_mod` read the
-   * same integers off it that the C's Float arithmetic does.
+   * `other` is any Numeric, and `f_add3`'s result `t` is a Rational for every
+   * Rational and Float `other`: **Ruby's Rational arithmetic does NOT fold a
+   * denominator of one back to an Integer** — on ruby 3.3.11
+   * `(Rational(1,2) * 12).class` is `Rational`, `(6/1)`. So `FIXNUM_P(t)` is
+   * false for every one of them and the C's `else` arm — `f_idiv` / `f_mod` —
+   * is the only arm they take. `t` is an Integer here exactly when `other` was
+   * one, which is what the first branch tests.
+   *
+   * The `else` arm's `FIX2INT` is the non-Fixnum `rb_num2int`, which
+   * TRUNCATES: `f_mod` is a floor-mod, so the remainder is non-negative and the
+   * truncation is the bigint division below. That is what keeps
+   * `Date.new(2000,1,31) >> Rational(1,2)` on 2000-01-31, puts
+   * `>> Rational(3,2)` on 2000-02-29 rather than walking into February by the
+   * fraction, and `>> Rational(23,2)` on 2000-12-31 — and it is also how
+   * `next_year(Rational(1,2))` reaches 2000-07-31, through this arm rather than
+   * a Fixnum fast path. A non-integral Float takes it through {@link fToR},
+   * since `Float#to_r` is exact and `f_idiv` / `f_mod` read the same integers
+   * off it that the C's Float arithmetic does.
+   *
+   * The Integer arm covers the C's `FIXNUM_P(t)` and the Bignum `t` its `else`
+   * arm also takes: `f_idiv` / `f_mod` over two Integers is the same DIV/MOD
+   * pair, so JS having no Fixnum/Bignum split costs nothing here.
    */
   rshift(other: number | bigint | Rational): this {
-    const t = rbRationalCanonicalize(
-      new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(
-        typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other,
-      ),
-    );
+    const o = typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other;
+    const base = BigInt(this.year) * 12n + BigInt(this.mon - 1);
+    const t: bigint | Rational =
+      o instanceof Rational ? new Rational(base, 1).add(o) : base + BigInt(o);
     let y: number | bigint;
     let m: number;
     if (!(t instanceof Rational)) {
-      const it = BigInt(t);
-      y = bigNorm(div(it, 12));
-      m = Number(mod(it, 12)) + 1;
+      y = bigNorm(div(t, 12));
+      m = Number(mod(t, 12)) + 1;
     } else {
       const d12 = t.denominator * 12n;
       let q = t.numerator / d12;
@@ -7271,7 +7265,9 @@ export class Date {
    * denominator is a Rational and prints parenthesized, as MRI's
    * `((2451911j,0s,(1000000000/3)n),+0s,2299161j)` for `DateTime.new(2001,1,1) +
    * Rational(1, 86400*3)` shows. Storage here is uniformly a {@link Rational}
-   * where MRI's `sf` is an Integer until it isn't, so `denominator === 1n` is
+   * where MRI's `sf` is an Integer until it isn't — `rb_rational_new`, the C
+   * constructor `sf` is built through, folds a denominator of one where
+   * `Rational()` and Rational arithmetic do not — so `denominator === 1n` is
    * that Integer arm — `0n`, not `(0/1)n`.
    */
   inspect(): string {

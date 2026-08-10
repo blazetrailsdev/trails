@@ -2166,29 +2166,36 @@ describe("Date's second registration names", () => {
 });
 
 /**
- * `rational.c`'s `rb_rational_canonicalize` folds a denominator of one back to
- * an Integer, so a reducible Rational reaches `date_core.c`'s `FIXNUM_P` /
- * `wholenum_p` branches as an Integer. The gem's own tests pass Integers
- * throughout and never exercise it, which is why these live here.
+ * Ruby's Rational arithmetic does NOT fold a denominator of one back to an
+ * Integer — on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`, `(6/1)`
+ * — so `date_core.c`'s `FIXNUM_P` branches see a reducible Rational as a
+ * Rational, and only `wholenum_p`, a predicate, tests for the fold. The gem's
+ * own tests pass Integers throughout and never pin which arm a Rational takes,
+ * which is why these live here.
  */
-describe("Rational canonicalization at the C's Integer branches", () => {
-  it("takes d_lite_rshift's FIXNUM_P arm for a reducible f_mul(n, 12)", () => {
+describe("a reducible Rational operand at the C's Integer branches", () => {
+  it("takes d_lite_rshift's f_idiv/f_mod arm, never the FIXNUM_P one", () => {
     // ruby 3.3.11 -rdate:
     //   Date.new(2000,1,31).next_year(Rational(1,2)).to_s #=> "2000-07-31"
     //   (Date.new(2000,1,31) >> Rational(1,2)).to_s       #=> "2000-01-31"
     //   (Date.new(2000,1,31) >> Rational(3,2)).to_s       #=> "2000-02-29"
+    //   (Date.new(2000,1,31) >> Rational(23,2)).to_s      #=> "2000-12-31"
     //   Date.new(2000,1,31).next_year(Rational(4,2)).to_s #=> "2002-01-31"
+    // 23/2 is the case that pins the arm: FIX2INT truncates the 11.5 months
+    // f_mod leaves, which is the else arm's arithmetic and not a Fixnum one.
     expect(new RubyDate(2000, 1, 31).nextYear(new Rational(1, 2)).toS()).toBe("2000-07-31");
     expect(new RubyDate(2000, 1, 31).rshift(new Rational(1, 2)).toS()).toBe("2000-01-31");
     expect(new RubyDate(2000, 1, 31).rshift(new Rational(3, 2)).toS()).toBe("2000-02-29");
+    expect(new RubyDate(2000, 1, 31).rshift(new Rational(23, 2)).toS()).toBe("2000-12-31");
     expect(new RubyDate(2000, 1, 31).nextYear(new Rational(4, 2)).toS()).toBe("2002-01-31");
   });
 
   it("takes d_lite_plus's wholenum_p re-dispatch for a whole Rational", () => {
-    // ruby 3.3.11 -rdate: a Rational(2,1) addend is the Integer 2, so the day
-    // is whole and the result is a simple Date — no day_fraction at all.
-    //   (Date.new(2001,1,1) + Rational(2,1)).to_s        #=> "2001-01-03"
-    //   (Date.new(2001,1,1) + Rational(2,1)).jd           #=> 2451913
+    // ruby 3.3.11 -rdate: wholenum_p is a predicate over the denominator, so a
+    // Rational(2,1) addend re-dispatches through rb_rational_num as the Integer
+    // 2 and the sum is a whole day.
+    //   (Date.new(2001,1,1) + Rational(2,1)).to_s #=> "2001-01-03"
+    //   (Date.new(2001,1,1) + Rational(2,1)).jd   #=> 2451913
     const d = new RubyDate(2001, 1, 1).plus(new Rational(2, 1));
     expect(d.toS()).toBe("2001-01-03");
     expect(d.jd).toBe(2451913);
