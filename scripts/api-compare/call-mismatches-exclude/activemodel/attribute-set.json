@@ -17,6 +17,17 @@
     "package": "activemodel",
     "tsFile": "attribute-set.ts",
     "rubyName": "deep_dup",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:transformValues"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-set.ts",
+    "rubyName": "deep_dup",
     "call": "transform_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -26,6 +37,17 @@
     "rubyName": "keys",
     "call": "each_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-set.ts",
+    "rubyName": "map",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:newAttributes"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activemodel",
@@ -47,5 +69,16 @@
     "rubyName": "values_for_database",
     "call": "transform_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-set.ts",
+    "rubyName": "write_cast_value",
+    "call": "with_cast_value",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:value"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

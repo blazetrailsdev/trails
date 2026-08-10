@@ -1,0 +1,11 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/resource-helpers.ts",
+    "rubyName": "controller_i18n_scope",
+    "call": "controller_file_path",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

@@ -23,6 +23,39 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "case_insensitive_comparison",
+    "call": "lower",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:value"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "column_for_attribute",
+    "call": "columns_hash",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "disconnect!",
+    "call": "clear_cache!",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "disconnect!",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -121,9 +154,84 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "reconnect!",
+    "call": "clear_cache!",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "reset!",
+    "call": "clear_cache!",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{newConnection=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_all",
+    "call": "empty",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{async=ref:async}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "select_all",
     "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_one",
+    "call": "select_all",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_rows",
+    "call": "select_all",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "select_value",
+    "call": "select_rows",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:arel",
+      "ref:name",
+      "ref:binds",
+      "kwargs{async=ref:async}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -138,5 +246,14 @@
     "rubyName": "with_raw_connection",
     "call": "order:translateExceptionClass,synchronize",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "with_raw_connection",
+    "call": "synchronize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

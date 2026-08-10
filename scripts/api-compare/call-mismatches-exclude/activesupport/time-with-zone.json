@@ -44,6 +44,15 @@
   {
     "package": "activesupport",
     "tsFile": "time-with-zone.ts",
+    "rubyName": "dst?",
+    "call": "dst?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-with-zone.ts",
     "rubyName": "localtime",
     "call": "getlocal",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -65,6 +74,40 @@
   {
     "package": "activesupport",
     "tsFile": "time-with-zone.ts",
+    "rubyName": "strftime",
+    "call": "strftime",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:format"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-with-zone.ts",
+    "rubyName": "to_fs",
+    "call": "strftime",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:formatter"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-with-zone.ts",
+    "rubyName": "to_s",
+    "call": "formatted_offset",
+    "kind": "args",
+    "rubyArgs": [
+      "bool:false",
+      "str:UTC"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-with-zone.ts",
     "rubyName": "to_s",
     "call": "strftime",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -82,5 +125,14 @@
     "rubyName": "xmlschema",
     "call": "strftime",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-with-zone.ts",
+    "rubyName": "zone",
+    "call": "abbreviation",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

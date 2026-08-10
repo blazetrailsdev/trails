@@ -33,6 +33,9 @@ export interface CallArgArtifact {
   packages?: string[];
   /** Sites compared — the report's denominator. */
   compared: number;
+  /** Sites the comparison could not reach, by reason (RFC 0095). Absent on an
+   *  artifact predating the tally. */
+  skipped?: Record<string, number>;
   mismatches: (CallArgKey & {
     rubyFile: string;
     tsName: string;

@@ -38,6 +38,7 @@ export function renderReport(artifact: CallArgArtifact, top: number): string {
       tally(rows, (r) => `${r.package}/${r.tsFile}`),
       top,
     ),
+    section("Skipped (uncomparable) sites by reason", Object.entries(artifact.skipped ?? {})),
     section(
       "By class",
       tally(rows, (r) => r.class),

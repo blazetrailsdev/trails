@@ -52,8 +52,32 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_some",
+    "call": "find_some_ordered",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:ids"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "find_some",
     "call": "order:primaryKey,where",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "find_some",
+    "call": "raise_record_not_found_exception!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:ids",
+      "ref:size",
+      "ref:expectedSize"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -61,6 +85,19 @@
     "rubyName": "find_some_ordered",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "find_some_ordered",
+    "call": "raise_record_not_found_exception!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:ids",
+      "ref:size",
+      "ref:size"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -89,6 +126,17 @@
     "rubyName": "find_take_with_limit",
     "call": "take",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "find_with_ids",
+    "call": "find_some",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:ids"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

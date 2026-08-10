@@ -2,6 +2,17 @@
   {
     "package": "activerecord",
     "tsFile": "type/hash-lookup-type-map.ts",
+    "rubyName": "alias_type",
+    "call": "register_type",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:type"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "type/hash-lookup-type-map.ts",
     "rubyName": "perform_fetch",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

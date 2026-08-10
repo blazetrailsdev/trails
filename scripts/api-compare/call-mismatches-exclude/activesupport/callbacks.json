@@ -23,6 +23,46 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
+    "rubyName": "compiled",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:makeLambda",
+      "ref:userConditions",
+      "ref:chainConfig"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
+    "rubyName": "compiled",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:makeLambda",
+      "ref:userConditions",
+      "ref:chainConfig",
+      "ref:filter",
+      "ref:name"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
+    "rubyName": "compiled",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:userCallback",
+      "ref:userConditions"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
     "rubyName": "define_callbacks",
     "call": "descendants",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

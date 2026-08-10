@@ -16,6 +16,18 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/param-builder.ts",
+    "rubyName": "new_depth_limit",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:paramsClass",
+      "ref:paramDepthLimit"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/param-builder.ts",
     "rubyName": "store_nested_param",
     "call": "params_hash_has_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

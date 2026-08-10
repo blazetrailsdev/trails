@@ -253,6 +253,48 @@ describe("compareCallArgs", () => {
     expect(compareCallArgs(site("where", ["hash"]), site("where", ["hash"])).verdict).toBe("skip");
   });
 
+  it("reports the skip reason for an excluded call name", () => {
+    expect(compareCallArgs(site("super", ["id:x"]), site("super", ["id:y"])).reason).toBe(
+      "excludedCallName",
+    );
+    expect(compareCallArgs(site("to_s", ["id:x"]), site("to_s", ["id:y"])).reason).toBe(
+      "excludedCallName",
+    );
+  });
+
+  it("reports the skip reason for an uncomparable flag", () => {
+    expect(
+      compareCallArgs(site("build", ["*splat"], ["splat"]), site("build", ["id:x"])).reason,
+    ).toBe("uncomparableFlag");
+  });
+
+  it("reports the skip reason for an opaque Ruby argument", () => {
+    expect(compareCallArgs(site("where", ["hash"]), site("where", ["id:x"])).reason).toBe(
+      "opaqueRubyArg",
+    );
+  });
+
+  it("reports the skip reason for an opaque TS argument", () => {
+    expect(compareCallArgs(site("where", ["id:x"]), site("where", ["hash"])).reason).toBe(
+      "opaqueTsArg",
+    );
+  });
+
+  it("reports the skip reason for an unparseable literal", () => {
+    expect(compareCallArgs(site("limit", ["num:1"]), site("limit", ["num:123n"])).reason).toBe(
+      "unparseableLiteral",
+    );
+  });
+
+  it("carries no skip reason on a match or a mismatch", () => {
+    expect(
+      compareCallArgs(site("visit", ["id:o"]), site("visit", ["id:o"])).reason,
+    ).toBeUndefined();
+    expect(
+      compareCallArgs(site("visit", ["id:o"]), site("visit", ["id:o", "id:x"])).reason,
+    ).toBeUndefined();
+  });
+
   it("compares the non-block arguments of a block-flagged site", () => {
     expect(
       compareCallArgs(

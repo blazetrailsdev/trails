@@ -1,0 +1,25 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher.ts",
+    "rubyName": "decrypt",
+    "call": "try_to_decrypt_with_each",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:encryptedMessage",
+      "kwargs{keys=ref:Array}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/cipher.ts",
+    "rubyName": "encrypt",
+    "call": "encrypt",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:cleanText"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

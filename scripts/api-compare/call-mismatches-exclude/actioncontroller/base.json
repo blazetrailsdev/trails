@@ -10,6 +10,18 @@
     "package": "actioncontroller",
     "tsFile": "base.ts",
     "rubyName": "allow_browser",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:request",
+      "kwargs{versions=ref:versions}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "base.ts",
+    "rubyName": "allow_browser",
     "call": "require",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -54,6 +66,17 @@
     "rubyName": "fresh_when",
     "call": "fresh?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "base.ts",
+    "rubyName": "fresh_when",
+    "call": "head",
+    "kind": "args",
+    "rubyArgs": [
+      "str:notModified"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actioncontroller",
@@ -129,6 +152,17 @@
     "package": "actioncontroller",
     "tsFile": "base.ts",
     "rubyName": "redirect_to",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "str:Cannot redirect to nil!"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "base.ts",
+    "rubyName": "redirect_to",
     "call": "response_body",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -152,6 +186,18 @@
     "rubyName": "render",
     "call": "response_body",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "base.ts",
+    "rubyName": "respond_to",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:mimes",
+      "ref:variant"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actioncontroller",

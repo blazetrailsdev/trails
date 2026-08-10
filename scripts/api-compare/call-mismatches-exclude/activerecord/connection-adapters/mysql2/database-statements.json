@@ -3,6 +3,18 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2/database-statements.ts",
     "rubyName": "cast_result",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:fields",
+      "ref:toA"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "cast_result",
     "call": "order:freeRawResult,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },

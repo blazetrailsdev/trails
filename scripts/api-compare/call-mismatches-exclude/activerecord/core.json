@@ -9,6 +9,18 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
+    "rubyName": "arel_table",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName",
+      "kwargs{klass=ref:this}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
     "rubyName": "cached_find_by_statement",
     "call": "create",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -54,6 +66,15 @@
     "rubyName": "custom_inspect_method_defined?",
     "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
+    "rubyName": "destroy_association_async_job",
+    "call": "constantize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -121,6 +142,18 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
+    "rubyName": "predicate_builder",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:this",
+      "ref:arelTable"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
     "rubyName": "preventing_writes?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -131,6 +164,18 @@
     "rubyName": "preventing_writes?",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "core.ts",
+    "rubyName": "strict_loading_violation!",
+    "call": "instrument",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{owner=ref:owner,reflection=ref:reflection}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

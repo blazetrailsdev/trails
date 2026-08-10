@@ -16,6 +16,18 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "annotate",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "eager_load_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -164,6 +176,24 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "cache_key_with_version",
+    "call": "cache_key",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "cache_key_with_version",
+    "call": "cache_version",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "cache_key_with_version",
     "call": "order:cacheKey,cacheVersion",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
@@ -296,6 +326,17 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "current_scope_restoring_block",
+    "call": "current_scope",
+    "kind": "args",
+    "rubyArgs": [
+      "bool:true"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "delete",
     "call": "order:primaryKey,where",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
@@ -345,9 +386,43 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "distinct",
+    "call": "distinct!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:value"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "eager_load",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "except",
     "call": "relation_with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exec_explain",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [
+      "str:<n>"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -591,6 +666,17 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exists?",
+    "call": "apply_join_dependency",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{eagerLoading=bool:false}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "exists?",
     "call": "skip_query_cache_if_necessary",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -611,6 +697,24 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "find_by_token_for",
+    "call": "token_definitions",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "find_by_token_for!",
+    "call": "token_definitions",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "find_each",
     "call": "apply_limits",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -625,9 +729,32 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "find_in_batches",
+    "call": "in_batches",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{cursor=ref:cursor,errorOnIgnore=ref:errorOnIgnore,finish=ref:finish,load=bool:true,of=ref:batchSize,order=ref:order,start=ref:start}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "first_or_initialize",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "group",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -663,6 +790,17 @@
     "rubyName": "in_batches",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "in_batches",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{cursor=ref:cursor,finish=ref:finish,of=ref:of,order=ref:order,relation=ref:this,start=ref:start,useRanges=ref:useRanges}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -716,6 +854,31 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "includes",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "insert_all!",
+    "call": "execute",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:this",
+      "ref:attributes",
+      "kwargs{onDuplicate=str:raise,recordTimestamps=ref:recordTimestamps,returning=ref:returning}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "instantiate_records",
     "call": "instantiate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -726,6 +889,18 @@
     "rubyName": "instantiate_records",
     "call": "strict_loading_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "joins",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -779,6 +954,30 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "optimizer_hints",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "order",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "pick",
     "call": "all_attributes?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -803,6 +1002,18 @@
     "rubyName": "pluck",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "preload",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -835,6 +1046,18 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "references",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:tableNames"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "references_eager_loaded_tables?",
     "call": "build_joins",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -856,9 +1079,58 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "regroup",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "reorder",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "reselect",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "scope_for_create",
     "call": "create_with_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "select",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:fields",
+      "str:Call `select' with at least one field."
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -873,6 +1145,17 @@
     "rubyName": "select_for_count",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "size",
+    "call": "count",
+    "kind": "args",
+    "rubyArgs": [
+      "str:all"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -954,6 +1237,42 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "unscope",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update",
+    "call": "update",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update!",
+    "call": "update!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
@@ -1020,5 +1339,29 @@
     "rubyName": "values_for_queries",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "with",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "with_recursive",
+    "call": "check_if_method_has_arguments!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:__callee__",
+      "ref:args"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

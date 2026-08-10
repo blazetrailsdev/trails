@@ -3,6 +3,28 @@
     "package": "activerecord",
     "tsFile": "attributes.ts",
     "rubyName": "_default_attributes",
+    "call": "apply_pending_attribute_modifications",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:attributeSet"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attributes.ts",
+    "rubyName": "_default_attributes",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:attributesHash"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attributes.ts",
+    "rubyName": "_default_attributes",
     "call": "type_for_column",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

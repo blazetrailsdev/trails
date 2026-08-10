@@ -15,3 +15,9 @@ vendor/*/
 # deliberately malformed YAML that prettier cannot parse, and reformatting the
 # rest would drift the fixtures away from the gem's.
 packages/i18n/src/test-data/locales/
+
+# Generated parity baselines with their own canonical serializer
+# (scripts/api-compare/baseline-json.ts#serializeBaseline, which the gates
+# verify byte-for-byte). Prettier collapses a short `rubyArgs` array onto one
+# line, which that serializer never emits, so the two formatters fight.
+scripts/api-compare/call-mismatches-exclude/

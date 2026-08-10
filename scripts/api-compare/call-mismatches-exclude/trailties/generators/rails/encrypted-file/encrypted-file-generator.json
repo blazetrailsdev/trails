@@ -1,0 +1,13 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/encrypted-file/encrypted-file-generator.ts",
+    "rubyName": "add_encrypted_file_silently",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{contentPath=ref:filePath,envKey=str:RAILS_MASTER_KEY,keyPath=ref:keyPath,raiseIfMissingKey=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

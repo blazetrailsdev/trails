@@ -3,6 +3,15 @@
     "package": "trailties",
     "tsFile": "generators/rails/resource-route/resource-route-generator.ts",
     "rubyName": "add_resource_route",
+    "call": "pluralize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/resource-route/resource-route-generator.ts",
+    "rubyName": "add_resource_route",
     "call": "route",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

@@ -17,8 +17,31 @@
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
     "rubyName": "assign_parameters",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:b"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "assign_parameters",
     "call": "query_string",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "assign_parameters",
+    "call": "set_header",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:k",
+      "ref:generatedPath"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actioncontroller",
@@ -38,8 +61,45 @@
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
     "rubyName": "process",
+    "call": "build_response",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:responseKlass"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "process",
     "call": "clear_instance_variables_between_requests",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "process",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:scrub_env!",
+      "ref:session",
+      "ref:class"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "process",
+    "call": "process_controller_response",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:action",
+      "ref:cookies",
+      "ref:xhr"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "actioncontroller",
@@ -93,8 +153,29 @@
   {
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
+    "rubyName": "query_string=",
+    "call": "set_header",
+    "kind": "args",
+    "rubyArgs": [
+      "const:QUERY_STRING",
+      "ref:string"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
     "rubyName": "scrub_env!",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "tests",
+    "call": "camelize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

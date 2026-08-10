@@ -5,5 +5,14 @@
     "rubyName": "to_tag",
     "call": "call",
     "reason": "to_tag ports XmlMini.to_tag: Rails' Hash#delete(:type)/#merge/#call/#to_s are satisfied by different TS idioms (immutable `{ ...options }` spread instead of merge, destructured `options.type` instead of delete, direct function invocation, and String()/keyToString()) — no behavioral omission."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "xml-mini.ts",
+    "rubyName": "to_tag",
+    "call": "singularize",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

@@ -59,6 +59,18 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "arel_column_with_table",
+    "call": "resolve_arel_attribute",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columnName"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "arel_column_with_table",
     "call": "sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -152,6 +164,15 @@
     "rubyName": "build_from",
     "call": "from_clause",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_join_buckets",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -262,8 +283,30 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_subquery",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:subquery"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_subquery",
     "call": "optimizer_hints_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_where_clause",
+    "call": "build_from_hash",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:opts"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -311,6 +354,26 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_with_join_node",
+    "call": "foreign_key",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_with_join_node",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_with_join_node",
     "call": "order:table,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
@@ -341,6 +404,17 @@
     "rubyName": "does_not_support_reverse?",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "excluding!",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:predicates"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -381,6 +455,18 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "preprocess_order_args",
+    "call": "disallow_raw_sql!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:flattenedArgs",
+      "kwargs{permit=ref:columnNameWithOrderMatcher}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "preprocess_order_args",
     "call": "flattened_args",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -411,5 +497,16 @@
     "rubyName": "table_name_matches?",
     "call": "quote_table_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "unscope!",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [
+      "str:, :"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

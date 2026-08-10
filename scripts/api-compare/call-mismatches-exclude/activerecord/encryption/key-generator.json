@@ -2,6 +2,18 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/key-generator.ts",
+    "rubyName": "derive_key_from",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:password",
+      "kwargs{hashDigestClass=ref:hashDigestClass}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/key-generator.ts",
     "rubyName": "generate_random_hex_key",
     "call": "generate_random_key",
     "reason": "Deferred (RFC 0072 activerecord-unrouted-privates-remaining-inventory): routing `generateRandomHexKey`/`generateRandomSecret` through `generateRandomKey` sits on top of a pre-existing return-type deviation (trails returns base64, Rails returns raw bytes). That deviation has to be settled first."

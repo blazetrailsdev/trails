@@ -2,6 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
+    "rubyName": "clear_query_caches_for_current_thread",
+    "call": "each_connection_pool",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
     "rubyName": "connected_to",
     "call": "connection_class?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -16,6 +25,29 @@
   {
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
+    "rubyName": "connected_to_many",
+    "call": "append_to_connected_to_stack",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{klasses=ref:classes,preventWrites=ref:preventWrites,role=ref:role,shard=ref:shard}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "connection_pool",
+    "call": "retrieve_connection_pool",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:connectionSpecificationName",
+      "kwargs{role=ref:currentRole,shard=ref:currentShard,strict=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
     "rubyName": "connects_to",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -24,8 +56,53 @@
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
     "rubyName": "establish_connection",
+    "call": "call",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "establish_connection",
     "call": "connection_handler",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "remove_connection",
+    "call": "remove_connection_pool",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{role=ref:currentRole,shard=ref:currentShard}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "remove_connection",
+    "call": "retrieve_connection_pool",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name",
+      "kwargs{role=ref:currentRole,shard=ref:currentShard}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "retrieve_connection",
+    "call": "retrieve_connection",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:connectionSpecificationName",
+      "kwargs{role=ref:currentRole,shard=ref:currentShard}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

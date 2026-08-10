@@ -9,6 +9,17 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
+    "rubyName": "callback",
+    "call": "callbacks_for",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:method"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
     "rubyName": "concat_records",
     "call": "loaded?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -19,6 +30,15 @@
     "rubyName": "empty?",
     "call": "exists?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_writer",
+    "call": "all",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -96,6 +116,19 @@
     "rubyName": "replace",
     "call": "transaction",
     "reason": "Confirmed equivalent (RFC 0044, transaction-wrapping-cluster): trails splits Rails' synchronous `CollectionAssociation#replace` (which wraps `replace_records` in `transaction` for a persisted owner — collection_association.rb:251) into a sync `replace` that records `_pendingReplace` plus an async `persistReplace`. The persisted-owner diff/save runs inside `transaction(this, ...)` in `persistReplace` (collection-association.ts:437), not literally inside `replace`, so the call-set extractor — which scopes to the Ruby-named `replace` body — flags it. The atomic wrap is present; false positive, no omission."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "replace_common_records_in_memory",
+    "call": "replace_on_target",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:record",
+      "ref:skipCallbacks",
+      "kwargs{replace=bool:true}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",

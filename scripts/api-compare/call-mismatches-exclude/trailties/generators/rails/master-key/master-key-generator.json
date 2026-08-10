@@ -1,0 +1,26 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/master-key/master-key-generator.ts",
+    "rubyName": "ignore_master_key_file",
+    "call": "ignore_key_file",
+    "kind": "args",
+    "rubyArgs": [
+      "const:MASTER_KEY_PATH",
+      "kwargs{ignore=ref:keyIgnore}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/master-key/master-key-generator.ts",
+    "rubyName": "ignore_master_key_file_silently",
+    "call": "ignore_key_file_silently",
+    "kind": "args",
+    "rubyArgs": [
+      "const:MASTER_KEY_PATH",
+      "kwargs{ignore=ref:keyIgnore}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

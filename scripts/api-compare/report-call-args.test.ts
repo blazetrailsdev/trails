@@ -20,6 +20,7 @@ describe("renderReport", () => {
   const artifact = {
     compared: 302,
     mismatched: 3,
+    skipped: { excludedCallName: 41, opaqueRubyArg: 7, unparseableLiteral: 0 },
     mismatches: [
       row(),
       row({ class: "naming", call: "quote" }),
@@ -46,6 +47,13 @@ describe("renderReport", () => {
 
   it("reports the compared population", () => {
     expect(renderReport(artifact, 20)).toContain("3 row(s) across 2 file(s), 302 call site(s)");
+  });
+
+  it("groups the skipped population by reason", () => {
+    const out = renderReport(artifact, 20);
+    expect(out).toContain("Skipped (uncomparable) sites by reason (3)");
+    expect(out).toMatch(/excludedCallName\s+41/);
+    expect(out).toMatch(/opaqueRubyArg\s+7/);
   });
 
   it("truncates a grouping to --top", () => {

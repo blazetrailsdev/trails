@@ -66,6 +66,20 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "change_column_null",
+    "call": "change_column",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:columnName",
+      "nil",
+      "kwargs{null=ref:null}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "change_column_null",
     "call": "order:quoteColumnName,execute",
     "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
   },
@@ -75,6 +89,19 @@
     "rubyName": "check_constraints",
     "call": "internal_exec_query",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "check_constraints",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:tableName",
+      "ref:expression",
+      "ref:options"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -166,6 +193,17 @@
     "rubyName": "handle_warnings",
     "call": "warning_ignored?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
+    "rubyName": "mismatched_foreign_key",
+    "call": "mismatched_foreign_key_details",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{message=ref:message,sql=ref:sql}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
