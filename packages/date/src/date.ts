@@ -1108,6 +1108,13 @@ export class Rational {
   toString(): string {
     return `${this.numerator}/${this.denominator}`;
   }
+
+  /** `rational.c` `nurat_inspect` (`Rational#inspect`), which parenthesizes where
+   * {@link toString} does not.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  inspect(): string {
+    return `(${this.toString()})`;
+  }
 }
 
 /**
@@ -4696,7 +4703,7 @@ export class Date {
 
   /**
    * @internal `date_core.c` `m_local_df` (`date_core.c:1531-1540`), the stored
-   * day fraction read back in local terms. The C's simple arm is `0`.
+   * day fraction read back in local terms; the C's simple arm is `0`.
    */
   mLocalDf(): number {
     if (simpleDatP(this)) return 0;
@@ -4705,8 +4712,7 @@ export class Date {
 
   /**
    * @internal `date_core.c` `m_fr` (`date_core.c:1573-1590`), the local day
-   * fraction plus the sub-second, both as fractions of a day. The C's simple
-   * arm is `INT2FIX(0)`.
+   * fraction plus the sub-second, both as fractions of a day; simple arm `0`.
    */
   mFr(): number | Rational {
     if (simpleDatP(this)) return 0;
@@ -4958,8 +4964,7 @@ export class Date {
 
   /**
    * Ruby `Date#cweek` (ruby/date, `date_core.c` `d_lite_cweek`,
-   * `date_core.c:5395-5407`, over `m_cweek`, `date_core.c:1877-1885`), the ISO
-   * week index.
+   * `date_core.c:5395-5407`, over `m_cweek`, `date_core.c:1877-1885`).
    */
   get cweek(): number {
     const [, rw] = cJdToCommercial(this.mLocalJd(), virtualSg(this.nth, this.start));
@@ -4968,9 +4973,8 @@ export class Date {
 
   /**
    * Ruby `Date#cwday` (ruby/date, `date_core.c` `d_lite_cwday`,
-   * `date_core.c:5412-5425`, over `m_cwday`, `date_core.c:1887-1895`), the
-   * commercial weekday index — Monday as `1`, Sunday as `7`, where
-   * {@link Date#wday} has Sunday as `0`.
+   * `date_core.c:5412-5425`, over `m_cwday`, `date_core.c:1887-1895`) — Monday
+   * as `1`, Sunday as `7`, where {@link Date#wday} has Sunday as `0`.
    */
   get cwday(): number {
     let w = this.wday;
@@ -5619,22 +5623,23 @@ export class Date {
    * Ruby `Date#inspect` (ruby/date, `date_core.c` `d_lite_inspect`,
    * `date_core.c:7043-7058`, over `mk_inspect`, `date_core.c:7032-7041`) —
    * `"#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>"`: the class, the
-   * `to_s`, then the raw state as the stored Julian day, day-fraction and
-   * sub-second, the offset and the reform start. The C's `%+"PRIsVALUE` flags
-   * are no-ops on a `VALUE` — only `of`'s `%+d` and `sg`'s `%.0f` do anything —
-   * which is why the day and the sub-second carry no sign here either.
+   * `to_s`, then the raw state as the stored Julian day, day-fraction,
+   * sub-second, offset and reform start.
    *
-   * `%"PRIsVALUE` renders `m_sf(x)` through `to_s`, so an exact `sf` prints as
-   * the Rational it is — `DateTime.new(2001,1,1) + Rational(1, 86400*3)` gives
-   * `1000000000/3n`. Storage here is uniformly a {@link Rational} where MRI's
-   * is an Integer until it isn't, so `denominator === 1n` is that Integer arm.
+   * `%+"PRIsVALUE` renders its `VALUE` through `inspect`, not `to_s` — no
+   * difference to `m_real_jd`, an Integer either way, but an `sf` exact past one
+   * denominator is a Rational and prints parenthesized, as MRI's
+   * `((2451911j,0s,(1000000000/3)n),+0s,2299161j)` for `DateTime.new(2001,1,1) +
+   * Rational(1, 86400*3)` shows. Storage here is uniformly a {@link Rational}
+   * where MRI's `sf` is an Integer until it isn't, so `denominator === 1n` is
+   * that Integer arm — `0n`, not `(0/1)n`.
    */
   inspect(): string {
     const of = this.mOf();
     const sf = this.mSf();
     return (
       `#<${this.constructor.name}: ${this.toS()} ` +
-      `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf}n),` +
+      `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf.inspect()}n),` +
       `${of < 0 ? "" : "+"}${of}s,${this.start.toFixed(0)}j)>`
     );
   }
