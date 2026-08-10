@@ -30,6 +30,21 @@ describe("parseCallSummariesFromLogs", () => {
     expect(callArgs).toBeNull();
   });
 
+  // Pre-rename logs label the same measurement "advisory, WIDE". The numbers
+  // run continuously across the rename, so they belong in the same series.
+  it("accepts the pre-rename WIDE qualifier", () => {
+    const wideLog = `
+  Calls (advisory, WIDE): 6041 matched pairs checked, 1517 omit a ported-method call Rails makes — see output/call-mismatches-wide.json
+`;
+
+    expect(parseCallSummariesFromLogs(wideLog).calls).toEqual({
+      matched: 4524,
+      total: 6041,
+      percent: 74.9,
+      mismatched: 1517,
+    });
+  });
+
   it("returns null for both when the step never ran", () => {
     expect(parseCallSummariesFromLogs("")).toEqual({ calls: null, callArgs: null });
   });

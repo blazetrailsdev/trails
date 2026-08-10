@@ -11,6 +11,11 @@
  * matched/total/percent shape as every other stats table, and the parity page
  * can chart them without a special case.
  *
+ * Before the step was renamed from --wide-calls, both lines carried a ", WIDE"
+ * qualifier ("Calls (advisory, WIDE): ..."). It is the same measurement over the
+ * same full surface — the numbers run continuously across the rename — so the
+ * qualifier is simply optional here, and ~850 pre-rename logs parse.
+ *
  * Returns null for a summary the log doesn't carry: `Call args` only prints
  * when the call-arg artifact exists, so an older log has calls but no args.
  */
@@ -21,11 +26,11 @@ export function parseCallSummariesFromLogs(logs: string): {
   return {
     calls: matchCallSummary(
       logs,
-      /Calls \(advisory\): (\d+) matched pairs checked, (\d+) omit a ported-method call/,
+      /Calls \(advisory(?:, WIDE)?\): (\d+) matched pairs checked, (\d+) omit a ported-method call/,
     ),
     callArgs: matchCallSummary(
       logs,
-      /Call args \(advisory\): (\d+) call sites compared, (\d+) pass different arguments/,
+      /Call args \(advisory(?:, WIDE)?\): (\d+) call sites compared, (\d+) pass different arguments/,
     ),
   };
 }
