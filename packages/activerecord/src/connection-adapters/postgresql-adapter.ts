@@ -445,7 +445,7 @@ export class PostgreSQLAdapter
    * command that is over reported as PQTRANS_ACTIVE.
    *
    * The invariant is that it is set `false` immediately before *every*
-   * `client.query` issued on the pinned client — `performQuery`, `exec`, the
+   * `client.query` issued on the pinned client — `_performQuery`, `exec`, the
    * `_bt_ret_*` savepoint wrapper in `executeMutation`, and both DEALLOCATE
    * sites (statement-pool eviction and `DEALLOCATE ALL` at checkout) — and back
    * to `true` only by the terminating-message handlers in
@@ -1721,9 +1721,7 @@ export class PostgreSQLAdapter
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const result = await this.performQuery(client, rewritten, binds, bindArray, {
-            notificationPayload: payload,
-          });
+          const result = await this._performQuery(client, rewritten, bindArray, payload);
           return result?.rows ?? [];
         });
       } catch (e: any) {
@@ -1745,22 +1743,19 @@ export class PostgreSQLAdapter
    * the `affectedRows` port).
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
-   *
-   * @internal
    */
-  async performQuery(
-    rawConnection: pg.Client,
+  private async _performQuery(
+    client: pg.Client,
     sql: string,
     binds: unknown[],
-    typeCastedBinds: unknown[],
-    { notificationPayload }: { notificationPayload?: Record<string, unknown> } = {},
+    payload: Record<string, unknown>,
   ): Promise<pg.QueryResult> {
     // Rails' perform_query first syncs the timestamp typemap / session timezone
     // when default_timezone changed (database_statements.rb:136 →
     // update_typemap_for_default_timezone); guarded, so it's a no-op unless the
     // timezone actually changed.
     await this.updateTypemapForDefaultTimezone();
-    const queryResult = await this._runQuery(rawConnection, sql, typeCastedBinds);
+    const queryResult = await this._runQuery(client, sql, binds);
     // Mirrors Rails' perform_query → verified!: a successful round-trip proves
     // the connection is live, so skip the verify ping on the next
     // withRawConnection.
@@ -1772,7 +1767,7 @@ export class PostgreSQLAdapter
     const result = (
       Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
     ) as pg.QueryResult;
-    if (notificationPayload) notificationPayload.row_count = result?.rows?.length ?? 0;
+    payload.row_count = result?.rows?.length ?? 0;
     this._flushWarnings(sql);
     return result;
   }
@@ -1841,9 +1836,7 @@ export class PostgreSQLAdapter
                 this._commandSettled = false;
                 await client.query(`SAVEPOINT "${spName}"`);
               }
-              const result = await this.performQuery(client, withReturning, originalBinds, binds, {
-                notificationPayload: payload,
-              });
+              const result = await this._performQuery(client, withReturning, binds, payload);
               if (useSavepoint) {
                 this._commandSettled = false;
                 await client.query(`RELEASE SAVEPOINT "${spName}"`);
@@ -1873,9 +1866,7 @@ export class PostgreSQLAdapter
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-                notificationPayload: payload,
-              });
+              const result = await this._performQuery(client, pgSql, binds, payload);
               const affected = this.affectedRows(result);
               payload.row_count = affected;
               return affected;
@@ -1884,9 +1875,7 @@ export class PostgreSQLAdapter
 
           // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-              notificationPayload: payload,
-            });
+            const result = await this._performQuery(client, pgSql, binds, payload);
             const affected = this.affectedRows(result);
             payload.row_count = affected;
             if (result.rows.length > 0) {
@@ -1896,9 +1885,7 @@ export class PostgreSQLAdapter
           }
 
           // For UPDATE/DELETE, return affected rows
-          const result = await this.performQuery(client, pgSql, originalBinds, binds, {
-            notificationPayload: payload,
-          });
+          const result = await this._performQuery(client, pgSql, binds, payload);
           const affected = this.affectedRows(result);
           payload.row_count = affected;
           return affected;
@@ -4349,7 +4336,7 @@ export class PostgreSQLAdapter
     if (this._sessionVariables["timezone"]) return;
     const tz = ActiveRecord.defaultTimezone;
     // Off the withRawConnection loop. This runs as the first step of
-    // `performQuery` (the adapter's one perform_query), which is itself the block
+    // `_performQuery` (the adapter's one perform_query), which is itself the block
     // executing inside withRawConnection on the same async chain. Re-entering
     // withRawConnection would NOT deadlock — TransactionManager.synchronize is
     // reentrant per async chain (transaction.ts: getStore() === _currentLockOwner

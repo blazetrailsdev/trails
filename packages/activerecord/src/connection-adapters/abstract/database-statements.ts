@@ -1399,33 +1399,33 @@ export async function internalExecQuery(
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<Result> {
   const sqlName = name ?? "SQL";
-  return logSql(this, sql, sqlName, binds, async () => {
-    // Materialize lazy transactions before executing SQL
-    const tm = (this as any)._transactionManager as TransactionManager | undefined;
-    if (tm && (options?.materializeTransactions ?? true)) await tm.materializeTransactions();
-    if (this?.internalExecute) {
-      // Thread binds and exec options through so a bound INSERT ... RETURNING
-      // reaches the driver and allow_retry / materialize_transactions survive
-      // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
-      // trails carries all of them in the opts object rather than positionally.
-      const rawResult = await this.internalExecute(sql, sqlName, {
-        binds,
-        prepare: options?.prepare,
-        allowRetry: options?.allowRetry,
-        materializeTransactions: options?.materializeTransactions,
-      });
-      return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
-    }
-    if (binds && binds.length > 0) {
-      throw new Error(
-        "internalExecQuery requires internalExecute on the adapter when binds are provided",
-      );
-    }
-    // Fallback: delegate through this.execute only when there are no binds
-    const doExecute = this?.execute?.bind(this) ?? execute;
-    const result = await doExecute(sql);
-    return normalizeResult(result);
-  });
+  // Rails is `cast_result(internal_execute(...))` and nothing else
+  // (abstract/database_statements.rb:545-547). `internal_execute` reaches
+  // `raw_execute` (`:588-591` → `:552-558`), which both logs (`:553`) and
+  // materializes through `with_raw_connection` (`:555`) — including the `log`
+  // rescue's `set_query`, so neither belongs here.
+  if (this?.internalExecute) {
+    // Thread binds and exec options through so a bound INSERT ... RETURNING
+    // reaches the driver and allow_retry / materialize_transactions survive
+    // (Rails internal_exec_query(...) → internal_execute(...) → raw_execute).
+    // trails carries all of them in the opts object rather than positionally.
+    const rawResult = await this.internalExecute(sql, sqlName, {
+      binds,
+      prepare: options?.prepare,
+      allowRetry: options?.allowRetry,
+      materializeTransactions: options?.materializeTransactions,
+    });
+    return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
+  }
+  if (binds && binds.length > 0) {
+    throw new Error(
+      "internalExecQuery requires internalExecute on the adapter when binds are provided",
+    );
+  }
+  // Fallback: delegate through this.execute only when there are no binds
+  const doExecute = this?.execute?.bind(this) ?? execute;
+  const result = await doExecute(sql);
+  return normalizeResult(result);
 }
 
 // --- Private helpers ---

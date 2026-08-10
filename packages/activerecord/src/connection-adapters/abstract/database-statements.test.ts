@@ -340,14 +340,16 @@ describe("DatabaseStatements", () => {
 
     it("attaches sql and binds to a translated StatementInvalid via set_query", async () => {
       const { internalExecQuery } = await import("./database-statements.js");
-      // Mirror with_raw_connection: internalExecute rejects with an already
-      // translated StatementInvalid carrying no statement context.
+      // Mirror internal_execute → raw_execute: with_raw_connection rejects with
+      // an already translated StatementInvalid carrying no statement context,
+      // and `log`'s rescue is what attaches the query (abstract_adapter.rb:1145).
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async () => {
-          throw new StatementInvalid("duplicate key value violates unique constraint");
-        },
+        internalExecute: async (sql: string, name: string, opts?: { binds?: unknown[] }) =>
+          log(sql, name, opts?.binds ?? [], [], false, async () => {
+            throw new StatementInvalid("duplicate key value violates unique constraint");
+          }),
       } as unknown as DatabaseStatementsHost;
       const binds = [1, "x"];
       const err = await internalExecQuery
@@ -366,9 +368,10 @@ describe("DatabaseStatements", () => {
       const host = {
         log,
         typeCastedBinds,
-        internalExecute: async () => {
-          throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
-        },
+        internalExecute: async (sql: string, name: string, opts?: { binds?: unknown[] }) =>
+          log(sql, name, opts?.binds ?? [], [], false, async () => {
+            throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
+          }),
       } as unknown as DatabaseStatementsHost;
       const err = await internalExecQuery.call(host, "OUTER SQL", "SQL", [1]).then(
         () => null,
