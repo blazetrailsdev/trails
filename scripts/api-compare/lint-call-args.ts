@@ -23,17 +23,6 @@
  * through the argument comparison rather than an argument defect; they stay
  * report-only, reachable through `--report`, until RFC 0096 drains them.
  *
- * ── Before the seed ─────────────────────────────────────────────────────────
- * The baseline is seeded by its own `main`-only PR (RFC 0095
- * `call-args-baseline-seed`) AFTER this gate lands, because a seed generated on
- * a branch drifts from what CI measures. Until then the shards carry no `args`
- * row at all while the artifact flags hundreds, and that combination — zero
- * baselined AND some flagged — is reported as UNSEEDED and exits 0 rather than
- * failing every PR on the merge train with the whole population. It self-closes
- * the moment the seed lands, and it cannot swallow a converged dimension: zero
- * baselined with zero flagged takes the normal path and passes as a real
- * green.
- *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
  * what makes a sibling PR's deleted method surface as a STALE row on a branch
@@ -111,15 +100,6 @@ export function renderKey(k: CallArgKey): string {
   return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call}(${k.rubyArgs.join(", ")})`;
 }
 
-export function renderUnseeded(rows: CallArgKey[]): string {
-  return (
-    "call-args ratchet: UNSEEDED — no `args` row is baselined yet, so the " +
-    `${rows.length} flagged shape row(s) are reported, not gated. The baseline is seeded on ` +
-    "`main` by its own PR (RFC 0095 call-args-baseline-seed); this arm disappears the " +
-    "moment the first row lands."
-  );
-}
-
 export async function main(write: boolean): Promise<number> {
   const artifact = await loadArtifact();
   const current: CallArgKey[] = gatedRows(artifact);
@@ -152,10 +132,6 @@ export async function main(write: boolean): Promise<number> {
   }
 
   const baseline = await loadBaseline();
-  if (baseline.length === 0 && current.length > 0) {
-    console.log(renderUnseeded(current));
-    return 0;
-  }
 
   const dups = findDuplicateKeys(baseline);
   if (dups.length > 0) {

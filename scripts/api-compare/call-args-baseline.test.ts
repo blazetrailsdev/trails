@@ -59,6 +59,12 @@ describe("diffAgainstBaseline", () => {
     expect(stale).toHaveLength(1);
   });
 
+  it("reports nothing when neither side has a row, so a converged dimension is a real green", () => {
+    const { added, stale } = diffAgainstBaseline([], []);
+    expect(added).toHaveLength(0);
+    expect(stale).toHaveLength(0);
+  });
+
   it("matches a baselined row on its argument list", () => {
     expect(diffAgainstBaseline([key()], [entry()]).added).toHaveLength(0);
     expect(diffAgainstBaseline([key({ rubyArgs: ["ref:o"] })], [entry()]).added).toHaveLength(1);
