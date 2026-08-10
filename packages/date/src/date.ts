@@ -689,6 +689,21 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled
+ * locally for the reason {@link NoMethodError} below is. `rb_num2int` — what
+ * `FIX2INT` is for the non-Fixnum operand of `d_lite_rshift`'s `f_idiv` /
+ * `f_mod` arm (`date_core.c:6459`) — raises it for a non-finite Float, with the
+ * Float's own `to_s` as the message: `Date.new(2000,1,31) >> Float::INFINITY`
+ * is `FloatDomainError: Infinity`.
+ */
+class FloatDomainError extends RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
+  }
+}
+
+/**
  * @internal Ruby core `NoMethodError`. It is here rather than imported because
  * `@blazetrails/date` is the bottom of the dependency graph — activemodel's
  * copy (`attribute-assignment.ts`) imports this package, not the reverse — and
@@ -4628,6 +4643,121 @@ function expectNumeric(x: unknown): void {
 }
 
 /**
+ * @internal `Float#to_r` (`rational.c` `float_to_r`), the exact binary value of
+ * a JS number. `d_lite_rshift`'s `f_add3` answers a Float for a Float `other`
+ * and its `f_idiv` / `f_mod` then work in Float; the value is the same either
+ * way, and carrying it as an exact {@link Rational} lets the one `else` arm
+ * serve both Numerics. A non-finite Float has no exact ratio and Ruby's own
+ * `rb_num2int` refuses it, so it raises {@link FloatDomainError} here — the
+ * error `f_idiv` reaches first in the C.
+ */
+function fToR(x: number): Rational {
+  if (!Number.isFinite(x)) throw new FloatDomainError(String(x));
+  let n = x;
+  let d = 1n;
+  while (!Number.isInteger(n)) {
+    n *= 2;
+    d *= 2n;
+  }
+  return new Rational(BigInt(n), d);
+}
+
+/**
+ * @internal `f_mul(n, INT2FIX(12))` as `d_lite_next_year` / `d_lite_prev_year`
+ * (`date_core.c:6554-6563`, `:6571-6580`) apply it — the one place the month
+ * wrappers scale their argument before handing it to `Date#>>` / `Date#<<`,
+ * and the reason those two take every Numeric `d_lite_rshift` does.
+ */
+function fMul12(n: number | bigint | Rational): number | bigint | Rational {
+  if (n instanceof Rational) return n.mul(12);
+  return typeof n === "bigint" ? n * 12n : n * 12;
+}
+
+/**
+ * @internal `date_core.c` `f_cmp` (`:74-86`), the `<=>` dispatch the C's
+ * arithmetic reaches for a non-Fixnum operand. The `FIXNUM_P(x) && FIXNUM_P(y)`
+ * arm is the subtraction below; it is widened to every JS `number` because
+ * Ruby's non-Fixnum Float reaches `Float#<=>`, which answers the same sign.
+ * Everything else goes through `rb_cmpint`, which raises `ArgumentError` for
+ * the `nil` a `<=>` that declines to answer gives back — including the `nil`
+ * Ruby's own `Object#<=>` answers for an unrelated operand, which is why an
+ * object carrying no `cmp` at all takes that arm rather than failing on the
+ * call. `test_step__compare`
+ * (`vendor/date/test/date/test_date_arith.rb:290-303`) asserts both arms of
+ * that through `Date#step`'s step argument.
+ */
+function fCmp(x: unknown, y: number): number {
+  if (typeof x === "number" && typeof y === "number") {
+    const c = x - y;
+    if (c > 0) return 1;
+    else if (c < 0) return -1;
+    return 0;
+  }
+  const cmp = (x as { cmp?: (y: number) => number | null | undefined } | null)?.cmp;
+  const c = typeof cmp === "function" ? cmp.call(x, y) : null;
+  if (c === null || c === undefined) {
+    const klass = x === null || x === undefined ? String(x) : (x.constructor?.name ?? "Object");
+    throw new ArgumentError(`comparison of ${klass} with ${y} failed`);
+  }
+  return c > 0 ? 1 : c < 0 ? -1 : 0;
+}
+
+/**
+ * @internal The loop of `date_core.c` `d_lite_upto` (`:6665-6671`) as a
+ * generator, driving both arms of {@link Date#upto} the way
+ * {@link dLiteStepEnum} drives {@link Date#step}. The C writes this loop out
+ * rather than calling `d_lite_step`, so it is its own body here too.
+ */
+function* dLiteUptoEnum(self: Date, max: Date): Generator<Date> {
+  let date = self;
+  while (date.cmp(max)! <= 0) {
+    yield date;
+    date = date.plus(1);
+  }
+}
+
+/**
+ * @internal The loop of `date_core.c` `d_lite_downto` (`:6686-6692`), the
+ * counterpart to {@link dLiteUptoEnum} and, like it, written out in the C
+ * rather than delegated to `d_lite_step`.
+ */
+function* dLiteDowntoEnum(self: Date, min: Date): Generator<Date> {
+  let date = self;
+  while (date.cmp(min)! >= 0) {
+    yield date;
+    date = date.plus(-1);
+  }
+}
+
+/**
+ * @internal The loop of `date_core.c` `d_lite_step` (`:6631-6652`) — the three
+ * arms of the sign of `f_cmp(step, 0)` — as a generator, so the block arm and
+ * the `RETURN_ENUMERATOR` arm of {@link Date#step} both drive it, exactly as
+ * the C reaches the one body twice.
+ */
+function* dLiteStepEnum(
+  self: Date,
+  limit: Date,
+  step: number | bigint | Rational,
+): Generator<Date> {
+  let date = self;
+  const c = fCmp(step, 0);
+  if (c < 0) {
+    while (date.cmp(limit)! >= 0) {
+      yield date;
+      date = date.plus(step);
+    }
+  } else if (c === 0) {
+    for (;;) yield date;
+  } else {
+    while (date.cmp(limit)! <= 0) {
+      yield date;
+      date = date.plus(step);
+    }
+  }
+}
+
+/**
  * @internal `date_core.c` `minus_dd` (`:6272-6321`), the difference between two
  * dates in days, as a Rational: the whole {@link CM_PERIOD}s, days,
  * day-fraction and sub-second, each carried into the term below, then summed.
@@ -5935,10 +6065,30 @@ export class Date {
     return this.plus(-other);
   }
 
+  /** Ruby `Date#next_day(n = 1)` (ruby/date, `date_core.c` `d_lite_next_day`,
+   *  `:6369-6377`), which is `Date#+` of `n`. */
+  nextDay(n: number | bigint | Rational = 1): this {
+    return this.plus(n);
+  }
+
   /** Ruby `Date#prev_day(n = 1)` (ruby/date, `date_core.c` `d_lite_prev_day`,
    *  `:6386-6395`), which is `Date#-` of `n`. */
   prevDay(n: number | bigint | Rational = 1): this {
     return this.minus(n) as this;
+  }
+
+  /** Ruby `Date#next` (ruby/date, `date_core.c` `d_lite_next`, `:6408-6412`),
+   *  which is `Date#next_day` of no argument. Ruby registers `succ` as a second
+   *  name for the same C function (`date_core.c:9779-9780`), so
+   *  {@link Date#succ} is that alias. */
+  next(): this {
+    return this.nextDay();
+  }
+
+  /** Ruby `Date#succ` — the second name `date_core.c:9780` registers for
+   *  `d_lite_next`. */
+  succ(): this {
+    return this.next();
   }
 
   /**
@@ -5946,11 +6096,37 @@ export class Date {
    * date `other` months after the receiver. When the new month has no such day
    * the last day of it is used — the `while` walking `d` down, which is why
    * `Date.new(2000,1,31) >> 1` is 2000-02-29.
+   *
+   * `other` is any Numeric, so `t` is carried as a {@link Rational}: Ruby
+   * canonicalizes a denominator of 1 back to an Integer, which is what puts
+   * `Date.new(2000,1,31).next_year(Rational(1,2))` — `f_mul(n, 12)` is `(6/1)`,
+   * so `t` is an Integer — on the C's `FIXNUM_P(t)` arm and answers 2000-07-31.
+   * The `else` arm is the C's `f_idiv` / `f_mod` pair. Its `FIX2INT` is the
+   * non-Fixnum `rb_num2int`, which TRUNCATES: `f_mod` is a floor-mod, so the
+   * remainder is non-negative and the truncation is the bigint division below.
+   * That is what keeps `Date.new(2000,1,31) >> Rational(1,2)` on 2000-01-31 and
+   * puts `>> Rational(3,2)` on 2000-02-29 rather than walking into February by
+   * the fraction. A non-integral Float takes the same arm through
+   * {@link fToR}, since `Float#to_r` is exact and `f_idiv` / `f_mod` read the
+   * same integers off it that the C's Float arithmetic does.
    */
-  rshift(other: number | bigint): this {
-    const t = BigInt(this.year) * 12n + BigInt(this.mon - 1) + BigInt(other);
-    const y = bigNorm(div(t, 12));
-    const m = Number(mod(t, 12)) + 1;
+  rshift(other: number | bigint | Rational): this {
+    const t = new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(
+      typeof other === "number" && !Number.isInteger(other) ? fToR(other) : other,
+    );
+    let y: number | bigint;
+    let m: number;
+    if (t.denominator === 1n) {
+      const it = t.numerator;
+      y = bigNorm(div(it, 12));
+      m = Number(mod(it, 12)) + 1;
+    } else {
+      const d12 = t.denominator * 12n;
+      let q = t.numerator / d12;
+      if (t.numerator % d12 !== 0n && t.numerator < 0n) q -= 1n;
+      y = bigNorm(q);
+      m = Number((t.numerator - q * d12) / t.denominator) + 1;
+    }
     let d = this.mday;
     const sg = this.start;
 
@@ -5967,20 +6143,89 @@ export class Date {
 
   /** Ruby `Date#<<` (ruby/date, `date_core.c` `d_lite_lshift`, `:6507-6512`),
    *  which is `Date#>>` of the negated argument. */
-  lshift(other: number | bigint): this {
-    return this.rshift(-other);
+  lshift(other: number | bigint | Rational): this {
+    return this.rshift(other instanceof Rational ? other.mul(-1) : -other);
+  }
+
+  /** Ruby `Date#next_month(n = 1)` (ruby/date, `date_core.c`
+   *  `d_lite_next_month`, `:6520-6529`), which is `Date#>>` of `n`. */
+  nextMonth(n: number | bigint | Rational = 1): this {
+    return this.rshift(n);
   }
 
   /** Ruby `Date#prev_month(n = 1)` (ruby/date, `date_core.c`
    *  `d_lite_prev_month`, `:6537-6546`), which is `Date#<<` of `n`. */
-  prevMonth(n: number | bigint = 1): this {
+  prevMonth(n: number | bigint | Rational = 1): this {
     return this.lshift(n);
+  }
+
+  /** Ruby `Date#next_year(n = 1)` (ruby/date, `date_core.c` `d_lite_next_year`,
+   *  `:6554-6563`), which is `Date#>>` of `n * 12`. */
+  nextYear(n: number | bigint | Rational = 1): this {
+    return this.rshift(fMul12(n));
   }
 
   /** Ruby `Date#prev_year(n = 1)` (ruby/date, `date_core.c` `d_lite_prev_year`,
    *  `:6571-6580`), which is `Date#<<` of `n * 12`. */
-  prevYear(n: number | bigint = 1): this {
-    return this.lshift(typeof n === "bigint" ? n * 12n : n * 12);
+  prevYear(n: number | bigint | Rational = 1): this {
+    return this.lshift(fMul12(n));
+  }
+
+  /**
+   * Ruby `Date#step(limit, step = 1)` (ruby/date, `date_core.c` `d_lite_step`,
+   * `:6614-6653`): the block is called with `self`, then each `date + step`,
+   * for as long as the date stays on `limit`'s side of the comparison. The
+   * three arms are the sign of `f_cmp(step, 0)` — a negative step walks down
+   * while `date <=> limit >= 0`, a positive one walks up while `<= 0`, and a
+   * zero step yields forever (the `step can't be 0` raise is `#if 0`'d out in
+   * the C).
+   *
+   * `RETURN_ENUMERATOR` is the no-block arm: TS has no `rb_block_given_p`, so
+   * an omitted `block` answers the generator that drives the same loop, which
+   * is what the gem's `test_step__noblock` exercises through `to_a`.
+   */
+  step(limit: Date, step?: number | bigint | Rational): Generator<this>;
+  step(
+    limit: Date,
+    step: number | bigint | Rational | undefined,
+    block: (date: this) => void,
+  ): this;
+  step(
+    limit: Date,
+    step: number | bigint | Rational = 1,
+    block?: (date: this) => void,
+  ): this | Generator<this> {
+    if (block === undefined) return dLiteStepEnum(this, limit, step) as Generator<this>;
+    for (const date of dLiteStepEnum(this, limit, step)) block(date as this);
+    return this;
+  }
+
+  /**
+   * Ruby `Date#upto(max)` (ruby/date, `date_core.c` `d_lite_upto`,
+   * `:6659-6672`). Documented as equivalent to {@link Date#step} with `max` and
+   * `1`, but the C is its own loop over `d_lite_cmp` and `d_lite_plus` and does
+   * not dispatch through `d_lite_step`, so this does not either.
+   */
+  upto(max: Date): Generator<this>;
+  upto(max: Date, block: (date: this) => void): this;
+  upto(max: Date, block?: (date: this) => void): this | Generator<this> {
+    if (block === undefined) return dLiteUptoEnum(this, max) as Generator<this>;
+    for (const date of dLiteUptoEnum(this, max)) block(date as this);
+    return this;
+  }
+
+  /**
+   * Ruby `Date#downto(min)` (ruby/date, `date_core.c` `d_lite_downto`,
+   * `:6680-6693`). Documented as equivalent to {@link Date#step} with `min` and
+   * `-1`, but the C is its own loop over `d_lite_cmp` and `d_lite_plus` and
+   * does not dispatch through `d_lite_step`, so this does not either.
+   */
+  downto(min: Date): Generator<this>;
+  downto(min: Date, block: (date: this) => void): this;
+  downto(min: Date, block?: (date: this) => void): this | Generator<this> {
+    if (block === undefined) return dLiteDowntoEnum(this, min) as Generator<this>;
+    for (const date of dLiteDowntoEnum(this, min)) block(date as this);
+    return this;
   }
 
   /**

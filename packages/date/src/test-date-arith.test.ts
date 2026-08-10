@@ -1,12 +1,19 @@
 /**
- * Port of `vendor/date/test/date/test_date_arith.rb` lines 10-152 — the gem's
- * own suite, which RFC 0088 makes the measure of the date port. Ruby's `+`,
- * `-`, `<=>` and `<<` have no TS syntax that dispatches to a method, so they
- * are the named methods `docs/ruby-ts-conventions.md` ("Operators") calls for:
- * `plus`, `minus`, `cmp`, `lshift`.
+ * Port of `vendor/date/test/date/test_date_arith.rb` — the gem's own suite,
+ * which RFC 0088 makes the measure of the date port. Ruby's `+`, `-`, `<=>`,
+ * `<<` and `>>` have no TS syntax that dispatches to a method, so they are the
+ * named methods `docs/ruby-ts-conventions.md` ("Operators") calls for: `plus`,
+ * `minus`, `cmp`, `lshift`, `rshift`.
+ *
+ * `test_next`'s `Date.today` / `DateTime.now` arms (`:161-172`) are not here:
+ * neither `date_s_today` (`date_core.c:3789-3826`) nor `datetime_s_now`
+ * (`:8134-8228`) is implemented, and RFC 0088's construction statics answer a
+ * `Temporal.PlainDate`, which carries no `next`/`succ` — so the return shape is
+ * a decision the port of those two has to make. Filed against 0088 as
+ * `port-date-today-and-datetime-now`.
  */
 import { describe, it, expect } from "vitest";
-import { Date, DateTime, Rational, Time } from "./index.js";
+import { ArgumentError, Date, DateTime, Rational, Time } from "./index.js";
 
 /** `test_date_arith.rb:6-8` — a `Numeric` whose `to_r` answers itself, so the C's
  *  `f_to_r` retry makes no progress and the arm raises. */
@@ -131,5 +138,131 @@ describe("TestDateArith", () => {
     expect([d.year, d.mon, d.mday]).toEqual([1990, 1, 31]);
     d = new Date(2000, 1, 31).prevYear(100);
     expect([d.year, d.mon, d.mday]).toEqual([1900, 1, 31]);
+  });
+
+  it("next", () => {
+    let d = new Date(2000, 12, 31).next();
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
+    d = new Date(2000, 12, 31).succ();
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
+  });
+
+  it("next day", () => {
+    let d = new Date(2000, 12, 31).nextDay();
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
+    d = new Date(2000, 12, 31).nextDay(2);
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 2]);
+    d = new Date(2001, 1, 1).nextDay(-2);
+    expect([d.year, d.mon, d.mday]).toEqual([2000, 12, 30]);
+
+    const dt = new DateTime(2000, 2, 29).nextDay(new Rational(1, 2));
+    expect([dt.year, dt.mon, dt.mday, dt.hour, dt.min, dt.sec]).toEqual([2000, 2, 29, 12, 0, 0]);
+  });
+
+  it("next month", () => {
+    let d = new Date(2000, 1, 31).rshift(-1);
+    expect([d.year, d.mon, d.mday]).toEqual([1999, 12, 31]);
+    d = new Date(2000, 1, 31).rshift(1);
+    expect([d.year, d.mon, d.mday]).toEqual([2000, 2, 29]);
+    d = new Date(2000, 1, 31).rshift(12);
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 31]);
+    d = new Date(2000, 1, 31).rshift(13);
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 2, 28]);
+  });
+
+  it("next month 2", () => {
+    let d = new Date(2000, 1, 31).nextMonth(-1);
+    expect([d.year, d.mon, d.mday]).toEqual([1999, 12, 31]);
+    d = new Date(2000, 1, 31).nextMonth();
+    expect([d.year, d.mon, d.mday]).toEqual([2000, 2, 29]);
+    d = new Date(2000, 1, 31).nextMonth(12);
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 31]);
+    d = new Date(2000, 1, 31).nextMonth(13);
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 2, 28]);
+  });
+
+  it("next year", () => {
+    let d = new Date(2000, 1, 31).nextYear(-1);
+    expect([d.year, d.mon, d.mday]).toEqual([1999, 1, 31]);
+    d = new Date(2000, 1, 31).nextYear();
+    expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 31]);
+    d = new Date(2000, 1, 31).nextYear(10);
+    expect([d.year, d.mon, d.mday]).toEqual([2010, 1, 31]);
+    d = new Date(2000, 1, 31).nextYear(100);
+    expect([d.year, d.mon, d.mday]).toEqual([2100, 1, 31]);
+  });
+
+  it("downto", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 7);
+    let i = 0;
+    p.downto(q, () => {
+      i += 1;
+    });
+    expect(i).toBe(8);
+  });
+
+  it("downto noblock", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 7);
+    const e = p.downto(q);
+    expect([...e].length).toBe(8);
+  });
+
+  it("upto", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 21);
+    let i = 0;
+    p.upto(q, () => {
+      i += 1;
+    });
+    expect(i).toBe(8);
+  });
+
+  it("upto noblock", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 21);
+    const e = p.upto(q);
+    expect([...e].length).toBe(8);
+  });
+
+  it("step", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 21);
+    let i = 0;
+    p.step(q, 2, () => {
+      i += 1;
+    });
+    expect(i).toBe(4);
+
+    i = 0;
+    p.step(q, undefined, () => {
+      i += 1;
+    });
+    expect(i).toBe(8);
+  });
+
+  it("step noblock", () => {
+    const p = new Date(2001, 1, 14);
+    const q = new Date(2001, 1, 21);
+    let e = p.step(q, 2);
+    expect([...e].length).toBe(4);
+
+    e = p.step(q);
+    expect([...e].length).toBe(8);
+  });
+
+  it("step compare", () => {
+    const p = new Date(2000, 1, 1);
+    const q = new Date(1999, 12, 31);
+    let o: object = { cmp: () => undefined };
+    expect(() => [...p.step(q, o as never)]).toThrow(ArgumentError);
+
+    o = { cmp: () => 2 };
+    const a: Date[] = [];
+    p.step(q, o as never, (d) => {
+      a.push(d);
+    });
+    expect(a).toEqual([]);
   });
 });

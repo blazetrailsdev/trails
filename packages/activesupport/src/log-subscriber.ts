@@ -4,34 +4,6 @@ import type { Logger } from "./logger.js";
 import { trailsLogger } from "./trails-logger-slot.js";
 
 /**
- * Check whether a logger has a given level enabled.
- * Rails' LEVEL_CHECKS call `logger.debug?`, `logger.info?`, etc.
- * Our Logger class defines these as getter properties (`get "debug?"()`),
- * but Base.logger can be a simple duck-typed object without them.
- * Treat missing predicates as "enabled" (not silenced) so logging
- * isn't suppressed for valid loggers that lack ActiveSupport predicates.
- */
-function isLevelEnabled(logger: Logger, level: string): boolean {
-  // Try Rails-style predicate getter: `debug?`, `info?`, etc.
-  const predicate = (logger as any)[`${level}?`];
-  if (typeof predicate === "boolean") return predicate;
-
-  // Try camelCase flag: `debugEnabled`, `infoEnabled`, etc.
-  const flag = (logger as any)[`${level}Enabled`];
-  if (typeof flag === "boolean") return flag;
-
-  // Try numeric level comparison (Logger.DEBUG=0, INFO=1, etc.)
-  if (typeof (logger as any).level === "number") {
-    const priorities: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
-    const required = priorities[level];
-    if (required !== undefined) return (logger as any).level <= required;
-  }
-
-  // No way to tell — assume enabled (don't suppress logging)
-  return true;
-}
-
-/**
  * ActiveSupport::LogSubscriber — a Subscriber that dispatches events
  * to a logger. Provides ANSI coloring helpers and log-level gating.
  *
@@ -84,10 +56,16 @@ export class LogSubscriber extends Subscriber {
     (getClassState(this) as any)._logLevels = value;
   }
 
+  /**
+   * Rails `LogSubscriber::LEVEL_CHECKS`
+   * (`activesupport/lib/active_support/log_subscriber.rb:86-90`), three lambdas
+   * that ask the logger its own predicate. Trails' {@link Logger} spells those
+   * as `get "debug?"()` getters, so the call is a property read.
+   */
   static readonly LEVEL_CHECKS: Record<string, (logger: Logger) => boolean> = {
-    debug: (logger) => !isLevelEnabled(logger, "debug"),
-    info: (logger) => !isLevelEnabled(logger, "info"),
-    error: (logger) => !isLevelEnabled(logger, "error"),
+    debug: (logger) => !logger["debug?"],
+    info: (logger) => !logger["info?"],
+    error: (logger) => !logger["error?"],
   };
 
   private static _logger: Logger | null = null;
