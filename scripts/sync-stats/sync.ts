@@ -7,6 +7,7 @@ import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapte
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
+import { classifyCompareStep } from "./classify-compare-step.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -1783,27 +1784,7 @@ function extractStepLogs(rawLog: string): Map<string, string> {
   let m;
   while ((m = runPattern.exec(rawLog)) !== null) {
     const command = m[1].trim();
-    let stepName: string | null = null;
-
-    if (command.includes("api-compare/compare.ts")) {
-      // The --calls run prints the same per-package table as the plain run, so
-      // it must be classified BEFORE falling through to "api_compare" —
-      // otherwise it overwrites the public-API step's log (it appears later in
-      // the job) and the api_compare_stats feed silently becomes the
-      // full-surface numbers.
-      stepName = command.includes("--privates")
-        ? "api_compare_privates"
-        : command.includes("--calls")
-          ? "api_calls"
-          : "api_compare";
-    } else if (
-      command.includes("test-compare/compare.ts") ||
-      // Pre-RFC-0092 entry-point names, kept so historic logs still parse.
-      command.includes("test-compare/test-compare.ts") ||
-      command.includes("test-compare/convention-compare.ts")
-    ) {
-      stepName = "test_compare";
-    }
+    const stepName = classifyCompareStep(command);
 
     if (!stepName) continue;
 
@@ -2031,7 +2012,10 @@ const MISSING_STATS_PREDICATE = `
         -- Same shape as the privates gate: only expect calls stats from a job
         -- that actually ran the --calls step, so pre-RFC-0095 logs don't make
         -- --refresh reprocess the whole history on every run.
-        rjl.log_output LIKE '%compare.ts --calls%'
+        (
+          rjl.log_output LIKE '%compare.ts --calls%'
+          OR rjl.log_output LIKE '%compare.ts --wide-calls%'
+        )
         AND NOT EXISTS (
           SELECT 1 FROM api_calls_stats acls
           WHERE acls.merge_commit_sha = rjl.merge_commit_sha
