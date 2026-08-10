@@ -2,11 +2,10 @@
 /**
  * Ratcheting gate for the call-ARGUMENT parity dimension (RFC 0095).
  *
- * `api:calls` compares the SET OF CALL NAMES a ported body makes; a body can
+ * `api:calls` compares the SET OF CALL NAMES a ported body makes, so a body can
  * call `where` where Rails calls `where`, hand it a completely different
- * argument list, and every existing gate stays green. This gate ratchets
- * output/call-arg-mismatches.json — written by compare.ts under `--calls` — so
- * a new argument-list divergence cannot land silently.
+ * argument list, and stay green. This gate ratchets
+ * output/call-arg-mismatches.json — written by compare.ts under `--calls`.
  *
  * Same only-shrink contract as lint-call-mismatches.ts, which is the template
  * throughout: a committed baseline lists the currently-known mismatches keyed
