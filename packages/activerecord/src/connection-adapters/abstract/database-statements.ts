@@ -1381,13 +1381,11 @@ export async function rawExecQuery(
  * Executes a query via internal_execute and returns an ActiveRecord::Result.
  * Delegates to internalExecute + castResult.
  *
- * Unlike `rawExecQuery` above, this one still wraps in `log`, where Rails'
- * `internal_exec_query` (database_statements.rb:546-548) leaves the logging to
- * `raw_execute`. Dropping it is tracked by
- * 0076-execute-primitive-convergence/wire-raw-execute-through-log: this
- * body is reached only by an adapter that overrides `internalExecute` but NOT
- * `internalExecQuery`, and for such a host `log`'s rescue is the only thing
- * attaching `set_query` context to a translated StatementInvalid.
+ * Like `rawExecQuery` above, this leaves logging to `raw_execute`, which
+ * `internal_execute` reaches (database_statements.rb:546-548, :588-591) — the
+ * `log` rescue's `set_query` included, so a translated StatementInvalid still
+ * carries its query for the one host shape this body serves (an adapter that
+ * overrides `internalExecute` but not `internalExecQuery`).
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_exec_query
  */
