@@ -299,6 +299,45 @@ describe("DatabaseStatements", () => {
       expect((result as any).rows).toEqual([[1]]);
     });
 
+    it("logs the query once and reports row_count off the yielded payload", async () => {
+      const { rawExecute, rawExecQuery } = await import("./database-statements.js");
+      const payloads: { row_count: number }[] = [];
+      const host = {
+        typeCastedBinds,
+        log: async (
+          sql: string,
+          name: string | null | undefined,
+          binds: unknown[],
+          _tcBinds: unknown[],
+          _isAsync: boolean,
+          block: (payload: any) => Promise<unknown>,
+        ) => {
+          const payload = { sql, name, binds, row_count: 0 };
+          payloads.push(payload);
+          return block(payload);
+        },
+        withRawConnection: async (_opts: unknown, block: (conn: unknown) => Promise<unknown>) =>
+          block(null),
+        performQuery: (
+          _conn: unknown,
+          _sql: string,
+          _binds: unknown[],
+          _tcBinds: unknown[],
+          options: { notificationPayload?: { row_count: number } },
+        ) => {
+          options.notificationPayload!.row_count = 2;
+          return { rows: [[1], [2]], columns: ["id"] };
+        },
+        castResult: (raw: any) => new Result(raw.columns, raw.rows),
+      } as unknown as DatabaseStatementsHost;
+      host.rawExecute = rawExecute.bind(host) as DatabaseStatementsHost["rawExecute"];
+
+      const result = await rawExecQuery.call(host, "SELECT id FROM t", "SQL", []);
+      expect(result.length).toBe(2);
+      expect(payloads.length).toBe(1);
+      expect(payloads[0].row_count).toBe(2);
+    });
+
     it("attaches sql and binds to a translated StatementInvalid via set_query", async () => {
       const { internalExecQuery } = await import("./database-statements.js");
       // Mirror with_raw_connection: internalExecute rejects with an already

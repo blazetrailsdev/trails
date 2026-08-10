@@ -193,6 +193,19 @@ export class Time {
   /** @internal Seconds east of UTC — Ruby's `Time#utc_offset`. */
   readonly #utcOffset: number;
 
+  /** Ruby `Time.now`, the current time in the local zone. */
+  static now(): Time {
+    const plain = Temporal.Now.plainDateTimeISO();
+    return new Time(
+      plain.year,
+      plain.month,
+      plain.day,
+      plain.hour,
+      plain.minute,
+      plain.second + plain.millisecond / 1_000 + plain.microsecond / 1_000_000,
+    );
+  }
+
   /**
    * Ruby `Time.utc(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`.
    * MRI's seventh positional is the microsecond, not a zone — `Time.utc` names
@@ -387,7 +400,15 @@ export class Time {
       .toDatetime();
   }
 
+  /**
+   * `zone` is a getter rather than a value because reading it builds a
+   * `Temporal.ZonedDateTime` to find the tzdata abbreviation, and only `%Z`
+   * ever asks for it — computing it eagerly made every `Time#strftime` pay for
+   * a directive it usually does not carry.
+   */
   strftime(format: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
     return strftime(
       {
         year: this.year,
@@ -399,7 +420,9 @@ export class Time {
         min: this.min,
         sec: this.sec,
         nsec: new Rational(this.nsec, 1),
-        zone: this.zone ?? "",
+        get zone(): string {
+          return self.zone ?? "";
+        },
         utcOffset: this.utcOffset,
       },
       format,

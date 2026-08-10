@@ -1319,8 +1319,7 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 /**
  * Wraps query execution in a `sql.active_record` instrumentation event by
  * delegating to `AbstractAdapter#log` (abstract_adapter.rb:1134), the single
- * payload producer — as in Rails, where `raw_execute` is `log`'s only caller
- * (abstract/database_statements.rb:554).
+ * payload producer.
  */
 async function logSql<T>(
   host: DatabaseStatementsHost,
@@ -1353,6 +1352,10 @@ async function logSql<T>(
  * Executes a raw query and returns an ActiveRecord::Result.
  * Delegates to rawExecute + castResult.
  *
+ * No `log` of its own: Rails' `raw_exec_query` is `cast_result(raw_execute(...))`
+ * (database_statements.rb:541-543), and `raw_execute` is what wraps the query in
+ * `log` — a second wrap here would emit `sql.active_record` twice.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_exec_query
  */
 export async function rawExecQuery(
@@ -1365,19 +1368,21 @@ export async function rawExecQuery(
     throw new Error("rawExecQuery requires rawExecute on the adapter");
   }
   const sqlName = name ?? "SQL";
-  return logSql(this, sql, sqlName, binds, async () => {
-    // Materialize lazy transactions before executing SQL, matching Rails'
-    // with_raw_connection which calls materialize_transactions.
-    const tm = (this as any)._transactionManager as TransactionManager | undefined;
-    if (tm) await tm.materializeTransactions();
-    const rawResult = await this.rawExecute!(sql, sqlName, binds);
-    return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
-  });
+  const rawResult = await this.rawExecute(sql, sqlName, binds);
+  return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
 }
 
 /**
  * Executes a query via internal_execute and returns an ActiveRecord::Result.
  * Delegates to internalExecute + castResult.
+ *
+ * Unlike `rawExecQuery` above, this one still wraps in `log`, where Rails'
+ * `internal_exec_query` (database_statements.rb:546-548) leaves the logging to
+ * `raw_execute`. Dropping it is tracked by
+ * 0076-execute-primitive-convergence/wire-raw-execute-through-log: this
+ * body is reached only by an adapter that overrides `internalExecute` but NOT
+ * `internalExecQuery`, and for such a host `log`'s rescue is the only thing
+ * attaching `set_query` context to a translated StatementInvalid.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_exec_query
  */
@@ -1816,6 +1821,10 @@ export const DatabaseStatements = {
 
 /** @internal */
 /**
+ * The `log` block here is where `sql.active_record` is emitted for the whole
+ * query path (database_statements.rb:554), and `perform_query` reports
+ * `row_count` / `statement_name` back by mutating the yielded payload.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#raw_execute
  *
  * @internal
@@ -1823,17 +1832,23 @@ export const DatabaseStatements = {
 export async function rawExecute(
   this: DatabaseStatementsHost,
   sql: string,
-  _name?: string | null,
+  name?: string | null,
   binds?: unknown[],
   prepare = false,
-  _async = false,
+  isAsync = false,
   allowRetry = false,
   materializeTransactions = true,
   batch = false,
 ): Promise<unknown> {
-  const tcBinds = this.typeCastedBinds(binds ?? []);
-  return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
-    (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare, batch }),
+  const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
+  return this.log!(sql, name, binds ?? [], typeCastedBinds, isAsync, (notificationPayload) =>
+    (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
+      (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
+        prepare,
+        notificationPayload,
+        batch,
+      }),
+    ),
   );
 }
 
