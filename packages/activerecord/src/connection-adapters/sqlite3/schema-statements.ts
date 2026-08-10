@@ -197,8 +197,8 @@ export function validTableDefinitionOptions(this: DatabaseAdapter): string[] {
 }
 
 /** @internal */
-function validateIndexLengthBang(
-  this: { adapter: DatabaseAdapter },
+export function validateIndexLengthBang(
+  this: DatabaseAdapter,
   tableName: string,
   newName: string,
   internal = false,

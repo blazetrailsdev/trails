@@ -28,6 +28,7 @@ import {
   indexes as sqliteIndexes,
   newColumnFromField,
   validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
+  validateIndexLengthBang as sqliteValidateIndexLengthBang,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import {
@@ -2141,6 +2142,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   validTableDefinitionOptions(): string[] {
     return sqliteValidTableDefinitionOptions.call(this);
+  }
+
+  /**
+   * Mirrors: SQLite3::SchemaStatements#validate_index_length!
+   * (sqlite3/schema_statements.rb:139-141) — `super unless internal`. The
+   * temporary table `alter_table` copies through is `a#{from}` and its indexes
+   * are renamed `t#{name}`, so an index already at the 64-character limit goes
+   * one over; `internal: true` from `copy_table_indexes` is what exempts it.
+   *
+   * @internal
+   */
+  override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
+    sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
   }
 
   // --- FK / Check constraint operations (SQLite requires table rebuild) ---
