@@ -380,32 +380,25 @@ interface HandleWarningsHost {
  */
 export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
   const action = (this.constructor as { dbWarningsAction?: DbWarningsAction }).dbWarningsAction;
-  try {
-    for (const warning of this._noticeReceiverSqlWarnings ?? []) {
-      if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
-      warning.sql = sql;
-      if (!action || action === "ignore") continue;
-      if (action === "raise") throw warning;
-      if (action === "log") {
-        const codeSuffix = warning.code ? ` (${warning.code})` : "";
-        const message = `[ActiveRecord::SQLWarning] ${warning.message}${codeSuffix}`;
-        const logger = this.logger as { warn?: (msg: string) => void } | null | undefined;
-        if (logger?.warn) logger.warn(message);
-        else console.warn(message);
-      }
-      // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
-      // (active_record.rb:248-249).
-      if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
-      // Rails' `ActiveRecord.db_warnings_action.call(warning)` — the symbol arms
-      // above are the behaviors its setter bakes into that Proc, and a
-      // user-supplied callable is invoked here exactly as Rails invokes it.
-      if (typeof action === "function") action.call(undefined, warning);
+  for (const warning of this._noticeReceiverSqlWarnings ?? []) {
+    if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
+    warning.sql = sql;
+    if (!action || action === "ignore") continue;
+    if (action === "raise") throw warning;
+    if (action === "log") {
+      const codeSuffix = warning.code ? ` (${warning.code})` : "";
+      const message = `[ActiveRecord::SQLWarning] ${warning.message}${codeSuffix}`;
+      const logger = this.logger as { warn?: (msg: string) => void } | null | undefined;
+      if (logger?.warn) logger.warn(message);
+      else console.warn(message);
     }
-  } finally {
-    // Rails resets the buffer when the notice receiver is (re)installed
-    // (postgresql_adapter.rb:338); trails clears it here as well so a warning
-    // is never re-dispatched by the next query on the same connection.
-    if (this._noticeReceiverSqlWarnings) this._noticeReceiverSqlWarnings = [];
+    // Mirrors Rails' `:report` → `Rails.error.report(warning, handled: true)`
+    // (active_record.rb:248-249).
+    if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
+    // Rails' `ActiveRecord.db_warnings_action.call(warning)` — the symbol arms
+    // above are the behaviors its setter bakes into that Proc, and a
+    // user-supplied callable is invoked here exactly as Rails invokes it.
+    if (typeof action === "function") action.call(undefined, warning);
   }
 }
 

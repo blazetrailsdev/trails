@@ -1065,7 +1065,6 @@ export class PostgreSQLAdapter
     // normalizer, mapping the adapter's `type_cast` over the binds.
     const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
-    this._noticeReceiverSqlWarnings = [];
     const pgResult: ArrayQueryResult = await this.log(
       rewritten,
       name ?? "SQL",
@@ -1539,7 +1538,6 @@ export class PostgreSQLAdapter
   ): Promise<Result> {
     const bindArray = this.typeCastedBinds(binds) ?? [];
     const rewritten = this.rewriteBinds(sql, bindArray);
-    this._noticeReceiverSqlWarnings = [];
     const pgResult = await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
       try {
         const r = await this._performQuery(client, rewritten, binds, bindArray, {
@@ -1577,24 +1575,29 @@ export class PostgreSQLAdapter
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
     // without re-running rewriteBinds.
-    this._noticeReceiverSqlWarnings = [];
-    // Flush inside the instrumented callback so a warning raise is captured by
-    // payload.exception — mirrors Rails' handle_warnings inside perform_query (line 166).
-    return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
-      try {
-        return await this.withRawConnection({ allowRetry }, async (conn) => {
-          const client = conn as unknown as pg.Client;
-          const result = await this._performQuery(client, rewritten, binds, bindArray, {
-            prepare: this._shouldPrepare(bindArray),
-            notificationPayload: payload,
+    try {
+      return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
+        try {
+          return await this.withRawConnection({ allowRetry }, async (conn) => {
+            const client = conn as unknown as pg.Client;
+            const result = await this._performQuery(client, rewritten, binds, bindArray, {
+              prepare: this._shouldPrepare(bindArray),
+              notificationPayload: payload,
+            });
+            return result?.rows ?? [];
           });
-          return result?.rows ?? [];
-        });
-      } catch (e: any) {
-        const translated = this._translateException(e, rewritten, bindArray);
-        throw translated;
-      }
-    });
+        } catch (e: any) {
+          const translated = this._translateException(e, rewritten, bindArray);
+          throw translated;
+        }
+      });
+    } finally {
+      // Rails' `execute(...) ... ensure @notice_receiver_sql_warnings = []`
+      // (postgresql/database_statements.rb:39-43). This is the only place the
+      // buffer is reset per query — a warning raised on an internal path
+      // survives into the next `handle_warnings` pass, as it does in Rails.
+      this._noticeReceiverSqlWarnings = [];
+    }
   }
 
   /**
@@ -1648,7 +1651,6 @@ export class PostgreSQLAdapter
     const originalBinds = binds;
     binds = this.typeCastedBinds(binds) ?? [];
     const pgSql = this.rewriteBinds(sql, binds);
-    this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
     // something that can be re-EXPLAIN'd without re-running rewriteBinds
     // (and without re-appending RETURNING for bare INSERTs, which isn't
@@ -2120,12 +2122,6 @@ export class PostgreSQLAdapter
       const hasBinds = binds.length > 0;
       const bindArray = hasBinds ? (this.typeCastedBinds(binds) ?? []) : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
-      // A bound query here is the exec_insert RETURNING read-back; mirror
-      // _instrumentedQueryOnClient by resetting the notice buffer up front and
-      // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
-      // dropped or misattributed to the next query. Transaction-control SQL passes
-      // no binds and keeps its byte-identical path (no reset/flush/rewrite).
-      if (hasBinds) this._noticeReceiverSqlWarnings = [];
       const result = await this.log(runSql, name, binds, bindArray, false, (payload) =>
         // materializeTransactions is handled above (not delegated to
         // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/

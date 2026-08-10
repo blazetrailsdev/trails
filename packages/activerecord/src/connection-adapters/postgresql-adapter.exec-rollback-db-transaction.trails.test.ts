@@ -10,6 +10,14 @@
  * the connection-error discard were deleted as unreachable; the first case
  * below fails when the surviving `finally` is dropped, and the second is why
  * the discard was not needed.
+ *
+ * The severed-socket ROLLBACK surfaces its driver error rather than silently
+ * reconnecting: `perform_query` ends in `verified!`
+ * (`postgresql/database_statements.rb:164`), so the BEGIN already marked the
+ * connection verified and `with_raw_connection` skips the verify ping that
+ * would otherwise have reconnected — and `internal_execute` passes
+ * `allow_retry: false`, so there is no retry either. The `finally` still
+ * releases the client, which is the invariant this case exists to pin.
  */
 import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "../support/describe-if-pg.js";
@@ -48,7 +56,9 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
       await adapter.beginDbTransaction();
       await (client(adapter) as { end(): Promise<void> }).end();
 
-      await adapter.execRollbackDbTransaction();
+      await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(
+        /Client was closed and is not queryable/,
+      );
 
       expect(inTransaction(adapter)).toBe(false);
       expect(client(adapter)).toBeNull();
