@@ -28,6 +28,7 @@ import {
   indexes as sqliteIndexes,
   newColumnFromField,
   validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
+  validateIndexLengthBang as sqliteValidateIndexLengthBang,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import {
@@ -2143,6 +2144,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteValidTableDefinitionOptions.call(this);
   }
 
+  /**
+   * Mirrors: SQLite3::SchemaStatements#validate_index_length!
+   * (sqlite3/schema_statements.rb:139-141) — `super unless internal`. The
+   * temporary table `alter_table` copies through is `a#{from}` and its indexes
+   * are renamed `t#{name}`, so an index already at the 64-character limit goes
+   * one over; `internal: true` from `copy_table_indexes` is what exempts it.
+   *
+   * @internal
+   */
+  override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
+    sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
+  }
+
   // --- FK / Check constraint operations (SQLite requires table rebuild) ---
 
   /**
@@ -2527,11 +2541,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
    *
-   * @missingRailsCall add_index — SQLite puts the schema on the INDEX name
-   *   (`CREATE INDEX aux.by_name ON widgets (…)`); qualifying the table instead
-   *   is a syntax error, and `add_index` has no notion of an ATTACHed schema, so
-   *   the statement is assembled here. It still goes through `execute`, the
-   *   primitive `add_index` would have reached.
+   * Rails calls `add_index` unconditionally (`sqlite3_adapter.rb:674`) and so
+   * does this, for every destination Rails can name. The one arm that does not
+   * is the schema-qualified one, which Rails has no notion of; it is recorded at
+   * that branch, not as a `@missingRailsCall` tag — the tag is per-method, and
+   * `api:calls` fails it as STALE now that the method does make the call.
    * @internal
    */
   private async copyTableIndexes(
@@ -2564,6 +2578,28 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
+      const options: {
+        name: string;
+        internal: boolean;
+        unique?: boolean;
+        where?: string;
+        order?: string | Record<string, string>;
+      } = { name: newName, internal: true };
+      if (idx.unique) options.unique = true;
+      if (idx.where) options.where = idx.where;
+      if (idx.orders) options.order = idx.orders;
+      // MISSING RAILS CALL (add_index, sqlite3_adapter.rb:674) — this branch
+      // only. SQLite puts the schema on the INDEX name, not on the table it
+      // indexes (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the
+      // table instead is a syntax error, and `add_index` quotes the table, so
+      // it cannot express a qualified destination. Rails has no ATTACHed-schema
+      // notion here at all — every destination Rails can name takes the
+      // `addIndex` call below, and this arm is the trails-only remainder.
+      const { schema: toSchema } = this._splitTableName(to);
+      if (toSchema === undefined || toSchema === "") {
+        await this.addIndex(to, cols, options);
+        continue;
+      }
       // Rails forwards `index.orders` to add_index, whose add_index_sort_order
       // appends any present direction upcased (`column << " #{orders[name].upcase}"`)
       // keyed off the column name as it appears in the copied list. This
@@ -2583,13 +2619,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
             .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
             .join(", ")
         : cols;
-      // SQLite puts the schema on the INDEX name, not on the table it indexes
-      // (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the table
-      // instead is a syntax error. Rails has no ATTACHed-schema notion here.
-      const { schema: toSchema } = this._splitTableName(to);
-      const target = toSchema
-        ? `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`
-        : `${quoteColumnName(newName)} ON ${quoteTableName(to)}`;
+      const target = `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.execute(sql);

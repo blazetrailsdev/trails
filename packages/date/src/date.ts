@@ -4369,7 +4369,21 @@ class DateError extends ArgumentError {
  * {@link DateInfinity#d} (TS4094).
  *
  * `Numeric` has no trails port, so the class stands alone — every member the
- * gem defines is here, and none of Ruby's inherited `Numeric` surface is.
+ * gem defines is here, and of Ruby's inherited surface only `Comparable`'s is:
+ * `Numeric` includes it (Ruby core `numeric.c` `Init_Numeric`,
+ * `rb_include_module(rb_cNumeric, rb_mComparable)`), and those six operators
+ * are what a `Range` calls on an endpoint — which is this class's whole job
+ * (`test_date.rb:9` `test_range_infinite_float`, `:166`
+ * `test_infinity_comparison`). They are NOT reimplemented per operator: each is
+ * `cmpint` over {@link DateInfinity#compareTo} exactly as `Comparable` derives
+ * them, so `<=>` (`lib/date.rb:35-48`) stays the single definition. Porting
+ * `Numeric` itself to carry them is the alternative, and it is not taken here:
+ * the gem's own inheritance is a Ruby-core class trails has no other caller for,
+ * and `Comparable` is a module with no members of its own to port — the derived
+ * bodies below ARE the module.
+ *
+ * The rest of `Numeric` (`step`, `div`, `fdiv`, `integer?`, …) remains absent;
+ * `Date::Infinity` overrides everything of it the gem itself reaches for.
  */
 export class DateInfinity {
   /**
@@ -4469,6 +4483,61 @@ export class DateInfinity {
       return spaceship(l, r);
     }
     return null;
+  }
+
+  /**
+   * Ruby `Comparable#cmp_int` over `rb_cmperr` (Ruby core `compar.c`), the one
+   * body every operator below is derived from: a `nil` `<=>` is an
+   * `ArgumentError`, not a `false`. `rb_cmperr` names the operand by `inspect`
+   * when it is a special constant or a Float, and by `rb_obj_class` otherwise.
+   */
+  #cmpint(other: unknown): number {
+    const c = this.compareTo(other);
+    if (c === null) {
+      const rhs =
+        other == null || typeof other === "boolean" || kNumericP(other)
+          ? String(other)
+          : ((other as object)?.constructor?.name ?? typeof other);
+      throw new ArgumentError(`comparison of Date::Infinity with ${rhs} failed`);
+    }
+    return c;
+  }
+
+  /** Ruby `Comparable#<` (Ruby core `compar.c` `cmp_lt`), `cmpint < 0`. */
+  lessThan(other: unknown): boolean {
+    return this.#cmpint(other) < 0;
+  }
+
+  /** Ruby `Comparable#<=` (Ruby core `compar.c` `cmp_le`), `cmpint <= 0`. */
+  lessThanOrEqual(other: unknown): boolean {
+    return this.#cmpint(other) <= 0;
+  }
+
+  /** Ruby `Comparable#>` (Ruby core `compar.c` `cmp_gt`), `cmpint > 0`. */
+  greaterThan(other: unknown): boolean {
+    return this.#cmpint(other) > 0;
+  }
+
+  /** Ruby `Comparable#>=` (Ruby core `compar.c` `cmp_ge`), `cmpint >= 0`. */
+  greaterThanOrEqual(other: unknown): boolean {
+    return this.#cmpint(other) >= 0;
+  }
+
+  /**
+   * Ruby `Comparable#==` (Ruby core `compar.c` `cmp_equal`), the one derived
+   * operator that does NOT raise: an incomparable operand — a `nil` `<=>` — is
+   * `false` here. This is the same shape {@link Date#equals} takes.
+   */
+  equals(other: unknown): boolean {
+    return this.compareTo(other) === 0;
+  }
+
+  /**
+   * Ruby `Comparable#between?` (Ruby core `compar.c` `cmp_between`), which is
+   * `cmpint` on both ends and so raises for an operand `<=>` cannot place.
+   */
+  isBetween(min: unknown, max: unknown): boolean {
+    return this.#cmpint(min) >= 0 && this.#cmpint(max) <= 0;
   }
 
   /**
@@ -4573,6 +4642,18 @@ function minusDd(self: Date, other: Date): Rational {
   if (df) r = r.add(isecToDay(df));
   if (!sf.isZero()) r = r.add(nsToDay(sf));
   return r;
+}
+
+/**
+ * @internal `date_core.c` `check_numeric` (`date_core.c:67-72`), the guard
+ * every constructor runs over each field it was passed: a non-Numeric is a
+ * `TypeError`, where the `valid_*?` predicates answer `false` for the same
+ * argument (`RETURN_FALSE_UNLESS_NUMERIC`, `date_core.c:2513` and friends).
+ * TypeScript's parameter types say the same thing for a typed caller; this is
+ * the runtime half, which is what `test_invalid_types` exercises.
+ */
+function checkNumeric(obj: unknown, field: string): void {
+  if (!kNumericP(obj)) throw new TypeError(`invalid ${field} (not numeric)`);
 }
 
 /**
@@ -4862,6 +4943,9 @@ export class Date {
       this.#of = of;
       return;
     }
+    checkNumeric(day, "day");
+    checkNumeric(month, "month");
+    checkNumeric(year, "year");
     const sg = val2sg(start);
     if (guessStyle(year, sg) < 0) {
       const r = validGregorianP(year, month as number, day);
@@ -4955,6 +5039,91 @@ export class Date {
   }
 
   /**
+   * Ruby `Date.valid_jd?(jd, start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `date_s_valid_jd_p`, `date_core.c:2506-2524`), which is "implemented for
+   * compatibility": `valid_jd_sub` (`:2465-2470`) validates the `start` and
+   * hands the Julian day straight back, so the only `false` is a non-Numeric.
+   */
+  static isValidJd(jd: unknown, start: number = DEFAULT_SG): boolean {
+    if (!kNumericP(jd)) return false;
+    val2sg(start);
+    return true;
+  }
+
+  /**
+   * Ruby `Date.valid_civil?(year, month, mday, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `date_s_valid_civil_p`, `date_core.c:2600-2622`).
+   * `valid_civil_sub` (`:2526-2560`) is `date_initialize`'s own branch on
+   * `guess_style` without the `need_jd` half.
+   */
+  static isValidCivil(
+    year: unknown,
+    month: unknown,
+    mday: unknown,
+    start: number = DEFAULT_SG,
+  ): boolean {
+    if (!kNumericP(year)) return false;
+    if (!kNumericP(month)) return false;
+    if (!kNumericP(mday)) return false;
+    const sg = val2sg(start);
+    if (guessStyle(year as number, sg) < 0) {
+      return validGregorianP(year as number, month as number, mday as number) !== null;
+    }
+    return validCivilP(year as number, month as number, mday as number, sg) !== null;
+  }
+
+  /**
+   * Ruby `Date.valid_ordinal?(year, yday, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `date_s_valid_ordinal_p`, `date_core.c:2688-2708`, over
+   * `valid_ordinal_sub`, `:2624-2650`).
+   */
+  static isValidOrdinal(year: unknown, yday: unknown, start: number = DEFAULT_SG): boolean {
+    if (!kNumericP(year)) return false;
+    if (!kNumericP(yday)) return false;
+    return cValidOrdinalP(year as number, yday as number, val2sg(start)) !== null;
+  }
+
+  /**
+   * Ruby `Date.valid_commercial?(cwyear, cweek, cwday, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `date_s_valid_commercial_p`, `date_core.c:2778-2800`,
+   * over `valid_commercial_sub`, `:2710-2736`).
+   */
+  static isValidCommercial(
+    cwyear: unknown,
+    cweek: unknown,
+    cwday: unknown,
+    start: number = DEFAULT_SG,
+  ): boolean {
+    if (!kNumericP(cwyear)) return false;
+    if (!kNumericP(cweek)) return false;
+    if (!kNumericP(cwday)) return false;
+    return (
+      cValidCommercialP(cwyear as number, cweek as number, cwday as number, val2sg(start)) !== null
+    );
+  }
+
+  /**
+   * Ruby `Date.julian_leap?(year)` (ruby/date, `date_core.c`
+   * `date_s_julian_leap_p`, `date_core.c:2972-2981`), which — unlike the
+   * `valid_*?` predicates — raises `TypeError` on a non-Numeric year.
+   */
+  static isJulianLeap(year: unknown): boolean {
+    checkNumeric(year, "year");
+    const [, ry] = decodeYear(year as number, +1);
+    return cJulianLeapP(ry);
+  }
+
+  /**
+   * Ruby `Date.gregorian_leap?(year)` (ruby/date, `date_core.c`
+   * `date_s_gregorian_leap_p`, `date_core.c:2995-3004`).
+   */
+  static isGregorianLeap(year: unknown): boolean {
+    checkNumeric(year, "year");
+    const [, ry] = decodeYear(year as number, -1);
+    return cGregorianLeapP(ry);
+  }
+
+  /**
    * Ruby `Date.jd(jd = 0)` (ruby/date, `date_core.c` `date_s_jd`,
    * `date_core.c:3377-3387`), the date the given Julian day names. Ruby writes
    * the day straight into a fresh `SimpleDateData` under `HAVE_JD` alone and
@@ -4962,6 +5131,7 @@ export class Date {
    * so the conversion happens at the call.
    */
   static jd(jd: number | bigint = 0, start = DEFAULT_SG): Temporal.PlainDate {
+    checkNumeric(jd, "jd");
     const [nth, rjd] = decodeJd(jd);
     return new Date(SEAT, nth, rjd, val2sg(start)).toDate();
   }
@@ -4973,6 +5143,8 @@ export class Date {
    * of the year, so `Date.ordinal(2001, -1)` is 2001-12-31.
    */
   static ordinal(year = -4712, yday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    checkNumeric(yday, "yday");
+    checkNumeric(year, "year");
     const sg = val2sg(start);
     const r = cValidOrdinalP(year, yday, sg);
     if (r === null) throw new DateError("invalid date");
@@ -4998,6 +5170,9 @@ export class Date {
    * the commercial year, so `Date.commercial(2001, -1, -1)` is 2001-12-30.
    */
   static commercial(cwyear = -4712, cweek = 1, cwday = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    checkNumeric(cwday, "cwday");
+    checkNumeric(cweek, "cweek");
+    checkNumeric(cwyear, "year");
     const sg = val2sg(start);
     const r = cValidCommercialP(cwyear, cweek, cwday, sg);
     if (r === null) throw new DateError("invalid date");
@@ -6286,6 +6461,12 @@ export class DateTime extends DateWithoutParseStatics {
       this.#of = of;
       return;
     }
+    if (second !== undefined) checkNumeric(second, "second");
+    if (minute !== undefined) checkNumeric(minute, "minute");
+    if (hour !== undefined) checkNumeric(hour, "hour");
+    if (day !== undefined) checkNumeric(day, "day");
+    if (month !== undefined) checkNumeric(month, "month");
+    if (year !== undefined) checkNumeric(year, "year");
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
     const [min, minFr] = num2intWithFrac(
       minute ?? 0,
@@ -6424,6 +6605,10 @@ export class DateTime extends DateWithoutParseStatics {
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
+    if (second !== undefined) checkNumeric(second, "second");
+    if (minute !== undefined) checkNumeric(minute, "minute");
+    if (hour !== undefined) checkNumeric(hour, "hour");
+    checkNumeric(jd, "jd");
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
     const [min, minFr] = num2intWithFrac(
       minute ?? 0,
@@ -6493,6 +6678,11 @@ export class DateTime extends DateWithoutParseStatics {
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
+    if (second !== undefined) checkNumeric(second, "second");
+    if (minute !== undefined) checkNumeric(minute, "minute");
+    if (hour !== undefined) checkNumeric(hour, "hour");
+    checkNumeric(yday, "yday");
+    checkNumeric(year, "year");
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
     const [min, minFr] = num2intWithFrac(
       minute ?? 0,
@@ -6581,6 +6771,12 @@ export class DateTime extends DateWithoutParseStatics {
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const sg = start === undefined ? DEFAULT_SG : val2sg(start);
     const rof = offset === undefined ? 0 : val2off(offset);
+    if (second !== undefined) checkNumeric(second, "second");
+    if (minute !== undefined) checkNumeric(minute, "minute");
+    if (hour !== undefined) checkNumeric(hour, "hour");
+    checkNumeric(cwday, "cwday");
+    checkNumeric(cweek, "cweek");
+    checkNumeric(cwyear, "year");
     const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
     const [min, minFr] = num2intWithFrac(
       minute ?? 0,
@@ -6753,7 +6949,15 @@ export class DateTime extends DateWithoutParseStatics {
    */
   newOffset(offset: number | bigint | Rational | string = 0): this {
     const rof = val2off(offset);
-    return new DateTime(SEAT, this.nth, this.#jd, this.#df, this.#sf, rof, this.start) as this;
+    return new DateTime(
+      SEAT,
+      this.nth,
+      this.#getCJd(),
+      this.#getCDf(),
+      this.#sf,
+      rof,
+      this.start,
+    ) as this;
   }
 
   override newStart(start = DEFAULT_SG): this {

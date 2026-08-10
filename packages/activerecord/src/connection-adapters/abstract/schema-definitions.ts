@@ -547,8 +547,19 @@ export interface AddIndexOptions {
   unique?: boolean;
   name?: string;
   where?: string;
-  order?: Record<string, string>;
+  /**
+   * `add_index(table, columns, order: :desc)` applies one direction to every
+   * column — `options_for_index_columns` takes the bare value as well as the
+   * per-column Hash.
+   */
+  order?: string | Record<string, string>;
   using?: string;
+  /**
+   * `internal:` is add_index's own kwarg, outside the asserted option set
+   * (schema_statements.rb:1476-1477); `copy_table_indexes` passes it
+   * (sqlite3_adapter.rb:668).
+   */
+  internal?: boolean;
   type?: string;
   comment?: string;
   ifNotExists?: boolean;
