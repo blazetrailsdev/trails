@@ -1368,6 +1368,11 @@ export async function rawExecQuery(
     throw new Error("rawExecQuery requires rawExecute on the adapter");
   }
   const sqlName = name ?? "SQL";
+  // Rails is `cast_result(raw_execute(...))` and nothing else
+  // (abstract/database_statements.rb:540-542): `raw_execute` is the single
+  // logging site (`:553`) and materializes through `with_raw_connection`
+  // (`:555`), so wrapping it again here would emit two `sql.active_record`
+  // events for one query.
   const rawResult = await this.rawExecute(sql, sqlName, binds);
   return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
 }

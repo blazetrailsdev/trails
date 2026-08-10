@@ -270,6 +270,10 @@ export async function performQuery(
     insertRowid = await rawConnection.lastInsertRowId();
   } finally {
     release();
+    // Rails closes the uncached statement in its own ensure
+    // (sqlite3/database_statements.rb:93-107); the pooled one on the `prepare`
+    // arm is the pool's to close. `finalize` is the driver's `close`.
+    if (!prepare && stmt !== null) await stmt.finalize?.();
   }
   // Persist for the affected_rows() port / public accessor. The RETURNED
   // locals — not these fields — are what executeMutation uses for its return
