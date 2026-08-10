@@ -156,6 +156,12 @@ function splitPairs(body: string): string[] {
  * Undo the extractors' delimiter escaping, once the descriptor has been split
  * down to a single payload.
  *
+ * The descriptor grammar is a FLAT string split on `,` `=` `{` `}`, and a string
+ * value can contain every one of them — `injectJoin(list, collector, ", ")`.
+ * Unescaped, that comma splits a `kwargs{…}` into a fragment with no `=` and the
+ * whole call site is silently dropped as uncomparable, losing exactly the
+ * SQL-fragment arguments RFC 0095 §2 calls load-bearing.
+ *
  * Percent- rather than backslash-escaped, because a `str:` payload's backslash
  * is NOT free: literals.ts#normalizeLiteral canonicalizes `\n` and friends, so a
  * backslash escape here would consume the marker that arm reads and `"\\n"`

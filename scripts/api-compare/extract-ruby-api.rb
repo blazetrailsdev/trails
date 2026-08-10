@@ -2480,15 +2480,8 @@ class ApiExtractor
     "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
   end
 
-  # The descriptor grammar is a FLAT string the comparator splits on `,` `=` `{`
-  # `}` (call-args.ts#splitPairs), and a string value can contain every one of
-  # them — `to_sentence(last_word_connector: ", or ")`. Unescaped, that comma
-  # splits `kwargs{…}` into a fragment with no `=` and the whole call site is
-  # silently dropped as uncomparable, losing exactly the SQL-fragment arguments
-  # RFC 0095 §2 calls load-bearing. call-args.ts unescapes after splitting.
-  #
-  # Percent- rather than backslash-escaped so the payload's own backslash
-  # escapes stay intact for literals.ts#normalizeLiteral.
+  # The four grammar delimiters, so a string VALUE carrying one does not read as
+  # one. Rationale and the inverse: call-args.ts#unescapeDescriptorText.
   def escape_descriptor_text(text)
     text.gsub(/[%,={}]/) { |c| format("%%%02X", c.ord) }
   end

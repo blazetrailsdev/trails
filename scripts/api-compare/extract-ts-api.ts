@@ -2832,14 +2832,9 @@ function unwrapArg(node: ts.Expression): ts.Expression {
 }
 
 /**
- * Mirrors extract-ruby-api.rb#escape_descriptor_text. The descriptor grammar is
- * a FLAT string the comparator splits on `,` `=` `{` `}`
- * (call-args.ts#splitPairs), and a string value can contain every one of them —
- * `injectJoin(list, collector, ", ")`. Unescaped, that comma splits a
- * `kwargs{…}` into a fragment with no `=` and the whole call site is silently
- * dropped as uncomparable, losing exactly the SQL-fragment arguments RFC 0095
- * §2 calls load-bearing. Percent- rather than backslash-escaped so the payload's
- * own backslash escapes stay intact for literals.ts#normalizeLiteral.
+ * Mirrors extract-ruby-api.rb#escape_descriptor_text: the four grammar
+ * delimiters, so a string VALUE carrying one does not read as one. Rationale
+ * and the inverse: call-args.ts#unescapeDescriptorText.
  */
 function escapeDescriptorText(text: string): string {
   return text.replace(/[%,={}]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);

@@ -93,9 +93,6 @@ describe("normalizeArg", () => {
     expect(normalizeArg("kwargs{opts=kwargs{k=str-interp}}")).toBeNull();
   });
 
-  // The delimiters both extractors escape inside a `str:` payload. Unescaped, a
-  // comma splits the kwargs body into a fragment with no `=` and the whole call
-  // site is silently skipped — the SQL-fragment arguments RFC 0095 §2 is for.
   it("unescapes a descriptor delimiter inside a string value", () => {
     expect(normalizeArg("str:%2C ")).toBe("str:, ");
     expect(normalizeArg("str:a%3Db%7Bc%7Dd")).toBe("str:a=b{c}d");
