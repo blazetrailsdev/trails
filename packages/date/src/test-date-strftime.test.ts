@@ -15,7 +15,6 @@
  * assertion reads.
  */
 
-import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
 import { Date as RubyDate, DateTime as RubyDateTime, Rational, dtNewByFrags } from "./date.js";
 import { Time as RubyTime } from "./time.js";
@@ -266,18 +265,13 @@ function inspect(value: unknown): string {
 
 /**
  * Ruby's `(Date.new(1970,1,1)..Date.new(2037,12,31)).each`, whose `Range#each`
- * walks by `Date#succ` (`date_core.c` `d_lite_next_day` over `d_lite_plus`).
- * Neither `#succ` nor `#+` is ported yet — they belong to
- * 0088-date-gem-port/port-test-date-arith-operators — so the walk goes through
- * `Temporal.PlainDate#add` and rebuilds the gem object per day.
+ * walks by `Date#succ` — `d_lite_next_day` over `d_lite_plus(self, 1)`. `#succ`
+ * itself is not ported yet (0088-date-gem-port/port-test-date-arith-operators
+ * owns it), so the walk calls the `plus` it is defined as, and `cmp` for the
+ * `<= end` the Range walks to.
  */
 function* dateRange(from: RubyDate, to: RubyDate): Generator<RubyDate> {
-  const last = to.toDate();
-  for (
-    let pd = from.toDate();
-    Temporal.PlainDate.compare(pd, last) <= 0;
-    pd = pd.add({ days: 1 })
-  ) {
-    yield new RubyDate(pd.year, pd.month, pd.day);
+  for (let d = from; d.cmp(to)! <= 0; d = d.plus(1)) {
+    yield d;
   }
 }
