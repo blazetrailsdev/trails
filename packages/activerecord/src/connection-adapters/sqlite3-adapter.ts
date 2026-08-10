@@ -301,7 +301,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * the handle is fully torn down. Sync drivers (better-sqlite3) leave this null.
    */
   private _closingDriver: Promise<void> | null = null;
+  /**
+   * Mirrors: SQLite3Adapter#active? (sqlite3_adapter.rb:216-218).
+   *
+   * Ruby's `disconnect!` takes `@lock.synchronize`
+   * (`abstract_adapter.rb:696-701`), which BLOCKS, so `active?` never observes
+   * an open handle once `disconnect!` has returned. `disconnectBang` below
+   * cannot block on `_statementLock` and defers the close instead, so this —
+   * the async surface — drains that deferred close before it answers, and no
+   * caller awaiting it sees a handle Rails would already have closed.
+   */
   override async active(): Promise<boolean> {
+    await this.whenClosed();
     return this.driver?.isOpen() ?? false;
   }
   /**
@@ -1451,7 +1462,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // between a statement's preparation and its execution. `_statementLock` is
     // that lock here, and it cannot be awaited from a sync body — so when it is
     // held, chain the close onto its tail rather than closing the handle out
-    // from under a queued statement. `close()` / `whenClosed()` drain it.
+    // from under a queued statement. `close()` / `whenClosed()` drain it, and
+    // `active()` drains it before it answers — so the deferral is invisible on
+    // every surface a caller can await, which is the whole of what Ruby's
+    // blocking `@lock.synchronize` buys. The two helpers below exist only to
+    // express that deferral: Rails needs neither, because `disconnect!`
+    // (sqlite3_adapter.rb:221) is one straight-line body under a lock that
+    // blocks. They go away with `_statementLock` itself once `perform_query`
+    // runs under `with_raw_connection`'s adapter-level lock (RFC 0076).
     const ahead = this._statementLock;
     if (ahead) {
       this._chainClose(ahead.then(() => this._disconnect()));
