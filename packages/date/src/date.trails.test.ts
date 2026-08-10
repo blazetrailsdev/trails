@@ -2210,3 +2210,23 @@ describe("a reducible Rational operand at the C's Integer branches", () => {
     expect(d.jd).toBe(2451913);
   });
 });
+
+/**
+ * Trails-only: `check_limit` measures `RSTRING_LEN(str)` — bytes
+ * (`date_core.c:4468-4479`) — and the gem's own tests are all ASCII, where a
+ * byte count and a JS UTF-16 code-unit count agree. They diverge on any
+ * multi-byte string, both in whether the raise fires and in the number the
+ * message reports.
+ */
+describe("check_limit measures bytes, not UTF-16 code units", () => {
+  it("raises for a string whose byte length crosses the limit its length does not", () => {
+    // 40 code units, 120 UTF-8 bytes.
+    const str = "日".repeat(40);
+    expect(str.length).toBe(40);
+    expect(() => RubyDate._parse(str, false, { limit: 100 })).toThrow(ArgumentError);
+    expect(() => RubyDate._parse(str, false, { limit: 100 })).toThrow(
+      "string length (120) exceeds the limit 100",
+    );
+    expect(() => RubyDate._parse(str, false, { limit: 120 })).not.toThrow();
+  });
+});

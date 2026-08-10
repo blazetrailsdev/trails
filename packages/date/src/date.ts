@@ -4833,13 +4833,14 @@ function getLimit(opt: ParseOpt | undefined): number {
  * @internal `date_core.c` `check_limit` (`date_core.c:4467-4479`), which runs
  * BEFORE any sub-parser so a pathological string is rejected rather than
  * walked. A `nil` string is let through to the sub-parser that answers `{}` for
- * it (`NIL_P(str)`, `date_core.c:4471`). The C measures `RSTRING_LEN` — bytes —
- * where a JS string measures UTF-16 code units; the gem's own tests are ASCII,
- * where the two agree.
+ * it (`NIL_P(str)`, `date_core.c:4471`). `RSTRING_LEN` is a byte count over the
+ * ASCII-compatible encoding `date_s__parse_internal` has already checked for
+ * (`rb_enc_str_asciicompat_p`, `date_core.c:4490-4492`), so `slen` is the
+ * string's UTF-8 byte length, not its UTF-16 code-unit length.
  */
 function checkLimit(str: string | null | undefined, opt: ParseOpt | undefined): void {
   if (str == null) return;
-  const slen = str.length;
+  const slen = new TextEncoder().encode(str).length;
   const limit = getLimit(opt);
   if (slen > limit) {
     throw new ArgumentError(`string length (${slen}) exceeds the limit ${limit}`);
@@ -6502,6 +6503,21 @@ export class Date {
    */
   get start(): number {
     return this.#sg;
+  }
+
+  /**
+   * Ruby `Date#dup`, which is `Object#dup` over the `initialize_copy` the C
+   * defines for it (`d_lite_initialize_copy`, `date_core.c:5140-5182`,
+   * registered at `:9714`): a new object of the receiver's own class carrying
+   * the receiver's `SimpleDateData`/`ComplexDateData` verbatim, reform
+   * included. TS has no `dup_obj`, so this runs through the same
+   * {@link Date#newStart} seam the C's `dup_obj_with_new_start` is, with the
+   * receiver's OWN reform — which is why `DateTime#dup` keeps its
+   * day-fraction, sub-second and offset (the C's complex arm, `:5171`) without
+   * a second override.
+   */
+  dup(): this {
+    return this.newStart(this.start);
   }
 
   /**
