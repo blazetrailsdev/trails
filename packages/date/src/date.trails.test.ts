@@ -1924,3 +1924,39 @@ describe("Date::Infinity", () => {
     );
   });
 });
+
+describe("Date::Infinity as a Range endpoint", () => {
+  it("derives the Comparable operators from its own spaceship", () => {
+    const pos = new RubyDate.Infinity();
+    const neg = new RubyDate.Infinity(-1);
+
+    expect(pos.greaterThan(1000)).toBe(true);
+    expect(pos.greaterThanOrEqual(1000)).toBe(true);
+    expect(pos.lessThan(1000)).toBe(false);
+    expect(pos.lessThanOrEqual(1000)).toBe(false);
+    expect(neg.lessThan(new Rational(1, 2))).toBe(true);
+    expect(pos.greaterThan(neg)).toBe(true);
+    expect(pos.lessThan(Number.POSITIVE_INFINITY)).toBe(false);
+    expect(pos.greaterThanOrEqual(Number.POSITIVE_INFINITY)).toBe(true);
+  });
+
+  it("places a value between the two infinities", () => {
+    const pos = new RubyDate.Infinity();
+    const neg = new RubyDate.Infinity(-1);
+    expect(pos.isBetween(neg, pos)).toBe(true);
+    expect(neg.isBetween(neg, pos)).toBe(true);
+    expect(pos.isBetween(neg, neg)).toBe(false);
+  });
+
+  it("equals answers false for an incomparable operand where the operators raise", () => {
+    const pos = new RubyDate.Infinity();
+    expect(pos.equals(pos)).toBe(true);
+    expect(pos.equals(new RubyDate.Infinity())).toBe(true);
+    expect(pos.equals(new RubyDate.Infinity(-1))).toBe(false);
+    expect(pos.equals("foo")).toBe(false);
+    expect(() => pos.lessThan("foo")).toThrow(ArgumentError);
+    expect(() => pos.isBetween("foo", pos)).toThrow(
+      /comparison of Date::Infinity with an instance of String failed/,
+    );
+  });
+});

@@ -2527,11 +2527,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /**
    * Mirrors: SQLite3Adapter#copy_table_indexes (sqlite3_adapter.rb:651-677)
    *
-   * @missingRailsCall add_index — SQLite puts the schema on the INDEX name
-   *   (`CREATE INDEX aux.by_name ON widgets (…)`); qualifying the table instead
-   *   is a syntax error, and `add_index` has no notion of an ATTACHed schema, so
-   *   the statement is assembled here. It still goes through `execute`, the
-   *   primitive `add_index` would have reached.
+   * The one arm that does NOT reach `add_index` is the schema-qualified
+   * destination (`aux.posts`), which Rails has no notion of — see the comment
+   * at that branch.
    * @internal
    */
   private async copyTableIndexes(
@@ -2564,6 +2562,28 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (!cols.length) continue;
       const escapedFrom = bareFrom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const newName = name.replace(new RegExp(`(^|_)(${escapedFrom})_`), `$1${bareTo}_`);
+      // sqlite3_adapter.rb:668-675 — the options hash and the add_index call it
+      // splats into, in Rails' own build order.
+      const options: {
+        name: string;
+        internal: boolean;
+        unique?: boolean;
+        where?: string;
+        order?: string | Record<string, string>;
+      } = { name: newName, internal: true };
+      if (idx.unique) options.unique = true;
+      if (idx.where) options.where = idx.where;
+      if (idx.orders) options.order = idx.orders;
+      // SQLite puts the schema on the INDEX name, not on the table it indexes
+      // (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the table
+      // instead is a syntax error. Rails has no ATTACHed-schema notion here at
+      // all, so its add_index call is unconditional and ours covers every case
+      // Rails has — the qualified arm below is the trails-only remainder.
+      const { schema: toSchema } = this._splitTableName(to);
+      if (toSchema === undefined || toSchema === "") {
+        await this.addIndex(to, cols, options);
+        continue;
+      }
       // Rails forwards `index.orders` to add_index, whose add_index_sort_order
       // appends any present direction upcased (`column << " #{orders[name].upcase}"`)
       // keyed off the column name as it appears in the copied list. This
@@ -2583,13 +2603,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
             .map((c) => `${quoteColumnName(c)}${orders[c] ? ` ${orders[c].toUpperCase()}` : ""}`)
             .join(", ")
         : cols;
-      // SQLite puts the schema on the INDEX name, not on the table it indexes
-      // (`CREATE INDEX aux.by_name ON widgets (...)`); qualifying the table
-      // instead is a syntax error. Rails has no ATTACHed-schema notion here.
-      const { schema: toSchema } = this._splitTableName(to);
-      const target = toSchema
-        ? `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`
-        : `${quoteColumnName(newName)} ON ${quoteTableName(to)}`;
+      const target = `${quoteColumnName(toSchema)}.${quoteColumnName(newName)} ON ${quoteColumnName(bareTo)}`;
       let sql = `CREATE ${idx.unique ? "UNIQUE " : ""}INDEX ${target} (${colSql})`;
       if (idx.where) sql += ` WHERE ${idx.where}`;
       await this.execute(sql);
