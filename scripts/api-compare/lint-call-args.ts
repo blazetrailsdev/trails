@@ -25,12 +25,12 @@
  *
  * ── Before the seed ─────────────────────────────────────────────────────────
  * The baseline is seeded by its own `main`-only PR (RFC 0095
- * `call-args-baseline-seed`), AFTER this gate lands — a seed generated on a
- * branch drifts from what CI measures. Until then the tree does not exist, and
- * an absent tree is reported as UNSEEDED and exits 0 rather than failing every
- * PR on the merge train with the whole population. The arm is self-closing: the
- * moment the seed lands every arm below is live. An EMPTY tree is not the same
- * thing — a fully converged dimension is a real state and stays gated.
+ * `call-args-baseline-seed`) AFTER this gate lands, because a seed generated on
+ * a branch drifts from what CI measures. Until then the tree does not exist,
+ * and an ABSENT tree is reported as UNSEEDED and exits 0 rather than failing
+ * every PR on the merge train with the whole population — self-closing the
+ * moment the seed lands. An EMPTY tree is a converged dimension, and stays
+ * gated.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
@@ -200,9 +200,8 @@ export async function main(write: boolean): Promise<number> {
     return 1;
   }
 
-  if (await reportNonCanonicalBaselines(await listJsonFiles(BASELINE_DIR), "call-args ratchet")) {
-    return 1;
-  }
+  const files = await listJsonFiles(BASELINE_DIR);
+  if (await reportNonCanonicalBaselines(files, "call-args ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
   if (added.length === 0 && stale.length === 0) {
