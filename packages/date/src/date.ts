@@ -4541,6 +4541,17 @@ function expectNumeric(x: unknown): void {
 }
 
 /**
+ * @internal `f_mul(n, INT2FIX(12))` as `d_lite_next_year` / `d_lite_prev_year`
+ * (`date_core.c:6554-6563`, `:6571-6580`) apply it — the one place the month
+ * wrappers scale their argument before handing it to `Date#>>` / `Date#<<`,
+ * and the reason those two take every Numeric `d_lite_rshift` does.
+ */
+function fMul12(n: number | bigint | Rational): number | bigint | Rational {
+  if (n instanceof Rational) return n.mul(12);
+  return typeof n === "bigint" ? n * 12n : n * 12;
+}
+
+/**
  * @internal `date_core.c` `f_cmp` (`:74-86`), the `<=>` dispatch the C's
  * arithmetic reaches for a non-Fixnum operand. The `FIXNUM_P(x) && FIXNUM_P(y)`
  * arm is the subtraction below; it is widened to every JS `number` because
@@ -5775,11 +5786,31 @@ export class Date {
    * date `other` months after the receiver. When the new month has no such day
    * the last day of it is used — the `while` walking `d` down, which is why
    * `Date.new(2000,1,31) >> 1` is 2000-02-29.
+   *
+   * `other` is any Numeric, so `t` is carried as a {@link Rational}: Ruby
+   * canonicalizes a denominator of 1 back to an Integer, which is what puts
+   * `Date.new(2000,1,31).next_year(Rational(1,2))` — `f_mul(n, 12)` is `(6/1)`,
+   * so `t` is an Integer — on the C's `FIXNUM_P(t)` arm and answers 2000-07-31.
+   * The `else` arm is the C's `f_idiv` / `f_mod` pair, and a `t` that is
+   * genuinely fractional falls out of it as a fractional month, which
+   * `valid_civil_p` rejects exactly as the C's `FIX2INT` of a Rational does not
+   * survive.
    */
-  rshift(other: number | bigint): this {
-    const t = BigInt(this.year) * 12n + BigInt(this.mon - 1) + BigInt(other);
-    const y = bigNorm(div(t, 12));
-    const m = Number(mod(t, 12)) + 1;
+  rshift(other: number | bigint | Rational): this {
+    const t = new Rational(BigInt(this.year) * 12n + BigInt(this.mon - 1), 1).add(other);
+    let y: number | bigint;
+    let m: number;
+    if (t.denominator === 1n) {
+      const it = t.numerator;
+      y = bigNorm(div(it, 12));
+      m = Number(mod(it, 12)) + 1;
+    } else {
+      const d12 = t.denominator * 12n;
+      let q = t.numerator / d12;
+      if (t.numerator % d12 !== 0n && t.numerator < 0n) q -= 1n;
+      y = bigNorm(q);
+      m = t.toF() - 12 * Number(q) + 1;
+    }
     let d = this.mday;
     const sg = this.start;
 
@@ -5796,32 +5827,32 @@ export class Date {
 
   /** Ruby `Date#<<` (ruby/date, `date_core.c` `d_lite_lshift`, `:6507-6512`),
    *  which is `Date#>>` of the negated argument. */
-  lshift(other: number | bigint): this {
-    return this.rshift(-other);
+  lshift(other: number | bigint | Rational): this {
+    return this.rshift(other instanceof Rational ? other.mul(-1) : -other);
   }
 
   /** Ruby `Date#next_month(n = 1)` (ruby/date, `date_core.c`
    *  `d_lite_next_month`, `:6520-6529`), which is `Date#>>` of `n`. */
-  nextMonth(n: number | bigint = 1): this {
+  nextMonth(n: number | bigint | Rational = 1): this {
     return this.rshift(n);
   }
 
   /** Ruby `Date#prev_month(n = 1)` (ruby/date, `date_core.c`
    *  `d_lite_prev_month`, `:6537-6546`), which is `Date#<<` of `n`. */
-  prevMonth(n: number | bigint = 1): this {
+  prevMonth(n: number | bigint | Rational = 1): this {
     return this.lshift(n);
   }
 
   /** Ruby `Date#next_year(n = 1)` (ruby/date, `date_core.c` `d_lite_next_year`,
    *  `:6554-6563`), which is `Date#>>` of `n * 12`. */
-  nextYear(n: number | bigint = 1): this {
-    return this.rshift(typeof n === "bigint" ? n * 12n : n * 12);
+  nextYear(n: number | bigint | Rational = 1): this {
+    return this.rshift(fMul12(n));
   }
 
   /** Ruby `Date#prev_year(n = 1)` (ruby/date, `date_core.c` `d_lite_prev_year`,
    *  `:6571-6580`), which is `Date#<<` of `n * 12`. */
-  prevYear(n: number | bigint = 1): this {
-    return this.lshift(typeof n === "bigint" ? n * 12n : n * 12);
+  prevYear(n: number | bigint | Rational = 1): this {
+    return this.lshift(fMul12(n));
   }
 
   /**
