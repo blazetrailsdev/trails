@@ -297,25 +297,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * MySQL dialect overrides — backtick identifiers and integer bool
-   * coercion. Matches Rails:
+   * MySQL dialect overrides — integer bool coercion. Matches Rails:
    *
-   * - `quote_column_name` / `quote_table_name` — backticks
-   *   (`mysql/quoting.rb:46-52`).
    * - `unquoted_true` / `unquoted_false` → `1` / `0`
    *   (`mysql/quoting.rb:72-77`).
    *
    * `quotedTrue`/`quotedFalse` are NOT overridden — Rails MySQL inherits the
    * abstract `"TRUE"`/`"FALSE"`. Binds serialize to 1/0 via `cast_bound_value`.
    */
-  override quoteTableName(name: string): string {
-    return mysqlQuoteTableName(name);
-  }
-
-  override quoteColumnName(name: string): string {
-    return mysqlQuoteColumnName(name);
-  }
-
   // Defined as methods, not class fields: Rails declares these with `def`
   // (`mysql/quoting.rb:72-77`), and the inherited `type_cast` reaches them
   // through `self`. A field lives on the instance rather than the prototype,

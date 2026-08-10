@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { Quoting } from "./abstract/quoting.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 // Compile-time guard: AbstractAdapter (the base, not a subclass) must
 // itself satisfy Quoting. A subclass-only assignment would let a
@@ -68,5 +71,37 @@ describe("Quoting interface", () => {
     } finally {
       adapter.disconnectBang();
     }
+  });
+});
+
+/**
+ * Rails puts every adapter's identifier quoters in `Quoting::ClassMethods`
+ * (`postgresql/quoting.rb:46,:54`, `sqlite3/quoting.rb:44,:48`,
+ * `mysql/quoting.rb:46,:50`); the instance methods are the abstract
+ * `self.class` delegators (`abstract/quoting.rb:135-143`).
+ */
+describe("Quoting::ClassMethods", () => {
+  it("every adapter class quotes identifiers on the class", () => {
+    expect(PostgreSQLAdapter.quoteColumnName("foo")).toBe('"foo"');
+    expect(PostgreSQLAdapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
+
+    expect(SQLite3Adapter.quoteColumnName("foo")).toBe('"foo"');
+    expect(SQLite3Adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
+
+    expect(Mysql2Adapter.quoteColumnName("foo")).toBe("`foo`");
+    expect(Mysql2Adapter.quoteTableName("foo.bar")).toBe("`foo`.`bar`");
+  });
+
+  it("an adapter defining only the class quoter inherits the instance delegators", () => {
+    class QuotingOnlyAdapter extends AbstractAdapter {
+      static override quoteColumnName(name: string): string {
+        return `[${name}]`;
+      }
+    }
+    const adapter = Object.create(QuotingOnlyAdapter.prototype) as QuotingOnlyAdapter;
+
+    expect(adapter.quoteColumnName("foo")).toBe("[foo]");
+    // abstract/quoting.rb:65-68 — quote_table_name defaults to quote_column_name.
+    expect(adapter.quoteTableName("foo")).toBe("[foo]");
   });
 });
