@@ -50,16 +50,13 @@ export interface CallArgArtifact {
   mismatches: CallArgRow[];
 }
 
-/** The gated class (RFC 0095 §4). */
-export const GATED_CLASS = "shape";
-
 export function keyOf(k: CallArgKey): string {
   return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call} ${k.rubyArgs.join(",")}`;
 }
 
 /** The artifact rows the gate ratchets: `shape` only. */
 export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
-  return artifact.mismatches.filter((m) => m.class === GATED_CLASS);
+  return artifact.mismatches.filter((m) => m.class === "shape");
 }
 
 export interface CallArgDiff {
@@ -79,12 +76,9 @@ export function diffAgainstBaseline(
   };
 }
 
-/**
- * Total order on baseline entries: ascending UTF-16 code-unit order of
- * `keyOf`. Deliberately NOT `localeCompare`, for the reason spelled out in
- * call-mismatch-baseline.ts#compareKeys — ICU collation is locale- and
- * ICU-version-dependent, so a reseed run by one agent reorders another's files.
- */
+/** Total order on baseline entries: ascending UTF-16 code-unit order of
+ *  `keyOf`. Deliberately NOT `localeCompare`, for the reason spelled out in
+ *  call-mismatch-baseline.ts#compareKeys. */
 export function compareKeys(a: CallArgKey, b: CallArgKey): number {
   const ka = keyOf(a);
   const kb = keyOf(b);
@@ -95,11 +89,9 @@ export function sortKeys<T extends CallArgKey>(entries: T[]): T[] {
   return [...entries].sort(compareKeys);
 }
 
-/**
- * Rebuild the baseline from the live artifact: keep each still-flagging row,
- * reusing a prior reason when present and seeding new ones with
- * `defaultReason`. Dropped rows are the stale entries the gate rejects.
- */
+/** Rebuild the baseline from the live artifact: keep each still-flagging row,
+ *  reusing a prior reason when present and seeding new ones with
+ *  `defaultReason`. Dropped rows are the stale entries the gate rejects. */
 export function reseed(
   current: CallArgKey[],
   baseline: CallArgExcludeEntry[],

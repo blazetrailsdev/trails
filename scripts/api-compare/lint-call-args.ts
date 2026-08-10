@@ -104,12 +104,10 @@ export async function baselineSeeded(dir: string = BASELINE_DIR): Promise<boolea
   );
 }
 
-/**
- * Repartition the reseeded baseline back across the split files: one sorted
- * array per (package, tsFile), creating files for newly-flagged sources and
- * DELETING a file (plus any emptied parent dirs) once all its rows converge, so
- * a post-reseed git diff shows only real baseline changes.
- */
+/** Repartition the reseeded baseline across the split files: one sorted array
+ *  per (package, tsFile), creating files for newly-flagged sources and DELETING
+ *  a file (plus any emptied parent dirs) once all its rows converge, so a
+ *  post-reseed git diff shows only real baseline changes. */
 export async function writeSplitBaseline(
   entries: CallArgExcludeEntry[],
   dir: string = BASELINE_DIR,

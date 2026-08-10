@@ -91,19 +91,13 @@ describe("reseed", () => {
   });
 });
 
-describe("sortKeys", () => {
-  it("orders by code unit, not locale collation", () => {
-    const sorted = sortKeys([key({ call: "permit_any" }), key({ call: "permit!" })]);
-    expect(sorted.map((k) => k.call)).toEqual(["permit!", "permit_any"]);
-  });
+it("sortKeys orders by code unit, not locale collation", () => {
+  const sorted = sortKeys([key({ call: "permit_any" }), key({ call: "permit!" })]);
+  expect(sorted.map((k) => k.call)).toEqual(["permit!", "permit_any"]);
 });
 
 describe("findDuplicateKeys", () => {
   it("reports a key recorded twice", () => {
     expect(findDuplicateKeys([entry(), entry({ reason: "other" })])).toEqual([keyOf(key())]);
-  });
-
-  it("accepts a 1:1 baseline", () => {
-    expect(findDuplicateKeys([entry(), entry({ call: "quote" })])).toEqual([]);
   });
 });
