@@ -48,6 +48,14 @@ describe("Date", () => {
     expect(new RubyDate(2001, 1, 1).plus(-1).toS()).toBe("2000-12-31");
   });
 
+  it("raises TypeError when deconstruct_keys is handed neither nil nor an Array", () => {
+    const d = new RubyDate(1999, 5, 23);
+    expect(() => d.deconstructKeys("year" as unknown as string[])).toThrow(TypeError);
+    expect(() => d.deconstructKeys("year" as unknown as string[])).toThrow(
+      "wrong argument type String (expected Array or nil)",
+    );
+  });
+
   it("parses a y-m-d string, padded or not", () => {
     for (const str of ["2008-07-02", "2008-7-2"]) {
       const date = RubyDate.parse(str);

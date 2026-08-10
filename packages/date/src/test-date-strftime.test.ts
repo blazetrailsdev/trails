@@ -6,6 +6,13 @@
  * `DateTime.parse(s)` and then calls `#strftime` on the result, this file goes
  * through the exported `dtNewByFrags`/`dNewByFrags` builders those statics
  * themselves call — the gem-shaped object that carries `strftime`.
+ *
+ * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm asserts the
+ * *effect* rather than the warning: `rb_warning("invalid offset is ignored")`
+ * (`date_core.c:8304`) is `$VERBOSE`-only and has no port analogue — the same
+ * position `date.ts` already records for `val2sg` and `val2off`. The offset
+ * itself is still dropped to `0` (`date_core.c:8301-8305`), which is what the
+ * assertion reads.
  */
 
 import { Temporal } from "@js-temporal/polyfill";
@@ -230,6 +237,9 @@ describe("TestDateStrftime", () => {
         const d = gemDateTimeParse(s + hh + mm);
         expect(d.strftime("%z")).toEqual(r);
       }
+    }
+    for (const r of ["+2430", "-2430"]) {
+      expect(gemDateTimeParse(s + r).zone).toEqual("+00:00");
     }
   });
 

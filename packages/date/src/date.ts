@@ -4581,7 +4581,8 @@ function equalGen(self: Date, other: unknown): boolean | null {
  * `d_lite_deconstruct_keys` (`:7500-7504`) and `dt_lite_deconstruct_keys`
  * carry an `is_datetime` flag into: `keys` of `null` answers every pair, an
  * Array answers only the names it lists, and an unlisted name is simply
- * absent.
+ * absent. Anything else raises `TypeError` (`date_core.c:7440-7445`) before
+ * the loop.
  */
 function deconstructKeys(
   self: Date,
@@ -4606,6 +4607,11 @@ function deconstructKeys(
     }
 
     return h;
+  }
+  if (!Array.isArray(keys)) {
+    throw new TypeError(
+      `wrong argument type ${(keys as object)?.constructor?.name ?? typeof keys} (expected Array or nil)`,
+    );
   }
 
   for (const key of keys) {
