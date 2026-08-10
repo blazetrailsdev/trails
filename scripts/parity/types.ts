@@ -17,7 +17,10 @@ export interface LiteralValue {
  * (`?`, `array`, `hash`, `str-interp`, `binop:<op>`, `unary<desc>`, `ternary`,
  * `*splat`) that mean "no cross-language agreement is possible here, skip the
  * site". `flags` carries the per-site `splat` / `blockpass` / `block` /
- * `zsuper` markers, which do the same for the site as a whole.
+ * `zsuper` markers, which do the same for the site as a whole, plus — Ruby side
+ * only — `weak`: the receiver was inert (`xs.map`), so the site says nothing
+ * about the port and compare.ts drops it, exactly as `weakCalls` does for the
+ * call-set gate.
  */
 export interface CallSite {
   name: string;

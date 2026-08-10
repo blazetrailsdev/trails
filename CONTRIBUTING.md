@@ -179,6 +179,48 @@ and the two ratchets gate different artifacts against different baselines; a
 combined `api:gates` wrapper was considered and declined as premature — the doc
 pointer above is the intended fix.
 
+#### The call-ARGUMENT ratchet (`pnpm parity:api:calls:args`)
+
+RFC 0095 adds a second, independent gate over the same `--calls` extraction:
+`api:calls` compares the SET OF CALL NAMES a body makes, so a port can call
+`where` where Rails calls `where`, hand it a completely different argument list,
+and stay green. `pnpm parity:api:calls:args` (`lint-call-args.ts`, CI step
+"Call-argument ratchet") ratchets `output/call-arg-mismatches.json` against the
+**same** `scripts/api-compare/call-mismatches-exclude/` shards the call-set gate
+uses — one shard file per source file, holding both dimensions. Its rows carry
+`kind: "args"` and are keyed `package + tsFile + rubyName + call + rubyArgs`;
+a row with `kind` absent or `"calls"` belongs to the call-set gate. Each gate
+filters the shard to its own kind, which is what keeps RFC 0084's row-count debt
+metric exactly the call-set rows. (A second parallel tree was the original
+design and was reversed: sharding both dimensions the same way meant every
+burndown PR touching one file's arguments and its call set edited two files in
+two directories, and every rebase ate two conflict surfaces.)
+
+It carries the identical contract to the calls ratchet above and for the same
+reasons: **only-shrink** (delete the converged row by hand — do NOT
+`--write`/reseed, which rewrites the whole tree), a stale-row arm, a
+partial-scope rejection, and self-regeneration of the artifact before gating.
+It does **not** carry the second, unreviewed-reason counter described above:
+`lint-call-args.ts` has no `--set-reason` and no high-water-mark tree, and its
+only debt metric is the row count.
+
+Two things are specific to it:
+
+- **It gates `shape` rows only** — argument count, order, literal values, kwarg
+  keys. `naming` rows, where the two lists differ only in how a `ref:`
+  identifier is spelled, are the local/parameter-identifier dimension surfacing
+  through the argument comparison; they are report-only, and
+  `pnpm parity:api:calls:args:report` is the only place they are visible.
+- **A reordering is `shape`, not `naming`.** The same identifiers in a different
+  order is an argument-ORDER defect (`inject_join(list, collector, join_str)`
+  ported as `injectJoin(nodes, connector, collector)`), and it is gated.
+
+The `args` rows are seeded on `main` by their own PR. Until then no `args` row
+is baselined while the artifact flags hundreds, and that combination is reported
+and exits 0; the arm closes itself the moment the first row lands, and it cannot
+swallow a converged dimension (nothing baselined AND nothing flagged is a real
+green).
+
 ### Assertion-mismatch ratchet
 
 `pnpm parity:test` measures three assertion-level divergences _inside_

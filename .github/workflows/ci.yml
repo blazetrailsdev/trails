@@ -1436,6 +1436,13 @@ jobs:
         # call-mismatches-unreviewed/; reseed with
         # `pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches.ts
+      - name: Call-argument ratchet
+        # Gates the RFC 0095 call-ARGUMENT artifact (written by the `--calls`
+        # step above) against the `kind: "args"` rows of the shared
+        # call-mismatches-exclude/ shards, only-shrink. `shape` rows only;
+        # `naming` rows are report-only. Reports instead of failing until the
+        # seed PR lands — see the UNSEEDED arm in lint-call-args.ts.
+        run: pnpm exec tsx scripts/api-compare/lint-call-args.ts
       - name: Ratchet baseline reseed drift
         # RFC 0083. The ratchet above only READS the committed baseline, so a
         # change that converges or seeds rows passes it and still leaves the

@@ -65,6 +65,36 @@ export interface CallMismatchKey {
   tsFile: string;
   rubyName: string;
   call: string;
+  /** Absent means `"calls"`, so every shard written before RFC 0095 loads
+   *  unchanged and needs no migration. */
+  kind?: RowKind;
+  /** `kind: "args"` only: the extra key component separating two sites of one
+   *  call that pass different argument lists. */
+  rubyArgs?: string[];
+}
+
+/** The two dimensions sharing a shard file. Each gate filters to its own kind,
+ *  which is what keeps RFC 0084's row-count debt metric exactly the call-set
+ *  rows; a second parallel tree was the original design and was reversed
+ *  because it doubled the conflict surface of every burndown PR (RFC 0095). */
+export type RowKind = "calls" | "args";
+
+/** The rows of one dimension. `kind` absent reads as `"calls"`. */
+export function rowsOfKind<T extends CallMismatchKey>(entries: T[], kind: RowKind): T[] {
+  return entries.filter((e) => (e.kind ?? "calls") === kind);
+}
+
+/** Ordering key for a row inside a shard, covering BOTH kinds so one comparator
+ *  writes the whole file. A call-set row's key is unchanged, so adding the
+ *  argument dimension never reorders an existing shard. */
+export function shardKeyOf(k: CallMismatchKey): string {
+  return k.kind === "args" ? `${keyOf(k)} args ${(k.rubyArgs ?? []).join(",")}` : keyOf(k);
+}
+
+export function compareShardKeys(a: CallMismatchKey, b: CallMismatchKey): number {
+  const ka = shardKeyOf(a);
+  const kb = shardKeyOf(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
 }
 
 export interface ExcludeEntry extends CallMismatchKey {
