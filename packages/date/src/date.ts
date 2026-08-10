@@ -7564,6 +7564,10 @@ export class DateTime extends DateWithoutParseStatics {
    * `NUM2DBL(vsg)` and NOT through `val2sg` — this is the one builder that
    * does not screen its `start` (`date_core.c:8147-8150`, against
    * `date_s_today`'s `val2sg` at `:3799-3802`).
+   *
+   * An offset past a day is dropped to `0` (`date_core.c:8217-8220`); the
+   * `rb_warning("invalid offset is ignored")` beside it has no port analogue,
+   * as `val2sg`'s and `val2off`'s do not.
    */
   static now(start = DEFAULT_SG): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const sg = start;
@@ -7577,8 +7581,12 @@ export class DateTime extends DateWithoutParseStatics {
     let s = tm.second;
     if (s === 60) s = 59;
 
-    const of = tm.offsetNanoseconds / 1000000000;
+    let of = tm.offsetNanoseconds / 1000000000;
     const sf = new Rational(tm.millisecond * 1000000 + tm.microsecond * 1000 + tm.nanosecond, 1);
+
+    if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) {
+      of = 0;
+    }
 
     const [nth, ry] = decodeYear(y, -1);
 
