@@ -6,6 +6,7 @@ import { Base } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
+import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -376,6 +377,38 @@ class ApiComparePrivatesStat extends Base {
   }
 }
 
+// The two advisory call summaries the --calls run prints. Whole-repo totals, so
+// every row is package "all" — kept as a column anyway so these tables have the
+// same shape as the other stats tables (and so a future per-package breakdown
+// slots in without a migration).
+class ApiCallsStat extends Base {
+  static {
+    this.tableName = "api_calls_stats";
+    this.attribute("id", "big_integer");
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("package", "string");
+    this.attribute("matched", "integer");
+    this.attribute("total", "integer");
+    this.attribute("percent", "float");
+    this.attribute("mismatched", "integer", { default: 0 });
+  }
+}
+
+class ApiCallArgsStat extends Base {
+  static {
+    this.tableName = "api_call_args_stats";
+    this.attribute("id", "big_integer");
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("package", "string");
+    this.attribute("matched", "integer");
+    this.attribute("total", "integer");
+    this.attribute("percent", "float");
+    this.attribute("mismatched", "integer", { default: 0 });
+  }
+}
+
 class CompareLog extends Base {
   static {
     this.tableName = "compare_logs";
@@ -620,6 +653,20 @@ async function migrateDb(adapter: SQLite3Adapter) {
       });
     }
 
+    for (const table of ["api_calls_stats", "api_call_args_stats"]) {
+      if (await tableExists(adapter, table)) continue;
+      await adapter.createTable(table, {}, (t) => {
+        t.string("merge_commit_sha");
+        t.integer("pr_number");
+        t.string("package");
+        t.integer("matched");
+        t.integer("total");
+        t.float("percent");
+        t.integer("mismatched", { default: 0 });
+        t.index(["merge_commit_sha", "package"], { unique: true });
+      });
+    }
+
     if (!(await tableExists(adapter, "api_compare_privates_stats"))) {
       await adapter.createTable("api_compare_privates_stats", {}, (t) => {
         t.string("merge_commit_sha");
@@ -835,6 +882,28 @@ async function migrateDb(adapter: SQLite3Adapter) {
       t.integer("total");
       t.float("percent");
       t.integer("missing", { default: 0 });
+      t.index(["merge_commit_sha", "package"], { unique: true });
+    });
+
+    await adapter.createTable("api_calls_stats", {}, (t) => {
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.string("package");
+      t.integer("matched");
+      t.integer("total");
+      t.float("percent");
+      t.integer("mismatched", { default: 0 });
+      t.index(["merge_commit_sha", "package"], { unique: true });
+    });
+
+    await adapter.createTable("api_call_args_stats", {}, (t) => {
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.string("package");
+      t.integer("matched");
+      t.integer("total");
+      t.float("percent");
+      t.integer("mismatched", { default: 0 });
       t.index(["merge_commit_sha", "package"], { unique: true });
     });
 
@@ -1717,7 +1786,16 @@ function extractStepLogs(rawLog: string): Map<string, string> {
     let stepName: string | null = null;
 
     if (command.includes("api-compare/compare.ts")) {
-      stepName = command.includes("--privates") ? "api_compare_privates" : "api_compare";
+      // The --calls run prints the same per-package table as the plain run, so
+      // it must be classified BEFORE falling through to "api_compare" —
+      // otherwise it overwrites the public-API step's log (it appears later in
+      // the job) and the api_compare_stats feed silently becomes the
+      // full-surface numbers.
+      stepName = command.includes("--privates")
+        ? "api_compare_privates"
+        : command.includes("--calls")
+          ? "api_calls"
+          : "api_compare";
     } else if (
       command.includes("test-compare/compare.ts") ||
       // Pre-RFC-0092 entry-point names, kept so historic logs still parse.
@@ -1949,6 +2027,16 @@ const MISSING_STATS_PREDICATE = `
           WHERE acps.merge_commit_sha = rjl.merge_commit_sha
         )
       )
+      OR (
+        -- Same shape as the privates gate: only expect calls stats from a job
+        -- that actually ran the --calls step, so pre-RFC-0095 logs don't make
+        -- --refresh reprocess the whole history on every run.
+        rjl.log_output LIKE '%compare.ts --calls%'
+        AND NOT EXISTS (
+          SELECT 1 FROM api_calls_stats acls
+          WHERE acls.merge_commit_sha = rjl.merge_commit_sha
+        )
+      )
       OR EXISTS (
         WITH expected(step_name, required) AS (
           VALUES
@@ -2089,6 +2177,43 @@ async function syncCompareStats(
       );
     }
 
+    // Advisory call summaries. Whole-repo totals printed once by the --calls
+    // run, so one row each, under package "all".
+    const callsStepLog = stepLogs.get("api_calls") ?? "";
+    const { calls, callArgs } = parseCallSummariesFromLogs(callsStepLog);
+    if (calls) {
+      await ApiCallsStat.upsertAll(
+        [
+          {
+            merge_commit_sha: headSha,
+            pr_number: prNumber,
+            package: "all",
+            matched: calls.matched,
+            total: calls.total,
+            percent: calls.percent,
+            mismatched: calls.mismatched,
+          },
+        ],
+        { uniqueBy: ["merge_commit_sha", "package"] },
+      );
+    }
+    if (callArgs) {
+      await ApiCallArgsStat.upsertAll(
+        [
+          {
+            merge_commit_sha: headSha,
+            pr_number: prNumber,
+            package: "all",
+            matched: callArgs.matched,
+            total: callArgs.total,
+            percent: callArgs.percent,
+            mismatched: callArgs.mismatched,
+          },
+        ],
+        { uniqueBy: ["merge_commit_sha", "package"] },
+      );
+    }
+
     if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0 || apiPrivatesStats.size > 0) {
       parsed++;
       const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
@@ -2098,8 +2223,10 @@ async function syncCompareStats(
         0,
       );
       const logSteps = [...stepLogs.keys()].join(", ");
+      const callsNote = calls ? `, calls ${calls.matched}/${calls.total}` : "";
+      const argsNote = callArgs ? `, call args ${callArgs.matched}/${callArgs.total}` : "";
       console.log(
-        `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), ${apiPrivatesStats.size} api-privates packages (${totalApiPrivates} matched), logs: [${logSteps}]`,
+        `  PR #${prNumber}: ${testStats.size} test packages (${totalTests} matched), ${apiStats.size} api packages (${totalApi} matched), ${apiPrivatesStats.size} api-privates packages (${totalApiPrivates} matched)${callsNote}${argsNote}, logs: [${logSteps}]`,
       );
     }
   }
