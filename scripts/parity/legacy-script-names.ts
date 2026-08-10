@@ -68,11 +68,11 @@ export const SKIPPED_DIRS: readonly string[] = ["node_modules", "dist", ".git", 
 
 /** `vendor/rails` is upstream Ruby; the rest of `vendor/` (README.md, fetch.ts,
  *  sources.ts) IS in scope — excluding `vendor/` wholesale is the miss the #6305
- *  review caught. */
+ *  review caught. The `output/` dirs are gitignored compare artifacts —
+ *  generated, gigantic, and rewritten by the CI steps that run before this
+ *  gate. */
 export const SKIPPED_PATHS: readonly string[] = [
   path.join("vendor", "rails"),
-  // Gitignored compare artifacts — generated, gigantic, and rewritten by the
-  // steps that run before this gate in CI.
   path.join("scripts", "api-compare", "output"),
   path.join("scripts", "test-compare", "output"),
   path.join("scripts", "fixtures-compare", "output"),

@@ -6591,9 +6591,10 @@ export class Date {
    * which sends `to_r` to anything else and re-dispatches, is reduced to its
    * `expect_numeric` head ({@link expectNumeric}): the parameter type spells the
    * numeric union, but it does not hold at a JS call site and the gem asserts
-   * the raise. The Rational arm keeps the
-   * C's `wholenum_p` re-dispatch, since a Rational whose denominator reduced to
-   * one is an Integer to Ruby. `modf` splits off a Float's fractional part and
+   * the raise. The Rational arm keeps the C's `wholenum_p` / `rb_rational_num`
+   * / `goto again` re-dispatch (`:6179-6182`) as {@link wholenumP} over
+   * {@link bigNorm}, since a Rational whose denominator reduced to one is an
+   * Integer to Ruby before the switch ever runs. `modf` splits off a Float's fractional part and
    * leaves the whole one in its out-parameter; JS has no `modf`, so the two
    * halves are taken separately.
    *
@@ -6692,8 +6693,6 @@ export class Date {
         sf = sf.mul(-1);
       }
     } else {
-      // `wholenum_p(other)` / `rb_rational_num` / `goto again` (`:6179-6182`):
-      // a denominator of one is an Integer to Ruby before the switch ever runs.
       if (wholenumP(other)) return this.plus(bigNorm(other.numerator));
 
       let s: number;
