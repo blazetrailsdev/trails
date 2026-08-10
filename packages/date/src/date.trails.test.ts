@@ -41,6 +41,9 @@ describe("Date", () => {
     expect(d).not.toBeInstanceOf(RubyDateTime);
     expect(d.dayFraction).toEqual(new Rational(1, 2));
     expect("hour" in d).toBe(false);
+    expect(new RubyDateTime(2001, 1, 1).plus(new Rational(1, 86400 * 3)).inspect()).toContain(
+      "1000000000/3n",
+    );
     expect(new RubyDate(2001, 1, 1).plus(1).toS()).toBe("2001-01-02");
     expect(new RubyDate(2001, 1, 1).plus(-1).toS()).toBe("2000-12-31");
   });

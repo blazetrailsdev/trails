@@ -5634,12 +5634,19 @@ export class Date {
    * sub-second, the offset and the reform start. The C's `%+"PRIsVALUE` flags
    * are no-ops on a `VALUE` — only `of`'s `%+d` and `sg`'s `%.0f` do anything —
    * which is why the day and the sub-second carry no sign here either.
+   *
+   * `%"PRIsVALUE` renders `m_sf(x)` through `to_s`, so an `sf` exact at a
+   * denominator past one prints as the Rational it is: `DateTime.new(2001,1,1)
+   * + Rational(1, 86400*3)` inspects with `1000000000/3n`. Storage here is
+   * uniformly a {@link Rational} where MRI's is an Integer until it isn't, so
+   * `denominator === 1n` is MRI's Integer arm and prints the numerator alone.
    */
   inspect(): string {
     const of = this.mOf();
+    const sf = this.mSf();
     return (
       `#<${this.constructor.name}: ${this.toS()} ` +
-      `((${this.mRealJd()}j,${this.mDf()}s,${this.mSf().numerator}n),` +
+      `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf}n),` +
       `${of < 0 ? "" : "+"}${of}s,${this.start.toFixed(0)}j)>`
     );
   }
