@@ -32,7 +32,6 @@ export interface CallArgExcludeEntry extends CallArgKey {
   reason: string;
 }
 
-/** One `mismatches` row of output/call-arg-mismatches.json (compare.ts). */
 export interface CallArgRow extends CallArgKey {
   rubyFile: string;
   tsName: string;
@@ -44,8 +43,8 @@ export interface CallArgArtifact {
   /** The packages the run compared; absent on an artifact predating the field,
    *  which `missingScope` reads as the partial scope it is. */
   packages?: string[];
+  /** Total sites compared, for the report's denominator. */
   compared: number;
-  mismatched: number;
   mismatches: CallArgRow[];
 }
 
@@ -59,10 +58,8 @@ export function gatedRows(artifact: CallArgArtifact): CallArgRow[] {
 }
 
 export interface CallArgDiff {
-  /** flagged now, not in baseline — the ratchet failure */
-  added: CallArgKey[];
-  /** in baseline, no longer flags — the only-shrink failure */
-  stale: CallArgExcludeEntry[];
+  added: CallArgKey[]; // flagged now, absent from the baseline — the ratchet
+  stale: CallArgExcludeEntry[]; // baselined, no longer flags — only-shrink
 }
 
 export function diffAgainstBaseline(
