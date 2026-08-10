@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { Date, DateTime, Rational, dNewByFrags, dtNewByFrags } from "./date.js";
+import { Date, DateTime, Rational } from "./date.js";
+import { Time } from "./time.js";
 
 /**
- * `vendor/date/test/date/test_date_new.rb:1-214`, the `Date.jd` / `Date.ordinal`
- * / `Date.civil` constructors and the shared invalid-type guards.
+ * `vendor/date/test/date/test_date_new.rb`, the `Date.jd` / `Date.ordinal` /
+ * `Date.civil` / `Date.commercial` constructors, the `weeknum` / `nth_kday`
+ * private ones, the clock readers `Date.today` / `DateTime.now`, and the
+ * shared invalid-type guards.
  *
  * The builders answer `Temporal` where Ruby answers a `Date` / `DateTime`
  * (RFC 0088, `vendor/sources.ts:212-221`), so `[d.year, d.mon, d.mday]` is read
@@ -18,6 +21,9 @@ describe("TestDateNew", () => {
     d.month,
     d.day,
   ];
+
+  /** Ruby subtracts two `Time`s to a number of seconds; this is that number. */
+  const epochSeconds = (t: Time): number => t.toTime().epochMilliseconds / 1000;
 
   it("jd", () => {
     const d = Date.jd();
@@ -207,17 +213,17 @@ describe("TestDateNew", () => {
 
   it("civil reform", () => {
     // Ruby's receivers are `Date.jd(...)` / `DateTime.jd(...)`, which answer the
-    // `Temporal` seat here (RFC 0088) and so carry no arithmetic. The gem-shaped
-    // object is reached through the exported `dNewByFrags` / `dtNewByFrags`, the
-    // route `toDate()`'s own JSDoc names: `d_new_by_frags` (date_core.c:4283)
-    // and `date_s_jd` (:3377-3387) both end at `d_simple_new_internal` (:3036),
-    // so a `jd` frag under the same `start` is the same date `Date.jd` names —
-    // asserted against `Date.jd` below rather than assumed.
+    // `Temporal` seat here (RFC 0088) and so carry no arithmetic. Ruby's own
+    // call is kept and the seat is fed back through the `Temporal` constructor
+    // overload, `d_simple_new_internal`'s (date_core.c:3036) other entry point,
+    // which is the documented inverse of `to_date` / `to_datetime`.
     //
     // `d -= 1` is `minus(1)` (`d_lite_minus`, date_core.c:6343-6360).
-    let d = dNewByFrags({ jd: Date.ENGLAND }, Date.ENGLAND);
-    let dt = dtNewByFrags({ jd: Date.ENGLAND, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ENGLAND);
-    expect(d.toDate().equals(Date.jd(Date.ENGLAND, Date.ENGLAND))).toBe(true);
+    let d = new Date(Date.jd(Date.ENGLAND, Date.ENGLAND), Date.ENGLAND);
+    let dt = new DateTime(
+      DateTime.jd(Date.ENGLAND, 0, 0, 0, 0, Date.ENGLAND) as Temporal.PlainDateTime,
+      Date.ENGLAND,
+    );
     expect([d.year, d.mon, d.day]).toEqual([1752, 9, 14]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 14]);
     d = d.minus(1) as Date;
@@ -225,8 +231,11 @@ describe("TestDateNew", () => {
     expect([d.year, d.mon, d.day]).toEqual([1752, 9, 2]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1752, 9, 2]);
 
-    d = dNewByFrags({ jd: Date.ITALY }, Date.ITALY);
-    dt = dtNewByFrags({ jd: Date.ITALY, hour: 0, min: 0, sec: 0, offset: 0 }, Date.ITALY);
+    d = new Date(Date.jd(Date.ITALY, Date.ITALY), Date.ITALY);
+    dt = new DateTime(
+      DateTime.jd(Date.ITALY, 0, 0, 0, 0, Date.ITALY) as Temporal.PlainDateTime,
+      Date.ITALY,
+    );
     expect([d.year, d.mon, d.day]).toEqual([1582, 10, 15]);
     expect([dt.year, dt.mon, dt.day]).toEqual([1582, 10, 15]);
     d = d.minus(1) as Date;
@@ -239,5 +248,123 @@ describe("TestDateNew", () => {
     expect(() => Date.civil(2001, 2, 29)).toThrow(Date.Error);
     expect(() => DateTime.civil(2001, 2, 28, 23, 59, 60, 0)).toThrow(Date.Error);
     expect(() => DateTime.civil(2001, 2, 28, 24, 59, 59, 0)).toThrow(Date.Error);
+  });
+
+  it("commercial", () => {
+    const d = Date.commercial();
+    const dt = DateTime.commercial() as Temporal.PlainDateTime;
+    expect(ymd(d)).toEqual([-4712, 1, 1]);
+    expect(ymd(dt)).toEqual([-4712, 1, 1]);
+    expect([dt.hour, dt.minute, dt.second]).toEqual([0, 0, 0]);
+
+    const d2 = Date.commercial();
+    const dt2 = DateTime.commercial() as Temporal.PlainDateTime;
+    expect(d.equals(d2)).toBe(true);
+    expect(dt.equals(dt2)).toBe(true);
+
+    let d3 = Date.commercial(1582, 40, 5);
+    expect(ymd(d3)).toEqual([1582, 10, 15]);
+
+    d3 = Date.commercial(1582, 40, 5.0);
+    expect(ymd(d3)).toEqual([1582, 10, 15]);
+
+    const d4 = DateTime.commercial(1582, 40, 5, 0, 0, 0, 0) as Temporal.PlainDateTime;
+    expect([...ymd(d4), d4.hour, d4.minute, d4.second]).toEqual([1582, 10, 15, 0, 0, 0]);
+    expect(d4).toBeInstanceOf(Temporal.PlainDateTime);
+    const d5 = DateTime.commercial(1582, 40, 5, 0, 0, 0, "+0900") as Temporal.ZonedDateTime;
+    expect([...ymd(d5), d5.hour, d5.minute, d5.second, d5.offset]).toEqual([
+      1582,
+      10,
+      15,
+      0,
+      0,
+      0,
+      "+09:00",
+    ]);
+  });
+
+  it("commercial neg", () => {
+    const d = Date.commercial(1998, -1, -1);
+    expect(ymd(d)).toEqual([1999, 1, 3]);
+
+    const dt = DateTime.commercial(1998, -1, -1, -1, -1, -1, 0) as Temporal.PlainDateTime;
+    expect([...ymd(dt), dt.hour, dt.minute, dt.second]).toEqual([1999, 1, 3, 23, 59, 59]);
+  });
+
+  it("commercial ex", () => {
+    expect(() => Date.commercial(1997, 53, 1)).toThrow(Date.Error);
+    expect(() => DateTime.commercial(1997, 52, 1, 23, 59, 60, 0)).toThrow(Date.Error);
+  });
+
+  it("weeknum", () => {
+    const d = Date.weeknum();
+    const dt = DateTime.weeknum() as Temporal.PlainDateTime;
+    expect(ymd(d)).toEqual([-4712, 1, 1]);
+    expect(ymd(dt)).toEqual([-4712, 1, 1]);
+    expect([dt.hour, dt.minute, dt.second]).toEqual([0, 0, 0]);
+
+    // Ruby reads `d.jd` off the gem object; the seat answers `Temporal`, so the
+    // day is named by the `Date.jd` that builds it (`date_s_jd`, :3377-3387).
+    const d2 = Date.weeknum(2002, 11, 4, 0);
+    expect(d2.equals(Date.jd(2452355))).toBe(true);
+
+    const d3 = DateTime.weeknum(2002, 11, 4, 0, 11, 22, 33) as Temporal.PlainDateTime;
+    expect(d3.toPlainDate().equals(Date.jd(2452355))).toBe(true);
+    expect([d3.hour, d3.minute, d3.second]).toEqual([11, 22, 33]);
+
+    expect(() => Date.weeknum(1999, 53, 0, 0)).toThrow(Date.Error);
+    expect(() => Date.weeknum(1999, -53, -1, 0)).toThrow(Date.Error);
+  });
+
+  it("nth kday", () => {
+    const d = Date.nthKday();
+    const dt = DateTime.nthKday() as Temporal.PlainDateTime;
+    expect(ymd(d)).toEqual([-4712, 1, 1]);
+    expect(ymd(dt)).toEqual([-4712, 1, 1]);
+    expect([dt.hour, dt.minute, dt.second]).toEqual([0, 0, 0]);
+
+    const d2 = Date.nthKday(1992, 2, 5, 6);
+    expect(d2.equals(Date.jd(2448682))).toBe(true);
+
+    const d3 = DateTime.nthKday(1992, 2, 5, 6, 11, 22, 33) as Temporal.PlainDateTime;
+    expect(d3.toPlainDate().equals(Date.jd(2448682))).toBe(true);
+    expect([d3.hour, d3.minute, d3.second]).toEqual([11, 22, 33]);
+
+    expect(() => Date.nthKday(2006, 5, 5, 0)).toThrow(Date.Error);
+    expect(() => Date.nthKday(2006, 5, -5, 0)).toThrow(Date.Error);
+  });
+
+  it("today", () => {
+    const z = Time.now();
+    const d = Date.today();
+    const t = Time.now();
+    const t2 = Time.utc(t.year, t.mon, t.day);
+    const t3 = Time.utc(d.year, d.month, d.day);
+    // `assert_in_delta(t2, t3, t - z + 2)` over two `Time`s, which Ruby
+    // subtracts to seconds; `epochSeconds` is that subtraction here.
+    expect(Math.abs(epochSeconds(t2) - epochSeconds(t3))).toBeLessThanOrEqual(
+      epochSeconds(t) - epochSeconds(z) + 2,
+    );
+
+    // `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985), which
+    // is the `Omit` in `DateWithoutParseStatics` — a type error, not a missing
+    // runtime property, since the value side is `Date` itself.
+    // @ts-expect-error DateTime does not respond to `today`.
+    void DateTime.today;
+  });
+
+  it("now", () => {
+    // `Date.respond_to?(:now)` is false — `now` is a `DateTime` singleton
+    // method alone (date_core.c:9987).
+    // @ts-expect-error Date does not respond to `now`.
+    void Date.now;
+
+    const z = Time.now();
+    const d = DateTime.now() as Temporal.ZonedDateTime;
+    const t = Time.now();
+    const t2 = Time.mktime(d.year, d.month, d.day, d.hour, d.minute, d.second);
+    expect(Math.abs(epochSeconds(t) - epochSeconds(t2))).toBeLessThanOrEqual(
+      epochSeconds(t) - epochSeconds(z) + 2,
+    );
   });
 });

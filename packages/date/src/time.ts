@@ -376,9 +376,29 @@ export class Time {
    * `GREGORIAN` — a `::Time` is proleptic Gregorian, so 1582-10-13 is a real
    * day for it — and then `set_sg(dat, DEFAULT_SG)` puts the reform back, which
    * is why `Time.utc(1582, 10, 13).to_date` reads `1582-10-03`.
+   *
+   * The C reaches `d_simple_new_internal` directly, so this goes through the
+   * same {@link SEAT} that {@link Time#toDatetime} does, and for the same
+   * reason: `set_sg(dat, DEFAULT_SG)` (`date_core.c:5787-5800`) is not a field
+   * assignment — on the simple arm it runs `get_s_jd(x)` and `clear_civil(x)`
+   * *before* storing the new `sg`, so the `HAVE_CIVIL` triple the build wrote
+   * is resolved to a day under the `GREGORIAN` the build used and discarded.
+   * That eager resolve is `c_civil_to_jd(ry, m, d, GREGORIAN)` (`get_s_jd`,
+   * `date_core.c:1168-1187`), which is the call below. Handing the public
+   * constructor the triple instead re-derives `nth` through
+   * `valid_gregorian_p` / `valid_civil_p` — re-validating a date the C has
+   * already established is buildable, which is exactly what the seat exists to
+   * skip — and would resolve it under `Date.ITALY`, answering a different day
+   * for every date before the reform.
    */
   toDate(): Temporal.PlainDate {
-    return new Date(this.year, this.mon, this.day, Date.GREGORIAN).newStart().toDate();
+    const y = this.year;
+    const m = this.mon;
+    const d = this.day;
+
+    const [nth, ry] = decodeYear(y, -1);
+
+    return new Date(SEAT, nth, cCivilToJd(ry, m, d, Date.GREGORIAN), Date.ITALY).toDate();
   }
 
   /**

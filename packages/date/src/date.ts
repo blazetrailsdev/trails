@@ -4084,6 +4084,51 @@ function cValidWeeknumP(
 }
 
 /**
+ * @internal `date_core.c` `c_jd_to_nth_kday` (`date_core.c:651-660`), the
+ * inverse of {@link cNthKdayToJd}: the month the day falls in, which `n`th
+ * weekday of that month it is, and which weekday.
+ */
+function cJdToNthKday(
+  jd: number,
+  sg = DEFAULT_SG,
+): [ry: number, rm: number, rn: number, rk: number] {
+  const [ry, rm] = cJdToCivil(jd, sg);
+  const rjd = cFindFdom(ry, rm, sg)!;
+  return [ry, rm, div(jd - rjd, 7) + 1, cJdToWday(jd)];
+}
+
+/**
+ * @internal `date_core.c` `c_valid_nth_kday_p` (`date_core.c:840-866`), the
+ * `n`th-weekday counterpart of {@link cValidWeeknumP}: a negative `k` folds up
+ * from Sunday and a negative `n` counts back from the month's end — through the
+ * FIRST such weekday of the FOLLOWING month, which is why the month rolls over
+ * before the round-trip rejection below.
+ */
+function cValidNthKdayP(
+  y: number,
+  m: number,
+  n: number,
+  k: number,
+  sg = DEFAULT_SG,
+): number | null {
+  if (k < 0) k += 7;
+  if (n < 0) {
+    const t = y * 12 + m;
+    const ny = div(t, 12);
+    const nm = mod(t, 12) + 1;
+
+    const rjd2 = cNthKdayToJd(ny, nm, 1, k, sg);
+    const [ry2, rm2, rn2] = cJdToNthKday(rjd2 + n * 7, sg);
+    if (ry2 !== y || rm2 !== m) return null;
+    n = rn2;
+  }
+  const rjd = cNthKdayToJd(y, m, n, k, sg);
+  const [ry, rm, rn, rk] = cJdToNthKday(rjd, sg);
+  if (y !== ry || m !== rm || n !== rn || k !== rk) return null;
+  return rjd;
+}
+
+/**
  * @internal `date_core.c` `rt__valid_jd_p` (`date_core.c:4119-4123`), which
  * answers the Julian day back: every integer names a day, so there is nothing
  * to reject.
@@ -5123,6 +5168,23 @@ export class Date {
    */
   constructor(year?: number | bigint, month?: number, day?: number | Rational, start?: number);
   /**
+   * The inverse of {@link Date#toDate}: the gem-shaped object for a
+   * `Temporal.PlainDate`, read under `start`. There is no C counterpart
+   * because MRI's `::Date` value *is* the gem object — `date_to_date`
+   * (`date_core.c:8977-8981`) answers `self` — so the direction only exists
+   * where the two are different types, which is RFC 0088's mapping table.
+   *
+   * It is the exact inverse of {@link plainDateFromJd}'s `c_jd_to_civil`: the
+   * `Temporal` triple goes back through `decode_year` and `c_civil_to_jd`
+   * under the same `sg`, which is `get_s_jd` (`date_core.c:1168-1187`) — the
+   * lazy read the proleptic-Gregorian arm of `date_initialize` leaves behind —
+   * and lands on {@link SEAT}, `d_simple_new_internal` (`:3036-3050`), the one
+   * seat `d_new_by_frags` and `date_s_jd` (`:3377-3387`) already end at. There
+   * is nothing to validate: a `Temporal.PlainDate` is a real day by
+   * construction, which is what `d_simple_new_internal` assumes of its caller.
+   */
+  constructor(date: Temporal.PlainDate, start?: number);
+  /**
    * @internal `date_core.c` `d_simple_new_internal` (`date_core.c:3036-3050`),
    * which writes an already-resolved day straight into a fresh
    * `SimpleDateData` under `HAVE_JD` and validates nothing — every caller
@@ -5140,14 +5202,22 @@ export class Date {
     of?: number,
   );
   constructor(
-    year: number | bigint | typeof SEAT = -4712,
-    month: number | bigint = 1,
+    year: number | bigint | typeof SEAT | Temporal.PlainDate = -4712,
+    month?: number | bigint,
     day: number | Rational = 1,
     start = DEFAULT_SG,
     df?: number,
     sf?: Rational,
     of?: number,
   ) {
+    if (year instanceof Temporal.PlainDate) {
+      const sg = val2sg((month as number | undefined) ?? DEFAULT_SG);
+      const [nth, ry] = decodeYear(year.year, -1);
+      this.nth = nth;
+      this.#jd = cCivilToJd(ry, year.month, year.day, virtualSg(nth, sg));
+      this.#sg = sg;
+      return;
+    }
     if (typeof year === "symbol") {
       this.nth = month as bigint;
       this.#jd = day as number;
@@ -5157,6 +5227,7 @@ export class Date {
       this.#of = of;
       return;
     }
+    month ??= 1;
     checkNumeric(day, "day");
     checkNumeric(month, "month");
     checkNumeric(year, "year");
@@ -5290,6 +5361,22 @@ export class Date {
   }
 
   /**
+   * Ruby `Date.valid_date?(year, month, mday, start = Date::ITALY)` — the
+   * second name `Init_date_core` registers `date_s_valid_civil_p` under
+   * (`date_core.c:9659`, alongside `valid_civil?` at `:9658`), so it is the
+   * same C function and the same answer. The rdoc for `date_s_valid_civil_p`
+   * is itself written in terms of this spelling (`date_core.c:2588-2590`).
+   */
+  static isValidDate(
+    year: unknown,
+    month: unknown,
+    mday: unknown,
+    start: number = DEFAULT_SG,
+  ): boolean {
+    return Date.isValidCivil(year, month, mday, start);
+  }
+
+  /**
    * Ruby `Date.valid_ordinal?(year, yday, start = Date::ITALY)` (ruby/date,
    * `date_core.c` `date_s_valid_ordinal_p`, `date_core.c:2688-2708`, over
    * `valid_ordinal_sub`, `:2624-2650`).
@@ -5338,6 +5425,16 @@ export class Date {
     checkNumeric(year, "year");
     const [, ry] = decodeYear(year as number, -1);
     return cGregorianLeapP(ry);
+  }
+
+  /**
+   * Ruby `Date.leap?(year)` — the second name `Init_date_core` registers
+   * `date_s_gregorian_leap_p` under (`date_core.c:9676`, alongside
+   * `gregorian_leap?` at `:9674`), so it is the same C function: the same
+   * answer, and the same `TypeError` for a non-Numeric year.
+   */
+  static isLeap(year: unknown): boolean {
+    return Date.isGregorianLeap(year);
   }
 
   /**
@@ -5425,6 +5522,66 @@ export class Date {
     const r = cValidCommercialP(cwyear, cweek, d, sg);
     if (r === null) throw new DateError("invalid date");
     return addFracTo(new Date(SEAT, 0n, r, sg), fr2).toDate();
+  }
+
+  /**
+   * Ruby `Date.weeknum(year = -4712, week = 0, day = 1, firstday = 0)`
+   * (ruby/date, `date_core.c` `date_s_weeknum`, `date_core.c:3657-3706`,
+   * `:9689`), the `:wnum0` / `:wnum1` constructor: a week `0`..`53` of the
+   * year and a day `0`..`6` from `firstday`, which is `0` for the
+   * Sunday-based weeks and `1` for the Monday-based ones. It is a `:nodoc:`
+   * singleton method defined only under `#ifndef NDEBUG`, which is why the
+   * gem's own test guards it with `Date.respond_to?(:weeknum, true)`.
+   */
+  static weeknum(
+    year = -4712,
+    week = 0,
+    day = 1,
+    firstday = 0,
+    start = DEFAULT_SG,
+  ): Temporal.PlainDate {
+    const sg = val2sg(start);
+    const rjd = cValidWeeknumP(year, week, day, firstday, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    return new Date(SEAT, 0n, rjd, sg).toDate();
+  }
+
+  /**
+   * Ruby `Date.nth_kday(year = -4712, month = 1, n = 1, k = 1)` (ruby/date,
+   * `date_core.c` `date_s_nth_kday`, `date_core.c:3707-3756`, `:9690`), the
+   * `n`th weekday `k` of a month — `Date.nth_kday(1992, 2, 5, 6)` is the 5th
+   * Saturday of February 1992. `:nodoc:` and `#ifndef NDEBUG`, as
+   * {@link Date.weeknum} is.
+   */
+  static nthKday(year = -4712, month = 1, n = 1, k = 1, start = DEFAULT_SG): Temporal.PlainDate {
+    const sg = val2sg(start);
+    const rjd = cValidNthKdayP(year, month, n, k, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    return new Date(SEAT, 0n, rjd, sg).toDate();
+  }
+
+  /**
+   * Ruby `Date.today(start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `date_s_today`, `date_core.c:3789-3825`), the present day in the LOCAL
+   * zone — the C's `localtime_r`, which is `Temporal.Now.plainDateISO()` here.
+   *
+   * The C builds under `GREGORIAN` and then `set_sg(dat, sg)`, the same shape
+   * `Time#to_date` has: `set_sg` (`date_core.c:5787-5800`) resolves the
+   * `HAVE_CIVIL` triple to a day through `get_s_jd` under the `GREGORIAN` the
+   * build used and discards it before storing `sg`, so the day is fixed
+   * proleptically and only its READING follows `start`.
+   */
+  static today(start = DEFAULT_SG): Temporal.PlainDate {
+    const sg = val2sg(start);
+    const tm = Temporal.Now.plainDateISO();
+
+    const y = tm.year;
+    const m = tm.month;
+    const d = tm.day;
+
+    const [nth, ry] = decodeYear(y, -1);
+
+    return new Date(SEAT, nth, cCivilToJd(ry, m, d, GREGORIAN), sg).toDate();
   }
 
   /**
@@ -6492,12 +6649,12 @@ export class Date {
    * the gem already names both directions and neither name is invented: the
    * statics answer Temporal through `to_date` / `to_datetime`, and the
    * exported {@link dNewByFrags} / {@link dtNewByFrags} answer the other
-   * direction — they are the *sole* gem-shaped seat, both ending at
-   * `d_simple_new_internal` (`date_core.c:3036`) exactly as `date_s_jd`
-   * (`:3377-3387`) does. `Date`'s constructor takes only
-   * `(year?, month?, day?, start?)` and the `SEAT` form; handing it a
-   * `Temporal.PlainDate` raises `TypeError: invalid year (not numeric)` from
-   * `check_numeric` (`date_core.c:67-72`).
+   * direction, as does this method's own inverse — the
+   * `Temporal.PlainDate` overload of `Date`'s constructor, and the
+   * `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` one on `DateTime`.
+   * All of them end at `d_simple_new_internal` (`date_core.c:3036`) exactly as
+   * `date_s_jd` (`:3377-3387`) does; the overload adds an entry point to that
+   * seat, not a seat.
    */
   toDate(): Temporal.PlainDate {
     return plainDateFromJd(this.mLocalJd(), this.#sg);
@@ -6616,10 +6773,14 @@ export class Date {
  * compares the two static sides whatever shape the member takes.
  *
  * So `DateTime` extends `Date` under an alias whose STATIC side omits the
- * members it re-declares — `parse` and `strptime`, and the four builders
+ * members it re-declares — `parse` and `strptime`, and the six builders
  * `Init_date_core` gives `DateTime` singleton methods of its own
- * (`date_core.c:9971-9975`) — which is the only shape that removes the comparison
- * without weakening either declaration. This is a type-level alias only — the
+ * (`date_core.c:9971-9982`) — which is the only shape that removes the
+ * comparison without weakening either declaration. `today` is in that list for
+ * the other reason: `Init_date_core` runs
+ * `rb_undef_method(CLASS_OF(cDateTime), "today")` (`date_core.c:9985`), so
+ * `DateTime.today` does not exist in Ruby either, and the omission is how that
+ * undef is spelled here. This is a type-level alias only — the
  * value is `Date` itself, so the runtime prototype chain, `instanceof`, and
  * every inherited static are unchanged, and the instance side is `Date` intact.
  * Both `Date.parse`/`Date.strptime` and `DateTime.parse`/`DateTime.strptime`
@@ -6632,7 +6793,18 @@ const DateWithoutParseStatics: (new (
   start?: number,
 ) => Date) &
   (new (seat: typeof SEAT, nth: bigint, rjd: number, sg: number) => Date) &
-  Omit<typeof Date, "parse" | "strptime" | "jd" | "ordinal" | "civil" | "commercial"> = Date;
+  Omit<
+    typeof Date,
+    | "parse"
+    | "strptime"
+    | "jd"
+    | "ordinal"
+    | "civil"
+    | "commercial"
+    | "weeknum"
+    | "nthKday"
+    | "today"
+  > = Date;
 
 /**
  * @noRailsEquivalent PERMANENT — the `ruby/date` gem's `::DateTime`, a `::Date`
@@ -6792,6 +6964,19 @@ export class DateTime extends DateWithoutParseStatics {
     start?: number,
   );
   /**
+   * The inverse of {@link DateTime#toDatetime}, the counterpart of
+   * {@link Date}'s `Temporal.PlainDate` overload: the civil triple and the
+   * time of day go through `decode_year`, `c_civil_to_jd` and `time_to_df`
+   * under the same `sg`, which is `get_c_jd` / `get_c_df`
+   * (`date_core.c:1264-1301`, `:1208-1225`), and the day and day-fraction are
+   * converted to the UTC the `ComplexDateData` stores exactly as
+   * `dt_new_by_frags` does (`date_core.c:8311-8313`) before landing on
+   * {@link SEAT}. A `Temporal.ZonedDateTime` carries its offset across as `of`
+   * in seconds east of UTC; a `PlainDateTime` has none, which is an `of` of
+   * `0` — the value `::DateTime` has when `m_of` is zero.
+   */
+  constructor(date: Temporal.PlainDateTime | Temporal.ZonedDateTime, start?: number);
+  /**
    * @internal `date_core.c` `d_complex_new_internal` (`date_core.c:3055-3071`),
    * the seam `dt_new_by_frags` (`date_core.c:8239-8322`) ends at, under
    * `HAVE_JD | HAVE_DF`: the day and day-fraction it has already converted to
@@ -6810,7 +6995,7 @@ export class DateTime extends DateWithoutParseStatics {
     sg: number,
   );
   constructor(
-    year?: number | bigint | typeof SEAT,
+    year?: number | bigint | typeof SEAT | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     month?: number | bigint,
     day?: number | Rational,
     hour?: number | Rational,
@@ -6819,6 +7004,23 @@ export class DateTime extends DateWithoutParseStatics {
     offset?: number | Rational | string,
     start?: number,
   ) {
+    if (year instanceof Temporal.PlainDateTime || year instanceof Temporal.ZonedDateTime) {
+      const sg = val2sg((month as number) ?? DEFAULT_SG);
+      const of = year instanceof Temporal.ZonedDateTime ? year.offsetNanoseconds / 1000000000 : 0;
+      const [nth, ry] = decodeYear(year.year, -1);
+      const rjd = cCivilToJd(ry, year.month, year.day, virtualSg(nth, sg));
+      const df = timeToDf(year.hour, year.minute, year.second);
+      const sf = new Rational(
+        year.millisecond * 1000000 + year.microsecond * 1000 + year.nanosecond,
+        1,
+      );
+      super(SEAT, nth, rjd, sg);
+      this.#jd = jdLocalToUtc(rjd, df, of);
+      this.#df = dfLocalToUtc(df, of);
+      this.#sf = sf;
+      this.#of = of;
+      return;
+    }
     if (typeof year === "symbol") {
       const nth = month as bigint;
       const rjd = day as number;
@@ -7192,6 +7394,179 @@ export class DateTime extends DateWithoutParseStatics {
       fr2,
     );
     return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.weeknum(year = -4712, week = 0, day = 1, firstday = 0,
+   * hour = 0, minute = 0, second = 0, offset = 0, start = Date::ITALY)`
+   * (ruby/date, `date_core.c` `datetime_s_weeknum`, `date_core.c:7986-8055`,
+   * `:9980`), {@link Date.weeknum} with a time of day. `day` carries the
+   * fraction (`num2int_with_frac(d, 4)`, `date_core.c:8019-8020`); `week`,
+   * `firstday` and `year` do not.
+   */
+  static weeknum(
+    year = -4712,
+    week = 0,
+    day: number | Rational = 1,
+    firstday = 0,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start?: number,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    const rof = offset === undefined ? 0 : val2off(offset);
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [d, dFr] = num2intWithFrac(
+      day,
+      DAY_IN_SECONDS,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
+    );
+    let fr2: number | Rational = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+    if (dFr !== 0) fr2 = dFr;
+
+    const rjd = cValidWeeknumP(year, week, d, firstday, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    const rt = cValidTimeP(h, min, s);
+    if (rt === null) throw new DateError("invalid date");
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
+    const [rjd2, df, sf] = addFrac(
+      jdLocalToUtc(rrjd, localDf, rof),
+      dfLocalToUtc(localDf, rof),
+      fr2,
+    );
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.nth_kday(year = -4712, month = 1, n = 1, k = 1, hour = 0,
+   * minute = 0, second = 0, offset = 0, start = Date::ITALY)` (ruby/date,
+   * `date_core.c` `datetime_s_nth_kday`, `date_core.c:8056-8125`, `:9982`),
+   * {@link Date.nthKday} with a time of day. `k` carries the fraction
+   * (`num2int_with_frac(k, 4)`, `date_core.c:8089-8090`).
+   */
+  static nthKday(
+    year = -4712,
+    month = 1,
+    n = 1,
+    k: number | Rational = 1,
+    hour?: number | Rational,
+    minute?: number | Rational,
+    second?: number | Rational,
+    offset?: number | Rational | string,
+    start?: number,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = start === undefined ? DEFAULT_SG : val2sg(start);
+    const rof = offset === undefined ? 0 : val2off(offset);
+    const [s, sFr] = num2intWithFrac(second ?? 0, 1, false);
+    const [min, minFr] = num2intWithFrac(
+      minute ?? 0,
+      MINUTE_IN_SECONDS,
+      second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [h, hFr] = num2intWithFrac(
+      hour ?? 0,
+      HOUR_IN_SECONDS,
+      minute !== undefined || second !== undefined || offset !== undefined || start !== undefined,
+    );
+    const [rk, kFr] = num2intWithFrac(
+      k,
+      DAY_IN_SECONDS,
+      hour !== undefined ||
+        minute !== undefined ||
+        second !== undefined ||
+        offset !== undefined ||
+        start !== undefined,
+    );
+    let fr2: number | Rational = 0;
+    if (sFr !== 0) fr2 = sFr;
+    if (minFr !== 0) fr2 = minFr;
+    if (hFr !== 0) fr2 = hFr;
+    if (kFr !== 0) fr2 = kFr;
+
+    const rjd = cValidNthKdayP(year, month, n, rk, sg);
+    if (rjd === null) throw new DateError("invalid date");
+    const rt = cValidTimeP(h, min, s);
+    if (rt === null) throw new DateError("invalid date");
+    let [rh] = rt;
+    const [, rmin, rs] = rt;
+    if (rh === 24) {
+      rh = 0;
+      fr2 = fr2 instanceof Rational ? fr2.add(DAY_IN_SECONDS) : fr2 + DAY_IN_SECONDS;
+    }
+    const localDf = timeToDf(rh, rmin, rs);
+    const [nth, rrjd] = decodeJd(rjd);
+    const [rjd2, df, sf] = addFrac(
+      jdLocalToUtc(rrjd, localDf, rof),
+      dfLocalToUtc(localDf, rof),
+      fr2,
+    );
+    return new DateTime(SEAT, nth, rjd2, df, sf, rof, sg).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.now(start = Date::ITALY)` (ruby/date, `date_core.c`
+   * `datetime_s_now`, `date_core.c:8134-8236`, `:9987`), the present time in
+   * the LOCAL zone with its offset carried across — the C's `localtime_r` plus
+   * `tm.tm_gmtoff`, which is `Temporal.Now.zonedDateTimeISO()` here. A leap
+   * second — `s == 60` — is stored as `59`, and `sf` is nanoseconds.
+   *
+   * The C builds under `GREGORIAN` and then `set_sg(dat, sg)`, the same shape
+   * {@link Date.today} and `Time#to_datetime` have.
+   */
+  static now(start = DEFAULT_SG): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    const sg = val2sg(start);
+    const tm = Temporal.Now.zonedDateTimeISO();
+
+    const y = tm.year;
+    const m = tm.month;
+    const d = tm.day;
+    const h = tm.hour;
+    const min = tm.minute;
+    let s = tm.second;
+    if (s === 60) s = 59;
+
+    const of = tm.offsetNanoseconds / 1000000000;
+    const sf = new Rational(tm.millisecond * 1000000 + tm.microsecond * 1000 + tm.nanosecond, 1);
+
+    const [nth, ry] = decodeYear(y, -1);
+
+    const rjd = cCivilToJd(ry, m, d, GREGORIAN);
+    const df = timeToDf(h, min, s);
+    return new DateTime(
+      SEAT,
+      nth,
+      jdLocalToUtc(rjd, df, of),
+      dfLocalToUtc(df, of),
+      sf,
+      of,
+      sg,
+    ).toDatetime();
   }
 
   /**
