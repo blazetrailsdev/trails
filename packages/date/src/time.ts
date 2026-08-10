@@ -540,4 +540,89 @@ export class Time {
       format,
     );
   }
+
+  /**
+   * Ruby `Time#utc?` (`ruby/time.c` `time_utc_p`, not vendored — the gem's
+   * `lib/time.rb` and `date_core.c` both duck-type it), true for the times
+   * `Time.utc` builds. A time built from an offset is not a UTC time even when
+   * the offset is zero, which is the distinction `#to_s` and `#xmlschema`
+   * print.
+   */
+  isUtc(): boolean {
+    return this.#timeZoneId === "UTC";
+  }
+
+  /**
+   * Ruby `Time#getutc` (`ruby/time.c` `time_getutc`), the same instant in UTC.
+   * `lib/time.rb`'s `httpdate` reaches it as `dup.utc`, an in-place conversion
+   * of a copy; trails' `Time` is immutable, so the copy is the answer here.
+   */
+  getutc(): Time {
+    const plain = this.#plain.add({ seconds: -this.#utcOffset });
+    return new Time(
+      plain.year,
+      plain.month,
+      plain.day,
+      plain.hour,
+      plain.minute,
+      new Rational(plain.second, 1).add(new Rational(this.nsec, 1_000_000_000)),
+      "UTC",
+    );
+  }
+
+  /**
+   * Ruby `Time#to_s` (`ruby/time.c` `time_to_s`), which is `#inspect` without
+   * the sub-second: `"%Y-%m-%d %H:%M:%S UTC"` for a UTC time and
+   * `"%Y-%m-%d %H:%M:%S %z"` for every other, the C writing the two formats
+   * out as separate string literals exactly as this does.
+   */
+  toS(): string {
+    return this.strftime(this.isUtc() ? "%Y-%m-%d %H:%M:%S UTC" : "%Y-%m-%d %H:%M:%S %z");
+  }
+
+  /**
+   * Ruby `Time#asctime` (`ruby/time.c` `time_asctime`), the `asctime(3)`
+   * spelling — a blank-padded day of month, and no zone at all, so a local time
+   * and a UTC one print alike.
+   */
+  asctime(): string {
+    return this.strftime("%a %b %e %H:%M:%S %Y");
+  }
+
+  /**
+   * Ruby `Time#xmlschema(fraction_digits = 0)` (`ruby/lib/time.rb`), the
+   * ISO 8601 spelling XML Schema's `dateTime` names: `%FT%T`, then the
+   * requested number of sub-second digits, then `Z` for a UTC time or the
+   * `%:z` offset for any other.
+   */
+  xmlschema(fractionDigits = 0): string {
+    fractionDigits = Math.trunc(fractionDigits);
+    let s = this.strftime("%FT%T");
+    if (fractionDigits > 0) {
+      s += this.strftime(`.%${fractionDigits}N`);
+    }
+    return s + (this.isUtc() ? "Z" : this.strftime("%:z"));
+  }
+
+  /** Ruby `Time#iso8601` (`ruby/lib/time.rb`, `alias iso8601 xmlschema`). */
+  declare iso8601: (fractionDigits?: number) => string;
+
+  /**
+   * Ruby `Time#rfc2822` (`ruby/lib/time.rb`), RFC 2822's date-time. A UTC time
+   * prints the `-0000` RFC 2822 reserves for "the local zone is unknown", not
+   * `+0000`; every other prints its own `%z` offset.
+   */
+  rfc2822(): string {
+    return this.strftime("%a, %d %b %Y %T ") + (this.isUtc() ? "-0000" : this.strftime("%z"));
+  }
+
+  /**
+   * Ruby `Time#httpdate` (`ruby/lib/time.rb`), RFC 2616's preferred date
+   * format: the receiver taken to UTC and printed with the literal `GMT` zone.
+   */
+  httpdate(): string {
+    return this.getutc().strftime("%a, %d %b %Y %T GMT");
+  }
 }
+
+Time.prototype.iso8601 = Time.prototype.xmlschema;

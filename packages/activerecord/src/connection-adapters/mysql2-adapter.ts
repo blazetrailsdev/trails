@@ -1733,21 +1733,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Read pending warnings for `conn`, filter via {@link isWarningIgnored},
-   * and dispatch per the configured `dbWarningsAction`. Called from
-   * `performQuery` where Rails calls it (mysql2/database_statements.rb:102),
-   * while the connection is still held — warnings are connection-scoped.
+   * Read pending warnings for the adapter's raw connection, filter via
+   * {@link isWarningIgnored}, and dispatch per the configured
+   * `dbWarningsAction`. Called from `performQuery` where Rails calls it
+   * (mysql2/database_statements.rb:103), while the connection is still held —
+   * warnings are connection-scoped.
    *
-   * Rails reads `@raw_connection` for the SHOW WARNINGS round-trip, a field the
-   * adapter holds because ruby-mysql2 owns one socket per adapter. trails hands
-   * connections out of the pool per query, so the connection is a trailing
-   * optional parameter rather than a field; the Rails parameter and its
-   * position are unchanged, and an absent one is the base class's no-op.
+   * Rails reads `@raw_connection` for the SHOW WARNINGS round-trip
+   * (abstract_mysql_adapter.rb:770-784); `_client` is trails' spelling of that
+   * same ivar, so the connection is sourced the same way rather than passed in.
    *
    * Mirrors: AbstractMysqlAdapter#handle_warnings.
    * @internal
    */
-  override async handleWarnings(sql: string, conn?: mysql.Connection): Promise<void> {
+  override async handleWarnings(sql: string): Promise<void> {
+    const conn = this._client;
     if (!conn) return;
     const ctor = this.constructor as typeof Mysql2Adapter;
     const action = ctor.dbWarningsAction;

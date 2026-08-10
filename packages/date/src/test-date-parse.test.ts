@@ -9,8 +9,7 @@
  * `secFraction`).
  *
  * The heuristic family's remaining tests are not here: `test__parse`'s table,
- * `test__parse_too_long_year` (`limit:` kwarg), `test_parse__time` (`Time#to_s`
- * and the `time` library's `iso8601`/`rfc2822`/`httpdate`/`xmlschema`),
+ * `test__parse_too_long_year` (`limit:` kwarg),
  * `test_parse__comp` (`DateTime.now`) and `test_parse__d_to_s`
  * (`DateTime#to_s`) each need a reader this package has not ported. They are
  * filed against RFC 0088.
@@ -30,6 +29,7 @@ import {
   dtNewByFrags,
   type DateParts,
 } from "./date.js";
+import { Time } from "./time.js";
 
 /** Ruby's `h.values_at(...)` over the frag hash, `nil` for an absent key. */
 function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {
@@ -296,6 +296,23 @@ describe("TestDateParse", () => {
     expect(h.min).toBe(2);
     expect(h.sec).toBe(3);
     expect(h.zone).toBe("\u{65e5}\u{672c}");
+  });
+
+  it("parse  time", () => {
+    const methods = ["toS", "asctime", "iso8601", "rfc2822", "httpdate", "xmlschema"] as const;
+
+    let t = Time.utc(2001, 2, 3, 4, 5, 6);
+    for (const m of methods) {
+      const d = dtParse(t[m]());
+      expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([2001, 2, 3, 4, 5, 6]);
+    }
+
+    t = Time.mktime(2001, 2, 3, 4, 5, 6);
+    for (const m of methods) {
+      if (m === "httpdate") continue;
+      const d = dtParse(t[m]());
+      expect([d.year, d.mon, d.mday, d.hour, d.min, d.sec]).toEqual([2001, 2, 3, 4, 5, 6]);
+    }
   });
 
   it("parse  ex", () => {
