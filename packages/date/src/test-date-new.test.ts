@@ -206,13 +206,17 @@ describe("TestDateNew", () => {
   });
 
   it.skip("civil reform", () => {
-    // Blocked, not omitted: the test's `d = Date.jd(...); d -= 1` has no
-    // receiver here. `Date.jd` answers a `Temporal.PlainDate` (RFC 0088's
-    // headline decision, vendor/sources.ts:212-221), which carries no `-`, and
-    // `Date#-` (`d_lite_minus`, date_core.c:6344) is unported even on the
-    // instance path — only `Date#+` exists. `Temporal.subtract` walks the
-    // proleptic ISO calendar, so it lands on 1752-09-13 rather than the
-    // reform's 1752-09-02. Filed as 0088 `port-test-date-new-civil-reform`.
+    // Blocked on two seams this PR may not build, not omitted. (1) `Date#-`
+    // (`d_lite_minus`, date_core.c:6343-6360) is ported by OPEN PR #6313, in
+    // the same file — adding it here duplicates an unmerged sibling. (2) The
+    // test's receiver: `d = Date.jd(...)` answers a `Temporal.PlainDate` (RFC
+    // 0088's headline decision, vendor/sources.ts:212-221) which carries no
+    // `-`, `Temporal.subtract` walks the proleptic ISO calendar and lands on
+    // 1752-09-13 rather than the reform's 1752-09-02, and no public seat turns
+    // a Julian day into a `Date` instance — `toDate()`'s JSDoc names a
+    // `Temporal` constructor overload that the class does not declare, and
+    // #6313 reaches `minus` through `new Date(y, m, d)` instead. Tracked as
+    // 0088 `port-test-date-new-civil-reform`, blocked on #6313.
   });
 
   it("civil ex", () => {
