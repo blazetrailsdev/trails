@@ -202,29 +202,6 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
- * The day and month names `Time#rfc2822` and `Time#httpdate` print, which are
- * RFC 2822's own — deliberately NOT locale-dependent, which is why Ruby spells
- * them as private constants of its own rather than reaching for `strftime`'s
- * `%a`/`%b` (`ruby/lib/time.rb`, `Time::RFC2822_DAY_NAME` /
- * `Time::RFC2822_MONTH_NAME`).
- */
-const RFC2822_DAY_NAME = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const RFC2822_MONTH_NAME = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
-
-/**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
  * class, only reopens it in `core_ext/time/*.rb`, so there is no Rails
  * counterpart for a port to converge on. trails carries only the members a
@@ -633,19 +610,10 @@ export class Time {
   /**
    * Ruby `Time#rfc2822` (`ruby/lib/time.rb`), RFC 2822's date-time. A UTC time
    * prints the `-0000` RFC 2822 reserves for "the local zone is unknown", not
-   * `+0000`; every other prints its own offset in hours and minutes, so a
-   * sub-minute offset truncates as MRI's `divmod` does.
+   * `+0000`; every other prints its own `%z` offset.
    */
   rfc2822(): string {
-    const head =
-      `${RFC2822_DAY_NAME[this.wday]}, ${pad2(this.day)} ` +
-      `${RFC2822_MONTH_NAME[this.mon - 1]} ${padYear(this.year)} ` +
-      `${pad2(this.hour)}:${pad2(this.min)}:${pad2(this.sec)} `;
-    if (this.isUtc()) return `${head}-0000`;
-    const off = this.utcOffset;
-    const sign = off < 0 ? "-" : "+";
-    const minutes = Math.trunc(Math.abs(off) / 60);
-    return `${head}${sign}${pad2(Math.trunc(minutes / 60))}${pad2(minutes % 60)}`;
+    return this.strftime("%a, %d %b %Y %T ") + (this.isUtc() ? "-0000" : this.strftime("%z"));
   }
 
   /**
@@ -653,28 +621,8 @@ export class Time {
    * format: the receiver taken to UTC and printed with the literal `GMT` zone.
    */
   httpdate(): string {
-    const t = this.getutc();
-    return (
-      `${RFC2822_DAY_NAME[t.wday]}, ${pad2(t.day)} ` +
-      `${RFC2822_MONTH_NAME[t.mon - 1]} ${padYear(t.year)} ` +
-      `${pad2(t.hour)}:${pad2(t.min)}:${pad2(t.sec)} GMT`
-    );
+    return this.getutc().strftime("%a, %d %b %Y %T GMT");
   }
 }
 
 Time.prototype.iso8601 = Time.prototype.xmlschema;
-
-/** MRI's `sprintf('%02d', n)`. */
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/**
- * MRI's `sprintf('%0*d', year < 0 ? 5 : 4, year)` — the extra column a
- * negative year needs for its sign, so the digits still line up at four.
- */
-function padYear(year: number): string {
-  const width = year < 0 ? 5 : 4;
-  const digits = String(Math.abs(year)).padStart(year < 0 ? width - 1 : width, "0");
-  return year < 0 ? `-${digits}` : digits;
-}
