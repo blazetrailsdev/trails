@@ -195,11 +195,12 @@ export class KeyValue {
         .reverse()
         .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
     });
-    const injected = nested.reduce<TranslationData | undefined>(
-      (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
-      undefined,
-    );
-    return (this.translationsStore = deepSymbolizeKeys(injected!));
+    return (this.translationsStore = deepSymbolizeKeys(
+      nested.reduce<TranslationData | undefined>(
+        (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
+        undefined,
+      )!,
+    ));
   }
 
   protected initTranslations(): void {

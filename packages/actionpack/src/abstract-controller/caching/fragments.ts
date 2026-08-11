@@ -106,18 +106,18 @@ export function writeFragment(
   options?: CacheOptions,
 ): string {
   if (!cacheConfigured(this)) return content;
-  const combined = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "write_fragment", combined, () => {
-    this.constructor.cacheStore!.write(combined, content, options);
+  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  return instrumentFragmentCache(this, "write_fragment", key, () => {
+    this.constructor.cacheStore!.write(key as string, content, options);
     return content;
   });
 }
 
 export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
   if (!cacheConfigured(this)) return undefined;
-  const combined = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "read_fragment", combined, () =>
-    this.constructor.cacheStore!.read(combined, options),
+  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  return instrumentFragmentCache(this, "read_fragment", key, () =>
+    this.constructor.cacheStore!.read(key as string, options),
   );
 }
 
@@ -132,9 +132,9 @@ export function fragmentExist(
   _options?: CacheOptions,
 ): boolean | undefined {
   if (!cacheConfigured(this)) return undefined;
-  const combined = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "exist_fragment?", combined, () =>
-    this.constructor.cacheStore!.exist(combined),
+  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  return instrumentFragmentCache(this, "exist_fragment?", key, () =>
+    this.constructor.cacheStore!.exist(key as string),
   );
 }
 
@@ -144,12 +144,15 @@ export function expireFragment(
   _options?: CacheOptions,
 ): unknown {
   if (!cacheConfigured(this)) return undefined;
-  const store = this.constructor.cacheStore!;
-  if (key instanceof RegExp) {
-    return instrumentFragmentCache(this, "expire_fragment", key, () => store.deleteMatched(key));
-  }
-  const combined = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "expire_fragment", combined, () => store.delete(combined));
+  if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+
+  return instrumentFragmentCache(this, "expire_fragment", key, () => {
+    if (key instanceof RegExp) {
+      return this.constructor.cacheStore!.deleteMatched(key);
+    } else {
+      return this.constructor.cacheStore!.delete(key as string);
+    }
+  });
 }
 
 export function instrumentFragmentCache<T>(

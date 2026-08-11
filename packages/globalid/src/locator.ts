@@ -338,8 +338,11 @@ export class Locator {
    */
   static use(app: string, locator: LocatorLike | LocatorBlock): void {
     validateApp(app);
-    const wrapped = typeof locator === "function" ? new BlockLocator(locator) : locator;
-    _appLocators.set(Locator.normalizeApp(app), wrapped);
+    const locatorBlock = typeof locator === "function" ? locator : undefined;
+    _appLocators.set(
+      Locator.normalizeApp(app),
+      locatorBlock === undefined ? (locator as LocatorLike) : new BlockLocator(locatorBlock),
+    );
   }
 
   // ─── Private helpers (Rails class << self private) ───────────────────────

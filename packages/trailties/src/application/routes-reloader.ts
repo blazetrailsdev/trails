@@ -42,12 +42,12 @@ export class RoutesReloader {
   }
 
   async executeUnlessLoaded(
-    app: unknown,
+    application: unknown,
     loader?: (p: string) => void | Promise<void>,
   ): Promise<boolean> {
     if (this.loaded) return false;
     await this.execute(loader);
-    runLoadHooks("after_routes_loaded", app);
+    runLoadHooks("after_routes_loaded", application);
     return true;
   }
 }

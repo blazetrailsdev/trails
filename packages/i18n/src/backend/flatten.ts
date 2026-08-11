@@ -28,7 +28,7 @@ export interface FlattenHost {
     prevKey?: string | null,
     block?: (currKey: string, value: unknown) => void,
   ): void;
-  storeLink(locale: string, key: string, link: unknown): void;
+  storeLink(locale: string, key: string, link: unknown): string;
   resolveLink(locale: string, key: string): string;
   findLink(locale: string, key: string): [string, string] | null;
   escapeDefaultSeparator(key: unknown): string;
@@ -176,11 +176,13 @@ export function flattenTranslations(
   return hash;
 }
 
-export function storeLink(this: FlattenHost, locale: string, key: string, link: unknown): void {
+export function storeLink(this: FlattenHost, locale: string, key: string, link: unknown): string {
   locale = toSym(locale).slice(1);
   const byLocale = this.links().get(locale) ?? new Map<string, string>();
   this.links().set(locale, byLocale);
-  byLocale.set(String(key), toS(link));
+  const value = toS(link);
+  byLocale.set(String(key), value);
+  return value;
 }
 
 export function resolveLink(this: FlattenHost, locale: string, key: string): string {
@@ -193,9 +195,7 @@ export function resolveLink(this: FlattenHost, locale: string, key: string): str
 
   const link = this.findLink(locale, key);
   if (link) {
-    const resolved = key.replaceAll(link[0], link[1]);
-    this.storeLink(locale, key, resolved);
-    return resolved;
+    return this.storeLink(locale, key, key.replaceAll(link[0], link[1]));
   }
   return key;
 }
