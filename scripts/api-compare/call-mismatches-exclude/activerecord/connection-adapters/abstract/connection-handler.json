@@ -36,7 +36,7 @@
     "rubyArgs": [
       "kwargs{initialCapacity=num:2}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "connection_handler.rb:78 `Concurrent::Map.new(initial_capacity: 2)` — a JS `Map` has no capacity hint, so the kwarg has no counterpart to pass. Language shortcoming, not deferred work."
   },
   {
     "package": "activerecord",

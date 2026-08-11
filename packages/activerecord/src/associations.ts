@@ -720,8 +720,17 @@ export class Associations {
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#belongs_to
    */
-  static belongsTo(name: string, options: AssociationOptions = {}): void {
-    BelongsToBuilder.build(this, name, options as Record<string, unknown>);
+  static belongsTo(
+    name: string,
+    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    options: AssociationOptions = {},
+  ): void {
+    BelongsToBuilder.build(
+      this,
+      name,
+      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      options as Record<string, unknown>,
+    );
   }
 
   /**
@@ -729,8 +738,17 @@ export class Associations {
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_one
    */
-  static hasOne(name: string, options: AssociationOptions = {}): void {
-    HasOneBuilder.build(this, name, options as Record<string, unknown>);
+  static hasOne(
+    name: string,
+    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    options: AssociationOptions = {},
+  ): void {
+    HasOneBuilder.build(
+      this,
+      name,
+      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      options as Record<string, unknown>,
+    );
   }
 
   /**

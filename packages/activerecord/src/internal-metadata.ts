@@ -181,8 +181,7 @@ export class InternalMetadata {
   }
 
   async deleteAllEntries(): Promise<void> {
-    const dm = new DeleteManager();
-    dm.from(this.arelTable);
+    const dm = new DeleteManager(this.arelTable);
     // Rails: connection.delete(dm, "#{self.class} Destroy") (internal_metadata.rb:58-62).
     await this._withConnection((connection) =>
       connection.delete(dm, `${this.constructor.name} Destroy`),
@@ -282,8 +281,7 @@ export class InternalMetadata {
     key: string,
     newValue: string,
   ): Promise<void> {
-    const um = new UpdateManager();
-    um.table(this.arelTable);
+    const um = new UpdateManager(this.arelTable);
     um.set([
       [this.arelTable.get(this.valueKey), newValue],
       [this.arelTable.get("updated_at"), this.currentTime(connection)],

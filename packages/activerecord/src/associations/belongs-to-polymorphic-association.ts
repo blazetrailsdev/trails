@@ -72,7 +72,10 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * `setInverseInstance`, so a missing-inverse raise leaves owner state
    * untouched).
    */
-  protected override replaceKeys(record: Base | null): void {
+  protected override replaceKeys(
+    record: Base | null,
+    { force = false }: { force?: boolean } = {},
+  ): void {
     // Write the polymorphic type column FIRST so that the dynamic
     // `this.klass` resolves via the _type column before
     // `super.replaceKeys` derives composite foreign-key names via
@@ -99,12 +102,18 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     //   2. Otherwise pick the most deeply namespaced registry key.
     //   3. Otherwise fall back to constructor.name.
     const typeName = record ? this.polymorphicTypeName(record) : null;
-    if (typeof (this.owner as any)._writeAttribute === "function") {
-      (this.owner as any)._writeAttribute(typeCol, typeName);
-    } else {
-      (this.owner as any)[typeCol] = typeName;
+    const currentType =
+      typeof (this.owner as any)._readAttribute === "function"
+        ? (this.owner as any)._readAttribute(typeCol)
+        : (this.owner as any)[typeCol];
+    if (force || currentType !== typeName) {
+      if (typeof (this.owner as any)._writeAttribute === "function") {
+        (this.owner as any)._writeAttribute(typeCol, typeName);
+      } else {
+        (this.owner as any)[typeCol] = typeName;
+      }
     }
-    super.replaceKeys(record);
+    super.replaceKeys(record, { force });
   }
 
   /**

@@ -1326,7 +1326,7 @@ export class AbstractAdapter implements Quoting {
           this._verified = true;
 
           await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
-            await this.clearCacheBang();
+            await this.clearCacheBang({ newConnection: true });
             await this.attemptConfigureConnection();
           });
           return;
@@ -1404,7 +1404,7 @@ export class AbstractAdapter implements Quoting {
   disconnectBang(): void {
     // Mirrors Rails AbstractAdapter#disconnect! (abstract_adapter.rb): the
     // raw-connection-dirty reset is what lets the next reconnect restore.
-    void this.clearCacheBang();
+    void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
     this._rawConnectionDirty = false;
     this._connection = null;
@@ -1452,7 +1452,7 @@ export class AbstractAdapter implements Quoting {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#clear_cache!
    */
-  clearCacheBang(): void | Promise<void> {
+  clearCacheBang(_opts: { newConnection?: boolean } = {}): void | Promise<void> {
     // Subclasses with statement caches override this
   }
 
@@ -1919,7 +1919,7 @@ export class AbstractAdapter implements Quoting {
   discardBang(): void {}
 
   resetBang(): void {
-    void this.clearCacheBang();
+    void this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
   }
 

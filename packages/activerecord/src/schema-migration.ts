@@ -109,8 +109,7 @@ export class SchemaMigration {
 
   // Rails: connection.delete(dm, "#{self.class} Destroy") (schema_migration.rb:27-33).
   async deleteVersion(version: string): Promise<void> {
-    const dm = new DeleteManager();
-    dm.from(this.arelTable);
+    const dm = new DeleteManager(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
     await this._withConnection((connection) =>
       connection.delete(dm, `${this.constructor.name} Destroy`),

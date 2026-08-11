@@ -1456,9 +1456,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.driver?.isOpen() ?? false;
   }
 
-  override clearCacheBang(): void {
-    void super.clearCacheBang();
-    void this._statementPool.clear();
+  override clearCacheBang({ newConnection = false }: { newConnection?: boolean } = {}): void {
+    void super.clearCacheBang({ newConnection });
+    if (newConnection) {
+      this._statementPool.reset();
+    } else {
+      void this._statementPool.clear();
+    }
   }
 
   override disconnectBang(): void {

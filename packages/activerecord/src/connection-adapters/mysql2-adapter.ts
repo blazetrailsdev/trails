@@ -340,9 +340,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors Rails' `Mysql2Adapter#clear_cache!` which calls `close` on
    * each cached statement on the adapter's sole connection.
    */
-  override clearCacheBang(): void {
-    void super.clearCacheBang();
-    void this._statementPool?.clear();
+  override clearCacheBang({ newConnection = false }: { newConnection?: boolean } = {}): void {
+    void super.clearCacheBang({ newConnection });
+    if (newConnection) {
+      this._statementPool?.reset();
+    } else {
+      void this._statementPool?.clear();
+    }
   }
   private _database: string | undefined;
 

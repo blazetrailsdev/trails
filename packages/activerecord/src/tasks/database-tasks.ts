@@ -985,16 +985,19 @@ export class DatabaseTasks {
     return path.isAbsolute(filename) ? filename : (path.resolve?.(this.root, filename) ?? filename);
   }
 
-  static async dumpSchema(dbConfig: DatabaseConfig): Promise<void> {
+  static async dumpSchema(
+    dbConfig: DatabaseConfig,
+    format: SchemaFormat = DatabaseTasks.schemaFormat,
+  ): Promise<void> {
     // Rails: `return unless db_config.schema_dump` — lets per-config
     // `schemaDump: false` (or null) suppress dumping.
     // schemaDumpPath() returns null when schemaDump is disabled.
-    const rawFilename = this.schemaDumpPath(dbConfig);
+    const rawFilename = this.schemaDumpPath(dbConfig, format);
     if (rawFilename == null) return;
     // Resolve relative paths against `root` so the dump lands in the app's
     // db/ dir regardless of process cwd — mirrors loadSchema's resolution.
     const filename = this._resolveSchemaPath(rawFilename);
-    if (this.schemaFormat === "sql") {
+    if (format === "sql") {
       const fs = getFs();
       const path = getPath();
       fs.mkdirSync(path.dirname(filename), { recursive: true });
@@ -1014,7 +1017,7 @@ export class DatabaseTasks {
     const path = getPath();
     const dir = path.dirname(filename);
     fs.mkdirSync(dir, { recursive: true });
-    const language = this.schemaFormat === "js" ? "js" : "ts";
+    const language = format === "js" ? "js" : "ts";
     const output = await SchemaDumper.dump(adapter, { language });
     fs.writeFileSync(filename, output);
   }
@@ -1546,22 +1549,26 @@ export class DatabaseTasks {
     // Mirrors Rails' `with_temporary_pool(db_config, clobber: true)` wrapper:
     // establishes a fresh connection so schemaUpToDate can query ar_internal_metadata,
     // then restores the prior connection when done.
-    await this.withTemporaryPool(dbConfig, async () => {
-      try {
-        if (await this.schemaUpToDate(dbConfig, format, file)) {
-          if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
-            await this.truncateTables(dbConfig);
+    await this.withTemporaryPool(
+      dbConfig,
+      async () => {
+        try {
+          if (await this.schemaUpToDate(dbConfig, format, file)) {
+            if (getEnv("SKIP_TEST_DATABASE_TRUNCATE") === undefined) {
+              await this.truncateTables(dbConfig);
+            }
+          } else {
+            await this.purge(dbConfig);
+            await this.loadSchema(dbConfig, format, file);
           }
-        } else {
-          await this.purge(dbConfig);
+        } catch (error) {
+          if (!(error instanceof NoDatabaseError)) throw error;
+          await this.create(dbConfig);
           await this.loadSchema(dbConfig, format, file);
         }
-      } catch (error) {
-        if (!(error instanceof NoDatabaseError)) throw error;
-        await this.create(dbConfig);
-        await this.loadSchema(dbConfig, format, file);
-      }
-    });
+      },
+      { clobber: true },
+    );
   }
 }
 

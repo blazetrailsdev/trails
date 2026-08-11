@@ -8,7 +8,7 @@
     "rubyArgs": [
       "ref:dependent"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "collection_proxy.rb:474-476 is `@association.delete_all(dependent).tap { reset_scope }`; the port reimplements the dependent dispatch, the through-join delete and the nullify arms inside the proxy rather than delegating, so there is no association-level `deleteAll(dependent)` call to forward the argument to. Converging is the delegation rewrite tracked by story call-args-ar-collection-proxy-delete-all-delegation."
   },
   {
     "package": "activerecord",

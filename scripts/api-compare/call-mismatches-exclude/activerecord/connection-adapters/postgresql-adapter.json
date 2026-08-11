@@ -86,32 +86,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exec_restart_db_transaction",
-    "call": "internal_execute",
-    "kind": "args",
-    "rubyArgs": [
-      "str:ROLLBACK AND CHAIN",
-      "str:TRANSACTION",
-      "kwargs{allowRetry=bool:false,materializeTransactions=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exec_rollback_db_transaction",
-    "call": "internal_execute",
-    "kind": "args",
-    "rubyArgs": [
-      "str:ROLLBACK",
-      "str:TRANSACTION",
-      "kwargs{allowRetry=bool:false,materializeTransactions=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "explain",
     "call": "build_explain_clause",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

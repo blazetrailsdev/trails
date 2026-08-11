@@ -8,7 +8,7 @@
     "rubyArgs": [
       "str:aroundSaveCollectionAssociation"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "autosave_association.rb:193 registers the Symbol `:around_save_collection_association`; trails' ActiveSupport::Callbacks rejects a method-NAME filter spelled as a string (callbacks.ts:671-675), so the port can only register the closure. Converging needs the method-name filter arm in ActiveSupport::Callbacks — story call-args-ar-autosave-around-save-method-name."
   },
   {
     "package": "activerecord",

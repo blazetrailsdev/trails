@@ -8,7 +8,7 @@
     "rubyArgs": [
       "const:CIPHER_TYPE"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "aes256_gcm.rb:64 `OpenSSL::Cipher.new(CIPHER_TYPE)` — node's crypto builds the cipher through the `createDecipheriv(Aes256Gcm.CIPHER_TYPE, ...)` factory (aes256-gcm.ts:117), not a constructor, so CIPHER_TYPE is passed there and the body's only `new` is the Configuration error. Language shortcoming."
   },
   {
     "package": "activerecord",
@@ -50,7 +50,7 @@
       "ref:secret",
       "ref:clearText"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "aes256_gcm.rb:94 `OpenSSL::HMAC.digest(OpenSSL::Digest::SHA256.new, @secret, clear_text)` is one-shot; node's HMAC is streaming, so the same three arguments land on `createHmac(\"sha256\", key).update(clearText).digest()` (aes256-gcm.ts:163-166) and `digest` itself takes none. Language shortcoming."
   },
   {
     "package": "activerecord",

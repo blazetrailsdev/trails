@@ -13,14 +13,29 @@ export class DerivedSecretKeyProvider extends KeyProvider {
 
   constructor(passwords: string | string[], options?: { keyGenerator?: KeyGenerator }) {
     const passwordList = Array.isArray(passwords) ? passwords : [passwords];
-    const generator = options?.keyGenerator ?? new KeyGenerator();
-    const keys = passwordList.map((p) => new Key(generator.deriveKeyFrom(p)));
-    super(keys);
-    this._keyGenerator = generator;
+    const keyGenerator = options?.keyGenerator ?? new KeyGenerator();
+    // Rails builds the key list by calling the private `derive_key_from` from
+    // inside the `super(...)` argument (derived_secret_key_provider.rb:8).
+    // Ruby has `self` before `super`; JS does not, so the same body runs
+    // unbound off the prototype — passing `using:` explicitly, as Rails does,
+    // is what makes the receiver unnecessary.
+    super(
+      passwordList.map((password) =>
+        DerivedSecretKeyProvider.prototype.deriveKeyFrom.call(
+          {} as DerivedSecretKeyProvider,
+          password,
+          { using: keyGenerator },
+        ),
+      ),
+    );
+    this._keyGenerator = keyGenerator;
   }
 
   /** @internal */
-  private deriveKeyFrom(password: string, using: KeyGenerator = this._keyGenerator): Key {
+  private deriveKeyFrom(
+    password: string,
+    { using = this._keyGenerator }: { using?: KeyGenerator } = {},
+  ): Key {
     const secret = using.deriveKeyFrom(password);
     return new Key(secret);
   }
