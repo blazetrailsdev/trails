@@ -160,6 +160,14 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.indexNameOptions("email")).toEqual({ column: "email" });
   });
 
+  it("indexName re-enters through indexNameOptions for a non-Hash options argument", () => {
+    const ss = makeStatements();
+    expect(ss.indexName("users", ["first_name", "last_name"])).toBe(
+      ss.indexName("users", { column: ["first_name", "last_name"] }),
+    );
+    expect(ss.indexName("users", "lower(email)")).toBe("index_users_on_lower_email");
+  });
+
   it("indexNameForRemove resolves a positional expression via generate_index_name", async () => {
     // Rails: `options[:name] = index_name(table, column_name)` — the expression
     // is scanned for \w+ words, joined with "_", and passed through

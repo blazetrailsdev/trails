@@ -396,8 +396,8 @@ export class SchemaStatements {
     // they never reach `validate_create_table_options!(options)`
     // (schema_statements.rb:307). We bundle every kwarg into one object, so
     // they are split back out here before validating.
-    const { id: _id, primaryKey: _primaryKey, force: _force, ...withoutOwnKwargs } = options;
-    this.validateCreateTableOptionsBang(withoutOwnKwargs);
+    const { id: _id, primaryKey: _primaryKey, force: _force, ...validatedOptions } = options;
+    this.validateCreateTableOptionsBang(validatedOptions);
 
     if (tableName.length > 64) {
       throw new Error(`Table name '${tableName}' is too long; the limit is 64 characters`);
