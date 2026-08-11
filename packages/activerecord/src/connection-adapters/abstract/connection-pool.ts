@@ -208,30 +208,12 @@ export class NullPool implements AbstractPool {
     return undefined;
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   checkout(): never {
     throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   checkin(_conn: DatabaseAdapter): void {}
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   remove(_conn: DatabaseAdapter): void {}
 
   get asyncExecutor(): null {
@@ -246,12 +228,6 @@ export class NullPool implements AbstractPool {
     return true;
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   disconnect(): void {}
 }
 
@@ -887,12 +863,6 @@ export class ConnectionPool implements ReapablePool {
   // the method NAME + semantics (per-checkout verify/self-heal), NOT the sync
   // return type — do not "converge back" to a sync return. See RFC
   // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
     if (pinned) {
