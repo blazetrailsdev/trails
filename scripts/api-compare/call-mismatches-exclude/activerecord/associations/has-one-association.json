@@ -80,7 +80,7 @@
       "str:restrict_dependent_destroy.has_one",
       "kwargs{record=ref:record}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/has_one_association.rb:17 `owner.errors.add(:base, :'restrict_dependent_destroy.has_one', record: record)`: the differing argument is a Ruby Symbol, spelled in trails as the colon-prefixed string the CLAUDE.md Symbol convention requires — same value, different rendering."
   },
   {
     "package": "activerecord",

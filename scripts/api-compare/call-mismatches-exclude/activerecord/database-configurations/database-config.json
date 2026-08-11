@@ -15,6 +15,6 @@
     "rubyArgs": [
       "ref:configurationHash"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at database_configurations/database_config.rb:25 `def new_connection`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   }
 ]

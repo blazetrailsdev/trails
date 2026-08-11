@@ -6,7 +6,7 @@
     "call": "underscore",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at signed_id.rb:104 `[ base_class.name.underscore, purpose.to_s ].compact_blank.join(\"/\")`: Rails invokes `underscore` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -75,6 +75,6 @@
       "ref:secret",
       "kwargs{digest=str:SHA256,serializer=const:JSON,urlSafe=bool:true}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at signed_id.rb:90 `ActiveSupport::MessageVerifier.new secret, digest: \"SHA256\", serializer: JSON, url_safe: true`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   }
 ]

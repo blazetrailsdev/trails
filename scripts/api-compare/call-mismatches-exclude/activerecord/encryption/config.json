@@ -8,6 +8,6 @@
     "rubyArgs": [
       "kwargs{hashDigestClass=const:SHA1}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at encryption/config.rb `support_sha1_for_non_deterministic_encryption=`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   }
 ]

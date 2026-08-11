@@ -240,7 +240,7 @@ export class ToSql extends Visitor {
 
     if (node.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
 
     if (node.limit) {
@@ -262,7 +262,7 @@ export class ToSql extends Visitor {
 
     if (node.values.length > 0) {
       collector.append(" SET ");
-      this.injectJoin(node.values, ", ", collector);
+      this.injectJoin(node.values, collector, ", ");
     }
 
     if (node.wheres.length > 0) {
@@ -273,7 +273,7 @@ export class ToSql extends Visitor {
 
     if (node.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
 
     if (node.limit) {
@@ -414,7 +414,7 @@ export class ToSql extends Visitor {
 
     if (node.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
 
     if (node.limit) {
@@ -458,17 +458,17 @@ export class ToSql extends Visitor {
     this.collectOptimizerHints(node, collector);
     this.maybeVisit(node.setQuantifier ?? null, collector);
 
-    this.collectNodesFor(node.projections, " ", ", ", collector);
+    this.collectNodesFor(node.projections, collector, " ", ", ");
 
     if (node.source && !node.source.isEmpty()) {
       collector.append(" FROM ");
       this.visit(node.source, collector);
     }
 
-    this.collectNodesFor(node.wheres, " WHERE ", " AND ", collector);
-    this.collectNodesFor(node.groups, " GROUP BY ", ", ", collector);
-    this.collectNodesFor(node.havings, " HAVING ", " AND ", collector);
-    this.collectNodesFor(node.windows, " WINDOW ", ", ", collector);
+    this.collectNodesFor(node.wheres, collector, " WHERE ", " AND ");
+    this.collectNodesFor(node.groups, collector, " GROUP BY ", ", ");
+    this.collectNodesFor(node.havings, collector, " HAVING ", " AND ");
+    this.collectNodesFor(node.windows, collector, " WINDOW ", ", ");
 
     this.maybeVisit(node.comment ?? null, collector);
 
@@ -645,13 +645,13 @@ export class ToSql extends Visitor {
    */
   protected collectNodesFor(
     nodes: Node[],
+    collector: SQLString,
     spacer: string,
     connector = ", ",
-    collector: SQLString,
   ): SQLString {
     if (nodes.length === 0) return collector;
     collector.append(spacer);
-    this.injectJoin(nodes, connector, collector);
+    this.injectJoin(nodes, collector, connector);
     return collector;
   }
 
@@ -694,23 +694,23 @@ export class ToSql extends Visitor {
   // -- Set operations --
 
   protected visitArelNodesUnion(node: Nodes.Union, collector: SQLString): SQLString {
-    return this.infixValueWithParen(node, " UNION ", false, collector);
+    return this.infixValueWithParen(node, collector, " UNION ", false);
   }
 
   protected visitArelNodesUnionAll(node: Nodes.UnionAll, collector: SQLString): SQLString {
-    return this.infixValueWithParen(node, " UNION ALL ", false, collector);
+    return this.infixValueWithParen(node, collector, " UNION ALL ", false);
   }
 
   protected visitArelNodesIntersect(node: Nodes.Intersect, collector: SQLString): SQLString {
     collector.append("( ");
-    this.infixValue(node, " INTERSECT ", collector);
+    this.infixValue(node, collector, " INTERSECT ");
     collector.append(" )");
     return collector;
   }
 
   protected visitArelNodesExcept(node: Nodes.Except, collector: SQLString): SQLString {
     collector.append("( ");
-    this.infixValue(node, " EXCEPT ", collector);
+    this.infixValue(node, collector, " EXCEPT ");
     collector.append(" )");
     return collector;
   }
@@ -726,12 +726,12 @@ export class ToSql extends Visitor {
     collector.append("(");
     if (node.partitions.length > 0) {
       collector.append("PARTITION BY ");
-      this.injectJoin(node.partitions, ", ", collector);
+      this.injectJoin(node.partitions, collector, ", ");
     }
     if (node.orders.length > 0) {
       if (node.partitions.length > 0) collector.append(" ");
       collector.append("ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
     if (node.framing) {
       if (node.partitions.length > 0 || node.orders.length > 0) collector.append(" ");
@@ -929,7 +929,7 @@ export class ToSql extends Visitor {
     collector.append(node.name);
     collector.append("(");
     if (node.distinct) collector.append("DISTINCT ");
-    this.injectJoin(node.expressions, ", ", collector);
+    this.injectJoin(node.expressions, collector, ", ");
     collector.append(")");
     if (node.alias) {
       collector.append(" AS ");
@@ -1059,7 +1059,7 @@ export class ToSql extends Visitor {
     if (node.left) this.visit(node.left, collector);
     if (node.right.length > 0) {
       if (node.left) collector.append(" ");
-      this.injectJoin(node.right, " ", collector);
+      this.injectJoin(node.right, collector, " ");
     }
     return collector;
   }
@@ -1653,7 +1653,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesFragments(node: Nodes.Fragments, collector: SQLString): SQLString {
-    return this.injectJoin(node.values, " ", collector);
+    return this.injectJoin(node.values, collector, " ");
   }
 
   /**
@@ -1718,7 +1718,7 @@ export class ToSql extends Visitor {
    * Mirrors `to_sql.rb#inject_join`: visits `list[0]`, then for each
    * subsequent node emits `joinStr` and visits.
    */
-  protected injectJoin(list: Node[], joinStr: string, collector: SQLString): SQLString {
+  protected injectJoin(list: Node[], collector: SQLString, joinStr: string): SQLString {
     list.forEach((n, i) => {
       if (i > 0) collector.append(joinStr);
       this.visit(n, collector);
@@ -1822,8 +1822,8 @@ export class ToSql extends Visitor {
   /** Mirrors `to_sql.rb#infix_value`. Visits left, emits literal, visits right. */
   protected infixValue(
     o: { left: Node; right: Node },
-    value: string,
     collector: SQLString,
+    value: string,
   ): SQLString {
     this.visit(o.left, collector);
     collector.append(value);
@@ -1838,24 +1838,24 @@ export class ToSql extends Visitor {
    */
   protected infixValueWithParen(
     o: Node & { left: Node; right: Node },
+    collector: SQLString,
     value: string,
     suppressParens = false,
-    collector: SQLString,
   ): SQLString {
     const sameClass = (child: Node): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
     if (!suppressParens) collector.append("( ");
     if (sameClass(o.left)) {
-      this.infixValueWithParen(o.left, value, true, collector);
+      this.infixValueWithParen(o.left, collector, value, true);
     } else {
-      this.groupingParentheses(o.left, false, collector);
+      this.groupingParentheses(o.left, collector, false);
     }
     collector.append(value);
     if (sameClass(o.right)) {
-      this.infixValueWithParen(o.right, value, true, collector);
+      this.infixValueWithParen(o.right, collector, value, true);
     } else {
-      this.groupingParentheses(o.right, false, collector);
+      this.groupingParentheses(o.right, collector, false);
     }
     if (!suppressParens) collector.append(" )");
     return collector;
@@ -1867,8 +1867,8 @@ export class ToSql extends Visitor {
    */
   protected groupingParentheses(
     o: Node,
-    alwaysWrapSelects = true,
     collector: SQLString,
+    alwaysWrapSelects = true,
   ): SQLString {
     if (o instanceof Nodes.SelectStatement && (alwaysWrapSelects || this.isRequireParentheses(o))) {
       collector.append("(");
@@ -1896,7 +1896,7 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     collector.append(`${name}(`);
     if (o.distinct) collector.append("DISTINCT ");
-    this.injectJoin(o.expressions, ", ", collector);
+    this.injectJoin(o.expressions, collector, ", ");
     collector.append(")");
     if (o.alias) {
       collector.append(" AS ");
@@ -2111,7 +2111,7 @@ export class ToSql extends Visitor {
   protected visitArelNodesLateral(node: Nodes.Lateral, collector: SQLString): SQLString {
     // Mirrors Rails: `collector << "LATERAL "; grouping_parentheses(o.expr, ...)`.
     collector.append("LATERAL ");
-    return this.groupingParentheses(node.subquery, true, collector);
+    return this.groupingParentheses(node.subquery, collector, true);
   }
 
   protected appendEscape(escape: Node | null, collector: SQLString): void {

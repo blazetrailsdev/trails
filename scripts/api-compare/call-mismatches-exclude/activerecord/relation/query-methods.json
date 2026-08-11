@@ -288,7 +288,7 @@
     "rubyArgs": [
       "ref:subquery"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1608 `Arel::SelectManager.new(subquery).project(select_value).tap do |arel|`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -368,7 +368,7 @@
     "rubyArgs": [
       "ref:name"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1955 `with_table = Arel::Table.new(name)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -414,7 +414,7 @@
     "rubyArgs": [
       "ref:predicates"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb `excluding!`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",

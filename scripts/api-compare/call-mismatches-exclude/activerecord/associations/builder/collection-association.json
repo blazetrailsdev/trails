@@ -13,6 +13,6 @@
     "call": "singularize",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/collection_association.rb:62 `def #{name.to_s.singularize}_ids`: Rails invokes `singularize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

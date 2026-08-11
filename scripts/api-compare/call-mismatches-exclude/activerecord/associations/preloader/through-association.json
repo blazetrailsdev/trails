@@ -20,7 +20,7 @@
     "call": "loaded?",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at associations/preloader/through_association.rb:13 `if loaded?(owner)` and :20 `owners.first.association(through_reflection.name).loaded?`: the body calls `loaded?` twice — once with an owner argument, once on a receiver — and the comparator paired the port's single `loaded(owner)` against the receiverless occurrence."
   },
   {
     "package": "activerecord",

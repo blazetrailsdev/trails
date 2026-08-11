@@ -20,7 +20,7 @@
     "call": "freeze",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:479 `@column_names ||= columns.map(&:name).freeze`: Rails invokes `freeze` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -29,7 +29,7 @@
     "call": "values",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:433 `@columns ||= columns_hash.values.freeze`: Rails invokes `values` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -119,6 +119,6 @@
     "call": "underscore",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:601 `table_name = model_name.to_s.demodulize.underscore`: Rails invokes `underscore` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

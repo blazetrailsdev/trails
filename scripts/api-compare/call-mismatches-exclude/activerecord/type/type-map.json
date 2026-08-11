@@ -8,7 +8,7 @@
     "rubyArgs": [
       "ref:key"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at type/type_map.rb:36 `register_type(key) do |sql_type|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",

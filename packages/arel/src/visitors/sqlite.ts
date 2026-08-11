@@ -30,7 +30,7 @@ export class SQLite extends ToSql {
 
     if (node.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
 
     if (node.limit) {
@@ -88,9 +88,9 @@ export class SQLite extends ToSql {
    */
   protected override infixValueWithParen(
     o: Node & { left: Node; right: Node },
+    collector: SQLString,
     value: string,
     suppressParens = false,
-    collector: SQLString,
   ): SQLString {
     const sameClass = (child: Node): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
@@ -98,16 +98,16 @@ export class SQLite extends ToSql {
     if (!suppressParens) collector.append("( ");
     const left = this.unwrapGrouping(o.left);
     if (sameClass(left)) {
-      this.infixValueWithParen(left, value, true, collector);
+      this.infixValueWithParen(left, collector, value, true);
     } else {
-      this.groupingParentheses(left, false, collector);
+      this.groupingParentheses(left, collector, false);
     }
     collector.append(value);
     const right = this.unwrapGrouping(o.right);
     if (sameClass(right)) {
-      this.infixValueWithParen(right, value, true, collector);
+      this.infixValueWithParen(right, collector, value, true);
     } else {
-      this.groupingParentheses(right, false, collector);
+      this.groupingParentheses(right, collector, false);
     }
     if (!suppressParens) collector.append(" )");
     return collector;
