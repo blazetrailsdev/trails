@@ -161,14 +161,14 @@ export class BaseLocator {
 
   /** @internal Mirrors: BaseLocator#model_id_is_valid? — modelId arity matches PK arity. */
   protected modelIdIsValid(gid: GlobalID): boolean {
-    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    if (!klass) return false;
-    return modelIdArityMatches(klass, gid.modelId, this.primaryKey(klass));
+    const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
+    if (!modelClass) return false;
+    return modelIdArityMatches(modelClass, gid.modelId, this.primaryKey(modelClass));
   }
 
   /** @internal Mirrors: BaseLocator#primary_key. */
-  protected primaryKey(klass: LocatorModel): string | string[] {
-    return klass.primaryKey ?? "id";
+  protected primaryKey(modelClass: LocatorModel): string | string[] {
+    return modelClass.primaryKey ?? "id";
   }
 }
 
@@ -369,13 +369,13 @@ export class Locator {
    */
   static parseAllowed(gids: Array<string | GlobalID>, only?: LocateOptions["only"]): GlobalID[] {
     const result: GlobalID[] = [];
-    for (const g of gids) {
-      const parsed = GlobalID.parse(g);
+    for (const gid of gids) {
+      const parsed = GlobalID.parse(gid);
       if (!parsed) continue;
-      const klass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
-      if (!klass) continue;
-      if (!Locator.findAllowed(klass, only)) continue;
-      if (!modelIdArityMatches(klass, parsed.modelId)) continue;
+      const modelClass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
+      if (!modelClass) continue;
+      if (!Locator.findAllowed(modelClass, only)) continue;
+      if (!modelIdArityMatches(modelClass, parsed.modelId)) continue;
       result.push(parsed);
     }
     return result;

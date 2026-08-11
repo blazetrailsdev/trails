@@ -96,21 +96,21 @@ export class ActionFilter implements CallbackPredicateLike {
   isMatch(controller: AbstractController): boolean {
     const Constructor = controller.constructor as { raiseOnMissingCallbackActions?: boolean };
     if (Constructor.raiseOnMissingCallbackActions) {
-      const missing = [...this._actions].find((a) => !controller.isAvailableAction(a));
-      if (missing !== undefined) {
-        const names =
+      const missingAction = [...this._actions].find((a) => !controller.isAvailableAction(a));
+      if (missingAction !== undefined) {
+        const filterNames =
           this._filters.length === 1
             ? _inspectFilter(this._filters[0])
             : `[${this._filters.map(_inspectFilter).join(", ")}]`;
         // Ruby `:key.inspect` renders as `:key`; preserve that for parity
         // with Rails' error message format (the literal `:only` / `:except`).
         const message =
-          `The ${missing} action could not be found for the ${names} ` +
+          `The ${missingAction} action could not be found for the ${filterNames} ` +
           `callback on ${controller.constructor.name}, but it is listed in the controller's ` +
           `:${this._conditionalKey} option.\n\n` +
           `Raising for missing callback actions is a new default in Rails 7.1; ` +
           `set \`raiseOnMissingCallbackActions = false\` on the controller class to opt out.`;
-        throw new ActionNotFound(message, controller, missing);
+        throw new ActionNotFound(message, controller, missingAction);
       }
     }
     return this._actions.has(controller.actionName);
@@ -159,17 +159,17 @@ export function _normalizeCallbackOption(
   from: "only" | "except",
   to: "if" | "unless",
 ): void {
-  const fromValue = options[from];
+  let fromValue: string | string[] | ActionFilter | undefined = options[from];
   if (fromValue === undefined) return;
   delete options[from];
 
   const filters = (options as CallbackOptionsWithFilters).filters ?? [];
-  const filter = new ActionFilter(filters, from, fromValue);
+  fromValue = new ActionFilter(filters, from, fromValue);
 
   const existing = options[to];
   const list: Array<((controller: AbstractController) => boolean) | CallbackPredicateLike> =
     existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
-  list.unshift(filter);
+  list.unshift(fromValue);
   options[to] = list;
 }
 

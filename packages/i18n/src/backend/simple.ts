@@ -163,16 +163,16 @@ export class Simple {
     let result: unknown = this.translations();
     for (const rawKey of keys) {
       if (!isHash(result)) return null;
-      let segment = String(rawKey);
-      if (!(segment in result)) {
-        segment = toSym(segment).slice(1);
-        if (!(segment in result)) return null;
+      let _key = String(rawKey);
+      if (!(_key in result)) {
+        _key = toSym(_key).slice(1);
+        if (!(_key in result)) return null;
       }
-      result = result[segment];
+      result = result[_key];
       if (isSymbol(result)) {
         result = this.resolveEntry(
           locale,
-          segment,
+          _key,
           result,
           except({ ...options, scope: null }, "count"),
         );

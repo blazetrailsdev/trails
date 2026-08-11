@@ -649,9 +649,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
-    const raw = this.extractNewCommentValue(commentOrChanges);
+    let comment = this.extractNewCommentValue(commentOrChanges);
     // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
-    const comment = raw == null ? "" : String(raw);
+    comment = comment == null ? "" : String(comment);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(comment)}`,
     );
@@ -742,13 +742,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition> {
     const column = await this.columnFor(tableName, columnName);
-    const extracted = this.extractNewDefaultValue(defaultOrChanges);
+    let default_ = this.extractNewDefaultValue(defaultOrChanges);
     // Normalize JS-only `undefined` → `null` so the schema-creation
     // visitor's SET branch produces `SET DEFAULT NULL` rather than the
     // bare `SET` that quoteDefaultExpression(undefined) → "" would emit.
     // Rails has no nil/undefined split, so this is TS-specific defense.
-    const newDefault = extracted === undefined ? null : extracted;
-    return new ChangeColumnDefaultDefinition(column, newDefault);
+    if (default_ === undefined) default_ = null;
+    return new ChangeColumnDefaultDefinition(column, default_);
   }
 
   /**
@@ -1078,8 +1078,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       .map((s) => (typeof s === "string" ? s : visitor.compile(s)))
       .filter((s) => s.trim().length > 0)
       .map((s) => s.replace(/\s+(?:ASC|DESC)\b/gi, "").trim())
-      .filter((col) => col.length > 0)
-      .map((col, i) => `${col} AS alias_${i}`);
+      .filter((column) => column.length > 0)
+      .map((column, i) => `${column} AS alias_${i}`);
     if (orderColumns.length === 0) return columns;
     return [...orderColumns, columns].join(", ");
   }

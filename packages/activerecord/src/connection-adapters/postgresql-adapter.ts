@@ -946,9 +946,9 @@ export class PostgreSQLAdapter
           `unknown OID ${oid}: failed to recognize type of '${columnName}'. It will be treated as String.`,
         );
       }
-      const fallback = new ValueType();
-      this.typeMap.registerType(oid, fallback);
-      return fallback;
+      const castType = new ValueType();
+      this.typeMap.registerType(oid, castType);
+      return castType;
     });
   }
 
@@ -3457,7 +3457,8 @@ export class PostgreSQLAdapter
     name?: string | null,
     options: { type?: string } = {},
   ): { schema: string; name: string | null; type: string | null } {
-    const [schema, table] = this.extractSchemaQualifiedName(name ?? "");
+    let schema: string | null;
+    [schema, name] = this.extractSchemaQualifiedName(name ?? "");
     let type: string | null = null;
     switch (options.type) {
       case "BASE TABLE":
@@ -3472,7 +3473,7 @@ export class PostgreSQLAdapter
     }
     return {
       schema: schema ? this.quote(schema) : "ANY (current_schemas(false))",
-      name: table ? this.quote(table) : null,
+      name: name ? this.quote(name) : null,
       type,
     };
   }
@@ -3605,13 +3606,9 @@ export class PostgreSQLAdapter
     // Rails resolves the name against `table.to_s` — the SCHEMA-QUALIFIED name,
     // so a generated index name matches the one addIndex produced for the same
     // argument. Passing the bare identifier here silently misses those.
-    const positional = typeof columnName === "string" ? columnName : null;
-    const nameOpts = Array.isArray(columnName)
-      ? { ...resolveOpts, column: columnName }
-      : resolveOpts;
     const indexToRemove = new Name(
       table.schema,
-      await this.indexNameForRemove(table.toString(), positional, nameOpts),
+      await this.indexNameForRemove(table.toString(), columnName, resolveOpts),
     );
 
     await this.execute(
@@ -3818,22 +3815,28 @@ export class PostgreSQLAdapter
 
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
   ): string {
     // Rails PostgreSQL#index_name strips the schema qualifier and derives the
     // name from the bare table (postgresql/schema_statements.rb), so a
     // `my_schema.values` table indexes as `index_values_on_value` — created in
     // `my_schema` via the schema-qualified table, keeping add/remove symmetric.
     const [, table] = this.extractSchemaQualifiedName(tableName);
-    if (options.column != null) {
-      if (options._usesLegacyIndexName) {
-        const cols = Array.isArray(options.column) ? options.column : [options.column];
-        return `index_${table}_on_${cols.join("_and_")}`;
+    if (typeof options !== "string" && !Array.isArray(options)) {
+      if (options.column != null) {
+        if (options._usesLegacyIndexName) {
+          const cols = Array.isArray(options.column) ? options.column : [options.column];
+          return `index_${table}_on_${cols.join("_and_")}`;
+        }
+        return this.generateIndexName(table, options.column);
       }
-      return this.generateIndexName(table, options.column);
+      if (options.name != null) return options.name;
+      throw new ArgumentError("You must specify the index name");
     }
-    if (options.name != null) return options.name;
-    throw new ArgumentError("You must specify the index name");
+    return this.indexName(table, this.indexNameOptions(options));
   }
 
   // Mirrors Rails PostgreSQL#add_index_options (schema_statements.rb:937-942):
@@ -3998,12 +4001,12 @@ export class PostgreSQLAdapter
   changeColumnNullForAlter(
     tableName: string,
     columnName: string,
-    nullable: boolean,
-    defaultValue?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): unknown {
-    if (defaultValue == null)
-      return `ALTER COLUMN ${this.quoteColumnName(columnName)} ${nullable ? "DROP" : "SET"} NOT NULL`;
-    return () => this.changeColumnNull(tableName, columnName, nullable, defaultValue);
+    if (default_ == null)
+      return `ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`;
+    return () => this.changeColumnNull(tableName, columnName, null_, default_);
   }
 
   /**

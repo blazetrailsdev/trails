@@ -48,27 +48,26 @@ export class GeneratedAttribute {
       indexType = type;
       type = undefined;
     }
-    const [parsedType, opts] = parseTypeAndOptions(type);
-    const finalType = parsedType ?? "string";
+    let attrOptions: AttrOptions;
+    // eslint-disable-next-line prefer-const
+    [type, attrOptions] = parseTypeAndOptions(type);
     if (DANGEROUS.has(name)) {
       throw new GeneratorError(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
       );
     }
-    if (parsedType && !GeneratedAttribute.validType(parsedType)) {
-      throw new GeneratorError(
-        `Could not generate field '${name}' with unknown type '${parsedType}'.`,
-      );
+    if (type && !GeneratedAttribute.validType(type)) {
+      throw new GeneratorError(`Could not generate field '${name}' with unknown type '${type}'.`);
     }
     if (indexType && !GeneratedAttribute.validIndexType(indexType)) {
       throw new GeneratorError(
         `Could not generate field '${name}' with unknown index '${indexType}'.`,
       );
     }
-    if (parsedType && GeneratedAttribute.reference(finalType) && indexType === "uniq") {
-      opts.index = { unique: true };
+    if (type && GeneratedAttribute.reference(type) && indexType === "uniq") {
+      attrOptions.index = { unique: true };
     }
-    return new GeneratedAttribute(name, finalType, indexType as IndexType, opts);
+    return new GeneratedAttribute(name, type ?? "string", indexType as IndexType, attrOptions);
   }
 
   static validType = (t: string): boolean => DEFAULT_TYPES.has(t);

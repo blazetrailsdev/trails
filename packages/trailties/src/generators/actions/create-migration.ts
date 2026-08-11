@@ -76,8 +76,8 @@ export class CreateMigration {
   }
 
   async relativeExistingMigration(): Promise<string> {
-    const e = await this.existingMigration();
-    return e ? this.base.relativeToOriginalDestinationRoot(e) : "";
+    const existingMigration = await this.existingMigration();
+    return existingMigration ? this.base.relativeToOriginalDestinationRoot(existingMigration) : "";
   }
 
   relativeDestination(): string {

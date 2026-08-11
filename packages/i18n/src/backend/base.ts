@@ -429,8 +429,8 @@ export abstract class Base {
     if (object == null && "default" in options) {
       return options.default;
     }
-    const subject = localizable(object);
-    if (!respondTo(subject, "strftime")) {
+    object = localizable(object);
+    if (!respondTo(object, "strftime")) {
       throw new ArgumentError(
         `Object must be a Date, DateTime or Time object. ${inspect(object)} given.`,
       );
@@ -438,13 +438,13 @@ export abstract class Base {
 
     if (isSymbol(format)) {
       const key = format;
-      const type = respondTo(subject, "sec") ? "time" : "date";
+      const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
       format = t(`:${type}.formats.${key.slice(1)}`, options);
     }
 
-    format = this.translateLocalizationFormat(locale, subject as Localizable, format, options);
-    return (subject as Localizable).strftime(format as string);
+    format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
+    return (object as Localizable).strftime(format as string);
   }
 
   /**
@@ -500,17 +500,17 @@ export abstract class Base {
     subject: unknown,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
-    const rest =
+    options =
       Object.keys(options).length === 1 && "default" in options ? {} : except(options, "default");
 
     if (Array.isArray(subject)) {
       for (const item of subject) {
-        const result = this.resolve(locale, object, item, rest);
+        const result = this.resolve(locale, object, item, options);
         if (result != null) return result;
       }
       return null;
     }
-    return this.resolve(locale, object, subject, rest);
+    return this.resolve(locale, object, subject, options);
   }
 
   /**
@@ -568,12 +568,12 @@ export abstract class Base {
    *   with regards to the CLDR pluralization rules.
    */
   protected pluralize(_locale: Locale, entry: unknown, count: unknown): unknown {
-    const subject = isHash(entry) ? except(entry, "attributes") : entry;
-    if (!isHash(subject) || !truthy(count)) return subject;
+    entry = isHash(entry) ? except(entry, "attributes") : entry;
+    if (!isHash(entry) || !truthy(count)) return entry;
 
-    const key = this.pluralizationKey(subject, count);
-    if (!(key in subject)) throw new InvalidPluralizationData(subject, count, key);
-    return subject[key];
+    const key = this.pluralizationKey(entry, count);
+    if (!(key in entry)) throw new InvalidPluralizationData(entry, count, key);
+    return entry[key];
   }
 
   /**
