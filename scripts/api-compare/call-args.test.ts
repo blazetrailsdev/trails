@@ -117,6 +117,25 @@ describe("normalizeArgs", () => {
   });
 });
 
+describe("compareCallArgs colon-kept Symbol spelling", () => {
+  // has_many_association.rb#handle_dependency
+  // `errors.add(:base, :"restrict_dependent_destroy.has_many", record: …)`.
+  it("reads a colon-kept TS string as the Ruby Symbol of the same name", () => {
+    expect(
+      compareCallArgs(
+        site("add", ["sym:base", "sym:restrict_dependent_destroy.has_many"]),
+        site("add", ["str:base", "str::restrict_dependent_destroy.has_many"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("strips the colon in one direction only", () => {
+    expect(compareCallArgs(site("add", ["str::a.b"]), site("add", ["str:a.b"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
 describe("compareCallArgs built-in receiver as argument 1", () => {
   it("reads the TS first argument as the Ruby receiver for a core-ext", () => {
     // reflection.rb:454 `name.to_s.camelize` → `camelize(name)`.

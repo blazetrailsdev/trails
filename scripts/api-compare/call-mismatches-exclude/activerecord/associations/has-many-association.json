@@ -10,19 +10,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-many-association.ts",
     "rubyName": "handle_dependency",
-    "call": "add",
-    "kind": "args",
-    "rubyArgs": [
-      "str:base",
-      "str:restrict_dependent_destroy.has_many",
-      "kwargs{record=ref:record}"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/has_many_association.rb:22 `owner.errors.add(:base, :'restrict_dependent_destroy.has_many', record: record)`: the differing argument is a Ruby Symbol, spelled in trails as the colon-prefixed string the CLAUDE.md Symbol convention requires — same value, different rendering."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-many-association.ts",
-    "rubyName": "handle_dependency",
     "call": "collect",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

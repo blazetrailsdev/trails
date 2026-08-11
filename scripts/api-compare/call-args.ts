@@ -492,7 +492,26 @@ function argKeysEqual(rubyKey: string, tsKey: string): boolean {
     return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
   }
   if (rubyKey.startsWith("ref:") && tsKey.startsWith("ref:")) return refKeysEqual(rubyKey, tsKey);
-  return rubyKey === tsKey;
+  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey);
+}
+
+/**
+ * Whether the TS key is the Ruby one written in the colon-kept Symbol spelling
+ * (RFC 0099). A Ruby Symbol is a JS string and CLAUDE.md ("Symbols vs strings")
+ * keeps the leading colon, so `:"restrict_dependent_destroy.has_many"`
+ * (has_many_association.rb#handle_dependency) is the port's
+ * `":restrict_dependent_destroy.has_many"`.
+ *
+ * {@link normalizeLiteralArg} already absorbs the colon for an
+ * IDENTIFIER-shaped value, on its way through the camelization every such name
+ * takes; a value that camelization does not apply to — a dotted i18n key —
+ * reached comparison with the colon still on it. Reconciled here rather than in
+ * the key so the strip is only ever the one direction the convention runs:
+ * `":x"` is `:x`, and a Ruby `":x"` STRING is not silently the same value as
+ * the Ruby string `"x"`.
+ */
+function keptSymbolColon(rubyKey: string, tsKey: string): boolean {
+  return rubyKey.startsWith("str:") && tsKey === `str::${rubyKey.slice("str:".length)}`;
 }
 
 function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
