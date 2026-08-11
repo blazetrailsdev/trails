@@ -18,6 +18,7 @@ import { normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
+import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
@@ -400,6 +401,40 @@ function calleeKeys(enclosingRubyName: string): string[] {
 }
 
 /**
+ * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
+ * cannot define on a receiver at all (RFC 0099 — see
+ * receiver-as-first-arg.ts for what qualifies and, more importantly, what
+ * does not). `name.to_s.camelize` is `camelize(name)`; the remaining arguments
+ * then compare pairwise, so `truncate(text, 10)` against `text.truncate(20)`
+ * still reads as the divergence it is.
+ *
+ * The RECEIVER EXPRESSION itself is deliberately not compared, and the sites
+ * this exists for are why: the Ruby extractor describes `name.to_s.camelize`'s
+ * receiver as the inner CALL (`to_s`), never as `name`, while the port —
+ * correctly, since a TS string is already a string — writes `camelize(name)`.
+ * There is no spelling of that receiver the two sides could agree on, so
+ * comparing it would re-flag every row the table exists to retire.
+ *
+ * Same only-when-it-explains-the-length guard as {@link stripMixinReceiver}:
+ * a port that also passes a genuine extra argument still reads as one.
+ */
+function stripBuiltinReceiver(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
+  if (tsArgs.length === rubyArgs.length + 1 && RECEIVER_AS_FIRST_ARG.has(name)) {
+    return tsArgs.slice(1);
+  }
+  return tsArgs;
+}
+
+/** The two leading-receiver forms, in the one place the comparator strips them:
+ *  the mixin `this` the port adds to a ported module function, and the Ruby
+ *  receiver of a built-in TS cannot define on a receiver. Neither can apply to
+ *  the same site — a name on the built-in table is never a ported mixin — so
+ *  the order is immaterial. */
+function stripReceiverArgs(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
+  return stripBuiltinReceiver(name, rubyArgs, stripMixinReceiver(rubyArgs, tsArgs));
+}
+
+/**
  * Drop the `nil`s TS must write to reach a block that Ruby wrote as a trailing
  * block (RFC 0099).
  *
@@ -488,7 +523,7 @@ function tsCallNameKeys(rubyName: string): string[] {
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
   const rubyArgs = normalizeArgs(ruby.args);
-  const tsArgs = normalizeArgs(stripMixinReceiver(ruby.args, ts.args));
+  const tsArgs = normalizeArgs(stripReceiverArgs(ruby.name, ruby.args, ts.args));
   const sameArity = ruby.args.length === ts.args.length ? 1 : 0;
   if (rubyArgs === null || tsArgs === null) return sameArity * 1_000;
   if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
@@ -585,7 +620,7 @@ export function compareCallArgs(
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
   }
-  const normalizedTs = normalizeArgsOrFailure(stripMixinReceiver(ruby.args, ts.args));
+  const normalizedTs = normalizeArgsOrFailure(stripReceiverArgs(ruby.name, ruby.args, ts.args));
   if (!Array.isArray(normalizedTs)) {
     return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }

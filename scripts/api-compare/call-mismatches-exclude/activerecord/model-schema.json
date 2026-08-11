@@ -16,24 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "column_names",
-    "call": "freeze",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:479 `@column_names ||= columns.map(&:name).freeze`: Rails invokes `freeze` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "columns",
-    "call": "values",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:433 `@columns ||= columns_hash.values.freeze`: Rails invokes `values` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "derive_join_table_name",
     "call": "join",
     "kind": "args",
@@ -111,14 +93,5 @@
     "rubyName": "table_name=",
     "call": "connected?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "undecorated_table_name",
-    "call": "underscore",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at model_schema.rb:601 `table_name = model_name.to_s.demodulize.underscore`: Rails invokes `underscore` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

@@ -117,6 +117,47 @@ describe("normalizeArgs", () => {
   });
 });
 
+describe("compareCallArgs built-in receiver as argument 1", () => {
+  it("reads the TS first argument as the Ruby receiver for a core-ext", () => {
+    // reflection.rb:454 `name.to_s.camelize` → `camelize(name)`.
+    expect(compareCallArgs(site("camelize", []), site("camelize", ["id:name"])).verdict).toBe(
+      "match",
+    );
+    // model_schema.rb:479 `columns_hash.values`.
+    expect(compareCallArgs(site("values", []), site("values", ["id:columnsHash"])).verdict).toBe(
+      "match",
+    );
+  });
+
+  it("compares the remaining arguments pairwise", () => {
+    expect(
+      compareCallArgs(site("pluralize", ["num:2"]), site("pluralize", ["id:word", "num:2"]))
+        .verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(site("pluralize", ["num:2"]), site("pluralize", ["id:word", "num:3"]))
+        .verdict,
+    ).toBe("mismatch");
+  });
+
+  it("leaves a Rails-defined method's explicit host argument flagged", () => {
+    // The `call-args-ar-host-param-*` divergence: the settled idiom is a
+    // `this`-typed function, so `Klass.polymorphicName()` is the port.
+    const result = compareCallArgs(
+      site("polymorphic_name", []),
+      site("polymorphicName", ["id:klass"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("still flags a genuine extra argument past the receiver", () => {
+    expect(
+      compareCallArgs(site("camelize", []), site("camelize", ["id:name", "bool:false"])).verdict,
+    ).toBe("mismatch");
+  });
+});
+
 describe("compareCallArgs block-tail nil padding", () => {
   const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
   const required = (name: string): ParamInfo => ({ name, kind: "required" });

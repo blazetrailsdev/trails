@@ -2,15 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/builder/belongs-to.ts",
-    "rubyName": "add_counter_cache_callbacks",
-    "call": "safe_constantize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/belongs_to.rb:39 `klass = reflection.class_name.safe_constantize`: Rails invokes `safe_constantize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "define_validations",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

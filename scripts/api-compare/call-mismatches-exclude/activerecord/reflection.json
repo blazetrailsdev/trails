@@ -30,15 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "reflection.ts",
-    "rubyName": "automatic_inverse_of",
-    "call": "demodulize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at reflection.rb:760 `inverse_name = ActiveSupport::Inflector.underscore(options[:as] || active_record.name.demodulize).to_sym`: Rails invokes `demodulize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
     "rubyName": "build_scope",
     "call": "create",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -53,24 +44,6 @@
       "ref:this"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "counter_cache_column",
-    "call": "underscore",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at reflection.rb:250 `counter_cache[:column] || -\"#{active_record.name.demodulize.underscore.pluralize}_count\"`: Rails invokes `underscore` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "derive_class_name",
-    "call": "camelize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at reflection.rb:454 `name.to_s.camelize`: Rails invokes `camelize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -143,23 +116,5 @@
     "rubyName": "join_scope",
     "call": "with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "source_reflection_name",
-    "call": "singularize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at reflection.rb:1114 `names = [name.to_s.singularize, name].collect(&:to_sym).uniq`: Rails invokes `singularize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "reflection.ts",
-    "rubyName": "source_reflection_names",
-    "call": "singularize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at reflection.rb:1109 `options[:source] ? [options[:source]] : [name.to_s.singularize, name].uniq`: Rails invokes `singularize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

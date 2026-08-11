@@ -59,15 +59,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "copy",
-    "call": "underscore",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at migration.rb:1102 `new_path = File.join(destination, \"#{migration.version}_#{migration.name.underscore}.#{scope}.rb\")`: Rails invokes `underscore` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "create_join_table",
     "call": "compatible_table_definition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

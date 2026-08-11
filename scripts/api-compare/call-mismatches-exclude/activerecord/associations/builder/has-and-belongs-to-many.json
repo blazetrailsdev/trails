@@ -16,15 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/builder/has-and-belongs-to-many.ts",
-    "rubyName": "middle_reflection",
-    "call": "pluralize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:60 `middle_name = [lhs_model.name.downcase.pluralize,`: Rails invokes `pluralize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
     "rubyName": "through_model",
     "call": "belongs_to",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -47,25 +38,7 @@
     "package": "activerecord",
     "tsFile": "associations/builder/has-and-belongs-to-many.ts",
     "rubyName": "through_model",
-    "call": "camelize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:50 `join_model.name                = \"HABTM_#{association_name.to_s.camelize}\"`: Rails invokes `camelize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
-    "rubyName": "through_model",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/has-and-belongs-to-many.ts",
-    "rubyName": "through_model",
-    "call": "singularize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:40 `rhs_name = name.to_s.singularize.to_sym`: Rails invokes `singularize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

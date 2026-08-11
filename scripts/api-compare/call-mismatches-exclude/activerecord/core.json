@@ -70,15 +70,6 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "destroy_association_async_job",
-    "call": "constantize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at core.rb:29 `self._destroy_association_async_job = _destroy_association_async_job.constantize`: Rails invokes `constantize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "find",
     "call": "order:constructor,primaryKey",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
