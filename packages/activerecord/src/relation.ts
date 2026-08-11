@@ -1545,20 +1545,15 @@ export class Relation<T extends Base> {
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T> {
-    // `check_if_method_has_arguments!` runs `args.flatten!` +
-    // `args.compact_blank!` in place before `spawn.joins!`
-    // (query_methods.rb:868-871), so blank specs never reach join state and a
-    // `joins(["a","b"])` array arrives here as two association names.
     this.checkIfMethodHasArgumentsBang("joins", args as unknown[]);
     const rel = this._clone();
-    const flatArgs = args as unknown[];
     // Rails joins! uses `joins_values |= args` — one array union over the whole
     // set, deduplicating by eql?/hash (structural for Arel `Nodes.Binary`, plain
     // strings, and Hash specs alike). structuralUnionEq mirrors that (=== first,
     // then eql/structural), and a single unified store preserves insertion order
     // across named and raw joins. The named-vs-raw partition the builders need is
     // derived on read (see `_namedInnerJoins` / `_joinValues`).
-    for (const arg of flatArgs) {
+    for (const arg of args) {
       if (!rel._joinsValues.some((v) => _qm.structuralUnionEq(v, arg)))
         rel._joinsValues.push(arg as AssociationSpec | string | Nodes.Join);
     }
@@ -1613,17 +1608,13 @@ export class Relation<T extends Base> {
     callee: string,
     args: Array<AssociationSpec | AssociationSpec[]>,
   ): Relation<T> {
-    // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
-    // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
-    // `leftJoins([])` drop their blank specs instead of polluting join state.
     this.checkIfMethodHasArgumentsBang(callee, args);
     const rel = this._clone();
-    const specs = args;
     // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
     // raises for a non-Hash/Symbol/Array arg lazily at SQL-build time, in
     // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
     // `buildJoinBuckets` for the raise.
-    for (const spec of specs) {
+    for (const spec of args) {
       // Rails' left_outer_joins! unions with `|=` (eql?/hash), so a Hash spec
       // passed twice folds structurally — not by JS reference identity.
       if (!rel._leftOuterJoinsValues.some((v) => _qm.structuralUnionEq(v, spec))) {
@@ -3607,9 +3598,6 @@ export class Relation<T extends Base> {
     // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
     // Uses the broader column_name_matcher (allows functions like UPPER(col))
     // rather than column_name_with_order_matcher (which is stricter, for order).
-    // Rails: `model.disallow_raw_sql!(flattened_args(column_names))`
-    // (calculations.rb:313) — the check runs over the FLATTENED args, so a
-    // nested `pluck(["a", "b"])` is checked too.
     const stringColumns = this.flattenedArgs(columns).filter(
       (c): c is string => typeof c === "string",
     );

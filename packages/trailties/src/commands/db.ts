@@ -609,14 +609,6 @@ async function withMigrationTasksForDb(
 }
 
 /**
- * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
- * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
- * routing (single-primary fast path, then `db_configs_with_versions` sorted so
- * one timestamp runs across every config before the next), so the migrations
- * for each config are registered up front and the whole run happens inside a
- * single `configs_for` registration rather than a per-database loop.
- */
-/**
  * Runs `fn` with `TRAILS_MIGRATION_VERSION` set to `targetVersion`, so
  * `DatabaseTasks.target_version` sees it exactly as it sees Rails'
  * `ENV["VERSION"]` (`tasks/database_tasks.rb:268`).
@@ -635,6 +627,14 @@ async function withTargetVersionEnv(
   }
 }
 
+/**
+ * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
+ * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
+ * routing (single-primary fast path, then `db_configs_with_versions` sorted so
+ * one timestamp runs across every config before the next), so the migrations
+ * for each config are registered up front and the whole run happens inside a
+ * single `configs_for` registration rather than a per-database loop.
+ */
 async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
@@ -734,10 +734,9 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
-      // Rails has no `--version` flag: the target version IS the environment
-      // variable `DatabaseTasks.target_version` reads (`database_tasks.rb:268`).
-      // So the flag is bridged onto it here rather than threaded through
-      // `migrate`/`migrate_all` as an argument Rails does not have.
+      // Rails has no `--version` flag: the target version IS the env var
+      // `target_version` reads (`database_tasks.rb:268`), so bridge it there
+      // rather than threading an argument Rails does not have.
       await withTargetVersionEnv(targetVersion, async () => {
         if (opts.database === undefined) {
           await runMigrateAll();

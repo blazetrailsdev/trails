@@ -402,10 +402,8 @@ export class DatabaseTasks {
     version: number | string | null | { skipInitialize?: boolean } = null,
     options: { skipInitialize?: boolean } = {},
   ): Promise<void> {
-    // Ruby lets `migrate(skip_initialize: true)` omit the leading optional
-    // positional (`database_tasks.rb:248`); TypeScript has no way to skip a
-    // positional, so the kwargs object is accepted in its place and the call
-    // sites stay the ones Rails writes.
+    // Ruby omits the leading optional positional at `database_tasks.rb:248`;
+    // TypeScript cannot, so the kwargs object is taken in its place.
     if (version !== null && typeof version === "object") {
       options = version;
       version = null;

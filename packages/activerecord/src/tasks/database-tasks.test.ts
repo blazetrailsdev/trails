@@ -1088,9 +1088,6 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 
 describe("DatabaseTasksMigrateErrorTest", () => {
   it("migrate raise error on invalid version format", async () => {
-    // Rails: `ENV["VERSION"] = "unknown"; DatabaseTasks.migrate`
-    // (`database_tasks_test.rb:1191-1196`) — the target version is the
-    // environment variable, never a `migrate` argument.
     setEnv("TRAILS_MIGRATION_VERSION", "abc");
     try {
       await expect(DatabaseTasks.migrate()).rejects.toThrow(/Invalid format/);

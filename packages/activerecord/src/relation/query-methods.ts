@@ -1867,8 +1867,6 @@ export function columnReferences(orderArgs: unknown[]): string[] {
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  // Ruby `order_args.map!` (query_methods.rb:2119) rewrites the caller's array
-  // in place — `order`'s block relies on that to sanitize its own `args`.
   for (let i = 0; i < orderArgs.length; i++) {
     orderArgs[i] = (this.model as any)?.sanitizeSqlForOrder?.(orderArgs[i]) ?? orderArgs[i];
   }
