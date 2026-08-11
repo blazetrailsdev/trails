@@ -189,7 +189,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * the join rows alongside the owner.
    * @internal
    */
-  protected override async concatRecords(records: Base[], _shouldRaise = false): Promise<Base[]> {
+  protected override async concatRecords(records: Base[], _raise = false): Promise<Base[]> {
     this.ensureNotNested();
     const added = await super.concatRecords(records, true);
     if (this.owner.isNewRecord() && added) {

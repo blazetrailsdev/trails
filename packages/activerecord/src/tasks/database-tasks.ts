@@ -260,13 +260,13 @@ export class DatabaseTasks {
   }
 
   static async createCurrent(environment?: string, name?: string): Promise<void> {
-    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment), name)) {
+    environment = this._normalizeEnv(environment);
+    for (const dbConfig of this.eachCurrentConfiguration(environment, name)) {
       await this.create(dbConfig);
     }
     // database_tasks.rb:173 — `migration_class.establish_connection(environment.to_sym)`,
     // which resolves the bare env name through `Base.configurations`.
-    const envName = this._normalizeEnv(environment);
-    await this.migrationClass().establishConnection(envName);
+    await this.migrationClass().establishConnection(environment);
   }
 
   static async drop(
@@ -525,13 +525,13 @@ export class DatabaseTasks {
   }
 
   static async purgeCurrent(environment?: string): Promise<void> {
-    const env = this._normalizeEnv(environment);
-    for (const dbConfig of this.eachCurrentConfiguration(env)) {
+    environment = this._normalizeEnv(environment);
+    for (const dbConfig of this.eachCurrentConfiguration(environment)) {
       await this.purge(dbConfig);
     }
     // database_tasks.rb:359 — `migration_class.establish_connection(environment.to_sym)`,
     // which resolves the bare env name through `Base.configurations`.
-    await this.migrationClass().establishConnection(env);
+    await this.migrationClass().establishConnection(environment);
   }
 
   static async purgeAll(): Promise<void> {
