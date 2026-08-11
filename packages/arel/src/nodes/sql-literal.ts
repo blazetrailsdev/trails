@@ -31,6 +31,13 @@ export class SqlLiteral extends Node {
     return undefined;
   }
 
+  // Rails' SqlLiteral IS a String subclass, so `to_s` returns the SQL text
+  // itself — which `resolve_attribute_name` (attribute_registration.rb:102) and
+  // `in_order_of`'s `column.to_s` (query_methods.rb:724) both rely on.
+  toString(): string {
+    return this.value;
+  }
+
   // Required by the Predications mixin (mirrors Rails' private
   // Predications#quoted_node, which calls `Nodes.build_quoted(other, self)`).
   /** @internal */
