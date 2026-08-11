@@ -34,8 +34,10 @@ import {
   reachedSameFileMethods,
   callTagKey,
   splitOverriddenFileBuckets,
+  resolveTsOwner,
   staleCallTags,
   suppressTaggedCalls,
+  tagsForOwner,
 } from "./compare.js";
 import { rubyMethodToTs } from "@blazetrails/parity/conventions";
 import type {
@@ -1656,17 +1658,26 @@ describe("suppressTaggedCalls", () => {
 });
 
 describe("staleCallTags", () => {
-  const tags = new Map([["relation.ts", new Map([["load", new Set(["synchronize", "reload"])]])]]);
+  const tags = new Map([
+    [
+      "relation.ts",
+      new Map([["load", new Map([["Relation", new Set(["synchronize", "reload"])]])]]),
+    ],
+  ]);
 
   it("reports a tag whose call no longer flags on a compared method", () => {
-    const used = new Map([[callTagKey("relation.ts", "load"), new Set(["synchronize"])]]);
+    const used = new Map([
+      [callTagKey("relation.ts", "Relation", "load"), new Set(["synchronize"])],
+    ]);
     expect(staleCallTags(tags, used)).toEqual([
       { tsFile: "relation.ts", tsName: "load", call: "reload" },
     ]);
   });
 
   it("reports nothing while every tag still suppresses", () => {
-    const used = new Map([[callTagKey("relation.ts", "load"), new Set(["synchronize", "reload"])]]);
+    const used = new Map([
+      [callTagKey("relation.ts", "Relation", "load"), new Set(["synchronize", "reload"])],
+    ]);
     expect(staleCallTags(tags, used)).toEqual([]);
   });
 
@@ -1676,13 +1687,73 @@ describe("staleCallTags", () => {
 
   it("keys tags to their own file, so a same-named method elsewhere is untouched", () => {
     const twoFiles = new Map([
-      ["relation.ts", new Map([["load", new Set(["synchronize"])]])],
-      ["core.ts", new Map([["load", new Set(["synchronize"])]])],
+      ["relation.ts", new Map([["load", new Map([["Relation", new Set(["synchronize"])]])]])],
+      ["core.ts", new Map([["load", new Map([["Core", new Set(["synchronize"])]])]])],
     ]);
-    const used = new Map([[callTagKey("core.ts", "load"), new Set<string>()]]);
+    const used = new Map([[callTagKey("core.ts", "Core", "load"), new Set<string>()]]);
     expect(staleCallTags(twoFiles, used)).toEqual([
       { tsFile: "core.ts", tsName: "load", call: "synchronize" },
     ]);
+  });
+
+  it("keys tags to their own class, so a sibling in the same file is untouched", () => {
+    const twoClasses = new Map([
+      [
+        "connection-pool.ts",
+        new Map([
+          [
+            "checkout",
+            new Map([
+              ["ConnectionPool", new Set(["synchronize"])],
+              ["NullPool", new Set(["synchronize"])],
+            ]),
+          ],
+        ]),
+      ],
+    ]);
+    const used = new Map([
+      [callTagKey("connection-pool.ts", "ConnectionPool", "checkout"), new Set(["synchronize"])],
+    ]);
+    expect(staleCallTags(twoClasses, used)).toEqual([]);
+  });
+});
+
+describe("resolveTsOwner", () => {
+  it("takes the sole declaring class without consulting the Ruby name", () => {
+    expect(resolveTsOwner(new Set(["ConnectionPool"]), "ActiveRecord::Base")).toBe(
+      "ConnectionPool",
+    );
+  });
+
+  it("picks the class named after the Ruby entity when a file declares several", () => {
+    const owners = new Set(["ConnectionPool", "NullPool"]);
+    expect(resolveTsOwner(owners, "ActiveRecord::ConnectionAdapters::NullPool")).toBe("NullPool");
+  });
+
+  it("resolves nothing when no declaring class carries the Ruby name", () => {
+    const owners = new Set(["ConnectionPool", "NullPool"]);
+    expect(resolveTsOwner(owners, "ActiveRecord::ConnectionAdapters::PoolConfig")).toBeUndefined();
+  });
+});
+
+describe("tagsForOwner", () => {
+  const byClass = new Map([
+    ["ConnectionPool", new Set(["synchronize"])],
+    ["NullPool", new Set(["reload"])],
+  ]);
+
+  it("reads only the resolved owner's tags", () => {
+    expect([...tagsForOwner(byClass, "ConnectionPool")!]).toEqual(["synchronize"]);
+  });
+
+  it("gives an owner with no tags of its own nothing from its siblings", () => {
+    expect(tagsForOwner(new Map([["NullPool", new Set(["synchronize"])]]), "ConnectionPool")).toBe(
+      undefined,
+    );
+  });
+
+  it("falls back to the union when the owner is unresolved", () => {
+    expect([...tagsForOwner(byClass, undefined)!].sort()).toEqual(["reload", "synchronize"]);
   });
 });
 

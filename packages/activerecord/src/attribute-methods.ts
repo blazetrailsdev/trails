@@ -267,6 +267,11 @@ export function dangerousAttributeMethods(): Set<string> {
  * wires this attribute-methods entry point as the single static (see base.ts),
  * so the super call reaches `generatedAssociationMethods` just as Rails' method
  * ancestry does.
+ *
+ * @missingRailsCall include — Per-entry verified (RFC 0032 wide-entry
+ *   verification): Rails attribute_methods.rb:42-50 does `include @generated_attribute_methods`;
+ *   trails attribute-methods.ts:257-259 assigns a GeneratedAttributeMethods
+ *   holder instance — no Module#include in TS, the holder is consulted directly.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   this._generatedAttributeMethods = new GeneratedAttributeMethods(this.name);
@@ -519,6 +524,14 @@ export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: str
   return dangerousAttributeMethods().has(name);
 }
 
+/**
+ * @missingRailsCall owner — Per-entry verified (RFC 0032 wide-entry
+ *   verification): Rails attribute_methods.rb:187-197 compares
+ *   `instance_method(name).owner` across class and superclass; trails
+ *   attribute-methods.ts:508-517 uses `name in klass.prototype` vs `name in
+ *   superklass.prototype` — the prototype chain check replaces Method#owner
+ *   introspection.
+ */
 export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,

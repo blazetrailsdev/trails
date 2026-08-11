@@ -90,6 +90,11 @@ export interface ArtifactMismatch {
   tsFile: string;
   rubyName: string;
   tsName: string;
+  /** The class declaring `tsName`, when compare.ts could resolve one for the
+   *  matched pair (see `resolveTsOwner`). A tag is minted on THAT declaration
+   *  alone; absent, every declaration of the name in the file is reconciled,
+   *  as before this was keyed. */
+  tsClass?: string;
   missing: string[];
 }
 
@@ -98,6 +103,8 @@ export interface SuppressedCall {
   tsFile: string;
   rubyName: string;
   tsName: string;
+  /** See `ArtifactMismatch.tsClass`. */
+  tsClass?: string;
   call: string;
 }
 
@@ -202,9 +209,12 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
     return oneLineProse(body[0]) === "" ? null : body[0];
   }
   // Normalize a one-line `/** ... */` comment to block form when tags exist.
+  // Its opener replaces the existing comment IN PLACE, after the declaration
+  // line's own indent — so, unlike the synthesized block above, it must not
+  // carry one of its own.
   if (ordered.length > 0 && body.length === 1) {
     const inner = oneLineProse(body[0]);
-    body = [`${indent}/**`, ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
+    body = ["/**", ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
   }
   const closeIdx = body.findIndex((l) => l.trim().endsWith("*/"));
   const head = body.slice(0, closeIdx);
@@ -228,6 +238,18 @@ interface Edit {
   text: string;
 }
 
+/** Key for one expectation: the declaration a tag belongs on. `tsClass` is the
+ *  declaring class, `""` for a top-level function, and `ANY_CLASS` when
+ *  compare.ts could not resolve one — the last matching any declaration of the
+ *  name in the file. */
+export function expectationKey(tsClass: string, tsName: string): string {
+  return `${tsClass}\u0000${tsName}`;
+}
+
+/** Stands in for a class in {@link expectationKey} when the artifact carries
+ *  none. */
+export const ANY_CLASS = "*";
+
 export interface MethodExpectation {
   /** Every Ruby method name matched onto this TS name, in artifact order. Two
    *  Ruby names can land on one TS method, and each keys its own baseline rows
@@ -235,6 +257,8 @@ export interface MethodExpectation {
    *  row of each, so a second Ruby name's deviation is not attributed to the
    *  first. */
   rubyNames: string[];
+  /** The declaration's TS name, since the map key is class-qualified. */
+  tsName: string;
   calls: Set<string>;
 }
 
@@ -285,14 +309,20 @@ export function reconcileFileText(
   const seen = new Set<string>();
   const skipped: string[] = [];
 
+  // The class a declaration is written in, `""` at the top level. Expectations
+  // are keyed by it, so a tag is minted only on the declaration whose Ruby
+  // counterpart actually makes the call — never on a same-named sibling in
+  // another class of the same file (`NullPool#checkout`, which Rails does not
+  // even define, next to `ConnectionPool#checkout`).
+  const enclosingClassName = (node: ts.Node): string => {
+    for (let p = node.parent; p; p = p.parent) {
+      if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) return p.name?.text ?? "";
+    }
+    return "";
+  };
+
   const visit = (node: ts.Node): void => {
     let name: string | null = null;
-    // KNOWN LIMITATION: expectations are keyed by bare identifier name per
-    // file (mirroring compare.ts's tsCallsByFileName), so two same-named
-    // methods in one file (STI siblings, mixin + host, get/set accessor
-    // pairs) are reconciled against the SAME expected-call set. Unlike the
-    // lints this tool writes to source, so a shared name can stamp tags onto
-    // a sibling they don't belong to — qualify by class if this ever bites.
     // Only body-bearing declarations: overload SIGNATURES (and interface /
     // ambient members) must not be stamped — tagging each overload duplicates
     // the block once per signature (found by the activerecord-wide run).
@@ -312,8 +342,11 @@ export function reconcileFileText(
       name = "constructor";
     }
     if (name !== null) {
-      seen.add(name);
-      const exp = expectations.get(name);
+      const key = expectationKey(enclosingClassName(node), name);
+      const anyKey = expectationKey(ANY_CLASS, name);
+      seen.add(key);
+      if (expectations.has(anyKey)) seen.add(anyKey);
+      const exp = expectations.get(key) ?? expectations.get(anyKey);
       const ranges = ts.getLeadingCommentRanges(text, node.getFullStart()) ?? [];
       const jsdocRange = ranges.filter((r) => text.slice(r.pos, r.pos + 3) === "/**").at(-1);
       const comment = jsdocRange ? text.slice(jsdocRange.pos, jsdocRange.end) : null;
@@ -367,7 +400,10 @@ export function reconcileFileText(
   };
   visit(sf);
 
-  const unmatched = [...expectations.keys()].filter((n) => !seen.has(n)).sort();
+  const unmatched = [...expectations.entries()]
+    .filter(([k]) => !seen.has(k))
+    .map(([, e]) => e.tsName)
+    .sort();
   if (edits.length === 0) return { text: null, harvested, tagged, unmatched, skipped };
   let out = text;
   for (const e of edits.sort((a, b) => b.start - a.start)) {
@@ -387,23 +423,29 @@ export function buildExpectations(
   onlyFile?: string,
 ): Map<string, Map<string, MethodExpectation>> {
   const byFile = new Map<string, Map<string, MethodExpectation>>();
-  const expectationFor = (tsFile: string, tsName: string, rubyName: string) => {
+  const expectationFor = (
+    tsFile: string,
+    tsName: string,
+    tsClass: string | undefined,
+    rubyName: string,
+  ) => {
     const fileMap = byFile.get(tsFile) ?? byFile.set(tsFile, new Map()).get(tsFile)!;
+    const key = expectationKey(tsClass ?? ANY_CLASS, tsName);
     const exp =
-      fileMap.get(tsName) ?? fileMap.set(tsName, { rubyNames: [], calls: new Set() }).get(tsName)!;
+      fileMap.get(key) ?? fileMap.set(key, { rubyNames: [], tsName, calls: new Set() }).get(key)!;
     if (!exp.rubyNames.includes(rubyName)) exp.rubyNames.push(rubyName);
     return exp;
   };
   for (const m of artifact.mismatches) {
     if (m.package !== pkg) continue;
     if (onlyFile && m.tsFile !== onlyFile) continue;
-    const exp = expectationFor(m.tsFile, m.tsName, m.rubyName);
+    const exp = expectationFor(m.tsFile, m.tsName, m.tsClass, m.rubyName);
     for (const missing of m.missing) exp.calls.add(callOf(missing));
   }
   for (const c of artifact.suppressed ?? []) {
     if (c.package !== pkg) continue;
     if (onlyFile && c.tsFile !== onlyFile) continue;
-    expectationFor(c.tsFile, c.tsName, c.rubyName).calls.add(c.call);
+    expectationFor(c.tsFile, c.tsName, c.tsClass, c.rubyName).calls.add(c.call);
   }
   return byFile;
 }

@@ -5185,6 +5185,26 @@ function simpleDatP(dat: Date): boolean {
 }
 
 /**
+ * @internal `union DateData` (`date_core.c:233-236`) read out as one record —
+ * `SimpleDateData`'s fields (`date_core.c:203-213`) with
+ * `ComplexDateData`'s `df`/`sf`/`of`/time (`date_core.c:215-231`) present
+ * exactly on the complex arm, which is what {@link simpleDatP} reads. The C
+ * gets at the struct through `get_d2` (`date_core.c:1109-1114`) and copies it
+ * whole; TS class fields are private per class, so the read is a method
+ * ({@link Date#dat}) and the write stays in the class that owns the fields.
+ */
+interface DateData {
+  nth: bigint;
+  jd?: number;
+  df?: number;
+  sf?: Rational;
+  of?: number;
+  sg: number;
+  civil?: [ry: number, rm: number, rdom: number];
+  time?: [rh: number, rmin: number, rs: number];
+}
+
+/**
  * @internal `date_core.c` `k_numeric_p` (`date_core.c:1073`), true for the
  * Numeric operands `cmp_gen` and `equal_gen` admit. Ruby's Numeric covers
  * Integer, Float and Rational; JS's covers `number` and `bigint`, and the
@@ -5557,7 +5577,7 @@ export class Date {
    * reform's readings rather than proleptic ones, and `Date.new(1500, 2, 29)`
    * builds, as MRI's does.
    *
-   * The `start` ARGUMENT is {@link #sg} below: every conversion is read under
+   * The `start` ARGUMENT is {@link Date#sg} below: every conversion is read under
    * it, and {@link Date#start}, {@link Date#isJulian} and
    * {@link Date#newStart} answer off it.
    *
@@ -5604,8 +5624,11 @@ export class Date {
    * @internal `SimpleDateData`'s `sg` (`date_core.c:203-213`), the
    * calendar-reform start the date is read under — the `start` argument every
    * constructor takes, {@link DEFAULT_SG} when none is passed.
+   *
+   * Not `#`-private, for the reason {@link nth} is not: `ComplexDateData`
+   * carries the same field, and {@link DateTime#initializeCopy} writes it.
    */
-  readonly #sg: number;
+  sg: number;
 
   /**
    * @internal `SimpleDateData`'s civil fields (`date_core.c:203-213`), which
@@ -5693,13 +5716,13 @@ export class Date {
       const [nth, ry] = decodeYear(year.year, -1);
       this.nth = nth;
       this.#jd = cCivilToJd(ry, year.month, year.day, virtualSg(nth, sg));
-      this.#sg = sg;
+      this.sg = sg;
       return;
     }
     if (typeof year === "symbol") {
       this.nth = month as bigint;
       this.#jd = day as number;
-      this.#sg = start;
+      this.sg = start;
       this.#df = df;
       this.#sf = sf;
       this.#of = of;
@@ -5717,7 +5740,7 @@ export class Date {
       if (r === null) throw new DateError("invalid date");
       const [nth, ry, rm, rd] = r;
       this.nth = nth;
-      this.#sg = sg;
+      this.sg = sg;
       this.#civil = [ry, rm, rd];
     } else {
       const r = validCivilP(year, month as number, d, sg);
@@ -5725,7 +5748,7 @@ export class Date {
       const [nth, rjd] = r;
       this.nth = nth;
       this.#jd = rjd;
-      this.#sg = sg;
+      this.sg = sg;
     }
   }
 
@@ -5738,7 +5761,7 @@ export class Date {
   #getSJd(): number {
     if (this.#jd === undefined) {
       const [year, mon, mday] = this.#civil as [number, number, number];
-      this.#jd = cCivilToJd(year, mon, mday, virtualSg(this.nth, this.#sg));
+      this.#jd = cCivilToJd(year, mon, mday, virtualSg(this.nth, this.sg));
     }
     return this.#jd;
   }
@@ -5800,7 +5823,7 @@ export class Date {
    * receiver.
    */
   #getCCivil(): [ry: number, rm: number, rdom: number] {
-    return (this.#civil ??= cJdToCivil(this.mLocalJd(), virtualSg(this.nth, this.#sg)));
+    return (this.#civil ??= cJdToCivil(this.mLocalJd(), virtualSg(this.nth, this.sg)));
   }
 
   /**
@@ -6451,7 +6474,7 @@ export class Date {
    * year, as the Julian leap day before it makes it in MRI.
    */
   get yday(): number {
-    const [, rd] = cJdToOrdinal(this.mLocalJd(), virtualSg(this.nth, this.#sg));
+    const [, rd] = cJdToOrdinal(this.mLocalJd(), virtualSg(this.nth, this.sg));
     return rd;
   }
 
@@ -6466,7 +6489,7 @@ export class Date {
    * one on `DateTime` — hence the override there.
    */
   get isJulian(): boolean {
-    return mJulianP(this.#getSJd(), virtualSg(this.nth, this.#sg));
+    return mJulianP(this.#getSJd(), virtualSg(this.nth, this.sg));
   }
 
   /**
@@ -6502,22 +6525,91 @@ export class Date {
    * a Double, which is a JS number.
    */
   get start(): number {
-    return this.#sg;
+    return this.sg;
   }
 
   /**
-   * Ruby `Date#dup`, which is `Object#dup` over the `initialize_copy` the C
-   * defines for it (`d_lite_initialize_copy`, `date_core.c:5140-5182`,
-   * registered at `:9714`): a new object of the receiver's own class carrying
-   * the receiver's `SimpleDateData`/`ComplexDateData` verbatim, reform
-   * included. TS has no `dup_obj`, so this runs through the same
-   * {@link Date#newStart} seam the C's `dup_obj_with_new_start` is, with the
-   * receiver's OWN reform — which is why `DateTime#dup` keeps its
-   * day-fraction, sub-second and offset (the C's complex arm, `:5171`) without
-   * a second override.
+   * @internal `date_core.c` `get_d1` (`date_core.c:1103-1107`) — the receiver's
+   * live `DateData` read straight out, lazy fields and all: a `jd` the
+   * proleptic-Gregorian arm has not filled in yet stays `undefined` here,
+   * exactly as the C copies a struct whose `HAVE_JD` bit is clear rather than
+   * forcing `get_s_jd`. {@link DateTime} overrides it for its own fields.
+   */
+  dat(): DateData {
+    return {
+      nth: this.nth,
+      jd: this.#jd,
+      df: this.#df,
+      sf: this.#sf,
+      of: this.#of,
+      sg: this.sg,
+      civil: this.#civil,
+    };
+  }
+
+  /**
+   * Ruby `Date#initialize_copy(date)` (ruby/date, `date_core.c`
+   * `d_lite_initialize_copy`, `date_core.c:5140-5182`, registered at `:9714`),
+   * the body `Object#dup` and `Object#clone` run over the freshly allocated
+   * receiver: the source's `DateData` written into it verbatim, reform
+   * included.
+   *
+   * `rb_check_frozen(copy)` is `Object.isFrozen` — the same `TypeError` JS
+   * raises on a write to a frozen object — and the `copy == date` early return
+   * (`:5144-5145`) comes before the copy, as it does there. The last arm is the
+   * one the C raises on (`:5172-5175`): a complex source cannot be loaded into
+   * a simple receiver, which is why `(Date.new(2001, 1, 1) + Rational(1, 2)).dup`
+   * is an `ArgumentError` in MRI too — `Date`'s allocator is
+   * `d_lite_s_alloc_simple` (`:9636`).
+   */
+  initializeCopy(date: Date): this {
+    if (Object.isFrozen(this)) {
+      throw new TypeError(`can't modify frozen ${(this as object).constructor.name}`);
+    }
+    if ((this as Date) === date) return this;
+    const bdat = date.dat();
+    if (simpleDatP(date)) {
+      if (simpleDatP(this)) {
+        this.nth = bdat.nth;
+        this.#jd = bdat.jd;
+        this.sg = bdat.sg;
+        this.#civil = bdat.civil;
+      } else {
+        // `:5150-5169`, the simple half widened into the complex arm: no day
+        // fraction, sub-second or offset to carry, so all three are zero.
+        this.nth = bdat.nth;
+        this.#jd = bdat.jd;
+        this.#df = 0;
+        this.#sf = new Rational(0, 1);
+        this.#of = 0;
+        this.sg = bdat.sg;
+        this.#civil = bdat.civil;
+      }
+    } else {
+      if (!this.complexDatP()) throw new ArgumentError("cannot load complex into simple");
+      this.nth = bdat.nth;
+      this.#jd = bdat.jd;
+      this.#df = bdat.df;
+      this.#sf = bdat.sf;
+      this.#of = bdat.of;
+      this.sg = bdat.sg;
+      this.#civil = bdat.civil;
+    }
+    return this;
+  }
+
+  /**
+   * Ruby has no `Date#dup` of its own: `Object#dup` allocates through the
+   * class's own allocator — `d_lite_s_alloc_simple` for `::Date` (`:9636`),
+   * `d_lite_s_alloc_complex` for `::DateTime` (`:9969`) — and calls
+   * {@link Date#initializeCopy} on it. TS cannot allocate an instance whose
+   * private fields exist without running a constructor, so the two allocators
+   * are the {@link SEAT} construction each class already has, and the copy is
+   * `initialize_copy`'s, not `dup_obj_with_new_start`'s: no `set_sg`, so
+   * nothing forces `get_c_jd`/`get_c_df` or clears the civil seat.
    */
   dup(): this {
-    return this.newStart(this.start);
+    return (new Date(SEAT, 0n, 0, DEFAULT_SG) as this).initializeCopy(this);
   }
 
   /**
@@ -7246,7 +7338,7 @@ export class Date {
    * seat, not a seat.
    */
   toDate(): Temporal.PlainDate {
-    return plainDateFromJd(encodeJd(this.nth, this.mLocalJd()), this.#sg);
+    return plainDateFromJd(encodeJd(this.nth, this.mLocalJd()), this.sg);
   }
 
   /**
@@ -7258,15 +7350,7 @@ export class Date {
    * `bdat->s = adat->s`; the seat below is that copy.
    */
   toDatetime(): Temporal.PlainDateTime | Temporal.ZonedDateTime {
-    return new DateTime(
-      SEAT,
-      this.nth,
-      this.mJd(),
-      0,
-      new Rational(0, 1),
-      0,
-      this.#sg,
-    ).toDatetime();
+    return new DateTime(SEAT, this.nth, this.mJd(), 0, new Rational(0, 1), 0, this.sg).toDatetime();
   }
 
   /**
@@ -7438,7 +7522,7 @@ export class DateTime extends DateWithoutParseStatics {
    * `d_complex_new_internal` seat, which stores `HAVE_JD | HAVE_DF` and leaves
    * `get_c_time` (`date_core.c:1227-1244`) to decode the time from `df`.
    */
-  readonly #time?: [rh: number, rmin: number, rs: number];
+  #time?: [rh: number, rmin: number, rs: number];
 
   /**
    * @internal `ComplexDateData`'s civil fields (`date_core.c:215-231`), which
@@ -7447,7 +7531,7 @@ export class DateTime extends DateWithoutParseStatics {
    * other arm keeps {@link Date}'s, which a `DateTime` never reads because it
    * overrides {@link mLocalJd}.
    */
-  readonly #civil?: [ry: number, rm: number, rdom: number];
+  #civil?: [ry: number, rm: number, rdom: number];
   /**
    * @internal `ComplexDateData`'s `sf`, the sub-second part in **nanoseconds**
    * (`date_core.c:215-231`). `jd_local_to_utc` / `df_local_to_utc` do not touch
@@ -7460,8 +7544,8 @@ export class DateTime extends DateWithoutParseStatics {
    * Rational either way (`:993-998`) — so the storage is uniformly a Rational,
    * exact at any denominator, and the two arms differ only in their rounding.
    */
-  readonly #sf: Rational;
-  readonly #of: number;
+  #sf: Rational;
+  #of: number;
 
   /**
    * Ruby `DateTime.new(y = -4712, m = 1, d = 1, h = 0, min = 0, s = 0, offset = 0)`
@@ -8363,6 +8447,72 @@ export class DateTime extends DateWithoutParseStatics {
       this.#of,
       val2sg(start),
     ) as this;
+  }
+
+  /**
+   * The `ComplexDateData` half of {@link Date#dat} — `df`, `sf` and `of` are
+   * always live on a `DateTime`, and the time of day the proleptic-Gregorian
+   * arm of `datetime_initialize` stores instead of a day-fraction rides along
+   * with the civil triple it goes with.
+   */
+  override dat(): DateData {
+    return {
+      nth: this.nth,
+      jd: this.#jd,
+      df: this.#df,
+      sf: this.#sf,
+      of: this.#of,
+      sg: this.start,
+      civil: this.#civil,
+      time: this.#time,
+    };
+  }
+
+  /**
+   * The complex receiver's half of `d_lite_initialize_copy`
+   * (`date_core.c:5140-5182`): one C function, but its two arms WRITE
+   * different data, and TS class fields are private to the class that declares
+   * them — so `adat->c = bdat->c` (`:5176`) is spelled where `c` lives. A
+   * `DateTime` is always complex, so the raise at `:5173-5175` cannot be
+   * reached from here; the simple-source arm is the C's `:5150-5169`.
+   */
+  override initializeCopy(date: Date): this {
+    if (Object.isFrozen(this)) {
+      throw new TypeError(`can't modify frozen ${(this as object).constructor.name}`);
+    }
+    if ((this as Date) === date) return this;
+    const bdat = date.dat();
+    this.nth = bdat.nth;
+    if (simpleDatP(date)) {
+      // A simple source has no day-fraction, sub-second or offset, and keeps
+      // its civil triple with no time of day beside it — so the day is taken
+      // whole rather than left to a `get_c_jd` that would find no time.
+      this.#jd = bdat.jd ?? date.mLocalJd();
+      this.#df = 0;
+      this.#sf = new Rational(0, 1);
+      this.#of = 0;
+      this.#civil = bdat.civil;
+      this.#time = undefined;
+    } else {
+      this.#jd = bdat.jd;
+      this.#df = bdat.df;
+      this.#sf = bdat.sf!;
+      this.#of = bdat.of!;
+      this.#civil = bdat.civil;
+      this.#time = bdat.time;
+    }
+    this.sg = bdat.sg;
+    return this;
+  }
+
+  /**
+   * `::DateTime`'s allocator is `d_lite_s_alloc_complex` (`date_core.c:9969`),
+   * where `::Date`'s is the simple one; see {@link Date#dup}.
+   */
+  override dup(): this {
+    return (new DateTime(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG) as this).initializeCopy(
+      this,
+    );
   }
 
   /**

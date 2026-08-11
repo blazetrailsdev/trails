@@ -4,7 +4,7 @@ import {
   NARROW_DEFAULT_REASON,
   suppressedCallsIn,
 } from "./missing-rails-call-tags.js";
-import { reconcileFileText } from "./build.js";
+import { ANY_CLASS, expectationKey, reconcileFileText } from "./build.js";
 
 const block = (...lines: string[]): string =>
   ["/**", ...lines.map((l) => ` * ${l}`), " */"].join("\n");
@@ -142,7 +142,12 @@ describe("suppressedCallsIn", () => {
 });
 
 describe("parity:api:build over a hand-written one-line tag", () => {
-  const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["first"]) }]]);
+  const expectations = new Map([
+    [
+      expectationKey(ANY_CLASS, "bar"),
+      { rubyNames: ["bar"], tsName: "bar", calls: new Set(["first"]) },
+    ],
+  ]);
   const reason = "the caller already ordered.";
   const src = [
     "export class Foo {",
