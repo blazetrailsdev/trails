@@ -71,6 +71,13 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
+    "rubyName": "remove_duplicates",
+    "call": "delete_if",
+    "reason": "Ruby Array#delete_if has no trails port; `this.chain = this.chain.filter(...)` is the same in-place removal, and is how CallbackChain#remove spells it in this file already."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "callbacks.ts",
     "rubyName": "reset_callbacks",
     "call": "descendants",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

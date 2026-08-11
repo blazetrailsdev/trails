@@ -375,8 +375,8 @@ describe("RelationScopingTest", () => {
         await SpecialComment.created();
       });
     });
-    expect(Comment.currentScope).toBeNull();
-    expect(SpecialComment.currentScope).toBeNull();
+    expect(Comment.currentScope()).toBeNull();
+    expect(SpecialComment.currentScope()).toBeNull();
   });
 
   it("scoping respects current class", async () => {

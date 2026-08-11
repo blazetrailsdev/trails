@@ -10,17 +10,6 @@
     "package": "activemodel",
     "tsFile": "validations/comparability.ts",
     "rubyName": "error_options",
-    "call": "keys",
-    "kind": "args",
-    "rubyArgs": [
-      "const:COMPARE_CHECKS"
-    ],
-    "reason": "RFC 0099: comparability.rb:6 declares COMPARE_CHECKS as a Hash (check => operator) and :11 reads `COMPARE_CHECKS.keys`; the port declares it as the key ARRAY, so there is no `.keys` receiver to pass. Converging means porting the Hash and its operator values through comparison.rb/numericality.rb — filed as its own story."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/comparability.ts",
-    "rubyName": "error_options",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

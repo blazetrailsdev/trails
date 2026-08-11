@@ -1389,19 +1389,39 @@ describe("SkipCallbacksTest", () => {
 });
 
 describe("ExcludingDuplicatesCallbackTest", () => {
-  it("excludes duplicates in separate calls", () => {
-    const target = { log: [] as string[], count: 0 };
-    defineCallbacks(target, "save");
-    const cb = (t: any) => {
-      t.log.push("cb");
-      t.count++;
+  function oneTwoThreeSave(): any {
+    const target: any = {
+      record: [] as string[],
+      first() {
+        target.record.push("one");
+      },
+      second() {
+        target.record.push("two");
+      },
+      third() {
+        target.record.push("three");
+      },
+      save() {
+        runCallbacks(target, "save", () => {
+          target.record.push("yielded");
+        });
+      },
     };
-    setCallback(target, "save", "before", cb);
-    setCallback(target, "save", "before", cb); // duplicate — runs once per registration
-    runCallbacks(target, "save");
-    // Our implementation registers each callback separately
-    expect(target.count).toBeGreaterThanOrEqual(1);
+    defineCallbacks(target, "save");
+    return target;
+  }
+
+  it("excludes duplicates in separate calls", () => {
+    const model = oneTwoThreeSave();
+    setCallback(model, "save", "before", ":first");
+    setCallback(model, "save", "before", ":second");
+    setCallback(model, "save", "before", ":first");
+    setCallback(model, "save", "before", ":third");
+
+    model.save();
+    expect(model.record).toEqual(["two", "one", "three", "yielded"]);
   });
+
   it("excludes duplicates in one call", () => {
     const target = { count: 0 };
     defineCallbacks(target, "save");

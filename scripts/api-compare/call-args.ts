@@ -23,7 +23,10 @@ import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
  *  dimension's sharpest finding, the arel visitor-helper argument order. */
-const IDENTIFIER_STRING = /^[a-z][A-Za-z0-9_]*$/;
+// Leading underscore included: Rails spells plenty of private method names
+// `_ensure_no_duplicate_errors`, and those are names the port renames by
+// convention exactly as any other identifier-shaped value is.
+const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
 
 /** Descriptors that carry no comparable value (RFC 0095 §1). Their presence
  *  anywhere in an argument list — INCLUDING nested inside a `kwargs{}` — makes

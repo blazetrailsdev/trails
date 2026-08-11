@@ -279,17 +279,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "current_scope_restoring_block",
-    "call": "current_scope",
-    "kind": "args",
-    "rubyArgs": [
-      "bool:true"
-    ],
-    "reason": "RFC 0099: relation.rb:1346 writes `model.current_scope(true)`; trails' `Base.currentScope` is a GETTER (base.ts:2267) with no skip-inherited parameter, so the port reaches ScopeRegistry.currentScope directly and the model arrives as argument 1. The `true` IS now passed. Converging needs currentScope flipped from a getter to a method across its call sites; filed separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "delete",
     "call": "order:primaryKey,where",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."

@@ -668,9 +668,10 @@ export class Callback {
           : arity > 0
             ? new InstanceExec1(this.filter as (target: object) => unknown)
             : new InstanceExec0(this.filter as () => unknown);
-    } else if (typeof this.filter === "string") {
-      // Rails Callback.build raises ArgumentError for a String filter; only a
-      // Symbol (method name) or a proc/block is permitted.
+    } else if (typeof this.filter === "string" && !this.filter.startsWith(":")) {
+      // A Ruby Symbol is a JS string; here the control flow turns on
+      // Symbol-vs-String, so the Symbol keeps its leading colon and a bare
+      // string is Callback.build's String arm, which raises.
       throw new Error(
         `Passing string to define a callback is not supported: ${String(this.filter)}`,
       );
@@ -681,7 +682,9 @@ export class Callback {
       // `around`/`before`/`after` and `scope: [:kind, :name]` calls `aroundSave`.
       callTemplate = new ObjectCall(this.filter, this.objectCallMethodName());
     } else {
-      callTemplate = new MethodCall(this.filter as PropertyKey);
+      callTemplate = new MethodCall(
+        typeof this.filter === "string" ? this.filter.slice(1) : (this.filter as PropertyKey),
+      );
     }
 
     if (this.kind === "before") {
@@ -1094,13 +1097,28 @@ export class CallbackChain {
   }
 
   append(callback: Callback): void {
-    this._allCallbacks = undefined;
-    this.chain.push(callback);
+    this.appendOne(callback);
   }
 
   prepend(callback: Callback): void {
+    this.prependOne(callback);
+  }
+
+  private appendOne(callback: Callback): void {
     this._allCallbacks = undefined;
+    this.removeDuplicates(callback);
+    this.chain.push(callback);
+  }
+
+  private prependOne(callback: Callback): void {
+    this._allCallbacks = undefined;
+    this.removeDuplicates(callback);
     this.chain.unshift(callback);
+  }
+
+  private removeDuplicates(callback: Callback): void {
+    this._allCallbacks = undefined;
+    this.chain = this.chain.filter((c) => !callback.isDuplicates(c));
   }
 
   remove(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): void {
@@ -1308,7 +1326,7 @@ export namespace Callbacks {
     target: T,
     name: string,
     kind: CallbackKind,
-    callback: AnyCallback<T> | CallbackObject,
+    callback: AnyCallback<T> | CallbackObject | string,
     options: CallbackOptions<T> = {},
   ): void {
     const chains = getCallbackChains(target);
@@ -1387,7 +1405,7 @@ export function setCallback<T extends object>(
   target: T,
   name: string,
   kind: CallbackKind,
-  callback: AnyCallback<T> | CallbackObject,
+  callback: AnyCallback<T> | CallbackObject | string,
   options: CallbackOptions<T> = {},
 ): void {
   Callbacks.setCallback(target, name, kind, callback, options);

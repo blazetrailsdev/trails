@@ -3,17 +3,6 @@
     "package": "activerecord",
     "tsFile": "autosave-association.ts",
     "rubyName": "add_autosave_association_callbacks",
-    "call": "around_save",
-    "kind": "args",
-    "rubyArgs": [
-      "str:aroundSaveCollectionAssociation"
-    ],
-    "reason": "autosave_association.rb:193 registers the Symbol `:around_save_collection_association`; trails' ActiveSupport::Callbacks rejects a method-NAME filter spelled as a string (callbacks.ts:671-675), so the port can only register the closure. Converging needs the method-name filter arm in ActiveSupport::Callbacks — story call-args-ar-autosave-around-save-method-name."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
-    "rubyName": "add_autosave_association_callbacks",
     "call": "define_autosave_validation_callbacks",
     "kind": "args",
     "rubyArgs": [
@@ -52,17 +41,6 @@
     "rubyName": "changed_for_autosave?",
     "call": "marked_for_destruction?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "autosave-association.ts",
-    "rubyName": "define_autosave_validation_callbacks",
-    "call": "after_validation",
-    "kind": "args",
-    "rubyArgs": [
-      "str:_ensure_no_duplicate_errors"
-    ],
-    "reason": "RFC 0099: autosave_association.rb:233 passes the callback as a METHOD NAME symbol; trails' `afterValidation` (callbacks.ts:56) takes `(modelClass, fn)` only and has no symbol-name arm, so the name cannot be passed. Converging needs the symbol arm on the callback registry; filed separately."
   },
   {
     "package": "activerecord",

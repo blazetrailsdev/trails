@@ -144,7 +144,10 @@ export interface TransactionalCallbackConditions<
 export function _defineBeforeModelCallback(klass: CallbackHost, event: string): void {
   const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
   Object.defineProperty(klass, `before${capitalizedEvent}`, {
-    value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
+    value: function (
+      fnOrObject: CallbackFn | CallbackObject | string,
+      conditions?: CallbackConditions,
+    ) {
       _registerCallbackOnProto(this.prototype, "before", event, fnOrObject, conditions);
     },
     writable: true,
@@ -162,7 +165,7 @@ export function _defineAroundModelCallback(klass: CallbackHost, event: string): 
   const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
   Object.defineProperty(klass, `around${capitalizedEvent}`, {
     value: function (
-      fnOrObject: AroundCallbackFn | CallbackObject,
+      fnOrObject: AroundCallbackFn | CallbackObject | string,
       conditions?: CallbackConditions,
     ) {
       _registerCallbackOnProto(this.prototype, "around", event, fnOrObject, conditions);
@@ -179,7 +182,10 @@ export function _defineAroundModelCallback(klass: CallbackHost, event: string): 
 export function _defineAfterModelCallback(klass: CallbackHost, event: string): void {
   const capitalizedEvent = event.charAt(0).toUpperCase() + event.slice(1);
   Object.defineProperty(klass, `after${capitalizedEvent}`, {
-    value: function (fnOrObject: CallbackFn | CallbackObject, conditions?: CallbackConditions) {
+    value: function (
+      fnOrObject: CallbackFn | CallbackObject | string,
+      conditions?: CallbackConditions,
+    ) {
       _registerCallbackOnProto(this.prototype, "after", event, fnOrObject, conditions);
     },
     writable: true,
@@ -280,7 +286,7 @@ export function _registerCallbackOnProto(
   proto: object,
   timing: CallbackTiming,
   event: string,
-  fn: CallbackFn | AroundCallbackFn | CallbackObject,
+  fn: CallbackFn | AroundCallbackFn | CallbackObject | string,
   conditions?: CallbackConditions | TransactionalCallbackConditions,
 ): void {
   if (conditions && "on" in conditions) {

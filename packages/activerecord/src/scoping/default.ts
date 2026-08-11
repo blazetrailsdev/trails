@@ -202,7 +202,7 @@ export function unscoped<T extends typeof Base, R>(
  * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
  */
 export function isScopeAttributes(this: {
-  currentScope?: unknown;
+  currentScope?(skipInheritedScope?: boolean): unknown;
   defaultScopes?: DefaultScope[];
 }): boolean {
   return (

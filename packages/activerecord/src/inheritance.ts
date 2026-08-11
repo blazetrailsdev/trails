@@ -1181,7 +1181,7 @@ export function subclassFromAttributesForNew(
   let subclass = resolve(attrs);
   if (!subclass) {
     const scopeAttrs = (
-      modelClass.currentScope as { scopeForCreate?(): unknown } | null
+      modelClass.currentScope?.() as { scopeForCreate?(): unknown } | null
     )?.scopeForCreate?.();
     subclass = resolve(scopeAttrs, true);
   }

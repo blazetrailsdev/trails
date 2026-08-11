@@ -31,6 +31,15 @@ export type CallbackOptions<TRecord = Base> = {
   prepend?: boolean;
 };
 
+/**
+ * A callback filter: a block, or — as Rails' macros take a Symbol — the NAME
+ * of a method on the record, resolved against it at invocation time
+ * (ActiveSupport::Callbacks::CallTemplate::MethodCall).
+ */
+export type CallbackFilter<TRecord, TReturn = void | Promise<void>> =
+  | ((record: TRecord) => TReturn)
+  | string;
+
 export type ValidationCallbackOptions<TRecord = Base> = CallbackOptions<TRecord> & {
   on?: "create" | "update" | Array<"create" | "update">;
 };
@@ -42,7 +51,7 @@ export type ValidationCallbackOptions<TRecord = Base> = CallbackOptions<TRecord>
  */
 export function beforeValidation<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: ValidationCallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "validation", fn, options);
@@ -55,7 +64,7 @@ export function beforeValidation<T extends ModelCtor>(
  */
 export function afterValidation<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: ValidationCallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "validation", fn, options);
@@ -68,7 +77,7 @@ export function afterValidation<T extends ModelCtor>(
  */
 export function beforeSave<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "save", fn, options);
@@ -81,7 +90,7 @@ export function beforeSave<T extends ModelCtor>(
  */
 export function afterSave<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "save", fn, options);
@@ -94,7 +103,7 @@ export function afterSave<T extends ModelCtor>(
  */
 export function beforeCreate<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "create", fn, options);
@@ -107,7 +116,7 @@ export function beforeCreate<T extends ModelCtor>(
  */
 export function afterCreate<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "create", fn, options);
@@ -120,7 +129,7 @@ export function afterCreate<T extends ModelCtor>(
  */
 export function beforeUpdate<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "update", fn, options);
@@ -133,7 +142,7 @@ export function beforeUpdate<T extends ModelCtor>(
  */
 export function afterUpdate<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "update", fn, options);
@@ -146,7 +155,7 @@ export function afterUpdate<T extends ModelCtor>(
  */
 export function beforeDestroy<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void> | false,
+  fn: CallbackFilter<InstanceType<T>, void | Promise<void> | false>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "before", "destroy", fn, options);
@@ -159,7 +168,7 @@ export function beforeDestroy<T extends ModelCtor>(
  */
 export function afterDestroy<T extends ModelCtor>(
   modelClass: T,
-  fn: (record: InstanceType<T>) => void | Promise<void>,
+  fn: CallbackFilter<InstanceType<T>>,
   options?: CallbackOptions<InstanceType<T>>,
 ): void {
   registerCallback(modelClass, "after", "destroy", fn, options);
@@ -234,7 +243,7 @@ function registerCallback(
   modelClass: ModelCtor,
   timing: "before" | "after",
   event: string,
-  fn: (...args: any[]) => unknown,
+  fn: ((...args: any[]) => unknown) | string,
   options?: AnyCallbackOptions,
 ): void {
   const conditions: Record<string, unknown> = {};
