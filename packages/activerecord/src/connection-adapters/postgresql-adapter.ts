@@ -2023,21 +2023,14 @@ export class PostgreSQLAdapter
   // before issuing ROLLBACK / ROLLBACK AND CHAIN. Best-effort: errors are
   // swallowed, as Ruby's `rescue PG::Error` swallows them.
   //
-  // Both of Ruby's two lines are BLOCKING, and both halves matter: `cancel` is
-  // PQcancel, which returns only once the request socket has been sent and
-  // closed, and `block` waits for the cancelled command to come back before
-  // the method returns. Together they mean the cancel is delivered, and its
-  // effect consumed, entirely inside the chain that owns the query.
-  //
-  // A CancelRequest is addressed to a BACKEND, not to a statement: whatever
-  // that backend is running when the packet lands is what dies. So dropping
-  // either half turns the cancel into a delayed round that fires at whatever
-  // query happens to be on the wire milliseconds later — measured at 25/25
-  // against PG 17 when the request is fired without awaiting delivery, which
-  // is the RFC 0061 run-end `QueryCanceled` unhandled rejection (a query whose
-  // awaiter is already gone rejecting long after its chain ended). Awaiting
-  // both halves is the ownership proof; the pre-2026-08-11 shape sampled
-  // `transactionStatus` and then fired blind.
+  // The invariant both of Ruby's lines buy, and neither buys alone: a
+  // CancelRequest is addressed to a BACKEND, not to a statement, so whatever
+  // that backend is running when the packet lands is what dies. `cancel` is
+  // PQcancel and returns only once the request has been sent and the socket
+  // closed; `block` waits for the cancelled command to come back. Both block,
+  // so the cancel is delivered — and its effect consumed — inside the chain
+  // that owns the query, rather than firing at whatever is on the wire
+  // milliseconds later.
   private async _cancelAnyRunningQuery(): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
@@ -2058,9 +2051,10 @@ export class PostgreSQLAdapter
       // 16-byte CancelRequest, and wait for the server to close it, exactly as
       // libpq PQcancel does. Leaves the original transaction socket untouched;
       // does NOT consume a pool slot.
-      await new Promise<void>((resolve) => {
+      await new Promise<void>((resolve, reject) => {
         const cancelCon = new pg.Connection() as PgConnectionWithCancel;
-        cancelCon.on("error", () => resolve());
+        // A failed PQcancel raises PG::Error in Ruby, so `block` never runs.
+        cancelCon.on("error", (error: unknown) => reject(error));
         cancelCon.on("end", () => resolve());
         cancelCon.once("connect", () => {
           cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
