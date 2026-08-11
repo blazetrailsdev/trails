@@ -3831,8 +3831,6 @@ export class PostgreSQLAdapter
           return new LockWaitTimeout(msg, { sql, binds });
         case "57014": // query_canceled
           return new QueryCanceled(msg, { sql, binds });
-        case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
-          return new ConnectionNotEstablished(msg);
         default:
           // A severed connection (08xxx, "Connection terminated", pg's
           // "Client has encountered a connection error", …) surfaces here as a
@@ -3863,10 +3861,10 @@ export class PostgreSQLAdapter
           // takes ConnectionFailed. (Connect-path failures still surface as
           // ConnectionNotEstablished — see newClient.)
           if (PostgreSQLAdapter._isConnectionClosedBeforeSend(e)) {
-            return new ConnectionNotEstablished(msg);
+            return new ConnectionNotEstablished(e, { connectionPool: this.pool });
           }
           if (PostgreSQLAdapter._isConnectionError(e)) {
-            return new ConnectionFailed(msg, { sql, binds });
+            return new ConnectionFailed(e, { connectionPool: this.pool });
           }
           // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
           // 5-char shape alone isn't enough — Node system errors like
