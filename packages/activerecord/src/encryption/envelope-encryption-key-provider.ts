@@ -62,9 +62,9 @@ export class EnvelopeEncryptionKeyProvider {
     const key = this.primaryKeyProvider()
       .decryptionKeys(encryptedMessage)
       ?.map((k) => k.secret);
-    if (!key || key.length === 0) return null;
     try {
-      return new Encryptor({ compress: false }).decrypt(encryptedDataKey, { key });
+      if (key) return new Encryptor({ compress: false }).decrypt(encryptedDataKey, { key });
+      return null;
     } catch (e) {
       if (e instanceof Decryption) return null;
       throw e;
