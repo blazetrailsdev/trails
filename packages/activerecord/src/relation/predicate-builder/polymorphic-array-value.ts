@@ -88,10 +88,10 @@ export class PolymorphicArrayValue {
   /** @internal */
   private typeToIdsMapping(): Map<string | null, unknown[]> {
     const map = new Map<string | null, unknown[]>();
-    for (const v of this.values) {
-      const k = this.klass(v);
-      const type = k ? (this.polymorphicName(k) ?? null) : null;
-      const id = this.convertToId(v);
+    for (const value of this.values) {
+      const klass = this.klass(value);
+      const type = klass ? (this.polymorphicName(klass) ?? null) : null;
+      const id = this.convertToId(value);
       if (!map.has(type)) map.set(type, []);
       map.get(type)!.push(id);
     }

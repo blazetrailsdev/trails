@@ -85,14 +85,15 @@ export class PredicateBuilder {
   }
 
   buildFromHash(
-    conditions: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    return this.expandFromHash(this.convertDotNotationToHash(conditions), block);
+    attributes = this.convertDotNotationToHash(attributes);
+    return this.expandFromHash(attributes, block);
   }
 
   protected expandFromHash(
-    conditions: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
     // Mirrors Rails PredicateBuilder#expand_from_hash: `return ["1=0"] if
@@ -104,11 +105,11 @@ export class PredicateBuilder {
     // the nested/associated recursion. Like Rails, expansion is always
     // positive: `where.not(...)` inverts the assembled WhereClause one level
     // up (WhereClause#invert), so `where.not(sink: {})` becomes `NOT (1=0)`.
-    if (Object.keys(conditions).length === 0) {
+    if (Object.keys(attributes).length === 0) {
       return [arelSql("1=0")];
     }
     const nodes: Nodes.Node[] = [];
-    for (const [key, value] of Object.entries(conditions)) {
+    for (const [key, value] of Object.entries(attributes)) {
       if (isPlainObject(value) && !this.table.hasColumn(key)) {
         // Mirrors Rails PredicateBuilder#expand_from_hash: pass the
         // join-dependency resolver block to associatedTable so a nested-hash key
@@ -133,7 +134,7 @@ export class PredicateBuilder {
           this.table.associatedTable(key),
           key,
           value,
-          conditions,
+          attributes,
         );
         nodes.push(...assocNodes);
       } else if (this.table.aggregatedWith(key)) {

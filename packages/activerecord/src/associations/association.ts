@@ -899,11 +899,18 @@ export class Association {
   }
 
   private isViolatesStrictLoading(): boolean {
-    const ownerAny = this.owner as any;
     if (this._skipStrictLoading) return false;
-    return !!(
-      ownerAny._strictLoading && !ownerAny._strictLoadingWhitelist?.includes(this.reflection.name)
-    );
+
+    // Rails (association.rb:287) skips the strict-loading check while a
+    // validation is running — autosave validation walks the association and
+    // must not raise there.
+    if ((this.owner as { validationContext?: unknown }).validationContext != null) return false;
+
+    if ("strictLoading" in (this.reflection.options as object)) {
+      return (this.reflection as { strictLoading?: boolean }).strictLoading ?? false;
+    }
+
+    return this.owner.isStrictLoading() && !this.owner.isStrictLoadingNPlusOneOnly();
   }
 
   /**

@@ -1619,12 +1619,12 @@ export function selectForCount(rel: CalculationRelation): string {
   const sel = (rel as any)._selectColumns;
   if (!sel || sel.length === 0) return "*";
   return sel
-    .map((s: unknown) => {
-      if (s instanceof Nodes.Node) {
+    .map((column: unknown) => {
+      if (column instanceof Nodes.Node) {
         const visitor = rel._conn?.()?.visitor;
-        return visitor ? visitor.compile(s) : String(s);
+        return visitor ? visitor.compile(column) : String(column);
       }
-      return String(s);
+      return String(column);
     })
     .join(", ");
 }

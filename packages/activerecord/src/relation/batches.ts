@@ -169,7 +169,7 @@ export function batchOnLoadedRelation(opts: {
   // relation.records() is async in this codebase; loaded records live on _records.
   let records: any[] = Array.isArray(relation._records) ? relation._records : [];
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  const orderDirs = batchOrders.map(([, dir]) => dir);
+  const order = batchOrders.map(([, dir]) => dir);
 
   if (opts.start != null || opts.finish != null) {
     const startArr =
@@ -178,17 +178,16 @@ export function batchOnLoadedRelation(opts: {
       opts.finish != null ? (Array.isArray(opts.finish) ? opts.finish : [opts.finish]) : null;
     records = records.filter((record) => {
       const values = recordCursorValues(record, cursor);
-      if (startArr != null && compareValuesForOrder(values, startArr, orderDirs) < 0) return false;
-      if (finishArr != null && compareValuesForOrder(values, finishArr, orderDirs) > 0)
-        return false;
+      if (startArr != null && compareValuesForOrder(values, startArr, order) < 0) return false;
+      if (finishArr != null && compareValuesForOrder(values, finishArr, order) > 0) return false;
       return true;
     });
   }
 
-  const sorted = [...records].sort((a, b) => {
-    const v1 = recordCursorValues(a, cursor);
-    const v2 = recordCursorValues(b, cursor);
-    return compareValuesForOrder(v1, v2, orderDirs);
+  const sorted = [...records].sort((record1, record2) => {
+    const values1 = recordCursorValues(record1, cursor);
+    const values2 = recordCursorValues(record2, cursor);
+    return compareValuesForOrder(values1, values2, order);
   });
   const result: any[][] = [];
   for (let i = 0; i < sorted.length; i += batchLimit) {
@@ -200,7 +199,7 @@ export function batchOnLoadedRelation(opts: {
 /** @internal */
 export function recordCursorValues(record: any, cursor: string | string[]): unknown[] {
   const cols = Array.isArray(cursor) ? cursor : [cursor];
-  return cols.map((c) => record.readAttribute?.(c) ?? record[c]);
+  return cols.map((column) => record.readAttribute?.(column) ?? record[column]);
 }
 
 /** @internal */
@@ -231,25 +230,25 @@ export async function* batchOnUnloadedRelation(opts: {
   remaining?: number | null;
   useRanges?: boolean | null;
 }): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
-  const { relation, cursor } = opts;
+  const { cursor } = opts;
   let { batchLimit } = opts;
   let remaining: number | null | undefined = opts.remaining;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
   // Apply start/finish limits once on the base relation; advance cursor per
   // iteration — matching Rails' batch_condition(relation, ...) pattern where
   // `relation` is always the original scoped relation, not the previous batch.
-  let baseRelation = relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
-  baseRelation = applyLimits(baseRelation, cursor, opts.start, opts.finish, batchOrders);
-  const emptyScope = relation.toSql() === relation.model.unscoped().all().toSql();
+  let relation = opts.relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
+  relation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders);
+  const emptyScope = opts.relation.toSql() === opts.relation.model.unscoped().all().toSql();
   const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   let lastValues: unknown[] | null = null;
   while (true) {
     const batchRelation =
       lastValues === null
-        ? baseRelation
+        ? relation
         : batchCondition(
-            baseRelation,
+            relation,
             cursorArr,
             lastValues,
             batchOrders.map(([, ord]) => (ord === "desc" ? "lt" : "gt")),
@@ -263,7 +262,7 @@ export async function* batchOnUnloadedRelation(opts: {
       if (remaining === 0) break;
       if (remaining < batchLimit) {
         batchLimit = remaining;
-        baseRelation = baseRelation.limit(batchLimit);
+        relation = relation.limit(batchLimit);
       }
     }
     lastValues = recordCursorValues(rows[rows.length - 1], cursor);

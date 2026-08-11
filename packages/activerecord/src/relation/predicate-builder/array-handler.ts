@@ -46,7 +46,7 @@ export class ArrayHandler {
     // inside the array is unsupported here — Rails would likewise fail
     // to serialize them inside HomogeneousIn; use `where(col: relation)`
     // for subqueries instead.
-    const scalarValues: unknown[] = [];
+    const values: unknown[] = [];
     let hasNull = false;
     const ranges: Range[] = [];
 
@@ -60,24 +60,24 @@ export class ArrayHandler {
         // Only genuine Base instances deref; an arbitrary non-Base object that
         // happens to carry an `id` (or a bare Ruby-Hash object literal) is left
         // intact, matching `is_a?(Base)` being false for both.
-        scalarValues.push(item.id);
+        values.push(item.id);
       } else {
-        scalarValues.push(item);
+        values.push(item);
       }
     }
 
     let valuesPredicate: Nodes.Node | typeof NullPredicate;
-    if (scalarValues.length === 0) {
+    if (values.length === 0) {
       valuesPredicate = NullPredicate;
-    } else if (scalarValues.length === 1) {
-      valuesPredicate = this.predicateBuilder.build(attribute, scalarValues[0]);
+    } else if (values.length === 1) {
+      valuesPredicate = this.predicateBuilder.build(attribute, values[0]);
     } else {
       // Rails builds the multi-value case with
       // `Arel::Nodes::HomogeneousIn.new(values, attribute, :in)`. Its
       // `castedValues` natively drops out-of-range / non-serializable values and
       // casts per column type, so `[1, 2^63]` → `IN (1)` without any sentinel
       // pre-substitution.
-      valuesPredicate = new Nodes.HomogeneousIn(scalarValues, attribute, "in");
+      valuesPredicate = new Nodes.HomogeneousIn(values, attribute, "in");
     }
 
     if (hasNull) {
@@ -91,9 +91,9 @@ export class ArrayHandler {
       return valuesPredicate === NullPredicate ? attribute.in([]) : (valuesPredicate as Nodes.Node);
     }
 
-    const rangePreds = ranges.map((r) => this.predicateBuilder.build(attribute, r));
+    const arrayPredicates = ranges.map((range) => this.predicateBuilder.build(attribute, range));
     let result: Nodes.Node | typeof NullPredicate = valuesPredicate;
-    for (const rp of rangePreds) {
+    for (const rp of arrayPredicates) {
       result = result === NullPredicate ? rp : groupedOr(result as Nodes.Node, rp);
     }
     return result as Nodes.Node;

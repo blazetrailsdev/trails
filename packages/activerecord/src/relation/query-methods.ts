@@ -75,19 +75,19 @@ export class WhereChain<R = any> {
     return this._scope.whereNot(conditions);
   }
 
-  associated(...associationNames: string[]): R {
+  associated(...associations: string[]): R {
     // The reflection is discarded on purpose: this call is here for Rails'
     // fail-fast on an unknown association (`scope_association_reflection`
     // raises, query_methods.rb:90), which happens before any join is built.
     // `whereAssociated` re-derives it because it needs the *scope's* reflection
     // as the scope advances. `missing` below has the same shape.
-    for (const name of associationNames) this.scopeAssociationReflection(name);
-    return this._scope.whereAssociated(...associationNames);
+    for (const association of associations) this.scopeAssociationReflection(association);
+    return this._scope.whereAssociated(...associations);
   }
 
-  missing(...associationNames: string[]): R {
-    for (const name of associationNames) this.scopeAssociationReflection(name);
-    return this._scope.whereMissing(...associationNames);
+  missing(...associations: string[]): R {
+    for (const association of associations) this.scopeAssociationReflection(association);
+    return this._scope.whereMissing(...associations);
   }
 
   exists(conditions?: unknown): Promise<boolean> {
@@ -1984,16 +1984,16 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
       return Object.entries(attr as Record<string, unknown>).flatMap(([table, columns]) => {
         const tableName = String(table);
         return (Array.isArray(columns) ? columns : [columns]).map(
-          (col) =>
-            builder?.resolveArelAttribute?.(tableName, String(col)) ??
-            new ArelTable(tableName).get(String(col)),
+          (column) =>
+            builder?.resolveArelAttribute?.(tableName, String(column)) ??
+            new ArelTable(tableName).get(String(column)),
         );
       });
     }
     const s = String(attr);
     if (s.includes(".")) {
-      const [table, col] = s.split(".", 2);
-      return [builder?.resolveArelAttribute?.(table, col) ?? new ArelTable(table).get(col)];
+      const [table, column] = s.split(".", 2);
+      return [builder?.resolveArelAttribute?.(table, column) ?? new ArelTable(table).get(column)];
     }
     return [s];
   });
@@ -2381,7 +2381,7 @@ export function buildWithExpressionFromValue(this: QueryMethodsHost, value: unkn
     if (value.length === 0)
       throw argumentError("Empty array passed to buildWithExpressionFromValue");
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0]);
-    const parts = value.map((q) => buildWithExpressionFromValue.call(this, q));
+    const parts = value.map((part) => buildWithExpressionFromValue.call(this, part));
     return parts.reduce(
       (result: unknown, part: unknown) => new Nodes.UnionAll(result as any, part as any),
     );
