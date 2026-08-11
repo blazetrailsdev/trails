@@ -2300,6 +2300,19 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@ident
   end
 
+  # `Proc.new { ... }` ports to an arrow function, which names no callee at all,
+  # so the `new` recorded here could never be satisfied by any TS body. The
+  # discriminator is the RECEIVER, not the name: `Foo.new` is a real call the TS
+  # side already satisfies (extract-ts-api.ts records `constructor` for every
+  # `new X()`, and rubyMethodToTs("new") is ["constructor"]), so this verdict is
+  # per-SITE — a body with both `Proc.new` and `Foo.new` still records the second.
+  def proc_new_receiver?(recv)
+    return false unless recv.is_a?(Array) && recv[0] == :var_ref
+
+    inner = recv[1]
+    inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
+  end
+
   # `weak` collects the occurrences whose receiver was inert; a name only
   # becomes a weak CALL when no non-inert occurrence exists (collect_method_calls).
   def walk_for_calls(node, calls, weak)
@@ -2315,7 +2328,8 @@ class ApiExtractor
       # matching extract-ts-api.ts#collectCalls; the two orders must agree.
       walk_for_calls(node[1], calls, weak)
       name = ident_name(node[3]) if node[3]
-      if name && !name.start_with?("_") && name =~ /\A[a-z]/
+      if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
+         !(name == "new" && proc_new_receiver?(node[1]))
         calls << name
         weak << name if inert_receiver?(node[1])
       end

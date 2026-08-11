@@ -18,7 +18,7 @@
     "tsFile": "system-testing/driver.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Constructor idiom: Ruby `X.new` ports to TS `new X()`, which extractCalls records as a construction/type reference rather than a named call. The construction is present in the port. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/system_testing/driver.rb:10-25) builds `@browser = Browser.new(options[:using])` on the `:selenium` branch. The port (system-testing/driver.ts:47-55) stores `options.using` raw; `Browser` has no trails counterpart. Tracked by story `0084-wide-call-set-burndown/port-system-testing-driver-browser`."
   },
   {
     "package": "actiondispatch",

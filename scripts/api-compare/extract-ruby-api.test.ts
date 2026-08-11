@@ -271,6 +271,39 @@ describe("Ruby extractor inert-receiver call suppression", () => {
     expect(c["Baz#c"].calls).toContain("save");
     expect(c["Baz#c"].weakCalls ?? []).not.toContain("save");
   });
+
+  it("drops new at a Proc receiver while keeping it at a constant receiver", () => {
+    const c = rubyWeakCalls({
+      "qux.rb": `
+        class Qux
+          def d
+            callback = Proc.new { |x| x.run }
+            Wrapper.new(callback)
+          end
+        end
+      `,
+    });
+    // `Proc.new { ... }` ports to an arrow function, which names no callee, so
+    // the site can never be satisfied; `Wrapper.new` is a real construction the
+    // TS side records as `constructor`.
+    expect(c["Qux#d"].calls).toContain("new");
+    expect(c["Qux#d"].calls?.filter((n) => n === "new")).toEqual(["new"]);
+    expect(c["Qux#d"].calls).toContain("run");
+  });
+
+  it("drops new entirely when Proc is the only receiver", () => {
+    const c = rubyWeakCalls({
+      "quux.rb": `
+        class Quux
+          def e
+            Proc.new { greet }
+          end
+        end
+      `,
+    });
+    expect(c["Quux#e"].calls ?? []).not.toContain("new");
+    expect(c["Quux#e"].calls).toContain("greet");
+  });
 });
 
 describe("Ruby extractor alias arity resolution", () => {
