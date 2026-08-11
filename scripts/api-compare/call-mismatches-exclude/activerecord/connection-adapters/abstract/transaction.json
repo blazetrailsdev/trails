@@ -2,18 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "after_rollback",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "str:afterRollback",
-      "ref:block"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/abstract/transaction.rb `after_rollback`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "before_commit_records",
     "call": "run_action_on_records",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -425,31 +425,81 @@ function tsCallNameKeys(rubyName: string): string[] {
 }
 
 /**
- * Pair the call sites of one already name-matched (Ruby, TS) method pair: the
- * nth Ruby site named `x` against the nth TS site whose name is a faithful
- * spelling of `x`, both streams in source order. No new METHOD matching is
- * introduced — the method pair is the one checkCalls already received; this is
- * only which site within the two bodies compares against which.
+ * How well two same-named call sites' argument lists agree, for
+ * {@link pairCallSites}. Higher is a better pairing. Ordered so that an exact
+ * argument-list agreement always outranks a mere arity agreement, which in turn
+ * outranks any number of positional key matches — a 3-argument list agreeing on
+ * all 3 must never outrank the 4-argument list that agrees on all 4.
+ *
+ * An opaque list has no keys to score; its arity is still known, so it competes
+ * on that alone rather than being excluded from the assignment.
+ */
+function argSimilarity(ruby: CallSite, ts: CallSite): number {
+  const rubyArgs = normalizeArgs(ruby.args);
+  const tsArgs = normalizeArgs(stripMixinReceiver(ruby.args, ts.args));
+  const sameArity = ruby.args.length === ts.args.length ? 1 : 0;
+  if (rubyArgs === null || tsArgs === null) return sameArity * 1_000;
+  if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
+  let matches = 0;
+  for (let i = 0; i < Math.min(rubyArgs.length, tsArgs.length); i++) {
+    if (argKeysEqual(rubyArgs[i], tsArgs[i])) matches++;
+  }
+  return sameArity * 1_000 + matches;
+}
+
+/**
+ * Pair the call sites of one already name-matched (Ruby, TS) method pair: each
+ * Ruby site named `x` against the TS site whose name is a faithful spelling of
+ * `x` and whose ARGUMENT LIST agrees with it best (RFC 0099). No new METHOD
+ * matching is introduced — the method pair is the one checkCalls already
+ * received; this is only which site within the two bodies compares against
+ * which.
+ *
+ * Source order is the wrong pairing as soon as a body calls one name twice.
+ * `sqlite3_adapter.rb:477` constructs `SQLite3Adapter::Version` once and the
+ * port constructs `Version` three times (a `"0.0.0"` guard arm among them);
+ * zipping by index compares Rails' single construction against whichever
+ * occurrence happens to come first and manufactures a shape row for a body that
+ * is correct. Both streams stay in source order for TIE-BREAKING only, so a
+ * body whose occurrences are indistinguishable pairs exactly as before.
  *
  * A Ruby site with no unconsumed TS counterpart is dropped rather than
  * reported: "the port makes no such call" is the call-set gate's finding
  * (call-mismatches.json), and re-reporting it here as an argument mismatch
- * would double-count one divergence in two artifacts.
+ * would double-count one divergence in two artifacts. The assignment is still
+ * maximal — a candidate whose two endpoints are both free is always taken — so
+ * within one name it consumes exactly the min(Ruby, TS) sites the source-order
+ * zip did, and nothing that used to be compared silently stops being compared.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const consumed = new Set<number>();
-  const pairs: { ruby: CallSite; ts: CallSite }[] = [];
-  for (const ruby of rubySites) {
+  const candidates: { rubyIdx: number; tsIdx: number; score: number }[] = [];
+  rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
-    const i = tsSites.findIndex((ts, idx) => !consumed.has(idx) && keys.has(ts.name));
-    if (i === -1) continue;
-    consumed.add(i);
-    pairs.push({ ruby, ts: tsSites[i] });
+    tsSites.forEach((ts, tsIdx) => {
+      if (!keys.has(ts.name)) return;
+      candidates.push({ rubyIdx, tsIdx, score: argSimilarity(ruby, tsSites[tsIdx]) });
+    });
+  });
+  // Greedy over the globally best-scoring candidate, ties broken by source
+  // order on the Ruby then the TS side — so the verdict never depends on the
+  // order the candidates were enumerated in.
+  candidates.sort((a, b) => b.score - a.score || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx);
+  const takenRuby = new Set<number>();
+  const takenTs = new Set<number>();
+  const matched = new Map<number, number>();
+  for (const { rubyIdx, tsIdx } of candidates) {
+    if (takenRuby.has(rubyIdx) || takenTs.has(tsIdx)) continue;
+    takenRuby.add(rubyIdx);
+    takenTs.add(tsIdx);
+    matched.set(rubyIdx, tsIdx);
   }
-  return pairs;
+  return rubySites.flatMap((ruby, rubyIdx) => {
+    const tsIdx = matched.get(rubyIdx);
+    return tsIdx === undefined ? [] : [{ ruby, ts: tsSites[tsIdx] }];
+  });
 }
 
 /** Compare one name-matched pair of call sites, mirroring

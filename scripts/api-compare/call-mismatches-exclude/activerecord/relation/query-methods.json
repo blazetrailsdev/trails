@@ -169,15 +169,6 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_buckets",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_join_buckets",
     "call": "order:leftOuterJoinsValues,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
@@ -358,17 +349,6 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_with_join_node",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1955 `with_table = Arel::Table.new(name)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",

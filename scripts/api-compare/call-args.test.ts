@@ -384,12 +384,46 @@ describe("compareCallArgs", () => {
 });
 
 describe("pairCallSites", () => {
-  it("pairs the nth Ruby site against the nth TS site of the same name", () => {
+  it("falls back to source order when the argument lists cannot tell the sites apart", () => {
     const pairs = pairCallSites(
       [site("visit", ["id:o"]), site("visit", ["id:x"])],
       [site("visit", ["id:node"]), site("visit", ["id:n"])],
     );
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
+  });
+
+  it("pairs same-named sites by argument agreement, not source order", () => {
+    const pairs = pairCallSites(
+      [site("new", ["id:table_name", "id:options"])],
+      [site("constructor", ["str:0.0.0"]), site("constructor", ["id:tableName", "id:options"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:tableName", "id:options"]]);
+  });
+
+  it("prefers an exact agreement over a longer partial one", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o"])],
+      [site("visit", ["id:o", "id:collector"]), site("visit", ["id:o"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:o"]]);
+  });
+
+  it("pairs a Ruby site whose receiver-less arity differs against the site that matches it", () => {
+    // through_association.rb:13 `loaded?(owner)` vs :20 `…association(…).loaded?`
+    // — one TS site, and the 1-argument Ruby occurrence is its counterpart.
+    const pairs = pairCallSites(
+      [site("loaded?", []), site("loaded?", ["id:owner"])],
+      [site("loaded", ["id:owner"])],
+    );
+    expect(pairs.map((p) => p.ruby.args)).toEqual([["id:owner"]]);
+  });
+
+  it("scores an opaque list on its arity alone rather than dropping it", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o", "hash"])],
+      [site("visit", ["id:o"]), site("visit", ["id:o", "hash"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:o", "hash"]]);
   });
 
   it("camelizes the Ruby call name to find its TS site", () => {

@@ -145,28 +145,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "validate",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "with_advisory_lock",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "const:RELEASE_LOCK_FAILED_MESSAGE"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "with_advisory_lock",
     "call": "order:constructor,releaseAdvisoryLock",
     "reason": "Ruby `raise ConcurrentMigrationError` names the class without constructing it (migration.rb:1604), so Rails' only `.new` is the RELEASE_LOCK_FAILED one after `release_advisory_lock`; TypeScript has no `throw SomeError` spelling, so the port's first `throw new` necessarily precedes it."
