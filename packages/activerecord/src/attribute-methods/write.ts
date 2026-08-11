@@ -43,7 +43,10 @@ export function _writeAttribute(this: Model, name: string, value: unknown): void
 // access is handled statically, so we compute the same metadata for parity
 // but intentionally do not register or define anything.
 /** @internal */
-function defineMethodAttribute(canonicalName: string, { owner }: { owner?: unknown } = {}): void {
+function defineMethodAttribute(
+  canonicalName: string,
+  { owner }: { owner?: unknown; as?: string } = {},
+): void {
   const { methodName, attrNameRef } = AttrNames.defineAttributeAccessorMethod(
     owner,
     canonicalName,
