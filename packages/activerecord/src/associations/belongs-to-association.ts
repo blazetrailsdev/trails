@@ -279,11 +279,8 @@ export class BelongsToAssociation extends SingularAssociation {
         }) ?? null
       );
     }
-    const ownerCtor = this.owner.constructor as {
-      _reflectOnAssociation?: (n: string) => { inverseName?: () => string | null } | null;
-    };
     const inverseName =
-      ownerCtor._reflectOnAssociation?.(this.reflection.name)?.inverseName?.() ??
+      this.reflection.inverseName?.() ??
       (this.reflection.options.inverseOf as string | undefined) ??
       null;
     if (!inverseName) return null;
@@ -308,35 +305,13 @@ export class BelongsToAssociation extends SingularAssociation {
   // --- Private helpers ---
 
   private foreignKeyName(): string {
-    const fk = this.reflection.options.foreignKey;
-    if (typeof fk === "string") return fk;
-    if (Array.isArray(fk)) return fk[0];
-    return `${underscore(this.reflection.name)}_id`;
+    const fk = this.reflection.foreignKey ?? `${underscore(this.reflection.name)}_id`;
+    return Array.isArray(fk) ? fk[0] : fk;
   }
 
   protected foreignKeyNames(): string[] {
-    const fk = this.reflection.options.foreignKey;
-    if (typeof fk === "string") return [fk];
-    if (Array.isArray(fk)) return fk;
-
-    // When the owner uses query_constraints, the foreign key is derived from
-    // them (Rails `derive_fk_query_constraints`), not from the target's primary
-    // key — e.g. a `Sharded::Comment` belongs_to whose owner constraints are
-    // `[blog_id, id]` carries `[blog_id, blog_post_id]`. The rich reflection's
-    // computed `foreignKey` already does this; the scalar-PK fallback below
-    // would drop the `blog_id` component. `this.reflection` is the lightweight
-    // `AssociationDefinition` (`{ type, name, options }`) — it has no computed
-    // `foreignKey` getter — so resolve the rich `AssociationReflection` (which
-    // carries the cached `deriveFkQueryConstraints` value) via the registry.
-    if (hasQueryConstraints.call(this.owner.constructor as never)) {
-      const ctor = this.owner.constructor as {
-        _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
-      };
-      const computed = ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey;
-      if (computed) return Array.isArray(computed) ? computed : [computed];
-    }
-
-    return [`${underscore(this.reflection.name)}_id`];
+    const fk = this.reflection.foreignKey ?? `${underscore(this.reflection.name)}_id`;
+    return Array.isArray(fk) ? fk : [fk];
   }
 
   protected associationPrimaryKeys(record: Base | null): string[] {
@@ -361,16 +336,9 @@ export class BelongsToAssociation extends SingularAssociation {
     // through to the single-`id` inference below and the FK zip in `replaceKeys`
     // lines up `[author_id, book_id]` against `[id]` — writing the target's
     // `id` into the owner's first FK column.
-    const richReflection = (
-      this.owner.constructor as {
-        _reflectOnAssociation?: (n: string) => { options?: { queryConstraints?: unknown } } | null;
-      }
-    )._reflectOnAssociation?.(this.reflection.name);
     if (
       targetCtor &&
-      (hasQueryConstraints.call(targetCtor) ||
-        this.reflection.options.queryConstraints ||
-        richReflection?.options?.queryConstraints)
+      (hasQueryConstraints.call(targetCtor) || this.reflection.options.queryConstraints)
     ) {
       const qc = queryConstraintsList.call(targetCtor);
       if (qc) return qc;
@@ -419,16 +387,7 @@ export class BelongsToAssociation extends SingularAssociation {
    * explicit `counterCache: "<column>"` / `{ column }` forms.
    */
   private counterCacheColumn(): string | null {
-    // Prefer the reflection's own `counterCacheColumn()` (mirrors Rails
-    // `reflection.counter_cache_column`): it resolves the inverse has_many to
-    // recover the demodulized column name for flat-named CPK models
-    // (`CpkBook` → `CpkOrder.books` → `books_count`, not `cpk_books_count`).
-    // Fall back to the plain owner-name derivation only when the rich
-    // reflection isn't available.
-    const richReflection = (this.owner.constructor as any)._reflectOnAssociation?.(
-      this.reflection.name,
-    );
-    const fromReflection = richReflection?.counterCacheColumn?.();
+    const fromReflection = this.reflection.counterCacheColumn?.();
     if (fromReflection !== undefined && fromReflection !== null) return fromReflection;
     return belongsToCounterCacheColumn(
       this.reflection.options.counterCache,

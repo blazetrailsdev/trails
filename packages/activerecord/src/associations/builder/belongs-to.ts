@@ -119,15 +119,6 @@ export class BelongsTo extends SingularAssociation {
     });
   }
 
-  private static resolvePk(reflection: any, klass: any): string | string[] {
-    const configuredPk = reflection?.options?.primaryKey;
-    if (configuredPk != null) return configuredPk;
-    const apk = reflection?.associationPrimaryKey;
-    if (typeof apk === "function") return apk.call(reflection, klass);
-    if (apk != null) return apk;
-    return klass?.primaryKey ?? "id";
-  }
-
   private static async touchParent(target: any, touch: any): Promise<void> {
     if (Array.isArray(touch) && touch.length === 0) return;
     const touchFn = target.touchLater ?? target.touch;
@@ -210,7 +201,7 @@ export class BelongsTo extends SingularAssociation {
           klass = association.klass;
         }
         if (klass) {
-          const pk = BelongsTo.resolvePk(reflection, klass);
+          const pk = reflection.associationPrimaryKeyFor(klass);
           const oldFkValue = fkColumns.length === 1 ? oldFkValues[0] : oldFkValues;
           const conditions = BelongsTo.buildFindConditions(pk, oldFkValue);
           if (conditions && typeof klass.findBy === "function") {

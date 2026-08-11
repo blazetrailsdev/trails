@@ -164,6 +164,27 @@ export interface AssociationDefinition {
   type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
   name: string;
   options: AssociationOptions & { joinTable?: string };
+  /**
+   * Rails' `MacroReflection#macro`. Present on the rich reflection an
+   * `Association` resolves off the owner's class in its constructor
+   * (`association.rb:32`), absent on the lightweight definitions the
+   * declaration macros build — on a reflection `type` is the polymorphic
+   * `*_type` column, not the macro, so bodies that branch on the macro must
+   * read this.
+   */
+  macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
+  /** Rails' `AssociationReflection#foreign_key`. See {@link macro}. */
+  foreignKey?: string | string[];
+  /** Rails' `AssociationReflection#association_primary_key`. See {@link macro}. */
+  associationPrimaryKey?: string | string[];
+  /** Rails' `AssociationReflection#counter_cache_column`. See {@link macro}. */
+  counterCacheColumn?: () => string | null;
+  /** Rails' `AssociationReflection#has_cached_counter?`. See {@link macro}. */
+  hasCachedCounter?: () => boolean;
+  /** Rails' `AssociationReflection#counter_must_be_updated_by_has_many?`. See {@link macro}. */
+  isCounterMustBeUpdatedByHasMany?: () => boolean;
+  /** Rails' `AbstractReflection#inverse_of` → `inverse_name`. See {@link macro}. */
+  inverseName?: () => string | null;
 }
 
 /**

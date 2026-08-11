@@ -32,7 +32,8 @@ import {
  */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
-  switch (assocDef.type) {
+  // A reflection's `type` is the polymorphic `*_type` column, not the macro.
+  switch (assocDef.macro ?? assocDef.type) {
     case "belongsTo":
       if (opts.polymorphic) return new BelongsToPolymorphicAssociation(this, assocDef as any);
       return new BelongsToAssociation(this, assocDef as any);
@@ -155,7 +156,14 @@ export function association(this: Base, name: string): AssociationInstance {
     throw _associationNotFound(this, name);
   }
 
-  const instance = _buildAssociationInstance.call(this, assocDef);
+  // Rails constructs from the reflection (`associations.rb:290-296`:
+  // `reflection.association_class.new(self, reflection)`); the `_associations`
+  // scan above stays only because it carries the subclass-override ordering
+  // and the macro `_buildAssociationInstance` dispatches on.
+  const instance = _buildAssociationInstance.call(
+    this,
+    (ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined) ?? assocDef,
+  );
   this._associationInstances.set(name, instance);
   syncAssociationInstance.call(this, name, instance);
   return instance;

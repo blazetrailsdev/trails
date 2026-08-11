@@ -362,10 +362,10 @@ function toI(value: unknown): number {
 
 /** @internal */
 async function updateCounter(assoc: HasManyAssociation, difference: number): Promise<void> {
-  const counterCol = assoc.reflection.options.counterCache;
-  if (!counterCol) return;
+  const reflection = assoc.reflection;
+  if (!reflection.hasCachedCounter?.()) return;
+  const column = reflection.counterCacheColumn?.() as string;
   const owner = assoc.owner as any;
-  const column = String(counterCol);
   if (typeof owner.incrementBang === "function") {
     await owner.incrementBang(column, difference);
   } else if (typeof owner.updateCounters === "function") {
@@ -384,17 +384,10 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
  * @internal
  */
 function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
-  const counterCol = this.reflection.options.counterCache;
-  if (!counterCol) return;
-  // `this.reflection` is the raw definition; resolve the rich reflection the
-  // same way `deleteRecords` does above.
-  const ctor = this.owner.constructor as typeof Base & {
-    _reflectOnAssociation?: (n: string) => { isCounterMustBeUpdatedByHasMany?: () => boolean };
-  };
-  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-  if (refl?.isCounterMustBeUpdatedByHasMany?.() === false) return;
+  const reflection = this.reflection;
+  if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
+  const column = reflection.counterCacheColumn?.() as string;
   const owner = this.owner as any;
-  const column = String(counterCol);
   const current = Number(owner.readAttribute?.(column) ?? 0);
   owner.writeAttribute?.(column, current + difference);
   owner.clearAttributeChange?.(column);
