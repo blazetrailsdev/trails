@@ -1859,22 +1859,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async changeColumnNull(
     tableName: string,
     columnName: string,
-    allowNull: boolean,
-    defaultValue?: unknown,
+    null_: boolean,
+    default_?: unknown,
   ): Promise<void> {
-    this.validateChangeColumnNullArgumentBang(allowNull);
-    if (!allowNull && defaultValue !== undefined) {
+    this.validateChangeColumnNullArgumentBang(null_);
+    if (!null_ && default_ !== undefined) {
       // Rails backfills NULLs via quote_default_expression, which serializes the
       // value through the column's cast type (abstract/schema_statements.rb).
       const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
-      const serialized = this.serializeDefaultForColumn(defaultValue, existing?.sqlType ?? null);
+      const serialized = this.serializeDefaultForColumn(default_, existing?.sqlType ?? null);
       const quotedDefault = this.quoteDefault(serialized);
       await this.execute(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
     }
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.get(columnName)!.options.null = allowNull;
+      definition.get(columnName)!.options.null = null_;
     });
   }
 
@@ -2296,7 +2296,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     toTableOrOptions?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    const positionalToTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
+    let toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
     const opts: RemoveForeignKeyOptions =
       typeof toTableOrOptions === "object" && toTableOrOptions !== null
         ? { ...toTableOrOptions, ...options }
@@ -2304,9 +2304,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const ifExists = opts.ifExists === true;
     delete opts.ifExists;
 
-    if (ifExists && !(await this.foreignKeyExists(fromTable, positionalToTable))) return;
+    if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
 
-    const toTable = positionalToTable ?? opts.toTable;
+    toTable ??= opts.toTable;
     const matchOptions: ForeignKeyLookupOptions = { ...opts };
     delete matchOptions.name;
     delete matchOptions.toTable;
@@ -2317,7 +2317,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
     );
 
-    const existingFks = await this.foreignKeys(fromTable);
+    const foreignKeys = await this.foreignKeys(fromTable);
     // Rails' SQLite override hand-rolls `options.slice(*fk.options.keys)` +
     // `fk.options[k].to_s == v.to_s` (sqlite3/schema_statements.rb:79-80) rather
     // than calling defined_for?. isDefinedFor is that same slice-and-compare,
@@ -2325,19 +2325,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // the `["a", "b"]` inspect form. Reproducing that would mean porting Ruby
     // inspect formatting, and it is unreachable here: SQLite add_foreign_key is
     // single-column.
-    const fkToRemove = existingFks.find(
+    const fkey = foreignKeys.find(
       (fk) =>
         this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions),
     );
 
-    if (!fkToRemove) {
+    if (!fkey) {
       throw new ArgumentError(
         `Table '${fromTable}' has no foreign key for ${toTable ?? JSON.stringify(matchOptions)}`,
       );
     }
 
-    const remainingFks = existingFks.filter((fk) => fk !== fkToRemove);
-    await this.alterTable(fromTable, remainingFks);
+    foreignKeys.splice(foreignKeys.indexOf(fkey), 1);
+    await this.alterTable(fromTable, foreignKeys);
   }
 
   /**
@@ -2383,12 +2383,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
 
-    const checkConstraints = await this.checkConstraints(tableName);
+    let checkConstraints = await this.checkConstraints(tableName);
     const chkNameToDelete = (
       await this.checkConstraintForBang(tableName, { expression, ...lookupOptions })
     ).name;
-    const remainingChecks = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
-    await this.alterTable(tableName, await this.foreignKeys(tableName), remainingChecks);
+    checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
+    await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
   }
 
   // --- Private: alter_table copy strategy (Rails: SQLite3Adapter#alter_table) ---
@@ -2507,8 +2507,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const COLLATE_REGEX = /.*"(\w+)".*collate\s+"(\w+)".*/i;
     const AI_REGEX = /.*"(\w+)".+PRIMARY KEY AUTOINCREMENT/i;
     const GENERATED_REGEX = /.*"(\w+)".+GENERATED ALWAYS AS \((.+)\) (?:STORED|VIRTUAL)/i;
-    const colNames = basicStructure.map((c) => String(c["name"]));
-    const strings = await this.tableStructureSql(tableName, colNames);
+    const strings = await this.tableStructureSql(
+      tableName,
+      basicStructure.map((column) => String(column["name"])),
+    );
     if (!strings.length) return basicStructure.map((c) => ({ ...c }));
     const collations: Record<string, string> = {};
     const autoIncrements: Record<string, boolean> = {};
