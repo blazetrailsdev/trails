@@ -1128,12 +1128,13 @@ describe("SelectManagerTest", () => {
 
   describe("lateral", () => {
     // Mirrors Rails: `lateral` returns `Lateral.new(ast)` when no name is
-    // given (select_manager.rb), so the visitor renders `LATERAL (...)`.
+    // given (select_manager.rb). `visit_Arel_Nodes_Lateral` is declared on
+    // the PostgreSQL visitor only (postgresql.rb:64), so compile there.
     it("returns a Lateral wrapping the SELECT", () => {
       const mgr = new SelectManager(users).project(users.get("id"));
       const lat = mgr.lateral();
       expect(lat).toBeInstanceOf(Nodes.Lateral);
-      const sql = new Visitors.ToSql(testConnection).compile(lat);
+      const sql = new Visitors.PostgreSQL(testConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users")');
     });
 
@@ -1144,8 +1145,8 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager(users).project(users.get("id"));
       const lat = mgr.lateral("u");
       expect(lat).toBeInstanceOf(Nodes.Lateral);
-      expect(lat.subquery).toBeInstanceOf(Nodes.TableAlias);
-      const sql = new Visitors.ToSql(testConnection).compile(lat);
+      expect(lat.expr).toBeInstanceOf(Nodes.TableAlias);
+      const sql = new Visitors.PostgreSQL(testConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") u');
     });
   });

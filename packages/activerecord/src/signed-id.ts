@@ -69,11 +69,6 @@ function _hasPrimaryKey(pk: unknown): boolean {
   return typeof pk === "string" && pk.length > 0;
 }
 
-function combinePurposes(modelClass: typeof Base, purpose?: string): string | undefined {
-  const combined = combineSignedIdPurposes(modelClass, purpose);
-  return combined || undefined;
-}
-
 /**
  * Generate a signed ID for a persisted record.
  * The token is HMAC-signed and tamper-proof.
@@ -96,7 +91,8 @@ export function signedId(
   return verifier.generate(coerce(instance.id), {
     expiresIn: options?.expiresIn,
     expiresAt: options?.expiresAt,
-    purpose: combinePurposes(ctor, options?.purpose),
+    // `|| undefined`: an empty combined purpose means "absent" to the verifier.
+    purpose: ctor.combineSignedIdPurposes(options?.purpose) || undefined,
   });
 }
 
@@ -108,7 +104,7 @@ export function signedId(
  */
 export async function findSigned<T extends typeof Base>(
   modelClass: T,
-  token: string,
+  signedId: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T> | null> {
   const pk = modelClass.primaryKey;
@@ -116,8 +112,8 @@ export async function findSigned<T extends typeof Base>(
     throw new UnknownPrimaryKey(modelClass);
   }
   const verifier = modelClass.signedIdVerifier;
-  const id = verifier.verified(token, {
-    purpose: combinePurposes(modelClass, options?.purpose),
+  const id = verifier.verified(signedId, {
+    purpose: modelClass.combineSignedIdPurposes(options?.purpose) || undefined,
   });
   if (id === null) return null;
   if (Array.isArray(pk)) {
@@ -138,12 +134,12 @@ export async function findSigned<T extends typeof Base>(
  */
 export async function findSignedBang<T extends typeof Base>(
   modelClass: T,
-  token: string,
+  signedId: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T>> {
   const verifier = modelClass.signedIdVerifier;
-  const id = verifier.verify(token, {
-    purpose: combinePurposes(modelClass, options?.purpose),
+  const id = verifier.verify(signedId, {
+    purpose: modelClass.combineSignedIdPurposes(options?.purpose) || undefined,
   });
   return modelClass.find(id);
 }

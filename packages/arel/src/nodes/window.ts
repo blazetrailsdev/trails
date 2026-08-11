@@ -1,5 +1,6 @@
 import { Node, NodeVisitor } from "./node.js";
 import { Unary } from "./unary.js";
+import { SqlLiteral } from "./sql-literal.js";
 
 /**
  * Window — a SQL window specification for OVER clauses.
@@ -18,13 +19,15 @@ export class Window extends Node {
     this.framing = null;
   }
 
-  order(...exprs: Node[]): this {
-    this.orders.push(...exprs);
+  order(...expr: (Node | string)[]): this {
+    // FIXME: We SHOULD NOT be converting these to SqlLiteral automatically
+    this.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  partition(...exprs: Node[]): this {
-    this.partitions.push(...exprs);
+  partition(...expr: (Node | string)[]): this {
+    // FIXME: We SHOULD NOT be converting these to SqlLiteral automatically
+    this.partitions.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 

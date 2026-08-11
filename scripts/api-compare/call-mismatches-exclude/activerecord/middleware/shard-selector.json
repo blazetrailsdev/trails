@@ -24,7 +24,7 @@
     "rubyArgs": [
       "kwargs{shard=ref:toSym}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "shard_selector.rb:56 passes `shard.to_sym`; trails models the Ruby Symbol as a JS `Symbol`, which CLAUDE.md forbids — converging the value means making `shard` a plain string, tracked by story `converge-shard-selector-symbol-to-string`."
   },
   {
     "package": "activerecord",

@@ -81,6 +81,11 @@ export class PostgreSQL extends ToSql {
     return this.groupingArrayOrGroupingElement(o, collector);
   }
 
+  protected visitArelNodesLateral(o: Nodes.Lateral, collector: SQLString): SQLString {
+    collector.append("LATERAL ");
+    return this.groupingParentheses(o.expr, collector);
+  }
+
   // Postgres natively supports `IS [NOT] DISTINCT FROM`. Behaviorally
   // identical to the base ToSql visitor; the explicit override mirrors
   // Rails' Postgres visitor for fidelity (no behavior change).
@@ -123,6 +128,10 @@ export class PostgreSQL extends ToSql {
     });
     collector.append(" )");
     return collector;
+  }
+
+  static {
+    PostgreSQL.dispatchCache().set(Nodes.Lateral, "visitArelNodesLateral");
   }
 }
 

@@ -1070,6 +1070,16 @@ export class Base extends Model {
     return _Core.currentPreventingWrites.call(this);
   }
 
+  // Mirrors: ActiveRecord::Core.current_role (core.rb:160-171).
+  static currentRole(): string {
+    return _Core.currentRole.call(this);
+  }
+
+  // Mirrors: ActiveRecord::Core.current_shard (core.rb:173-184).
+  static currentShard(): string {
+    return _Core.currentShard.call(this);
+  }
+
   /**
    * Walks up the superclass chain until it finds a class where
    * connectionClassQ() is true, or reaches Base.
@@ -4381,6 +4391,13 @@ export class Base extends Model {
     options?: { purpose?: string },
   ): Promise<InstanceType<T>> {
     return _findSignedBang(this, signedId, options);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::SignedId::ClassMethods#combine_signed_id_purposes
+   */
+  static combineSignedIdPurposes(purpose?: string): string {
+    return SignedId.combineSignedIdPurposes(this, purpose);
   }
 
   /**

@@ -454,19 +454,17 @@ export function connectionDbConfig(this: typeof Base) {
 }
 
 export function connectionPool(this: typeof Base): ConnectionPool {
-  const name = connectionSpecificationName.call(this);
-  return this.connectionHandler.retrieveConnectionPool(name, {
-    role: coreCurrentRole.call(this as any),
-    shard: coreCurrentShard.call(this as any),
+  return this.connectionHandler.retrieveConnectionPool(connectionSpecificationName.call(this), {
+    role: this.currentRole(),
+    shard: this.currentShard(),
     strict: true,
   })!;
 }
 
 export function retrieveConnection(this: typeof Base): Promise<DatabaseAdapter> {
-  const name = connectionSpecificationName.call(this);
-  return this.connectionHandler.retrieveConnection(name, {
-    role: coreCurrentRole.call(this as any),
-    shard: coreCurrentShard.call(this as any),
+  return this.connectionHandler.retrieveConnection(connectionSpecificationName.call(this), {
+    role: this.currentRole(),
+    shard: this.currentShard(),
   });
 }
 
@@ -552,15 +550,15 @@ export function removeConnection(this: typeof Base): DatabaseConfig | undefined 
   const name = connectionSpecificationName.call(this);
   if (
     this.connectionHandler.retrieveConnectionPool(name, {
-      role: coreCurrentRole.call(this as any),
-      shard: coreCurrentShard.call(this as any),
+      role: this.currentRole(),
+      shard: this.currentShard(),
     })
   ) {
     (this as any)._connectionSpecificationName = undefined;
   }
   return this.connectionHandler.removeConnectionPool(name, {
-    role: coreCurrentRole.call(this as any),
-    shard: coreCurrentShard.call(this as any),
+    role: this.currentRole(),
+    shard: this.currentShard(),
   });
 }
 

@@ -114,21 +114,6 @@ export interface GroupingFolders {
   ): Grouping;
 }
 
-function groupedAny(nodes: Node[]): Grouping {
-  // Rails' `Or.inject` on [] returns nil; the visitor renders that as
-  // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
-  // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
-  // while still guarding against the `Array#reduce` TypeError on empty.
-  if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
-  return new Grouping(nodes.reduce((acc, n) => new Or(acc, n)));
-}
-
-function groupedAll(nodes: Node[]): Grouping {
-  // Match Attribute#groupedAll: an empty And inside a Grouping. The
-  // visitor renders this as `()`, same as Rails' empty-And rendering.
-  return new Grouping(new And(nodes));
-}
-
 // Build the `expr → Node` callback used by groupingAny / groupingAll.
 // Resolves a method-id string against the host (with a clear error if
 // the name doesn't refer to a callable method) or invokes a closure
@@ -451,7 +436,13 @@ export const Predications = {
     others: unknown[],
     ...extras: unknown[]
   ): Grouping {
-    return groupedAny(others.map(predicationDispatch(this, methodId, extras)));
+    const nodes = others.map(predicationDispatch(this, methodId, extras));
+    // Rails' `Or.inject` on [] returns nil; the visitor renders that as
+    // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
+    // FALSE under SQL: `NULL OR FALSE` is NULL, `FALSE OR FALSE` is FALSE)
+    // while still guarding against the `Array#reduce` TypeError on empty.
+    if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
+    return new Grouping(nodes.reduce((memo, node) => new Or(memo, node)));
   },
 
   // Mirrors Arel::Predications#grouping_all — fold with AND.
@@ -461,7 +452,8 @@ export const Predications = {
     others: unknown[],
     ...extras: unknown[]
   ): Grouping {
-    return groupedAll(others.map(predicationDispatch(this, methodId, extras)));
+    const nodes = others.map(predicationDispatch(this, methodId, extras));
+    return new Grouping(new And(nodes));
   },
 
   // Mirrors Arel::Predications#infinity? (predications.rb:248-250) —

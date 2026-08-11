@@ -32,7 +32,7 @@ export abstract class NodeExpression extends Node {
    */
   quotedNode(other: unknown): Node {
     if (other instanceof Node) return other;
-    if (_buildQuoted) return _buildQuoted(other, this);
+    if (buildQuoted) return buildQuoted(other, this);
     throw new Error(
       'NodeExpression.quotedNode called before buildQuoted was registered. Import from "@blazetrails/arel" so Arel package initialization runs and wires node registries.',
     );
@@ -43,9 +43,9 @@ export abstract class NodeExpression extends Node {
 // extends it). A direct import would deadlock the class-extends
 // expression at module-load time; instead casted.ts registers itself here
 // at its own module-init.
-let _buildQuoted: ((other: unknown, ctx: unknown) => Node) | undefined;
+let buildQuoted: ((other: unknown, ctx: unknown) => Node) | undefined;
 export function registerBuildQuoted(fn: (other: unknown, ctx: unknown) => Node): void {
-  _buildQuoted = fn;
+  buildQuoted = fn;
 }
 
 // Using `typeof import(...)` inline avoids pulling the mixin modules into

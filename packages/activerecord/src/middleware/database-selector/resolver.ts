@@ -68,7 +68,7 @@ export class Resolver {
   }
 
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: "writing", preventWrites: true }, () =>
+    return Base.connectedTo({ role: Base.writingRole, preventWrites: true }, () =>
       this.instrumenter.instrumentAsync(
         "database_selector.active_record.read_from_primary",
         {},
@@ -78,7 +78,7 @@ export class Resolver {
   }
 
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: "reading", preventWrites: true }, () =>
+    return Base.connectedTo({ role: Base.readingRole, preventWrites: true }, () =>
       this.instrumenter.instrumentAsync(
         "database_selector.active_record.read_from_replica",
         {},
@@ -88,7 +88,7 @@ export class Resolver {
   }
 
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
-    return Base.connectedTo({ role: "writing", preventWrites: false }, () =>
+    return Base.connectedTo({ role: Base.writingRole, preventWrites: false }, () =>
       this.instrumenter.instrumentAsync(
         "database_selector.active_record.wrote_to_primary",
         {},

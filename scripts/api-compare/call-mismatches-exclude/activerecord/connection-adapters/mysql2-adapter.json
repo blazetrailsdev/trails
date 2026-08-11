@@ -37,7 +37,7 @@
       "str:string",
       "kwargs{adapter=str:mysql2,limit=ref:limit}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "mysql2_adapter.rb:45-49 scopes these to `adapter: :mysql2`; trails' `adapterNameFromConfig` (abstract-adapter.ts:142-155) normalizes every MySQL config to `\"mysql\"`, so the registration and the lookup must move together — tracked by story `converge-mysql2-type-registration-adapter-key`."
   },
   {
     "package": "activerecord",
@@ -49,7 +49,7 @@
       "str:string",
       "kwargs{adapter=str:mysql2}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "mysql2_adapter.rb:45-49 scopes these to `adapter: :mysql2`; trails' `adapterNameFromConfig` (abstract-adapter.ts:142-155) normalizes every MySQL config to `\"mysql\"`, so the registration and the lookup must move together — tracked by story `converge-mysql2-type-registration-adapter-key`."
   },
   {
     "package": "activerecord",

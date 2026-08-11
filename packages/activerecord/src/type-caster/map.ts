@@ -14,7 +14,7 @@ export class Map {
     this._klass = klass;
   }
 
-  typeCastForDatabase(attrName: string, value: unknown): unknown {
+  typeCastForDatabase(attrName: unknown, value: unknown): unknown {
     // Rails' `model.type_caster` (TypeCaster::Map → `klass.type_for_attribute`)
     // is EnumType-aware: an enum attribute serializes the label → its stored
     // database value. Resolve the enum through `enumTypeOf` (the replayed
@@ -23,18 +23,20 @@ export class Map {
     // from the mapping shape, whereas the AttributeSet carries the EnumType
     // built from the reflected column type. `whereValuesHash` / `scopeForCreate`
     // round-trip the label through the same reflected type.
-    const enumType = enumTypeOf(this._klass, attrName);
+    const enumType = enumTypeOf(this._klass, String(attrName));
     if (enumType) return enumType.serialize(value);
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }
 
-  typeForAttribute(name: string): Type {
+  typeForAttribute(name: unknown): Type {
     // The resolved type already carries every decoration (NormalizedValueType,
     // Serialized, EncryptedAttributeType): `_baseTypeForAttribute` delegates to
     // `klass.typeForAttribute`, which resolves through the decorated default
-    // attribute set, so no query-side re-wrap is needed.
-    return this._baseTypeForAttribute(name);
+    // attribute set, so no query-side re-wrap is needed. Rails' `to_s` lives in
+    // `klass.type_for_attribute` (model_schema.rb), so callers pass the column
+    // as-is — a Symbol, a String, or an Arel node.
+    return this._baseTypeForAttribute(String(name));
   }
 
   private _baseTypeForAttribute(name: string): Type {

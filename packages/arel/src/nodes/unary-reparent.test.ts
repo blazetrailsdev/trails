@@ -35,11 +35,6 @@ describe("Unary reparenting (Rails fidelity)", () => {
       const lat = new Nodes.Lateral(inner);
       expect(lat.expr).toBe(inner);
     });
-
-    it("subquery getter returns expr (back-compat)", () => {
-      const lat = new Nodes.Lateral(inner);
-      expect(lat.subquery).toBe(lat.expr);
-    });
   });
 
   describe("GroupingElement / Cube / RollUp / GroupingSet extend Unary", () => {

@@ -51,17 +51,5 @@
       "ref:shard"
     ],
     "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/abstract/connection_handler.rb:279 `ConnectionAdapters::PoolConfig.new(connection_name, db_config, role, shard)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "retrieve_connection_pool",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:message",
-      "kwargs{connectionName=ref:connectionName,role=ref:role,shard=ref:shard}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

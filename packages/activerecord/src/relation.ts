@@ -1161,25 +1161,26 @@ export class Relation<T extends Base> {
 
     const rel = this._clone();
 
+    // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
+    // Cast each value to its database form so the CASE/IN predicates match a typed
+    // column (e.g. enum integer mappings, date/time serialization) instead of the
+    // JS-native string/number form. An Arel node finds no attribute type and falls
+    // through to ValueType (no-op cast).
+    const typeCaster = new TypeCasterMap(this.model);
+    // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
+    const normalized = values.map((v) => {
+      if (v === undefined || v === null) return null;
+      return typeCaster.typeCastForDatabase(column, v);
+    });
+
     // Mirrors Rails: `column.is_a?(Arel::Nodes::SqlLiteral) ? column : order_column(column.to_s)`.
     // An Arel expression (e.g. `Arel.sql("id * 2")`) is used verbatim; a string/symbol
     // resolves through orderColumn, which handles `"table.column"` for joined associations
     // (and records the reference on the cloned relation).
     const arelCol =
-      column instanceof Nodes.Node ? column : (_qm.orderColumn.call(rel as any, column) as any);
-
-    // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
-    // Cast each value to its database form so the CASE/IN predicates match a typed
-    // column (e.g. enum integer mappings, date/time serialization) instead of the
-    // JS-native string/number form. column.to_s drives the type lookup; an Arel node
-    // (SqlLiteral) finds no attribute type and falls through to ValueType (no-op cast).
-    const typeCaster = new TypeCasterMap(this.model);
-    const columnName = typeof column === "string" ? column : String(column);
-    // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
-    const normalized = values.map((v) => {
-      if (v === undefined || v === null) return null;
-      return typeCaster.typeCastForDatabase(columnName, v);
-    });
+      column instanceof Nodes.SqlLiteral
+        ? column
+        : (_qm.orderColumn.call(rel as any, String(column)) as any);
 
     // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).
     // Mirrors Rails' build_case_for_value_position: Arel::Nodes::Case.new (no operand)
@@ -2666,12 +2667,10 @@ export class Relation<T extends Base> {
       ...this._joinValues.flatMap((v) => {
         if (typeof v === "string") {
           const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
-          const sqlText = join.left instanceof Nodes.SqlLiteral ? join.left.value : v;
-          return this.tablesInString(sqlText);
+          return this.tablesInString(join.left);
         }
         if (v instanceof Nodes.StringJoin) {
-          const sqlText = v.left instanceof Nodes.SqlLiteral ? v.left.value : v.toSql();
-          return this.tablesInString(sqlText);
+          return this.tablesInString(v.left);
         }
         const leftName = (v.left as any)?.name;
         if (typeof leftName === "string") return [leftName.toLowerCase()];
@@ -2688,7 +2687,12 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#tables_in_string
    */
-  private tablesInString(string: string): string[] {
+  private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
+    // Rails' SqlLiteral IS a String subclass, so `tables_in_string(join.left)`
+    // reaches `blank?`/`scan` unconverted (relation.rb:1477, 1491). TS has no
+    // String subclass, so the unwrap lives here rather than at each call site.
+    if (string instanceof Nodes.SqlLiteral) string = string.value;
+    else if (string instanceof Nodes.Node) string = string.toSql();
     if (!string) return [];
     // Mirrors Rails' tables_in_string regex: /[a-zA-Z_][.\w]+(?=.?\.)/
     // The `.?` lookahead allows one non-dot char (e.g. a closing `"`) between
@@ -3881,17 +3885,10 @@ export class Relation<T extends Base> {
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
     // so optimistic locking (lock_version increment) is applied — mirrors Rails
     // touch_all which calls update_all internally (relation.rb).
-    const touchUpdates = touchAttributesWithTime.call(this.model, ...names, time);
-    const updates: Record<string, unknown> = {};
-    for (const [col, touchedAt] of Object.entries(touchUpdates)) {
-      updates[col] = new Nodes.Quoted(touchedAt);
-    }
-
     // No empty-updates guard: Rails passes the hash straight to update_all,
     // which raises ArgumentError on a blank hash (relation.rb:589) — before
     // its `none?` check, so a `none` relation raises too.
-
-    return this.updateAll(updates);
+    return this.updateAll(touchAttributesWithTime.call(this.model, ...names, time));
   }
 
   /**

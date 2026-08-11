@@ -154,7 +154,7 @@
       "ref:name",
       "kwargs{owner=ref:owner,reflection=ref:reflection}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "core.rb:253-262 takes `owner:`/`reflection:` kwargs and instruments them verbatim; trails takes positional `(owner, reflection: string)` and synthesizes `ownerClass`/`reflectionLike`, so the values converge only with the signature — tracked by story `converge-strict-loading-violation-signature`."
   },
   {
     "package": "activerecord",

@@ -14,10 +14,7 @@ import type { Base } from "../base.js";
  *
  * Mirrors: ActiveRecord::Locking::Pessimistic#lock!
  */
-export async function lockBang<T extends Base>(
-  this: T,
-  lockClause: boolean | string = true,
-): Promise<T> {
+export async function lockBang<T extends Base>(this: T, lock: boolean | string = true): Promise<T> {
   if (this.isPersisted()) {
     if (this.changed) {
       // Mirrors Rails' squished message order: the save/reload guidance first,
@@ -33,7 +30,7 @@ export async function lockBang<T extends Base>(
     // `LIMIT 1` ahead of the lock clause and resets in-memory + association
     // state from the freshly locked row.
     await (this as unknown as { reload(o: { lock: boolean | string }): Promise<unknown> }).reload({
-      lock: lockClause,
+      lock,
     });
   }
   return this;

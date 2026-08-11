@@ -4,7 +4,7 @@
     "tsFile": "select-manager.ts",
     "rubyName": "collapse",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "select_manager.rb:52-58 / :257-268 wrap through `Arel.sql`, which lives in the package entry index.ts; importing it here adds a select-manager→index edge that makes `table.js` throw `Cannot access 'Table' before initialization` when entered as a module (verified against built dist). The one-line body `new SqlLiteral(...)` is inlined instead."
   },
   {
     "package": "arel",
@@ -22,6 +22,6 @@
     "tsFile": "select-manager.ts",
     "rubyName": "lock",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "select_manager.rb:52-58 / :257-268 wrap through `Arel.sql`, which lives in the package entry index.ts; importing it here adds a select-manager→index edge that makes `table.js` throw `Cannot access 'Table' before initialization` when entered as a module (verified against built dist). The one-line body `new SqlLiteral(...)` is inlined instead."
   }
 ]
