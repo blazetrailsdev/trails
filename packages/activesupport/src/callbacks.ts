@@ -668,9 +668,12 @@ export class Callback {
           : arity > 0
             ? new InstanceExec1(this.filter as (target: object) => unknown)
             : new InstanceExec0(this.filter as () => unknown);
-    } else if (typeof this.filter === "string") {
-      // Rails Callback.build raises ArgumentError for a String filter; only a
-      // Symbol (method name) or a proc/block is permitted.
+    } else if (typeof this.filter === "string" && !this.filter.startsWith(":")) {
+      // Rails CallTemplate.build/Callback.build reject a String filter; only a
+      // Symbol (a method name) or a proc is permitted. A Ruby Symbol is a JS
+      // string, so — as CLAUDE.md prescribes wherever the control flow turns on
+      // Symbol-vs-String — the Symbol keeps its leading colon and a bare string
+      // is the String arm that raises.
       throw new Error(
         `Passing string to define a callback is not supported: ${String(this.filter)}`,
       );
@@ -681,7 +684,12 @@ export class Callback {
       // `around`/`before`/`after` and `scope: [:kind, :name]` calls `aroundSave`.
       callTemplate = new ObjectCall(this.filter, this.objectCallMethodName());
     } else {
-      callTemplate = new MethodCall(this.filter as PropertyKey);
+      // Symbol filter (`:around_save_collection_association`) → MethodCall.
+      // A Ruby Symbol is a JS string carrying its leading colon; a JS symbol
+      // property key is dispatched as-is.
+      callTemplate = new MethodCall(
+        typeof this.filter === "string" ? this.filter.slice(1) : (this.filter as PropertyKey),
+      );
     }
 
     if (this.kind === "before") {
@@ -1094,13 +1102,28 @@ export class CallbackChain {
   }
 
   append(callback: Callback): void {
-    this._allCallbacks = undefined;
-    this.chain.push(callback);
+    this.appendOne(callback);
   }
 
   prepend(callback: Callback): void {
+    this.prependOne(callback);
+  }
+
+  private appendOne(callback: Callback): void {
     this._allCallbacks = undefined;
+    this.removeDuplicates(callback);
+    this.chain.push(callback);
+  }
+
+  private prependOne(callback: Callback): void {
+    this._allCallbacks = undefined;
+    this.removeDuplicates(callback);
     this.chain.unshift(callback);
+  }
+
+  private removeDuplicates(callback: Callback): void {
+    this._allCallbacks = undefined;
+    this.chain = this.chain.filter((c) => !callback.isDuplicates(c));
   }
 
   remove(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): void {

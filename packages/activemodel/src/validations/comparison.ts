@@ -2,37 +2,18 @@ import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank } from "@blazetrails/activesupport";
-import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
+import { isBlank, underscore } from "@blazetrails/activesupport";
+import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
+import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
-
-type CompareKey = (typeof COMPARE_CHECKS)[number];
-
-const COMPARE_OPS = {
-  greaterThan: (c) => c > 0,
-  greaterThanOrEqualTo: (c) => c >= 0,
-  equalTo: (c) => c === 0,
-  lessThan: (c) => c < 0,
-  lessThanOrEqualTo: (c) => c <= 0,
-  otherThan: (c) => c !== 0,
-} satisfies Record<CompareKey, (cmp: number) => boolean>;
-
-const COMPARE_KEYS_TO_RAILS = {
-  greaterThan: ":greater_than",
-  greaterThanOrEqualTo: ":greater_than_or_equal_to",
-  equalTo: ":equal_to",
-  lessThan: ":less_than",
-  lessThanOrEqualTo: ":less_than_or_equal_to",
-  otherThan: ":other_than",
-} satisfies Record<CompareKey, string>;
 
 export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
   validateEach(record: ValidatableRecord, attrName: string, value: unknown): void {
-    for (const optKey of COMPARE_CHECKS) {
-      const rawOptionValue = this.options[optKey];
+    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+      const rawOptionValue = this.options[option];
       if (rawOptionValue === undefined) continue;
       const optionValue = this.resolveValue(record, rawOptionValue);
 
@@ -43,10 +24,10 @@ export class ComparisonValidator extends EachValidator {
 
       try {
         const cmp = this.compare(value, optionValue);
-        if (!COMPARE_OPS[optKey](cmp)) {
+        if (!compareOperator(COMPARE_CHECKS[option], cmp)) {
           record.errors.add(
             attrName,
-            COMPARE_KEYS_TO_RAILS[optKey],
+            `:${underscore(option)}`,
             this.errorOptions(value, optionValue),
           );
         }
@@ -86,7 +67,7 @@ export class ComparisonValidator extends EachValidator {
   }
 
   override checkValidity(): void {
-    if (!COMPARE_CHECKS.some((k) => this.options[k] !== undefined)) {
+    if (!Object.keys(COMPARE_CHECKS).some((k) => this.options[k] !== undefined)) {
       throw new ArgumentError(
         "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
       );

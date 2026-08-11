@@ -15,7 +15,7 @@ import { NestedError as AssociationsNestedError } from "./associations/nested-er
 import { _preloadedHolderTarget, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
-import { afterCreate, afterUpdate, afterValidation, beforeSave } from "./callbacks.js";
+import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
@@ -1270,11 +1270,6 @@ export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) 
   }
 }
 
-const _AUTOSAVE_AROUND_SAVE_KEY = Symbol.for("blazetrails.autosaveAroundSaveRegistered");
-const _ensureNoDuplicateErrorsRegistered = Symbol.for(
-  "blazetrails.ensureNoDuplicateErrorsRegistered",
-);
-
 /**
  * Registers save callbacks for an association declared with `autosave: true`.
  *
@@ -1308,22 +1303,11 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
 
   if (isCollection) {
-    // around_save runs once per save regardless of how many collection
-    // associations are declared — mirrors Rails' dedup via the
-    // `:around_save_collection_association` symbol, which also dedups across
-    // the inheritance chain, hence the prototype-chain lookup: a second hook
-    // registered by a subclass nests, and the nested invocation's
-    // `!prev && new_record?` would clobber the outer `_newRecordBeforeSave`.
-    if (!(_AUTOSAVE_AROUND_SAVE_KEY in model)) {
-      Object.defineProperty(model, _AUTOSAVE_AROUND_SAVE_KEY, {
-        value: true,
-        configurable: true,
-        writable: false,
-      });
-      model.aroundSave(function (record: any, proceed: () => any) {
-        return aroundSaveCollectionAssociation.call(record, proceed);
-      });
-    }
+    // `around_save :around_save_collection_association` — the method-name
+    // filter is load-bearing: CallbackChain#remove_duplicates dedups on it, so
+    // the hook runs once per save no matter how many collection associations
+    // are declared, and across the inheritance chain.
+    model.aroundSave(":aroundSaveCollectionAssociation");
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
@@ -1422,14 +1406,8 @@ export function defineAutosaveValidationCallbacks(klass: any, reflection: any): 
   if (typeof klass.validate === "function") {
     klass.validate(validationName);
   }
-  // Mirrors Rails: after_validation :_ensure_no_duplicate_errors (once per class).
-  // Own-property check mirrors the same pattern as the validation method guard above —
-  // a subclass inheriting the flag from its parent does NOT inherit the registered
-  // after_validation callback if its chains COW'd before the parent registration.
-  if (!Object.prototype.hasOwnProperty.call(klass, _ensureNoDuplicateErrorsRegistered)) {
-    klass[_ensureNoDuplicateErrorsRegistered] = true;
-    afterValidation(klass, (record: any) => {
-      _ensureNoDuplicateErrors.call(record);
-    });
-  }
+  // Mirrors Rails autosave_association.rb:233 —
+  // `after_validation :_ensure_no_duplicate_errors`. The method-name filter is
+  // what dedups the callback across every association on the class.
+  klass.afterValidation(":_ensureNoDuplicateErrors");
 }

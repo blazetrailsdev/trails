@@ -6790,7 +6790,7 @@ export class Relation<T extends Base> {
 
   private currentScopeRestoringBlock(block?: (record: T) => void): (record: T) => void {
     const modelClass = this.model;
-    const currentScope = ScopeRegistry.currentScope(modelClass as any, true);
+    const currentScope = (modelClass as any).currentScope(true);
     return (record: T) => {
       ScopeRegistry.setCurrentScope(modelClass as any, currentScope ?? null);
       block?.(record);

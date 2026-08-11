@@ -326,7 +326,7 @@ export class Association {
     // Branch 2: klass.current_scope.proxy_association == self.
     // Fires when CollectionProxy.scoping sets an AssociationRelation as
     // klass.currentScope; not yet implemented, so this is unreachable.
-    const currentScope = (klass as any).currentScope;
+    const currentScope = (klass as any).currentScope();
     if (currentScope && currentScope.proxyAssociation === this) {
       return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
     }

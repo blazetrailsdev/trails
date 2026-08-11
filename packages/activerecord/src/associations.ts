@@ -1160,9 +1160,12 @@ export function _skipSingularStatementCache(
   // override makes the relation owner/context-dependent. Mirror all three arms
   // (the third — `hasDefaultScopeOverride` — covers a `def self.defaultScope`
   // that never lands in `defaultScopes`).
-  const klass = targetModel as unknown as { currentScope?: unknown; defaultScopes?: unknown[] };
+  const klass = targetModel as unknown as {
+    currentScope?(): unknown;
+    defaultScopes?: unknown[];
+  };
   if (
-    klass.currentScope ||
+    klass.currentScope?.() ||
     (klass.defaultScopes?.length ?? 0) > 0 ||
     hasDefaultScopeOverride(targetModel)
   ) {

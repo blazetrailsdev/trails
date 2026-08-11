@@ -141,7 +141,7 @@ export function initializeInternalsCallback(this: ScopingHost): void {
 // ---------------------------------------------------------------------------
 
 interface ScopingClassHost {
-  currentScope?: any;
+  currentScope?(skipInheritedScope?: boolean): any;
   all?(): any;
 }
 
@@ -151,7 +151,7 @@ export function scopeAttributes(this: ScopingClassHost): Record<string, unknown>
 }
 
 export function isScopeAttributes(this: ScopingClassHost): boolean {
-  return !!this.currentScope;
+  return !!this.currentScope?.();
 }
 
 /**

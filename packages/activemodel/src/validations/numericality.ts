@@ -1,7 +1,8 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank, RoundingHelper, BigDecimal } from "@blazetrails/activesupport";
-import { errorOptions } from "./comparability.js";
+import { isBlank, underscore, RoundingHelper, BigDecimal } from "@blazetrails/activesupport";
+import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
+import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, TypeError as RubyTypeError } from "../attribute-assignment.js";
 import { roundFloatToSignificantDigits } from "../type/decimal.js";
@@ -93,59 +94,22 @@ export class NumericalityValidator extends EachValidator {
       count,
     });
 
-    const gt = this.resolveNumeric(
-      this.options.greaterThan as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (gt !== undefined && !(num > gt)) {
-      record.errors.add(attribute, ":greater_than", withCount(gt));
-    }
-    const gte = this.resolveNumeric(
-      this.options.greaterThanOrEqualTo as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (gte !== undefined && !(num >= gte)) {
-      record.errors.add(attribute, ":greater_than_or_equal_to", withCount(gte));
-    }
-    const lt = this.resolveNumeric(
-      this.options.lessThan as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (lt !== undefined && !(num < lt)) {
-      record.errors.add(attribute, ":less_than", withCount(lt));
-    }
-    const lte = this.resolveNumeric(
-      this.options.lessThanOrEqualTo as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (lte !== undefined && !(num <= lte)) {
-      record.errors.add(attribute, ":less_than_or_equal_to", withCount(lte));
-    }
-    const eq = this.resolveNumeric(
-      this.options.equalTo as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (eq !== undefined && num !== eq) {
-      record.errors.add(attribute, ":equal_to", withCount(eq));
-    }
-    const ot = this.resolveNumeric(
-      this.options.otherThan as NumericValue | undefined,
-      record,
-      precision,
-      scale,
-    );
-    if (ot !== undefined && num === ot) {
-      record.errors.add(attribute, ":other_than", withCount(ot));
+    // Mirrors numericality.rb:58-63 — the compare branch of the
+    // `options.slice(*RESERVED_OPTIONS)` loop, dispatching through
+    // `value.public_send(COMPARE_CHECKS[option], option_value)`.
+    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+      const rawOptionValue = this.options[option];
+      if (rawOptionValue === undefined) continue;
+      const optionValue = this.optionAsNumber(
+        record,
+        rawOptionValue as NumericValue,
+        precision,
+        scale,
+      );
+      if (optionValue === undefined) continue;
+      if (!compareOperator(COMPARE_CHECKS[option], num - optionValue)) {
+        record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+      }
     }
     if (this.options.in !== undefined) {
       const [min, max] = this.options.in as [number, number];
@@ -161,26 +125,8 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
-  private resolveNumeric(
-    val: NumericValue | undefined,
-    record: ValidatableRecord,
-    precision: number,
-    scale?: number,
-  ): number | undefined {
-    if (val === undefined) return undefined;
-    return this.optionAsNumber(record, val, precision, scale);
-  }
-
   override checkValidity(): void {
-    const compareKeys = [
-      "greaterThan",
-      "greaterThanOrEqualTo",
-      "lessThan",
-      "lessThanOrEqualTo",
-      "equalTo",
-      "otherThan",
-    ] as const;
-    for (const key of compareKeys) {
+    for (const key of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
       const val = this.options[key];
       if (
         val !== undefined &&
@@ -224,23 +170,16 @@ const NON_DECIMAL_LITERAL_REGEX = /^[+-]?0[xXbBoO]/;
 // Mirrors Rails numericality.rb:16:
 //   RESERVED_OPTIONS = COMPARE_CHECKS.keys + NUMBER_CHECKS.keys + RANGE_CHECKS.keys + [:only_integer, :only_numeric]
 // camelCased for trails option-key conventions.
+const RANGE_CHECKS = { in: ":in?" } as const;
+const NUMBER_CHECKS = { odd: ":odd?", even: ":even?" } as const;
+
 const RESERVED_OPTIONS = [
-  // COMPARE_CHECKS keys
-  "greaterThan",
-  "greaterThanOrEqualTo",
-  "equalTo",
-  "lessThan",
-  "lessThanOrEqualTo",
-  "otherThan",
-  // NUMBER_CHECKS keys
-  "odd",
-  "even",
-  // RANGE_CHECKS keys
-  "in",
-  // Misc
+  ...Object.keys(COMPARE_CHECKS),
+  ...Object.keys(NUMBER_CHECKS),
+  ...Object.keys(RANGE_CHECKS),
   "onlyInteger",
   "onlyNumeric",
-] as const;
+];
 
 /**
  * Mirrors: numericality.rb:67-69
@@ -453,7 +392,7 @@ export function filteredOptions(
 ): Record<string, unknown> {
   const filtered: Record<string, unknown> = {};
   for (const key of Object.keys(this.options)) {
-    if (!(RESERVED_OPTIONS as readonly string[]).includes(key)) {
+    if (!RESERVED_OPTIONS.includes(key)) {
       filtered[key] = this.options[key];
     }
   }

@@ -972,19 +972,27 @@ export class ToSql extends Visitor {
   // -- Matches with ESCAPE --
 
   protected visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
+    collector = this.visit(o.left, collector);
     collector.append(" LIKE ");
-    this.visit(o.right, collector);
-    this.appendEscape(o.escape, collector);
-    return collector;
+    collector = this.visit(o.right, collector);
+    if (o.escape) {
+      collector.append(" ESCAPE ");
+      return this.visit(o.escape, collector);
+    } else {
+      return collector;
+    }
   }
 
   protected visitArelNodesDoesNotMatch(o: Nodes.DoesNotMatch, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
+    collector = this.visit(o.left, collector);
     collector.append(" NOT LIKE ");
-    this.visit(o.right, collector);
-    this.appendEscape(o.escape, collector);
-    return collector;
+    collector = this.visit(o.right, collector);
+    if (o.escape) {
+      collector.append(" ESCAPE ");
+      return this.visit(o.escape, collector);
+    } else {
+      return collector;
+    }
   }
 
   // -- Joins --
@@ -2010,12 +2018,6 @@ export class ToSql extends Visitor {
     }
     collector.append(")");
     return collector;
-  }
-
-  protected appendEscape(escape: Node | null, collector: SQLString): void {
-    if (escape == null) return;
-    collector.append(" ESCAPE ");
-    this.visit(escape, collector);
   }
 
   // -- Helpers --

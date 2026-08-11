@@ -139,7 +139,7 @@ export function scope<T extends typeof Base>(
 }
 
 interface NamedHost {
-  currentScope?: any;
+  currentScope?(skipInheritedScope?: boolean): any;
   defaultScopes?: import("./default.js").DefaultScope[];
   // Rails' `relation` (core.rb) — a pristine Relation with the STI type
   // condition but neither current_scope nor default_scope applied. It is the
@@ -155,7 +155,7 @@ interface NamedHost {
  */
 export function scopeForAssociation(this: NamedHost, scope?: any): any {
   const rel = scope ?? this._buildUnscopedRelation?.();
-  if (this.currentScope?.isEmptyScope) {
+  if (this.currentScope?.()?.isEmptyScope) {
     return rel;
   }
   return defaultScoped.call(this, rel);

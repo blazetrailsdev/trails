@@ -2281,8 +2281,8 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.current_scope
    */
-  static get currentScope(): any | null {
-    return ScopeRegistry.currentScope(this);
+  static currentScope(skipInheritedScope = false): any | null {
+    return ScopeRegistry.currentScope(this, skipInheritedScope);
   }
 
   /**
@@ -2372,7 +2372,7 @@ export class Base extends Model {
     this: T,
     options?: { allQueries?: boolean | null },
   ): Relation<InstanceType<T>> {
-    const scope = this.currentScope;
+    const scope = this.currentScope();
     if (scope) {
       // Rails' `all`: `self == scope.model ? scope.clone :
       // relation.merge!(scope)`. When the current scope was set on a
@@ -2676,7 +2676,7 @@ export class Base extends Model {
    * and yields each record to the block before save.
    */
   private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
-    const scope = this.currentScope;
+    const scope = this.currentScope();
     if (scope) {
       const scopeAttrs = scope.scopeForCreate?.() ?? {};
       return { ...scopeAttrs, ...attrs };
