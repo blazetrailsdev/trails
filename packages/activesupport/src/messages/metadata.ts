@@ -55,8 +55,8 @@ export abstract class Metadata {
       const envelope = this.wrapInMetadataLegacyEnvelope({ message: dataString }, metadata);
       return this.serializeToJson(envelope);
     } else {
-      const wrapped = hasMetadata ? this.wrapInMetadataEnvelope({ data }, metadata) : data;
-      return this.serialize(wrapped);
+      if (hasMetadata) data = this.wrapInMetadataEnvelope({ data }, metadata);
+      return this.serialize(data);
     }
   }
 

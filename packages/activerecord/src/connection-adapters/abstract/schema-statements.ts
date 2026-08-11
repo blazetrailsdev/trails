@@ -813,7 +813,7 @@ export class SchemaStatements {
     // Rails checks existence with only the positional to_table
     // (`foreign_key_exists?(from_table, to_table)`), then resolves the exact
     // constraint via foreign_key_for! using column/name too.
-    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, { toTable }))) {
+    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, toTable))) {
       return;
     }
     const lookup: ForeignKeyLookupOptions = { ...opts, toTable };
@@ -1568,31 +1568,29 @@ export class SchemaStatements {
     toTable: string,
     options: Record<string, unknown> = {},
   ): Record<string, unknown> {
-    const result = { ...options };
+    options = { ...options };
 
-    if (Array.isArray(result.primaryKey)) {
-      if (!result.column) {
-        result.column = (result.primaryKey as string[]).map((pkColumn) =>
+    if (Array.isArray(options.primaryKey)) {
+      if (!options.column) {
+        options.column = (options.primaryKey as string[]).map((pkColumn) =>
           this.foreignKeyColumnFor(toTable, pkColumn),
         );
       }
     } else {
       // Rails (schema_statements.rb:1254): the scalar branch always derives the
       // default column from the literal "id", independent of :primary_key.
-      if (!result.column) {
-        result.column = this.foreignKeyColumnFor(toTable, "id");
+      if (!options.column) {
+        options.column = this.foreignKeyColumnFor(toTable, "id");
       }
     }
 
-    if (!result.name) {
-      result.name = this.foreignKeyName(fromTable, {
-        column: result.column as string | string[],
-      });
+    if (!options.name) {
+      options.name = this.foreignKeyName(fromTable, options);
     }
 
-    assertCompositeForeignKeyArity(toTable, result.column, result.primaryKey);
+    assertCompositeForeignKeyArity(toTable, options.column, options.primaryKey);
 
-    return result;
+    return options;
   }
 
   async checkConstraints(_tableName: string): Promise<CheckConstraintDefinition[]> {
@@ -2049,11 +2047,7 @@ export class SchemaStatements {
       !options.name &&
       this.isExpressionColumnName(typeof columnName === "string" ? columnName : "")
     ) {
-      // Rails: `options[:name] = index_name(table_name, column_name)` — a String
-      // column is scanned for \w+ words, joined with "_", and passed through
-      // generate_index_name, so the index-name length/hash fallback applies.
-      const joined = ((columnName as string).match(/\w+/g) ?? []).join("_");
-      options = { ...options, name: this.generateIndexName(tableName, joined) };
+      options = { ...options, name: this.indexName(tableName, columnName as string) };
       columnNames = [];
     } else {
       const rawColumn = columnName ?? options.column;
@@ -2075,9 +2069,7 @@ export class SchemaStatements {
       !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
     ) {
       checks.push(
-        (i) =>
-          this.indexName(tableName, { column: i.columns }) ===
-          this.indexName(tableName, { column: columnNames }),
+        (i) => this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),
       );
     }
 

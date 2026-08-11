@@ -534,9 +534,8 @@ export class DatabaseTasks {
     }
   }
 
-  static async truncateAll(environment?: string): Promise<void> {
-    const env = this._normalizeEnv(environment);
-    const configs = this.configsFor(env);
+  static async truncateAll(environment: string = DatabaseTasks.env): Promise<void> {
+    const configs = this.configsFor({ envName: environment });
     for (const dbConfig of configs) {
       const handler = this.databaseAdapterFor(dbConfig);
       if (handler.truncateAll) {
@@ -570,12 +569,13 @@ export class DatabaseTasks {
     return handler.charset(dbConfig);
   }
 
-  static async charsetCurrent(environment?: string): Promise<string | null> {
-    const env = this._normalizeEnv(environment);
-    const configs = this.configsFor(env);
-    if (configs.length === 0) return null;
-    const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0];
-    return this.charset(dbConfig);
+  static async charsetCurrent(
+    envName: string = DatabaseTasks.env,
+    dbName: string = "primary",
+  ): Promise<string | null> {
+    const dbConfig = this.configsFor({ envName, name: dbName });
+    if (dbConfig.length === 0) return null;
+    return this.charset(dbConfig[0]);
   }
 
   /**
@@ -597,12 +597,13 @@ export class DatabaseTasks {
     return handler.collation(dbConfig);
   }
 
-  static async collationCurrent(environment?: string): Promise<string | null> {
-    const env = this._normalizeEnv(environment);
-    const configs = this.configsFor(env);
-    if (configs.length === 0) return null;
-    const dbConfig = configs.find((c) => c.name === "primary") ?? configs[0];
-    return this.collation(dbConfig);
+  static async collationCurrent(
+    envName: string = DatabaseTasks.env,
+    dbName: string = "primary",
+  ): Promise<string | null> {
+    const dbConfig = this.configsFor({ envName, name: dbName });
+    if (dbConfig.length === 0) return null;
+    return this.collation(dbConfig[0]);
   }
 
   static targetVersion(): number | null {
@@ -659,22 +660,25 @@ export class DatabaseTasks {
    *   - Otherwise run {@link checkCurrentProtectedEnvironmentBang} against
    *     every config in the target environment.
    */
-  static async checkProtectedEnvironmentsBang(environment?: string): Promise<void> {
+  static async checkProtectedEnvironmentsBang(
+    environment: string = DatabaseTasks.env,
+  ): Promise<void> {
     // Rails: `return if ENV["DISABLE_DATABASE_ENVIRONMENT_CHECK"]`.
     // In Ruby "" is truthy, so any *present* value bypasses. JS "" is
     // falsy, so we use a presence check to preserve Rails semantics.
     if (getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK") !== undefined) return;
 
-    const envName = this._normalizeEnv(environment);
-    for (const dbConfig of this.configsFor(envName)) {
+    for (const dbConfig of this.configsFor({ envName: environment })) {
       await checkCurrentProtectedEnvironmentBang(dbConfig);
     }
   }
 
   /** @internal */
-  static configsFor(environment: string): DatabaseConfig[] {
+  static configsFor(
+    options: { envName?: string; name?: string; includeHidden?: boolean } = {},
+  ): DatabaseConfig[] {
     // database_tasks.rb:551-553 — `Base.configurations.configs_for(**options)`.
-    return configurationsStore().configsFor({ envName: environment });
+    return configurationsStore().configsFor(options);
   }
 
   /**
@@ -693,7 +697,7 @@ export class DatabaseTasks {
   private static eachCurrentConfiguration(environment: string, name?: string): DatabaseConfig[] {
     const results: DatabaseConfig[] = [];
     for (const env of eachCurrentEnvironment(environment)) {
-      for (const dbConfig of this.configsFor(env)) {
+      for (const dbConfig of this.configsFor({ envName: env })) {
         if (name != null && name !== dbConfig.name) continue;
         results.push(dbConfig);
       }
@@ -1156,7 +1160,7 @@ export class DatabaseTasks {
   static async migrateAll({
     targetVersion,
   }: { targetVersion?: number | string | null } = {}): Promise<void> {
-    const configs = this.configsFor(this._normalizeEnv());
+    const configs = this.configsFor({ envName: this._normalizeEnv() });
 
     // Rails: initialize_database for every config before the single-primary fast path or version loop.
     for (const dbConfig of configs) {
@@ -1196,7 +1200,7 @@ export class DatabaseTasks {
 
     // Rails: each_current_configuration { |db_config| initialize_database(db_config) }
     for (const environment of eachCurrentEnvironment(env)) {
-      for (const dbConfig of this.configsFor(environment)) {
+      for (const dbConfig of this.configsFor({ envName: environment })) {
         const databaseInitialized = await initializeDatabase(dbConfig);
         if (databaseInitialized && dbConfig.seeds) seed = true;
       }
@@ -1246,7 +1250,7 @@ export class DatabaseTasks {
         ? targetVersionOverride.trim() || null
         : (targetVersionOverride ?? null);
     const targetVersion = explicit === null ? this.targetVersion() : Number(explicit);
-    for (const dbConfig of this.configsFor(env)) {
+    for (const dbConfig of this.configsFor({ envName: env })) {
       await this.withTemporaryPool(dbConfig, async (pool) => {
         const context = await this._migrationContextFor(await pool.leaseConnection(), dbConfig);
         const versionsToRun = await context.pendingMigrationVersions();
@@ -1508,8 +1512,11 @@ export class DatabaseTasks {
   }
 
   static raiseForMultiDb(environment: string | undefined, opts: { command: string }): void {
-    const envName = this._normalizeEnv(environment);
-    const configs = this.configsFor(envName);
+    // Rails' `raise_for_multi_db(environment = env, command:)` defaults the
+    // positional; TS cannot put a required parameter after a defaulted one, so
+    // the default is applied here instead.
+    environment ??= DatabaseTasks.env;
+    const configs = this.configsFor({ envName: environment });
     if (configs.length > 1) {
       const list = configs.map((c) => `${opts.command}:${c.name}`).join(", ");
       throw new Error(

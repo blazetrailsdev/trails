@@ -1170,13 +1170,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
       { allowRetry: true, materializeTransactions: false },
     );
     return checkInfo.toArray().map((row) => {
+      const options = {
+        name: row.conname as string,
+        validate: row.valid as boolean,
+      };
       const expression = (row.constraintdef as string).match(/CHECK \((.+)\)/s)?.[1] ?? "";
-      return new CheckConstraintDefinition(
-        tableName,
-        expression,
-        row.conname as string,
-        row.valid as boolean,
-      );
+
+      return new CheckConstraintDefinition(tableName, expression, options);
     });
   }
 

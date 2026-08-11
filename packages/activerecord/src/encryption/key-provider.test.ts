@@ -22,7 +22,7 @@ describe("ActiveRecord::Encryption::KeyProviderTest", () => {
 
   beforeEach(() => {
     originalStoreKeyReferences = Configurable.config.storeKeyReferences;
-    message = new Message("some secret");
+    message = new Message({ payload: "some secret" });
     keys = buildKeys(3);
     keyProvider = new KeyProvider(keys);
   });

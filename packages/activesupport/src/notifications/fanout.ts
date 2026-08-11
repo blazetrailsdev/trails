@@ -114,7 +114,11 @@ interface Subscriber {
   readonly matcher: Matcher;
   readonly kind: SubscriberKind;
   readonly delegate: EventedListener | TimedCallback | EventObjectCallback;
+  /** Mirrors: `Subscribers::Evented#silenceable` (fanout.rb:376, 381). */
+  readonly silenceable: boolean;
   subscribed(name: string): boolean;
+  /** Mirrors: `Subscribers::Evented#silenced?` (fanout.rb:404-406). */
+  silenced(name: string): boolean;
 }
 
 function createSubscriber(
@@ -139,12 +143,21 @@ function createSubscriber(
     }
   }
 
+  const silenceable =
+    listener != null && typeof (listener as { silenced?: unknown }).silenced === "function";
+
   return {
     matcher,
     kind,
     delegate: listener,
+    silenceable,
     subscribed(name: string) {
       return matcher.matches(name);
+    },
+    silenced(name: string) {
+      if (!silenceable) return false;
+      const result = (listener as unknown as { silenced(name: string): unknown }).silenced(name);
+      return result != null && result !== false;
     },
   };
 }
@@ -378,7 +391,7 @@ export class Fanout {
     const finish = event.end ?? event.time;
     const { name, transactionId: id, payload } = event;
 
-    iterateGuardingExceptions(this.allListenersFor(name), (s) => {
+    iterateGuardingExceptions(this.listenersFor(name), (s) => {
       if (s.kind === "event_object") {
         (s.delegate as EventObjectCallback)(event);
       } else if (s.kind === "timed" || s.kind === "monotonic") {
@@ -414,8 +427,14 @@ export class Fanout {
     return cached;
   }
 
+  /** Mirrors: `listeners_for` (fanout.rb:306-308). */
+  private listenersFor(name: string): Subscriber[] {
+    return this.allListenersFor(name).filter((s) => !s.silenced(name));
+  }
+
+  /** Mirrors: `listening?` (fanout.rb:310-312). */
   listening(name: string): boolean {
-    return this.allListenersFor(name).length > 0;
+    return this.allListenersFor(name).some((s) => !s.silenced(name));
   }
 
   private groupsFor(name: string): Group[] {

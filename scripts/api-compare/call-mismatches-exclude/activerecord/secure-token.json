@@ -10,17 +10,6 @@
     "package": "activerecord",
     "tsFile": "secure-token.ts",
     "rubyName": "has_secure_token",
-    "call": "generate_unique_secure_token",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{length=ref:length}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "secure-token.ts",
-    "rubyName": "has_secure_token",
     "call": "set_callback",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

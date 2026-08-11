@@ -3443,7 +3443,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
-    const scope = this.quotedScope(name, options);
+    const scope = this.quotedScope(name, { type: options.type });
     const type = scope.type ?? "'r','v','m','p','f'";
     let sql = `SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace`;
     sql += ` WHERE n.nspname = ${scope.schema}`;

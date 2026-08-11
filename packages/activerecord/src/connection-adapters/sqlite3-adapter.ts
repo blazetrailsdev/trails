@@ -2269,7 +2269,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+CHECK\s*\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/gi;
     return [...String(tableSql ?? "").matchAll(regex)].map((match) => {
       const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
-      return new CheckConstraintDefinition(tableName, match[3].trim(), name);
+      const expression = match[3].trim();
+      return new CheckConstraintDefinition(tableName, expression, { name });
     });
   }
 
@@ -2441,7 +2442,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         // (sqlite3_adapter.rb:585-596). `options` — and with it `:rename` — goes to
         // the first move only; the second re-reflects the "a"-prefixed buffer and
         // layers the caller's FKs / checks / `modify` on top of it.
-        await this.moveTable(tableName, alteredTableName, { temporary: true, rename });
+        await this.moveTable(tableName, alteredTableName, { ...options, temporary: true });
         await this.moveTable(alteredTableName, tableName, {}, caller);
       });
     });

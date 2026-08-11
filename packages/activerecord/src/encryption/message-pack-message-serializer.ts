@@ -67,9 +67,9 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     this.validateMessageDataFormat(data, level);
     const d = data as Record<string, unknown>;
     const payload = d["p"];
-    const message = new Message(
-      typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
-    );
+    const message = new Message({
+      payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
+    });
     const headers = this.parseProperties(d["h"] as Record<string, unknown> | null, level);
     let nestedCount = 0;
     for (const [key, value] of headers.entries()) {

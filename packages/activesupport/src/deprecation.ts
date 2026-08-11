@@ -115,25 +115,30 @@ function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
     throw new ArgumentError(`${inspected} is not a valid deprecation behavior.`);
   }
 
-  const fn = behavior as (...args: unknown[]) => void;
-  switch (arityOfCallable(fn)) {
+  switch (arityOfCallable(behavior)) {
     case 2:
       return (message, callstack) => {
-        fn(message, callstack);
+        behavior(message, callstack);
       };
     case 0:
     case 1:
     case 3:
-      return fn as DeprecationBehaviorCallable;
+      return behavior as DeprecationBehaviorCallable;
     default:
       return (message, callstack, deprecator) => {
-        fn(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
+        behavior(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
       };
   }
 }
 
-/** Mirrors: `arity_of_callable` (behaviors.rb:142-144). */
-function arityOfCallable(callable: (...args: unknown[]) => void): number {
+/**
+ * Mirrors: `arity_of_callable` (behaviors.rb:142-144).
+ *
+ * Takes the same duck-typed callable Ruby's `respond_to?(:call)` guard admits,
+ * which is what `typeof behavior !== "function"` narrows `unknown` to.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+function arityOfCallable(callable: Function): number {
   return callable.length;
 }
 

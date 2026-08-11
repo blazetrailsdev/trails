@@ -111,7 +111,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     const iv = fresh.headers.get("iv") as Buffer;
     const realTag = fresh.headers.get("at") as Buffer;
 
-    const forged = new Message(fresh.payload);
+    const forged = new Message({ payload: fresh.payload });
     forged.addHeaders({ iv, at: realTag.subarray(0, 10) });
     expect(() => new Cipher(key).decrypt(forged)).toThrow(EncryptedContentIntegrity);
   });

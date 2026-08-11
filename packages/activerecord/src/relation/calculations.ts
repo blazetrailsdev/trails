@@ -99,7 +99,7 @@ interface CalculationRelation {
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _applyJoinsToManager(manager: any): void;
   /** @internal Rails `apply_join_dependency`; see Relation. */
-  applyJoinDependency(eagerLoading?: boolean): CalculationRelation;
+  applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -430,7 +430,7 @@ function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | No
  * @internal
  */
 function eagerJoinedRelation(rel: CalculationRelation, eagerLoading: boolean): CalculationRelation {
-  return rel.applyJoinDependency(eagerLoading);
+  return rel.applyJoinDependency({ eagerLoading });
 }
 
 async function singleAggregate(

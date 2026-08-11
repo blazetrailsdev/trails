@@ -83,7 +83,7 @@ export class Aes256Gcm {
 
     // Store raw bytes as Buffers, like MRI keeps binary Strings on the Message;
     // the serializer then does a single base64 hop, byte-identical to Rails.
-    const message = new Message(encrypted);
+    const message = new Message({ payload: encrypted });
     message.addHeaders({ iv, at: authTag });
     return message;
   }

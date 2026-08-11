@@ -26,9 +26,9 @@ describe("ActiveRecord::Encryption::MessageTest", () => {
   it("validates that payloads are either nil or strings", () => {
     // Rails uses Date.new / []; Temporal.PlainDate has no zero-arg analogue, so
     // an array stands in for the non-string payload.
-    expect(() => new Message([] as any)).toThrow(ForbiddenClass);
+    expect(() => new Message({ payload: [] as any })).toThrow(ForbiddenClass);
     expect(() => new Message()).not.toThrow();
-    expect(() => new Message("")).not.toThrow();
-    expect(() => new Message("Some payload")).not.toThrow();
+    expect(() => new Message({ payload: "" })).not.toThrow();
+    expect(() => new Message({ payload: "Some payload" })).not.toThrow();
   });
 });

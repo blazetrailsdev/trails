@@ -1899,10 +1899,10 @@ function orderedNode(node: unknown, dir: unknown): unknown {
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   // disallowRawSqlBang skips symbols — resolve symbol names to strings first
   // so their descriptions are validated against the column-name matcher.
-  const keysForCheck = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
+  const flattenedArgs = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
     typeof k === "symbol" ? symbolToName(k) : k,
   );
-  disallowRawSqlBang(keysForCheck, resolveOrderMatcher(this.model));
+  disallowRawSqlBang(flattenedArgs, { permit: resolveOrderMatcher(this.model) });
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);
   if (refs.length > 0) {
@@ -2269,7 +2269,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
       opts._eagerLoadingForSql() &&
       typeof opts.applyJoinDependency === "function"
     ) {
-      resolved = opts.applyJoinDependency(opts._groupColumns?.length === 0);
+      resolved = opts.applyJoinDependency();
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the

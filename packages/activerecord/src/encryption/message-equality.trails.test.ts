@@ -5,30 +5,34 @@ import { Properties } from "./properties.js";
 describe("MessageEqualityTrails", () => {
   it("compares payload and headers", () => {
     const build = () => {
-      const message = new Message("some payload");
+      const message = new Message({ payload: "some payload" });
       message.addHeader("key_1", "1");
       return message;
     };
     expect(build().equals(build())).toBe(true);
 
-    const otherPayload = new Message("other payload");
+    const otherPayload = new Message({ payload: "other payload" });
     otherPayload.addHeader("key_1", "1");
     expect(build().equals(otherPayload)).toBe(false);
 
-    const otherHeaderValue = new Message("some payload");
+    const otherHeaderValue = new Message({ payload: "some payload" });
     otherHeaderValue.addHeader("key_1", "2");
     expect(build().equals(otherHeaderValue)).toBe(false);
 
-    expect(build().equals(new Message("some payload"))).toBe(false);
+    expect(build().equals(new Message({ payload: "some payload" }))).toBe(false);
   });
 
   it("compares string and Buffer payloads on bytes", () => {
-    expect(new Message("hello").equals(new Message(Buffer.from("hello")))).toBe(true);
-    expect(new Message("hello").equals(new Message(Buffer.from("hellO")))).toBe(false);
+    expect(
+      new Message({ payload: "hello" }).equals(new Message({ payload: Buffer.from("hello") })),
+    ).toBe(true);
+    expect(
+      new Message({ payload: "hello" }).equals(new Message({ payload: Buffer.from("hellO") })),
+    ).toBe(false);
   });
 
   it("compares any message-like object, without a class guard", () => {
-    const message = new Message("x");
+    const message = new Message({ payload: "x" });
     message.addHeader("iv", "some iv");
     expect(message.equals({ payload: "x", headers: new Properties({ iv: "some iv" }) })).toBe(true);
     expect(message.equals({ payload: "x", headers: { iv: "some iv" } })).toBe(true);
@@ -37,22 +41,22 @@ describe("MessageEqualityTrails", () => {
   });
 
   it("raises on a value that carries no payload, as Ruby's NoMethodError does", () => {
-    expect(() => new Message("x").equals(null as never)).toThrow();
-    expect(() => new Message("x").equals("x" as never)).toThrow();
+    expect(() => new Message({ payload: "x" }).equals(null as never)).toThrow();
+    expect(() => new Message({ payload: "x" }).equals("x" as never)).toThrow();
   });
 
   it("compares nested Messages in headers by value", () => {
     const build = () => {
-      const message = new Message("outer");
-      const nested = new Message("inner");
+      const message = new Message({ payload: "outer" });
+      const nested = new Message({ payload: "inner" });
       nested.addHeader("some_header", "some value");
       message.headers.set("other_message", nested);
       return message;
     };
     expect(build().equals(build())).toBe(true);
 
-    const differentNested = new Message("outer");
-    const nested = new Message("inner");
+    const differentNested = new Message({ payload: "outer" });
+    const nested = new Message({ payload: "inner" });
     nested.addHeader("some_header", "other value");
     differentNested.headers.set("other_message", nested);
     expect(build().equals(differentNested)).toBe(false);
@@ -81,7 +85,7 @@ describe("MessageEqualityTrails", () => {
   it("Properties#equals is false for a value Ruby's Hash#== rejects outright", () => {
     expect(new Properties({ a: "1" }).equals("a")).toBe(false);
     expect(new Properties({ a: "1" }).equals(5)).toBe(false);
-    expect(new Properties({ a: "1" }).equals(new Message("a"))).toBe(false);
+    expect(new Properties({ a: "1" }).equals(new Message({ payload: "a" }))).toBe(false);
   });
 
   it("Properties#equals compares raw header bytes on value", () => {

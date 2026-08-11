@@ -40,7 +40,7 @@ describe("DatabaseTasksRollbackTest", () => {
         animals: { adapter: "sqlite3", database: ":memory:", pool: 1 },
       },
     });
-    const configs = DatabaseTasks.configsFor(env);
+    const configs = DatabaseTasks.configsFor({ envName: env });
     const primary = configs.find((c) => c.name === "primary")!;
     const animals = configs.find((c) => c.name === "animals")!;
 

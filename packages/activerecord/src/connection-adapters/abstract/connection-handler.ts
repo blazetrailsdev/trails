@@ -168,12 +168,14 @@ export class ConnectionHandler {
 
     poolManager.setPoolConfig(role, shard, poolConfig);
 
-    Notifications.instrument("!connection.active_record", {
+    const payload = {
       connection_name: poolKey,
       role,
       shard,
       config: poolConfig.dbConfig.configuration,
-    });
+    };
+
+    Notifications.instrument("!connection.active_record", payload);
 
     // Mirrors connectsTo: when no explicit adapterFactory is given, kick off
     // an async load so the synchronous adapter cache is warm by the time the

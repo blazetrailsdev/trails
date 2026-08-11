@@ -236,7 +236,7 @@ export interface Coder {
   dump(value: unknown): string | null;
   load(value: unknown): unknown;
   objectClass?: new (...args: any[]) => any;
-  assertValidValue?(value: unknown): void;
+  assertValidValue?(value: unknown, options: { action: string }): void;
 }
 
 /**
@@ -346,7 +346,7 @@ export class Serialized extends ValueType {
 
   assertValidValue(value: unknown): void {
     if (this.coder.assertValidValue) {
-      this.coder.assertValidValue(value);
+      this.coder.assertValidValue(value, { action: "serialize" });
     }
   }
 

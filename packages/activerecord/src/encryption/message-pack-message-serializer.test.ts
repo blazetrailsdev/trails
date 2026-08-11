@@ -19,7 +19,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("serializes messages", () => {
-    const message = new Message("some payload");
+    const message = new Message({ payload: "some payload" });
     message.headers.set("key_1", "1");
 
     const deserialized = serializer.load(serializer.dump(message));
@@ -27,9 +27,9 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("serializes messages with nested messages in their headers", () => {
-    const message = new Message("some payload");
+    const message = new Message({ payload: "some payload" });
     message.headers.set("key_1", "1");
-    const nested = new Message("some other secret payload");
+    const nested = new Message({ payload: "some other secret payload" });
     nested.headers.set("some_header", "some other value");
     message.headers.set("other_message", nested);
 
@@ -71,7 +71,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   ];
 
   const fixtureMessage = () => {
-    const message = new Message(Buffer.from("some payload", "utf-8"));
+    const message = new Message({ payload: Buffer.from("some payload", "utf-8") });
     message.headers.set("key_1", "1");
     message.headers.set("iv", Buffer.from(Array.from({ length: 12 }, (_, i) => i)));
     message.headers.set("at", Buffer.from(Array.from({ length: 16 }, (_, i) => i + 100)));
@@ -84,7 +84,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("round-trips values that span the str8/bin16/map16 length-prefix boundaries", () => {
-    const message = new Message(Buffer.from("x".repeat(50))); // bin8
+    const message = new Message({ payload: Buffer.from("x".repeat(50)) }); // bin8
     message.headers.set("long", "y".repeat(40)); // str8 (> 31 bytes)
     message.headers.set("big", Buffer.from("z".repeat(300))); // bin16 (> 255 bytes)
     for (let i = 0; i < 20; i++) message.headers.set(`k${i}`, `v${i}`); // map16 (> 15 entries)
@@ -105,11 +105,11 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("raises Decryption when trying to parse message with more than one nested message", () => {
-    const message = new Message("some payload");
+    const message = new Message({ payload: "some payload" });
     message.headers.set("key_1", "1");
-    const nested = new Message("some other secret payload");
+    const nested = new Message({ payload: "some other secret payload" });
     nested.headers.set("some_header", "some other value");
-    const deepNested = new Message("yet some other secret payload");
+    const deepNested = new Message({ payload: "yet some other secret payload" });
     deepNested.headers.set("some_header", "yet some other value");
     nested.headers.set("yet_another_message", deepNested);
     message.headers.set("other_message", nested);

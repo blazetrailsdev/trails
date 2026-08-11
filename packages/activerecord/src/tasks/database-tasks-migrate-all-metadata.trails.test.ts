@@ -65,7 +65,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
 
   async function metadataTablesExist(): Promise<boolean[]> {
     const results: boolean[] = [];
-    for (const config of DatabaseTasks.configsFor(DatabaseTasks.env)) {
+    for (const config of DatabaseTasks.configsFor({ envName: DatabaseTasks.env })) {
       await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
         results.push(await adapter.tableExists("ar_internal_metadata"));
       });

@@ -428,14 +428,25 @@ export class PrimaryKeyDefinition {
 export class CheckConstraintDefinition {
   readonly tableName: string;
   readonly expression: string;
-  readonly name: string;
-  readonly validate: boolean;
+  readonly options: { name?: string; validate?: boolean };
 
-  constructor(tableName: string, expression: string, name: string, validate: boolean = true) {
+  constructor(
+    tableName: string,
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ) {
     this.tableName = tableName;
     this.expression = expression;
-    this.name = name;
-    this.validate = validate;
+    this.options = options;
+  }
+
+  get name(): string {
+    return this.options.name as string;
+  }
+
+  /** Mirrors: `validate?` (schema_definitions.rb:180-183). */
+  get validate(): boolean {
+    return this.options.validate ?? true;
   }
 
   get isValidate(): boolean {
@@ -1245,12 +1256,7 @@ export class TableDefinition {
       name?: string;
       validate?: boolean;
     };
-    return new CheckConstraintDefinition(
-      this.tableName,
-      expression,
-      resolved.name as string,
-      resolved.validate ?? true,
-    );
+    return new CheckConstraintDefinition(this.tableName, expression, resolved);
   }
 
   /** @internal */
