@@ -1692,7 +1692,7 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
         const resolved =
           p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
         if (getFs().existsSync(resolved)) {
-          await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, resolved);
+          await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
         }
       }
     }

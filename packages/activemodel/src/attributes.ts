@@ -230,12 +230,14 @@ export function attribute(
  */
 export function defineMethodAttribute(
   canonicalName: string,
-  _options?: { owner?: unknown; as?: string },
+  { owner }: { owner?: unknown; as?: string } = {},
 ): void {
   // Writers are already installed by attribute() via Object.defineProperty.
   // Compute and expose the method name the same way Rails would, for callers
   // that inspect the name (e.g. alias generation paths).
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(canonicalName, true);
+  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
+    writer: true,
+  });
   void methodName;
 }
 

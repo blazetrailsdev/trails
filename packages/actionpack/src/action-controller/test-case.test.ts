@@ -143,6 +143,14 @@ describe("ActionController::TestRequest helpers", () => {
     expect(qs).toContain("format=json");
   });
 
+  it("assignParameters leaves a present-but-empty PATH_INFO alone (Rails: fetch_header)", () => {
+    const req = TestRequest.create();
+    req.setHeader("REQUEST_METHOD", "GET");
+    req.setHeader("PATH_INFO", "");
+    req.assignParameters(null, "posts", "index", {}, "/posts", []);
+    expect(req.getHeader("PATH_INFO")).toBe("");
+  });
+
   it("assignParameters encodes body for POST url-encoded", () => {
     const req = TestRequest.create();
     req.setHeader("REQUEST_METHOD", "POST");

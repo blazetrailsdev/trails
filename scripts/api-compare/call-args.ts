@@ -400,6 +400,12 @@ function calleeKeys(enclosingRubyName: string): string[] {
   return keys;
 }
 
+/** A receiver descriptor with an agreeable cross-language spelling: a bare
+ *  local/ivar (`id:`) or constant (`const:`) ref, which the port passes through
+ *  under the same identifier. Anything else — a chain (`call:`), a literal, an
+ *  opaque `?` — falls back to {@link alignBuiltinReceiver}'s strip. */
+const SIMPLE_RECEIVER = /^(?:id|const):/;
+
 /**
  * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
  * cannot define on a receiver at all (RFC 0099 — see
@@ -408,30 +414,45 @@ function calleeKeys(enclosingRubyName: string): string[] {
  * then compare pairwise, so `truncate(text, 10)` against `text.truncate(20)`
  * still reads as the divergence it is.
  *
- * The RECEIVER EXPRESSION itself is deliberately not compared, and the sites
- * this exists for are why: the Ruby extractor describes `name.to_s.camelize`'s
- * receiver as the inner CALL (`to_s`), never as `name`, while the port —
- * correctly, since a TS string is already a string — writes `camelize(name)`.
- * There is no spelling of that receiver the two sides could agree on, so
- * comparing it would re-flag every row the table exists to retire.
+ * A SIMPLE receiver — a plain `id:`/`const:` ref the extractor records as
+ * `CallSite.recv` — is COMPARED rather than dropped: it is PREPENDED to the
+ * Ruby list so `camelize(a)` where Rails wrote `b.camelize` reads as the
+ * divergence it is, instead of matching on the call name alone.
+ *
+ * A CHAINED receiver keeps the strip, and the sites this exists for are why:
+ * the Ruby extractor describes `name.to_s.camelize`'s receiver as the inner
+ * CALL (`call:to_s`), never as `name`, while the port — correctly, since a TS
+ * string is already a string — writes `camelize(name)`. There is no spelling of
+ * that receiver the two sides could agree on, so comparing it would re-flag
+ * every row this table exists to retire.
  *
  * Same only-when-it-explains-the-length guard as {@link stripMixinReceiver}:
  * a port that also passes a genuine extra argument still reads as one.
  */
-function stripBuiltinReceiver(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
-  if (tsArgs.length === rubyArgs.length + 1 && RECEIVER_AS_FIRST_ARG.has(name)) {
-    return tsArgs.slice(1);
+function alignBuiltinReceiver(
+  ruby: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+): { rubyArgs: string[]; tsArgs: string[] } {
+  if (tsArgs.length !== rubyArgs.length + 1 || !RECEIVER_AS_FIRST_ARG.has(ruby.name)) {
+    return { rubyArgs, tsArgs };
   }
-  return tsArgs;
+  if (ruby.recv !== undefined && SIMPLE_RECEIVER.test(ruby.recv)) {
+    return { rubyArgs: [ruby.recv, ...rubyArgs], tsArgs };
+  }
+  return { rubyArgs, tsArgs: tsArgs.slice(1) };
 }
 
-/** The two leading-receiver forms, in the one place the comparator strips them:
+/** The two leading-receiver forms, in the one place the comparator handles them:
  *  the mixin `this` the port adds to a ported module function, and the Ruby
  *  receiver of a built-in TS cannot define on a receiver. Neither can apply to
  *  the same site — a name on the built-in table is never a ported mixin — so
  *  the order is immaterial. */
-function stripReceiverArgs(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
-  return stripBuiltinReceiver(name, rubyArgs, stripMixinReceiver(rubyArgs, tsArgs));
+function alignReceiverArgs(
+  ruby: CallSite,
+  tsArgs: string[],
+): { rubyArgs: string[]; tsArgs: string[] } {
+  return alignBuiltinReceiver(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs));
 }
 
 /**
@@ -553,12 +574,12 @@ function tsCallNameKeys(rubyName: string): string[] {
  * assignment takes it whenever the key matches tie.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
-  const strippedTs = stripReceiverArgs(ruby.name, ruby.args, ts.args);
-  const sameArity = ruby.args.length === strippedTs.length ? 1 : 0;
-  const rubyArgs = normalizeArgs(ruby.args);
-  const tsArgs = normalizeArgs(strippedTs);
+  const aligned = alignReceiverArgs(ruby, ts.args);
+  const sameArity = aligned.rubyArgs.length === aligned.tsArgs.length ? 1 : 0;
+  const rubyArgs = normalizeArgs(aligned.rubyArgs);
+  const tsArgs = normalizeArgs(aligned.tsArgs);
   if (rubyArgs === null || tsArgs === null) {
-    return sameArity * 1_000 + Math.min(ruby.args.length, strippedTs.length);
+    return sameArity * 1_000 + Math.min(aligned.rubyArgs.length, aligned.tsArgs.length);
   }
   if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
   let matches = 0;
@@ -651,11 +672,12 @@ export function compareCallArgs(
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 
-  const rubyArgs = normalizeArgsOrFailure(ruby.args);
+  const aligned = alignReceiverArgs(ruby, ts.args);
+  const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
   }
-  const normalizedTs = normalizeArgsOrFailure(stripReceiverArgs(ruby.name, ruby.args, ts.args));
+  const normalizedTs = normalizeArgsOrFailure(aligned.tsArgs);
   if (!Array.isArray(normalizedTs)) {
     return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }

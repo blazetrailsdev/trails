@@ -8,6 +8,6 @@
     "rubyArgs": [
       "const:Base"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: type.rb:55 names the `ActiveRecord::Base` CONSTANT, which Zeitwerk resolves at call time. A static import of base.ts from type.ts closes the `type.ts -> base.ts -> attributes -> type.ts` cycle, so base.ts injects a resolver instead (setCurrentAdapterResolver, type.ts:114) and the constant arrives as a local. Genuine ESM/autoload shortcoming."
   }
 ]

@@ -578,9 +578,9 @@ export class TestRequest extends AbstractTestRequest {
         // cache so params/requestParameters expose the uploaded files directly.
         this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
       } else {
-        if (!this.getHeader("CONTENT_TYPE")) {
-          this.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
-        }
+        this.fetchHeader("CONTENT_TYPE", (k) => {
+          this.setHeader(k, "application/x-www-form-urlencoded");
+        });
 
         const ct = this.getHeader("CONTENT_TYPE") ?? "";
         let data: string;
@@ -606,13 +606,13 @@ export class TestRequest extends AbstractTestRequest {
       }
     }
 
-    if (!this.getHeader("PATH_INFO")) {
-      this.setHeader("PATH_INFO", generatedPath);
-    }
-    if (!this.getHeader("ORIGINAL_FULLPATH")) {
+    this.fetchHeader("PATH_INFO", (k) => {
+      this.setHeader(k, generatedPath);
+    });
+    this.fetchHeader("ORIGINAL_FULLPATH", (k) => {
       // Rails uses fullpath here (path + query string) not just the generated path
-      this.setHeader("ORIGINAL_FULLPATH", this.fullpath);
-    }
+      this.setHeader(k, this.fullpath);
+    });
 
     pathParameters["controller"] = controllerPath;
     pathParameters["action"] = action;

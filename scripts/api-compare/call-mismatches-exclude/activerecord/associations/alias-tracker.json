@@ -15,7 +15,7 @@
     "rubyArgs": [
       "num:0"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: alias_tracker.rb:12 builds `Hash.new(0)` — a hash with a DEFAULT-VALUE proc. A JS Map has no default, so the port carries the zero/initial-count default in `AliasTracker#_getCount` instead and this `new` has no counterpart argument. Converging needs a default-proc Map port; filed separately."
   },
   {
     "package": "activerecord",

@@ -163,6 +163,7 @@ export class BiasedConditionVariable {
  * expose a mutable `_cond` field.
  */
 interface BiasableQueueHost {
+  _lock?: unknown;
   _cond: BiasedConditionVariable;
 }
 
@@ -173,12 +174,12 @@ interface BiasableQueueHost {
  * `with_a_bias_for(thread)` to temporarily bias the queue's condition variable
  * toward a specific thread.
  */
-export function withABiasFor<T>(this: BiasableQueueHost, context: unknown, fn: () => T): T {
+export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: () => T): T {
   let previousCond: BiasedConditionVariable | null = null;
   let newCond: BiasedConditionVariable | null = null;
   synchronize(this, () => {
     previousCond = this._cond;
-    this._cond = newCond = new BiasedConditionVariable(undefined, this._cond, context);
+    this._cond = newCond = new BiasedConditionVariable(this._lock, this._cond, thread);
   });
   try {
     return fn();
@@ -204,10 +205,12 @@ export const BiasableQueue = {
  */
 export class Queue {
   private _queue: DatabaseAdapter[] = [];
+  protected _lock?: unknown;
   protected _cond: BiasedConditionVariable;
   private _numWaiting = 0;
 
   constructor(lock?: unknown) {
+    this._lock = lock;
     this._cond = new BiasedConditionVariable(lock);
   }
 
