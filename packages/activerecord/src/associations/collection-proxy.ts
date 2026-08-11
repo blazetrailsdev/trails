@@ -201,18 +201,6 @@ interface ThroughAssociationHandle {
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 
-/**
- * Minimal shape of the owner's Association holder. Rails builds collection
- * records through `Association#build_record` (association.rb:383), which
- * fills scope_for_create via
- * `Association#initialize_attributes` (association.rb:217); the proxy is a
- * Relation rather than that Association, so `_build` / `_buildThrough` reach
- * the holder for it. @internal
- */
-interface InitializeAttributesHolder {
-  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void;
-}
-
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -1349,12 +1337,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(buildAttrs);
-    (
-      this._record.association(this._assocName) as unknown as InitializeAttributesHolder
-    ).initializeAttributes(record, attrs);
-    // Rails wires the inverse inside `initialize_attributes`, before any
-    // build/create block runs — so a block can already see `child.owner`.
-    _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
+    this._record.association(this._assocName).initializeAttributes(record, attrs);
     return record;
   }
 
@@ -1369,9 +1352,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(attrs);
-    (
-      this._record.association(this._assocName) as unknown as InitializeAttributesHolder
-    ).initializeAttributes(record, attrs);
+    this._record.association(this._assocName).initializeAttributes(record, attrs);
     // Mirrors the inverse half of Rails' HasManyThroughAssociation#build_record:
     // pre-build the join row and wire it onto the target's inverse so the join
     // is created alongside the target on save.
