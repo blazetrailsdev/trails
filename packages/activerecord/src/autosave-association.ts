@@ -213,16 +213,11 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Private save helpers
-//
-// The live save path reaches these through the per-association callbacks
-// registered in `addAutosaveAssociationCallbacks`:
-//   - collections (hasMany + HABTM): `saveCollectionAssociation` ->
-//     `autosaveHasMany`. HABTM reflections route here as a hasMany-typed def,
-//     mirroring Rails, which backs `has_and_belongs_to_many` with
-//     `has_many :through` and runs `save_collection_association` for both.
-//   - hasOne: `saveHasOneAssociation` -> `autosaveHasOne`.
-//   - belongsTo: `saveBelongsToAssociation` -> `_autosaveBelongsTo`.
+// Save callbacks, registered per association by
+// `addAutosaveAssociationCallbacks` (autosave_association.rb:171-206).
+// HABTM reflections route into `saveCollectionAssociation` as a hasMany-typed
+// def, mirroring Rails, which backs `has_and_belongs_to_many` with
+// `has_many :through` and runs `save_collection_association` for both.
 // ---------------------------------------------------------------------------
 
 /** @internal */
@@ -231,31 +226,19 @@ export async function saveCollectionAssociation(
   reflection: any,
 ): Promise<boolean> {
   const record = this as unknown as Base;
-  // Rails reads the option off the reflection the callback closed over
-  // (autosave_association.rb:420-421). HABTM reflections route here as a
-  // hasMany-typed def, mirroring Rails, which backs `has_and_belongs_to_many`
-  // with `has_many :through` and runs `save_collection_association` for both.
   const assoc: AssociationDefinition = {
     name: reflection.name,
     type: "hasMany",
     options: reflection.options ?? {},
   } as AssociationDefinition;
   const inst = associationInstanceGet.call(record, reflection.name) as any;
-  // Rails save_collection_association:430-434:
-  //   if autosave
-  //     records_to_destroy = records.select(&:marked_for_destruction?)
-  //     records_to_destroy.each { |record| association.destroy(record) }
-  //     records -= records_to_destroy
-  // Gated on `autosave` (reflection.options[:autosave]) — a plain collection
-  // never destroys marked children on owner save. Route each marked-for-
-  // destruction child through the collection-level `destroy` (not record-level
-  // `child.destroy`) so the `before_remove`/`after_remove` callbacks fire and
-  // the record is pruned from the in-memory target. A built (unpersisted) child
-  // is destroyed too: `delete_or_destroy`/`remove_records`
-  // (collection_association.rb:385-408) still runs the remove callbacks and
-  // splices `@target` even when `existing_records` is empty (no DB delete).
-  // Snapshot first since `inst.destroy` splices the live target as it removes
-  // each record.
+  // Rails save_collection_association:430-434 routes each marked-for-destruction
+  // child through the collection-level `destroy`, so `before_remove`/
+  // `after_remove` fire and the record is pruned from the in-memory target. A
+  // built (unpersisted) child is destroyed too: `remove_records`
+  // (collection_association.rb:385-408) runs the remove callbacks and splices
+  // `@target` even when `existing_records` is empty. Snapshot first since
+  // `inst.destroy` splices the live target as it removes each record.
   if (assoc.options.autosave && inst && typeof inst.destroy === "function") {
     const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
     for (const child of snapshot) {
@@ -679,12 +662,11 @@ export async function saveBelongsToAssociation(
   reflection: any,
 ): Promise<boolean> {
   const record = this as unknown as Base;
-  // The raw reflection options ride along untouched — FK resolution is
-  // deferred to `_resolveBelongsToForeignKey`, which only runs on the branches
-  // that need to write or null columns. Eagerly reading `reflection.foreignKey`
-  // here would trip its query-constraints-derivation ConfigurationError paths
-  // (reflection.ts deriveFkQueryConstraints) on every belongs_to save, even for
-  // an unloaded/untouched association.
+  // FK resolution is deferred to `_resolveBelongsToForeignKey`, which only runs
+  // on the branches that write or null columns: eagerly reading
+  // `reflection.foreignKey` here would trip its query-constraints-derivation
+  // ConfigurationError paths (reflection.ts deriveFkQueryConstraints) on every
+  // belongs_to save, even for an unloaded/untouched association.
   const assoc: AssociationDefinition = {
     name: reflection.name,
     type: "belongsTo",
