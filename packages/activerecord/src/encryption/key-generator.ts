@@ -22,7 +22,7 @@ export class KeyGenerator {
 
   deriveKeyFrom(password: string, length?: number): string {
     const salt = this.keyDerivationSalt();
-    const generator = new AsKeyGenerator(password, { hashDigestClass: this._hashDigestClass });
+    const generator = new AsKeyGenerator(password, { hashDigestClass: this.hashDigestClass });
     return generator.generateKey(salt, length ?? this.keyLength()).toString("base64");
   }
 

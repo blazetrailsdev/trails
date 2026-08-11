@@ -267,13 +267,13 @@ export class ConnectionHandler {
   }
 
   retrieveConnectionPool(
-    owner: string,
+    connectionName: string,
     options?: { role?: string; shard?: string; strict?: boolean },
   ): ConnectionPool | undefined {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
     const strict = options?.strict ?? false;
-    const poolManager = this.getPoolManager(owner);
+    const poolManager = this.getPoolManager(connectionName);
     const pool = poolManager?.getPoolConfig(role, shard)?.pool;
 
     if (strict && !pool) {
@@ -281,12 +281,12 @@ export class ConnectionHandler {
       if (shard !== "default") parts.push(`'${shard}' shard`);
       if (role !== "writing") parts.push(`'${role}' role`);
       const selector = parts.join(" and ");
-      const prefix = owner !== "Base" ? owner : "";
+      const prefix = connectionName !== "Base" ? connectionName : "";
       const full = [prefix, selector].filter(Boolean).join(" with ");
       const suffix = full ? ` for ${full}` : "";
       const message = `No database connection defined${suffix}.`;
       throw new ConnectionNotDefined(message, {
-        connectionName: owner,
+        connectionName,
         shard,
         role,
       });

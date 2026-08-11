@@ -587,7 +587,6 @@ export class ToSql extends Visitor {
     reg(Nodes.GroupingSet, "visitArelNodesGroupingSet");
     reg(Nodes.Group, "visitArelNodesGroup");
     reg(Nodes.GroupingElement, "visitArelNodesGroupingElement");
-    reg(Nodes.Lateral, "visitArelNodesLateral");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.OptimizerHints, "visitArelNodesOptimizerHints");
     reg(Nodes.HomogeneousIn, "visitArelNodesHomogeneousIn");
@@ -2114,12 +2113,6 @@ export class ToSql extends Visitor {
     }
     collector.append(")");
     return collector;
-  }
-
-  protected visitArelNodesLateral(node: Nodes.Lateral, collector: SQLString): SQLString {
-    // Mirrors Rails: `collector << "LATERAL "; grouping_parentheses(o.expr, ...)`.
-    collector.append("LATERAL ");
-    return this.groupingParentheses(node.subquery, collector);
   }
 
   protected appendEscape(escape: Node | null, collector: SQLString): void {

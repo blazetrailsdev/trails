@@ -39,15 +39,11 @@ export class Not extends Unary {
 
 // Mirrors Rails: `Lateral < Unary` (unary.rb). The subquery node lives in
 // the inherited `expr` slot — Rails' visit_Arel_Nodes_Lateral reads `o.expr`
-// (postgresql.rb). Keep `subquery` as a back-compat getter for the existing
-// Trails visitor which already reads `node.subquery`.
+// (postgresql.rb:66).
 export class Lateral extends Unary {
   declare readonly expr: Node;
-  constructor(subquery: Node) {
-    super(subquery);
-  }
-  get subquery(): Node {
-    return this.expr;
+  constructor(expr: Node) {
+    super(expr);
   }
 }
 
