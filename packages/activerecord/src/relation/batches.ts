@@ -223,14 +223,14 @@ export async function* batchOnUnloadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
-  cursor: string | string[];
+  cursor: string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
   batchLimit: number;
   load?: boolean;
   remaining?: number | null;
   useRanges?: boolean | null;
 }): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
-  const cursor = Array.isArray(opts.cursor) ? opts.cursor : [opts.cursor];
+  const { cursor } = opts;
   let { batchLimit } = opts;
   let remaining: number | null | undefined = opts.remaining;
   const batchOrders = buildBatchOrders(cursor, opts.order as any);
