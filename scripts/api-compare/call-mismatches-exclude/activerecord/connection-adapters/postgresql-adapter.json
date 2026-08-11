@@ -59,22 +59,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "dbconsole",
-    "call": "database_cli",
-    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "dbconsole",
     "call": "find_cmd_and_exec",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "disable_referential_integrity",
-    "call": "collect",
-    "reason": "The body lives in postgresql/referential-integrity.ts — Rails houses it in the ReferentialIntegrity module too (postgresql/referential_integrity.rb:5-36) — and makes both calls there; the adapter member is the include seam."
   },
   {
     "package": "activerecord",

@@ -104,6 +104,33 @@ describe("resolvePortedWithArgsSigs", () => {
       [],
     );
   });
+
+  it("drops a set accessor's signature, so a get/set pair reads as a zero-arg reader", () => {
+    const writerSig = sig(1);
+    const pairByFileName = new Map([
+      ["relation.ts", new Map([["whereClause", [sig(0), writerSig]]])],
+    ]);
+    const pairByNameInPkg = new Map([["whereClause", [sig(0), writerSig]]]);
+    const writerSigs = new Set<readonly ParamInfo[]>([writerSig]);
+    expect(
+      resolvePortedWithArgsSigs(
+        pairByFileName,
+        pairByNameInPkg,
+        "relation.ts",
+        "whereClause",
+        writerSigs,
+      ),
+    ).toEqual([sig(0)]);
+    expect(
+      resolvePortedWithArgsSigs(
+        pairByFileName,
+        pairByNameInPkg,
+        "other.ts",
+        "whereClause",
+        writerSigs,
+      ),
+    ).toEqual([sig(0)]);
+  });
 });
 
 describe("significantMissingCalls", () => {

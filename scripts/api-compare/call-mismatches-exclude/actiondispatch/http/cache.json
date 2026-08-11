@@ -2,13 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/cache.ts",
-    "rubyName": "etag?",
-    "call": "etag",
-    "reason": "Satisfied by a different path: the body reads the ETag header directly via getHeader rather than going through the etag accessor, which is a class getter here and not callable as a module function."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
     "rubyName": "strong_etag=",
     "call": "set_header",
     "kind": "args",
@@ -29,12 +22,5 @@
       "ref:generateWeakEtag"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/cache.ts",
-    "rubyName": "weak_etag?",
-    "call": "etag",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

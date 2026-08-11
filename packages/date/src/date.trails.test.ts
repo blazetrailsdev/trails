@@ -2017,6 +2017,22 @@ describe("strftime over a Temporal subject", () => {
     expect(() => strftime(d, "%100000Y".repeat(13))).toThrow(ERANGE);
   });
 
+  /**
+   * `date_strftime_alloc` runs a pass at `size` BEFORE testing
+   * `size >= 1024 * flen` (date_core.c:7081-7095), so `1024 * flen` is the size
+   * the loop gives up AT, not the size it stops growing at: a format needing
+   * more than it still answers whenever the next doubling fits. `%6145Y` needs
+   * 6145 characters against a `1024 * flen` of 6144, and the pass at 8192
+   * produces it.
+   *
+   * ruby 3.3.11 -rdate:
+   *   Date.new(2001, 2, 3).strftime("%6145Y").length #=> 6145
+   */
+  it("answers a format one doubling past 1024 * format length", () => {
+    const d = Temporal.PlainDate.from("2001-02-03");
+    expect(strftime(d, "%6145Y")).toHaveLength(6145);
+  });
+
   it("carries a Temporal sub-second into %L and %N", () => {
     const plain = Temporal.PlainDateTime.from("2008-03-01T06:00:00.123456789");
     expect(strftime(plain, "%L %N %6N %12N")).toBe("123 123456789 123456 123456789000");

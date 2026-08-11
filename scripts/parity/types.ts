@@ -160,6 +160,20 @@ export interface MethodInfo {
   /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
    *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
   option_keys?: string[];
+  /**
+   * TS-side only: this entry is a `set` accessor. Ruby spells the writer as its
+   * OWN method (`where_clause=`), but conventions.ts maps that onto the bare
+   * camel name, so a get/set pair lands here as two entries sharing one name.
+   * The calls gate's ported-with-args test (compare.ts gate 2) pools the
+   * signatures under a name to decide "real method, or zero-arg attribute
+   * reader?" — and the reader is what a Ruby `x` CALL maps to. Without this
+   * flag the writer's one parameter answers that question for the reader, so
+   * adding a writer Rails already has turns every `this._x` read in the package
+   * into a call mismatch. Flagged so the gate can treat a get/set pair exactly
+   * as it treats a getter-only accessor. Arity still sees the signature: it is
+   * the real match for Ruby's `x=`.
+   */
+  writer?: boolean;
   /** TS-side property names of the trailing options-object param; `null` when
    *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
   optionKeys?: string[] | null;

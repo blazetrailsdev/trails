@@ -113,7 +113,7 @@ export function cteRelationSelfWraps(relation: Node): boolean {
  * Rails too, so this exists to keep the emitted text identical to Rails, not to
  * make such a query work.
  */
-function rubyToS(value: unknown): string {
+function toS(value: unknown): string {
   if (Array.isArray(value)) return rubyInspect(value);
   return String(value);
 }
@@ -215,10 +215,9 @@ export class ToSql extends Visitor {
   ): SQLString {
     collector.retryable = false;
     o = this.prepareDeleteStatement(o);
-    const joinSourceLeft = this.hasJoinSources(o) ? (o.relation as Nodes.JoinSource).left : null;
-    if (joinSourceLeft) {
+    if (this.hasJoinSources(o)) {
       collector.append("DELETE ");
-      this.visit(joinSourceLeft, collector);
+      this.visit((o.relation as Nodes.JoinSource).left, collector);
       collector.append(" FROM ");
     } else {
       collector.append("DELETE FROM ");
@@ -747,7 +746,7 @@ export class ToSql extends Visitor {
       // renders bare — `over("foo")` is `OVER "foo"` but
       // `over(Arel.sql("foo"))` is `OVER foo`.
       this.visit(o.left, collector);
-      collector.append(` OVER ${this.quoteColumnName(o.right)}`);
+      collector.append(` OVER ${this.quoteColumnName(toS(o.right))}`);
       return collector;
     } else {
       return this.infixValue(o as { left: Node; right: Node }, collector, " OVER ");
@@ -780,27 +779,22 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesGrouping(o: Nodes.Grouping, collector: SQLString): SQLString {
-    collector.append("(");
-    let inner = o.expr;
-    while (inner instanceof Nodes.Grouping) inner = inner.expr;
-    if (Array.isArray(inner)) {
-      // Composite-key row-value tuple: `(pk1, pk2, ...)`.
-      inner.forEach((item, i) => {
-        if (i > 0) collector.append(", ");
-        this.visit(item, collector);
-      });
-    } else if (inner instanceof Node) {
-      this.visit(inner, collector);
-    } else if (inner !== null && inner !== undefined) {
-      collector.append(String(inner));
+    // A nested Grouping recurses back here rather than adding a second pair of
+    // parentheses, and an Array expr — the composite-key row-value tuple —
+    // dispatches to `visitArray`, which is where Rails' comma join lives too.
+    if (o.expr instanceof Nodes.Grouping) {
+      this.visit(o.expr, collector);
+    } else {
+      collector.append("(");
+      this.visit(o.expr, collector);
+      collector.append(")");
     }
-    collector.append(")");
     return collector;
   }
 
   private visitArelNodesHomogeneousIn(o: Nodes.HomogeneousIn, collector: SQLString): SQLString {
     collector.preparable = false;
-    this.visit(o.attribute, collector);
+    this.visit(o.left, collector);
     collector.append(o.type === "in" ? " IN (" : " NOT IN (");
     // Mirrors Rails to_sql.rb:346-351 exactly: branch on the *casted* list, not
     // the raw values, and emit `quote(nil)` (→ `NULL`) when it is empty. This
@@ -1334,12 +1328,12 @@ export class ToSql extends Visitor {
   }
 
   private visitArelAttributesAttribute(o: Nodes.Attribute, collector: SQLString): SQLString {
-    const tbl = o.relation.tableAlias || o.relation.name;
+    const joinName = o.relation.tableAlias || o.relation.name;
     // Rails: `quote_column_name(Arel.star)` returns the `SqlLiteral("*")`
     // unchanged. We model `Arel.star` as the string sentinel `"*"` on the
     // Attribute, so short-circuit identifier quoting here.
     const col = o.name === "*" ? "*" : this.quoteColumnName(o.name);
-    collector.append(`${this.quoteTableName(tbl)}.${col}`);
+    collector.append(`${this.quoteTableName(joinName)}.${col}`);
     return collector;
   }
 
@@ -1555,7 +1549,7 @@ export class ToSql extends Visitor {
     // The operator is emitted verbatim with a space on each side; callers
     // are responsible for the operator's own whitespace.
     collector.append(` ${o.operator} `);
-    this.visit(o.operand, collector);
+    this.visit(o.expr as Node, collector);
     return collector;
   }
 
@@ -1593,13 +1587,13 @@ export class ToSql extends Visitor {
   /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteTableName(rubyToS(name));
+    return this.connection.quoteTableName(toS(name));
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteColumnName(rubyToS(name));
+    return this.connection.quoteColumnName(toS(name));
   }
 
   /**

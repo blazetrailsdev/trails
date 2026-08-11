@@ -21,6 +21,7 @@
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
+import { isBlank } from "@blazetrails/activesupport";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -680,11 +681,18 @@ export abstract class SchemaDumper {
 
   /** @internal */
   removePrefixAndSuffix(table: string): string {
-    const prefix = (this._options.tableNamePrefix as string | undefined) ?? "";
-    const suffix = (this._options.tableNameSuffix as string | undefined) ?? "";
-    if (!prefix && !suffix) return table;
+    // This method appears at the top when profiling active_record test cases run.
+    // Avoid costly calculation when there are no prefix and suffix.
+    if (isBlank(this._options.tableNamePrefix) && isBlank(this._options.tableNameSuffix)) {
+      return table;
+    }
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`^${escape(prefix)}(.+)${escape(suffix)}$`);
+    // `Regexp.escape(@options[:table_name_prefix].to_s)` (schema_dumper.rb:371):
+    // the escape is what `prefix` HOLDS, and `to_s` renders a missing option as
+    // the empty string.
+    const prefix = escape((this._options.tableNamePrefix as string | undefined) ?? "");
+    const suffix = escape((this._options.tableNameSuffix as string | undefined) ?? "");
+    const re = new RegExp(`^${prefix}(.+)${suffix}$`);
     const m = table.match(re);
     return m ? m[1] : table;
   }

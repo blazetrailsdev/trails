@@ -44,13 +44,13 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** Mirrors `def self.create(connection, options)` (abstract/schema_dumper.rb:8-10). */
   static override create<T extends typeof BaseSchemaDumper>(
     this: T,
-    source: SchemaSource,
+    connection: SchemaSource,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     return new (this as unknown as new (
-      source: SchemaSource,
+      connection: SchemaSource,
       options: Record<string, unknown>,
-    ) => InstanceType<T>)(source, options);
+    ) => InstanceType<T>)(connection, options);
   }
 
   /** @internal */

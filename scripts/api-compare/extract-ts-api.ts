@@ -1834,6 +1834,7 @@ export function harvestObjectLiteralMethods(
     let calls: string[] | undefined;
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
+    let writer = false;
     let internal = hasInternalJsDocTag(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
@@ -1857,6 +1858,7 @@ export function harvestObjectLiteralMethods(
       callArgs = extractCallArgs(prop.body);
     } else if (ts.isSetAccessorDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
       mname = prop.name.text;
+      writer = true;
       params = extractParameters(prop.parameters);
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
@@ -1901,6 +1903,7 @@ export function harvestObjectLiteralMethods(
       ...(callSeq !== undefined ? { callSeq } : {}),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
+      ...(writer ? { writer: true } : {}),
     });
   }
   return out;
@@ -2140,6 +2143,7 @@ export function extractClass(
         line,
         file,
         isStatic,
+        writer: true,
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(callArgs !== undefined ? { callArgs } : {}),

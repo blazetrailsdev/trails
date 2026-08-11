@@ -136,22 +136,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "dbconsole",
-    "call": "database_cli",
-    "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (abstract_mysql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "dbconsole",
     "call": "find_cmd_and_exec",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "extended_type_map_key",
-    "call": "emulate_booleans",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_mysql_adapter.rb:762-768 pairs @default_timezone with the emulate_booleans accessor; trails abstract-mysql-adapter.ts:1733-1743 reads the `_emulateBooleans` field directly."
   },
   {
     "package": "activerecord",
@@ -275,12 +261,5 @@
     "rubyName": "translate_exception",
     "call": "error_number",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "type_cast",
-    "call": "default_timezone",
-    "reason": "Rails' MySQL type_cast branches on default_timezone inline (mysql/quoting.rb:100,106); trails' override delegates to mysql/quoting.ts typeCast, which reaches ActiveRecord.defaultTimezone via dispatchQuotedDate to quotedDate to defaultSqlTimezone()."
   }
 ]

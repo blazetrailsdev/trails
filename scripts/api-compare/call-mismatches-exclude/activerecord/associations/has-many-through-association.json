@@ -51,13 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-many-through-association.ts",
-    "rubyName": "stale_state",
-    "call": "owner",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasManyThroughAssociation#staleState delegates to."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "target_scope",
     "call": "drop",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "full_table_name_prefix",
-    "call": "table_name_prefix",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "full_table_name_suffix",
     "call": "detect",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -37,22 +30,8 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "full_table_name_suffix",
-    "call": "table_name_suffix",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "reset_column_information",
     "call": "clear_data_source_cache!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "reset_column_information",
-    "call": "schema_cache",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

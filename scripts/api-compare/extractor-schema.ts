@@ -83,6 +83,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "noRailsEquivalent",
   "missingRailsCalls",
   "recv",
+  "writer",
 ] as const;
 
 /**

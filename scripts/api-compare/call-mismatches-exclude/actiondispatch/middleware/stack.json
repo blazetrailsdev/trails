@@ -2,20 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/stack.ts",
-    "rubyName": "build",
-    "call": "middlewares",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "delete",
-    "call": "middlewares",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
     "rubyName": "delete!",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -23,13 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/stack.ts",
-    "rubyName": "index_of",
-    "call": "middlewares",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
     "rubyName": "insert",
     "call": "assert_index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -39,13 +18,6 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "insert",
     "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "insert",
-    "call": "middlewares",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -65,13 +37,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/stack.ts",
-    "rubyName": "last",
-    "call": "middlewares",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails stack.rb:89-91 reads the `middlewares` accessor; trails stack.ts:48-50 reads the backing `this.entries` array directly."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
     "rubyName": "move",
     "call": "assert_index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -81,13 +46,6 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "move",
     "call": "insert",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "move",
-    "call": "middlewares",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -107,13 +65,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/stack.ts",
-    "rubyName": "move_after",
-    "call": "middlewares",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
     "rubyName": "swap",
     "call": "assert_index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -123,13 +74,6 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "swap",
     "call": "insert",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "swap",
-    "call": "middlewares",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -137,13 +81,6 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "unshift",
     "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "unshift",
-    "call": "middlewares",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -162,13 +99,6 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "use",
     "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "use",
-    "call": "middlewares",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

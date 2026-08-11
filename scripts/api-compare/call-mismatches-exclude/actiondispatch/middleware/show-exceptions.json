@@ -14,13 +14,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/show-exceptions.ts",
-    "rubyName": "pass_response",
-    "call": "default_charset",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/show-exceptions.ts",
     "rubyName": "render_exception",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

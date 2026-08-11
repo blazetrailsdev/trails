@@ -34,12 +34,5 @@
     "rubyName": "dispatch",
     "call": "process",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal.ts",
-    "rubyName": "performed?",
-    "call": "response_body",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails metal.rb:245-247 reads `response_body || response.committed?`; trails metal.ts:294-296 isPerformed reads the recorded `this.performed` flag (set by the responseBody setter) plus `response?.committed` — the body read is a direct field, so no responseBody call is recorded."
   }
 ]

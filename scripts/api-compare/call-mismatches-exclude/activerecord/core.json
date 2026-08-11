@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "application_record_class?",
-    "call": "application_record_class",
-    "reason": "`applicationRecordClassQ` is ported in inheritance.ts, not core.ts, and does read `ActiveRecord.applicationRecordClass` there; the omission is the file placement, not a missing call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "cached_find_by_statement",
     "call": "create",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -46,13 +39,6 @@
     "tsFile": "core.ts",
     "rubyName": "current_shard",
     "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "custom_inspect_method_defined?",
-    "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -143,12 +129,5 @@
       "kwargs{owner=ref:owner,reflection=ref:reflection}"
     ],
     "reason": "core.rb:253-262 takes `owner:`/`reflection:` kwargs and instruments them verbatim; trails takes positional `(owner, reflection: string)` and synthesizes `ownerClass`/`reflectionLike`, so the values converge only with the signature — tracked by story `converge-strict-loading-violation-signature`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "strict_loading_violation!",
-    "call": "order:constructor,actionOnStrictLoadingViolation",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   }
 ]
