@@ -61,7 +61,7 @@ export namespace AttrNames {
   const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
 
   export function defineAttributeAccessorMethod(
-    _owner: unknown,
+    owner: unknown,
     attrName: string,
     { writer = false }: { writer?: boolean } = {},
   ): { methodName: string; attrNameRef: string } {

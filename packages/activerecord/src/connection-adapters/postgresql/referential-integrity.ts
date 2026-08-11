@@ -134,8 +134,6 @@ export async function disableReferentialIntegrity(
 export async function checkAllForeignKeysValidBang(this: ReferentialIntegrityHost): Promise<void> {
   await this.transaction(
     async () => {
-      // Marks every FK constraint as unvalidated then immediately re-validates,
-      // causing the database to raise if any constraint is currently violated.
       const sql = `
 do $$
   declare r record;

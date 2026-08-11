@@ -230,7 +230,7 @@ export function attribute(
  */
 export function defineMethodAttribute(
   canonicalName: string,
-  { owner, as: _as }: { owner?: unknown; as?: string } = {},
+  { owner }: { owner?: unknown; as?: string } = {},
 ): void {
   // Writers are already installed by attribute() via Object.defineProperty.
   // Compute and expose the method name the same way Rails would, for callers

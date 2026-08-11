@@ -1692,8 +1692,6 @@ export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<bool
         const resolved =
           p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
         if (getFs().existsSync(resolved)) {
-          // Rails passes `nil` (database_tasks.rb:664) and lets `load_schema`
-          // re-derive the dump path itself; `resolved` only guards File.exist?.
           await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
         }
       }

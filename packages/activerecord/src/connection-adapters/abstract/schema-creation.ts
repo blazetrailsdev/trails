@@ -148,9 +148,9 @@ export class SchemaCreation {
   }
 
   protected async visitTableDefinition(o: TableDefinition): Promise<string> {
-    let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
-    if (o.ifNotExists) sql += " IF NOT EXISTS";
-    sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
+    let createSql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
+    if (o.ifNotExists) createSql += " IF NOT EXISTS";
+    createSql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
     // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
     // (the api-compare wide gate tracks it) but map to thunks so each column
@@ -185,11 +185,11 @@ export class SchemaCreation {
 
     statements.push(...(await this.tableConstraintStatements(o)));
 
-    if (statements.length > 0) sql += ` (${statements.join(", ")})`;
-    sql = this.addTableOptionsBang(sql, o);
-    if (o.as) sql += ` AS ${this.toSql(o.as)}`;
+    if (statements.length > 0) createSql += ` (${statements.join(", ")})`;
+    createSql = this.addTableOptionsBang(createSql, o);
+    if (o.as) createSql += ` AS ${this.toSql(o.as)}`;
 
-    return sql;
+    return createSql;
   }
 
   /**
@@ -261,11 +261,14 @@ export class SchemaCreation {
       }
       throw e;
     }
-    let sql = `${this.adapter.quoteColumnName(o.name)} ${o.sqlType}`;
+    let columnSql = `${this.adapter.quoteColumnName(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
-      sql = await this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
+      columnSql = await this.addColumnOptionsBang(
+        columnSql,
+        this.columnOptions(o) as ColumnOptions,
+      );
     }
-    return sql;
+    return columnSql;
   }
 
   protected async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
@@ -282,17 +285,17 @@ export class SchemaCreation {
     for (const fk of o.foreignKeyAdds) {
       parts.push(this.visitAddForeignKey(fk));
     }
-    for (const name of o.foreignKeyDrops) {
-      parts.push(this.visitDropForeignKey(name));
+    for (const fk of o.foreignKeyDrops) {
+      parts.push(this.visitDropForeignKey(fk));
     }
-    for (const chk of o.checkConstraintAdds) {
-      parts.push(this.visitAddCheckConstraint(chk));
+    for (const con of o.checkConstraintAdds) {
+      parts.push(this.visitAddCheckConstraint(con));
     }
-    for (const name of o.checkConstraintDrops) {
-      parts.push(await this.visitDropCheckConstraint(name));
+    for (const con of o.checkConstraintDrops) {
+      parts.push(await this.visitDropCheckConstraint(con));
     }
-    for (const name of o.constraintDrops) {
-      parts.push(this.visitDropConstraint(name));
+    for (const con of o.constraintDrops) {
+      parts.push(this.visitDropConstraint(con));
     }
     for (const change of o.columnDefaultChanges) {
       const col = this.adapter.quoteColumnName(change.columnName);
@@ -486,7 +489,7 @@ export class SchemaCreation {
 
   /** @internal */
   protected visitPrimaryKeyDefinition(o: PrimaryKeyDefinition): string {
-    return `PRIMARY KEY (${o.name.map((n) => this.adapter.quoteColumnName(n)).join(", ")})`;
+    return `PRIMARY KEY (${o.name.map((name) => this.adapter.quoteColumnName(name)).join(", ")})`;
   }
 
   /** @internal */
