@@ -306,6 +306,71 @@ describe("Ruby extractor inert-receiver call suppression", () => {
   });
 });
 
+describe("Ruby extractor call-argument Proc.new suppression", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> the recorded call sites' names.
+  function rubyCallSiteNames(fixtures: Record<string, string>): Record<string, string[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "args-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = (m[:callArgs] || []).map { |s| s[:name] }
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("drops the Proc.new site while keeping a constant-receiver new site", () => {
+    const c = rubyCallSiteNames({
+      "qux.rb": `
+        class Qux
+          def d
+            callback = Proc.new { |x| x.run }
+            Wrapper.new(callback)
+          end
+        end
+      `,
+    });
+    expect(c["Qux#d"].filter((n) => n === "new")).toEqual(["new"]);
+    expect(c["Qux#d"]).toContain("run");
+  });
+
+  it("drops the new site entirely when Proc is the only receiver", () => {
+    const c = rubyCallSiteNames({
+      "quux.rb": `
+        class Quux
+          def e
+            Proc.new { greet }
+          end
+        end
+      `,
+    });
+    expect(c["Quux#e"]).not.toContain("new");
+    expect(c["Quux#e"]).toContain("greet");
+  });
+});
+
 describe("Ruby extractor alias arity resolution", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 

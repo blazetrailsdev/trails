@@ -3807,33 +3807,32 @@ export class PostgreSQLAdapter
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
-      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
+      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds });
       const code = (e as { code?: string }).code;
       const msg = e.message;
-      const cause = e;
       switch (code) {
         case "23505": // unique_violation
-          return new RecordNotUnique(msg, { sql, binds, cause });
+          return new RecordNotUnique(msg, { sql, binds });
         case "23503": // foreign_key_violation
-          return new InvalidForeignKey(msg, { sql, binds, cause });
+          return new InvalidForeignKey(msg, { sql, binds });
         case "23502": // not_null_violation
-          return new NotNullViolation(msg, { sql, binds, cause });
+          return new NotNullViolation(msg, { sql, binds });
         case "22001": // string_data_right_truncation
-          return new ValueTooLong(msg, { sql, binds, cause });
+          return new ValueTooLong(msg, { sql, binds });
         case "22003": // numeric_value_out_of_range
-          return new ActiveRecordRangeError(msg, { sql, binds, cause });
+          return new ActiveRecordRangeError(msg, { sql, binds });
         case "40001": // serialization_failure
-          return new SerializationFailure(msg, { sql, binds, cause });
+          return new SerializationFailure(msg, { sql, binds });
         case "40P01": // deadlock_detected
-          return new Deadlocked(msg, { sql, binds, cause });
+          return new Deadlocked(msg, { sql, binds });
         case "42P04": // duplicate_database
-          return new DatabaseAlreadyExists(msg, { sql, binds, cause });
+          return new DatabaseAlreadyExists(msg, { sql, binds });
         case "55P03": // lock_not_available
-          return new LockWaitTimeout(msg, { sql, binds, cause });
+          return new LockWaitTimeout(msg, { sql, binds });
         case "57014": // query_canceled
-          return new QueryCanceled(msg, { sql, binds, cause });
+          return new QueryCanceled(msg, { sql, binds });
         case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
-          return new ConnectionNotEstablished(msg, { cause });
+          return new ConnectionNotEstablished(msg);
         default:
           // A severed connection (08xxx, "Connection terminated", pg's
           // "Client has encountered a connection error", …) surfaces here as a
@@ -3864,10 +3863,10 @@ export class PostgreSQLAdapter
           // takes ConnectionFailed. (Connect-path failures still surface as
           // ConnectionNotEstablished — see newClient.)
           if (PostgreSQLAdapter._isConnectionClosedBeforeSend(e)) {
-            return new ConnectionNotEstablished(msg, { cause });
+            return new ConnectionNotEstablished(msg);
           }
           if (PostgreSQLAdapter._isConnectionError(e)) {
-            return new ConnectionFailed(msg, { sql, binds, cause });
+            return new ConnectionFailed(msg, { sql, binds });
           }
           // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
           // 5-char shape alone isn't enough — Node system errors like
@@ -3876,12 +3875,21 @@ export class PostgreSQLAdapter
           // network failures as StatementInvalid with misleading
           // sql/binds attached.
           if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
-            return new StatementInvalid(msg, { sql, binds, cause });
+            return new StatementInvalid(msg, { sql, binds });
           }
           return e;
       }
     };
     const translated = build();
+    // `translate_exception`'s result is raised from inside the `rescue`, so Ruby
+    // sets `Exception#cause` from `$!` and never names the driver error in the
+    // argument list (postgresql_adapter.rb:1015-1055). JS chains nothing at a
+    // `throw`; this is the raise-site stand-in for the direct
+    // `throw this._translateException(...)` sites, as `translateExceptionClass`
+    // is for everything routed through the public translator.
+    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
+      (translated as { cause?: unknown }).cause = e;
+    }
     // Mirrors Rails' PostgreSQLAdapter#translate_exception, which builds every
     // translated error with `connection_pool: @pool`. For a standalone adapter
     // that pool is a NullPool. Use setPool/setConnectionPool (both guarded) so

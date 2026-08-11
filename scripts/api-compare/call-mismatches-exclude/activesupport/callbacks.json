@@ -29,20 +29,6 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
-    "rubyName": "define_callbacks",
-    "call": "descendants",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "define_callbacks",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
     "rubyName": "duplicates?",
     "call": "matches?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails callbacks.rb:272-279 delegates to `matches?(other.kind, other.filter)` for Symbol filters; trails callbacks.ts:629-634 isDuplicates inlines the kind/filter equality for string filters."
@@ -74,47 +60,5 @@
     "rubyName": "remove_duplicates",
     "call": "delete_if",
     "reason": "Ruby Array#delete_if has no trails port; `this.chain = this.chain.filter(...)` is the same in-place removal, and is how CallbackChain#remove spells it in this file already."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "reset_callbacks",
-    "call": "descendants",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "run_callbacks",
-    "call": "invoke_after",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "run_callbacks",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "set_callback",
-    "call": "build",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "set_callback",
-    "call": "normalize_callback_params",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
-    "rubyName": "skip_callback",
-    "call": "normalize_callback_params",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

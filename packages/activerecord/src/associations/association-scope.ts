@@ -624,13 +624,13 @@ export class AssociationScope {
       // (association_scope.rb:93-96). Routes through both `polymorphicName`
       // (base_class.name for STI) and the value-transformation lambda.
       const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
-      const nextName = nextKlass ? nextKlass.polymorphicName() : "";
+      const value = this.transformValue(nextKlass ? nextKlass.polymorphicName() : "");
       // Qualify with the resolved node's name — the alias for an aliased
       // chain, the bare table otherwise — matching Rails' `apply_scope(scope,
       // table, ...)` where `table` is `reflection.aliased_table` (so
       // `table.name` is the alias). Keeps the `_type` WHERE on the same
       // identifier the JOIN uses.
-      scope = this.applyScope(scope, tableNode, r.type, this.transformValue(nextName));
+      scope = this.applyScope(scope, tableNode, r.type, value);
     }
     // Wrap the join target + constraint in Arel's LeadingJoin/On nodes via
     // `join()` and push it through Relation#joins, which stores Arel join

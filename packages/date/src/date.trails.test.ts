@@ -2266,10 +2266,15 @@ describe("initialize_copy", () => {
   it("refuses a frozen receiver", () => {
     // ruby 3.3.11 -rdate: rb_check_frozen(copy) (date_core.c:5142) —
     //   Date.new(2001,2,3).freeze.send(:initialize_copy, Date.new(2002,1,1))
-    //   #=> FrozenError: can't modify frozen Date
+    //   #=> FrozenError: can't modify frozen Date:
+    //        #<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>
     const d = Object.freeze(new RubyDate(2001, 2, 3));
-    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow(TypeError);
-    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow("can't modify frozen Date");
+    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow(
+      expect.objectContaining({ name: "FrozenError" }),
+    );
+    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow(
+      "can't modify frozen Date: #<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
+    );
   });
 
   it("carries a DateTime's day-fraction, sub-second and offset across", () => {
