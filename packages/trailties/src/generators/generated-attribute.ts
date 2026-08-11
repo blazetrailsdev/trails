@@ -48,9 +48,9 @@ export class GeneratedAttribute {
       indexType = type;
       type = undefined;
     }
-    let opts: AttrOptions;
+    let attrOptions: AttrOptions;
     // eslint-disable-next-line prefer-const
-    [type, opts] = parseTypeAndOptions(type);
+    [type, attrOptions] = parseTypeAndOptions(type);
     if (DANGEROUS.has(name)) {
       throw new GeneratorError(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
@@ -65,9 +65,9 @@ export class GeneratedAttribute {
       );
     }
     if (type && GeneratedAttribute.reference(type) && indexType === "uniq") {
-      opts.index = { unique: true };
+      attrOptions.index = { unique: true };
     }
-    return new GeneratedAttribute(name, type ?? "string", indexType as IndexType, opts);
+    return new GeneratedAttribute(name, type ?? "string", indexType as IndexType, attrOptions);
   }
 
   static validType = (t: string): boolean => DEFAULT_TYPES.has(t);

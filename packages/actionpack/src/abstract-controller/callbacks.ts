@@ -159,12 +159,12 @@ export function _normalizeCallbackOption(
   from: "only" | "except",
   to: "if" | "unless",
 ): void {
-  const only = options[from];
-  if (only === undefined) return;
+  let fromValue: string | string[] | ActionFilter | undefined = options[from];
+  if (fromValue === undefined) return;
   delete options[from];
 
   const filters = (options as CallbackOptionsWithFilters).filters ?? [];
-  const fromValue = new ActionFilter(filters, from, only);
+  fromValue = new ActionFilter(filters, from, fromValue);
 
   const existing = options[to];
   const list: Array<((controller: AbstractController) => boolean) | CallbackPredicateLike> =
