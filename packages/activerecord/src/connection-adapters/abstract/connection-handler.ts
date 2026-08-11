@@ -109,8 +109,18 @@ export class ConnectionHandler {
     return this.connectionPoolList();
   }
 
-  eachConnectionPool(role: string | null | undefined, cb: (pool: ConnectionPool) => void): void {
-    const effectiveRole = role === "all" ? null : role;
+  // `each_connection_pool(role = nil, &block)` (`connection_handler.rb:104`):
+  // Ruby's block is syntactically separate from the optional `role`, so a
+  // caller with no role passes only the block. The overload keeps those call
+  // sites spelled as Rails spells them.
+  eachConnectionPool(block: (pool: ConnectionPool) => void): void;
+  eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
+  eachConnectionPool(
+    role: string | null | undefined | ((pool: ConnectionPool) => void),
+    block?: (pool: ConnectionPool) => void,
+  ): void {
+    const cb = typeof role === "function" ? role : block!;
+    const effectiveRole = typeof role === "function" ? null : role === "all" ? null : role;
     for (const manager of this._connectionNameToPoolManager.values()) {
       const configs =
         effectiveRole == null ? manager.poolConfigs() : manager.poolConfigs(effectiveRole);

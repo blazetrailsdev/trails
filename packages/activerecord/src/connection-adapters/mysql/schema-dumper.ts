@@ -213,10 +213,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  override async table(tableName: string, lines: string[]): Promise<void> {
+  override async table(tableName: string, stream: string[]): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);
     // super.table (abstract) populates primaryKeyOrderCache via @connection.primaryKeys.
-    await super.table(tableName, lines);
+    await super.table(tableName, stream);
   }
 
   /**

@@ -33,7 +33,7 @@ export interface RackApp {
  * @internal
  */
 function clearActiveConnections(): void {
-  Base.connectionHandler.eachConnectionPool(null, (pool) => {
+  Base.connectionHandler.eachConnectionPool((pool) => {
     const connection = pool.activeConnection;
     if (!connection) return;
     const transaction =

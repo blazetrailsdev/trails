@@ -236,7 +236,7 @@ export class SchemaDumper extends BaseSchemaDumper {
    * @internal
    */
   protected emitTable(
-    lines: string[],
+    stream: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
@@ -260,16 +260,18 @@ export class SchemaDumper extends BaseSchemaDumper {
     } catch (e) {
       const cls = e instanceof Error ? e.name : "StandardError";
       const message = e instanceof Error ? e.message : String(e);
-      lines.push(`# Could not dump table ${JSON.stringify(tableName)} because of following ${cls}`);
-      lines.push(`#   ${message}`);
+      stream.push(
+        `# Could not dump table ${JSON.stringify(tableName)} because of following ${cls}`,
+      );
+      stream.push(`#   ${message}`);
       return;
     }
-    for (const line of body) lines.push(line);
+    for (const line of body) stream.push(line);
   }
 
   /** @internal */
   protected emitTableBody(
-    lines: string[],
+    stream: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
@@ -319,7 +321,7 @@ export class SchemaDumper extends BaseSchemaDumper {
       tableOpts["comment"] = JSON.stringify(adapterTableOpts.comment);
     tableOpts["force"] = '"cascade"';
 
-    lines.push(
+    stream.push(
       `  await ctx.createTable(${JSON.stringify(stripped)}, { ${this.formatColspec(tableOpts)} }, (t) => {`,
     );
 
@@ -331,20 +333,20 @@ export class SchemaDumper extends BaseSchemaDumper {
       const typeName = String(dslType);
 
       if (this._isDslHelper(typeName)) {
-        lines.push(`    t.${typeName}(${JSON.stringify(col.name)}${optStr});`);
+        stream.push(`    t.${typeName}(${JSON.stringify(col.name)}${optStr});`);
       } else if ((col as any).isEnum && typeName === "enum") {
-        lines.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
+        stream.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
       } else {
         // Generic fallback: pass arbitrary SQL type verbatim via t.column.
         const colType = typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
-        lines.push(
+        stream.push(
           `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(colType)}${optStr});`,
         );
       }
     }
 
-    for (const line of inlineConstraints) lines.push(line);
-    lines.push("  });");
-    this.indexesInCreate(tableName, lines, indexes);
+    for (const line of inlineConstraints) stream.push(line);
+    stream.push("  });");
+    this.indexesInCreate(tableName, stream, indexes);
   }
 }

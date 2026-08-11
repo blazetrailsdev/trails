@@ -506,12 +506,12 @@ export abstract class SchemaDumper {
     } else {
       dumper = this.create(wrappedSource);
     }
-    const lines: string[] = [];
-    await dumper.schemas(lines);
-    await dumper.extensions(lines);
-    await dumper.types(lines);
-    await dumper.dumpTable(lines, tableName);
-    return lines.join("\n");
+    const stream: string[] = [];
+    await dumper.schemas(stream);
+    await dumper.extensions(stream);
+    await dumper.types(stream);
+    await dumper.dumpTable(stream, tableName);
+    return stream.join("\n");
   }
 
   /**
@@ -537,123 +537,101 @@ export abstract class SchemaDumper {
   }
 
   dump(): string | Promise<string> {
-    const lines: string[] = [];
-    this.header(lines);
-    const schemasResult = this.schemas(lines);
+    const stream: string[] = [];
+    this.header(stream);
+    const schemasResult = this.schemas(stream);
     // Run header sections sequentially to preserve deterministic output order
     // (schemas → extensions → types). If any section is async, chain the rest.
     if (schemasResult instanceof Promise) {
       return schemasResult
-        .then(() => this.extensions(lines))
-        .then(() => this.types(lines))
-        .then(() => this._finalizeDump(lines));
+        .then(() => this.extensions(stream))
+        .then(() => this.types(stream))
+        .then(() => this._finalizeDump(stream));
     }
-    const extensionsResult = this.extensions(lines);
+    const extensionsResult = this.extensions(stream);
     if (extensionsResult instanceof Promise) {
-      return extensionsResult.then(() => this.types(lines)).then(() => this._finalizeDump(lines));
+      return extensionsResult.then(() => this.types(stream)).then(() => this._finalizeDump(stream));
     }
-    const typesResult = this.types(lines);
+    const typesResult = this.types(stream);
     if (typesResult instanceof Promise) {
-      return typesResult.then(() => this._finalizeDump(lines));
+      return typesResult.then(() => this._finalizeDump(stream));
     }
-    return this._finalizeDump(lines);
+    return this._finalizeDump(stream);
   }
 
   /** @internal */
-  private _finalizeDump(lines: string[]): string | Promise<string> {
-    const result = this.tables(lines);
+  private _finalizeDump(stream: string[]): string | Promise<string> {
+    const result = this.tables(stream);
     if (result instanceof Promise) {
       return result.then(async () => {
-        await this.virtualTables(lines);
-        this.trailer(lines);
-        return lines.join("\n");
+        await this.virtualTables(stream);
+        this.trailer(stream);
+        return stream.join("\n");
       });
     }
-    const vtResult = this.virtualTables(lines);
+    const vtResult = this.virtualTables(stream);
     if (vtResult instanceof Promise) {
       return vtResult.then(() => {
-        this.trailer(lines);
-        return lines.join("\n");
+        this.trailer(stream);
+        return stream.join("\n");
       });
     }
-    this.trailer(lines);
-    return lines.join("\n");
+    this.trailer(stream);
+    return stream.join("\n");
   }
 
   /** @internal */
-  protected extensions(_lines: string[]): void | Promise<void> {}
+  protected extensions(_stream: string[]): void | Promise<void> {}
 
   /** @internal */
-  protected types(_lines: string[]): void | Promise<void> {}
+  protected types(_stream: string[]): void | Promise<void> {}
 
   /** @internal */
-  protected schemas(_lines: string[]): void | Promise<void> {}
+  protected schemas(_stream: string[]): void | Promise<void> {}
 
   /** @internal */
-  protected virtualTables(lines: string[]): void | Promise<void> {
-    const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
-    if (!adapter || typeof (adapter as any).virtualTables !== "function") return;
-    return this._dumpVirtualTablesAsync(lines);
-  }
+  protected virtualTables(_stream: string[]): void | Promise<void> {}
 
-  private async _dumpVirtualTablesAsync(lines: string[]): Promise<void> {
-    const adapter = this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined;
-    if (!adapter) return;
-    const tables: Record<string, [string, string]> = await (adapter as any).virtualTables();
-    const names = Object.keys(tables).sort();
-    if (names.length === 0) return;
-    lines.push("");
-    // Split on commas that are NOT inside single quotes; filter empty segments
-    const splitArgs = (s: string): string[] => {
-      if (s.trim() === "") return [];
-      return s
-        .split(/,(?=(?:[^']*'[^']*')*[^']*$)/)
-        .map((a) => a.trim())
-        .filter((a) => a.length > 0);
-    };
-    for (const name of names) {
-      const [moduleName, argsStr] = tables[name];
-      const args = splitArgs(argsStr);
-      lines.push(
-        `  await ctx.createVirtualTable(${JSON.stringify(name)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(args)});`,
-      );
-    }
-  }
-
-  private header(lines: string[]): void {
-    lines.push("// This file is auto-generated from the current state of the database.");
-    lines.push("// Instead of editing this file, please use the migrations feature.");
+  private header(stream: string[]): void {
+    stream.push("// This file is auto-generated from the current state of the database.");
+    stream.push("// Instead of editing this file, please use the migrations feature.");
     const params = this.defineParams();
-    if (params) lines.push(`// ${params}`);
-    lines.push("");
+    if (params) stream.push(`// ${params}`);
+    stream.push("");
     if (this._language === "ts") {
-      lines.push(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
-      lines.push("");
-      lines.push("export default async function defineSchema(ctx: DatabaseAdapter) {");
+      stream.push(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
+      stream.push("");
+      stream.push("export default async function defineSchema(ctx: DatabaseAdapter) {");
     } else {
-      lines.push("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
-      lines.push("export default async function defineSchema(ctx) {");
+      stream.push("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
+      stream.push("export default async function defineSchema(ctx) {");
     }
   }
 
-  private trailer(lines: string[]): void {
-    lines.push("}");
+  private trailer(stream: string[]): void {
+    stream.push("}");
   }
 
-  private tables(lines: string[]): void | Promise<void> {
+  private tables(stream: string[]): void | Promise<void> {
     const tableNames = this._source.tables();
     if (tableNames instanceof Promise) {
       return tableNames.then(async (raw) => {
-        const names = [...raw].sort();
-        for (const tableName of names) {
-          if (this.isIgnored(tableName)) continue;
-          await this.table(tableName, lines);
+        const sortedTables = [...raw].sort();
+
+        const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
+
+        for (const tableName of notIgnoredTables) {
+          await this.table(tableName, stream);
         }
+
+        // dump foreign keys at the end to make sure all dependent tables exist.
         if (this._fkHookHost() !== undefined) {
-          for (const tableName of names) {
-            if (this.isIgnored(tableName)) continue;
-            await this.foreignKeys(tableName, lines);
+          const foreignKeysStream: string[] = [];
+          for (const tbl of notIgnoredTables) {
+            await this.foreignKeys(tbl, foreignKeysStream);
           }
+
+          for (const line of foreignKeysStream) stream.push(line);
         }
       });
     }
@@ -678,8 +656,8 @@ export abstract class SchemaDumper {
       }
       this.tableName = tableName;
       try {
-        this.emitTable(lines, tableName, columns, indexes, adapterTableOpts);
-        lines.push("");
+        this.emitTable(stream, tableName, columns, indexes, adapterTableOpts);
+        stream.push("");
       } finally {
         this.tableName = undefined;
       }
@@ -712,12 +690,12 @@ export abstract class SchemaDumper {
   }
 
   /** @internal Used by `dumpTableSchema` and external callers. */
-  async dumpTable(lines: string[], tableName: string): Promise<void> {
-    await this.table(tableName, lines);
+  async dumpTable(stream: string[], tableName: string): Promise<void> {
+    await this.table(tableName, stream);
   }
 
   /** @internal */
-  async table(table: string, lines: string[]): Promise<void> {
+  async table(table: string, stream: string[]): Promise<void> {
     // Mirrors Rails' reliance on `@connection.primary_key(table)`: capture the
     // authoritative PK column order before iterating columns so `emitTable` /
     // `resolvePrimaryKeyColumns` render composite/promoted keys in key order.
@@ -737,9 +715,9 @@ export abstract class SchemaDumper {
       const adapterTableOpts = await this.fetchTableOptions(table);
       const inlineLines: string[] = [];
       const remaining = await this.gatherInlineConstraints(table, inlineLines);
-      this.emitTable(lines, table, columns, indexes, adapterTableOpts, inlineLines);
-      if (remaining && remaining.length > 0) lines.push("", ...remaining);
-      lines.push("");
+      this.emitTable(stream, table, columns, indexes, adapterTableOpts, inlineLines);
+      if (remaining && remaining.length > 0) stream.push("", ...remaining);
+      stream.push("");
     } finally {
       this.tableName = undefined;
     }
@@ -753,9 +731,9 @@ export abstract class SchemaDumper {
    */
   protected async gatherInlineConstraints(
     tableName: string,
-    lines: string[],
+    stream: string[],
   ): Promise<string[] | undefined> {
-    return this.checkConstraintsInCreate(tableName, lines);
+    return this.checkConstraintsInCreate(tableName, stream);
   }
 
   /**
@@ -768,7 +746,7 @@ export abstract class SchemaDumper {
    */
   protected async checkConstraintsInCreate(
     table: string,
-    lines: string[],
+    stream: string[],
   ): Promise<string[] | undefined> {
     const host = this._hookHost("checkConstraints") as
       | {
@@ -797,7 +775,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `    t.checkConstraint(${expr}${optStr});`;
       });
-      lines.push(checkConstraintStatements.sort().join("\n"));
+      stream.push(checkConstraintStatements.sort().join("\n"));
     }
 
     if (checkInvalid.length > 0) {
@@ -891,7 +869,7 @@ export abstract class SchemaDumper {
 
   /** @internal */
   protected abstract emitTable(
-    lines: string[],
+    stream: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
@@ -901,7 +879,7 @@ export abstract class SchemaDumper {
 
   /** @internal */
   protected abstract emitTableBody(
-    lines: string[],
+    stream: string[],
     tableName: string,
     columns: ColumnInfo[],
     indexes: IndexInfo[],
@@ -983,12 +961,12 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  indexesInCreate(tableName: string, lines: string[], indexes: IndexInfo[] = []): void {
+  indexesInCreate(tableName: string, stream: string[], indexes: IndexInfo[] = []): void {
     const stripped = this.removePrefixAndSuffix(tableName);
     for (const index of indexes) {
       const [cols, ...opts] = this.indexParts(index);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      lines.push(`  await ctx.addIndex(${JSON.stringify(stripped)}, ${cols}${optStr});`);
+      stream.push(`  await ctx.addIndex(${JSON.stringify(stripped)}, ${cols}${optStr});`);
     }
   }
 
@@ -1031,7 +1009,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  async foreignKeys(tableName: string, lines: string[]): Promise<void> {
+  async foreignKeys(tableName: string, stream: string[]): Promise<void> {
     const host = this._hookHost("foreignKeys");
     if (!host) return;
     const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
@@ -1087,7 +1065,7 @@ export abstract class SchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
-    lines.push(statements.sort().join("\n"));
+    stream.push(statements.sort().join("\n"));
   }
 
   /**

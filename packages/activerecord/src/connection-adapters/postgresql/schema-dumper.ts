@@ -169,45 +169,45 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async extensions(lines: string[]): Promise<void> {
+  protected override async extensions(stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.extensions) return;
     const exts: string[] = await adapter.extensions();
     if (exts.length === 0) return;
-    lines.push("  // These are extensions that must be enabled in order to support this database");
+    stream.push("  // These are extensions that must be enabled in order to support this database");
     for (const ext of exts.sort()) {
-      lines.push(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
+      stream.push(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
     }
-    lines.push("");
+    stream.push("");
   }
 
   /** @internal */
-  protected override async types(lines: string[]): Promise<void> {
+  protected override async types(stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.enumTypes) return;
     const enumTypes: [string, string[]][] = await adapter.enumTypes();
     if (enumTypes.length === 0) return;
-    lines.push("  // Custom types defined in this database.");
-    lines.push(
+    stream.push("  // Custom types defined in this database.");
+    stream.push(
       "  // Note that some types may not work with other database engines. Be careful if changing database.",
     );
     for (const [name, values] of enumTypes.sort((a, b) => a[0].localeCompare(b[0]))) {
-      lines.push(`  await ctx.createEnum(${JSON.stringify(name)}, ${JSON.stringify(values)});`);
+      stream.push(`  await ctx.createEnum(${JSON.stringify(name)}, ${JSON.stringify(values)});`);
     }
-    lines.push("");
+    stream.push("");
   }
 
   /** @internal */
-  protected override async schemas(lines: string[]): Promise<void> {
+  protected override async schemas(stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.schemaNames) return;
     const allNames: string[] = await adapter.schemaNames();
     const names = allNames.filter((n) => n !== "public").sort();
     if (names.length === 0) return;
     for (const name of names) {
-      lines.push(`  await ctx.createSchema(${JSON.stringify(name)});`);
+      stream.push(`  await ctx.createSchema(${JSON.stringify(name)});`);
     }
-    lines.push("");
+    stream.push("");
   }
 
   /** @internal */
@@ -241,17 +241,17 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * passed to the createTable callback, so they cannot be inlined as t.* calls.
    * @internal
    */
-  override async table(tableName: string, lines: string[]): Promise<void> {
-    await super.table(tableName, lines);
+  override async table(tableName: string, stream: string[]): Promise<void> {
+    await super.table(tableName, stream);
     // Remove the trailing blank pushed by super.table so constraints land before it.
-    if (lines[lines.length - 1] === "") lines.pop();
-    await this.exclusionConstraintsInCreate(tableName, lines);
-    await this.uniqueConstraintsInCreate(tableName, lines);
-    lines.push("");
+    if (stream[stream.length - 1] === "") stream.pop();
+    await this.exclusionConstraintsInCreate(tableName, stream);
+    await this.uniqueConstraintsInCreate(tableName, stream);
+    stream.push("");
   }
 
   /** @internal */
-  protected async exclusionConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  protected async exclusionConstraintsInCreate(tableName: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: ExclusionConstraintDefinition[] =
       this._cachedExclConstraints ??
@@ -268,11 +268,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addExclusionConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(ec.expression)}${optStr});`;
     });
-    lines.push(stmts.sort().join("\n"));
+    stream.push(stmts.sort().join("\n"));
   }
 
   /** @internal */
-  protected async uniqueConstraintsInCreate(tableName: string, lines: string[]): Promise<void> {
+  protected async uniqueConstraintsInCreate(tableName: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: UniqueConstraintDefinition[] =
       this._cachedUniqConstraints ??
@@ -289,7 +289,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addUniqueConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(uc.column)}${optStr});`;
     });
-    lines.push(stmts.sort().join("\n"));
+    stream.push(stmts.sort().join("\n"));
   }
 
   /** @internal */

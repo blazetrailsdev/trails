@@ -5,7 +5,7 @@
  * config hash and merges with any provided configuration overrides.
  */
 import { HashConfig } from "./hash-config.js";
-import type { DatabaseConfigOptions } from "./database-config.js";
+import { _setConfigurationHash, type DatabaseConfigOptions } from "./database-config.js";
 import { ConnectionUrlResolver } from "./connection-url-resolver.js";
 import { inferAdapterNameFromUrl } from "../connection-adapters/adapter-args.js";
 
@@ -18,10 +18,53 @@ export class UrlConfig extends HashConfig {
     url: string,
     configuration: DatabaseConfigOptions = {},
   ) {
-    const urlHash = buildUrlHash(url);
-    normalizeUrlHash(urlHash);
-    super(envName, name, { ...configuration, ...urlHash });
+    super(envName, name, configuration);
+
     this.url = url;
+    // `url_config.rb:43` — `@configuration_hash = @configuration_hash.merge(build_url_hash)`.
+    // The base class freezes its hash, so the merge goes through the internal
+    // writer rather than assigning the (readonly) accessor.
+    const urlHash = this.buildUrlHash();
+    normalizeUrlHash(urlHash);
+    _setConfigurationHash(this, { ...this.configurationHash, ...urlHash });
+  }
+
+  // Mirrors: UrlConfig#build_url_hash
+  // jdbc:/http:/https: URLs are passed through untouched — they're adapter-specific
+  // connection strings, not URIs we should decompose.
+  /** @internal */
+  private buildUrlHash(): DatabaseConfigOptions {
+    const url = this.url;
+    if (
+      !url ||
+      url.startsWith("jdbc:") ||
+      url.startsWith("http:") ||
+      url.startsWith("https:") ||
+      // Windows drive-letter paths (e.g. "C:\\path\\db.sqlite3") are filesystem
+      // paths, not URLs, even though they have a single-letter "scheme".
+      /^[A-Za-z]:[\\/]/.test(url)
+    ) {
+      return { url };
+    }
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
+      // Scheme-less string. Rails' URI parser turns a bare word ("foo", "foo-bar")
+      // into `{ database: "foo" }`, overriding the config's database. Filesystem-style
+      // SQLite connection strings (":memory:", bare paths with "/", "\\" or ".")
+      // are not database names — pass those through as `{ url }` unchanged so the
+      // UrlConfig#database accessor can fall back to the path.
+      if (/^[A-Za-z0-9_-]+$/.test(url)) {
+        return { database: url };
+      }
+      // Scheme-less SQLite shorthand (`:memory:`, bare `.sqlite3`/`.db` paths).
+      // Rails' URL configs always parse a scheme, so their configuration_hash
+      // always carries an adapter; trails' scheme-less shorthand otherwise
+      // wouldn't. Infer it here at build time so the resolved config already
+      // names its adapter and the handler's resolvePoolConfig doesn't have to
+      // raise AdapterNotSpecified (no connect-time backfill needed).
+      const adapter = inferAdapterNameFromUrl(url);
+      return adapter ? { url, adapter } : { url };
+    }
+    return new ConnectionUrlResolver(url).toHash();
   }
 
   // Mirrors Rails' UrlConfig — when the configuration hash doesn't carry an
@@ -81,43 +124,6 @@ function normalizeUrlHash(hash: Record<string, unknown>): void {
   if (typeof hash.replica === "string") {
     hash.replica = hash.replica !== "false";
   }
-}
-
-// Mirrors: UrlConfig#build_url_hash
-// jdbc:/http:/https: URLs are passed through untouched — they're adapter-specific
-// connection strings, not URIs we should decompose.
-/** @internal */
-function buildUrlHash(url: string): DatabaseConfigOptions {
-  if (
-    !url ||
-    url.startsWith("jdbc:") ||
-    url.startsWith("http:") ||
-    url.startsWith("https:") ||
-    // Windows drive-letter paths (e.g. "C:\\path\\db.sqlite3") are filesystem
-    // paths, not URLs, even though they have a single-letter "scheme".
-    /^[A-Za-z]:[\\/]/.test(url)
-  ) {
-    return { url };
-  }
-  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-    // Scheme-less string. Rails' URI parser turns a bare word ("foo", "foo-bar")
-    // into `{ database: "foo" }`, overriding the config's database. Filesystem-style
-    // SQLite connection strings (":memory:", bare paths with "/", "\\" or ".")
-    // are not database names — pass those through as `{ url }` unchanged so the
-    // UrlConfig#database accessor can fall back to the path.
-    if (/^[A-Za-z0-9_-]+$/.test(url)) {
-      return { database: url };
-    }
-    // Scheme-less SQLite shorthand (`:memory:`, bare `.sqlite3`/`.db` paths).
-    // Rails' URL configs always parse a scheme, so their configuration_hash
-    // always carries an adapter; trails' scheme-less shorthand otherwise
-    // wouldn't. Infer it here at build time so the resolved config already
-    // names its adapter and the handler's resolvePoolConfig doesn't have to
-    // raise AdapterNotSpecified (no connect-time backfill needed).
-    const adapter = inferAdapterNameFromUrl(url);
-    return adapter ? { url, adapter } : { url };
-  }
-  return new ConnectionUrlResolver(url).toHash();
 }
 
 /**
