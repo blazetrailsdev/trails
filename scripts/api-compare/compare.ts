@@ -3225,10 +3225,6 @@ function printReport(
   mode: CompareMode = "public",
   showClosureOnly = false,
 ) {
-  // `--closure` scopes the PER-FILE table (and its own totals line) to the
-  // AR/AM require closure (RFC 0092), so a burndown agent sees only the files
-  // the data layer actually pulls in. Package and Data-layer/AR-closure
-  // summaries below are unaffected — this filters rows, not denominators.
   const DATA_LAYER = new Set(DATA_LAYER_PACKAGES);
   const closureFileSet = showClosureOnly ? writeArClosure().files : null;
   if (mode === "private") {

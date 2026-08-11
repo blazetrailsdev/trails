@@ -214,8 +214,8 @@ export class ToSql extends Visitor {
     o: Nodes.DeleteStatement,
     collector: SQLString,
   ): SQLString {
-    const node = this.prepareDeleteStatement(o);
     collector.retryable = false;
+    const node = this.prepareDeleteStatement(o);
     const joinSourceLeft = this.hasJoinSources(node)
       ? (node.relation as Nodes.JoinSource).left
       : null;
@@ -237,8 +237,8 @@ export class ToSql extends Visitor {
     o: Nodes.UpdateStatement,
     collector: SQLString,
   ): SQLString {
-    const node = this.prepareUpdateStatement(o);
     collector.retryable = false;
+    const node = this.prepareUpdateStatement(o);
     collector.append("UPDATE ");
     if (node.relation) this.visit(node.relation, collector);
 

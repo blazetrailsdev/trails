@@ -206,9 +206,6 @@ describe("PostgreSQL SchemaCreation", () => {
     at.foreignKeyAdds.push(fk);
     at.constraintValidations = ["some_constraint"];
     const sql = await s().visitAlterTable(at);
-    // Rails' `visit_AlterTable` (postgresql/schema_creation.rb:10-15) appends
-    // each group's `join(" ")` straight onto the string with no separator
-    // between groups — only ever one group is populated per alter_table call.
     expect(sql).toContain("ADD CONSTRAINT");
     expect(sql).toContain('VALIDATE CONSTRAINT "some_constraint"');
   });
