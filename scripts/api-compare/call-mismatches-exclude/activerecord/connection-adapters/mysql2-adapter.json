@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "active?",
-    "call": "synchronize",
-    "reason": "@lock.synchronize has no counterpart: trails is single-threaded and ports no adapter mutex."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "discard!",
-    "call": "synchronize",
-    "reason": "Rails wraps discard! in @lock.synchronize (Ruby Mutex); trails' single-threaded async model has no lock to acquire, matching the existing disconnect!/reconnect! synchronize exclusions in this file."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "disconnect!",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

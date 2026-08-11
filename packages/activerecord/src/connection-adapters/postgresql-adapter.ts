@@ -270,6 +270,10 @@ export class PostgreSQLAdapter
   // trails' handle-state terms for "this client was torn down / never
   // configured" — a client in either state has no usable socket, so they sit
   // with the presence guard rather than letting the probe throw.
+  /**
+   * @missingRailsCall synchronize — @lock.synchronize has no counterpart: trails
+   *   is single-threaded and ports no adapter mutex.
+   */
   override async active(): Promise<boolean> {
     const rawConnection = this._rawConnection;
     if (rawConnection === null || this._closed || this._pgClientOptions == null) return false;

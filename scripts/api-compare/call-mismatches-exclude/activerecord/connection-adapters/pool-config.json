@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/pool-config.ts",
-    "rubyName": "discard_pool!",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/pool-config.ts",
     "rubyName": "discard_pools!",
     "call": "each_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -26,12 +19,5 @@
     "rubyName": "disconnect_all!",
     "call": "each_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/pool-config.ts",
-    "rubyName": "server_version",
-    "call": "synchronize",
-    "reason": "Ruby wraps the memo in MonitorMixin#synchronize; trails is single-threaded and has no mutex, so the port has no analogue call - same mechanism as the NullPool row in abstract/connection-pool.json."
   }
 ]

@@ -58,13 +58,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_methods",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "generate_alias_attribute_methods",
     "call": "clear",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -175,13 +168,6 @@
     "rubyName": "saved_change_to_attribute?",
     "call": "changed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "undefine_attribute_methods",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
   },
   {
     "package": "activerecord",

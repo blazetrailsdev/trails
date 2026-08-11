@@ -31,13 +31,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "checkin",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
     "call": "acquire_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -52,23 +45,9 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "checkout",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
     "call": "checkin",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "clear_reloadable_connections",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
   },
   {
     "package": "activerecord",
@@ -82,20 +61,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "connected?",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; trails is single-threaded and has no mutex, so the port has no analogue call. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "discard!",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "disconnect",
     "call": "checkin",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -103,23 +68,9 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "disconnect",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "flush",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body mutates pool state in a fully synchronous core and only then awaits the drains that core returns, so no other body observes an intermediate state and the mutex has no analogue call. The invariant a later refactor must not break is that every state mutation precedes the first await."
   },
   {
     "package": "activerecord",
@@ -152,13 +103,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "reap",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "remove",
     "call": "bulk_make_new_connections",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -173,13 +117,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "remove",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "server_version",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -190,13 +127,6 @@
     "rubyName": "stat",
     "call": "count",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "stat",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
   },
   {
     "package": "activerecord",

@@ -30,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/delegation.ts",
-    "rubyName": "generate_method",
-    "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; the ported body is fully synchronous — it has no yield point, so run-to-completion supplies what the mutex supplies and the port has no analogue call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/delegation.ts",
     "rubyName": "generate_relation_method",
     "call": "generate_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
