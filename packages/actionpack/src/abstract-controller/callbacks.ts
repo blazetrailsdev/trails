@@ -164,9 +164,6 @@ export function _normalizeCallbackOption(
   delete options[from];
 
   const filters = (options as CallbackOptionsWithFilters).filters ?? [];
-  // Rails rebinds `from_value` to the ActionFilter it wraps (callbacks.rb:101);
-  // TS keeps the declared type of a `let`, so the wrapped value is its own
-  // binding under the same Rails name.
   const fromValue = new ActionFilter(filters, from, only);
 
   const existing = options[to];

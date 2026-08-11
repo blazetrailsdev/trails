@@ -2691,8 +2691,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     columns: string[],
     rename: Record<string, string> = {},
   ): Promise<void> {
-    // rename maps {srcCol: destCol}; Rails' `rename.each { |a| ... }` builds the
-    // dest→src direction of the same mapping.
+    // rename maps {srcCol: destCol}; build dest→src for lookup
     const columnMappings: Record<string, string> = Object.fromEntries(
       columns.map((name) => [name, name]),
     );

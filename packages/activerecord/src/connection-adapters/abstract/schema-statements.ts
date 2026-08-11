@@ -996,8 +996,6 @@ export class SchemaStatements {
       if (options.name != null) return options.name;
       throw new ArgumentError("You must specify the index name");
     }
-    // Rails' `else` arm: a non-Hash `options` is a column name (or list of
-    // them) and re-enters through index_name_options (schema_statements.rb:1006).
     return this.indexName(tableName, this.indexNameOptions(options));
   }
 
@@ -1657,8 +1655,6 @@ export class SchemaStatements {
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
-    // Ruby's String#to_i: leading whitespace/sign, underscore separators, and a
-    // non-numeric tail all collapse to the leading integer run (or 0).
     const leading = /^\s*([+-]?\d+(?:_\d+)*)/.exec(String(version));
     version = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
 

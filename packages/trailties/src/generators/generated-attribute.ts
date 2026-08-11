@@ -48,7 +48,6 @@ export class GeneratedAttribute {
       indexType = type;
       type = undefined;
     }
-    // Destructured alongside the `type` reassignment Rails makes (generated_attribute.rb:44).
     let opts: AttrOptions;
     // eslint-disable-next-line prefer-const
     [type, opts] = parseTypeAndOptions(type);
