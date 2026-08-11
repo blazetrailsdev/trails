@@ -190,9 +190,9 @@ export class AttributeSet {
     return new AttributeSet(newAttrs);
   }
 
-  reset(name: string): void {
-    if (this.has(name)) {
-      this.writeFromDatabase(name, null);
+  reset(key: string): void {
+    if (this.has(key)) {
+      this.writeFromDatabase(key, null);
     }
   }
 

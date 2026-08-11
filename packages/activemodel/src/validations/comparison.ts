@@ -30,14 +30,14 @@ export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
 
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+  validateEach(record: ValidatableRecord, attrName: string, value: unknown): void {
     for (const optKey of COMPARE_CHECKS) {
-      const raw = this.options[optKey];
-      if (raw === undefined) continue;
-      const optionValue = this.resolveValue(record, raw);
+      const rawOptionValue = this.options[optKey];
+      if (rawOptionValue === undefined) continue;
+      const optionValue = this.resolveValue(record, rawOptionValue);
 
       if (value === null || value === undefined || (typeof value === "string" && isBlank(value))) {
-        record.errors.add(attribute, ":blank", this.errorOptions(value, optionValue));
+        record.errors.add(attrName, ":blank", this.errorOptions(value, optionValue));
         return;
       }
 
@@ -45,7 +45,7 @@ export class ComparisonValidator extends EachValidator {
         const cmp = this.compare(value, optionValue);
         if (!COMPARE_OPS[optKey](cmp)) {
           record.errors.add(
-            attribute,
+            attrName,
             COMPARE_KEYS_TO_RAILS[optKey],
             this.errorOptions(value, optionValue),
           );
@@ -54,7 +54,7 @@ export class ComparisonValidator extends EachValidator {
         if (!(e instanceof ArgumentError)) throw e;
         // Rails comparison.rb:30 — uses the ArgumentError message as the
         // error key/message and continues to the next compare option.
-        record.errors.add(attribute, e.message);
+        record.errors.add(attrName, e.message);
       }
     }
   }

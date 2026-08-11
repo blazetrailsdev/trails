@@ -35,8 +35,8 @@ export class InfixOperation extends Binary {
     return buildQuoted(other, this);
   }
 
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
+  as(other: string): As {
+    return new As(this, new SqlLiteral(other, { retryable: true }));
   }
 
   asc(): Ascending {

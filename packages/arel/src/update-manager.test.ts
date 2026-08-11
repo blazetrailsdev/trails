@@ -25,14 +25,14 @@ describe("UpdateManagerTest", () => {
     it("adds columns to the AST when group value is a String", () => {
       const um = new UpdateManager();
       um.table(users);
-      um.group("name");
+      um.group(["name"]);
       expect(um.ast.groups.length).toBe(1);
     });
 
     it("adds columns to the AST when group value is a Symbol", () => {
       const um = new UpdateManager();
       um.table(users);
-      um.group(users.get("name"));
+      um.group([users.get("name")]);
       expect(um.ast.groups.length).toBe(1);
     });
   });

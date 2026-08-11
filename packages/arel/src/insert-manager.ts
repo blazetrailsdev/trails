@@ -82,12 +82,12 @@ export class InsertManager extends TreeManager {
       if (first?.relation) this.ast.relation = first.relation;
     }
 
-    const row: unknown[] = [];
-    for (const [col, val] of fields) {
-      this.ast.columns.push(col);
-      row.push(val);
+    const values: unknown[] = [];
+    for (const [column, value] of fields) {
+      this.ast.columns.push(column);
+      values.push(value);
     }
-    this.ast.values = this.createValues(row);
+    this.ast.values = this.createValues(values);
     return this;
   }
 

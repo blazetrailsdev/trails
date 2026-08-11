@@ -10,11 +10,9 @@ interface PermittedAttributes {
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
   assertHashAttributes(newAttributes);
 
-  const attrs = newAttributes;
-  if (isMassAssignmentEmpty(attrs)) return;
+  if (isMassAssignmentEmpty(newAttributes)) return;
 
-  const sanitized = sanitizeForMassAssignment(attrs);
-  _assignAttributes(model, sanitized);
+  _assignAttributes(model, sanitizeForMassAssignment(newAttributes));
 }
 
 export function attributeWriterMissing(
@@ -36,14 +34,14 @@ export function _assignAttributes(
 }
 
 /** @internal Rails-private helper. */
-export function _assignAttribute(model: AttributeAssignment, key: string, value: unknown): void {
-  const setter = findSetter(model, key);
+export function _assignAttribute(model: AttributeAssignment, k: string, v: unknown): void {
+  const setter = findSetter(model, k);
   if (setter) {
-    setter.call(model, value);
+    setter.call(model, v);
     return;
   }
   try {
-    model.writeAttribute(key, value);
+    model.writeAttribute(k, v);
   } catch (error) {
     // Rails `_assign_attribute` only writes through a setter; a key with no
     // setter goes straight to `attribute_writer_missing` → UnknownAttributeError.
@@ -53,9 +51,9 @@ export function _assignAttribute(model: AttributeAssignment, key: string, value:
     // MissingAttributeError with no setter — surface it as Rails does.
     if (error instanceof UnknownAttributeError || error instanceof MissingAttributeError) {
       if (typeof model.attributeWriterMissing === "function") {
-        model.attributeWriterMissing(key, value);
+        model.attributeWriterMissing(k, v);
       } else {
-        attributeWriterMissing(model, key, value);
+        attributeWriterMissing(model, k, v);
       }
     } else {
       throw error;

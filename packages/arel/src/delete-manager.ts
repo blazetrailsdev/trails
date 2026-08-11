@@ -42,13 +42,12 @@ export class DeleteManager extends TreeManager {
    *
    * Mirrors: Arel::DeleteManager#group
    */
-  group(column: Node | string, ...rest: (Node | string)[]): this {
-    const columns = [column, ...rest];
-    for (const c of columns) {
-      if (typeof c === "string") {
-        this.ast.groups.push(new Group(new SqlLiteral(c)));
+  group(columns: (Node | string)[]): this {
+    for (const column of columns) {
+      if (typeof column === "string") {
+        this.ast.groups.push(new Group(new SqlLiteral(column)));
       } else {
-        this.ast.groups.push(new Group(c));
+        this.ast.groups.push(new Group(column));
       }
     }
     return this;

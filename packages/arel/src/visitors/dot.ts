@@ -503,10 +503,9 @@ export class Dot extends Visitor {
 
   /** Mirrors Rails' Dot#edge — push edge, run block, pop. */
   protected edge(name: string, block: () => void): void {
-    const from = this.nodeStack[this.nodeStack.length - 1];
-    const e = new DotEdge(name, from);
-    this.edgeStack.push(e);
-    this.edges.push(e);
+    const edge = new DotEdge(name, this.nodeStack[this.nodeStack.length - 1]);
+    this.edgeStack.push(edge);
+    this.edges.push(edge);
     try {
       block();
     } finally {

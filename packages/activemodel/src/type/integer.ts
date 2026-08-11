@@ -58,7 +58,8 @@ export class IntegerType extends NumericValueType {
     // `castValue` (`to_i rescue nil`, integer.rb:90), and `in_range?(nil)` is
     // `!value` => true. Casting here rather than trusting the caller keeps this
     // predicate correct for a raw value, whether or not the caller pre-cast.
-    return this.isInRange(this.cast(value) as number | bigint | null);
+    const castValue = this.cast(value) as number | bigint | null;
+    return this.isInRange(castValue);
   }
 
   /**

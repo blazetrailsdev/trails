@@ -36,20 +36,25 @@ export abstract class Attribute {
 
   // --- Factory methods ---
 
-  static fromDatabase(name: string, value: unknown, type: Type, castValue?: unknown): FromDatabase {
+  static fromDatabase(
+    name: string,
+    valueBeforeTypeCast: unknown,
+    type: Type,
+    value?: unknown,
+  ): FromDatabase {
     if (arguments.length >= 4) {
-      return new FromDatabase(name, value, type, null, castValue);
+      return new FromDatabase(name, valueBeforeTypeCast, type, null, value);
     }
-    return new FromDatabase(name, value, type, null);
+    return new FromDatabase(name, valueBeforeTypeCast, type, null);
   }
 
   static fromUser(
     name: string,
-    value: unknown,
+    valueBeforeTypeCast: unknown,
     type: Type,
     originalAttribute: Attribute | null = null,
   ): FromUser {
-    return new FromUser(name, value, type, originalAttribute);
+    return new FromUser(name, valueBeforeTypeCast, type, originalAttribute);
   }
 
   static withCastValue(name: string, value: unknown, type: Type): WithCastValue {

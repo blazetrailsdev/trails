@@ -49,14 +49,14 @@ export class AttributeMutationTracker {
   }
 
   changedAttributeNames(): string[] {
-    return this.attrNames().filter((name) => this.isChanged(name));
+    return this.attrNames().filter((attrName) => this.isChanged(attrName));
   }
 
   changedValues(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const name of this.attrNames()) {
-      if (this.isChanged(name)) {
-        result[name] = this.originalValue(name);
+    for (const attrName of this.attrNames()) {
+      if (this.isChanged(attrName)) {
+        result[attrName] = this.originalValue(attrName);
       }
     }
     return result;
@@ -64,81 +64,81 @@ export class AttributeMutationTracker {
 
   changes(): Record<string, [unknown, unknown]> {
     const result: Record<string, [unknown, unknown]> = {};
-    for (const name of this.attrNames()) {
-      const change = this.changeToAttribute(name);
-      if (change) result[name] = change;
+    for (const attrName of this.attrNames()) {
+      const change = this.changeToAttribute(attrName);
+      if (change) result[attrName] = change;
     }
     return result;
   }
 
-  changeToAttribute(name: string): [unknown, unknown] | null {
-    if (this.isChanged(name)) {
-      return [this.originalValue(name), this.fetchValue(name)];
+  changeToAttribute(attrName: string): [unknown, unknown] | null {
+    if (this.isChanged(attrName)) {
+      return [this.originalValue(attrName), this.fetchValue(attrName)];
     }
     return null;
   }
 
   anyChanges(): boolean {
-    return this.attrNames().some((name) => this.isChanged(name));
+    return this.attrNames().some((attr) => this.isChanged(attr));
   }
 
-  isChanged(name: string, options?: { from?: unknown; to?: unknown }): boolean {
-    if (!this.attributeChanged(name)) return false;
+  isChanged(attrName: string, options?: { from?: unknown; to?: unknown }): boolean {
+    if (!this.attributeChanged(attrName)) return false;
     if (
       options &&
       "from" in options &&
-      !valuesEqual(this.originalValue(name), this.typeCast(name, options.from))
+      !valuesEqual(this.originalValue(attrName), this.typeCast(attrName, options.from))
     )
       return false;
     if (
       options &&
       "to" in options &&
-      !valuesEqual(this.fetchValue(name), this.typeCast(name, options.to))
+      !valuesEqual(this.fetchValue(attrName), this.typeCast(attrName, options.to))
     )
       return false;
     return true;
   }
 
-  changedInPlace(name: string): boolean {
-    return this.attributes.getAttribute(name).changedInPlace();
+  changedInPlace(attrName: string): boolean {
+    return this.attributes.getAttribute(attrName).changedInPlace();
   }
 
-  forgetChange(name: string): void {
-    this.forcedChanges.delete(name);
-    if (this.attributes.has(name)) {
-      const attr = this.attributes.getAttribute(name);
-      this.attributes.set(name, attr.forgettingAssignment());
+  forgetChange(attrName: string): void {
+    this.forcedChanges.delete(attrName);
+    if (this.attributes.has(attrName)) {
+      const attr = this.attributes.getAttribute(attrName);
+      this.attributes.set(attrName, attr.forgettingAssignment());
     }
   }
 
-  originalValue(name: string): unknown {
-    return this.attributes.getAttribute(name).originalValue;
+  originalValue(attrName: string): unknown {
+    return this.attributes.getAttribute(attrName).originalValue;
   }
 
-  forceChange(name: string): void {
+  forceChange(attrName: string): void {
     // Intentionally store the live value (no clone) to match Rails:
     // in-place mutations after forceChange must surface via dirty tracking.
-    this.forcedChanges.set(name, this.fetchValue(name));
+    this.forcedChanges.set(attrName, this.fetchValue(attrName));
   }
 
   protected attrNames(): string[] {
     const keys = new Set(this.attributes.keys());
-    for (const name of this.forcedChanges.keys()) keys.add(name);
+    for (const attrName of this.forcedChanges.keys()) keys.add(attrName);
     return [...keys];
   }
 
-  protected attributeChanged(name: string): boolean {
-    return this.forcedChanges.has(name) || this.attributes.getAttribute(name).isChanged();
+  protected attributeChanged(attrName: string): boolean {
+    return this.forcedChanges.has(attrName) || this.attributes.getAttribute(attrName).isChanged();
   }
 
   /** @internal */
-  protected fetchValue(name: string): unknown {
-    return this.attributes.fetchValue(name);
+  protected fetchValue(attrName: string): unknown {
+    return this.attributes.fetchValue(attrName);
   }
 
   /** @internal */
-  protected typeCast(name: string, value: unknown): unknown {
-    return this.attributes.getAttribute(name).typeCast(value);
+  protected typeCast(attrName: string, value: unknown): unknown {
+    return this.attributes.getAttribute(attrName).typeCast(value);
   }
 }
 
@@ -150,35 +150,35 @@ export class AttributeMutationTracker {
 export class ForcedMutationTracker extends AttributeMutationTracker {
   private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
 
-  changedInPlace(_name: string): boolean {
+  changedInPlace(_attrName: string): boolean {
     return false;
   }
 
-  changeToAttribute(name: string): [unknown, unknown] | null {
+  changeToAttribute(attrName: string): [unknown, unknown] | null {
     if (
       this.finalizedChanges &&
-      Object.prototype.hasOwnProperty.call(this.finalizedChanges, name)
+      Object.prototype.hasOwnProperty.call(this.finalizedChanges, attrName)
     ) {
-      return [...this.finalizedChanges[name]];
+      return [...this.finalizedChanges[attrName]];
     }
-    return super.changeToAttribute(name);
+    return super.changeToAttribute(attrName);
   }
 
-  forgetChange(name: string): void {
-    this.forcedChanges.delete(name);
+  forgetChange(attrName: string): void {
+    this.forcedChanges.delete(attrName);
   }
 
-  originalValue(name: string): unknown {
-    if (this.isChanged(name)) {
-      return this.forcedChanges.get(name);
+  originalValue(attrName: string): unknown {
+    if (this.isChanged(attrName)) {
+      return this.forcedChanges.get(attrName);
     }
-    return this.fetchValue(name);
+    return this.fetchValue(attrName);
   }
 
-  forceChange(name: string): void {
-    if (this.forcedChanges.has(name)) return;
-    const value = this.fetchValue(name);
-    this.forcedChanges.set(name, cloneValue(value));
+  forceChange(attrName: string): void {
+    if (this.forcedChanges.has(attrName)) return;
+    const value = this.fetchValue(attrName);
+    this.forcedChanges.set(attrName, cloneValue(value));
   }
 
   finalizeChanges(): void {
@@ -189,12 +189,12 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     return Array.from(this.forcedChanges.keys());
   }
 
-  protected override attributeChanged(name: string): boolean {
-    return this.forcedChanges.has(name);
+  protected override attributeChanged(attrName: string): boolean {
+    return this.forcedChanges.has(attrName);
   }
 
   /** @internal */
-  protected override typeCast(_name: string, value: unknown): unknown {
+  protected override typeCast(_attrName: string, value: unknown): unknown {
     return value;
   }
 }
@@ -217,7 +217,7 @@ export class NullMutationTracker {
     return {};
   }
 
-  changeToAttribute(_name: string): [unknown, unknown] | null {
+  changeToAttribute(_attrName: string): [unknown, unknown] | null {
     return null;
   }
 
@@ -225,19 +225,19 @@ export class NullMutationTracker {
     return false;
   }
 
-  isChanged(_name: string, _options?: { from?: unknown; to?: unknown }): boolean {
+  isChanged(_attrName: string, _options?: { from?: unknown; to?: unknown }): boolean {
     return false;
   }
 
-  changedInPlace(_name: string): boolean {
+  changedInPlace(_attrName: string): boolean {
     return false;
   }
 
-  originalValue(_name: string): unknown {
+  originalValue(_attrName: string): unknown {
     return undefined;
   }
 
-  forgetChange(_name: string): void {}
-  forceChange(_name: string): void {}
+  forgetChange(_attrName: string): void {}
+  forceChange(_attrName: string): void {}
   finalizeChanges(): void {}
 }

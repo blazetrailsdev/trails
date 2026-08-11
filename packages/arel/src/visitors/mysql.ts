@@ -13,12 +13,12 @@ export class MySQL extends ToSql {
   // cast form) rather than the prefix-`BINARY ` operator the previous
   // Trails impl used. Both force binary comparison; this matches Rails'
   // emitted SQL.
-  protected override visitArelNodesBin(node: Nodes.Bin, collector: SQLString): SQLString {
+  protected override visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
     collector.append("CAST(");
-    if (node.expr instanceof Node) {
-      this.visit(node.expr, collector);
-    } else if (node.expr !== null) {
-      collector.append(String(node.expr));
+    if (o.expr instanceof Node) {
+      this.visit(o.expr, collector);
+    } else if (o.expr !== null) {
+      collector.append(String(o.expr));
     }
     collector.append(" AS BINARY)");
     return collector;
@@ -30,70 +30,70 @@ export class MySQL extends ToSql {
   // relation prefix this leaves on for an Attribute is fine: MySQL's
   // `UPDATE t SET x = t.x + 1` is valid.
   protected override visitArelNodesUnqualifiedColumn(
-    node: Nodes.UnqualifiedColumn,
+    o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    if (node.expr instanceof Node) {
-      this.visit(node.expr, collector);
-    } else if (node.expr !== null) {
-      collector.append(String(node.expr));
+    if (o.expr instanceof Node) {
+      this.visit(o.expr, collector);
+    } else if (o.expr !== null) {
+      collector.append(String(o.expr));
     }
     return collector;
   }
 
   protected override visitArelNodesSelectStatement(
-    node: Nodes.SelectStatement,
+    o: Nodes.SelectStatement,
     collector: SQLString,
   ): SQLString {
-    if (node.with) {
-      this.visit(node.with, collector);
+    if (o.with) {
+      this.visit(o.with, collector);
       collector.append(" ");
     }
 
-    for (let i = 0; i < node.cores.length; i++) {
+    for (let i = 0; i < o.cores.length; i++) {
       if (i > 0) collector.append(" ");
-      this.visit(node.cores[i], collector);
+      this.visit(o.cores[i], collector);
     }
 
-    if (node.orders.length > 0) {
+    if (o.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, collector, ", ");
+      this.injectJoin(o.orders, collector, ", ");
     }
 
-    if (node.limit) {
+    if (o.limit) {
       collector.append(" ");
-      this.visit(node.limit, collector);
-    } else if (node.offset) {
+      this.visit(o.limit, collector);
+    } else if (o.offset) {
       // MySQL requires a LIMIT when using OFFSET; use the max unsigned 64-bit value.
       collector.append(" LIMIT 18446744073709551615");
     }
 
-    if (node.offset) {
+    if (o.offset) {
       collector.append(" ");
-      this.visit(node.offset, collector);
+      this.visit(o.offset, collector);
     }
 
-    if (node.lock) {
+    if (o.lock) {
       collector.append(" ");
-      this.visit(node.lock, collector);
+      this.visit(o.lock, collector);
     }
 
     return collector;
   }
 
   protected override visitArelNodesSelectCore(
-    node: Nodes.SelectCore,
+    o: Nodes.SelectCore,
     collector: SQLString,
   ): SQLString {
-    node.froms ??= new Nodes.SqlLiteral("DUAL", { retryable: true });
-    return super.visitArelNodesSelectCore(node, collector);
+    o.froms ??= new Nodes.SqlLiteral("DUAL", { retryable: true });
+    return super.visitArelNodesSelectCore(o, collector);
   }
 
-  protected override visitArelNodesConcat(node: Nodes.Concat, collector: SQLString): SQLString {
+  protected override visitArelNodesConcat(o: Nodes.Concat, collector: SQLString): SQLString {
     collector.append(" CONCAT(");
-    this.visit(node.left, collector);
+    this.visit(o.left, collector);
     collector.append(", ");
-    this.visit(node.right, collector);
+    this.visit(o.right, collector);
     collector.append(") ");
     return collector;
   }
@@ -102,68 +102,62 @@ export class MySQL extends ToSql {
   // FROM` is supported only on MySQL 8.0.14+; the operator form works
   // on every MySQL version.
   protected override visitArelNodesIsNotDistinctFrom(
-    node: Nodes.IsNotDistinctFrom,
+    o: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    this.visit(node.left, collector);
+    this.visit(o.left, collector);
     collector.append(" <=> ");
-    this.visit(node.right, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
   protected override visitArelNodesIsDistinctFrom(
-    node: Nodes.IsDistinctFrom,
+    o: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
     collector.append("NOT ");
-    return this.visitArelNodesIsNotDistinctFrom(node, collector);
+    return this.visitArelNodesIsNotDistinctFrom(o, collector);
   }
 
   // MySQL uses `REGEXP` / `NOT REGEXP`, not the SQL-standard `~` /
   // `!~` (which is Postgres). Mirrors Rails MySQL's `infix_value`
   // helper — same shape as visitArelNodesMatches.
-  protected override visitArelNodesRegexp(node: Nodes.Regexp, collector: SQLString): SQLString {
-    this.visit(node.left, collector);
+  protected override visitArelNodesRegexp(o: Nodes.Regexp, collector: SQLString): SQLString {
+    this.visit(o.left, collector);
     collector.append(" REGEXP ");
-    this.visit(node.right, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
-  protected override visitArelNodesNotRegexp(
-    node: Nodes.NotRegexp,
-    collector: SQLString,
-  ): SQLString {
-    this.visit(node.left, collector);
+  protected override visitArelNodesNotRegexp(o: Nodes.NotRegexp, collector: SQLString): SQLString {
+    this.visit(o.left, collector);
     collector.append(" NOT REGEXP ");
-    this.visit(node.right, collector);
+    this.visit(o.right, collector);
     return collector;
   }
 
   protected override visitArelNodesNullsFirst(
-    node: Nodes.NullsFirst,
+    o: Nodes.NullsFirst,
     collector: SQLString,
   ): SQLString {
     // MySQL has no NULLS FIRST; emulate: col IS NOT NULL, col ASC/DESC
-    const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visit(ordering.expr as Nodes.NodeOrValue, collector);
+    const expr = o.expr as Nodes.Ascending | Nodes.Descending;
+    this.visit(expr.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NOT NULL, ");
-    this.visit(ordering, collector);
+    this.visit(expr, collector);
     return collector;
   }
 
-  protected override visitArelNodesNullsLast(
-    node: Nodes.NullsLast,
-    collector: SQLString,
-  ): SQLString {
+  protected override visitArelNodesNullsLast(o: Nodes.NullsLast, collector: SQLString): SQLString {
     // MySQL has no NULLS LAST; emulate: col IS NULL, col ASC/DESC
-    const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visit(ordering.expr as Nodes.NodeOrValue, collector);
+    const expr = o.expr as Nodes.Ascending | Nodes.Descending;
+    this.visit(expr.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NULL, ");
-    this.visit(ordering, collector);
+    this.visit(expr, collector);
     return collector;
   }
 
-  protected override visitArelNodesCte(node: Nodes.Cte, collector: SQLString): SQLString {
+  protected override visitArelNodesCte(o: Nodes.Cte, collector: SQLString): SQLString {
     // MySQL identifiers are backtick-quoted, not double-quoted, and the
     // MATERIALIZED / NOT MATERIALIZED modifiers Postgres supports are
     // ignored. Mirrors Rails' MySQL visit_Arel_Nodes_Cte which calls
@@ -172,12 +166,12 @@ export class MySQL extends ToSql {
     // SelectManager as Rails does), so we add them explicitly. But a
     // Grouping (SqlLiteral path) or a set-operation node (array CTE → UnionAll)
     // visits with its own parens — skip the explicit wrap in that case.
-    collector.append(`${this.quoteTableName(node.name)} AS `);
-    if (cteRelationSelfWraps(node.relation)) {
-      this.visit(node.relation, collector);
+    collector.append(`${this.quoteTableName(o.name)} AS `);
+    if (cteRelationSelfWraps(o.relation)) {
+      this.visit(o.relation, collector);
     } else {
       collector.append("(");
-      this.visit(node.relation, collector);
+      this.visit(o.relation, collector);
       collector.append(")");
     }
     return collector;
@@ -240,9 +234,12 @@ export class MySQL extends ToSql {
 
     const stmt = new Nodes.SelectStatement();
     const core = stmt.cores[stmt.cores.length - 1];
-    const keyName = (key as unknown as { name: string }).name;
     core.source = new Nodes.JoinSource(new Nodes.Grouping(subselect).as("__active_record_temp"));
-    core.projections = [new Nodes.SqlLiteral(this.quoteColumnName(keyName), { retryable: true })];
+    core.projections = [
+      new Nodes.SqlLiteral(this.quoteColumnName((key as unknown as { name: string }).name), {
+        retryable: true,
+      }),
+    ];
     return stmt;
   }
 }
