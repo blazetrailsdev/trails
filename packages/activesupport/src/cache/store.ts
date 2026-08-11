@@ -101,6 +101,14 @@ export abstract class Store {
     }
   }
 
+  /**
+   * Mirrors Rails `Cache::Store#fetch` (cache.rb:443). Rails reassigns
+   * `options = merged_options(options)`; TypeScript cannot, because the
+   * pre-merge value here is a `let` local (the overload split), and TS drops
+   * narrowing for a `let` assigned on more than one branch — so the merged
+   * value is a block-scoped `options` and the pre-merge one keeps Rails' other
+   * name for it, `call_options` (cache.rb:861, 948).
+   */
   fetch(
     name: string,
     options?: StoreOptions,
