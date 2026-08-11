@@ -265,6 +265,7 @@ import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
   scopeRegistry as _scopeRegistry,
+  globalCurrentScope as _globalCurrentScope,
   scopeAttributes,
   defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
@@ -2267,6 +2268,11 @@ export class Base extends Model {
   static get currentScope(): any | null {
     return ScopeRegistry.currentScope(this);
   }
+
+  /**
+   * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope
+   */
+  static globalCurrentScope = _globalCurrentScope;
 
   /**
    * Mirrors: ActiveRecord::Scoping::ClassMethods#scope_registry

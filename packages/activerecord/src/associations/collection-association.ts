@@ -10,7 +10,6 @@ import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
-import { polymorphicName } from "../inheritance.js";
 
 /**
  * The persisted-owner DB work `replace` defers to its awaitable caller: the
@@ -983,7 +982,7 @@ export class CollectionAssociation extends Association {
       const typeCol = this.polymorphicTypeColumn()!;
       // Rails writes `owner.class.base_class.name` (polymorphic_name) for the
       // `as:` type column, so STI subclasses store their base class name.
-      const typeName = polymorphicName(ctor as typeof Base);
+      const typeName = (ctor as typeof Base).polymorphicName();
       if (typeof (record as any)._writeAttribute === "function") {
         (record as any)._writeAttribute(typeCol, typeName);
       } else {

@@ -4,7 +4,6 @@ import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
-import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -241,14 +240,14 @@ export class AssociationScope {
     const fks = Array.isArray(joinFk) ? joinFk : joinFk ? [joinFk] : [];
     for (const fk of fks) binds.push(owner._readAttribute(fk));
     if ((last as { type?: string | null }).type) {
-      binds.push(polymorphicName(owner.constructor as typeof Base));
+      binds.push((owner.constructor as typeof Base).polymorphicName());
     }
     for (let i = 0; i < chain.length - 1; i++) {
       const refl = chain[i];
       const next = chain[i + 1];
       if ((refl as { type?: string | null }).type) {
         const nextKlass = (next as { klass?: typeof Base }).klass;
-        binds.push(nextKlass ? polymorphicName(nextKlass) : null);
+        binds.push(nextKlass ? nextKlass.polymorphicName() : null);
       }
     }
     return binds;
@@ -469,7 +468,7 @@ export class AssociationScope {
     if (r.type) {
       // Rails: `owner.class.polymorphic_name` (returns base_class.name
       // for STI subclasses) routed through `transform_value`.
-      const polyName = this.transformValue(polymorphicName(owner.constructor as typeof Base));
+      const polyName = this.transformValue((owner.constructor as typeof Base).polymorphicName());
       scope = this.applyScope(scope, tableNode, r.type, polyName);
     }
     return scope;
@@ -625,7 +624,7 @@ export class AssociationScope {
       // (association_scope.rb:93-96). Routes through both `polymorphicName`
       // (base_class.name for STI) and the value-transformation lambda.
       const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
-      const nextName = nextKlass ? polymorphicName(nextKlass) : "";
+      const nextName = nextKlass ? nextKlass.polymorphicName() : "";
       // Qualify with the resolved node's name — the alias for an aliased
       // chain, the bare table otherwise — matching Rails' `apply_scope(scope,
       // table, ...)` where `table` is `reflection.aliased_table` (so

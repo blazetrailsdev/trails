@@ -154,6 +154,14 @@ export function isScopeAttributes(this: ScopingClassHost): boolean {
   return !!this.currentScope;
 }
 
+/**
+ * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope
+ * (scoping.rb:34-36).
+ */
+export function globalCurrentScope(this: ScopingClassHost, skipInheritedScope = false): any | null {
+  return ScopeRegistry.globalCurrentScope(this as unknown as object, skipInheritedScope);
+}
+
 export function scopeRegistry(): ScopeRegistry {
   return ScopeRegistry.instance();
 }

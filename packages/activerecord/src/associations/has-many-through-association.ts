@@ -41,6 +41,35 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /**
+   * Rails' ThroughAssociation / HasManyThroughAssociation instance methods,
+   * installed onto the prototype at the bottom of this file (the trails mixin
+   * idiom) so each is called on `this` with Rails' own argument list.
+   *
+   * @internal
+   */
+  declare buildThroughRecord: (record: Base) => Base | null;
+  /** @internal */
+  declare throughScope: () => unknown;
+  /** @internal */
+  declare throughScopeAttributes: () => Record<string, unknown>;
+  /** @internal */
+  declare saveThroughRecord: (record: Base) => Promise<boolean>;
+  /** @internal */
+  declare throughRecordsFor: (record: Base) => Base[];
+  /** @internal */
+  declare deleteThroughRecords: (records: Base[]) => Promise<void>;
+  /** @internal */
+  declare throughReflection: () => unknown;
+  /** @internal */
+  declare throughAssociation: () => unknown;
+  /** @internal */
+  declare constructJoinAttributes: (...records: Base[]) => Record<string, unknown>;
+  /** @internal */
+  declare ensureMutable: () => void;
+  /** @internal */
+  declare ensureNotNested: () => void;
+
+  /**
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#find_target
    * (has_many_through_association.rb:225) — reads owner and reflection off
    * `this`, exactly as Rails does, and delegates the query itself to
@@ -108,7 +137,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::ThroughAssociation#transaction
    */
   protected override transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
-    const klass = (throughReflection(this) as { klass: { transaction(b: unknown): unknown } })
+    const klass = (this.throughReflection() as { klass: { transaction(b: unknown): unknown } })
       .klass;
     return klass.transaction(block) as Promise<R | undefined>;
   }
@@ -161,11 +190,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * @internal
    */
   protected override async concatRecords(records: Base[], _shouldRaise = false): Promise<Base[]> {
-    ensureNotNested(this);
+    this.ensureNotNested();
     const added = await super.concatRecords(records, true);
     if (this.owner.isNewRecord() && added) {
       for (const record of added.flat()) {
-        buildThroughRecord(this, record);
+        this.buildThroughRecord(record);
       }
     }
     return added;
@@ -181,7 +210,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    */
   protected override buildThroughRecordsInMemory(records: Base[]): void {
     for (const record of records) {
-      buildThroughRecord(this, record);
+      this.buildThroughRecord(record);
     }
   }
 
@@ -234,13 +263,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * then creates/saves the join row via the through association.
    */
   override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
-    ensureNotNested(this);
+    this.ensureNotNested();
     const needsTargetSave = record.isNewRecord() || record.hasChangesToSave;
     if (needsTargetSave) {
       const saved = await super.insertRecord(record, validate, raise);
       if (!saved) return false;
     }
-    return saveThroughRecord(this, record);
+    return this.saveThroughRecord(record);
   }
 
   /**
@@ -269,7 +298,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * wires it onto that inverse so the join is created alongside the target.
    */
   protected override buildRecord(attributes?: Record<string, unknown>): Base | null {
-    ensureNotNested(this);
+    this.ensureNotNested();
     (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = (
       this as unknown as { scope?: () => unknown }
     ).scope?.();
@@ -334,7 +363,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // truthy so deleteOrDestroy hands back `resolved`; the empty-args guard is
     // the only through path that yields nil.
     await super.removeRecords(existingRecords, records, method);
-    await deleteThroughRecords(this, records);
+    await this.deleteThroughRecords(records);
     return true;
   }
 
@@ -346,15 +375,15 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * @internal
    */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
-    ensureNotNested(this);
+    this.ensureNotNested();
     const throughName = this.reflection.options.through;
     const owner = this.owner as unknown as { association?: (n: string) => any };
     const throughAssoc = throughName ? (owner.association?.(throughName) ?? null) : null;
     if (!throughAssoc) return 0;
 
     let scope: any = throughAssoc.scope();
-    scope = scope.where(constructJoinAttributes(this, ...records));
-    const extra = throughScopeAttributes(this);
+    scope = scope.where(this.constructJoinAttributes(...records));
+    const extra = this.throughScopeAttributes();
     if (Object.keys(extra).length > 0) scope = scope.where(extra);
 
     // Dispatch on `method` exactly as Rails' `delete_records` case statement:
@@ -386,7 +415,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       count = await scope.deleteAll();
     }
 
-    await deleteThroughRecords(this, records);
+    await this.deleteThroughRecords(records);
 
     // Rails' counter-cache tail (has_many_through_association.rb:159-173). Kept
     // inline (rather than in a helper) so the ported `delete_records` body makes
@@ -500,6 +529,7 @@ export function buildThroughInverseFor(
     owner,
     reflection,
     _throughScope: throughScope,
+    ...throughAssociationMethods,
   } as unknown as HasManyThroughAssociation;
   const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(reflection.name);
@@ -511,7 +541,7 @@ export function buildThroughInverseFor(
     : sourceRefl.inverseOf?.();
   if (!inverse?.name) return null;
 
-  const throughRecord = buildThroughRecord(assoc, record);
+  const throughRecord = assoc.buildThroughRecord(record);
   if (!throughRecord) return null;
 
   return {
@@ -540,22 +570,22 @@ export function buildThroughInverseFor(
  * target's primary key when both are saved together.
  * @internal
  */
-function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Base | null {
+function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base | null {
   // HABTM associations don't expose a sourceReflection chain, so
   // constructJoinAttributes (which keys off source_reflection) can't run.
   // Build the join row from the habtm options instead — matches Rails'
   // build_through_record path for habtm under the hood.
-  if ((assoc.reflection as any).type === "hasAndBelongsToMany") {
-    return buildHabtmThroughRecord(assoc, record);
+  if ((this.reflection as any).type === "hasAndBelongsToMany") {
+    return buildHabtmThroughRecord(this, record);
   }
-  const cache = throughRecordsCache(assoc);
+  const cache = throughRecordsCache(this);
   const cached = cache.get(record);
   if (cached) return cached;
 
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection;
-  const proxy = throughProxy(assoc);
+  const proxy = throughProxy(this);
   if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
 
   // When the through is a singular (has_one/belongs_to) association that's already
@@ -568,16 +598,13 @@ function buildThroughRecord(assoc: HasManyThroughAssociation, record: Base): Bas
     return existingTarget;
   }
 
-  const attributes = throughScopeAttributes(assoc);
+  const attributes = this.throughScopeAttributes();
   if (sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo") {
     attributes[sourceRefl.name] = record;
   }
   const newRecord = proxy.build(attributes);
-  if (assoc.reflection.options.sourceType && sourceRefl.foreignType) {
-    (newRecord as any).writeAttribute?.(
-      sourceRefl.foreignType,
-      assoc.reflection.options.sourceType,
-    );
+  if (this.reflection.options.sourceType && sourceRefl.foreignType) {
+    (newRecord as any).writeAttribute?.(sourceRefl.foreignType, this.reflection.options.sourceType);
   }
   cache.set(record, newRecord);
   return newRecord;
@@ -638,18 +665,18 @@ function buildHabtmThroughRecord(assoc: HasManyThroughAssociation, record: Base)
 }
 
 /** @internal */
-function throughScope(assoc: HasManyThroughAssociation): unknown {
+function throughScope(this: HasManyThroughAssociation): unknown {
   // through_scope is set externally by the association's concat/insert path.
   // Return the memoized scope if it was set; otherwise null.
-  return (assoc as any)._throughScope ?? null;
+  return (this as any)._throughScope ?? null;
 }
 
 /** @internal */
-function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string, unknown> {
+function throughScopeAttributes(this: HasManyThroughAssociation): Record<string, unknown> {
   // Extract WHERE conditions from the through scope for the through model's table.
-  const throughName = assoc.reflection.options.through;
+  const throughName = this.reflection.options.through;
   if (!throughName) return {};
-  const throughAssoc = (assoc.owner as any).association?.(throughName);
+  const throughAssoc = (this.owner as any).association?.(throughName);
   if (!throughAssoc) return {};
   // Rails: `scope = through_scope || self.scope` (hmt:72). The `_throughScope`
   // ivar is set during `buildRecord` (hmt:93) and cleared after; consult it
@@ -663,7 +690,7 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
   // filters the equality predicates to the through model's table, so
   // target-table predicates carried by any of these relations are dropped
   // rather than leaking into the join row / delete query.
-  const scope: any = throughScope(assoc) ?? (assoc as any).scope?.() ?? throughAssoc.scope?.();
+  const scope: any = this.throughScope() ?? (this as any).scope?.() ?? throughAssoc.scope?.();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = throughAssoc.klass?.tableName ?? "";
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
@@ -677,25 +704,25 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
 }
 
 /** @internal */
-async function saveThroughRecord(assoc: HasManyThroughAssociation, record: Base): Promise<boolean> {
+async function saveThroughRecord(this: HasManyThroughAssociation, record: Base): Promise<boolean> {
   // `build_through_record` constructs the join row synchronously, so the join
   // model's attribute definitions have to be in place first. Ruby reflects
   // columns lazily on first access; trails' reflection is async, and a join
   // model on a secondary connection (HABTM "alternate database") has not been
   // reflected by the time we get here — assigning its FK would raise
   // UnknownAttributeError. No Rails counterpart; purely the async-schema seam.
-  const throughKlass = safeKlass(throughReflection(assoc) as { klass?: unknown } | null);
+  const throughKlass = safeKlass(this.throughReflection() as { klass?: unknown } | null);
   if (typeof throughKlass?.ensureSchemaLoaded === "function") {
     await throughKlass.ensureSchemaLoaded();
   }
   try {
-    const joinRecord = buildThroughRecord(assoc, record);
+    const joinRecord = this.buildThroughRecord(record);
     if (!joinRecord) return true;
     if (!joinRecord.changed) return true;
     await (joinRecord as any).saveBang();
     return true;
   } finally {
-    throughRecordsCache(assoc).delete(record);
+    throughRecordsCache(this).delete(record);
   }
 }
 
@@ -775,7 +802,7 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 function throughCounterReflection(
   assoc: HasManyThroughAssociation,
 ): RichCounterReflection | undefined {
-  return (throughReflection(assoc) as RichCounterReflection | null) ?? undefined;
+  return (assoc.throughReflection() as RichCounterReflection | null) ?? undefined;
 }
 
 /**
@@ -795,10 +822,10 @@ async function updateThroughCounterCache(
 }
 
 /** @internal */
-function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base[] {
-  const throughName = assoc.reflection.options.through;
+function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[] {
+  const throughName = this.reflection.options.through;
   if (!throughName) return [];
-  const proxy = throughProxy(assoc);
+  const proxy = throughProxy(this);
   if (!proxy) return [];
 
   // Mirrors Rails `through_records_for`: filter the through target by
@@ -808,7 +835,7 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
   // a `{ source_reflection_name => record }` association map — the latter is how
   // an in-memory-built join row (whose FK is still nil until the target is
   // saved) is matched by the source *record*, not its yet-unset FK column.
-  const joinAttrs = constructJoinAttributes(assoc, record);
+  const joinAttrs = this.constructJoinAttributes(record);
   const candidates: Base[] = Array.isArray(proxy.target)
     ? proxy.target
     : proxy.target
@@ -836,17 +863,17 @@ function throughRecordsFor(assoc: HasManyThroughAssociation, record: Base): Base
 }
 
 /** @internal */
-function deleteThroughRecords(assoc: HasManyThroughAssociation, records: Base[]): Promise<void> {
+function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]): Promise<void> {
   // Mirrors Rails `delete_through_records`: prune the matching join rows from
   // the through target, then evict the per-record `@through_records` cache so a
   // built-then-removed target is not re-associated when the owner is saved.
-  const throughName = assoc.reflection.options.through;
+  const throughName = this.reflection.options.through;
   if (!throughName) return Promise.resolve();
-  const proxy = throughProxy(assoc);
-  const cache = throughRecordsCache(assoc);
+  const proxy = throughProxy(this);
+  const cache = throughRecordsCache(this);
   if (!proxy) return Promise.resolve();
   for (const record of records) {
-    const toDelete = throughRecordsFor(assoc, record);
+    const toDelete = this.throughRecordsFor(record);
     if (Array.isArray(proxy.target)) {
       for (const r of toDelete) {
         const idx = proxy.target.indexOf(r);
@@ -909,19 +936,19 @@ export function multisetIntersection(a: Base[], b: Base[]): Base[] {
  *
  * @internal
  */
-function throughReflection(assoc: HasManyThroughAssociation): unknown {
-  // Resolve the rich reflection first — assoc.reflection is the
+function throughReflection(this: HasManyThroughAssociation): unknown {
+  // Resolve the rich reflection first — this.reflection is the
   // AssociationDefinition (no throughReflection getter), so we need
   // ThroughReflection#throughReflection from the registry.
   type Refl = {
     throughReflection?: Refl | null;
     isThroughReflection?: () => boolean;
   };
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
   let refl: Refl | null =
-    (ctor._reflectOnAssociation?.(assoc.reflection.name) as Refl | null)?.throughReflection ?? null;
+    (ctor._reflectOnAssociation?.(this.reflection.name) as Refl | null)?.throughReflection ?? null;
   if (!refl) {
-    const throughName = assoc.reflection.options.through;
+    const throughName = this.reflection.options.through;
     if (!throughName) return null;
     refl = ctor._reflectOnAssociation?.(throughName) ?? null;
   }
@@ -939,12 +966,10 @@ function throughReflection(assoc: HasManyThroughAssociation): unknown {
  *
  * @internal
  */
-function throughAssociation(assoc: HasManyThroughAssociation): unknown {
-  const tr = throughReflection(assoc) as { name?: string } | null;
+function throughAssociation(this: HasManyThroughAssociation): unknown {
+  const tr = this.throughReflection() as { name?: string } | null;
   if (!tr?.name) return null;
-  return (assoc.owner as unknown as { association?: (n: string) => unknown }).association?.(
-    tr.name,
-  );
+  return (this.owner as unknown as { association?: (n: string) => unknown }).association?.(tr.name);
 }
 
 /**
@@ -965,7 +990,7 @@ interface ThroughTargetStore {
 }
 
 function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | null {
-  const tr = throughReflection(assoc) as {
+  const tr = assoc.throughReflection() as {
     name?: string;
     isCollection?: () => boolean;
     macro?: string;
@@ -1009,12 +1034,12 @@ function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | nu
  * @internal
  */
 function constructJoinAttributes(
-  assoc: HasManyThroughAssociation,
+  this: HasManyThroughAssociation,
   ...records: Base[]
 ): Record<string, unknown> {
-  ensureMutable(assoc);
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  this.ensureMutable();
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const reflKlass = safeKlass(refl);
@@ -1062,22 +1087,22 @@ function constructJoinAttributes(
  *
  * @internal
  */
-function ensureMutable(assoc: HasManyThroughAssociation): void {
+function ensureMutable(this: HasManyThroughAssociation): void {
   // HABTM associations are always mutable: the join model's right side is an
   // implicit belongsTo, but our habtm reflection doesn't expose that chain.
   // Rails reaches the same conclusion via source_reflection.belongs_to?.
-  if ((assoc.reflection as any).type === "hasAndBelongsToMany") return;
+  if ((this.reflection as any).type === "hasAndBelongsToMany") return;
 
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection as
     | { isBelongsTo?: () => boolean; macro?: string }
     | undefined;
   const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
   if (!isBelongs) {
     throw new HasManyThroughCantAssociateThroughHasOneOrManyReflection(
-      (assoc.owner.constructor as { name: string }).name,
-      assoc.reflection.name,
+      (this.owner.constructor as { name: string }).name,
+      this.reflection.name,
     );
   }
 }
@@ -1090,15 +1115,15 @@ function ensureMutable(assoc: HasManyThroughAssociation): void {
  *
  * @internal
  */
-function ensureNotNested(assoc: HasManyThroughAssociation): void {
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as {
+function ensureNotNested(this: HasManyThroughAssociation): void {
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name) as {
     isNested?: () => boolean;
   } | null;
   if (refl?.isNested?.()) {
     throw new HasManyThroughNestedAssociationsAreReadonly(
-      (assoc.owner.constructor as { name: string }).name,
-      assoc.reflection.name,
+      (this.owner.constructor as { name: string }).name,
+      this.reflection.name,
     );
   }
 }
@@ -1247,3 +1272,24 @@ async function loadHasManyThrough(
     return rel.toArray();
   }
 }
+
+/**
+ * Rails' `ThroughAssociation` / `HasManyThroughAssociation` instance methods.
+ * Installed on the prototype (Ruby `include`) rather than passed a host
+ * argument, so every call site reads exactly as the Ruby does.
+ */
+const throughAssociationMethods = {
+  buildThroughRecord,
+  throughScope,
+  throughScopeAttributes,
+  saveThroughRecord,
+  throughRecordsFor,
+  deleteThroughRecords,
+  throughReflection,
+  throughAssociation,
+  constructJoinAttributes,
+  ensureMutable,
+  ensureNotNested,
+};
+
+Object.assign(HasManyThroughAssociation.prototype, throughAssociationMethods);

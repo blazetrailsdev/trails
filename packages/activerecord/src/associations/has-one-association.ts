@@ -11,7 +11,6 @@ import {
 } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
-import { polymorphicName } from "../inheritance.js";
 
 /**
  * Manages has_one associations. Handles dependent destruction,
@@ -200,7 +199,7 @@ export class HasOneAssociation extends SingularAssociation {
     switch (this.reflection.options.dependent) {
       case "restrictWithException":
         if (await this.loadTarget()) {
-          throw new DeleteRestrictionError(this.owner, this.reflection.name);
+          throw new DeleteRestrictionError(this.reflection.name);
         }
         break;
 
@@ -558,7 +557,7 @@ export class HasOneAssociation extends SingularAssociation {
         this.reflection.options.foreignType ?? `${underscore(this.reflection.options.as)}_type`;
       // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
       // subclasses store their base class name in the `as:` type column.
-      const typeName = polymorphicName(ctor as typeof Base);
+      const typeName = (ctor as typeof Base).polymorphicName();
       if (typeof (record as any)._writeAttribute === "function") {
         (record as any)._writeAttribute(typeCol, typeName);
       } else {

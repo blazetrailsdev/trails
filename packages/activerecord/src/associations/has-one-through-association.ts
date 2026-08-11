@@ -30,6 +30,27 @@ function safeKlass(refl: { klass?: unknown } | null | undefined): any {
  */
 export class HasOneThroughAssociation extends HasOneAssociation {
   /**
+   * Rails' `ThroughAssociation` / `HasOneThroughAssociation` instance methods,
+   * installed onto the prototype at the bottom of this file (the trails mixin
+   * idiom) so each is called on `this` with Rails' own argument list.
+   *
+   * @internal
+   */
+  declare createThroughRecord: (record: Base | null, save: boolean) => Promise<Base | null>;
+  /** @internal */
+  declare transaction: <R>(block: (tx?: any) => Promise<R>) => Promise<R | undefined>;
+  /** @internal */
+  declare throughReflection: () => unknown;
+  /** @internal */
+  declare throughAssociation: () => any;
+  /** @internal */
+  declare constructJoinAttributes: (...records: Base[]) => Record<string, unknown>;
+  /** @internal */
+  declare ensureMutable: () => void;
+  /** @internal */
+  declare ensureNotNested: () => void;
+
+  /**
    * A has_one_through persists its association through a join-model
    * build/create/update/destroy (`createThroughRecord`), not the direct
    * foreign-key save the base `HasOneAssociation` uses, so it keeps its own
@@ -105,7 +126,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * @internal
    */
   protected override loadTargetForBuild(): Promise<unknown> {
-    const throughProxy = throughAssociation(this) as {
+    const throughProxy = this.throughAssociation() as {
       loadTarget?: () => unknown;
     } | null;
     return Promise.resolve(throughProxy?.loadTarget?.());
@@ -366,10 +387,10 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   private constructThroughRecordInMemory(record: Base, save: boolean): void {
     if (!((this.owner as any).isNewRecord?.() || !save)) return;
 
-    ensureNotNested(this);
-    const throughProxy = throughAssociation(this);
+    this.ensureNotNested();
+    const throughProxy = this.throughAssociation();
     if (!throughProxy) return;
-    const attrs = constructJoinAttributes(this, record);
+    const attrs = this.constructJoinAttributes(record);
     const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
       if ((throughRecord as any).isNewRecord?.()) {
@@ -511,7 +532,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     // strand the sentinel either.
     if (this._pendingUnloadedThroughReconcile) {
       this._pendingUnloadedThroughReconcile = false;
-      const tp = throughAssociation(this) as {
+      const tp = this.throughAssociation() as {
         reset?: () => void;
         _pendingReplace?: unknown;
       } | null;
@@ -519,21 +540,21 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       if (tp) tp._pendingReplace = null;
     }
     if (!pending) return;
-    await transaction(this, async () => {
-      await createThroughRecord(this, pending.record, save);
+    await this.transaction(async () => {
+      await this.createThroughRecord(pending.record, save);
     });
   }
 }
 
 /** @internal */
 async function createThroughRecord(
-  assoc: HasOneThroughAssociation,
+  this: HasOneThroughAssociation,
   record: Base | null,
   save: boolean,
 ): Promise<Base | null> {
-  ensureNotNested(assoc);
+  this.ensureNotNested();
 
-  const throughProxy = throughAssociation(assoc);
+  const throughProxy = this.throughAssociation();
   if (!throughProxy) return null;
 
   let throughRecord = await throughProxy.loadTarget?.();
@@ -551,7 +572,7 @@ async function createThroughRecord(
   if (record) {
     // Mutability is enforced inside constructJoinAttributes — keep the
     // precondition in one place.
-    const attrs = constructJoinAttributes(assoc, record);
+    const attrs = this.constructJoinAttributes(record);
 
     if (throughRecord) {
       if (throughRecord.isNewRecord?.()) {
@@ -559,7 +580,7 @@ async function createThroughRecord(
       } else {
         await throughRecord.update?.(attrs);
       }
-    } else if ((assoc.owner as any).isNewRecord?.() || !save) {
+    } else if ((this.owner as any).isNewRecord?.() || !save) {
       buildThroughProxyRecord(throughProxy, attrs);
     } else {
       await throughProxy.create?.(attrs);
@@ -577,10 +598,10 @@ async function createThroughRecord(
  * @internal
  */
 function transaction<R>(
-  assoc: HasOneThroughAssociation,
+  this: HasOneThroughAssociation,
   block: (tx?: any) => Promise<R>,
 ): Promise<R | undefined> {
-  const tr = throughReflection(assoc) as { klass?: unknown } | null;
+  const tr = this.throughReflection() as { klass?: unknown } | null;
   const klass = safeKlass(tr) as { transaction?: (...args: any[]) => any } | null;
   if (klass && typeof klass.transaction === "function") {
     return klass.transaction(block) as Promise<R | undefined>;
@@ -595,19 +616,19 @@ function transaction<R>(
  *
  * @internal
  */
-function throughReflection(assoc: HasOneThroughAssociation): unknown {
-  // Resolve the rich reflection first — assoc.reflection is the
+function throughReflection(this: HasOneThroughAssociation): unknown {
+  // Resolve the rich reflection first — this.reflection is the
   // AssociationDefinition (no throughReflection getter), so we need
   // ThroughReflection#throughReflection from the registry.
   type Refl = {
     throughReflection?: Refl | null;
     isThroughReflection?: () => boolean;
   };
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
   let refl: Refl | null =
-    (ctor._reflectOnAssociation?.(assoc.reflection.name) as Refl | null)?.throughReflection ?? null;
+    (ctor._reflectOnAssociation?.(this.reflection.name) as Refl | null)?.throughReflection ?? null;
   if (!refl) {
-    const throughName = assoc.reflection.options.through;
+    const throughName = this.reflection.options.through;
     if (!throughName) return null;
     refl = ctor._reflectOnAssociation?.(throughName) ?? null;
   }
@@ -625,10 +646,10 @@ function throughReflection(assoc: HasOneThroughAssociation): unknown {
  *
  * @internal
  */
-function throughAssociation(assoc: HasOneThroughAssociation): any {
-  const tr = throughReflection(assoc) as { name?: string } | null;
+function throughAssociation(this: HasOneThroughAssociation): any {
+  const tr = this.throughReflection() as { name?: string } | null;
   if (!tr?.name) return null;
-  return (assoc.owner as any).association?.(tr.name);
+  return (this.owner as any).association?.(tr.name);
 }
 
 /**
@@ -641,12 +662,12 @@ function throughAssociation(assoc: HasOneThroughAssociation): any {
  * @internal
  */
 function constructJoinAttributes(
-  assoc: HasOneThroughAssociation,
+  this: HasOneThroughAssociation,
   ...records: Base[]
 ): Record<string, unknown> {
-  ensureMutable(assoc);
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  this.ensureMutable();
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const reflKlass = safeKlass(refl);
@@ -700,17 +721,17 @@ function constructJoinAttributes(
  *
  * @internal
  */
-function ensureMutable(assoc: HasOneThroughAssociation): void {
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+function ensureMutable(this: HasOneThroughAssociation): void {
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   const sourceRefl = refl?.sourceReflection as
     | { isBelongsTo?: () => boolean; macro?: string }
     | undefined;
   const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
   if (!isBelongs) {
     throw new HasOneThroughCantAssociateThroughHasOneOrManyReflection(
-      (assoc.owner.constructor as { name: string }).name,
-      assoc.reflection.name,
+      (this.owner.constructor as { name: string }).name,
+      this.reflection.name,
     );
   }
 }
@@ -723,15 +744,15 @@ function ensureMutable(assoc: HasOneThroughAssociation): void {
  *
  * @internal
  */
-function ensureNotNested(assoc: HasOneThroughAssociation): void {
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) as {
+function ensureNotNested(this: HasOneThroughAssociation): void {
+  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name) as {
     isNested?: () => boolean;
   } | null;
   if (refl?.isNested?.()) {
     throw new HasOneThroughNestedAssociationsAreReadonly(
-      (assoc.owner.constructor as { name: string }).name,
-      assoc.reflection.name,
+      (this.owner.constructor as { name: string }).name,
+      this.reflection.name,
     );
   }
 }
@@ -819,3 +840,18 @@ function buildThroughProxyRecord(throughProxy: any, attrs: Record<string, unknow
   const record = throughProxy.buildRecord?.(attrs);
   if (record) throughProxy.setNewRecord?.(record);
 }
+
+/**
+ * Rails' `ThroughAssociation` / `HasOneThroughAssociation` instance methods.
+ * Installed on the prototype (Ruby `include`) rather than passed a host
+ * argument, so every call site reads exactly as the Ruby does.
+ */
+Object.assign(HasOneThroughAssociation.prototype, {
+  createThroughRecord,
+  transaction,
+  throughReflection,
+  throughAssociation,
+  constructJoinAttributes,
+  ensureMutable,
+  ensureNotNested,
+});
