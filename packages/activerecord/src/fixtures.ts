@@ -21,7 +21,7 @@ import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
 import { singularize, underscore } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
-import { EncryptableRecord } from "./encryption/encryptable-record.js";
+import { EncryptableRecord, encryptedAttributes } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import type { Type } from "@blazetrails/activemodel";
 
@@ -743,7 +743,7 @@ async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void
  * produced here is compatible with what the reloaded record will decrypt.
  */
 function encryptFixtureRows(ModelClass: BaseClass, rows: FixtureAttrs[]): void {
-  const encryptedAttrs = EncryptableRecord.encryptedAttributes(ModelClass);
+  const encryptedAttrs = encryptedAttributes.call(ModelClass);
   // Build a name→EncryptedAttributeType map from _pendingEncryptions. This lets
   // us serialize even before loadSchemaFromAdapter has run (schema-reflected types
   // won't be in _attributeDefinitions yet, but the scheme is already recorded).
@@ -1257,7 +1257,7 @@ export async function prepareModelFixtures(
   // serialize each encrypted column value to ciphertext before insert so the DB stores
   // encrypted data (not cleartext), and populate original_* preserve-columns for ignoreCase.
   // Mirrors: ActiveRecord::Railtie `Fixture.prepend EncryptedFixtures if config.encrypt_fixtures`
-  if (Configurable.config.encryptFixtures && EncryptableRecord.hasEncryptedAttributes(ModelClass)) {
+  if (Configurable.config.encryptFixtures && encryptedAttributes.call(ModelClass).size > 0) {
     encryptFixtureRows(ModelClass, rows);
   }
 

@@ -4,7 +4,7 @@ import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
 import { Decryption } from "./errors.js";
 import type { EncryptorLike } from "./encryptor.js";
-import { EncryptableRecord } from "./encryptable-record.js";
+import { encrypts } from "./encryptable-record.js";
 import type { SchemeOptions } from "./scheme.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
@@ -287,7 +287,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
     const modelClass = { _attributeDefinitions: new Map() };
     // Non-deterministic attribute — only the non-deterministic global scheme is compatible.
-    EncryptableRecord.encrypts(modelClass, "name", {
+    encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 
@@ -401,7 +401,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
     const modelClass = { _attributeDefinitions: new Map() };
     // Deterministic attribute — only the deterministic global scheme is compatible.
-    EncryptableRecord.encrypts(modelClass, "name", {
+    encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
       deterministic: true,
     });
@@ -437,7 +437,7 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
     ];
 
     const modelClass = { _attributeDefinitions: new Map() };
-    EncryptableRecord.encrypts(modelClass, "name", {
+    encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 
@@ -464,7 +464,7 @@ describe("global previous schemes wiring — config.previous → EncryptableReco
     ];
 
     const modelClass = { _attributeDefinitions: new Map() };
-    EncryptableRecord.encrypts(modelClass, "name", {
+    encrypts.call(modelClass, "name", {
       encryptor: new TestEncryptor({ current: "current_cipher" }),
     });
 

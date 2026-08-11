@@ -48,10 +48,20 @@ export type { ConnectionOwner };
 // `import` from here would close a cycle (base.ts already imports this file),
 // so `base.ts` pushes itself in at the bottom of its own body instead — the
 // same `_registerBase` shape schema-migration.ts uses.
-let _base: ConnectionOwner | undefined;
+let _base: BaseLike | undefined;
+
+/**
+ * `Base` as `connection_handler.rb` reads it: the owner-name default plus the
+ * `current_role` / `current_shard` readers `establish_connection`,
+ * `retrieve_connection` and `connected?` default their selectors off.
+ */
+type BaseLike = ConnectionOwner & {
+  currentRole(): string;
+  currentShard(): string;
+};
 
 /** @internal */
-export function _registerBase(base: ConnectionOwner): void {
+export function _registerBase(base: BaseLike): void {
   _base = base;
 }
 
@@ -162,8 +172,13 @@ export class ConnectionHandler {
         ? new ConnectionDescriptor(config.name)
         : new ConnectionDescriptor("primary"));
 
-    const role = options.role ?? "writing";
-    const shard = options.shard ?? "default";
+    // `role: Base.current_role, shard: Base.current_shard`
+    // (connection_handler.rb:115) — resolved at call time, so a caller inside
+    // `connected_to(role:)` establishes on the swapped role. Same pre-load
+    // window as `ownerName` above: fall back to the seeded defaults
+    // (`writing_role` / `default_shard`, core.rb:250) until base.ts registers.
+    const role = options.role ?? _base?.currentRole() ?? "writing";
+    const shard = options.shard ?? _base?.currentShard() ?? "default";
     const clobber = options.clobber ?? false;
 
     const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard, {
@@ -261,18 +276,22 @@ export class ConnectionHandler {
     connectionName: string,
     options?: { role?: string; shard?: string },
   ): Promise<DatabaseAdapter> {
+    // `role: ActiveRecord::Base.current_role, shard: ActiveRecord::Base.current_shard`
+    // (connection_handler.rb:193).
     const pool = this.retrieveConnectionPool(connectionName, {
-      role: options?.role,
-      shard: options?.shard,
+      role: options?.role ?? _base?.currentRole(),
+      shard: options?.shard ?? _base?.currentShard(),
       strict: true,
     });
     return pool!.leaseConnection();
   }
 
   isConnected(connectionName: string, options?: { role?: string; shard?: string }): boolean {
+    // `role: ActiveRecord::Base.current_role, shard: ActiveRecord::Base.current_shard`
+    // (connection_handler.rb:200).
     const pool = this.retrieveConnectionPool(connectionName, {
-      role: options?.role,
-      shard: options?.shard,
+      role: options?.role ?? _base?.currentRole(),
+      shard: options?.shard ?? _base?.currentShard(),
     });
     return pool != null && pool.isConnected();
   }

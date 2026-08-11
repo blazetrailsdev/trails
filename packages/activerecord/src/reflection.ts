@@ -204,8 +204,11 @@ export class AbstractReflection {
     return this.klass.tableName;
   }
 
-  buildAssociation(attributes: Record<string, unknown> = {}): InstanceType<typeof Base> {
-    return new (this.klass as any)(attributes);
+  buildAssociation(
+    attributes: Record<string, unknown> = {},
+    block?: (record: InstanceType<typeof Base>) => void,
+  ): InstanceType<typeof Base> {
+    return new (this.klass as any)(attributes, block);
   }
 
   get className(): string {

@@ -704,11 +704,10 @@ export class Association {
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    const record = this.buildRecord(attributes);
+    // Rails yields the record inside `build_record` (association.rb:383-388),
+    // before the save — so the block can mutate attributes that get persisted.
+    const record = this.buildRecord(attributes, block);
     if (!record) return null;
-    // Rails yields the record inside `build_record` (association.rb), before the
-    // save — so the block can mutate attributes that get persisted.
-    if (block) block(record);
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();
       if (!saved && shouldRaise) {
@@ -718,7 +717,10 @@ export class Association {
     return record;
   }
 
-  protected buildRecord(attributes?: Record<string, unknown>): Base | null {
+  protected buildRecord(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null {
     const Klass = this.klass;
     if (!Klass) return null;
     // Rails' `build_record` passes `initialize_attributes` as the block to
@@ -726,11 +728,33 @@ export class Association {
     // block (core.rb:479) BEFORE `_run_initialize_callbacks`. So both the
     // scope_for_create attrs (e.g. the association FK) AND the inverse instance
     // wired by `initialize_attributes` (association.rb:224) are visible to
-    // `after_initialize` hooks. Thread the same block through trails' `new`.
-    const record = new (Klass as any)(attributes ?? {}, (r: Base) => {
-      this.initializeAttributes(r, attributes);
+    // `after_initialize` hooks — as is a caller-supplied block, which Rails
+    // yields inside the same block (association.rb:383-388).
+    // `this.reflection` is the lightweight `AssociationDefinition` a macro
+    // builds, which carries no `build_association`; the rich reflection off the
+    // owner's class is the one that does (reflection.rb:182). Resolve it the
+    // same way `klass` above does, and fall back to the plain construction when
+    // there is none (synthetic definitions built by hand).
+    const reflection = (
+      this.owner.constructor as typeof Base & {
+        _reflectOnAssociation?: (n: string) => {
+          buildAssociation?: (
+            attributes: Record<string, unknown>,
+            block?: (record: Base) => void,
+          ) => Base;
+        } | null;
+      }
+    )._reflectOnAssociation?.(this.reflection.name);
+    if (reflection?.buildAssociation) {
+      return reflection.buildAssociation(attributes ?? {}, (record: Base) => {
+        this.initializeAttributes(record, attributes);
+        if (block) block(record);
+      });
+    }
+    return new (Klass as any)(attributes ?? {}, (record: Base) => {
+      this.initializeAttributes(record, attributes);
+      if (block) block(record);
     });
-    return record;
   }
 
   private inverseAssociationFor(record: Base): Association | null {

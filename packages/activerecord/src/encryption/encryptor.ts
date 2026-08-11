@@ -281,14 +281,14 @@ export class Encryptor {
   }
 
   /** @internal */
-  private compressIfWorthIt(clearText: string): [string | Buffer, boolean] {
+  private compressIfWorthIt(string: string): [string | Buffer, boolean] {
     if (
-      this._compress &&
-      Buffer.byteLength(clearText, "utf-8") > THRESHOLD_TO_JUSTIFY_COMPRESSION
+      this.isCompress() &&
+      Buffer.byteLength(string, "utf-8") > THRESHOLD_TO_JUSTIFY_COMPRESSION
     ) {
-      return [this.compress(clearText), true];
+      return [this.compress(string), true];
     }
-    return [clearText, false];
+    return [string, false];
   }
 
   /** @internal */
