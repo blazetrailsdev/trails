@@ -201,6 +201,15 @@ interface ThroughAssociationHandle {
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 
+/**
+ * Minimal shape of the owner's Association holder used by the build paths to
+ * reach `Association#initialize_attributes` (association.rb:217) — the one
+ * implementation of the `scope_for_create.except!` fill. @internal
+ */
+interface InitializeAttributesHolder {
+  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void;
+}
+
 interface StaleWrapper {
   isStaleTarget?: () => boolean;
   resetScope?: () => void;
@@ -1337,7 +1346,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(buildAttrs);
-    this._applyScopeForCreate(record, attrs, foreignKey);
+    // Rails builds collection records through `CollectionAssociation#build_record`,
+    // which routes the scope_for_create fill through the one
+    // `Association#initialize_attributes` (association.rb:217). The proxy is a
+    // Relation, not that Association, so reach the owner's holder for it.
+    (
+      this._record.association(this._assocName) as unknown as InitializeAttributesHolder
+    ).initializeAttributes(record, attrs);
     // Rails wires the inverse inside `initialize_attributes`, before any
     // build/create block runs — so a block can already see `child.owner`.
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
@@ -1355,7 +1370,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(attrs);
-    this._applyScopeForCreate(record, attrs);
+    (
+      this._record.association(this._assocName) as unknown as InitializeAttributesHolder
+    ).initializeAttributes(record, attrs);
     // Mirrors the inverse half of Rails' HasManyThroughAssociation#build_record:
     // pre-build the join row and wire it onto the target's inverse so the join
     // is created alongside the target on save.
@@ -1398,49 +1415,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const fn = (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
       .scopeForCreate;
     return typeof fn === "function" ? fn.call(this) : {};
-  }
-
-  // Mirrors Rails' Association#initialize_attributes (association.rb:217):
-  // pre-fill scope_for_create attrs. Caller-supplied / already-changed
-  // keys normally win, except for skip_assign = [foreign_key,
-  // foreign_type], where the scope value is allowed through (Rails
-  // relies on this to re-anchor a scoped FK / polymorphic type).
-  // `foreign_type` here is the polymorphic-belongs-to type column
-  // (`${as}_type`), NOT the STI inheritance column.
-  private _applyScopeForCreate(
-    record: Base,
-    exceptFromScope: Record<string, unknown>,
-    foreignKey?: string | string[],
-  ): void {
-    const sfc = this._scopeForCreateRaw();
-    if (!sfc || Object.keys(sfc).length === 0) return;
-
-    // Rails' skip_assign is [foreign_key, foreign_type] — the polymorphic
-    // type column on belongs_to (Reflection#type returns foreign_type, NOT
-    // the STI inheritance column). For composite-key associations the FK
-    // is an array; every column must land in skipAssign so scope values
-    // for any of them can re-anchor (matches Array(reflection.foreign_key)
-    // in Rails' initialize_attributes).
-    const skipAssign = new Set<string>();
-    if (Array.isArray(foreignKey)) {
-      for (const k of foreignKey) if (k) skipAssign.add(k);
-    } else if (foreignKey) {
-      skipAssign.add(foreignKey);
-    }
-    const asName = this._assocDef.options.as;
-    if (asName) skipAssign.add(this._assocDef.options.foreignType ?? `${underscore(asName)}_type`);
-
-    const assigned = new Set<string>(
-      ((record as any).changedAttributeNamesToSave ?? []) as string[],
-    );
-    for (const k of Object.keys(exceptFromScope)) assigned.add(k);
-
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(sfc)) {
-      if (assigned.has(key) && !skipAssign.has(key)) continue;
-      out[key] = value;
-    }
-    if (Object.keys(out).length > 0) (record as any)._assignAttributes(out);
   }
 
   /**
