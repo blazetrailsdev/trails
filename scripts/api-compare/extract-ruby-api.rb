@@ -2387,6 +2387,11 @@ class ApiExtractor
     walk_for_call_args(callee[1], sites) if callee[0] == :call || callee[0] == :command_call
 
     name = call_site_name(callee)
+    # The argument half of walk_for_calls' `Proc.new` verdict: the call-set gate
+    # has already agreed the site can never be satisfied, so recording it here
+    # would let the argument gate flag a site the other extractor says is gone.
+    name = nil if name == "new" && (callee[0] == :call || callee[0] == :command_call) &&
+                  proc_new_receiver?(callee[1])
     if name
       site_flags = flags.dup
       # The per-SITE half of walk_for_calls' `weak` tally, from the same

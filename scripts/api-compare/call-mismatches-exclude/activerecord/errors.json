@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "errors.ts",
-    "rubyName": "set_query",
-    "call": "call",
-    "reason": "Proc-invocation idiom: Rails' `@query_parser.call(sql)` (errors.rb:282) ports to a direct function invocation `this._queryParser(sql)` (MismatchedForeignKey#setQuery), which extractCalls does not record as a named `call`. The overload itself is ported (story errors-set-query-query-parser-overload)."
-  }
-]

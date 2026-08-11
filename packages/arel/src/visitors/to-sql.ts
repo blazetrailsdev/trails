@@ -1848,16 +1848,12 @@ export class ToSql extends Visitor {
 
   /** Mirrors `to_sql.rb#collect_ctes`. Visits each CTE child joined by ", ". */
   protected collectCtes(
-    children: ReadonlyArray<{ toCte(): Node } | Node>,
+    children: ReadonlyArray<{ toCte(): Node }>,
     collector: SQLString,
   ): SQLString {
     children.forEach((child, i) => {
       if (i > 0) collector.append(", ");
-      const node =
-        typeof (child as { toCte?: () => Node }).toCte === "function"
-          ? (child as { toCte: () => Node }).toCte()
-          : (child as Node);
-      this.visit(node, collector);
+      this.visit(child.toCte(), collector);
     });
     return collector;
   }

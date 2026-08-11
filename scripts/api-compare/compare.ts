@@ -784,6 +784,20 @@ export function resolveTsOwner(
   return owners.has(short) ? short : undefined;
 }
 
+/** True when a file declares `tsName` on several owners and the one this pair
+ *  resolved to records nothing in `byFileNameOwner` — its own copy is the
+ *  counterpart, so a same-named sibling's body must not stand in for it. */
+export function ownerRecordsNothing(
+  byFileNameOwner: ReadonlyMap<string, ReadonlyMap<string, ReadonlyMap<string, unknown[]>>>,
+  tsFile: string,
+  tsName: string,
+  tsClass: string | undefined,
+  owners: ReadonlySet<string> | undefined,
+): boolean {
+  if (tsClass === undefined || (owners?.size ?? 0) <= 1) return false;
+  return byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) === undefined;
+}
+
 /** The tags that justify deviations for `owner`'s copy of a method. A resolved
  *  owner reads ONLY its own class's tags, so a tag on a sibling class cannot
  *  silence a flag raised against this one. With no owner resolved the tags of
@@ -1962,6 +1976,15 @@ export function main() {
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
+    // The same two populations narrowed by declaring class (file → name → owner
+    // → sets), consulted when one file declares the name on SEVERAL owners and
+    // `resolveTsOwner` names the one this Ruby entity ported to. Without it a
+    // Ruby body pairs against whichever same-named member happens to carry a
+    // call set — `query_cache.rb`'s `ConnectionPoolConfiguration#query_cache`
+    // (:187) against the `attr_accessor` port (query-cache.ts:330) rather than
+    // the getter (:305) that makes its calls.
+    const tsCallsByFileNameOwner = new Map<string, Map<string, Map<string, string[][]>>>();
+    const tsCallArgsByFileNameOwner = new Map<string, Map<string, Map<string, CallSite[][]>>>();
     // (file → name → declaring class → tagged calls), so a tag on one class
     // never speaks for a same-named sibling; a top-level function is `""`.
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
@@ -2058,6 +2081,14 @@ export function main() {
         const byName = tsCallArgsByFileName.get(file) ?? new Map<string, CallSite[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.callArgs]);
         tsCallArgsByFileName.set(file, byName);
+        if (scope === "package") {
+          const byOwner =
+            tsCallArgsByFileNameOwner.get(file) ?? new Map<string, Map<string, CallSite[][]>>();
+          const sets = byOwner.get(m.name) ?? new Map<string, CallSite[][]>();
+          sets.set(owner, [...(sets.get(owner) ?? []), m.callArgs]);
+          byOwner.set(m.name, sets);
+          tsCallArgsByFileNameOwner.set(file, byOwner);
+        }
       }
       if (m.skeleton !== undefined) {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -2068,6 +2099,14 @@ export function main() {
         const byName = tsCallsByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.calls]);
         tsCallsByFileName.set(file, byName);
+        if (scope === "package") {
+          const byOwner =
+            tsCallsByFileNameOwner.get(file) ?? new Map<string, Map<string, string[][]>>();
+          const sets = byOwner.get(m.name) ?? new Map<string, string[][]>();
+          sets.set(owner, [...(sets.get(owner) ?? []), m.calls]);
+          byOwner.set(m.name, sets);
+          tsCallsByFileNameOwner.set(file, byOwner);
+        }
         const { calls, negated } = partitionNegatedCalls(m.calls);
         const union = tsCallsByName.get(m.name) ?? new Set<string>();
         for (const c of calls) union.add(c);
@@ -2399,6 +2438,15 @@ export function main() {
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
       const rubyCallArgsByName = new Map<string, CallSite[]>();
+      // The same two populations keyed by (declaring class, name). One Ruby FILE
+      // can declare a name twice — `query_cache.rb` has both
+      // `ConnectionPoolConfiguration#query_cache` (:187) and the adapter's
+      // `attr_accessor :query_cache` (:194) — and first-sighting keying then
+      // hands the first one's body to BOTH matched pairs.
+      const rubyOwnersByName = new Map<string, Set<string>>();
+      const rubyCallsByOwnerName = new Map<string, { calls: string[]; weak: string[] }>();
+      const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
+      const ownerKey = (owner: string, name: string) => `${owner}\u0000${name}`;
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -2412,9 +2460,22 @@ export function main() {
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
           }
+          rubyOwnersByName.set(
+            rm.name,
+            (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
+          );
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
+          }
+          if (rm.calls && !rubyCallsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
+            rubyCallsByOwnerName.set(ownerKey(item.fqn, rm.name), {
+              calls: rm.calls,
+              weak: rm.weakCalls ?? [],
+            });
+          }
+          if (rm.callArgs && !rubyCallArgsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
+            rubyCallArgsByOwnerName.set(ownerKey(item.fqn, rm.name), rm.callArgs);
           }
           if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
             rubySkeletonByName.set(rm.name, rm.skeleton);
@@ -2475,11 +2536,24 @@ export function main() {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
-        const rubyCalls = dropWeakCalls(
-          rubyCallsByName.get(rubyName),
-          rubyWeakCallsByName.get(rubyName),
-        );
+        const rubyOwned =
+          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
+            ? rubyCallsByOwnerName.get(ownerKey(rubyModule, rubyName))
+            : {
+                calls: rubyCallsByName.get(rubyName) ?? [],
+                weak: rubyWeakCallsByName.get(rubyName) ?? [],
+              };
+        const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
         if (rubyCalls.length === 0) return;
+        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
+        const tsClass = resolveTsOwner(tsOwners, rubyModule);
+        // Several same-named members in one TS file and the resolved owner's own
+        // copy records no calls: that copy IS this pair's counterpart, and the
+        // extractor recording nothing for it (a getter carries no call set) is a
+        // reason to compare nothing, not to fall back on a same-named sibling's
+        // body. `query_cache.rb`'s ConnectionPoolConfiguration#query_cache (:187)
+        // against the attr_accessor port (query-cache.ts:330) is that pairing.
+        if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
         // Helper extraction / delegation transparency: the body is compared
@@ -2524,7 +2598,6 @@ export function main() {
           jsEnumerableAliases,
           negatedTsCalls,
         );
-        const tsClass = resolveTsOwner(tsOwnersByFileName.get(tsFile)?.get(tsName), rubyModule);
         const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
         let kept = missing;
         if (tags !== undefined && tags.size > 0) {
@@ -2569,7 +2642,12 @@ export function main() {
 
       // Advisory call-argument check (RFC 0095), on the pair checkCalls
       // receives; computed only under `--calls`, the mode that writes it.
-      const checkCallArgs = (rubyName: string, tsName: string, tsFile: string) => {
+      const checkCallArgs = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+      ) => {
         if (!callsGate) return;
         // Same exclusion checkCalls makes through `dropWeakCalls`: a call on an
         // inert receiver (`xs.map`, `opts.fetch`) collides by name with an
@@ -2578,13 +2656,20 @@ export function main() {
         // `inert_receiver?` — the call-set gate has no per-site identity and can
         // only drop whole NAMES, but here a name that is weak at one site and a
         // genuine call at another would lose both sites to a name filter.
-        const rubySites = rubyCallArgsByName
-          .get(rubyName)
-          ?.filter((s) => !s.flags.includes("weak"));
+        const rubyOwnSites =
+          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
+            ? rubyCallArgsByOwnerName.get(ownerKey(rubyModule, rubyName))
+            : rubyCallArgsByName.get(rubyName);
+        const rubySites = rubyOwnSites?.filter((s) => !s.flags.includes("weak"));
         if (!rubySites || rubySites.length === 0) return;
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
+        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
+        const tsClass = resolveTsOwner(tsOwners, rubyModule);
+        if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
+          return;
+        }
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
@@ -2631,7 +2716,7 @@ export function main() {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         checkCalls(rubyName, tsName, tsFile, rubyModule);
-        checkCallArgs(rubyName, tsName, tsFile);
+        checkCallArgs(rubyName, tsName, tsFile, rubyModule);
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name

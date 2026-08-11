@@ -11,8 +11,11 @@ export class With extends Unary {
     super(children);
   }
 
-  get children(): Node[] {
-    return this.expr as Node[];
+  // Every element is a Cte / As / TableAlias — the visitor calls `child.to_cte`
+  // unconditionally (to_sql.rb:1026), so a child that cannot answer it is a
+  // malformed WITH clause, not a case to fall back on.
+  get children(): Array<{ toCte(): Node }> {
+    return this.expr as Array<{ toCte(): Node }>;
   }
 }
 

@@ -1385,16 +1385,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     message: string,
     sql: string | null,
     binds: unknown[],
-    cause: unknown,
   ): MismatchedForeignKey {
     if (sql) {
       const details = this.mismatchedForeignKeyDetails(message, sql);
-      return new MismatchedForeignKey({ message, sql, binds, cause, ...details });
+      return new MismatchedForeignKey({ message, sql, binds, ...details });
     }
     return new MismatchedForeignKey({
       message,
       binds,
-      cause,
       queryParser: (parsedSql) => this.mismatchedForeignKeyDetails(message, parsedSql),
     });
   }
@@ -1483,69 +1481,81 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
-    if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
-    const errno = (e as { errno?: number }).errno;
-    const msg = e.message;
-    const cause = e;
-    if (typeof errno !== "number") {
-      // Mirrors Rails' `when nil` branch — driver errors without a MySQL
-      // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
-      // generic Error) get promoted to ConnectionNotEstablished when the
-      // message indicates the client lost the server handshake.
-      if (/MySQL client is not connected/i.test(msg)) {
-        return new ConnectionNotEstablished(msg, { cause });
-      }
-    }
-    switch (errno) {
-      case ER_DB_CREATE_EXISTS:
-        return new DatabaseAlreadyExists(msg, { sql, binds, cause });
-      case ER_DUP_ENTRY:
-        return new RecordNotUnique(msg, { sql, binds, cause });
-      case ER_NO_REFERENCED_ROW:
-      case ER_ROW_IS_REFERENCED:
-      case ER_ROW_IS_REFERENCED_2:
-      case ER_NO_REFERENCED_ROW_2:
-        return new InvalidForeignKey(msg, { sql, binds, cause });
-      case ER_CANNOT_ADD_FOREIGN:
-      case ER_FK_INCOMPATIBLE_COLUMNS:
-        return this.mismatchedForeignKey(msg, sql, binds, cause);
-      case ER_CANNOT_CREATE_TABLE:
-        if (msg.includes("errno: 150") || msg.includes("errno 150")) {
-          return this.mismatchedForeignKey(msg, sql, binds, cause);
+    const build = (): Error => {
+      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds });
+      const errno = (e as { errno?: number }).errno;
+      const msg = e.message;
+      if (typeof errno !== "number") {
+        // Mirrors Rails' `when nil` branch — driver errors without a MySQL
+        // errno (e.g. node-mysql2 surfacing a closed-socket failure as a
+        // generic Error) get promoted to ConnectionNotEstablished when the
+        // message indicates the client lost the server handshake.
+        if (/MySQL client is not connected/i.test(msg)) {
+          return new ConnectionNotEstablished(msg);
         }
-        return new StatementInvalid(msg, { sql, binds, cause });
-      case ER_NOT_NULL_VIOLATION:
-      case ER_DO_NOT_HAVE_DEFAULT:
-        return new NotNullViolation(msg, { sql, binds, cause });
-      case ER_DATA_TOO_LONG:
-        return new ValueTooLong(msg, { sql, binds, cause });
-      case ER_OUT_OF_RANGE:
-        return new ARRangeError(msg, { sql, binds, cause });
-      case ER_LOCK_DEADLOCK:
-        return new Deadlocked(msg, { sql, binds, cause });
-      case ER_LOCK_WAIT_TIMEOUT:
-        return new LockWaitTimeout(msg, { sql, binds, cause });
-      case ER_QUERY_TIMEOUT:
-      case ER_FILSORT_ABORT:
-        return new StatementTimeout(msg, { sql, binds, cause });
-      case ER_QUERY_INTERRUPTED:
-        return new QueryCanceled(msg, { sql, binds, cause });
-      case ER_CONNECTION_KILLED:
-      case ER_SERVER_SHUTDOWN:
-      case CR_SERVER_GONE_ERROR:
-      case CR_SERVER_LOST:
-      case ER_CLIENT_INTERACTION_TIMEOUT:
-        return new ConnectionFailed(msg, { sql, binds, cause });
-      default:
-        // Driver errors expose a positive MySQL errno and usually a
-        // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
-        // an `errno`, often negative, so gate on a positive numeric
-        // errno to avoid re-tagging network failures as
-        // StatementInvalid (which would attach misleading sql/binds).
-        return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
-          ? new StatementInvalid(msg, { sql, binds, cause })
-          : e;
+      }
+      switch (errno) {
+        case ER_DB_CREATE_EXISTS:
+          return new DatabaseAlreadyExists(msg, { sql, binds });
+        case ER_DUP_ENTRY:
+          return new RecordNotUnique(msg, { sql, binds });
+        case ER_NO_REFERENCED_ROW:
+        case ER_ROW_IS_REFERENCED:
+        case ER_ROW_IS_REFERENCED_2:
+        case ER_NO_REFERENCED_ROW_2:
+          return new InvalidForeignKey(msg, { sql, binds });
+        case ER_CANNOT_ADD_FOREIGN:
+        case ER_FK_INCOMPATIBLE_COLUMNS:
+          return this.mismatchedForeignKey(msg, sql, binds);
+        case ER_CANNOT_CREATE_TABLE:
+          if (msg.includes("errno: 150") || msg.includes("errno 150")) {
+            return this.mismatchedForeignKey(msg, sql, binds);
+          }
+          return new StatementInvalid(msg, { sql, binds });
+        case ER_NOT_NULL_VIOLATION:
+        case ER_DO_NOT_HAVE_DEFAULT:
+          return new NotNullViolation(msg, { sql, binds });
+        case ER_DATA_TOO_LONG:
+          return new ValueTooLong(msg, { sql, binds });
+        case ER_OUT_OF_RANGE:
+          return new ARRangeError(msg, { sql, binds });
+        case ER_LOCK_DEADLOCK:
+          return new Deadlocked(msg, { sql, binds });
+        case ER_LOCK_WAIT_TIMEOUT:
+          return new LockWaitTimeout(msg, { sql, binds });
+        case ER_QUERY_TIMEOUT:
+        case ER_FILSORT_ABORT:
+          return new StatementTimeout(msg, { sql, binds });
+        case ER_QUERY_INTERRUPTED:
+          return new QueryCanceled(msg, { sql, binds });
+        case ER_CONNECTION_KILLED:
+        case ER_SERVER_SHUTDOWN:
+        case CR_SERVER_GONE_ERROR:
+        case CR_SERVER_LOST:
+        case ER_CLIENT_INTERACTION_TIMEOUT:
+          return new ConnectionFailed(msg, { sql, binds });
+        default:
+          // Driver errors expose a positive MySQL errno and usually a
+          // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
+          // an `errno`, often negative, so gate on a positive numeric
+          // errno to avoid re-tagging network failures as
+          // StatementInvalid (which would attach misleading sql/binds).
+          return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
+            ? new StatementInvalid(msg, { sql, binds })
+            : e;
+      }
+    };
+    const translated = build();
+    // `translate_exception`'s result is raised from inside the `rescue`, so Ruby
+    // sets `Exception#cause` from `$!` and never names the driver error in the
+    // argument list (abstract_mysql_adapter.rb:815-856). JS chains nothing at a
+    // `throw`; this is the raise-site stand-in for the direct
+    // `throw this._translateException(...)` sites, as `translateExceptionClass`
+    // is for everything routed through the public translator.
+    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
+      (translated as { cause?: unknown }).cause = e;
     }
+    return translated;
   }
 
   /** @internal */

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/test-process.ts",
-    "rubyName": "file_fixture_upload",
-    "call": "order:constructor,fileFixture",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  }
-]

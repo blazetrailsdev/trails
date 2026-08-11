@@ -252,22 +252,32 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * codes (`ER_QUERY_TIMEOUT` / `ER_FILSORT_ABORT`).
    */
   protected override _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    if (isMysql2DriverTimeout(e)) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return new AdapterTimeout(msg, { sql, binds, cause: e });
-    }
-    if (isMysql2ConnectionError(e)) {
-      // Mirrors `Mysql2Adapter#translate_exception`'s
-      // `Mysql2::Error::ConnectionError` branch: a "MySQL client is not
-      // connected" message is promoted to ConnectionNotEstablished;
-      // everything else in this family is ConnectionFailed.
-      const msg = (e as Error).message;
-      if (/MySQL client is not connected/i.test(msg)) {
-        return new ConnectionNotEstablished(msg, { cause: e });
+    const build = (): Error => {
+      if (isMysql2DriverTimeout(e)) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return new AdapterTimeout(msg, { sql, binds });
       }
-      return new ConnectionFailed(msg, { sql, binds, cause: e });
+      if (isMysql2ConnectionError(e)) {
+        // Mirrors `Mysql2Adapter#translate_exception`'s
+        // `Mysql2::Error::ConnectionError` branch: a "MySQL client is not
+        // connected" message is promoted to ConnectionNotEstablished;
+        // everything else in this family is ConnectionFailed.
+        const msg = (e as Error).message;
+        if (/MySQL client is not connected/i.test(msg)) {
+          return new ConnectionNotEstablished(msg);
+        }
+        return new ConnectionFailed(msg, { sql, binds });
+      }
+      return super._translateException(e, sql, binds);
+    };
+    const translated = build();
+    // The raise-site stand-in for Ruby's implicit `Exception#cause`, as in the
+    // superclass — `translate_exception` never names the driver error in its
+    // argument list (mysql2_adapter.rb `translate_exception`).
+    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
+      (translated as { cause?: unknown }).cause = e;
     }
-    return super._translateException(e, sql, binds);
+    return translated;
   }
 
   /**

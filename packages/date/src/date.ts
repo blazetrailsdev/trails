@@ -770,6 +770,20 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * @internal Ruby core `FrozenError`, a `RuntimeError` subclass, spelled locally
+ * for the reason {@link NoMethodError} below is. It is what `rb_check_frozen`
+ * raises — `d_lite_initialize_copy`'s first statement (`date_core.c:5142`) —
+ * with `rb_check_frozen`'s own `"can't modify frozen %s: %s"` message over the
+ * receiver's class and its `inspect`.
+ */
+class FrozenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FrozenError";
+  }
+}
+
+/**
  * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled
  * locally for the reason {@link NoMethodError} below is. `rb_num2int` — what
  * `FIX2INT` is for the non-Fixnum operand of `d_lite_rshift`'s `f_idiv` /
@@ -6590,8 +6604,9 @@ export class Date {
    * receiver: the source's `DateData` written into it verbatim, reform
    * included.
    *
-   * `rb_check_frozen(copy)` is `Object.isFrozen` — the same `TypeError` JS
-   * raises on a write to a frozen object — and the `copy == date` early return
+   * `rb_check_frozen(copy)` is `Object.isFrozen` raising {@link FrozenError}
+   * with `rb_check_frozen`'s `"can't modify frozen %s: %s"` message over the
+   * receiver's class and `inspect` — and the `copy == date` early return
    * (`:5144-5145`) comes before the copy, as it does there. The middle arm
    * (`:5150-5169`) widens a simple source into a complex receiver, which is why
    * its day fraction, sub-second and offset are all zero. The last arm is the
@@ -6602,7 +6617,9 @@ export class Date {
    */
   initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
-      throw new TypeError(`can't modify frozen ${(this as object).constructor.name}`);
+      throw new FrozenError(
+        `can't modify frozen ${(this as object).constructor.name}: ${this.inspect()}`,
+      );
     }
     if ((this as Date) === date) return this;
     const bdat = date.dat();
@@ -8515,7 +8532,9 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
-      throw new TypeError(`can't modify frozen ${(this as object).constructor.name}`);
+      throw new FrozenError(
+        `can't modify frozen ${(this as object).constructor.name}: ${this.inspect()}`,
+      );
     }
     if ((this as Date) === date) return this;
     const bdat = date.dat();
