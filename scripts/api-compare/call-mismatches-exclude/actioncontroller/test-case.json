@@ -39,6 +39,18 @@
     "kind": "args",
     "rubyArgs": [
       "ref:k",
+      "ref:fullpath"
+    ],
+    "reason": "RFC 0099: pre-existing divergence the source-order pairing hid. test_case.rb:142 writes `fetch_header(\"ORIGINAL_FULLPATH\") { |k| set_header k, fullpath }` and passes the block's `k`; the port inlines the header name at the `setHeader` call instead of threading the fetch_header block parameter. Pending per-body convergence review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "test-case.ts",
+    "rubyName": "assign_parameters",
+    "call": "set_header",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:k",
       "ref:generatedPath"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
@@ -168,14 +180,5 @@
     "rubyName": "scrub_env!",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "tests",
-    "call": "camelize",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

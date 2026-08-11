@@ -11,12 +11,14 @@
 // without them (the nested-opaque leak alone was 8 of 17 noise rows, and 94 of
 // 604 activerecord rows).
 
-import type { CallSite, LiteralValue } from "@blazetrails/parity/types";
+import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import { stripThis } from "./arity.js";
 import { normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
+import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
@@ -398,6 +400,91 @@ function calleeKeys(enclosingRubyName: string): string[] {
   return keys;
 }
 
+/**
+ * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
+ * cannot define on a receiver at all (RFC 0099 — see
+ * receiver-as-first-arg.ts for what qualifies and, more importantly, what
+ * does not). `name.to_s.camelize` is `camelize(name)`; the remaining arguments
+ * then compare pairwise, so `truncate(text, 10)` against `text.truncate(20)`
+ * still reads as the divergence it is.
+ *
+ * The RECEIVER EXPRESSION itself is deliberately not compared, and the sites
+ * this exists for are why: the Ruby extractor describes `name.to_s.camelize`'s
+ * receiver as the inner CALL (`to_s`), never as `name`, while the port —
+ * correctly, since a TS string is already a string — writes `camelize(name)`.
+ * There is no spelling of that receiver the two sides could agree on, so
+ * comparing it would re-flag every row the table exists to retire.
+ *
+ * Same only-when-it-explains-the-length guard as {@link stripMixinReceiver}:
+ * a port that also passes a genuine extra argument still reads as one.
+ */
+function stripBuiltinReceiver(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
+  if (tsArgs.length === rubyArgs.length + 1 && RECEIVER_AS_FIRST_ARG.has(name)) {
+    return tsArgs.slice(1);
+  }
+  return tsArgs;
+}
+
+/** The two leading-receiver forms, in the one place the comparator strips them:
+ *  the mixin `this` the port adds to a ported module function, and the Ruby
+ *  receiver of a built-in TS cannot define on a receiver. Neither can apply to
+ *  the same site — a name on the built-in table is never a ported mixin — so
+ *  the order is immaterial. */
+function stripReceiverArgs(name: string, rubyArgs: string[], tsArgs: string[]): string[] {
+  return stripBuiltinReceiver(name, rubyArgs, stripMixinReceiver(rubyArgs, tsArgs));
+}
+
+/**
+ * Drop the `nil`s TS must write to reach a block that Ruby wrote as a trailing
+ * block (RFC 0099).
+ *
+ * `sqlite3_adapter.rb:561` declares
+ * `alter_table(table_name, foreign_keys = …, check_constraints = …, **options)`
+ * and every caller writes `alter_table(table_name) do |definition|`. TS has no
+ * block syntax, so the callback is a trailing PARAMETER and the port has to pad
+ * every defaulted parameter it skips over — `alterTable(tableName, null, null,
+ * null, (definition) => …)`. That padding is forced by the language and carries
+ * no information: the callee applies exactly the default expressions Ruby would.
+ *
+ * Narrow on purpose. Both sides must actually carry a block, the padding must be
+ * a pure `nil` TAIL past the arguments Rails passes, and — {@link
+ * padsDefaultedParams} — the TS callee must genuinely default those parameters.
+ * A `nil` the callee reads as a value is a real divergence and still reads as
+ * one.
+ */
+function stripBlockTailPadding(
+  ruby: CallSite,
+  ts: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (!ruby.flags.includes("block") || !ts.flags.includes("block")) return tsArgs;
+  if (tsArgs.length <= rubyArgs.length) return tsArgs;
+  if (!tsArgs.slice(rubyArgs.length).every((arg) => arg === "nil")) return tsArgs;
+  if (!padsDefaultedParams(calleeSigs, rubyArgs.length, tsArgs.length)) return tsArgs;
+  return tsArgs.slice(0, rubyArgs.length);
+}
+
+/** Whether some TS signature of the callee declares every parameter in
+ *  `[from, to)` with a default or a `?` — the check that keeps
+ *  {@link stripBlockTailPadding} from swallowing a `nil` the callee treats as a
+ *  value. An unresolved callee (no signature in the package) answers no: the
+ *  padding is only provably inert when the declaration says so. */
+function padsDefaultedParams(
+  calleeSigs: ParamInfo[][] | undefined,
+  from: number,
+  to: number,
+): boolean {
+  return (calleeSigs ?? []).some((raw) => {
+    const sig = stripThis(raw);
+    for (let i = from; i < to; i++) {
+      if (sig[i]?.kind !== "optional") return false;
+    }
+    return true;
+  });
+}
+
 /** Two argument keys naming the same value. Only `ref:` keys have more than one
  *  spelling; a literal key is already canonical. */
 function argKeysEqual(rubyKey: string, tsKey: string): boolean {
@@ -405,7 +492,26 @@ function argKeysEqual(rubyKey: string, tsKey: string): boolean {
     return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
   }
   if (rubyKey.startsWith("ref:") && tsKey.startsWith("ref:")) return refKeysEqual(rubyKey, tsKey);
-  return rubyKey === tsKey;
+  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey);
+}
+
+/**
+ * Whether the TS key is the Ruby one written in the colon-kept Symbol spelling
+ * (RFC 0099). A Ruby Symbol is a JS string and CLAUDE.md ("Symbols vs strings")
+ * keeps the leading colon, so `:"restrict_dependent_destroy.has_many"`
+ * (has_many_association.rb#handle_dependency) is the port's
+ * `":restrict_dependent_destroy.has_many"`.
+ *
+ * {@link normalizeLiteralArg} already absorbs the colon for an
+ * IDENTIFIER-shaped value, on its way through the camelization every such name
+ * takes; a value that camelization does not apply to — a dotted i18n key —
+ * reached comparison with the colon still on it. Reconciled here rather than in
+ * the key so the strip is only ever the one direction the convention runs:
+ * `":x"` is `:x`, and a Ruby `":x"` STRING is not silently the same value as
+ * the Ruby string `"x"`.
+ */
+function keptSymbolColon(rubyKey: string, tsKey: string): boolean {
+  return rubyKey.startsWith("str:") && tsKey === `str::${rubyKey.slice("str:".length)}`;
 }
 
 function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
@@ -425,31 +531,97 @@ function tsCallNameKeys(rubyName: string): string[] {
 }
 
 /**
- * Pair the call sites of one already name-matched (Ruby, TS) method pair: the
- * nth Ruby site named `x` against the nth TS site whose name is a faithful
- * spelling of `x`, both streams in source order. No new METHOD matching is
- * introduced — the method pair is the one checkCalls already received; this is
- * only which site within the two bodies compares against which.
+ * How well two same-named call sites' argument lists agree, for
+ * {@link pairCallSites}. Higher is a better pairing. Ordered so that an exact
+ * argument-list agreement always outranks a mere arity agreement, which in turn
+ * outranks any number of positional key matches — a 3-argument list agreeing on
+ * all 3 must never outrank the 4-argument list that agrees on all 4.
+ *
+ * An opaque list has no keys to score, so it scores as if every position agreed
+ * — below an exact agreement, above any PARTIAL one of the same arity. That is
+ * the honest reading (the site is uncomparable, not divergent) and it is
+ * load-bearing: `attributes.rb:245`'s single `Attribute.from_database` against
+ * the port's three, one of which passes an uncomparable `?? null`, would
+ * otherwise abandon the uncomparable-but-plausible site for the one that scores
+ * a single positional hit — turning a skip into a manufactured shape row.
+ *
+ * Arity is read off the STRIPPED lists, the ones the verdict is reached on.
+ * On the raw lists it is backwards for every {@link RECEIVER_AS_FIRST_ARG}
+ * name: the port's correct site there always carries one argument MORE than
+ * Rails' (the receiver), so a raw comparison hands the arity bonus to the site
+ * that happens to have the same raw count — the wrong one — and the greedy
+ * assignment takes it whenever the key matches tie.
+ */
+function argSimilarity(ruby: CallSite, ts: CallSite): number {
+  const strippedTs = stripReceiverArgs(ruby.name, ruby.args, ts.args);
+  const sameArity = ruby.args.length === strippedTs.length ? 1 : 0;
+  const rubyArgs = normalizeArgs(ruby.args);
+  const tsArgs = normalizeArgs(strippedTs);
+  if (rubyArgs === null || tsArgs === null) {
+    return sameArity * 1_000 + Math.min(ruby.args.length, strippedTs.length);
+  }
+  if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
+  let matches = 0;
+  for (let i = 0; i < Math.min(rubyArgs.length, tsArgs.length); i++) {
+    if (argKeysEqual(rubyArgs[i], tsArgs[i])) matches++;
+  }
+  return sameArity * 1_000 + matches;
+}
+
+/**
+ * Pair the call sites of one already name-matched (Ruby, TS) method pair: each
+ * Ruby site named `x` against the TS site whose name is a faithful spelling of
+ * `x` and whose ARGUMENT LIST agrees with it best (RFC 0099). No new METHOD
+ * matching is introduced — the method pair is the one checkCalls already
+ * received; this is only which site within the two bodies compares against
+ * which.
+ *
+ * Source order is the wrong pairing as soon as a body calls one name twice.
+ * `sqlite3_adapter.rb:477` constructs `SQLite3Adapter::Version` once and the
+ * port constructs `Version` three times (a `"0.0.0"` guard arm among them);
+ * zipping by index compares Rails' single construction against whichever
+ * occurrence happens to come first and manufactures a shape row for a body that
+ * is correct. Both streams stay in source order for TIE-BREAKING only, so a
+ * body whose occurrences are indistinguishable pairs exactly as before.
  *
  * A Ruby site with no unconsumed TS counterpart is dropped rather than
  * reported: "the port makes no such call" is the call-set gate's finding
  * (call-mismatches.json), and re-reporting it here as an argument mismatch
- * would double-count one divergence in two artifacts.
+ * would double-count one divergence in two artifacts. The assignment is still
+ * maximal — a candidate whose two endpoints are both free is always taken — so
+ * within one name it consumes exactly the min(Ruby, TS) sites the source-order
+ * zip did, and nothing that used to be compared silently stops being compared.
+ *
+ * Greedy over the globally best-scoring candidate, ties broken by source order
+ * on the Ruby then the TS side, so the verdict never depends on the order the
+ * candidates were enumerated in.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const consumed = new Set<number>();
-  const pairs: { ruby: CallSite; ts: CallSite }[] = [];
-  for (const ruby of rubySites) {
+  const candidates: { rubyIdx: number; tsIdx: number; score: number }[] = [];
+  rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
-    const i = tsSites.findIndex((ts, idx) => !consumed.has(idx) && keys.has(ts.name));
-    if (i === -1) continue;
-    consumed.add(i);
-    pairs.push({ ruby, ts: tsSites[i] });
+    tsSites.forEach((ts, tsIdx) => {
+      if (!keys.has(ts.name)) return;
+      candidates.push({ rubyIdx, tsIdx, score: argSimilarity(ruby, tsSites[tsIdx]) });
+    });
+  });
+  candidates.sort((a, b) => b.score - a.score || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx);
+  const takenRuby = new Set<number>();
+  const takenTs = new Set<number>();
+  const matched = new Map<number, number>();
+  for (const { rubyIdx, tsIdx } of candidates) {
+    if (takenRuby.has(rubyIdx) || takenTs.has(tsIdx)) continue;
+    takenRuby.add(rubyIdx);
+    takenTs.add(tsIdx);
+    matched.set(rubyIdx, tsIdx);
   }
-  return pairs;
+  return rubySites.flatMap((ruby, rubyIdx) => {
+    const tsIdx = matched.get(rubyIdx);
+    return tsIdx === undefined ? [] : [{ ruby, ts: tsSites[tsIdx] }];
+  });
 }
 
 /** Compare one name-matched pair of call sites, mirroring
@@ -461,11 +633,14 @@ export function pairCallSites(
  *  site, so the remaining arguments still compare.
  *
  *  `enclosingRubyName` is the Ruby method whose body both sites are in — the
- *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}). */
+ *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}).
+ *  `calleeSigs` are the TS signatures of the method being CALLED, which
+ *  {@link stripBlockTailPadding} reads to tell inert padding from a value. */
 export function compareCallArgs(
   ruby: CallSite,
   ts: CallSite,
   enclosingRubyName?: string,
+  calleeSigs?: ParamInfo[][],
 ): CallArgResult {
   const skipped = (reason: CallArgSkipReason): CallArgResult => ({
     verdict: "skip",
@@ -480,10 +655,11 @@ export function compareCallArgs(
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
   }
-  const tsArgs = normalizeArgsOrFailure(stripMixinReceiver(ruby.args, ts.args));
-  if (!Array.isArray(tsArgs)) {
-    return skipped(tsArgs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
+  const normalizedTs = normalizeArgsOrFailure(stripReceiverArgs(ruby.name, ruby.args, ts.args));
+  if (!Array.isArray(normalizedTs)) {
+    return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }
+  const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
 
   const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
   if (argsEqual(compared, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { CallSite } from "@blazetrails/parity/types";
+import type { CallSite, ParamInfo } from "@blazetrails/parity/types";
 import { compareCallArgs, normalizeArg, normalizeArgs, pairCallSites } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -114,6 +114,124 @@ describe("normalizeArgs", () => {
   it("is uncomparable when any member is opaque", () => {
     expect(normalizeArgs(["id:x", "?"])).toBeNull();
     expect(normalizeArgs(["id:x", "sym:foo"])).toEqual(["ref:x", "str:foo"]);
+  });
+});
+
+describe("compareCallArgs colon-kept Symbol spelling", () => {
+  // has_many_association.rb#handle_dependency
+  // `errors.add(:base, :"restrict_dependent_destroy.has_many", record: …)`.
+  it("reads a colon-kept TS string as the Ruby Symbol of the same name", () => {
+    expect(
+      compareCallArgs(
+        site("add", ["sym:base", "sym:restrict_dependent_destroy.has_many"]),
+        site("add", ["str:base", "str::restrict_dependent_destroy.has_many"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("strips the colon in one direction only", () => {
+    expect(compareCallArgs(site("add", ["str::a.b"]), site("add", ["str:a.b"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
+describe("compareCallArgs built-in receiver as argument 1", () => {
+  it("reads the TS first argument as the Ruby receiver for a core-ext", () => {
+    // reflection.rb:454 `name.to_s.camelize` → `camelize(name)`.
+    expect(compareCallArgs(site("camelize", []), site("camelize", ["id:name"])).verdict).toBe(
+      "match",
+    );
+    // model_schema.rb:479 `columns_hash.values`.
+    expect(compareCallArgs(site("values", []), site("values", ["id:columnsHash"])).verdict).toBe(
+      "match",
+    );
+  });
+
+  it("compares the remaining arguments pairwise", () => {
+    expect(
+      compareCallArgs(site("pluralize", ["num:2"]), site("pluralize", ["id:word", "num:2"]))
+        .verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(site("pluralize", ["num:2"]), site("pluralize", ["id:word", "num:3"]))
+        .verdict,
+    ).toBe("mismatch");
+  });
+
+  it("leaves a Rails-defined method's explicit host argument flagged", () => {
+    // The `call-args-ar-host-param-*` divergence: the settled idiom is a
+    // `this`-typed function, so `Klass.polymorphicName()` is the port.
+    const result = compareCallArgs(
+      site("polymorphic_name", []),
+      site("polymorphicName", ["id:klass"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("still flags a genuine extra argument past the receiver", () => {
+    expect(
+      compareCallArgs(site("camelize", []), site("camelize", ["id:name", "bool:false"])).verdict,
+    ).toBe("mismatch");
+  });
+});
+
+describe("compareCallArgs block-tail nil padding", () => {
+  const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
+  const required = (name: string): ParamInfo => ({ name, kind: "required" });
+  // sqlite3_adapter.rb:561 `alter_table(table_name, foreign_keys = …,
+  // check_constraints = …, **options)`, called as `alter_table(t) do |d| … end`.
+  const rubyCall = site("alter_table", ["id:table_name"], ["block"]);
+  const tsCall = site("alterTable", ["id:tableName", "nil", "nil", "nil"], ["block"]);
+  const sig = [
+    required("tableName"),
+    optional("overrideForeignKeys"),
+    optional("overrideCheckConstraints"),
+    optional("options"),
+    optional("block"),
+  ];
+
+  it("ignores the padding when the callee defaults every padded parameter", () => {
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [sig]).verdict).toBe("match");
+  });
+
+  it("still flags the padding when the callee treats a padded parameter as a value", () => {
+    const valued = [...sig];
+    valued[2] = required("overrideCheckConstraints");
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [valued]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire without a callee signature to prove the padding inert", () => {
+    expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("does not fire when neither side carries a block", () => {
+    expect(
+      compareCallArgs(
+        site("alter_table", ["id:table_name"]),
+        site("alterTable", ["id:tableName", "nil"]),
+        undefined,
+        [sig],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("does not fire on a nil Rails itself passes in the middle of the list", () => {
+    expect(
+      compareCallArgs(
+        site("alter_table", ["id:table_name"], ["block"]),
+        site("alterTable", ["id:tableName", "nil", "id:options"], ["block"]),
+        undefined,
+        [sig],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("looks past a leading this receiver on a mixin signature", () => {
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [[required("this"), ...sig]]).verdict).toBe(
+      "match",
+    );
   });
 });
 
@@ -384,12 +502,71 @@ describe("compareCallArgs", () => {
 });
 
 describe("pairCallSites", () => {
-  it("pairs the nth Ruby site against the nth TS site of the same name", () => {
+  it("falls back to source order when the argument lists cannot tell the sites apart", () => {
     const pairs = pairCallSites(
       [site("visit", ["id:o"]), site("visit", ["id:x"])],
       [site("visit", ["id:node"]), site("visit", ["id:n"])],
     );
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
+  });
+
+  it("pairs same-named sites by argument agreement, not source order", () => {
+    const pairs = pairCallSites(
+      [site("new", ["id:table_name", "id:options"])],
+      [site("constructor", ["str:0.0.0"]), site("constructor", ["id:tableName", "id:options"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:tableName", "id:options"]]);
+  });
+
+  it("prefers an exact agreement over a longer partial one", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o"])],
+      [site("visit", ["id:o", "id:collector"]), site("visit", ["id:o"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:o"]]);
+  });
+
+  it("pairs a Ruby site whose receiver-less arity differs against the site that matches it", () => {
+    // through_association.rb:13 `loaded?(owner)` vs :20 `…association(…).loaded?`
+    // — one TS site, and the 1-argument Ruby occurrence is its counterpart.
+    const pairs = pairCallSites(
+      [site("loaded?", []), site("loaded?", ["id:owner"])],
+      [site("loaded", ["id:owner"])],
+    );
+    expect(pairs.map((p) => p.ruby.args)).toEqual([["id:owner"]]);
+  });
+
+  it("scores arity after the built-in receiver is stripped, not before", () => {
+    // The port's correct site for a RECEIVER_AS_FIRST_ARG name carries one
+    // argument MORE than Rails'. Scored on raw counts, the arity bonus goes to
+    // the site that merely has the same raw count — the wrong one.
+    const pairs = pairCallSites(
+      [site("pluralize", ["id:count", "id:locale"])],
+      [
+        site("pluralize", ["id:word", "id:count", "id:lang"]),
+        site("pluralize", ["id:count", "id:other"]),
+      ],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:word", "id:count", "id:lang"]]);
+  });
+
+  it("scores an opaque list on its arity rather than dropping it", () => {
+    const pairs = pairCallSites(
+      [site("visit", ["id:o", "hash"])],
+      [site("visit", ["id:o"]), site("visit", ["id:o", "hash"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:o", "hash"]]);
+  });
+
+  it("prefers an uncomparable site of the same arity over a partial agreement", () => {
+    const pairs = pairCallSites(
+      [site("from_database", ["id:name", "id:default", "id:type_for_column"])],
+      [
+        site("fromDatabase", ["id:name", "nil", "id:type"]),
+        site("fromDatabase", ["id:name", "?", "id:seed_type"]),
+      ],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:name", "?", "id:seed_type"]]);
   });
 
   it("camelizes the Ruby call name to find its TS site", () => {

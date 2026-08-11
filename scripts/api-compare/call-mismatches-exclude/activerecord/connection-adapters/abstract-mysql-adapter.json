@@ -94,19 +94,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "check_constraints",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:tableName",
-      "ref:expression",
-      "ref:options"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/abstract_mysql_adapter.rb:542 `CheckConstraintDefinition.new(table_name, expression, options)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "check_constraints",
     "call": "order:constructor,quotedScope",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },

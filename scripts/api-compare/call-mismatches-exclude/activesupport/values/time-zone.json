@@ -10,33 +10,8 @@
     "package": "activesupport",
     "tsFile": "values/time-zone.ts",
     "rubyName": "iso8601",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:utc",
-      "ref:this"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
-    "rubyName": "iso8601",
     "call": "ordinal",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
-    "rubyName": "local",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "nil",
-      "ref:this",
-      "ref:time"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activesupport",
@@ -44,18 +19,6 @@
     "rubyName": "now",
     "call": "in_time_zone",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "values/time-zone.ts",
-    "rubyName": "rfc3339",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:utc",
-      "ref:this"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activesupport",

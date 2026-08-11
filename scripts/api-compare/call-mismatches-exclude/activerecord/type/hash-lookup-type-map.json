@@ -2,17 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "type/hash-lookup-type-map.ts",
-    "rubyName": "alias_type",
-    "call": "register_type",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:type"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at type/hash_lookup_type_map.rb:40 `register_type(type) { |_, *args| lookup(alias_type, *args) }`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "type/hash-lookup-type-map.ts",
     "rubyName": "perform_fetch",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

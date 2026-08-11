@@ -73,19 +73,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "handle_dependency",
-    "call": "add",
-    "kind": "args",
-    "rubyArgs": [
-      "str:base",
-      "str:restrict_dependent_destroy.has_one",
-      "kwargs{record=ref:record}"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/has_one_association.rb:17 `owner.errors.add(:base, :'restrict_dependent_destroy.has_one', record: record)`: the differing argument is a Ruby Symbol, spelled in trails as the colon-prefixed string the CLAUDE.md Symbol convention requires — same value, different rendering."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "handle_dependency",
     "call": "new",
     "kind": "args",
     "rubyArgs": [

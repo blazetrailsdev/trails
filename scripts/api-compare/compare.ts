@@ -2492,7 +2492,7 @@ export function main() {
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
-          const result = compareCallArgs(ruby, ts, rubyName);
+          const result = compareCallArgs(ruby, ts, rubyName, portedWithArgsSigs(tsFile, ts.name));
           if (result.verdict === "skip") {
             callArgsSkipped[result.reason]++;
             continue;
