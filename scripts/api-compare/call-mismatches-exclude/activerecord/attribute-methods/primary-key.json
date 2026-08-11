@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "get_primary_key",
-    "call": "schema_cache",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/primary-key.ts",
-    "rubyName": "get_primary_key",
     "call": "table_exists?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

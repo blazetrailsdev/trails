@@ -70,7 +70,7 @@ describe("Math", () => {
       const node = attr.bitwiseNot();
       expect(node).toBeInstanceOf(Nodes.BitwiseNot);
       expect(node.operator).toBe("~");
-      expect(node.operand).toBe(attr);
+      expect(node.expr).toBe(attr);
     });
 
     it("renders SQL with surrounding spaces around the operator", () => {

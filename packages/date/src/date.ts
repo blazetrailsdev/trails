@@ -424,39 +424,24 @@ export const Errno = { ERANGE };
  * A `Temporal` value is accepted in place of the subject and read through
  * {@link temporalSubject} — the fields Ruby's `::Date`/`::Time` answer natively.
  *
- * `maxsize` is `1024 * flen`, the size `date_strftime_alloc` doubles its buffer
- * up to before it gives up and `rb_sys_fail`s (`date_core.c:7081-7097`). A JS
- * string grows on its own, so that bound is the only part of the C's buffer
- * machinery that is observable — and it is observable, as the two
- * {@link ERANGE} arms are what `test_strftime` asserts: a precision past it
- * (`date_strftime.c:577-582`) and output past it (`FILL_PADDING`,
- * `date_strftime.c:124-126`, over `NEEDS`, `:94`).
+ * `maxsize` is ONE pass's buffer size, not a bound on the format: it is
+ * `char *endp = s + maxsize` (`date_strftime.c:54`), and the two {@link ERANGE}
+ * arms `test_strftime` asserts are what makes a pass fail against it — a
+ * precision past it (`date_strftime.c:577-582`) and output past it
+ * (`FILL_PADDING`, `date_strftime.c:124-126`, over `NEEDS`, `:94`). The second
+ * is over the ACCUMULATED output, not the field alone: the C writes every field
+ * into the one buffer, so a format whose fields are each short but whose total
+ * runs past `endp` fails there too.
  *
- * The second bound is over the ACCUMULATED output, not the field alone: the C
- * writes every field into the one buffer and measures against
- * `char *endp = s + maxsize` (`date_strftime.c:54`), so a format whose fields
- * are each short but whose total runs past `endp` fails there too — which is
- * what `'%100000Y' * 13` does, thirteen fields none of which is itself past
- * `1024 * flen`.
+ * A failed pass is not a failed `strftime` — {@link strftime} is
+ * `date_strftime_alloc` and retries this one against a growing buffer.
  */
-export function strftime(
-  value:
-    | StrftimeSubject
-    | Temporal.PlainDate
-    | Temporal.PlainDateTime
-    | Temporal.ZonedDateTime
-    | Temporal.Instant,
+function dateStrftime(
+  subject: StrftimeSubject,
   format: string,
-): string {
-  const subject: StrftimeSubject =
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.ZonedDateTime ||
-    value instanceof Temporal.Instant
-      ? temporalSubject(value)
-      : value;
+  maxsize: number,
+): string | undefined {
   const hour12 = subject.hour % 12 === 0 ? 12 : subject.hour % 12;
-  const maxsize = 1024 * format.length;
   let out = "";
   let f = 0;
 
@@ -521,7 +506,7 @@ export function strftime(
       if (c !== undefined && isdigit(c)) {
         if (c === "0") padding = "0";
         const [prec, e] = strtoul(format, g);
-        if (prec > INT_MAX || prec > maxsize) throw new ERANGE(format);
+        if (prec > INT_MAX || prec > maxsize) return undefined;
         precision = prec;
         g = e;
         continue;
@@ -718,12 +703,63 @@ export function strftime(
       f = spec === undefined ? format.length : g + 1;
       continue;
     }
-    if (out.length + formatted.length > maxsize) throw new ERANGE(format);
+    if (out.length + formatted.length > maxsize) return undefined;
     out += formatted;
     f = g + 1;
   }
 
   return out;
+}
+
+/**
+ * `SMALLBUF`, the size of the stack buffer `date_strftime_alloc`'s first pass
+ * writes into (`date_core.c:7066`).
+ */
+const SMALLBUF = 100;
+
+/**
+ * Mirrors: `date_strftime_alloc` (`date_core.c:7067-7099`) — the buffer growth
+ * around {@link dateStrftime}, and the only place {@link ERANGE} is raised.
+ *
+ * The `1024 * flen` guess is the size the loop GIVES UP at, not the size it
+ * stops growing at: the loop runs a pass at `size` FIRST and only then tests
+ * `size >= 1024 * flen`, so a format needing more than `1024 * flen` still
+ * answers whenever the next power of two after the failure fits it —
+ * `Date.new(2001,2,3).strftime("%6145Y")` is 6145 characters against a
+ * `1024 * flen` of 6144. Bounding the FORMAT by `1024 * flen` instead would
+ * raise there, up to one doubling tighter than MRI.
+ *
+ * A JS string grows on its own, so the buffer itself is unobservable; the pass
+ * boundary is not, because it is what the two `ERANGE` arms measure against. A
+ * pass answers `undefined` where the C hits `ERANGE`, so `len != 0 || (**buf ==
+ * '\0' && errno != ERANGE)` (`date_core.c:7080`) is "the pass answered" —
+ * empty output included.
+ */
+export function strftime(
+  value:
+    | StrftimeSubject
+    | Temporal.PlainDate
+    | Temporal.PlainDateTime
+    | Temporal.ZonedDateTime
+    | Temporal.Instant,
+  format: string,
+): string {
+  const subject: StrftimeSubject =
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Temporal.Instant
+      ? temporalSubject(value)
+      : value;
+  const flen = format.length;
+  if (flen === 0) return "";
+  const first = dateStrftime(subject, format, SMALLBUF);
+  if (first !== undefined) return first;
+  for (let size = 1024; ; size *= 2) {
+    const len = dateStrftime(subject, format, size);
+    if (len !== undefined) return len;
+    if (size >= 1024 * flen) throw new ERANGE(format);
+  }
 }
 
 export class ArgumentError extends Error {

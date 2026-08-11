@@ -28,7 +28,6 @@ import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import {
   columnNameMatcher as abstractColumnNameMatcher,
-  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   defaultSqlTimezone,
 } from "./connection-adapters/abstract/sql-formatting.js";
 import {
@@ -289,15 +288,6 @@ function resolveColumnNameMatcher(adapter: any): RegExp {
   // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
   // lookup on the concrete adapter class.
   return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
-}
-
-function resolveColumnNameWithOrderMatcher(adapter: any): RegExp {
-  // Order-path matcher additionally permits an `ASC|DESC` and `NULLS
-  // FIRST|LAST` suffix after the column name. Mirrors Rails'
-  // `model.adapter_class.column_name_with_order_matcher`.
-  return (
-    adapter?.constructor?.columnNameWithOrderMatcher?.() ?? abstractColumnNameWithOrderMatcher()
-  );
 }
 
 /**
@@ -1144,20 +1134,16 @@ export class Relation<T extends Base> {
   /**
    * Order by specific values of a column.
    *
-   * Mirrors: ActiveRecord::Relation#in_order_of
+   * Mirrors: ActiveRecord::Relation#in_order_of (query_methods.rb:718) — the
+   * permit matcher comes off `model.adapter_class`, a class-level lookup that
+   * leases no connection.
    */
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
-    // Mirrors Rails: reject opaque raw SQL in the order column before doing
-    // anything else. The order-path matcher permits a bare column (optionally
-    // table-prefixed) with an optional ASC|DESC / NULLS FIRST|LAST suffix;
-    // Arel nodes are passed through untouched.
-    let orderMatcher: RegExp | undefined;
-    try {
-      orderMatcher = resolveColumnNameWithOrderMatcher(this._conn());
-    } catch {
-      orderMatcher = abstractColumnNameWithOrderMatcher();
-    }
-    disallowRawSqlBang([column], { permit: orderMatcher });
+    disallowRawSqlBang([column], {
+      permit: (
+        this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+      ).columnNameWithOrderMatcher(),
+    });
 
     if (values.length === 0) return this.none();
 
@@ -4154,6 +4140,10 @@ export class Relation<T extends Base> {
    */
   get whereClause(): WhereClause {
     return this._whereClause;
+  }
+  set whereClause(value: WhereClause) {
+    this.assertModifiableBang();
+    this._whereClause = value;
   }
 
   // The remaining `VALUE_METHODS.each`-generated accessors (query_methods.rb:162):

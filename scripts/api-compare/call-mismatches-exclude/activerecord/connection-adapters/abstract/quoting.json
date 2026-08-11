@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quoted_date",
-    "call": "default_timezone",
-    "reason": "Rails' quoted_date branches on default_timezone inline (abstract/quoting.rb:186); trails' quotedDate formats through formatInstantForSql / formatPlainDateTimeForSql in abstract/sql-datetime.ts, whose defaultSqlTimezone() reads ActiveRecord.defaultTimezone."
-  }
-]

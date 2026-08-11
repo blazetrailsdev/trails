@@ -251,14 +251,14 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected async exclusionConstraintsInCreate(tableName: string, stream: string[]): Promise<void> {
+  protected async exclusionConstraintsInCreate(table: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: ExclusionConstraintDefinition[] =
       this._cachedExclConstraints ??
-      (adapter?.exclusionConstraints ? await adapter.exclusionConstraints(tableName) : []);
+      (adapter?.exclusionConstraints ? await adapter.exclusionConstraints(table) : []);
     this._cachedExclConstraints = undefined;
     if (constraints.length === 0) return;
-    const stripped = this.removePrefixAndSuffix(tableName);
+    const stripped = this.removePrefixAndSuffix(table);
     const stmts = constraints.map((ec) => {
       const opts: string[] = [];
       if (ec.where) opts.push(`where: ${JSON.stringify(ec.where)}`);
@@ -272,14 +272,14 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected async uniqueConstraintsInCreate(tableName: string, stream: string[]): Promise<void> {
+  protected async uniqueConstraintsInCreate(table: string, stream: string[]): Promise<void> {
     const adapter = this.pgAdapter();
     const constraints: UniqueConstraintDefinition[] =
       this._cachedUniqConstraints ??
-      (adapter?.uniqueConstraints ? await adapter.uniqueConstraints(tableName) : []);
+      (adapter?.uniqueConstraints ? await adapter.uniqueConstraints(table) : []);
     this._cachedUniqConstraints = undefined;
     if (constraints.length === 0) return;
-    const stripped = this.removePrefixAndSuffix(tableName);
+    const stripped = this.removePrefixAndSuffix(table);
     const stmts = constraints.map((uc) => {
       const opts: string[] = [];
       if (uc.nullsNotDistinct)

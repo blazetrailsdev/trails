@@ -21,6 +21,7 @@
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/abstract/schema-dumper.js";
+import { isBlank } from "@blazetrails/activesupport";
 import { SchemaMigration } from "./schema-migration.js";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
@@ -680,11 +681,15 @@ export abstract class SchemaDumper {
 
   /** @internal */
   removePrefixAndSuffix(table: string): string {
-    const prefix = (this._options.tableNamePrefix as string | undefined) ?? "";
-    const suffix = (this._options.tableNameSuffix as string | undefined) ?? "";
-    if (!prefix && !suffix) return table;
+    // This method appears at the top when profiling active_record test cases run.
+    // Avoid costly calculation when there are no prefix and suffix.
+    if (isBlank(this._options.tableNamePrefix) && isBlank(this._options.tableNameSuffix)) {
+      return table;
+    }
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`^${escape(prefix)}(.+)${escape(suffix)}$`);
+    const prefix = escape((this._options.tableNamePrefix as string | undefined) ?? "");
+    const suffix = escape((this._options.tableNameSuffix as string | undefined) ?? "");
+    const re = new RegExp(`^${prefix}(.+)${suffix}$`);
     const m = table.match(re);
     return m ? m[1] : table;
   }
@@ -961,8 +966,8 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  indexesInCreate(tableName: string, stream: string[], indexes: IndexInfo[] = []): void {
-    const stripped = this.removePrefixAndSuffix(tableName);
+  indexesInCreate(table: string, stream: string[], indexes: IndexInfo[] = []): void {
+    const stripped = this.removePrefixAndSuffix(table);
     for (const index of indexes) {
       const [cols, ...opts] = this.indexParts(index);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";

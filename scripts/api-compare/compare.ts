@@ -473,10 +473,12 @@ export function resolvePortedWithArgsSigs(
   byNameInPkg: ReadonlyMap<string, ParamInfo[][]>,
   tsFile: string,
   name: string,
+  writerSigs: ReadonlySet<readonly ParamInfo[]> = new Set(),
 ): ParamInfo[][] {
+  const readers = (sigs: ParamInfo[][]): ParamInfo[][] => sigs.filter((s) => !writerSigs.has(s));
   const sameFile = byFileName.get(tsFile)?.get(name);
-  if (sameFile && sameFile.length > 0) return sameFile;
-  return byNameInPkg.get(name) ?? [];
+  if (sameFile && sameFile.length > 0) return readers(sameFile);
+  return readers(byNameInPkg.get(name) ?? []);
 }
 
 /**
@@ -1935,6 +1937,16 @@ export function main() {
     // still let a dep signature open the gate. Feeds the ported-with-args gate
     // and the literal-default check.
     const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
+    // Signature objects (by identity) belonging to a `set` accessor. A Ruby
+    // writer is its own method (`where_clause=`) but conventions.ts maps it onto
+    // the bare camel name, so a get/set pair pools two signatures under one
+    // name. The ported-with-args gate must not read the writer's parameter as
+    // proof that the READER — the method a Ruby `where_clause` CALL maps to —
+    // takes arguments; that is what made adding a writer Rails already has
+    // surface call mismatches on bodies nobody touched. Arity keeps the
+    // signature (it is the real match for `where_clause=`); only this gate
+    // subtracts it. See MethodInfo.writer.
+    const tsWriterSigs = new Set<readonly ParamInfo[]>();
     // Per-(file, name) resolved options-object keys (null = uncheckable),
     // package-only for the same collision reason as tsParamsByFileNameInPkg.
     // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
@@ -1979,7 +1991,13 @@ export function main() {
       return byName;
     };
     const portedWithArgsSigs = (tsFile: string, name: string): ParamInfo[][] =>
-      resolvePortedWithArgsSigs(tsParamsByFileNameInPkg, tsParamsByNameInPkg, tsFile, name);
+      resolvePortedWithArgsSigs(
+        tsParamsByFileNameInPkg,
+        tsParamsByNameInPkg,
+        tsFile,
+        name,
+        tsWriterSigs,
+      );
     const includeGraph = buildIncludeGraph(
       tsPkg ? [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)] : [],
       tsPkg?.fileFunctions ?? {},
@@ -2014,6 +2032,7 @@ export function main() {
         const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
         pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
         tsParamsByFileNameInPkg.set(file, pkgByName);
+        if (m.writer) tsWriterSigs.add(m.params);
         if (m.optionKeys !== undefined) {
           const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
           byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);

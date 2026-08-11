@@ -169,7 +169,7 @@ interface QueryMethodsHost {
   primaryKey: string | string[];
   _whereClause: WhereClause;
   /** Rails' `where_clause` / `having_clause` readers (CLAUSE_METHODS). */
-  readonly whereClause: WhereClause;
+  whereClause: WhereClause;
   havingClause: WhereClause;
   _orderClauses: Array<string | Nodes.Node>;
   _rawOrderClauses: string[];
@@ -1191,7 +1191,7 @@ function andBang(this: QueryMethodsHost, other: any): any {
 function orBang(this: QueryMethodsHost, other: any): any {
   assertRelationForCombining(other, "or");
   assertStructurallyCompatible(this, other, "or");
-  this._whereClause = this.whereClause.or(other.whereClause);
+  this.whereClause = this.whereClause.or(other.whereClause);
   this.havingClause = this.havingClause.or(other.havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
   this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);

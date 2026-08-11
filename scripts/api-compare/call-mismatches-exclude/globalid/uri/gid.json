@@ -20,13 +20,6 @@
   {
     "package": "globalid",
     "tsFile": "uri/gid.ts",
-    "rubyName": "to_s",
-    "call": "query",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails uri/gid.rb:104-107 reassembles from app/path/query; trails uri/gid.ts:222-224 toString returns the stored canonical `this.uri` string built at parse time — no query re-read needed."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "uri/gid.ts",
     "rubyName": "validate_app",
     "call": "parse",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
