@@ -797,7 +797,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `    t.checkConstraint(${expr}${optStr});`;
       });
-      lines.push(...checkConstraintStatements.sort());
+      lines.push(checkConstraintStatements.sort().join("\n"));
     }
 
     if (checkInvalid.length > 0) {
@@ -1086,8 +1086,7 @@ export abstract class SchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
-    statements.sort();
-    lines.push(...statements);
+    if (statements.length > 0) lines.push(statements.sort().join("\n"));
   }
 
   /**

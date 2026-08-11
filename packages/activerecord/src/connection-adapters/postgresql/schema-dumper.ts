@@ -268,7 +268,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addExclusionConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(ec.expression)}${optStr});`;
     });
-    lines.push(...stmts.sort());
+    lines.push(stmts.sort().join("\n"));
   }
 
   /** @internal */
@@ -289,7 +289,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       return `  await ctx.addUniqueConstraint(${JSON.stringify(stripped)}, ${JSON.stringify(uc.column)}${optStr});`;
     });
-    lines.push(...stmts.sort());
+    lines.push(stmts.sort().join("\n"));
   }
 
   /** @internal */

@@ -276,27 +276,20 @@ export class SchemaCreation {
   }
 
   protected async visitAlterTable(o: AlterTable): Promise<string> {
-    const table = this.adapter.quoteTableName(o.name);
-    const parts: string[] = [];
+    let sql = `ALTER TABLE ${this.adapter.quoteTableName(o.name)} `;
 
-    for (const add of o.adds) {
-      parts.push(await this.visitAddColumnDefinition(add));
-    }
-    for (const fk of o.foreignKeyAdds) {
-      parts.push(this.visitAddForeignKey(fk));
-    }
-    for (const fk of o.foreignKeyDrops) {
-      parts.push(this.visitDropForeignKey(fk));
-    }
-    for (const con of o.checkConstraintAdds) {
-      parts.push(this.visitAddCheckConstraint(con));
-    }
-    for (const con of o.checkConstraintDrops) {
-      parts.push(await this.visitDropCheckConstraint(con));
-    }
-    for (const con of o.constraintDrops) {
-      parts.push(this.visitDropConstraint(con));
-    }
+    sql += (await Promise.all(o.adds.map((col) => this.accept(col)))).join(" ");
+    sql += o.foreignKeyAdds.map((fk) => this.visitAddForeignKey(fk)).join(" ");
+    sql += o.foreignKeyDrops.map((fk) => this.visitDropForeignKey(fk)).join(" ");
+    sql += o.checkConstraintAdds.map((con) => this.visitAddCheckConstraint(con)).join(" ");
+    sql += (
+      await Promise.all(o.checkConstraintDrops.map((con) => this.visitDropCheckConstraint(con)))
+    ).join(" ");
+    sql += o.constraintDrops.map((con) => this.visitDropConstraint(con)).join(" ");
+
+    // Not in Rails' visit_AlterTable (schema_creation.rb:24-32): trails'
+    // AlterTable carries column-default changes as their own group.
+    const parts: string[] = [];
     for (const change of o.columnDefaultChanges) {
       const col = this.adapter.quoteColumnName(change.columnName);
       if (change.defaultValue == null) {
@@ -308,7 +301,9 @@ export class SchemaCreation {
       }
     }
 
-    return `ALTER TABLE ${table} ${parts.join(", ")}`;
+    sql += parts.join(" ");
+
+    return sql;
   }
 
   /** @internal */

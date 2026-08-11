@@ -2049,11 +2049,7 @@ export class SchemaStatements {
       !options.name &&
       this.isExpressionColumnName(typeof columnName === "string" ? columnName : "")
     ) {
-      // Rails: `options[:name] = index_name(table_name, column_name)` — a String
-      // column is scanned for \w+ words, joined with "_", and passed through
-      // generate_index_name, so the index-name length/hash fallback applies.
-      const joined = ((columnName as string).match(/\w+/g) ?? []).join("_");
-      options = { ...options, name: this.generateIndexName(tableName, joined) };
+      options = { ...options, name: this.indexName(tableName, columnName as string) };
       columnNames = [];
     } else {
       const rawColumn = columnName ?? options.column;
@@ -2076,8 +2072,7 @@ export class SchemaStatements {
     ) {
       checks.push(
         (i) =>
-          this.indexName(tableName, { column: i.columns }) ===
-          this.indexName(tableName, { column: columnNames }),
+          this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),
       );
     }
 

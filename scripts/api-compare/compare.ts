@@ -12,8 +12,13 @@
  *
  * Usage:
  *   npx tsx scripts/api-compare/compare.ts \
- *     [--package activerecord] [--missing] [--files] [--incomplete] \
+ *     [--package activerecord] [--missing] [--files] [--incomplete] [--closure] \
  *     [--inheritance] [--arity] [--public-only | --privates-only] [--calls]
+ *
+ * `--closure` scopes the per-file detail table to the AR/AM require closure
+ * (ar-closure.ts, RFC 0092) and prints its own totals line under the table, so
+ * a support-gem burndown sees only the files ActiveRecord/ActiveModel require.
+ * Whole-package and Data-layer/AR-closure summaries are unchanged either way.
  *
  * The default reports the full surface (public + private). `--public-only`
  * drops Rails-private/internal methods on both sides for a contract-only
@@ -1778,6 +1783,7 @@ export function main() {
   const showMissing = args.includes("--missing");
   const showFiles = args.includes("--files");
   const showIncomplete = args.includes("--incomplete");
+  const showClosureOnly = args.includes("--closure");
   const showInheritance = args.includes("--inheritance");
   // Arity is always computed (summary + artifact); --arity adds the breakdown.
   const showArity = args.includes("--arity");
@@ -3182,6 +3188,7 @@ export function main() {
     showInheritance,
     showArity,
     mode,
+    showClosureOnly,
   );
 }
 
@@ -3216,7 +3223,14 @@ function printReport(
   showInheritance = false,
   showArity = false,
   mode: CompareMode = "public",
+  showClosureOnly = false,
 ) {
+  // `--closure` scopes the PER-FILE table (and its own totals line) to the
+  // AR/AM require closure (RFC 0092), so a burndown agent sees only the files
+  // the data layer actually pulls in. Package and Data-layer/AR-closure
+  // summaries below are unaffected — this filters rows, not denominators.
+  const DATA_LAYER = new Set(DATA_LAYER_PACKAGES);
+  const closureFileSet = showClosureOnly ? writeArClosure().files : null;
   if (mode === "private") {
     console.log(
       `\n  (comparing internal/private API surface — ` +
@@ -3321,6 +3335,12 @@ function printReport(
     }
 
     // Per-file table (only for detail packages or when filtered)
+    const inClosure = closureFileSet ? new Set(closureFileSet[pkg.package] ?? []) : null;
+    const detailFiles =
+      inClosure && !DATA_LAYER.has(pkg.package)
+        ? pkg.files.filter((f) => inClosure.has(f.rubyFile))
+        : pkg.files;
+
     if (DETAIL_PACKAGES.has(pkg.package) || filterPkg || showFiles) {
       console.log(
         `\n  ${"Ruby file".padEnd(55)} ${"Expected TS file".padEnd(40)} ${"Match".padStart(6)} ${"Miss".padStart(6)} ${"Tot".padStart(6)}  %`,
@@ -3329,7 +3349,7 @@ function printReport(
         `  ${"-".repeat(55)} ${"-".repeat(40)} ${"-".repeat(6)} ${"-".repeat(6)} ${"-".repeat(6)} ${"-".repeat(4)}`,
       );
 
-      for (const f of pkg.files) {
+      for (const f of detailFiles) {
         const pct = f.total > 0 ? Math.round((f.matched / f.total) * 100) : 0;
         const fullyMatched = f.total > 0 && f.matched === f.total;
         // A misplaced file is "incomplete" even at 100% match \u2014 the
@@ -3352,11 +3372,19 @@ function printReport(
           }
         }
       }
+
+      if (closureFileSet) {
+        const total = detailFiles.reduce((n, f) => n + f.total, 0);
+        const matched = detailFiles.reduce((n, f) => n + f.matched, 0);
+        const pct = total > 0 ? Math.round((matched / total) * 1000) / 10 : 0;
+        console.log(
+          `\n  in AR closure: ${matched}/${total} methods (${pct}%)  |  files: ${detailFiles.length}`,
+        );
+      }
     }
   }
 
   // Data layer summary (arel + activemodel + activerecord)
-  const DATA_LAYER = new Set(DATA_LAYER_PACKAGES);
   let dataTotal = 0;
   let dataMatched = 0;
   let dataFiles = 0;

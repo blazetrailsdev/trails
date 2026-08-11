@@ -2965,7 +2965,7 @@ export class Relation<T extends Base> {
       const plan = await c.explain(sql, binds, options);
       parts.push(`${msg}\n${plan}`);
     }
-    return parts.join("\n\n");
+    return parts.join("\n");
   }
 
   /**
