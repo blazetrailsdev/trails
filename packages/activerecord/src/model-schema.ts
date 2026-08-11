@@ -917,11 +917,16 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
   // reload_schema_from_cache, resetting @find_by_statement_cache. Clearing it
   // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
   // itself leaves the cache alone.
-  void (
-    connectionPool.call(this as unknown as typeof Base).activeConnection as {
-      clearCacheBang?: () => unknown;
-    } | null
-  )?.clearCacheBang?.();
+  try {
+    void (
+      connectionPool.call(this as unknown as typeof Base).activeConnection as {
+        clearCacheBang?: () => unknown;
+      } | null
+    )?.clearCacheBang?.();
+  } catch {
+    // `connectionPool` throws for a pool-less model (a directly-assigned
+    // adapter); Ruby's `connection_pool` is always there to answer nil.
+  }
   (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   // Mirrors Rails reset_column_information's
   // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop

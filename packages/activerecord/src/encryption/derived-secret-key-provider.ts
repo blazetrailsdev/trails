@@ -16,15 +16,16 @@ export class DerivedSecretKeyProvider extends KeyProvider {
     const keyGenerator = options?.keyGenerator ?? new KeyGenerator();
     // Rails builds the key list by calling the private `derive_key_from` from
     // inside the `super(...)` argument (derived_secret_key_provider.rb:8).
-    // Ruby has `self` before `super`; JS does not, so the same body runs off
-    // the prototype with a receiver carrying only the state its `using:`
-    // default would have read.
-    const receiver = { _keyGenerator: keyGenerator } as unknown as DerivedSecretKeyProvider;
+    // Ruby has `self` before `super`; JS does not, so the same body runs
+    // unbound off the prototype — passing `using:` explicitly, as Rails does,
+    // is what makes the receiver unnecessary.
     super(
       passwordList.map((password) =>
-        DerivedSecretKeyProvider.prototype.deriveKeyFrom.call(receiver, password, {
-          using: keyGenerator,
-        }),
+        DerivedSecretKeyProvider.prototype.deriveKeyFrom.call(
+          {} as DerivedSecretKeyProvider,
+          password,
+          { using: keyGenerator },
+        ),
       ),
     );
     this._keyGenerator = keyGenerator;
