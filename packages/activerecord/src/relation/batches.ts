@@ -230,8 +230,6 @@ export async function* batchOnUnloadedRelation(opts: {
   remaining?: number | null;
   useRanges?: boolean | null;
 }): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
-  // Rails' `cursor` is already an Array by the time batch_on_unloaded_relation
-  // runs (`Array(cursor)`, batches.rb:260).
   const cursor = Array.isArray(opts.cursor) ? opts.cursor : [opts.cursor];
   let { batchLimit } = opts;
   let remaining: number | null | undefined = opts.remaining;

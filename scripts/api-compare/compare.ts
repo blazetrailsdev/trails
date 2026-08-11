@@ -2503,10 +2503,6 @@ export function main() {
             ts,
             rubyName,
             portedWithArgsSigs(tsFile, ts.name),
-            // The Symbol-vs-String discriminator needs the CALLEE's Ruby
-            // params (RFC 0099). Only a callee this same Ruby file defines is
-            // resolvable here, which is the narrow arming the row measurement
-            // called for.
             rubyParamsByName.get(ruby.name),
           );
           if (result.verdict === "skip") {

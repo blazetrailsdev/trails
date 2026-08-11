@@ -675,10 +675,12 @@ export function pairCallSites(
  * already matched: the normalized keys cannot express the difference.
  *
  * Deliberately narrow. The callee's params are the ones the enclosing Ruby FILE
- * defines, so only a same-file callee arms the strict arm; making every Ruby
+ * defines, so only a same-file callee arms the strict arm, and a site whose
+ * argument lists {@link alignReceiverArgs} had to re-align is skipped because
+ * the Ruby positions no longer index the callee's params. Making every Ruby
  * Symbol argument strict was measured at +191 rows over 1047, overwhelmingly
- * ports of non-discriminated names, and is the "wave of false rows" RFC 0099
- * rules out.
+ * ports of names that are not discriminated at all — the "wave of false rows"
+ * RFC 0099 rules out.
  */
 function symbolDiscriminatedAt(params: ParamInfo[] | undefined, index: number): boolean {
   const positional = (params ?? []).filter((p) => p.kind === "required" || p.kind === "optional");
@@ -781,7 +783,11 @@ export function compareCallArgs(
 
   const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
   if (argsEqual(compared, tsArgs)) {
-    if (symbolSpellingsHold(aligned.rubyArgs, aligned.tsArgs, calleeRubyParams)) {
+    const alignedRuby = aligned.rubyArgs === ruby.args ? aligned.rubyArgs : undefined;
+    if (
+      alignedRuby === undefined ||
+      symbolSpellingsHold(alignedRuby, aligned.tsArgs, calleeRubyParams)
+    ) {
       return { verdict: "match", rubyArgs, tsArgs };
     }
     return { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };

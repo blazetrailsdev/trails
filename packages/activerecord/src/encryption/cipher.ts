@@ -5,9 +5,7 @@
  * Mirrors: ActiveRecord::Encryption::Cipher (encryption/cipher.rb)
  */
 
-// `Kernel#Array` is a global method in Ruby, so cipher.rb:26 spells it `Array(key)`.
-// Aliasing on import keeps that spelling at the call site; this file uses no
-// global `Array` member, so the shadow costs nothing.
+// Ruby's `Kernel#Array` is a global method, so cipher.rb:26 spells it `Array(key)`.
 import { kernelArray as Array } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";

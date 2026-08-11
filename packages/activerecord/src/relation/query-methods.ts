@@ -1887,7 +1887,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
     typeof k === "symbol" ? symbolToName(k) : k,
   );
   disallowRawSqlBang(flattenedArgs, {
-    permit: (this.model as any).adapterClassSync().columnNameWithOrderMatcher(),
+    permit: (
+      this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+    ).columnNameWithOrderMatcher(),
   });
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);

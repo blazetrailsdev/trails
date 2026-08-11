@@ -134,7 +134,16 @@ export class Scheme {
     return this.deterministic === other.deterministic;
   }
 
-  /** Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68). */
+  /**
+   * Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68) — the
+   * as-passed options plus `@context_properties`, compacted.
+   *
+   * Carries four keys Rails' `to_h` does not (`key`, `fixed`,
+   * `supportUnencryptedData`, `compress`/`compressor`). That is pre-existing
+   * (`_toOptions`, which this renames onto the Rails name) and is what `merge`
+   * currently relies on to carry them across; narrowing it to Rails' five keys
+   * is story `converge-scheme-to-h-key-set`.
+   */
   toH(): SchemeOptions {
     const o = this._opts;
     const opts: SchemeOptions = {};

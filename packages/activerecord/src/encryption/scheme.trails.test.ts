@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
+import { Contexts } from "./contexts.js";
 
-describe("ActiveRecord::Encryption::SchemeTest", () => {
-  // scheme.rb:32-33 builds an Encryptor only on `unless @compress` / `if compressor`.
-  // With the defaults nothing is installed into @context_properties, so the
-  // surrounding context's own encryptor is the one that runs.
+describe("ActiveRecord::Encryption::SchemeTest (trails)", () => {
   it("builds no encryptor on the default path", () => {
     expect(new Scheme().toH().encryptor).toBeUndefined();
     expect(new Scheme({ deterministic: true }).toH().encryptor).toBeUndefined();
@@ -19,5 +17,14 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
         compressor: { deflate: (d: string) => Buffer.from(d), inflate: () => "" },
       }).toH().encryptor,
     ).toBeInstanceOf(Encryptor);
+  });
+
+  it("leaves the surrounding context's encryptor in place on the default path", () => {
+    const outer = new Encryptor();
+    Contexts.withEncryptionContext({ encryptor: outer }, () => {
+      new Scheme().withContext(() => {
+        expect(Contexts.context.encryptor).toBe(outer);
+      });
+    });
   });
 });
