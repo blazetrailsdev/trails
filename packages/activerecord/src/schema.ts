@@ -90,13 +90,13 @@ export class Schema extends Current {
     // trailties boot). Using defaultEnv over a hard-coded literal
     // keeps Schema.define consistent with how Migrator and other
     // migration-stack pieces resolve the current environment.
-    const environment =
+    const currentEnvironment =
       info.environment ??
       getEnv("TRAILS_ENV") ??
       getEnv("NODE_ENV") ??
       DatabaseConfigurations.defaultEnv;
     const internalMetadata = new InternalMetadata(adapter.pool);
-    await internalMetadata.createTableAndSetFlags(environment);
+    await internalMetadata.createTableAndSetFlags(currentEnvironment);
   }
 
   constructor(adapter: DatabaseAdapter) {

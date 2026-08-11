@@ -132,10 +132,10 @@ export class CommandRecorder {
       typeof delegate?.supportsBulkAlter === "function" && delegate.supportsBulkAlter() === true;
 
     if (options["bulk"] && supportsBulk) {
-      const sub = new CommandRecorder(this._delegate);
-      sub.reverting = this._reverting;
-      await callback(delegate.updateTableDefinition(tableName, sub));
-      this._commands.push({ cmd: "changeTable", args: [tableName, sub.commands] });
+      const recorder = new CommandRecorder(this._delegate);
+      recorder.reverting = this._reverting;
+      await callback(delegate.updateTableDefinition(tableName, recorder));
+      this._commands.push({ cmd: "changeTable", args: [tableName, recorder.commands] });
     } else {
       await callback(delegate.updateTableDefinition(tableName, this));
     }

@@ -180,7 +180,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       // and PostgreSQL owns the rejection — `[null]` would throw in the quoter
       // first (add_unique_constraint has no pre-raise for the empty case).
       const cols = wrap(o.column)
-        .map((c) => this.adapter.quoteColumnName(c))
+        .map((column) => this.adapter.quoteColumnName(column))
         .join(", ");
       p.push(`(${cols})`);
     }

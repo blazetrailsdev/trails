@@ -103,22 +103,25 @@ export function buildColumnSerializer(
   type: unknown,
   yaml?: YamlColumnOptions,
 ): unknown {
-  const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
+  // When ::JSON is used, force it to go through the Active Support JSON encoder
+  // to ensure special objects (e.g. Active Record models) are dumped correctly
+  // using the #as_json hook.
+  if (coder === globalThis.JSON) coder = CodersJSON;
 
   // Mirrors Rails' `coder == ::YAML || coder == Coders::YAMLColumn`. The string
   // "YAML" is the trails analog of Ruby's `::YAML` module constant. Rails forwards
   // `**(yaml || {})` (permitted_classes/unsafe_load) into the YAMLColumn ctor.
-  if (resolvedCoder === "YAML" || resolvedCoder === YAMLColumn) {
+  if (coder === "YAML" || coder === YAMLColumn) {
     return new YAMLColumn(attrName, type as new (...args: unknown[]) => unknown, yaml ?? {});
   }
 
-  if (typeof resolvedCoder === "function" && !("load" in resolvedCoder)) {
-    return new (resolvedCoder as any)(attrName, type);
+  if (typeof coder === "function" && !("load" in coder)) {
+    return new (coder as any)(attrName, type);
   }
 
   if (type && type !== Object) {
-    return new CodersColumnSerializer(attrName, resolvedCoder as any, type as any);
+    return new CodersColumnSerializer(attrName, coder as any, type as any);
   }
 
-  return resolvedCoder;
+  return coder;
 }

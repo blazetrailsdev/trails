@@ -40,8 +40,8 @@ export class AssociatedValidator extends EachValidator {
     // would race on a repeated/shared associated record and reorder
     // callbacks. Await each in order to preserve that observable behavior.
     let anyInvalid = false;
-    for (const assoc of values) {
-      if (!(await isValidObject(assoc, context))) anyInvalid = true;
+    for (const association of values) {
+      if (!(await isValidObject(association, context))) anyInvalid = true;
     }
     if (anyInvalid) {
       const { attributes: _, ...errorOpts } = this.options;

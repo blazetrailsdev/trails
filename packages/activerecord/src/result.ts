@@ -239,8 +239,8 @@ export class Result {
 
   get indexedRows(): IndexedRow[] {
     if (this.#indexedRows) return this.#indexedRows;
-    const idx = this.columnIndexes;
-    this.#indexedRows = this.rows.map((row) => new IndexedRow(idx, row));
+    const columns = this.columnIndexes;
+    this.#indexedRows = this.rows.map((row) => new IndexedRow(columns, row));
     return this.#indexedRows;
   }
 

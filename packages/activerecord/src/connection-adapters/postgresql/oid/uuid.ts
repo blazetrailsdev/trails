@@ -55,9 +55,9 @@ export class Uuid extends ValueType<string> {
 
   /** @internal Rails-private helper. */
   protected override castValue(value: unknown): string | null {
-    const str = String(value);
-    if (!ACCEPTABLE_UUID.test(str)) return null;
-    return this.formatUuid(str);
+    value = String(value);
+    if (!ACCEPTABLE_UUID.test(value as string)) return null;
+    return this.formatUuid(value as string);
   }
 
   private formatUuid(uuid: string): string {

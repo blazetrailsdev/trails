@@ -131,23 +131,23 @@ export function hasDefaultScopeOverride(modelClass: any): boolean {
  */
 export function defaultScope<T extends typeof Base>(
   this: T,
-  fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
   options?: { allQueries?: boolean },
 ): void;
 export function defaultScope<T extends typeof Base>(
   this: T,
-  fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
   allQueries?: boolean,
 ): void;
 export function defaultScope<T extends typeof Base>(
   this: T,
-  fn: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
   optionsOrAllQueries?: { allQueries?: boolean } | boolean,
 ): void {
   // Rails: `scope.is_a?(Relation) || !scope.respond_to?(:call)`. A trails
   // Relation is a non-callable object, so the callable check alone covers both
   // (an eager `Model.where(...)` relation included).
-  if (typeof fn !== "function") {
+  if (typeof scope !== "function") {
     throw new ArgumentError(
       "Support for calling #default_scope without a block is removed. For " +
         "example instead of `default_scope where(color: 'red')`, please use " +
@@ -161,7 +161,7 @@ export function defaultScope<T extends typeof Base>(
       ? optionsOrAllQueries
       : (optionsOrAllQueries?.allQueries ?? false);
 
-  const scopeObj = new DefaultScope(fn as (rel: any) => any, allQueries);
+  const scopeObj = new DefaultScope(scope as (rel: any) => any, allQueries);
   const existing: DefaultScope[] = (this as any).defaultScopes ?? [];
   (this as any).defaultScopes = [...existing, scopeObj];
 }
@@ -244,8 +244,8 @@ function isIgnoreDefaultScope(modelClass: any): boolean {
 }
 
 /** @internal */
-function setIgnoreDefaultScope(modelClass: any, value: boolean | null): void {
-  ScopeRegistry.setIgnoreDefaultScope(modelClass, value);
+function setIgnoreDefaultScope(baseClass: any, ignore: boolean | null): void {
+  ScopeRegistry.setIgnoreDefaultScope(baseClass, ignore);
 }
 
 /**

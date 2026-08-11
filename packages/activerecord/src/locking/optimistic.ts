@@ -268,11 +268,11 @@ export function destroyRow(
  * @internal
  * Mirrors: ActiveRecord::Locking::Optimistic#_lock_value_for_database
  */
-export function _lockValueForDatabase(this: InstanceLockingHost, col: string): unknown {
-  if (isWillSaveChangeToAttribute(this as any, col)) {
-    return this.readAttribute(col) ?? 0;
+export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: string): unknown {
+  if (isWillSaveChangeToAttribute(this as any, lockingColumn)) {
+    return this.readAttribute(lockingColumn) ?? 0;
   }
-  return attributeInDatabase(this as any, col) ?? 0;
+  return attributeInDatabase(this as any, lockingColumn) ?? 0;
 }
 
 /**
@@ -281,9 +281,9 @@ export function _lockValueForDatabase(this: InstanceLockingHost, col: string): u
  */
 export function _clearLockingColumn(this: InstanceLockingHost): void {
   const ctor = this.constructor;
-  const col = ctor.lockingColumn;
-  this.writeAttribute(col, null);
-  this.clearAttributeChange(col);
+  const lockingColumn = ctor.lockingColumn;
+  this.writeAttribute(lockingColumn, null);
+  this.clearAttributeChange(lockingColumn);
 }
 
 /**
