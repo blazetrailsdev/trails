@@ -2733,12 +2733,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (code !== undefined) (exc as any).code = code;
     }
     const translated = translateException(exc, msg, sql, binds, this.pool);
-    // Ruby chains the driver error implicitly: `translate_exception`'s result is
-    // raised from inside the `rescue`, so `Exception#cause` is `$!` and the
-    // driver error is never named in the argument list
-    // (sqlite3_adapter.rb:698-702). JS sets no cause at a `throw`, so this is
-    // the raise-site stand-in — the same one `translateExceptionClass` applies
-    // for every adapter that goes through the public translator.
+    // `translate_exception`'s result is raised from inside the `rescue`, so
+    // Ruby sets `Exception#cause` from `$!` and never names the driver error in
+    // the argument list (sqlite3_adapter.rb:698-702). JS chains nothing at a
+    // `throw`; this is the raise-site stand-in for the direct
+    // `throw this._translateException(...)` sites, as `translateExceptionClass`
+    // is for everything routed through the public translator.
     if (translated !== exc && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = exc;
     }

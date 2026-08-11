@@ -325,12 +325,10 @@ export class HasAndBelongsToMany {
         habtmOptions[k] = options[k];
       }
     }
-    // `scope:` is captured as a positional reflection arg below, but keep
-    // it on the options bag too for callers that bypass reflection.
     // Rails passes `scope` as the second positional to
-    // `HasAndBelongsToManyReflection.new` (associations.rb:1871); accept it
-    // there as well as off the options bag, which the through-routing loaders
-    // already read.
+    // `HasAndBelongsToManyReflection.new` (associations.rb:1871). It is
+    // captured as a positional reflection arg below, but kept on the options
+    // bag too for the through-routing loaders, which read it from there.
     const positionalScope = typeof scope === "function" ? scope : null;
     if (positionalScope || typeof options.scope === "function") {
       habtmOptions.scope = positionalScope ?? options.scope;

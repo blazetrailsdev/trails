@@ -784,9 +784,10 @@ export class Associations {
     scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
-    // Mirrors Builder::Association.build's options-object shift (Rails resolves
-    // this from the Ruby signature; the HABTM builder is not an Association
-    // subclass, so the shift happens here at the macro).
+    // Builder::Association.build's options-object shift, which
+    // `Builder::HasAndBelongsToMany` does not inherit in Rails either
+    // (associations.rb:1870) — so it happens at the macro rather than in the
+    // builder.
     if (
       typeof scope === "object" &&
       scope !== null &&
