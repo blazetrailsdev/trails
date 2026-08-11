@@ -2247,6 +2247,15 @@ describe("initialize_copy", () => {
     expect(() => d.dup()).toThrow("cannot load complex into simple");
   });
 
+  it("refuses a frozen receiver", () => {
+    // ruby 3.3.11 -rdate: rb_check_frozen(copy) (date_core.c:5142) —
+    //   Date.new(2001,2,3).freeze.send(:initialize_copy, Date.new(2002,1,1))
+    //   #=> FrozenError: can't modify frozen Date
+    const d = Object.freeze(new RubyDate(2001, 2, 3));
+    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow(TypeError);
+    expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow("can't modify frozen Date");
+  });
+
   it("returns the receiver when it is its own source", () => {
     // The C's `copy == date` early return (date_core.c:5144-5145).
     const d = new RubyDate(2001, 2, 3);
