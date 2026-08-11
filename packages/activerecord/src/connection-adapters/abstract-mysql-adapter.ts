@@ -1546,12 +1546,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
     };
     const translated = build();
-    // `translate_exception`'s result is raised from inside the `rescue`, so Ruby
-    // sets `Exception#cause` from `$!` and never names the driver error in the
-    // argument list (abstract_mysql_adapter.rb:815-856). JS chains nothing at a
-    // `throw`; this is the raise-site stand-in for the direct
-    // `throw this._translateException(...)` sites, as `translateExceptionClass`
-    // is for everything routed through the public translator.
+    // Ruby sets `Exception#cause` at the `raise` site, so `translate_exception`
+    // never names the driver error in its argument list
+    // (abstract_mysql_adapter.rb:815-856). JS chains nothing at a `throw`; this
+    // is the raise-site stand-in for the direct `_translateException` callers,
+    // as `translateExceptionClass` is for the public translator.
     if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = e;
     }

@@ -2438,11 +2438,9 @@ export function main() {
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
       const rubyCallArgsByName = new Map<string, CallSite[]>();
-      // The same two populations keyed by (declaring class, name). One Ruby FILE
-      // can declare a name twice — `query_cache.rb` has both
-      // `ConnectionPoolConfiguration#query_cache` (:187) and the adapter's
-      // `attr_accessor :query_cache` (:194) — and first-sighting keying then
-      // hands the first one's body to BOTH matched pairs.
+      // The same two populations keyed by (declaring class, name): one Ruby FILE
+      // can declare a name twice, and first-sighting keying then hands the first
+      // one's body to BOTH matched pairs.
       const rubyOwnersByName = new Map<string, Set<string>>();
       const rubyCallsByOwnerName = new Map<string, { calls: string[]; weak: string[] }>();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
@@ -2547,12 +2545,6 @@ export function main() {
         if (rubyCalls.length === 0) return;
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
         const tsClass = resolveTsOwner(tsOwners, rubyModule);
-        // Several same-named members in one TS file and the resolved owner's own
-        // copy records no calls: that copy IS this pair's counterpart, and the
-        // extractor recording nothing for it (a getter carries no call set) is a
-        // reason to compare nothing, not to fall back on a same-named sibling's
-        // body. `query_cache.rb`'s ConnectionPoolConfiguration#query_cache (:187)
-        // against the attr_accessor port (query-cache.ts:330) is that pairing.
         if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;

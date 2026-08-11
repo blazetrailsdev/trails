@@ -624,8 +624,6 @@ export class AssociationScope {
       // (association_scope.rb:93-96). Routes through both `polymorphicName`
       // (base_class.name for STI) and the value-transformation lambda.
       const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
-      // `value = transform_value(next_reflection.klass.polymorphic_name)`
-      // (association_scope.rb:94), named and built before apply_scope.
       const value = this.transformValue(nextKlass ? nextKlass.polymorphicName() : "");
       // Qualify with the resolved node's name — the alias for an aliased
       // chain, the bare table otherwise — matching Rails' `apply_scope(scope,
