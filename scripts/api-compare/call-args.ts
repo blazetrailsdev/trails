@@ -400,6 +400,12 @@ function calleeKeys(enclosingRubyName: string): string[] {
   return keys;
 }
 
+/** A receiver descriptor with an agreeable cross-language spelling: a bare
+ *  local/ivar (`id:`) or constant (`const:`) ref, which the port passes through
+ *  under the same identifier. Anything else — a chain (`call:`), a literal, an
+ *  opaque `?` — falls back to {@link alignBuiltinReceiver}'s strip. */
+const SIMPLE_RECEIVER = /^(?:id|const):/;
+
 /**
  * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
  * cannot define on a receiver at all (RFC 0099 — see
@@ -436,12 +442,6 @@ function alignBuiltinReceiver(
   }
   return { rubyArgs, tsArgs: tsArgs.slice(1) };
 }
-
-/** A receiver descriptor with an agreeable cross-language spelling: a bare
- *  local/ivar (`id:`) or constant (`const:`) ref, which the port passes through
- *  under the same identifier. Anything else — a chain (`call:`), a literal, an
- *  opaque `?` — falls back to {@link alignBuiltinReceiver}'s strip. */
-const SIMPLE_RECEIVER = /^(?:id|const):/;
 
 /** The two leading-receiver forms, in the one place the comparator handles them:
  *  the mixin `this` the port adds to a ported module function, and the Ruby
