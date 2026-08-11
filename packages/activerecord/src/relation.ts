@@ -1046,8 +1046,8 @@ export class Relation<T extends Base> {
       return this.toArray().then((records) => records.filter(fields[0]));
     }
     this.checkIfMethodHasArgumentsBang("select", fields, "Call `select' with at least one field.");
-    const selectFields = this.processSelectArgs(fields);
-    return this._clone()._selectBang(...selectFields);
+    fields = this.processSelectArgs(fields);
+    return this._clone()._selectBang(...fields);
   }
 
   /**
@@ -1057,8 +1057,8 @@ export class Relation<T extends Base> {
    */
   reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang("reselect", args as unknown[]);
-    const fields = this.processSelectArgs(args as unknown[]);
-    return this._clone().reselectBang(...fields);
+    args = this.processSelectArgs(args as unknown[]) as typeof args;
+    return this._clone().reselectBang(...args);
   }
 
   /**

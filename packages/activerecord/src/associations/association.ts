@@ -901,9 +901,6 @@ export class Association {
   private isViolatesStrictLoading(): boolean {
     if (this._skipStrictLoading) return false;
 
-    // Rails (association.rb:287) skips the strict-loading check while a
-    // validation is running — autosave validation walks the association and
-    // must not raise there.
     if ((this.owner as { validationContext?: unknown }).validationContext != null) return false;
 
     if ("strictLoading" in (this.reflection.options as object)) {
