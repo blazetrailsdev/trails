@@ -338,8 +338,6 @@ export class Locator {
    */
   static use(app: string, locator: LocatorLike | LocatorBlock): void {
     validateApp(app);
-    // Ruby splits the two arms across a positional `locator` and a `&locator_block`;
-    // TypeScript has no block parameter, so the single argument is discriminated here.
     const locatorBlock = typeof locator === "function" ? locator : undefined;
     _appLocators.set(
       Locator.normalizeApp(app),
