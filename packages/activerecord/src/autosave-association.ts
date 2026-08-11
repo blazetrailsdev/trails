@@ -6,13 +6,10 @@
  */
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
-import {
-  AssociationNotFoundError,
-  CompositePrimaryKeyMismatchError,
-} from "./associations/errors.js";
+import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
 import { routeThroughCheckValidity } from "./associations/validate-through-reflection.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
-import { _preloadedHolderTarget, type AssociationDefinition } from "./associations.js";
+import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { underscore } from "@blazetrails/activesupport";
 import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
@@ -26,126 +23,6 @@ function _guardKey(association: unknown): string {
   if (association && typeof (association as any).name === "string")
     return (association as any).name;
   return String(association);
-}
-
-/**
- * Returns the loaded Association instance for `name` (its `.target` may
- * still be null in the negative-cache / preloaded-nil case — what matters
- * here is that `isLoaded()` is true), or `null` when no cached data exists
- * or the association name is unknown. Mirrors Rails'
- * `association_instance_get(name)` read path used throughout autosave —
- * the holder / collection proxy are the storage backing (the holder carries
- * any preloaded target via `isLoaded()` + `_loadedFromPreload`), but lookups
- * must go through the Association object so that subclass
- * methods (`isUpdated`, `isStaleTarget`, `setInverseInstance`,
- * `loadedBang`, etc.) are reachable.
- *
- * Configuration errors (`validateThroughReflection`, `constantize` for an
- * unregistered target class, inverse-of validity, etc.) intentionally
- * propagate to surface misconfiguration loudly, matching Rails'
- * `Reflection#check_validity!` semantics. Only `AssociationNotFoundError`
- * is caught — that is the case Rails' `association_instance_get` answers
- * with a nil return.
- *
- * @internal
- */
-function _loadedAssociation(record: any, name: string): any | null {
-  // Mirrors Rails' `association_instance_get(name)`. Always routes through
-  // `record.association(name)` so `syncAssociationInstance` re-pulls fresh
-  // target data from the collection proxy / holder (the
-  // preloader writes in preloader/association.ts, relation.ts — Rails has no
-  // equivalent shortcut; every preloader write lands in `@association_cache`
-  // via `association_instance_set`). Without the re-sync, an Association
-  // instance constructed before a later preload write would surface stale
-  // target data here.
-  //
-  // Rails' helper never throws (only reads `@association_cache[name]`);
-  // ours can if the name is unknown. Only swallow `AssociationNotFoundError`
-  // (matches Rails' nil return for unknown names — `associations.rb:52-58`
-  // would raise it via `record.association(name)` but `association_instance_get`
-  // never does). Configuration errors from `validateThroughReflection`
-  // (through-reflection / inverse-of validity, `validate-through-reflection.ts`)
-  // must propagate so misconfiguration surfaces loudly, matching Rails'
-  // `Reflection#check_validity!`.
-  const existing = record.associationInstanceGet?.(name);
-  if (typeof record.association !== "function") {
-    return existing?.isLoaded?.() ? existing : null;
-  }
-  // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
-  // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
-  // reset in `ensure`. So `CollectionProxy#build` records sit in
-  // `proxy._target` while `loaded === false`. Treat a non-empty proxy
-  // target as cached data: autosave's `save_collection_association` only
-  // gates on `if association = association_instance_get(...)` truthy,
-  // never on `loaded?` (autosave_association.rb:420).
-  const proxy = record._collectionProxies?.get?.(name) as
-    | { loaded?: boolean; target?: unknown[] }
-    | undefined;
-  const proxyHasBuiltRecords = Array.isArray(proxy?.target) && proxy.target.length > 0;
-  const existingHasBuiltRecords =
-    Array.isArray(existing?.target) && (existing.target as unknown[]).length > 0;
-  // RFC 0022 b1+: a loaded singular target lives on the holder, surfacing here
-  // through `existing.isLoaded()` — there is no direct `_cachedAssociations.has`
-  // read (the map mirror, removed in b4). The gate stays on these cheap signals
-  // so an unloaded, misconfigured through-association is not eagerly built,
-  // which would surface a source-reflection error before the association is
-  // actually used.
-  const hasCachedData =
-    !!_preloadedHolderTarget(record as Base, name) ||
-    !!proxy?.loaded ||
-    proxyHasBuiltRecords ||
-    existingHasBuiltRecords ||
-    !!existing?.isLoaded?.();
-  if (!hasCachedData) return null;
-  try {
-    const inst = record.association(name);
-    if (inst?.isLoaded?.()) return inst;
-    // In-memory built records (no preload, no DB load). Surface them on
-    // the Association instance's `target` via direct assignment (not
-    // `setTarget` which flips `loadedBang`) so the Association stays
-    // unloaded — matches Rails' `@_was_loaded` ephemeral flag semantics
-    // (collection_association.rb:457-490) and keeps `_hydrateFromPreload`
-    // viable for later preload-after-build orderings.
-    if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
-      inst.target = proxy.target as any;
-      return inst;
-    }
-    // Association-side build (e.g. `record.association(name).build(...)`)
-    // populates `existing.target` directly while `loaded` stays false —
-    // our `replaceOnTarget` doesn't `loadedBang`. Treat that as cached.
-    if (existingHasBuiltRecords && inst && inst === existing) {
-      return inst;
-    }
-    return null;
-  } catch (err) {
-    if (err instanceof AssociationNotFoundError) return null;
-    throw err;
-  }
-}
-
-const _nestedCheckInProgress = new WeakSet<object>();
-
-function _nestedRecordsChangedForAutosave(record: any): boolean {
-  if (_nestedCheckInProgress.has(record)) return false;
-  _nestedCheckInProgress.add(record);
-  try {
-    const associations: AssociationDefinition[] = record.constructor._associations ?? [];
-    for (const assoc of associations) {
-      if (!assoc.options.autosave) continue;
-      const inst = _loadedAssociation(record, assoc.name);
-      if (!inst || inst.target == null) continue;
-      const children: any[] = Array.isArray(inst.target) ? inst.target : [inst.target];
-      if (
-        children.some((c: any) =>
-          typeof c.changedForAutosave === "function" ? c.changedForAutosave() : false,
-        )
-      )
-        return true;
-    }
-    return false;
-  } finally {
-    _nestedCheckInProgress.delete(record);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +92,7 @@ export const AutosaveAssociation = {
       !!this.hasChangesToSave ||
       !!this.changed ||
       !!this[MARKED_FOR_DESTRUCTION] ||
-      _nestedRecordsChangedForAutosave(this)
+      isNestedRecordsChangedForAutosave.call(this)
     );
   },
 
@@ -348,8 +225,45 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
 //   - belongsTo: `saveBelongsToAssociation` -> `_autosaveBelongsTo`.
 // ---------------------------------------------------------------------------
 
-async function autosaveHasMany(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const inst = _loadedAssociation(record, assoc.name);
+/** @internal */
+export async function saveCollectionAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<boolean> {
+  const record = this as unknown as Base;
+  // Rails reads the option off the reflection the callback closed over
+  // (autosave_association.rb:420-421). HABTM reflections route here as a
+  // hasMany-typed def, mirroring Rails, which backs `has_and_belongs_to_many`
+  // with `has_many :through` and runs `save_collection_association` for both.
+  const assoc: AssociationDefinition = {
+    name: reflection.name,
+    type: "hasMany",
+    options: reflection.options ?? {},
+  } as AssociationDefinition;
+  const inst = associationInstanceGet.call(record, reflection.name) as any;
+  // Rails save_collection_association:430-434:
+  //   if autosave
+  //     records_to_destroy = records.select(&:marked_for_destruction?)
+  //     records_to_destroy.each { |record| association.destroy(record) }
+  //     records -= records_to_destroy
+  // Gated on `autosave` (reflection.options[:autosave]) — a plain collection
+  // never destroys marked children on owner save. Route each marked-for-
+  // destruction child through the collection-level `destroy` (not record-level
+  // `child.destroy`) so the `before_remove`/`after_remove` callbacks fire and
+  // the record is pruned from the in-memory target. A built (unpersisted) child
+  // is destroyed too: `delete_or_destroy`/`remove_records`
+  // (collection_association.rb:385-408) still runs the remove callbacks and
+  // splices `@target` even when `existing_records` is empty (no DB delete).
+  // Snapshot first since `inst.destroy` splices the live target as it removes
+  // each record.
+  if (assoc.options.autosave && inst && typeof inst.destroy === "function") {
+    const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
+    for (const child of snapshot) {
+      if (isMarkedForDestruction(child)) {
+        await inst.destroy(child);
+      }
+    }
+  }
   // Rails: save_collection_association resets the scope before iterating so
   // the per-child save path (which may re-read the scope) doesn't keep a
   // stale memoized association_scope across the owner save.
@@ -494,10 +408,19 @@ async function _insertCollectionRecordFallback(
   return !!(await child.save({ validate: false }));
 }
 
-async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promise<boolean> {
-  const inst = _loadedAssociation(record, assoc.name);
+/** @internal */
+export async function saveHasOneAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<boolean> {
+  const record = this as unknown as Base;
+  const assoc: AssociationDefinition = {
+    name: reflection.name,
+    type: "hasOne",
+    options: reflection.options ?? {},
+  } as AssociationDefinition;
+  const inst = associationInstanceGet.call(record, reflection.name) as any;
   const ctor = record.constructor as typeof Base;
-  const reflection = (ctor as any)._reflectOnAssociation?.(assoc.name);
   // Rails `save_has_one_association` reads `reflection.through_reflection`
   // (autosave_association.rb:489).
   const isThrough = !!reflection?.throughReflection;
@@ -750,51 +673,24 @@ function _resolveBelongsToForeignKey(
   return [`${underscore(assoc.name)}_id`];
 }
 
-/**
- * Resolve the primary-key column(s) on the target side of a belongs_to
- * association, paired against `_resolveBelongsToForeignKey` so the
- * autosave FK propagation zips matching columns. Mirrors
- * Rails' `compute_primary_key(reflection, record)`
- * (autosave_association.rb:576-589).
- *
- * @internal
- */
-function _resolveBelongsToPrimaryKey(
-  assoc: AssociationDefinition,
-  assocRecord: Base,
-  reflection?: any,
-): string[] {
-  if (assoc.options.primaryKey == null) {
-    // Defer to computePrimaryKey when the target has *explicit*
-    // class-level query_constraints and Rails' compute_primary_key
-    // (steps 2/3 at autosave_association.rb:577-582) would pick that
-    // list.
-    const targetHasQc = hasQueryConstraints.call(assocRecord.constructor as any);
-    const targetQcWouldApply =
-      targetHasQc && (assoc.options.queryConstraints != null || assoc.options.foreignKey == null);
-    if (!targetQcWouldApply) {
-      // When the FK is explicitly composite, pair the full composite PK
-      // against the composite FK columns so the zip hits every column.
-      const explicitFk = assoc.options.foreignKey ?? assoc.options.queryConstraints;
-      const fkIsComposite = Array.isArray(explicitFk) && explicitFk.length > 1;
-      const reflFk = reflection?.foreignKey;
-      const reflFkIsComposite = Array.isArray(reflFk) && reflFk.length > 1;
-      if (fkIsComposite || reflFkIsComposite) {
-        const pk = (assocRecord.constructor as typeof Base).primaryKey;
-        if (Array.isArray(pk) && pk.length > 1) return pk;
-      }
-    }
-  }
-  const rawPk = computePrimaryKey({ options: assoc.options }, assocRecord);
-  return Array.isArray(rawPk) ? rawPk : [rawPk];
-}
-
-async function _autosaveBelongsTo(
-  record: Base,
-  assoc: AssociationDefinition,
-  reflection?: any,
+/** @internal */
+export async function saveBelongsToAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
 ): Promise<boolean> {
-  const inst = _loadedAssociation(record, assoc.name);
+  const record = this as unknown as Base;
+  // The raw reflection options ride along untouched — FK resolution is
+  // deferred to `_resolveBelongsToForeignKey`, which only runs on the branches
+  // that need to write or null columns. Eagerly reading `reflection.foreignKey`
+  // here would trip its query-constraints-derivation ConfigurationError paths
+  // (reflection.ts deriveFkQueryConstraints) on every belongs_to save, even for
+  // an unloaded/untouched association.
+  const assoc: AssociationDefinition = {
+    name: reflection.name,
+    type: "belongsTo",
+    options: reflection.options ?? {},
+  } as AssociationDefinition;
+  const inst = associationInstanceGet.call(record, reflection.name) as any;
   // Rails save_belongs_to_association:538 — skip when the loaded target is
   // stale (FK changed since the target was cached).
   if (inst?.isStaleTarget?.()) return true;
@@ -865,7 +761,33 @@ async function _autosaveBelongsTo(
     // Pair against the target's PK columns in the same shape the writer
     // (BelongsToAssociation#replaceKeys) used, so autosave FK
     // propagation lands on the same columns the writer populated.
-    const primaryKey = _resolveBelongsToPrimaryKey(assoc, assocRecord, reflection);
+    // Rails save_belongs_to_association:561 —
+    // `primary_key = Array(compute_primary_key(reflection, record)).map(&:to_s)`.
+    let primaryKey: string[] | null = null;
+    if (assoc.options.primaryKey == null) {
+      // Defer to computePrimaryKey when the target has *explicit* class-level
+      // query_constraints and Rails' compute_primary_key (steps 2/3 at
+      // autosave_association.rb:577-582) would pick that list.
+      const targetHasQc = hasQueryConstraints.call(assocRecord.constructor as any);
+      const targetQcWouldApply =
+        targetHasQc && (assoc.options.queryConstraints != null || assoc.options.foreignKey == null);
+      if (!targetQcWouldApply) {
+        // When the FK is explicitly composite, pair the full composite PK
+        // against the composite FK columns so the zip hits every column.
+        const explicitFk = assoc.options.foreignKey ?? assoc.options.queryConstraints;
+        const fkIsComposite = Array.isArray(explicitFk) && explicitFk.length > 1;
+        const reflFk = reflection?.foreignKey;
+        const reflFkIsComposite = Array.isArray(reflFk) && reflFk.length > 1;
+        if (fkIsComposite || reflFkIsComposite) {
+          const pk = (assocRecord.constructor as typeof Base).primaryKey;
+          if (Array.isArray(pk) && pk.length > 1) primaryKey = pk;
+        }
+      }
+    }
+    if (primaryKey === null) {
+      const rawPk = computePrimaryKey(reflection, assocRecord);
+      primaryKey = Array.isArray(rawPk) ? rawPk : [rawPk];
+    }
     // Rails save_belongs_to_association:563: `primary_key.zip(foreign_key)`.
     // Ruby's Array#zip drops trailing args when the argument is longer than
     // the receiver, and pads with nil when the argument is shorter. Mirror
@@ -921,9 +843,37 @@ export function associatedRecordsToValidateOrSave(
   return target.filter((r: any) => r.isNewRecord?.() ?? false);
 }
 
+// Rails guards the recursion with an `@_already_called` hash
+// (autosave_association.rb:313); trails uses a module-level WeakSet keyed by
+// record so the guard needs no instance slot.
+const _nestedCheckInProgress = new WeakSet<object>();
+
 /** @internal */
 export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost): boolean {
-  return _nestedRecordsChangedForAutosave(this);
+  const record = this as any;
+  if (_nestedCheckInProgress.has(record)) return false;
+  _nestedCheckInProgress.add(record);
+  try {
+    const associations: AssociationDefinition[] = record.constructor._associations ?? [];
+    for (const reflection of associations) {
+      if (!reflection.options.autosave) continue;
+      const association = associationInstanceGet.call(record, reflection.name) as any;
+      if (!association || association.target == null) continue;
+      // Rails: `Array.wrap(association.target).any?(&:changed_for_autosave?)`.
+      const children: any[] = Array.isArray(association.target)
+        ? association.target
+        : [association.target];
+      if (
+        children.some((c: any) =>
+          typeof c.changedForAutosave === "function" ? c.changedForAutosave() : false,
+        )
+      )
+        return true;
+    }
+    return false;
+  } finally {
+    _nestedCheckInProgress.delete(record);
+  }
 }
 
 /** @internal */
@@ -931,7 +881,7 @@ export async function validateHasOneAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const inst = _loadedAssociation(this, reflection.name);
+  const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   // Rails autosave_association.rb:332 — `record.changed_for_autosave? || custom_validation_context?`.
@@ -946,7 +896,7 @@ export async function validateHasOneAssociation(
       ? reflection.inverseOf()
       : (reflection.inverseOf ?? null);
   if (inverse) {
-    const inverseInst = _loadedAssociation(record, inverse.name);
+    const inverseInst = associationInstanceGet.call(record, inverse.name) as any;
     if (
       inverseInst &&
       (record.isValidatingBelongsToFor?.(inverse) || record.isAutosavingBelongsToFor?.(inverse))
@@ -961,7 +911,7 @@ export async function validateBelongsToAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const inst = _loadedAssociation(this, reflection.name);
+  const inst = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
   // Rails autosave_association.rb:346 — `record.changed_for_autosave? || custom_validation_context?`.
@@ -985,7 +935,7 @@ export async function validateCollectionAssociation(
   // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
   // Pass the real Association instance so downstream readers can reach
   // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
-  const association = _loadedAssociation(this, reflection.name);
+  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
   // Mirrors Rails autosave_association.rb:298-305 — a custom validation context
   // bypasses the changed/new filter so unchanged persisted children still run
   // their context-specific validators (the `|| custom_validation_context?` arm).
@@ -1084,56 +1034,6 @@ export function aroundSaveCollectionAssociation(
 }
 
 /** @internal */
-export async function saveCollectionAssociation(
-  this: AutosaveAssociationHost,
-  reflection: any,
-): Promise<boolean> {
-  const owner = this as unknown as Base;
-  // Rails save_collection_association (autosave_association.rb:430-434):
-  //   if autosave
-  //     records_to_destroy = records.select(&:marked_for_destruction?)
-  //     records_to_destroy.each { |record| association.destroy(record) }
-  //     records -= records_to_destroy
-  // Gated on `autosave` (reflection.options[:autosave]) — a plain collection
-  // never destroys marked children on owner save. Route each marked-for-
-  // destruction child through the collection-level `destroy` (not record-level
-  // `child.destroy`) so the `before_remove`/`after_remove` callbacks fire and
-  // the record is pruned from the in-memory target. A built (unpersisted) child
-  // is destroyed too: `delete_or_destroy`/`remove_records`
-  // (collection_association.rb:385-408) still runs the remove callbacks and
-  // splices `@target` even when `existing_records` is empty (no DB delete).
-  // Snapshot first since `inst.destroy` splices the live target as it removes
-  // each record.
-  const autosave = reflection.options?.autosave;
-  const inst = _loadedAssociation(owner, reflection.name);
-  if (autosave && inst && typeof inst.destroy === "function") {
-    const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
-    for (const child of snapshot) {
-      if (isMarkedForDestruction(child)) {
-        await inst.destroy(child);
-      }
-    }
-  }
-  return autosaveHasMany(owner, {
-    name: reflection.name,
-    type: "hasMany",
-    options: reflection.options ?? {},
-  });
-}
-
-/** @internal */
-export async function saveHasOneAssociation(
-  this: AutosaveAssociationHost,
-  reflection: any,
-): Promise<boolean> {
-  return autosaveHasOne(this as unknown as Base, {
-    name: reflection.name,
-    type: "hasOne",
-    options: reflection.options ?? {},
-  });
-}
-
-/** @internal */
 export function is_recordChanged(reflection: any, record: any, key: any[]): boolean {
   const fkCols: string[] = Array.isArray(reflection.foreignKey)
     ? reflection.foreignKey
@@ -1177,29 +1077,6 @@ export function isInversePolymorphicAssociationChanged(reflection: any, record: 
     polymorphicClassFor: (n: string) => unknown;
   };
   return reflection.activeRecord !== recordClass.polymorphicClassFor(className);
-}
-
-/** @internal */
-export async function saveBelongsToAssociation(
-  this: AutosaveAssociationHost,
-  reflection: any,
-): Promise<boolean> {
-  // Pass the raw reflection options through — FK resolution is deferred
-  // to `_resolveBelongsToForeignKey`, which only runs on the branches that
-  // need to write or null columns. Eagerly reading `reflection.foreignKey`
-  // here would trip its query-constraints-derivation ConfigurationError
-  // paths (reflection.ts deriveFkQueryConstraints) on every belongs_to
-  // save, even for an unloaded/untouched association — undesirable now
-  // that the autosave callback is registered for every belongs_to.
-  return _autosaveBelongsTo(
-    this as unknown as Base,
-    {
-      name: reflection.name,
-      type: "belongsTo",
-      options: reflection.options ?? {},
-    },
-    reflection,
-  );
 }
 
 /** @internal */
