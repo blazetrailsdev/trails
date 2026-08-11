@@ -756,8 +756,17 @@ export class Associations {
    *
    * Mirrors: ActiveRecord::Associations::ClassMethods#has_many
    */
-  static hasMany(name: string, options: AssociationOptions = {}): void {
-    HasManyBuilder.build(this, name, options as Record<string, unknown>);
+  static hasMany(
+    name: string,
+    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    options: AssociationOptions = {},
+  ): void {
+    HasManyBuilder.build(
+      this,
+      name,
+      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      options as Record<string, unknown>,
+    );
   }
 
   /**
@@ -772,8 +781,22 @@ export class Associations {
    */
   static hasAndBelongsToMany(
     name: string,
+    scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
     options: AssociationOptions & { joinTable?: string } = {},
   ): void {
+    // Builder::Association.build's options-object shift, which
+    // `Builder::HasAndBelongsToMany` does not inherit in Rails either
+    // (associations.rb:1870) — so it happens at the macro rather than in the
+    // builder.
+    if (
+      typeof scope === "object" &&
+      scope !== null &&
+      !Array.isArray(scope) &&
+      !(scope instanceof Function)
+    ) {
+      options = scope;
+      scope = null;
+    }
     // `class_name` Symbol coercion is handled generically in
     // MacroReflection#normalizeOptions (mirroring Rails' AbstractReflection#
     // class_name `.to_s`), but the HABTM builder reads `options.className`
@@ -783,12 +806,18 @@ export class Associations {
     if (typeof rawClassName === "symbol") {
       options = { ...options, className: rawClassName.description ?? "" };
     }
-    HabtmBuilder.build(this, name, options as Record<string, unknown>, {
-      defaultJoinTableName,
-      singleFk,
-      createHabtmJoinModel,
-      modelRegistry,
-    });
+    HabtmBuilder.build(
+      this,
+      name,
+      scope as ((...args: any[]) => any) | null,
+      options as Record<string, unknown>,
+      {
+        defaultJoinTableName,
+        singleFk,
+        createHabtmJoinModel,
+        modelRegistry,
+      },
+    );
     // Rails registers the autosave-association callbacks for every HABTM
     // (the underlying has_many :through is built via the standard
     // `has_many` builder, which always calls `define_callbacks`). Wire it

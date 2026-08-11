@@ -1296,7 +1296,6 @@ export class DatabaseTasks {
       // (database_tasks.rb:543). Ruby's `establish_connection(config_or_env = nil)`
       // takes no `clobber:`, so the kwarg can only be threaded through the handler.
       const pool = migrationClass.connectionHandler.establishConnection(dbConfig, {
-        ownerName: migrationClass.connectionClassForSelf(),
         clobber,
       });
       // Deviation: ESM cannot import synchronously, so the handler resolves the
@@ -1307,7 +1306,6 @@ export class DatabaseTasks {
       return await fn(pool);
     } finally {
       await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
-        ownerName: migrationClass.connectionClassForSelf(),
         clobber,
       }).adapterReady;
     }

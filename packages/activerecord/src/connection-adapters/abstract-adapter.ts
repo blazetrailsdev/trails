@@ -2610,6 +2610,12 @@ export class AbstractAdapter implements Quoting {
     });
     if (arError !== nativeError && arError instanceof Error && nativeError instanceof Error) {
       arError.stack = nativeError.stack;
+      // Ruby's raise site sets `Exception#cause` from `$!` implicitly, so no
+      // translator names the driver error in its argument list
+      // (`translate_exception` in each adapter). JS chains nothing at a `throw`,
+      // so the driver error is attached here — beside the `set_backtrace`
+      // analogue (abstract_adapter.rb:1130) — rather than in the call.
+      if (arError.cause === undefined) arError.cause = nativeError;
     }
     return arError;
   }

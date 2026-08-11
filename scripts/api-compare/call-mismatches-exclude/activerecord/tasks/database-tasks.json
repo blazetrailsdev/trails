@@ -232,29 +232,5 @@
       "ref:flags"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "with_temporary_pool",
-    "call": "establish_connection",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:dbConfig",
-      "kwargs{clobber=ref:clobber}"
-    ],
-    "reason": "RFC 0099: database_tasks.rb:544,548 pass no owner_name, relying on establish_connection's `owner_name: Base` default (abstract/connection_handler.rb:115); trails' handler cannot import Base (module cycle, connection-handler.ts:70-76) so it falls back to a config-name descriptor and the owner has to be named here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "with_temporary_pool",
-    "call": "establish_connection",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:originalDbConfig",
-      "kwargs{clobber=ref:clobber}"
-    ],
-    "reason": "RFC 0099: database_tasks.rb:544,548 pass no owner_name, relying on establish_connection's `owner_name: Base` default (abstract/connection_handler.rb:115); trails' handler cannot import Base (module cycle, connection-handler.ts:70-76) so it falls back to a config-name descriptor and the owner has to be named here."
   }
 ]

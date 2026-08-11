@@ -133,6 +133,7 @@ export class HasAndBelongsToMany {
   static build(
     model: any,
     name: string,
+    scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     deps: {
       defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
@@ -141,15 +142,18 @@ export class HasAndBelongsToMany {
       modelRegistry: Map<string, any>;
     },
   ): void {
-    new this(name, model, options)._build(deps);
+    new this(name, model, options)._build(deps, scope);
   }
 
-  private _build(deps: {
-    defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
-    singleFk: (fk: string | string[] | undefined, fallback: string) => string;
-    createHabtmJoinModel: (...args: any[]) => any;
-    modelRegistry: Map<string, any>;
-  }): void {
+  private _build(
+    deps: {
+      defaultJoinTableName: (model: any, name: string, options?: { className?: string }) => string;
+      singleFk: (fk: string | string[] | undefined, fallback: string) => string;
+      createHabtmJoinModel: (...args: any[]) => any;
+      modelRegistry: Map<string, any>;
+    },
+    scope: ((...args: any[]) => any) | null = null,
+  ): void {
     const model = this.lhsModel;
     const name = this.associationName;
     const options = this.options;
@@ -321,10 +325,13 @@ export class HasAndBelongsToMany {
         habtmOptions[k] = options[k];
       }
     }
-    // `scope:` is captured as a positional reflection arg below, but keep
-    // it on the options bag too for callers that bypass reflection.
-    if (typeof options.scope === "function") {
-      habtmOptions.scope = options.scope;
+    // Rails passes `scope` as the second positional to
+    // `HasAndBelongsToManyReflection.new` (associations.rb:1871). It is
+    // captured as a positional reflection arg below, but kept on the options
+    // bag too for the through-routing loaders, which read it from there.
+    const positionalScope = typeof scope === "function" ? scope : null;
+    if (positionalScope || typeof options.scope === "function") {
+      habtmOptions.scope = positionalScope ?? options.scope;
     }
     model._associations.push({
       type: "hasAndBelongsToMany",

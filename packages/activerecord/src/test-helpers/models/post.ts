@@ -365,8 +365,7 @@ export class Post extends Base {
       source: "ratings",
     });
     this.hasMany("specialComments");
-    this.hasMany("nonexistentComments", {
-      scope: (q: any) => q.where("comments.id < 0"),
+    this.hasMany("nonexistentComments", (q: any) => q.where("comments.id < 0"), {
       className: "Comment",
     });
 
