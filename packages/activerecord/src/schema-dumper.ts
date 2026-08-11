@@ -797,7 +797,7 @@ export abstract class SchemaDumper {
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
         return `    t.checkConstraint(${expr}${optStr});`;
       });
-      lines.push(...checkConstraintStatements.sort());
+      lines.push(checkConstraintStatements.sort().join("\n"));
     }
 
     if (checkInvalid.length > 0) {
@@ -1036,6 +1036,7 @@ export abstract class SchemaDumper {
     if (!host) return;
     const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
     const fks = (await fn.call(host, tableName)) ?? [];
+    if (fks.length === 0) return;
     type Fk = {
       fromTable?: string;
       toTable: string;
@@ -1086,8 +1087,7 @@ export abstract class SchemaDumper {
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
     }
-    statements.sort();
-    lines.push(...statements);
+    lines.push(statements.sort().join("\n"));
   }
 
   /**

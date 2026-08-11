@@ -126,7 +126,7 @@ describe("ExplainTest", () => {
     adapter.explain = async () => `query plan ${sqls[called++]}`;
     try {
       const clause = await buildExplainClause(adapter);
-      const expected = sqls.map((sql) => `${clause} ${sql}\nquery plan ${sql}`).join("\n\n");
+      const expected = sqls.map((sql) => `${clause} ${sql}\nquery plan ${sql}`).join("\n");
       expect(await Base.execExplain(queries)).toBe(expected);
     } finally {
       adapter.explain = original;
@@ -153,7 +153,7 @@ describe("ExplainTest", () => {
       const expected = [
         `${clause} ${sqls[0]} [1]\nquery plan ${sqls[0]}`,
         `${clause} ${sqls[1]} [2]\nquery plan ${sqls[1]}`,
-      ].join("\n\n");
+      ].join("\n");
       expect(await Base.execExplain(queries)).toBe(expected);
     } finally {
       adapter.explain = original;
@@ -174,7 +174,7 @@ describe("ExplainTest", () => {
 
   it("captures queries for eager-loaded associations, one block per query", async () => {
     const plan = await Car.all().preload("bulbs").explain();
-    const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
+    const blocks = plan.split(/^(?=EXPLAIN)/m).filter((b) => /EXPLAIN/.test(b));
     expect(blocks.length).toBeGreaterThanOrEqual(2);
     expect(plan.toLowerCase()).toContain("cars");
     expect(plan.toLowerCase()).toContain("bulbs");

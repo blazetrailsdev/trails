@@ -1795,7 +1795,7 @@ describe("the to_sql visitor", () => {
     it("emits /*+ HINT */ for an OptimizerHints node with array expr", () => {
       const node = new Nodes.OptimizerHints(["IDX(t1)", "MAX_EXEC_TIME(1000)"]);
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toBe(" /*+ IDX(t1) MAX_EXEC_TIME(1000) */");
+      expect(sql).toBe("/*+ IDX(t1) MAX_EXEC_TIME(1000) */");
     });
 
     it("strips embedded comment delimiters from each hint (Rails parity)", () => {
@@ -1804,13 +1804,13 @@ describe("the to_sql visitor", () => {
       // is preserved as comment text — it's still inside /*+ ... */.
       const node = new Nodes.OptimizerHints(["A */ DROP /*"]);
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toBe(" /*+ A DROP */");
+      expect(sql).toBe("/*+ A DROP */");
       expect(sql.match(/\*\//g)?.length).toBe(1);
     });
 
     it("accepts SqlLiteral hints (passes through unchanged)", () => {
       const node = new Nodes.OptimizerHints([new Nodes.SqlLiteral("FORCE INDEX (t)")]);
-      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(" /*+ FORCE INDEX (t) */");
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe("/*+ FORCE INDEX (t) */");
     });
   });
 

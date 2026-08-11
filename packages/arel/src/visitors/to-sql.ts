@@ -190,7 +190,7 @@ export class ToSql extends Visitor {
   ): string {
     // Rails-faithful `compile(node, collector)`: drive the supplied collector
     // (so callers control its bind state) and return the rendered SQL. An array
-    // node renders as a comma-joined list, mirroring Arel's `visit_Array` — this
+    // node dispatches to `visit_Array` and renders as a comma-joined list — this
     // is what bind_parameter_test's `bind_params` helper relies on to compile a
     // list of `BindParam` nodes through a single shared collector. The collector
     // type covers the string-rendering collectors (`SQLString` keeps `?`
@@ -199,18 +199,14 @@ export class ToSql extends Visitor {
     // of this file does.
     if (collector !== undefined) {
       const c = collector as unknown as SQLString;
-      if (Array.isArray(node)) {
-        this.visitArray(node as ReadonlyArray<Nodes.NodeOrValue>, c);
-      } else {
-        this.visit(node as Node, c);
-      }
+      this.accept(node, c);
       return collector.value;
     }
     // Mirrors Rails `compile` defaulting to a plain `SQLString` (to_sql.rb:17):
     // Casted/Quoted inline their quoted literal in the visitor, BindParam emits
     // `?` (BIND_BLOCK = proc { "?" }). No post-hoc inlining needed.
     const sqlCollector = new SQLString();
-    this.visit(node as Node, sqlCollector);
+    this.accept(node, sqlCollector);
     return sqlCollector.value;
   }
 
@@ -218,8 +214,8 @@ export class ToSql extends Visitor {
     o: Nodes.DeleteStatement,
     collector: SQLString,
   ): SQLString {
-    const node = this.prepareDeleteStatement(o);
     collector.retryable = false;
+    const node = this.prepareDeleteStatement(o);
     const joinSourceLeft = this.hasJoinSources(node)
       ? (node.relation as Nodes.JoinSource).left
       : null;
@@ -232,56 +228,25 @@ export class ToSql extends Visitor {
     }
     if (node.relation) this.visit(node.relation, collector);
 
-    if (node.wheres.length > 0) {
-      collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
-      this.visit(conditions, collector);
-    }
-
-    if (node.orders.length > 0) {
-      collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, collector, ", ");
-    }
-
-    if (node.limit) {
-      collector.append(" ");
-      this.visit(node.limit, collector);
-    }
-
-    return collector;
+    this.collectNodesFor(node.wheres, collector, " WHERE ", " AND ");
+    this.collectNodesFor(node.orders, collector, " ORDER BY ");
+    return this.maybeVisit(node.limit, collector);
   }
 
   protected visitArelNodesUpdateStatement(
     o: Nodes.UpdateStatement,
     collector: SQLString,
   ): SQLString {
-    const node = this.prepareUpdateStatement(o);
     collector.retryable = false;
+    const node = this.prepareUpdateStatement(o);
     collector.append("UPDATE ");
     if (node.relation) this.visit(node.relation, collector);
 
-    if (node.values.length > 0) {
-      collector.append(" SET ");
-      this.injectJoin(node.values, collector, ", ");
-    }
+    this.collectNodesFor(node.values, collector, " SET ");
 
-    if (node.wheres.length > 0) {
-      collector.append(" WHERE ");
-      const conditions = node.wheres.length === 1 ? node.wheres[0] : new Nodes.And(node.wheres);
-      this.visit(conditions, collector);
-    }
-
-    if (node.orders.length > 0) {
-      collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, collector, ", ");
-    }
-
-    if (node.limit) {
-      collector.append(" ");
-      this.visit(node.limit, collector);
-    }
-
-    return collector;
+    this.collectNodesFor(node.wheres, collector, " WHERE ", " AND ");
+    this.collectNodesFor(node.orders, collector, " ORDER BY ");
+    return this.maybeVisit(node.limit, collector);
   }
 
   protected visitArelNodesInsertStatement(
@@ -309,14 +274,12 @@ export class ToSql extends Visitor {
     // `visit` so a SelectManager-shaped duck-type (the form
     // `InsertManager#select` stores) lands in `visitArelSelectManager`.
     if (node.values) {
-      collector.append(" ");
-      this.visit(node.values, collector);
+      return this.maybeVisit(node.values, collector);
     } else if (node.select) {
-      collector.append(" ");
-      this.visit(node.select as Nodes.NodeOrValue, collector);
+      return this.maybeVisit(node.select as Node, collector);
+    } else {
+      return collector;
     }
-
-    return collector;
   }
 
   protected visitArelNodesExists(node: Nodes.Exists, collector: SQLString): SQLString {
@@ -407,9 +370,8 @@ export class ToSql extends Visitor {
       collector.append(" ");
     }
 
-    for (let i = 0; i < node.cores.length; i++) {
-      if (i > 0) collector.append(" ");
-      this.visit(node.cores[i], collector);
+    for (const x of node.cores) {
+      this.visitArelNodesSelectCore(x, collector);
     }
 
     if (node.orders.length > 0) {
@@ -417,31 +379,19 @@ export class ToSql extends Visitor {
       this.injectJoin(node.orders, collector, ", ");
     }
 
-    if (node.limit) {
-      collector.append(" ");
-      this.visit(node.limit, collector);
-    }
-
-    if (node.offset) {
-      collector.append(" ");
-      this.visit(node.offset, collector);
-    }
-
-    if (node.lock) {
-      collector.append(" ");
-      this.visit(node.lock, collector);
-    }
-
-    return collector;
+    return this.visitArelNodesSelectOptions(node, collector);
   }
 
   /**
    * Mirrors Rails: `visit_Arel_Nodes_SelectOptions` (to_sql.rb:143). Emits
-   * limit/offset/lock via `maybeVisit`. Trails' SelectStatement carries
-   * those fields directly, so this fires only when a caller constructs a
-   * `Nodes.SelectOptions` explicitly. Reachable through the dispatch table.
+   * limit/offset/lock via `maybeVisit`. As in Rails it is called with the
+   * `SelectStatement` itself — which carries those three fields — and is also
+   * reachable through the dispatch table for an explicit `Nodes.SelectOptions`.
    */
-  protected visitArelNodesSelectOptions(o: Nodes.SelectOptions, collector: SQLString): SQLString {
+  protected visitArelNodesSelectOptions(
+    o: Nodes.SelectOptions | Nodes.SelectStatement,
+    collector: SQLString,
+  ): SQLString {
     this.maybeVisit(o.limit, collector);
     this.maybeVisit(o.offset, collector);
     this.maybeVisit(o.lock, collector);
@@ -608,7 +558,7 @@ export class ToSql extends Visitor {
   // OptimizerHints node carries a list of hint strings (Rails' `o.expr` is
   // an array); each hint is sanitized and the joined result wrapped in
   // /*+ ... */. SelectCore stores its optimizer hints as an OptimizerHints
-  // node and `emitOptimizerHints` delegates here.
+  // node, which `collect_optimizer_hints` threads here through `maybeVisit`.
   protected visitArelNodesOptimizerHints(
     node: Nodes.OptimizerHints,
     collector: SQLString,
@@ -621,7 +571,7 @@ export class ToSql extends Visitor {
     // node only exists when `optimizer_hints(*hints)` got a non-empty splat
     // (select_manager.rb:147-149), which is the only emptiness Rails guards.
     const hints = node.hints.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
-    collector.append(` /*+ ${hints} */`);
+    collector.append(`/*+ ${hints} */`);
     return collector;
   }
 
@@ -723,10 +673,9 @@ export class ToSql extends Visitor {
 
   private visitArelNodesWindow(node: Nodes.Window, collector: SQLString): SQLString {
     collector.append("(");
-    if (node.partitions.length > 0) {
-      collector.append("PARTITION BY ");
-      this.injectJoin(node.partitions, collector, ", ");
-    }
+
+    this.collectNodesFor(node.partitions, collector, "PARTITION BY ");
+
     if (node.orders.length > 0) {
       if (node.partitions.length > 0) collector.append(" ");
       collector.append("ORDER BY ");
@@ -794,20 +743,23 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesOver(node: Nodes.Over, collector: SQLString): SQLString {
-    this.visit(node.left, collector);
-    collector.append(" OVER ");
-    if (!node.right) {
-      collector.append("()");
+    if (node.right == null) {
+      this.visit(node.left, collector);
+      collector.append(" OVER ()");
+      return collector;
+    } else if (node.right instanceof Nodes.SqlLiteral) {
+      return this.infixValue(node as { left: Node; right: Node }, collector, " OVER ");
     } else if (typeof node.right === "string") {
       // Rails' `when String, Symbol` arm quotes a bare window name as an
       // identifier (to_sql.rb:306-307). A SqlLiteral right, by contrast,
       // renders bare — `over("foo")` is `OVER "foo"` but
       // `over(Arel.sql("foo"))` is `OVER foo`.
-      collector.append(this.quoteColumnName(node.right));
+      this.visit(node.left, collector);
+      collector.append(` OVER ${this.quoteColumnName(node.right)}`);
+      return collector;
     } else {
-      this.visit(node.right, collector);
+      return this.infixValue(node as { left: Node; right: Node }, collector, " OVER ");
     }
-    return collector;
   }
 
   protected visitArelNodesOffset(node: Nodes.Offset, collector: SQLString): SQLString {
@@ -1223,19 +1175,11 @@ export class ToSql extends Visitor {
   // -- Boolean --
 
   private visitArelNodesAnd(node: Nodes.And, collector: SQLString): SQLString {
-    for (let i = 0; i < node.children.length; i++) {
-      if (i > 0) collector.append(" AND ");
-      this.visit(node.children[i], collector);
-    }
-    return collector;
+    return this.injectJoin(node.children, collector, " AND ");
   }
 
   private visitArelNodesOr(node: Nodes.Or, collector: SQLString): SQLString {
-    for (let i = 0; i < node.children.length; i++) {
-      if (i > 0) collector.append(" OR ");
-      this.visit(node.children[i], collector);
-    }
-    return collector;
+    return this.injectJoin(node.children, collector, " OR ");
   }
 
   private visitArelNodesAssignment(node: Nodes.Assignment, collector: SQLString): SQLString {
@@ -1647,11 +1591,7 @@ export class ToSql extends Visitor {
    * equivalent path that handles both Node and non-Node entries.
    */
   protected visitArray(items: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
-    items.forEach((item, i) => {
-      if (i > 0) collector.append(", ");
-      this.visit(item, collector);
-    });
-    return collector;
+    return this.injectJoin(items, collector, ", ");
   }
 
   /** Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861). */
@@ -1698,15 +1638,9 @@ export class ToSql extends Visitor {
     return this.connection.sanitizeAsSqlComment(String(value));
   }
 
-  /**
-   * Mirrors `to_sql.rb#collect_optimizer_hints`. Rails delegates to
-   * `maybe_visit o.optimizer_hints`; Trails' SelectCore now stores an
-   * `OptimizerHints` node (or null), and `emitOptimizerHints` does the
-   * `maybe_visit` no-op-when-nil dispatch.
-   */
+  /** Mirrors `to_sql.rb#collect_optimizer_hints` (to_sql.rb:887-889). */
   protected collectOptimizerHints(o: Nodes.SelectCore, collector: SQLString): SQLString {
-    this.emitOptimizerHints(o, collector);
-    return collector;
+    return this.maybeVisit(o.optimizerHints, collector);
   }
 
   /**
@@ -1725,7 +1659,11 @@ export class ToSql extends Visitor {
    * Mirrors `to_sql.rb#inject_join`: visits `list[0]`, then for each
    * subsequent node emits `joinStr` and visits.
    */
-  protected injectJoin(list: Node[], collector: SQLString, joinStr: string): SQLString {
+  protected injectJoin(
+    list: ReadonlyArray<Nodes.NodeOrValue>,
+    collector: SQLString,
+    joinStr: string,
+  ): SQLString {
     list.forEach((x, i) => {
       if (i > 0) collector.append(joinStr);
       this.visit(x, collector);
@@ -1966,14 +1904,6 @@ export class ToSql extends Visitor {
     this.visit(node, composite as unknown as SQLString);
     const binds = bindCollector.value.map((b) => (b instanceof Nodes.BindParam ? b.value : b));
     return [sqlCollector.value, binds, sqlCollector.retryable, composite.preparable];
-  }
-
-  protected emitOptimizerHints(node: Nodes.SelectCore, collector: SQLString): void {
-    // Mirrors Rails: `@ctx.optimizer_hints` is now an `OptimizerHints`
-    // node (or null); the visitor delegates to the dedicated visitor
-    // which sanitizes + wraps in `/*+ ... */`.
-    if (node.optimizerHints === null) return;
-    this.visit(node.optimizerHints, collector);
   }
 
   private subselectKey(key: Node): Node {

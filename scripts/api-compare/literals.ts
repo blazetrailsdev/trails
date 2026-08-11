@@ -9,15 +9,21 @@ import { snakeToCamel } from "@blazetrails/parity/conventions";
 
 // ESC is one of the characters being canonicalized, so it belongs in the class.
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\x1b\r\n\t]/g;
+const CONTROL_CHARS = /[\x00\x1b\r\n\t]/g;
 
 /** Canonicalize so Ruby raw source escapes (`\e`, `\r\n`) and TS resolved control chars compare equal. */
 function canonString(s: string): string {
-  const real: Record<string, string> = { "\x1b": "<e>", "\r": "<r>", "\n": "<n>", "\t": "<t>" };
+  const real: Record<string, string> = {
+    "\x00": "<0>",
+    "\x1b": "<e>",
+    "\r": "<r>",
+    "\n": "<n>",
+    "\t": "<t>",
+  };
   return s
     .replace(CONTROL_CHARS, (c) => real[c])
     .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "<e>")
-    .replace(/\\([rnt])/g, (_, c) => `<${c}>`);
+    .replace(/\\([0rnt])/g, (_, c) => `<${c}>`);
 }
 
 /** Canonical comparison key, or null when uncomparable (`expr`); int/float parse numerically. */

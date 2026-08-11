@@ -190,7 +190,7 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).not.toContain("CONSTRAINT");
   });
 
-  it("visitAlterTable: constraint validations and exclusion adds are comma-separated from FK adds", async () => {
+  it("visitAlterTable: appends constraint validations after the FK adds (Rails parity)", async () => {
     const fk = new ForeignKeyDefinition(
       "users",
       "posts",
@@ -207,7 +207,7 @@ describe("PostgreSQL SchemaCreation", () => {
     at.constraintValidations = ["some_constraint"];
     const sql = await s().visitAlterTable(at);
     expect(sql).toContain("ADD CONSTRAINT");
-    expect(sql).toContain(", VALIDATE CONSTRAINT");
+    expect(sql).toContain('VALIDATE CONSTRAINT "some_constraint"');
   });
 
   it("quotedIncludeColumns + tableModifierInCreate", async () => {

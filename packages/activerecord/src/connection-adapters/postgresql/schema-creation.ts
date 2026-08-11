@@ -115,41 +115,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);
-    // DIVERGENCE (schema_creation.rb:12-14): Rails joins within a group with
-    // " "; trails uses ", " because `super` here emits a comma-separated
-    // ALTER TABLE action list.
-    const pgParts: string[] = [];
-    if (Array.isArray(o.constraintValidations) && o.constraintValidations.length > 0) {
-      pgParts.push(
-        (o.constraintValidations as string[])
-          .map((fk) => this.visitValidateConstraint(fk))
-          .join(", "),
-      );
-    }
-    if (Array.isArray(o.exclusionConstraintAdds) && o.exclusionConstraintAdds.length > 0) {
-      pgParts.push(
-        (o.exclusionConstraintAdds as ExclusionConstraintDefinition[])
-          .map((con) => this.visitAddExclusionConstraint(con))
-          .join(", "),
-      );
-    }
-    if (Array.isArray(o.uniqueConstraintAdds) && o.uniqueConstraintAdds.length > 0) {
-      pgParts.push(
-        (
-          await Promise.all(
-            (o.uniqueConstraintAdds as UniqueConstraintDefinition[]).map((con) =>
-              this.visitAddUniqueConstraint(con),
-            ),
-          )
-        ).join(", "),
-      );
-    }
-    if (pgParts.length > 0) {
-      const table = this.adapter.quoteTableName(o.name);
-      const trimmed = sql.trimEnd();
-      const separator = trimmed === `ALTER TABLE ${table}` ? " " : ", ";
-      sql = trimmed + separator + pgParts.join(", ");
-    }
+    sql += ((o.constraintValidations as string[] | undefined) ?? [])
+      .map((fk) => this.visitValidateConstraint(fk))
+      .join(" ");
+    sql += ((o.exclusionConstraintAdds as ExclusionConstraintDefinition[] | undefined) ?? [])
+      .map((con) => this.visitAddExclusionConstraint(con))
+      .join(" ");
+    sql += (
+      await Promise.all(
+        ((o.uniqueConstraintAdds as UniqueConstraintDefinition[] | undefined) ?? []).map((con) =>
+          this.visitAddUniqueConstraint(con),
+        ),
+      )
+    ).join(" ");
     return sql;
   }
 

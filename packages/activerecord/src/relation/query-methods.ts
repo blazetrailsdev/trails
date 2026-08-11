@@ -827,7 +827,7 @@ function unscopeBang(
       const scope = rawScope === "leftJoins" ? "leftOuterJoins" : rawScope;
       if (!VALID_UNSCOPING_VALUES.has(scope as UnscopeType)) {
         throw argumentError(
-          `Called unscope() with invalid unscoping argument '${scope}'. Valid arguments are: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
+          `Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
         );
       }
       resetValueForScope(this, scope as UnscopeType);
