@@ -341,7 +341,7 @@ export class Association {
       target != null && typeof target.merge === "function"
         ? target.merge(associationScope)
         : associationScope;
-    const globalScope = (klass as unknown as { globalCurrentScope(): any }).globalCurrentScope();
+    const globalScope = klass?.globalCurrentScope();
     return globalScope && typeof base?.merge === "function" ? base.merge(globalScope) : base;
   }
 

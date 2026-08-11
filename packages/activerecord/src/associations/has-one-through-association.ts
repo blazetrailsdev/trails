@@ -49,6 +49,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
+
   /**
    * A has_one_through persists its association through a join-model
    * build/create/update/destroy (`createThroughRecord`), not the direct
