@@ -1544,11 +1544,11 @@ export class ConnectionPool implements ReapablePool {
   // defined below as `this`-typed functions and mixed in here (CLAUDE.md "Module
   // mixins"), so every call site carries Rails' argument list —
   // `try_to_checkout_new_connection` takes none, not an explicit pool.
-  private acquireConnection = acquireConnection;
   private bulkMakeNewConnections = bulkMakeNewConnections;
   private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
   private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
   private withNewConnectionsBlocked = withNewConnectionsBlocked;
+  private acquireConnection = acquireConnection;
   private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
   private adoptConnection = adoptConnection;
   private checkoutNewConnection = checkoutNewConnection;
@@ -1880,7 +1880,7 @@ function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   // concrete driver adapters use `pool` for their own driver pool. Mirror the
   // gate already used by ConnectionPool#newConnection.
   if (conn instanceof AbstractAdapter) {
-    (conn as unknown as { this?: ConnectionPool }).this = this;
+    (conn as unknown as { pool?: ConnectionPool }).pool = this;
   }
   if (this._connections && !this._connections.includes(conn)) {
     this._connections.push(conn);

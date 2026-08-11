@@ -25,6 +25,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const names = Object.keys(virtualTables).sort();
     if (names.length === 0) return;
     stream.push("");
+    stream.push("  // Virtual tables defined in this database.");
+    stream.push(
+      "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
+    );
     // Split on commas that are NOT inside single quotes; filter empty segments
     const splitArgs = (s: string): string[] => {
       if (s.trim() === "") return [];
