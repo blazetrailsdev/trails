@@ -18,7 +18,7 @@
     "tsFile": "system-testing/driver.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/system_testing/driver.rb:10-25) builds `@browser = Browser.new(options[:using])` on the `:selenium` branch. The port (system-testing/driver.ts:47-55) stores `options.using` raw; `Browser` has no trails counterpart. Tracked by story `0084-wide-call-set-burndown/port-system-testing-driver-browser`."
+    "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/system_testing/driver.rb:10-25) builds `@browser = Browser.new(options[:using])` on the `:selenium` branch. The port (system-testing/driver.ts:47-55) stores `options.using` raw; `Browser` has no trails counterpart. Not tracked by a story: actionpack is outside the project's stated focus (activerecord and its dependencies), which is why the convergence story filed for this row was closed as out of scope."
   },
   {
     "package": "actiondispatch",
