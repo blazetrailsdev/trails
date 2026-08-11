@@ -1569,13 +1569,13 @@ export class ToSql extends Visitor {
    * doesn't dispatch on JS primitives — `rubyClassName` (ruby-class.ts) is the
    * equivalent path that handles both Node and non-Node entries.
    */
-  protected visitArray(items: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
-    return this.injectJoin(items, collector, ", ");
+  protected visitArray(o: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
+    return this.injectJoin(o, collector, ", ");
   }
 
   /** Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861). */
-  protected visitSet(items: ReadonlySet<Nodes.NodeOrValue>, collector: SQLString): SQLString {
-    return this.visitArray([...items], collector);
+  protected visitSet(o: ReadonlySet<Nodes.NodeOrValue>, collector: SQLString): SQLString {
+    return this.visitArray([...o], collector);
   }
 
   protected visitArelNodesFragments(o: Nodes.Fragments, collector: SQLString): SQLString {
