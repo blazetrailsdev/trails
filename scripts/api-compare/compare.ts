@@ -88,7 +88,7 @@ import {
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
-import { DATA_LAYER_PACKAGES, writeArClosure } from "./ar-closure.js";
+import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
   hasRubyFileTsOverride,
   isArityOverridden,
@@ -2508,7 +2508,13 @@ export function main() {
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
-          const result = compareCallArgs(ruby, ts, rubyName, portedWithArgsSigs(tsFile, ts.name));
+          const result = compareCallArgs(
+            ruby,
+            ts,
+            rubyName,
+            portedWithArgsSigs(tsFile, ts.name),
+            rubyParamsByName.get(ruby.name),
+          );
           if (result.verdict === "skip") {
             callArgsSkipped[result.reason]++;
             continue;
@@ -3341,11 +3347,9 @@ function printReport(
     }
 
     // Per-file table (only for detail packages or when filtered)
-    const inClosure = closureFileSet ? new Set(closureFileSet[pkg.package] ?? []) : null;
-    const detailFiles =
-      inClosure && !DATA_LAYER.has(pkg.package)
-        ? pkg.files.filter((f) => inClosure.has(f.rubyFile))
-        : pkg.files;
+    const detailFiles = closureFileSet
+      ? filterFilesToClosure(pkg.files, closureFileSet[pkg.package], DATA_LAYER.has(pkg.package))
+      : pkg.files;
 
     if (DETAIL_PACKAGES.has(pkg.package) || filterPkg || showFiles) {
       console.log(

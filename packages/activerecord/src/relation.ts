@@ -7279,7 +7279,7 @@ export class Relation<T extends Base> {
   private batchOnUnloadedRelation(opts: {
     start: unknown;
     finish: unknown;
-    cursor: string | string[];
+    cursor: string[];
     order: "asc" | "desc" | ("asc" | "desc")[];
     batchLimit: number;
     load?: boolean;

@@ -29,7 +29,6 @@ import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
 import { disallowRawSqlBang } from "../sanitization.js";
 import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
-import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
@@ -169,6 +168,9 @@ interface QueryMethodsHost {
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
   _whereClause: WhereClause;
+  /** Rails' `where_clause` / `having_clause` readers (CLAUSE_METHODS). */
+  readonly whereClause: WhereClause;
+  havingClause: WhereClause;
   _orderClauses: Array<string | Nodes.Node>;
   _rawOrderClauses: string[];
   _reordering: boolean | undefined;
@@ -239,21 +241,6 @@ interface QueryMethodsHost {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function resolveOrderMatcher(model: QueryMethodsHost["model"]): RegExp {
-  try {
-    // Mirrors Rails' `model.adapter_class.column_name_with_order_matcher` — a
-    // class-level lookup that does NOT lease a connection. Reading the
-    // deprecated `.connection` getter here would permanently check out a
-    // connection under `permanent_connection_checkout = :deprecated|:disallowed`
-    // whenever an ordered relation is built outside a `with_connection` scope.
-    const adapterClass: any = model.adapterClassSync?.();
-    return adapterClass?.columnNameWithOrderMatcher?.() ?? abstractOrderMatcher();
-  } catch {
-    // No adapter configured — fall back to abstract pattern.
-    return abstractOrderMatcher();
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Bang variants — mutate `this` in place, return `this`.
@@ -1204,11 +1191,8 @@ function andBang(this: QueryMethodsHost, other: any): any {
 function orBang(this: QueryMethodsHost, other: any): any {
   assertRelationForCombining(other, "or");
   assertStructurallyCompatible(this, other, "or");
-  // Mirrors Rails: where_clause = where_clause.or(other.where_clause);
-  //                having_clause = having_clause.or(other.having_clause);
-  //                references_values |= other.references_values
-  this._whereClause = this._whereClause.or(other._whereClause);
-  this._havingClause = this._havingClause.or(other._havingClause);
+  this._whereClause = this.whereClause.or(other.whereClause);
+  this.havingClause = this.havingClause.or(other.havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
   this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
   this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
@@ -1900,7 +1884,11 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   const flattenedArgs = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
     typeof k === "symbol" ? symbolToName(k) : k,
   );
-  disallowRawSqlBang(flattenedArgs, { permit: resolveOrderMatcher(this.model) });
+  disallowRawSqlBang(flattenedArgs, {
+    permit: (
+      this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+    ).columnNameWithOrderMatcher(),
+  });
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);
   if (refs.length > 0) {

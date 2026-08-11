@@ -227,14 +227,14 @@ export class TableDefinition extends AbstractTableDefinition {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): ExclusionConstraintDefinition {
-    return new ExclusionConstraintDefinition(this.tableName, expression, options);
+    return new ExclusionConstraintDefinition(this.name, expression, options);
   }
 
   newUniqueConstraintDefinition(
     columnName: string | string[],
     options: UniqueConstraintOptions = {},
   ): UniqueConstraintDefinition {
-    return new UniqueConstraintDefinition(this.tableName, columnName, options);
+    return new UniqueConstraintDefinition(this.name, columnName, options);
   }
 
   /**

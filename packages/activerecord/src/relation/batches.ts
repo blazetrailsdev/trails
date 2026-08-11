@@ -223,7 +223,7 @@ export async function* batchOnUnloadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
-  cursor: string | string[];
+  cursor: string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
   batchLimit: number;
   load?: boolean;
@@ -241,19 +241,9 @@ export async function* batchOnUnloadedRelation(opts: {
   relation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders);
   const emptyScope = opts.relation.toSql() === opts.relation.model.unscoped().all().toSql();
   const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
-  const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
-  let lastValues: unknown[] | null = null;
+  let batchRelation = relation;
   while (true) {
-    const batchRelation =
-      lastValues === null
-        ? relation
-        : batchCondition(
-            relation,
-            cursorArr,
-            lastValues,
-            batchOrders.map(([, ord]) => (ord === "desc" ? "lt" : "gt")),
-          );
-    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursorArr)).toArray();
+    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursor)).toArray();
     if (rows.length === 0) break;
     yield { rows, useRanges };
     if (rows.length < batchLimit) break;
@@ -265,6 +255,14 @@ export async function* batchOnUnloadedRelation(opts: {
         relation = relation.limit(batchLimit);
       }
     }
-    lastValues = recordCursorValues(rows[rows.length - 1], cursor);
+    const batchOrdersCopy = [...batchOrders];
+    const [, lastOrder] = batchOrdersCopy.pop() as [string, "asc" | "desc"];
+    const operators: string[] = batchOrdersCopy.map(([, order]) =>
+      order === "desc" ? "lteq" : "gteq",
+    );
+    operators.push(lastOrder === "desc" ? "lt" : "gt");
+
+    const cursorValue = recordCursorValues(rows[rows.length - 1], cursor);
+    batchRelation = batchCondition(relation, cursor, cursorValue, operators);
   }
 }

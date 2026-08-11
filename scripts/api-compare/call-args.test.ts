@@ -614,3 +614,101 @@ describe("pairCallSites", () => {
     expect(pairs).toHaveLength(1);
   });
 });
+
+describe("compareCallArgs Symbol-discriminated arguments", () => {
+  // i18n/backend/base.rb#localize — `format` branches on `Symbol === format`,
+  // so extract-ruby-api.rb:201 marks the parameter symbolDiscriminated.
+  const param = (name: string, kind: ParamInfo["kind"], discriminated = false): ParamInfo =>
+    ({ name, kind, symbolDiscriminated: discriminated }) as ParamInfo;
+
+  const localizeParams = [
+    param("object", "required"),
+    param("format", "required", true),
+    param("locale", "optional"),
+  ];
+
+  it("mismatches a colon-less TS string at a Symbol-discriminated position", () => {
+    expect(
+      compareCallArgs(
+        site("localize", ["id:object", "sym:short"]),
+        site("localize", ["id:object", "str:short"]),
+        undefined,
+        undefined,
+        localizeParams,
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("matches the colon-kept TS string at a Symbol-discriminated position", () => {
+    expect(
+      compareCallArgs(
+        site("localize", ["id:object", "sym:short"]),
+        site("localize", ["id:object", "str::short"]),
+        undefined,
+        undefined,
+        localizeParams,
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("keeps matching both spellings at a non-discriminated position", () => {
+    const params = [param("object", "required"), param("format", "required")];
+    for (const tsArg of ["str:short", "str::short"]) {
+      expect(
+        compareCallArgs(
+          site("localize", ["id:object", "sym:short"]),
+          site("localize", ["id:object", tsArg]),
+          undefined,
+          undefined,
+          params,
+        ).verdict,
+      ).toBe("match");
+    }
+  });
+
+  it("keeps matching both spellings when the callee is not resolvable", () => {
+    for (const tsArg of ["str:short", "str::short"]) {
+      expect(
+        compareCallArgs(
+          site("localize", ["id:object", "sym:short"]),
+          site("localize", ["id:object", tsArg]),
+        ).verdict,
+      ).toBe("match");
+    }
+  });
+
+  it("applies the discriminator to a kwarg value by its key", () => {
+    const params = [param("object", "required"), param("format", "keyword", true)];
+    expect(
+      compareCallArgs(
+        site("localize", ["id:object", "kwargs{format=sym:short}"]),
+        site("localize", ["id:object", "kwargs{format=str:short}"]),
+        undefined,
+        undefined,
+        params,
+      ).verdict,
+    ).toBe("mismatch");
+    expect(
+      compareCallArgs(
+        site("localize", ["id:object", "kwargs{format=sym:short}"]),
+        site("localize", ["id:object", "kwargs{format=str::short}"]),
+        undefined,
+        undefined,
+        params,
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("reads an underscored Ruby Symbol against its camelized colon-kept port", () => {
+    const params = [param("format", "required", true)];
+    expect(
+      compareCallArgs(
+        site("localize", ["sym:long_ordinal"]),
+        site("localize", ["str::longOrdinal"]),
+        undefined,
+        undefined,
+        params,
+      ).verdict,
+    ).toBe("match");
+  });
+});

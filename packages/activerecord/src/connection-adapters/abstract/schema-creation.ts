@@ -150,7 +150,7 @@ export class SchemaCreation {
   protected async visitTableDefinition(o: TableDefinition): Promise<string> {
     let createSql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
     if (o.ifNotExists) createSql += " IF NOT EXISTS";
-    createSql += ` ${this.adapter.quoteTableName(o.tableName)}`;
+    createSql += ` ${this.adapter.quoteTableName(o.name)}`;
 
     // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
     // (the api-compare wide gate tracks it) but map to thunks so each column
@@ -167,7 +167,7 @@ export class SchemaCreation {
 
     if (this.supportsIndexesInCreate()) {
       for (const [columnName, options] of o.indexes) {
-        statements.push(await this.indexInCreate(o.tableName, columnName, options));
+        statements.push(await this.indexInCreate(o.name, columnName, options));
       }
     }
 

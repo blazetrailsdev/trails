@@ -657,11 +657,109 @@ export function pairCallSites(
  *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}).
  *  `calleeSigs` are the TS signatures of the method being CALLED, which
  *  {@link stripBlockTailPadding} reads to tell inert padding from a value. */
+/**
+ * The Symbol-vs-String discriminator, on call ARGUMENTS (RFC 0099).
+ *
+ * `compareLiteral` already enforces it on PARAMETER DEFAULTS, off
+ * `ParamInfo.symbolDiscriminated` — which extract-ruby-api.rb:201 sets on a
+ * parameter whose method body branches on `Symbol === x`. Arguments had no
+ * equivalent, so a colon-less TS string silently matched a Ruby Symbol
+ * everywhere: `normalizeLiteralArg` folds `":short"` and `"short"` onto the
+ * same key, by design, because at a NON-discriminated position they are the
+ * same value.
+ *
+ * At a discriminated position they are not. CLAUDE.md ("Symbols vs strings")
+ * requires the port to keep the leading colon there — it is the discriminator
+ * Ruby gets from the type — so a bare string is a body that bypassed the
+ * branch. This runs on the RAW descriptors, after the normalized lists have
+ * already matched: the normalized keys cannot express the difference.
+ *
+ * Deliberately narrow. The callee's params are the ones the enclosing Ruby FILE
+ * defines, so only a same-file callee arms the strict arm, and a site whose
+ * argument lists {@link alignReceiverArgs} had to re-align is skipped because
+ * the Ruby positions no longer index the callee's params. Making every Ruby
+ * Symbol argument strict was measured at +191 rows over 1047, overwhelmingly
+ * ports of names that are not discriminated at all — the "wave of false rows"
+ * RFC 0099 rules out.
+ */
+function symbolDiscriminatedAt(params: ParamInfo[] | undefined, index: number): boolean {
+  const positional = (params ?? []).filter((p) => p.kind === "required" || p.kind === "optional");
+  return positional[index]?.symbolDiscriminated === true;
+}
+
+function symbolDiscriminatedKwarg(params: ParamInfo[] | undefined, key: string): boolean {
+  return (params ?? []).some(
+    (p) => p.kind === "keyword" && p.name === key && p.symbolDiscriminated,
+  );
+}
+
+/** A Ruby Symbol descriptor is `sym:<name>`; the port keeps the colon, so the
+ *  only faithful TS spelling is the string `":<name>"` — `str::<name>` raw. */
+function colonKeptSymbolMatches(rubyRaw: string, tsRaw: string): boolean {
+  const name = unescapeDescriptorText(rubyRaw.slice("sym:".length));
+  if (!tsRaw.startsWith("str:")) return false;
+  const text = unescapeDescriptorText(tsRaw.slice("str:".length));
+  if (!text.startsWith(":")) return false;
+  const bare = text.slice(1);
+  return bare === name || bare === snakeToCamel(name);
+}
+
+/**
+ * Whether every Symbol argument at a Symbol-discriminated position of the
+ * callee kept its leading colon. Returns true when nothing is discriminated,
+ * which is the overwhelming majority of sites.
+ */
+function symbolSpellingsHold(
+  rubyRaw: string[],
+  tsRaw: string[],
+  calleeRubyParams: ParamInfo[] | undefined,
+): boolean {
+  if (calleeRubyParams === undefined) return true;
+  let positional = 0;
+  for (let i = 0; i < rubyRaw.length; i++) {
+    const rubyArg = rubyRaw[i];
+    const tsArg = tsRaw[i];
+    if (tsArg === undefined) continue;
+    if (rubyArg.startsWith("kwargs{")) {
+      for (const pair of splitPairs(rubyArg.slice("kwargs{".length, -1))) {
+        const eq = pair.indexOf("=");
+        if (eq === -1) continue;
+        const key = pair.slice(0, eq);
+        const value = pair.slice(eq + 1);
+        if (!value.startsWith("sym:")) continue;
+        if (!symbolDiscriminatedKwarg(calleeRubyParams, key)) continue;
+        const tsValue = kwargValue(tsArg, key);
+        if (tsValue === undefined || !colonKeptSymbolMatches(value, tsValue)) return false;
+      }
+      continue;
+    }
+    const index = positional++;
+    if (!rubyArg.startsWith("sym:")) continue;
+    if (!symbolDiscriminatedAt(calleeRubyParams, index)) continue;
+    if (!colonKeptSymbolMatches(rubyArg, tsArg)) return false;
+  }
+  return true;
+}
+
+/** The raw value the TS `kwargs{…}` descriptor carries for `key`, camelized the
+ *  same way {@link normalizeKwargs} camelizes the Ruby side. */
+function kwargValue(tsArg: string, rubyKey: string): string | undefined {
+  if (!tsArg.startsWith("kwargs{")) return undefined;
+  const want = normalizeRubyKey(rubyKey);
+  for (const pair of splitPairs(tsArg.slice("kwargs{".length, -1))) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) continue;
+    if (normalizeRubyKey(pair.slice(0, eq)) === want) return pair.slice(eq + 1);
+  }
+  return undefined;
+}
+
 export function compareCallArgs(
   ruby: CallSite,
   ts: CallSite,
   enclosingRubyName?: string,
   calleeSigs?: ParamInfo[][],
+  calleeRubyParams?: ParamInfo[],
 ): CallArgResult {
   const skipped = (reason: CallArgSkipReason): CallArgResult => ({
     verdict: "skip",
@@ -684,6 +782,15 @@ export function compareCallArgs(
   const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
 
   const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
-  if (argsEqual(compared, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
+  if (argsEqual(compared, tsArgs)) {
+    const alignedRuby = aligned.rubyArgs === ruby.args ? aligned.rubyArgs : undefined;
+    if (
+      alignedRuby === undefined ||
+      symbolSpellingsHold(alignedRuby, aligned.tsArgs, calleeRubyParams)
+    ) {
+      return { verdict: "match", rubyArgs, tsArgs };
+    }
+    return { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };
+  }
   return { verdict: "mismatch", class: classify(compared, tsArgs), rubyArgs, tsArgs };
 }

@@ -25,7 +25,6 @@ export class EncryptedAttributeType extends ValueType {
   readonly castType: Type;
   private _previousType: boolean;
   private _default?: unknown;
-  private _encryptor: EncryptorLike;
   private _previousTypes?: Map<boolean, EncryptedAttributeType[]>;
   private _previousTypesWithoutCleanText?: EncryptedAttributeType[];
   private _serializeWithOldest = false;
@@ -41,7 +40,6 @@ export class EncryptedAttributeType extends ValueType {
     this.castType = options.castType ?? new StringType();
     this._previousType = options.previousType ?? false;
     this._default = options.default;
-    this._encryptor = options.scheme.encryptor;
   }
 
   cast(value: unknown): unknown {
@@ -291,11 +289,7 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private get encryptor(): EncryptorLike {
-    // Mirrors Rails EncryptedAttributeType#encryptor → ActiveRecord::Encryption.encryptor
-    // (== context.encryptor). The TS default context carries no encryptor, so fall
-    // back to the scheme's. Resolved inside the existing scheme.withContext wrapper, so
-    // a scheme override has already been pushed onto the context before this reads it.
-    return (Contexts.context.encryptor as EncryptorLike | undefined) ?? this._encryptor;
+    return Contexts.context.encryptor as EncryptorLike;
   }
 
   /** @internal */

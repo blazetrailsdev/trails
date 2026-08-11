@@ -178,3 +178,23 @@ export function writeArClosure(): ArClosure {
   );
   return closure;
 }
+
+/**
+ * The `--closure` row filter: restrict a package's per-file detail rows to the
+ * files in the AR closure.
+ *
+ * Data-layer packages (arel/activemodel/activerecord) are the closure's own
+ * seed — every one of their files is in scope — so they pass through whole and
+ * the flag only ever narrows a SUPPORT gem. The input array is never mutated
+ * and the summary denominators are computed from it, not from the result: the
+ * flag filters rows, never totals.
+ */
+export function filterFilesToClosure<T extends { rubyFile: string }>(
+  files: readonly T[],
+  closureFiles: readonly string[] | undefined,
+  isDataLayer: boolean,
+): T[] {
+  if (isDataLayer) return [...files];
+  const inClosure = new Set(closureFiles ?? []);
+  return files.filter((f) => inClosure.has(f.rubyFile));
+}
