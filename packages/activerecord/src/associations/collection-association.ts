@@ -505,19 +505,32 @@ export class CollectionAssociation extends Association {
    * option. If :dependent is :destroy, uses :delete_all strategy instead.
    */
   async deleteAll(dependent?: string): Promise<number> {
-    if (dependent && dependent !== "nullify" && dependent !== "deleteAll") {
+    // Rails' `[:nullify, :delete_all].include?(dependent)`. `:delete_all` is
+    // spelled both ways in trails: `"delete_all"` (the literal Symbol name, what
+    // the proxy has always accepted from callers) and `"deleteAll"` (the
+    // camelCased form the internal `method` dispatch below runs on).
+    if (
+      dependent &&
+      dependent !== "nullify" &&
+      dependent !== "delete_all" &&
+      dependent !== "deleteAll"
+    ) {
       throw new ArgumentError("Valid values are :nullify or :delete_all");
     }
 
     const optionDep = this.options.dependent;
-    dependent = dependent
-      ? dependent
-      : // Rails' `options[:dependent] == :destroy` arm. Canonical trails models
-        // spell `:delete_all` as `"delete"`, which is the same delete strategy,
-        // so it collapses here too rather than falling through to nullify.
-        optionDep === "destroy" || optionDep === "delete"
+    dependent =
+      dependent === "delete_all"
         ? "deleteAll"
-        : optionDep;
+        : dependent
+          ? dependent
+          : // Rails' `options[:dependent] == :destroy` arm. Canonical trails
+            // models spell `:delete_all` as `"delete"`, which is the same delete
+            // strategy, so it collapses here too rather than falling through to
+            // nullify.
+            optionDep === "destroy" || optionDep === "delete"
+            ? "deleteAll"
+            : optionDep;
 
     const count = await this.deleteOrNullifyAllRecords(dependent);
 
