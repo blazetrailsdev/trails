@@ -305,7 +305,8 @@ export class LeaseRegistry {
  * Wired up when ConnectionHandler is complete (PR 6).
  */
 type ConnectionHandlerLike = {
-  eachConnectionPool(role: string | null | undefined, cb: (pool: ConnectionPool) => void): void;
+  eachConnectionPool(block: (pool: ConnectionPool) => void): void;
+  eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
 };
 
 export class ExecutorHooks {
@@ -341,7 +342,7 @@ export class ExecutorHooks {
   static complete(): void {
     const handler = ExecutorHooks._getConnectionHandler?.();
     if (!handler) return;
-    handler.eachConnectionPool(null, (pool) => {
+    handler.eachConnectionPool((pool) => {
       const connection = pool.activeConnection;
       if (connection) {
         const txn =
@@ -1043,7 +1044,7 @@ export class ConnectionPool implements ReapablePool {
    */
   private _disconnect(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
-    withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
+    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
       for (const conn of this._connections ?? []) {
         (conn as unknown as { disconnectBang?: () => void }).disconnectBang?.();
         const drain = (conn as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.();
@@ -1150,7 +1151,7 @@ export class ConnectionPool implements ReapablePool {
    */
   private _clearReloadableConnections(raiseOnAcquisitionTimeout: boolean): Array<Promise<void>> {
     const draining: Array<Promise<void>> = [];
-    withExclusivelyAcquiredAllConnections(this, raiseOnAcquisitionTimeout, () => {
+    this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () => {
       const ctx = String(executionContextId());
       const reloadable = new Set<DatabaseAdapter>();
       for (const conn of this._connections ?? []) {
@@ -1538,6 +1539,19 @@ export class ConnectionPool implements ReapablePool {
     }
     return this._leases.get(String(executionContextId()));
   }
+
+  // Rails' private ConnectionPool instance methods, defined below as
+  // `this`-typed functions and mixed in here (CLAUDE.md "Module mixins"), so
+  // every call site reads as Rails' does — `try_to_checkout_new_connection`
+  // takes no argument, not an explicit pool.
+  private acquireConnection = acquireConnection;
+  private bulkMakeNewConnections = bulkMakeNewConnections;
+  private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
+  private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
+  private withNewConnectionsBlocked = withNewConnectionsBlocked;
+  private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
+  private adoptConnection = adoptConnection;
+  private checkoutNewConnection = checkoutNewConnection;
 }
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
@@ -1588,10 +1602,10 @@ function buildAsyncExecutor(_pool: Pool): null {
  *
  * @internal
  */
-function bulkMakeNewConnections(pool: Pool, numNewConnsNeeded: number): void {
+function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
   for (let i = 0; i < numNewConnsNeeded; i++) {
-    const conn = tryToCheckoutNewConnection(pool);
-    if (conn) pool.checkin(conn);
+    const conn = this.tryToCheckoutNewConnection();
+    if (conn) this.checkin(conn);
   }
 }
 
@@ -1605,12 +1619,12 @@ function bulkMakeNewConnections(pool: Pool, numNewConnsNeeded: number): void {
  * @internal
  */
 function withExclusivelyAcquiredAllConnections<R>(
-  pool: Pool,
+  this: Pool,
   raiseOnAcquisitionTimeout: boolean,
   block: () => R,
 ): R {
-  return withNewConnectionsBlocked(pool, () => {
-    attemptToCheckoutAllExistingConnections(pool, raiseOnAcquisitionTimeout);
+  return this.withNewConnectionsBlocked(() => {
+    this.attemptToCheckoutAllExistingConnections(raiseOnAcquisitionTimeout);
     return block();
   });
 }
@@ -1627,31 +1641,31 @@ function withExclusivelyAcquiredAllConnections<R>(
  * @internal
  */
 function attemptToCheckoutAllExistingConnections(
-  pool: Pool,
+  this: Pool,
   raiseOnAcquisitionTimeout: boolean,
 ): void {
-  pool.reap();
-  const conns = pool._connections ? [...pool._connections] : [];
+  this.reap();
+  const conns = this._connections ? [...this._connections] : [];
   const newlyCheckedOut: DatabaseAdapter[] = [];
   let release = false;
   try {
     for (const conn of conns) {
-      if (pool._checkedOut.has(conn)) continue;
+      if (this._checkedOut.has(conn)) continue;
       try {
-        if (pool._available?.remove?.(conn) === false) {
+        if (this._available?.remove?.(conn) === false) {
           // Not idle — fall back to a generic checkout to surface a timeout.
-          const acquired = checkoutForExclusiveAccess(pool, pool.checkoutTimeout);
+          const acquired = checkoutForExclusiveAccess(this, this.checkoutTimeout);
           if (acquired) newlyCheckedOut.push(acquired);
           continue;
         }
-        pool._checkedOut.add(conn);
+        this._checkedOut.add(conn);
         (conn as unknown as PoolManagedConnection).lease?.();
         newlyCheckedOut.push(conn);
       } catch (innerErr) {
         if (innerErr instanceof ConnectionTimeoutError) {
           throw new ExclusiveConnectionTimeoutError(
-            `could not obtain ownership of all database connections in ${pool.checkoutTimeout} seconds`,
-            { connectionPool: pool },
+            `could not obtain ownership of all database connections in ${this.checkoutTimeout} seconds`,
+            { connectionPool: this },
           );
         }
         throw innerErr;
@@ -1669,7 +1683,7 @@ function attemptToCheckoutAllExistingConnections(
     throw err;
   } finally {
     if (release) {
-      for (const conn of newlyCheckedOut) pool.checkin(conn);
+      for (const conn of newlyCheckedOut) this.checkin(conn);
     }
   }
 }
@@ -1719,24 +1733,24 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
  *
  * @internal
  */
-function withNewConnectionsBlocked<R>(pool: Pool, block: () => R): R {
-  const p = pool;
+function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
+  const p = this;
   p._threadsBlockingNewConnections = (p._threadsBlockingNewConnections ?? 0) + 1;
   try {
     return block();
   } finally {
     p._threadsBlockingNewConnections! -= 1;
     if (p._threadsBlockingNewConnections === 0) {
-      const waiters = pool.numWaitingInQueue();
+      const waiters = this.numWaitingInQueue();
       let need = waiters;
-      pool._available?.clear?.();
-      for (const conn of pool._connections ?? []) {
-        if (!pool._checkedOut.has(conn)) {
-          pool._available?.add(conn);
+      this._available?.clear?.();
+      for (const conn of this._connections ?? []) {
+        if (!this._checkedOut.has(conn)) {
+          this._available?.add(conn);
           need -= 1;
         }
       }
-      if (need > 0) bulkMakeNewConnections(pool, need);
+      if (need > 0) this.bulkMakeNewConnections(need);
     }
   }
 }
@@ -1752,36 +1766,36 @@ function withNewConnectionsBlocked<R>(pool: Pool, block: () => R): R {
  * @internal
  */
 function acquireConnection(
-  pool: Pool,
+  this: Pool,
   checkoutTimeout: number,
 ): DatabaseAdapter | Promise<DatabaseAdapter> {
   const tagPool = (err: unknown) => {
-    if (err instanceof ConnectionTimeoutError) err.setPool(pool);
+    if (err instanceof ConnectionTimeoutError) err.setPool(this);
     return err;
   };
   const ensureLive = () => {
-    if (pool.isDiscarded?.()) {
+    if (this.isDiscarded?.()) {
       throw new ConnectionNotEstablished("Connection pool has been discarded", {
-        connectionPool: pool,
+        connectionPool: this,
       });
     }
   };
   const accept = (c: DatabaseAdapter): DatabaseAdapter => {
-    pool._checkedOut.add(c);
+    this._checkedOut.add(c);
     return c;
   };
   try {
     ensureLive();
-    let conn = pool._available?.poll() as DatabaseAdapter | undefined;
+    let conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
-    conn = tryToCheckoutNewConnection(pool) ?? undefined;
+    conn = this.tryToCheckoutNewConnection() ?? undefined;
     if (conn) return conn; // tryToCheckoutNewConnection already adds to _checkedOut
-    pool.reap();
-    conn = pool._available?.poll() as DatabaseAdapter | undefined;
+    this.reap();
+    conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
-    conn = tryToCheckoutNewConnection(pool) ?? undefined;
+    conn = this.tryToCheckoutNewConnection() ?? undefined;
     if (conn) return conn;
-    const result = pool._available?.poll(checkoutTimeout);
+    const result = this._available?.poll(checkoutTimeout);
     if (result instanceof Promise) {
       return result.then(
         (c) => {
@@ -1796,7 +1810,7 @@ function acquireConnection(
     if (result == null) {
       throw new ConnectionTimeoutError(
         `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
-        { connectionPool: pool },
+        { connectionPool: this },
       );
     }
     return accept(result);
@@ -1837,21 +1851,21 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | numbe
  *
  * @internal
  */
-function tryToCheckoutNewConnection(pool: Pool): DatabaseAdapter | null {
-  const p = pool;
+function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
+  const p = this;
   if ((p._threadsBlockingNewConnections ?? 0) > 0) return null;
-  if (!pool._connections || pool._connections.length >= pool.size) return null;
-  if (!pool.automaticReconnect) {
+  if (!this._connections || this._connections.length >= this.size) return null;
+  if (!this.automaticReconnect) {
     throw new ConnectionNotEstablished(
       "No connection available from pool and automatic_reconnect is disabled",
-      { connectionPool: pool },
+      { connectionPool: this },
     );
   }
-  const conn = checkoutNewConnection(pool);
-  adoptConnection(pool, conn);
-  pool._checkedOut.add(conn);
+  const conn = this.checkoutNewConnection();
+  this.adoptConnection(conn);
+  this._checkedOut.add(conn);
   (conn as unknown as PoolManagedConnection).lease?.();
-  return checkoutAndVerify(pool, conn);
+  return checkoutAndVerify(this, conn);
 }
 
 /**
@@ -1863,15 +1877,15 @@ function tryToCheckoutNewConnection(pool: Pool): DatabaseAdapter | null {
  *
  * @internal
  */
-function adoptConnection(pool: Pool, conn: DatabaseAdapter): void {
+function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   // Only AbstractAdapter has a `pool` slot reserved for this back-reference;
-  // concrete driver adapters use `pool` for their own driver pool. Mirror the
+  // concrete driver adapters use `pool` for their own driver this. Mirror the
   // gate already used by ConnectionPool#newConnection.
   if (conn instanceof AbstractAdapter) {
-    (conn as unknown as { pool?: ConnectionPool }).pool = pool;
+    (conn as unknown as { this?: ConnectionPool }).this = this;
   }
-  if (pool._connections && !pool._connections.includes(conn)) {
-    pool._connections.push(conn);
+  if (this._connections && !this._connections.includes(conn)) {
+    this._connections.push(conn);
   }
 }
 
@@ -1884,14 +1898,14 @@ function adoptConnection(pool: Pool, conn: DatabaseAdapter): void {
  *
  * @internal
  */
-function checkoutNewConnection(pool: Pool): DatabaseAdapter {
-  if (!pool.automaticReconnect) {
+function checkoutNewConnection(this: Pool): DatabaseAdapter {
+  if (!this.automaticReconnect) {
     throw new ConnectionNotEstablished(
       "No connection available from pool and automatic_reconnect is disabled",
-      { connectionPool: pool },
+      { connectionPool: this },
     );
   }
-  return pool.newConnection();
+  return this.newConnection();
 }
 
 /**

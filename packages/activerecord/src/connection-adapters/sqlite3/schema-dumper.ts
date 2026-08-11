@@ -18,8 +18,27 @@ interface Column extends ColumnInfo {
 
 export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
-  protected override virtualTables(lines: string[]): void | Promise<void> {
-    return super.virtualTables(lines);
+  protected override async virtualTables(stream: string[]): Promise<void> {
+    const connection = this._adapter();
+    if (!connection || typeof connection.virtualTables !== "function") return;
+    const virtualTables: Record<string, [string, string]> = await connection.virtualTables();
+    const names = Object.keys(virtualTables).sort();
+    if (names.length === 0) return;
+    stream.push("");
+    // Split on commas that are NOT inside single quotes; filter empty segments
+    const splitArgs = (s: string): string[] => {
+      if (s.trim() === "") return [];
+      return s
+        .split(/,(?=(?:[^']*'[^']*')*[^']*$)/)
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+    };
+    for (const tableName of names) {
+      const [moduleName, argumentsStr] = virtualTables[tableName];
+      stream.push(
+        `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(splitArgs(argumentsStr))});`,
+      );
+    }
   }
 
   /** @internal */

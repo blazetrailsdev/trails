@@ -26,7 +26,7 @@ import { IsolatedExecutionState, Notifications } from "@blazetrails/activesuppor
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
+import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
@@ -2699,12 +2699,10 @@ export class AbstractAdapter implements Quoting {
     // A `TableAlias` relation may carry a `SqlLiteral` name (set-op / subquery
     // derived table); unwrap to the bare identifier for the schema-cache lookup.
     const tableName = relationName(attribute.relation.name);
-    // A standalone adapter's NullPool has no `schemaCache`, which is Rails'
-    // signal to bind the reflection to the connection itself
-    // (abstract_adapter.rb:298).
-    const pool =
-      this.pool == null || this.pool instanceof NullPool ? new FakePool(this) : this.pool;
-    const hash = await (this.internalSchemaCache as any).columnsHash(pool, tableName);
+    // `schemaCache` is Rails' `schema_cache` (abstract_adapter.rb:298): the
+    // pool's BoundSchemaReflection, or one bound to this connection when the
+    // adapter stands alone on a NullPool.
+    const hash = await this.schemaCache.columnsHash(tableName);
     return hash?.[attribute.name];
   }
 

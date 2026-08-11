@@ -485,7 +485,7 @@ function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   // context), so a re-read after checkout would hit stale results unless the
   // Store itself is cleared here.
   const cleared = new Set<Store>();
-  ExecutorHooks.connectionHandler()?.eachConnectionPool(null, (pool) => {
+  ExecutorHooks.connectionHandler()?.eachConnectionPool((pool) => {
     const p = pool as unknown as QueryCachePool & { queryCache?: Store };
     p.clearQueryCache();
     if (p.queryCache) cleared.add(p.queryCache);

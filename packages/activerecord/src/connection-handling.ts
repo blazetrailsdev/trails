@@ -356,7 +356,7 @@ export function clearQueryCachesForCurrentThread(this: typeof Base): void {
   // connection is currently checked in still holds this thread's cached rows
   // in its registry (they survive checkin, keyed by execution context), so a
   // re-read after checkout would hit stale results unless the Store is cleared.
-  this.connectionHandler.eachConnectionPool(null, (pool) => {
+  this.connectionHandler.eachConnectionPool((pool) => {
     (pool as unknown as { clearQueryCache?: () => void }).clearQueryCache?.();
   });
 }
