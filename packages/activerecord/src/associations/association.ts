@@ -8,6 +8,7 @@ import { validateReflectionValidity } from "./validate-through-reflection.js";
 import {
   camelize,
   constantize,
+  except,
   safeConstantize,
   singularize,
   underscore,
@@ -617,18 +618,18 @@ export class Association {
     }
   }
 
-  /**
-   * Mirrors Rails' `Association#initialize_attributes` (association.rb:217):
-   * pre-fill the newly built record with attributes derived from the
-   * association's `scope_for_create` (where-conditions on the scope).
-   * Caller-supplied / already-changed keys normally win; the exception is
-   * `skip_assign = [foreign_key, foreign_type]`, where the scope value is
-   * allowed through (Rails relies on this so a scoped association's FK /
-   * polymorphic type gets anchored from the scope). `foreign_type` is the
-   * polymorphic-belongs-to type column — NOT the STI inheritance column.
-   */
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
-    applyScopeForCreate(this, record, exceptFromScopeAttributes);
+    exceptFromScopeAttributes ??= {};
+    const skipAssign = [...this.resolveForeignKey(), this.resolveReflectionType()].filter(
+      (key) => key != null,
+    );
+    let assignedKeys = record.changedAttributeNamesToSave;
+    assignedKeys = assignedKeys.concat(Object.keys(exceptFromScopeAttributes).map(String));
+    const attributes = except(
+      this.scopeForCreate(),
+      ...assignedKeys.filter((key) => !skipAssign.includes(key)),
+    );
+    if (Object.keys(attributes).length > 0) record._assignAttributes(attributes);
     this.setInverseInstance(record);
   }
 
@@ -829,6 +830,24 @@ export class Association {
     return (Array.isArray(fk) ? fk : [fk]).filter((k) => k != null).map(String);
   }
 
+  /**
+   * Mirrors: AssociationReflection#type (reflection.rb) — the
+   * polymorphic-belongs-to foreign-type column, NOT the STI inheritance
+   * column. `this.reflection` is the lightweight AssociationDefinition, whose
+   * `type` is the macro name, so the rich Reflection is resolved through
+   * `_reflectOnAssociation` (the sibling of `resolveForeignKey`) and
+   * `options.as` covers the window before macro registration finishes.
+   */
+  private resolveReflectionType(): string | null {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => { type?: string | null } | null;
+    };
+    const rich = ctor._reflectOnAssociation?.(this.reflection.name);
+    if (rich?.type != null) return rich.type;
+    const as = (this.reflection.options as AssociationOptions).as;
+    return as ? `${underscore(as)}_type` : null;
+  }
+
   private foreignKeyValues(record: Base): unknown[] {
     return this.resolveForeignKey().map((key) => (record as any)._readAttribute(key));
   }
@@ -1027,89 +1046,6 @@ export class Association {
     }
     return fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id);
   }
-}
-
-/**
- * Apply scope_for_create attrs to `record`, mirroring Rails'
- * `initialize_attributes` (association.rb:217). Caller-supplied attrs
- * normally win — except for `skip_assign = [foreign_key, foreign_type]`,
- * where the scope value is allowed through even when already assigned
- * (Rails relies on this so a scoped association's FK / polymorphic type
- * gets re-anchored from the scope). Note: `foreign_type` is the
- * polymorphic-belongs-to type column, NOT the STI inheritance column.
- *
- * @internal
- */
-export function applyScopeForCreate(
-  assoc: Association,
-  record: Base,
-  exceptFromScopeAttributes?: Record<string, unknown>,
-): void {
-  const scope = assoc.scopeForCreate();
-  if (!scope || Object.keys(scope).length === 0) return;
-
-  // `assoc.reflection` is the lightweight AssociationDefinition (its `type`
-  // is the macro name — "belongsTo" / etc. — not the polymorphic foreign
-  // type column). Resolve the rich Reflection via `_reflectOnAssociation`
-  // to read Rails-equivalent `foreignKey` / `type` accessors. Fall back to
-  // `options.foreignKey` when the rich reflection isn't installed (e.g.
-  // before macro registration finishes).
-  const ctor = assoc.owner.constructor as typeof Base & {
-    _reflectOnAssociation?: (n: string) => unknown;
-  };
-  const rich = ctor._reflectOnAssociation?.(assoc.reflection.name) as
-    | { foreignKey?: string | string[]; type?: string | null }
-    | undefined;
-  const options = assoc.reflection.options as {
-    foreignKey?: string | string[];
-    as?: string;
-  };
-  const fk = rich?.foreignKey ?? options.foreignKey;
-  // Polymorphic foreign-type column derives from `:as` when the rich
-  // reflection isn't yet installed (same shape `setOwnerAttributes` uses).
-  const foreignType = rich?.type ?? (options.as ? `${underscore(options.as)}_type` : null);
-  const skipAssign = new Set<string>();
-  if (Array.isArray(fk)) {
-    for (const k of fk) if (k) skipAssign.add(String(k));
-  } else if (fk) {
-    skipAssign.add(String(fk));
-  }
-  if (foreignType) skipAssign.add(String(foreignType));
-
-  const assigned = new Set<string>(((record as any).changedAttributeNamesToSave ?? []) as string[]);
-  if (exceptFromScopeAttributes) {
-    for (const k of Object.keys(exceptFromScopeAttributes)) assigned.add(k);
-  }
-
-  const attributes = filterScopeForCreate(scope, assigned, skipAssign);
-  // Route through AR's `_assignAttributes` (mixed onto Base) so
-  // multiparameter / nested-attribute handling applies — matches
-  // Rails' `record.send(:_assign_attributes, ...)` dispatch.
-  if (attributes) (record as any)._assignAttributes(attributes);
-}
-
-/**
- * Core of Rails' `scope_for_create.except!(*(assigned - skip_assign))`
- * filter: returns the attribute hash to apply, or `null` when nothing
- * is left after filtering. Shared between `applyScopeForCreate` (the
- * `Association#initializeAttributes` path) and `CollectionProxy`'s
- * direct-build paths.
- *
- * @internal
- */
-export function filterScopeForCreate(
-  scope: Record<string, unknown>,
-  assigned: Set<string>,
-  skipAssign: Set<string>,
-): Record<string, unknown> | null {
-  const out: Record<string, unknown> = {};
-  let any = false;
-  for (const [k, v] of Object.entries(scope)) {
-    if (assigned.has(k) && !skipAssign.has(k)) continue;
-    out[k] = v;
-    any = true;
-  }
-  return any ? out : null;
 }
 
 /**

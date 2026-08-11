@@ -2162,12 +2162,12 @@ export class Relation<T extends Base> {
     // construction so the constructor's seeding honors the relation's scope.
     const modelClass = this._model as any;
     const prev = ScopeRegistry.currentScope(modelClass);
-    ScopeRegistry.setCurrentScope(modelClass, this as any);
+    modelClass.setCurrentScope(this as any);
     let record: T;
     try {
       record = new this._model(attrs) as T;
     } finally {
-      ScopeRegistry.setCurrentScope(modelClass, prev);
+      modelClass.setCurrentScope(prev);
     }
     // The block runs AFTER current_scope is restored, matching Rails'
     // `current_scope_restoring_block` (relation.rb:1345): it captures the
@@ -6792,7 +6792,7 @@ export class Relation<T extends Base> {
     const modelClass = this.model;
     const currentScope = (modelClass as any).currentScope(true);
     return (record: T) => {
-      ScopeRegistry.setCurrentScope(modelClass as any, currentScope ?? null);
+      (modelClass as any).setCurrentScope(currentScope ?? null);
       block?.(record);
     };
   }
