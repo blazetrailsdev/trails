@@ -751,14 +751,51 @@ export interface SuppressedCall {
   tsFile: string;
   rubyName: string;
   tsName: string;
+  /** See `CallMismatch.tsClass`. */
+  tsClass?: string;
   call: string;
 }
 
 /** Identity of the declaration a `@missingRailsCall` tag is written on. Keyed
- *  by (tsFile, tsName), so a tag justifies the deviation for exactly the method
- *  that carries it and never for a same-named method in another file. */
-export function callTagKey(tsFile: string, tsName: string): string {
-  return `${tsFile}\u0000${tsName}`;
+ *  by (tsFile, tsClass, tsName), so a tag justifies the deviation for exactly
+ *  the method that carries it — never for a same-named method in another file,
+ *  and never for a sibling class's method in the SAME file (`NullPool#checkout`
+ *  next to `ConnectionPool#checkout`). `tsClass` is `""` for a top-level
+ *  function and `"*"` when the owning class could not be resolved. */
+export function callTagKey(tsFile: string, tsClass: string, tsName: string): string {
+  return `${tsFile}\u0000${tsClass}\u0000${tsName}`;
+}
+
+/** The TS class that owns `tsName` in the file a pair matched, given every
+ *  class in that file declaring the name and the Ruby entity the pair came
+ *  from. One declaration needs no disambiguation; several are resolved by the
+ *  Ruby class's own short name (`ActiveRecord::ConnectionAdapters::NullPool` →
+ *  `NullPool`), which the naming rules make the TS class name too. Unresolved
+ *  (`undefined`) keeps the whole-file behaviour it replaced. */
+export function resolveTsOwner(
+  owners: ReadonlySet<string> | undefined,
+  rubyModule: string,
+): string | undefined {
+  if (!owners || owners.size === 0) return undefined;
+  if (owners.size === 1) return [...owners][0];
+  const short = rubyModule.split("::").at(-1) ?? rubyModule;
+  return owners.has(short) ? short : undefined;
+}
+
+/** The tags that justify deviations for `owner`'s copy of a method. A resolved
+ *  owner reads ONLY its own class's tags, so a tag on a sibling class cannot
+ *  silence a flag raised against this one. With no owner resolved the tags of
+ *  the file's single tagged class — or, ambiguously, their union — apply. */
+export function tagsForOwner(
+  byClass: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+  owner: string | undefined,
+): ReadonlySet<string> | undefined {
+  if (!byClass || byClass.size === 0) return undefined;
+  if (owner !== undefined) return byClass.get(owner);
+  if (byClass.size === 1) return [...byClass.values()][0];
+  const union = new Set<string>();
+  for (const calls of byClass.values()) for (const c of calls) union.add(c);
+  return union;
 }
 
 /** Drop the flagged calls a tag on this declaration justifies, recording each
@@ -778,19 +815,25 @@ export function suppressTaggedCalls(
   });
 }
 
-/** Every tagged call on a COMPARED (tsFile, tsName) that never suppressed a
- *  flag — the tag's stale half. Sorted for a deterministic artifact. */
+/** Every tagged call on a COMPARED (tsFile, tsClass, tsName) that never
+ *  suppressed a flag — the tag's stale half. Sorted for a deterministic
+ *  artifact. A pair whose owning class stayed unresolved recorded its
+ *  suppressions under the `"*"` class, so both keys are consulted. */
 export function staleCallTags(
-  tagsByFileName: Map<string, Map<string, Set<string>>>,
+  tagsByFileName: Map<string, Map<string, Map<string, Set<string>>>>,
   used: Map<string, Set<string>>,
 ): StaleCallTag[] {
   const out: StaleCallTag[] = [];
   for (const [tsFile, byName] of tagsByFileName) {
-    for (const [tsName, calls] of byName) {
-      const hit = used.get(callTagKey(tsFile, tsName));
-      if (hit === undefined) continue;
-      for (const call of calls) {
-        if (!hit.has(call)) out.push({ tsFile, tsName, call });
+    for (const [tsName, byClass] of byName) {
+      for (const [tsClass, calls] of byClass) {
+        const hit =
+          used.get(callTagKey(tsFile, tsClass, tsName)) ??
+          used.get(callTagKey(tsFile, "*", tsName));
+        if (hit === undefined) continue;
+        for (const call of calls) {
+          if (!hit.has(call)) out.push({ tsFile, tsName, call });
+        }
       }
     }
   }
@@ -861,6 +904,10 @@ interface CallMismatch {
   tsFile: string;
   rubyName: string;
   tsName: string;
+  /** The class declaring `tsName` in `tsFile`, when the file's declarations of
+   *  that name resolve to one (see `resolveTsOwner`). `parity:api:build` mints
+   *  the tag on that declaration alone. */
+  tsClass?: string;
   missing: string[];
 }
 
@@ -1903,7 +1950,11 @@ export function main() {
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
-    const tsMissingCallTagsByFileName = new Map<string, Map<string, Set<string>>>();
+    // (file → name → declaring class → tagged calls), so a tag on one class
+    // never speaks for a same-named sibling; a top-level function is `""`.
+    const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
+    // (file → name → every class declaring it), `resolveTsOwner`'s population.
+    const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -1946,7 +1997,13 @@ export function main() {
       m: MethodInfo,
       file = m.file ?? "",
       scope: "package" | "dep" = "package",
+      owner = "",
     ) => {
+      if (scope === "package") {
+        const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+        owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
+        tsOwnersByFileName.set(file, owners);
+      }
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
@@ -1964,10 +2021,13 @@ export function main() {
         }
       }
       if (m.missingRailsCalls !== undefined) {
-        const byName = tsMissingCallTagsByFileName.get(file) ?? new Map<string, Set<string>>();
-        const tagged = byName.get(m.name) ?? new Set<string>();
+        const byName =
+          tsMissingCallTagsByFileName.get(file) ?? new Map<string, Map<string, Set<string>>>();
+        const byClass = byName.get(m.name) ?? new Map<string, Set<string>>();
+        const tagged = byClass.get(owner) ?? new Set<string>();
         for (const c of m.missingRailsCalls) tagged.add(c);
-        byName.set(m.name, tagged);
+        byClass.set(owner, tagged);
+        byName.set(m.name, byClass);
         tsMissingCallTagsByFileName.set(file, byName);
       }
       if (m.callSeq !== undefined) {
@@ -2006,7 +2066,7 @@ export function main() {
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
           if (tsShouldInclude(m)) {
             methods.add(m.name);
-            recordTsParams(m, file);
+            recordTsParams(m, file, "package", cls.name);
           }
         }
         tsMethodsByFile.set(file, methods);
@@ -2039,7 +2099,7 @@ export function main() {
       if (!depPkg) continue;
       for (const ent of [...Object.values(depPkg.classes), ...Object.values(depPkg.modules)]) {
         for (const m of [...ent.instanceMethods, ...ent.classMethods]) {
-          if (tsShouldInclude(m)) recordTsParams(m, m.file ?? "", "dep");
+          if (tsShouldInclude(m)) recordTsParams(m, m.file ?? "", "dep", ent.name);
         }
       }
       for (const fns of Object.values(depPkg.fileFunctions ?? {})) {
@@ -2392,7 +2452,7 @@ export function main() {
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
-      const checkCalls = (rubyName: string, tsName: string, tsFile: string) => {
+      const checkCalls = (rubyName: string, tsName: string, tsFile: string, rubyModule: string) => {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
@@ -2445,15 +2505,16 @@ export function main() {
           jsEnumerableAliases,
           negatedTsCalls,
         );
-        const tags = tsMissingCallTagsByFileName.get(tsFile)?.get(tsName);
+        const tsClass = resolveTsOwner(tsOwnersByFileName.get(tsFile)?.get(tsName), rubyModule);
+        const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
         let kept = missing;
         if (tags !== undefined && tags.size > 0) {
-          const tagKey = callTagKey(tsFile, tsName);
+          const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
           const used = callTagsUsed.get(tagKey) ?? callTagsUsed.set(tagKey, new Set()).get(tagKey)!;
           kept = suppressTaggedCalls(missing, tags, used);
           for (const m of missing) {
             const call = callOf(m);
-            if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, call });
+            if (tags.has(call)) suppressedCalls.push({ tsFile, rubyName, tsName, tsClass, call });
           }
         }
         const rubySkeleton = rubySkeletonByName.get(rubyName);
@@ -2484,7 +2545,7 @@ export function main() {
         }
         const flagged = [...kept, ...ordered];
         if (flagged.length === 0) return;
-        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, missing: flagged });
+        callMismatches.push({ rubyFile, tsFile, rubyName, tsName, tsClass, missing: flagged });
       };
 
       // Advisory call-argument check (RFC 0095), on the pair checkCalls
@@ -2547,10 +2608,10 @@ export function main() {
         bodyHashRecords.push({ rubyFile, rubyName, tsFile, tsName, digest });
       };
 
-      const checkArity = (rubyName: string, tsName: string, tsFile: string) => {
+      const checkArity = (rubyName: string, tsName: string, tsFile: string, rubyModule = "") => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
-        checkCalls(rubyName, tsName, tsFile);
+        checkCalls(rubyName, tsName, tsFile, rubyModule);
         checkCallArgs(rubyName, tsName, tsFile);
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
@@ -2633,7 +2694,7 @@ export function main() {
         const directMatch = tsCandidates.find((c) => tsMethods.has(c));
         if (directMatch) {
           fileMatched++;
-          checkArity(rubyName, directMatch, expectedTs);
+          checkArity(rubyName, directMatch, expectedTs, rubyModule);
           continue;
         }
 
@@ -2653,7 +2714,7 @@ export function main() {
 
         if (foundViaInclude) {
           fileMatched++;
-          checkArity(rubyName, matchedCandidate!, foundViaInclude);
+          checkArity(rubyName, matchedCandidate!, foundViaInclude, rubyModule);
           moves.push({
             tsName: matchedCandidate!,
             rubyName,
@@ -2697,7 +2758,7 @@ export function main() {
         );
         if (creditedToReopening) {
           fileMatched++;
-          checkArity(rubyName, creditedToReopening.tsName, creditedToReopening.tsFile);
+          checkArity(rubyName, creditedToReopening.tsName, creditedToReopening.tsFile, rubyModule);
           moves.push({
             tsName: creditedToReopening.tsName,
             rubyName,
@@ -2714,7 +2775,7 @@ export function main() {
           const misplacedMatch = tsCandidates.find((c) => actualMethods.has(c));
           if (misplacedMatch) {
             fileMatched++;
-            checkArity(rubyName, misplacedMatch, misplacedActualFile!);
+            checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule);
             moves.push({
               tsName: misplacedMatch,
               rubyName,
@@ -2754,7 +2815,7 @@ export function main() {
             // Only an arity-meaningful direct match (`writingRole`) is checked;
             // a `setX` setter has an extra `value` param vs the Ruby reader, so
             // comparing their arities manufactures a spurious mismatch.
-            if (directPort) checkArity(rubyName, directPort, actualFile);
+            if (directPort) checkArity(rubyName, directPort, actualFile, rubyModule);
             moves.push({
               tsName: port,
               rubyName,

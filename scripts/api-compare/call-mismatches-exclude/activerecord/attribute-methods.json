@@ -94,13 +94,6 @@
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "initialize_generated_modules",
-    "call": "include",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:42-50 does `include @generated_attribute_methods`; trails attribute-methods.ts:257-259 assigns a GeneratedAttributeMethods holder instance — no Module#include in TS, the holder is consulted directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "initialize_generated_modules",
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
@@ -126,13 +119,6 @@
     "rubyName": "instance_method_already_implemented?",
     "call": "owner",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "method_defined_within?",
-    "call": "owner",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:187-197 compares `instance_method(name).owner` across class and superclass; trails attribute-methods.ts:508-517 uses `name in klass.prototype` vs `name in superklass.prototype` — the prototype chain check replaces Method#owner introspection."
   },
   {
     "package": "activerecord",

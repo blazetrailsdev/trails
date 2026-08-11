@@ -3286,6 +3286,12 @@ export class PostgreSQLAdapter
    * (XmlData, BitData, Range, ArrayData) fall through to the base dispatch.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote
+   *
+   * @missingRailsCall check_int_in_range — Equivalent (RFC 0072
+   *   activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is
+   *   a bare alias — `export const checkIntInRange = checkIntegerRange` — so the
+   *   routed call is the alias target and the extractor never sees the alias
+   *   name. Nothing to converge.
    */
   override quote(value: unknown): string {
     // `.call(this)` so the inherited date/time dispatch resolves to this
@@ -3297,6 +3303,15 @@ export class PostgreSQLAdapter
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_string
    * (postgresql/quoting.rb:127-131) — escape-only, so the inherited `quote`
    * dispatches here instead of the abstract backslash-doubling escape.
+   *
+   * @missingRailsCall with_raw_connection — Language shortcoming: Rails'
+   *   quote_string escapes through the live connection (`with_raw_connection {
+   *   |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres
+   *   exposes no escape entry point at all — sync or async — and `quote_string`
+   *   is a sync method every `quote` call site depends on. The override
+   *   reproduces libpq's standard_conforming_strings escaping inline in
+   *   postgresql/quoting.ts (same divergence already baselined for that module's
+   *   quote_string).
    */
   override quoteString(s: string): string {
     return pgQuoteString(s);
@@ -3447,6 +3462,14 @@ export class PostgreSQLAdapter
     );
   }
 
+  /**
+   * @missingRailsCall values_at — Per-entry verified (RFC 0072
+   *   converge-pg-extension-cluster-onto-internal-exec-query): Ruby's
+   *   `split(".").values_at(-2, -1)` has no JS analogue;
+   *   postgresql-adapter.ts#enableExtension expresses the identical
+   *   destructuring as `[parts.at(-2) ?? null, parts.at(-1)]`, giving nil-schema
+   *   for a bare name.
+   */
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
     const parts = String(name).split(".");
     const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
@@ -3456,6 +3479,13 @@ export class PostgreSQLAdapter
     await this.reloadTypeMap();
   }
 
+  /**
+   * @missingRailsCall values_at — Per-entry verified (RFC 0072
+   *   converge-pg-extension-cluster-onto-internal-exec-query): Ruby's
+   *   `split(".").values_at(-2, -1)` discards the schema half;
+   *   postgresql-adapter.ts#disableExtension takes `parts.at(-1)` directly,
+   *   which is the same value.
+   */
   async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
     const parts = String(name).split(".");
     const extName = parts.at(-1)!;
@@ -3484,6 +3514,10 @@ export class PostgreSQLAdapter
     return names as string[];
   }
 
+  /**
+   * @missingRailsCall any? — Ruby-ism: `query_values(...).any?` is `names.length
+   *   > 0` in TS; `length` is a property access, not a call.
+   */
   async foreignTableExists(tableName: string): Promise<boolean> {
     if (!tableName) return false;
     const names = await this.queryValues(
@@ -4033,7 +4067,14 @@ export class PostgreSQLAdapter
     ];
   }
 
-  /** @internal postgresql/schema_statements.rb:1051-1056. */
+  /**
+   * @internal postgresql/schema_statements.rb:1051-1056.
+   *
+   * @missingRailsCall new — Rails builds the deferred half of the ALTER with
+   *   `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS
+   *   body uses an arrow function, the JS analogue, so there is no `new` to
+   *   match.
+   */
   async changeColumnForAlter(
     tableName: string,
     columnName: string,
@@ -4049,7 +4090,14 @@ export class PostgreSQLAdapter
     return sqls;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   *
+   * @missingRailsCall new — Rails builds the deferred half of the ALTER with
+   *   `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS
+   *   body uses an arrow function, the JS analogue, so there is no `new` to
+   *   match.
+   */
   changeColumnNullForAlter(
     tableName: string,
     columnName: string,

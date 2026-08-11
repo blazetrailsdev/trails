@@ -823,6 +823,13 @@ export class AbstractAdapter implements Quoting {
    */
   static dbWarningsIgnore: (string | RegExp)[] = [];
 
+  /**
+   * @missingRailsCall disable_prepared_statements — Bucket (b): Rails reads
+   *   `ActiveRecord.disable_prepared_statements` inline in `initialize`
+   *   (abstract_adapter.rb:159); the port applies it in the `preparedStatements`
+   *   setter (abstract-adapter.ts:1058), the chokepoint the constructor and
+   *   every (re-)establishConnection flow through.
+   */
   constructor() {
     // The module-level `include(...)` / callback / query-cache wiring is applied
     // lazily on first construction rather than at module-evaluation time. This

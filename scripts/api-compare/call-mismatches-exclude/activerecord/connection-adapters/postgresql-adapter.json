@@ -30,20 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "change_column_for_alter",
-    "call": "new",
-    "reason": "Rails builds the deferred half of the ALTER with `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS body uses an arrow function, the JS analogue, so there is no `new` to match."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "change_column_null_for_alter",
-    "call": "new",
-    "reason": "Rails builds the deferred half of the ALTER with `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS body uses an arrow function, the JS analogue, so there is no `new` to match."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -86,13 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "disable_extension",
-    "call": "values_at",
-    "reason": "Per-entry verified (RFC 0072 converge-pg-extension-cluster-onto-internal-exec-query): Ruby's `split(\".\").values_at(-2, -1)` discards the schema half; postgresql-adapter.ts#disableExtension takes `parts.at(-1)` directly, which is the same value."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "disable_referential_integrity",
     "call": "collect",
     "reason": "The body lives in postgresql/referential-integrity.ts — Rails houses it in the ReferentialIntegrity module too (postgresql/referential_integrity.rb:5-36) — and makes both calls there; the adapter member is the include seam."
@@ -103,13 +82,6 @@
     "rubyName": "disable_referential_integrity",
     "call": "quote_table_name",
     "reason": "The body lives in postgresql/referential-integrity.ts — Rails houses it in the ReferentialIntegrity module too (postgresql/referential_integrity.rb:5-36) — and makes both calls there; the adapter member is the include seam."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "enable_extension",
-    "call": "values_at",
-    "reason": "Per-entry verified (RFC 0072 converge-pg-extension-cluster-onto-internal-exec-query): Ruby's `split(\".\").values_at(-2, -1)` has no JS analogue; postgresql-adapter.ts#enableExtension expresses the identical destructuring as `[parts.at(-2) ?? null, parts.at(-1)]`, giving nil-schema for a bare name."
   },
   {
     "package": "activerecord",
@@ -168,13 +140,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "foreign_table_exists?",
-    "call": "any?",
-    "reason": "Ruby-ism: `query_values(...).any?` is `names.length > 0` in TS; `length` is a property access, not a call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "foreign_tables",
     "call": "data_source_sql",
     "kind": "args",
@@ -224,20 +189,6 @@
     "rubyName": "prepare_statement",
     "call": "translate_exception_class",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quote",
-    "call": "check_int_in_range",
-    "reason": "Equivalent (RFC 0072 activerecord-unrouted-privates-remaining-inventory): `checkIntInRange` is a bare alias — `export const checkIntInRange = checkIntegerRange` — so the routed call is the alias target and the extractor never sees the alias name. Nothing to converge."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quote_string",
-    "call": "with_raw_connection",
-    "reason": "Language shortcoming: Rails' quote_string escapes through the live connection (`with_raw_connection { |c| c.escape(s) }`, postgresql/quoting.rb:127-131), but node-postgres exposes no escape entry point at all — sync or async — and `quote_string` is a sync method every `quote` call site depends on. The override reproduces libpq's standard_conforming_strings escaping inline in postgresql/quoting.ts (same divergence already baselined for that module's quote_string)."
   },
   {
     "package": "activerecord",

@@ -3,7 +3,10 @@ import * as os from "os";
 import * as path from "path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  ANY_CLASS,
+  type MethodExpectation,
   DEFAULT_TAG_REASON,
+  expectationKey,
   parseJsdoc,
   reconcile,
   reconcileFileText,
@@ -13,6 +16,14 @@ import {
 } from "./build.js";
 import { serializeBaseline } from "./baseline-json.js";
 import { NARROW_DEFAULT_REASON } from "./missing-rails-call-tags.js";
+
+/** One expectation under {@link ANY_CLASS} — the key a `tsClass`-less artifact
+ *  row produces, which reconciles every declaration of the name in the file. */
+const anyClass = (
+  tsName: string,
+  rubyNames: string[],
+  calls: Set<string>,
+): [string, MethodExpectation] => [expectationKey(ANY_CLASS, tsName), { rubyNames, tsName, calls }];
 
 const reasonFor = () => DEFAULT_TAG_REASON;
 
@@ -141,8 +152,8 @@ const FILE = [
 describe("reconcileFileText", () => {
   it("reconciles: drops satisfied tags, adds tags, creates missing JSDoc", () => {
     const expectations = new Map([
-      ["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }],
-      ["baz", { rubyNames: ["baz"], calls: new Set(["reload"]) }],
+      anyClass("bar", ["bar"], new Set(["save"])),
+      anyClass("baz", ["baz"], new Set(["reload"])),
     ]);
     const { text, harvested } = reconcileFileText("foo.ts", FILE, expectations, () => "why");
     expect(text).not.toBeNull();
@@ -158,7 +169,7 @@ describe("reconcileFileText", () => {
 
   it("produces zero edits when every missing call is still baselined by placeholder", () => {
     const src = ["export class Foo {", "  bar(): void {}", "}"].join("\n");
-    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const r = reconcileFileText("foo.ts", src, expectations, () => DEFAULT_TAG_REASON);
     expect(r.text).toBeNull();
     expect(r.skipped).toEqual(["save"]);
@@ -172,7 +183,7 @@ describe("reconcileFileText", () => {
       "  bar(): void {}",
       "}",
     ].join("\n");
-    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const r = reconcileFileText("foo.ts", src, expectations, () => DEFAULT_TAG_REASON);
     expect(r.text).toBeNull();
   });
@@ -184,8 +195,8 @@ describe("reconcileFileText", () => {
 
   it("is idempotent: a second run produces zero edits", () => {
     const expectations = new Map([
-      ["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }],
-      ["baz", { rubyNames: ["baz"], calls: new Set(["reload"]) }],
+      anyClass("bar", ["bar"], new Set(["save"])),
+      anyClass("baz", ["baz"], new Set(["reload"])),
     ]);
     const first = reconcileFileText("foo.ts", FILE, expectations, () => "why").text!;
     const second = reconcileFileText("foo.ts", first, expectations, () => "why");
@@ -194,9 +205,7 @@ describe("reconcileFileText", () => {
 
   it("reconciles set accessors (extract-ts-api extracts them into the artifact)", () => {
     const src = ["export class Foo {", "  set name(v: string) {}", "}"].join("\n");
-    const expectations = new Map([
-      ["name", { rubyNames: ["name="], calls: new Set(["write_attribute"]) }],
-    ]);
+    const expectations = new Map([anyClass("name", ["name="], new Set(["write_attribute"]))]);
     const { text } = reconcileFileText("foo.ts", src, expectations, () => "why");
     expect(text!).toContain("@missingRailsCall write_attribute — why");
   });
@@ -207,9 +216,7 @@ describe("reconcileFileText", () => {
     const reason =
       "Per-entry verified (RFC 0032): Rails core.rb caches `klass.primary_key` into " +
       "@primary_key and calls `klass.define_attribute_methods`; neither call appears here.";
-    const expectations = new Map([
-      ["bar", { rubyNames: ["bar"], calls: new Set(["primary_key"]) }],
-    ]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["primary_key"]))]);
     const first = reconcileFileText("foo.ts", src, expectations, () => reason).text!;
     const second = reconcileFileText("foo.ts", first, expectations, () => reason);
     expect(second.text).toBeNull();
@@ -221,8 +228,8 @@ describe("reconcileFileText", () => {
   it("tags constructors (Ruby initialize) and reports unmatched expectations", () => {
     const src = ["export class Foo {", "  constructor() {}", "}"].join("\n");
     const expectations = new Map([
-      ["constructor", { rubyNames: ["initialize"], calls: new Set(["super"]) }],
-      ["prototypePatched", { rubyNames: ["patched"], calls: new Set(["save"]) }],
+      anyClass("constructor", ["initialize"], new Set(["super"])),
+      anyClass("prototypePatched", ["patched"], new Set(["save"])),
     ]);
     const { text, unmatched } = reconcileFileText("foo.ts", src, expectations, () => "why");
     expect(text!).toContain("@missingRailsCall super — why");
@@ -235,7 +242,9 @@ describe("reconcileFileText", () => {
       "export function f(a: number): void;",
       "export function f(a: unknown): void {}",
     ].join("\n");
-    const expectations = new Map([["f", { rubyNames: ["f"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([
+      [expectationKey(ANY_CLASS, "f"), { rubyNames: ["f"], tsName: "f", calls: new Set(["save"]) }],
+    ]);
     const { text } = reconcileFileText("foo.ts", src, expectations, () => "why");
     expect(text!.match(/@missingRailsCall save/g)).toHaveLength(1);
     expect(text!.indexOf("@missingRailsCall")).toBeGreaterThan(text!.indexOf("f(a: number)"));
@@ -274,8 +283,8 @@ describe("reconcileFileText", () => {
 describe("reconcileFileText baseline migration", () => {
   it("reports every justified (rubyName, call) so the baseline row can be dropped", () => {
     const expectations = new Map([
-      ["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }],
-      ["baz", { rubyNames: ["baz"], calls: new Set(["reload"]) }],
+      anyClass("bar", ["bar"], new Set(["save"])),
+      anyClass("baz", ["baz"], new Set(["reload"])),
     ]);
     const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => "why");
     expect(tagged).toEqual([
@@ -285,10 +294,62 @@ describe("reconcileFileText baseline migration", () => {
   });
 
   it("reports a KEPT tag too — an already-tagged call owes no baseline row", () => {
-    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const first = reconcileFileText("foo.ts", FILE, expectations, () => "why").text!;
     const { tagged } = reconcileFileText("foo.ts", first, expectations, () => "why");
     expect(tagged).toEqual([{ rubyName: "bar", call: "save" }]);
+  });
+});
+
+describe("class-qualified expectations", () => {
+  // Two same-named methods in one file, as `connection-pool.ts` has:
+  // Rails' NullPool takes no mutex and defines no `checkout` at all
+  // (connection_adapters/abstract/connection_pool.rb:14-42), so only
+  // ConnectionPool's copy is the artifact's match.
+  const src = [
+    "export class ConnectionPool {",
+    "  checkout(): void {}",
+    "}",
+    "",
+    "export class NullPool {",
+    "  checkout(): void {}",
+    "}",
+  ].join("\n");
+  const artifact = {
+    packages: ["activerecord"],
+    mismatches: [
+      {
+        package: "activerecord",
+        tsFile: "connection-pool.ts",
+        rubyName: "checkout",
+        tsName: "checkout",
+        tsClass: "ConnectionPool",
+        missing: ["synchronize → synchronize"],
+      },
+    ],
+  };
+
+  it("mints the tag only on the class the artifact matched", () => {
+    const expectations = buildExpectations(artifact, "activerecord").get("connection-pool.ts")!;
+    const { text } = reconcileFileText("connection-pool.ts", src, expectations, () => "why");
+    expect(text).not.toBeNull();
+    expect(text!.match(/@missingRailsCall synchronize/g)).toHaveLength(1);
+    expect(text!).toContain(
+      ["export class ConnectionPool {", "  /**", "   * @missingRailsCall synchronize — why"].join(
+        "\n",
+      ),
+    );
+    expect(text!).toContain(["export class NullPool {", "  checkout(): void {}"].join("\n"));
+  });
+
+  it("reconciles every declaration of the name when the artifact resolved no class", () => {
+    const unqualified = {
+      ...artifact,
+      mismatches: [{ ...artifact.mismatches[0], tsClass: undefined }],
+    };
+    const expectations = buildExpectations(unqualified, "activerecord").get("connection-pool.ts")!;
+    const { text } = reconcileFileText("connection-pool.ts", src, expectations, () => "why");
+    expect(text!.match(/@missingRailsCall synchronize/g)).toHaveLength(2);
   });
 });
 
@@ -319,7 +380,7 @@ describe("buildExpectations", () => {
   it("keeps a suppressed call expected, so the tag that earned it survives", () => {
     const calls = buildExpectations(artifact, "arel")
       .get("insert-manager.ts")!
-      .get("insert")!.calls;
+      .get(expectationKey(ANY_CLASS, "insert"))!.calls;
     expect([...calls].sort()).toEqual(["each", "first"]);
   });
 
@@ -329,13 +390,13 @@ describe("buildExpectations", () => {
   });
 
   it("leaves a placeholder-reasoned row in the baseline — it justifies nothing", () => {
-    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => DEFAULT_TAG_REASON);
     expect(tagged).toEqual([]);
   });
 
   it("mints no tag for a narrow-seeded row either, matching the wide policy", () => {
-    const expectations = new Map([["bar", { rubyNames: ["bar"], calls: new Set(["save"]) }]]);
+    const expectations = new Map([anyClass("bar", ["bar"], new Set(["save"]))]);
     const { text, tagged, skipped } = reconcileFileText(
       "foo.ts",
       FILE,
@@ -367,16 +428,16 @@ describe("buildExpectations", () => {
         },
       ],
     };
-    const exp = buildExpectations(twoNames, "arel").get("insert-manager.ts")!.get("insert")!;
+    const exp = buildExpectations(twoNames, "arel")
+      .get("insert-manager.ts")!
+      .get(expectationKey(ANY_CLASS, "insert"))!;
     expect(exp.rubyNames).toEqual(["insert", "insert_all"]);
   });
 });
 
 describe("reconcileFileText with two Ruby names on one TS method", () => {
   it("drops the baseline row of each Ruby name a justified tag covers", () => {
-    const expectations = new Map([
-      ["bar", { rubyNames: ["bar", "bar_all"], calls: new Set(["save"]) }],
-    ]);
+    const expectations = new Map([anyClass("bar", ["bar", "bar_all"], new Set(["save"]))]);
     const { tagged } = reconcileFileText("foo.ts", FILE, expectations, () => "why");
     expect(tagged).toEqual([
       { rubyName: "bar", call: "save" },
@@ -385,9 +446,7 @@ describe("reconcileFileText with two Ruby names on one TS method", () => {
   });
 
   it("seeds a new tag from whichever Ruby name has curated prose", () => {
-    const expectations = new Map([
-      ["bar", { rubyNames: ["bar", "bar_all"], calls: new Set(["save"]) }],
-    ]);
+    const expectations = new Map([anyClass("bar", ["bar", "bar_all"], new Set(["save"]))]);
     const { text } = reconcileFileText("foo.ts", FILE, expectations, (rubyName) =>
       rubyName === "bar_all" ? "curated" : DEFAULT_TAG_REASON,
     );
