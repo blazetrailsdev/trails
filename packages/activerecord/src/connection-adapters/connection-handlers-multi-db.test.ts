@@ -49,9 +49,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
     handler = new ConnectionHandler();
     const dbConfig = new HashConfig("test", connectionName, sqliteDb("primary"));
-    rwPool = handler.establishConnection(dbConfig, { owner: connectionName });
+    rwPool = handler.establishConnection(dbConfig, { ownerName: connectionName });
     roPool = handler.establishConnection(dbConfig, {
-      owner: connectionName,
+      ownerName: connectionName,
       role: "reading",
     });
   });

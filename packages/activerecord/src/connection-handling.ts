@@ -152,7 +152,7 @@ export function connectsTo(
         : Promise.resolve(null);
       adapterReady.catch(() => {});
       const pool = this.connectionHandler.establishConnection(dbConfig, {
-        owner: this.connectionClassForSelf(),
+        ownerName: this.connectionClassForSelf(),
         role,
         shard,
         adapterFactory: () => {
@@ -255,8 +255,12 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   // at read time in core.ts#matchesStack, so a `connected_to_many` scope
   // doesn't leak across abstract subclasses that happen to share a CCFS.
   const klasses = new Set<any>(normalized);
-  const entry = { role, shard, preventWrites, klasses };
-  appendToConnectedToStack(entry);
+  // Rails unwinds with `connected_to_stack.pop` (connection_handling.rb:177);
+  // trails' unwind runs through `withCleanup` around a possibly-async body, so
+  // it removes this specific entry by identity instead — hence capturing the
+  // literal here rather than popping. The argument itself is Rails'.
+  let entry!: Parameters<typeof appendToConnectedToStack>[0];
+  appendToConnectedToStack((entry = { role, shard, preventWrites, klasses }));
 
   let result: T;
   try {
@@ -680,13 +684,15 @@ export function withRoleAndShard<T>(
   // read time. Pushing the pre-resolved CCFS would leak a scope opened on
   // an abstract subclass without `connectsTo` (so CCFS walks up to Base)
   // into every pool.
-  const entry = {
-    role,
-    shard,
-    preventWrites: resolvedPreventWrites,
-    klasses: new Set<any>([this]),
-  };
-  appendToConnectedToStack(entry);
+  let entry!: Parameters<typeof appendToConnectedToStack>[0];
+  appendToConnectedToStack(
+    (entry = {
+      role,
+      shard,
+      preventWrites: resolvedPreventWrites,
+      klasses: new Set<any>([this]),
+    }),
+  );
 
   let result: T;
   try {
@@ -958,7 +964,7 @@ async function establishWithConfig(
   const shard = coreCurrentShard.call(modelClass as any);
 
   modelClass.connectionHandler.establishConnection(dbConfig, {
-    owner: modelClass.connectionClassForSelf(),
+    ownerName: modelClass.connectionClassForSelf(),
     role,
     shard,
     adapterFactory: () =>

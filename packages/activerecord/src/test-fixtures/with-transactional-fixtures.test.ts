@@ -64,7 +64,7 @@ describe("withTransactionalFixtures", () => {
     // ConnectionHandler#establish_connection (connection_handler.rb:149).
     const pool = Base.connectionHandler.establishConnection(
       { adapter: "sqlite3", database: ":memory:" },
-      { owner: "MidTestPool" },
+      { ownerName: "MidTestPool" },
     );
     // The subscriber's pin/lease is async, so let its microtasks settle.
     await Promise.resolve();

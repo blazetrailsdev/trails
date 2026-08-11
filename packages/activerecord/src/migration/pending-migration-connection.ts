@@ -29,7 +29,7 @@ export class PendingMigrationConnection {
     dbConfig: DatabaseConfig,
     block: (pool: ConnectionPool) => Promise<T> | T,
   ): Promise<T> {
-    const pool = connectionHandler().establishConnection(dbConfig, { owner: this.name });
+    const pool = connectionHandler().establishConnection(dbConfig, { ownerName: this });
     try {
       return await block(pool);
     } finally {
@@ -37,7 +37,7 @@ export class PendingMigrationConnection {
     }
   }
 
-  static isPrimaryClass(): boolean {
+  static primaryClassQ(): boolean {
     return false;
   }
 

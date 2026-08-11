@@ -151,7 +151,9 @@ export class Encryptor {
     encryptedText: string,
     options?: {
       keyProvider?: KeyProviderLike;
-      key?: string;
+      // Rails' `cipher.decrypt(message, key: keys.collect(&:secret))` takes the
+      // whole rotation set (cipher.rb:20), so `key` accepts an array too.
+      key?: string | string[];
       // cipher_options is accepted for API symmetry with encrypt() but unused today —
       // deterministic IV is read from message headers rather than cipher_options on decrypt.
       cipherOptions?: Record<string, unknown>;
@@ -174,7 +176,7 @@ export class Encryptor {
     if (options?.keyProvider) {
       keys = options.keyProvider.decryptionKeys(message).map((k) => k.secret);
     } else if (options?.key !== undefined) {
-      keys = [options.key];
+      keys = Array.isArray(options.key) ? options.key : [options.key];
     } else {
       const kp = this.defaultKeyProvider();
       if (!kp) throw new Decryption("No decryption key provided");

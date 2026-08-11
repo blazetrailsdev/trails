@@ -29,7 +29,7 @@ const COLUMN_NAME_WITH_ORDER =
   /^\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?[\w,\s]*)\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*\s*$/i;
 
 export interface InsertAllOptions {
-  onDuplicate?: "skip" | "update" | Nodes.SqlLiteral;
+  onDuplicate?: "raise" | "skip" | "update" | Nodes.SqlLiteral;
   updateOnly?: string | string[];
   uniqueBy?: string | string[];
   returning?: string | string[] | Nodes.SqlLiteral | false;
@@ -50,7 +50,7 @@ export class InsertAll {
   uniqueBy: string | string[] | IndexDefinition | undefined;
   returning: string | string[] | Nodes.SqlLiteral | false | undefined;
 
-  onDuplicate: "skip" | "update" | Nodes.SqlLiteral | undefined;
+  onDuplicate: "raise" | "skip" | "update" | Nodes.SqlLiteral | undefined;
   updateOnly: string | string[] | undefined;
   updateSql: Nodes.SqlLiteral | undefined;
 

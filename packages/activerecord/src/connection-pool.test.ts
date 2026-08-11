@@ -378,7 +378,7 @@ it("connection notification is called", async () => {
   });
   try {
     const dbConfig = new HashConfig("test", "primary", ambientPoolConfiguration());
-    Base.connectionHandler.establishConnection(dbConfig, { owner: ConnectionTestModel });
+    Base.connectionHandler.establishConnection(dbConfig, { ownerName: ConnectionTestModel });
     expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
     expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);

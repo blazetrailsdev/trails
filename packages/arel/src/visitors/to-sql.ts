@@ -198,8 +198,7 @@ export class ToSql extends Visitor {
     // dispatch is typed against `SQLString`, so cast at the boundary as the rest
     // of this file does.
     if (collector !== undefined) {
-      const c = collector as unknown as SQLString;
-      this.accept(node, c);
+      this.accept(node, collector as unknown as SQLString);
       return collector.value;
     }
     // Mirrors Rails `compile` defaulting to a plain `SQLString` (to_sql.rb:17):
@@ -368,9 +367,7 @@ export class ToSql extends Visitor {
       collector.append(" ");
     }
 
-    for (const x of o.cores) {
-      this.visitArelNodesSelectCore(x, collector);
-    }
+    collector = o.cores.reduce((c, x) => this.visitArelNodesSelectCore(x, c), collector);
 
     if (o.orders.length > 0) {
       collector.append(" ORDER BY ");

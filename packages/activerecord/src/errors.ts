@@ -78,8 +78,13 @@ export class AdapterError extends ActiveRecordError {
 export class ConnectionNotEstablished extends AdapterError {
   private _poolSet: boolean;
 
-  constructor(message?: string, options?: { connectionPool?: unknown; cause?: unknown }) {
-    super(message, options);
+  // Rails builds this one from the driver exception rather than a message
+  // string (`sqlite3_adapter.rb:704`, `ConnectionNotEstablished.new(exception,
+  // connection_pool: @pool)`); Ruby's `Exception.new` takes any object and
+  // `to_s`es it, so accept an Error here and keep it as the cause.
+  constructor(message?: string | Error, options?: { connectionPool?: unknown; cause?: unknown }) {
+    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
+    super(message instanceof Error ? message.message : message, { ...options, cause });
     this.name = "ConnectionNotEstablished";
     this._poolSet = options?.connectionPool !== undefined;
   }

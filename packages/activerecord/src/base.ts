@@ -1301,6 +1301,9 @@ export class Base extends Model {
     return _Core.arelTable.call(this);
   }
 
+  /** Mirrors: ActiveRecord::Base.type_caster (core.rb:399-401). */
+  static typeCaster = _Core.typeCaster;
+
   /**
    * Returns the model's predicate builder, creating it if necessary.
    * Use this to register custom value handlers:

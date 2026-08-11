@@ -59,10 +59,12 @@ export class EnvelopeEncryptionKeyProvider {
   private decryptDataKey(encryptedMessage: Message): string | null {
     const encryptedDataKey = headerString(encryptedMessage.headers.encryptedDataKey);
     if (!encryptedDataKey) return null;
+    const key = this.primaryKeyProvider()
+      .decryptionKeys(encryptedMessage)
+      ?.map((k) => k.secret);
+    if (!key || key.length === 0) return null;
     try {
-      return new Encryptor({ compress: false }).decrypt(encryptedDataKey, {
-        keyProvider: this.primaryKeyProvider(),
-      });
+      return new Encryptor({ compress: false }).decrypt(encryptedDataKey, { key });
     } catch (e) {
       if (e instanceof Decryption) return null;
       throw e;

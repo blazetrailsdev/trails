@@ -4443,13 +4443,13 @@ export class Relation<T extends Base> {
     errorOnIgnore?: boolean;
   } = {}): AsyncGenerator<T[]> {
     for await (const batchRel of this.inBatches({
-      batchSize,
+      of: batchSize,
       start,
       finish,
-      order,
-      cursor,
-      errorOnIgnore,
       load: true,
+      errorOnIgnore,
+      cursor,
+      order,
     })) {
       yield ((batchRel as any)._records ?? []) as T[];
     }
@@ -4498,7 +4498,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Batches#in_batches
    */
   inBatches({
-    batchSize = 1000,
+    of = 1000,
     start,
     finish,
     order,
@@ -4507,7 +4507,7 @@ export class Relation<T extends Base> {
     load = false,
     useRanges,
   }: {
-    batchSize?: number;
+    of?: number;
     start?: unknown;
     finish?: unknown;
     order?: "asc" | "desc" | ("asc" | "desc")[];
@@ -4533,11 +4533,11 @@ export class Relation<T extends Base> {
     const batchOrders = _buildBatchOrders(cursorArr, order as any);
 
     let remaining: number | null = null;
-    let effectiveBatchSize = batchSize;
+    let effectiveBatchSize = of;
     if (this._limitValue !== null) {
       remaining = this._limitValue;
       if (remaining === 0) {
-        return new BatchEnumerator(async function* () {}, batchSize, {
+        return new BatchEnumerator(async function* () {}, of, {
           start,
           finish,
           relation: self,
@@ -5845,10 +5845,11 @@ export class Relation<T extends Base> {
    * `def insert_all!(attributes, returning: nil, record_timestamps: nil)`).
    */
   async insertAllBang(
-    records: Record<string, unknown>[],
+    attributes: Record<string, unknown>[],
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
   ): Promise<Result> {
-    return InsertAll.execute(this, records, {
+    return InsertAll.execute(this, attributes, {
+      onDuplicate: "raise",
       returning: options?.returning,
       recordTimestamps: options?.recordTimestamps,
     });

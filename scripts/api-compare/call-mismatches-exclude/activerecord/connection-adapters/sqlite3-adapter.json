@@ -23,19 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "commit_db_transaction",
-    "call": "internal_execute",
-    "kind": "args",
-    "rubyArgs": [
-      "str:COMMIT TRANSACTION",
-      "str:TRANSACTION",
-      "kwargs{allowRetry=bool:true,materializeTransactions=bool:false}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "configure_connection",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -159,19 +146,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "internal_begin_transaction",
-    "call": "internal_execute",
-    "kind": "args",
-    "rubyArgs": [
-      "str:PRAGMA read_uncommitted=ON",
-      "str:TRANSACTION",
-      "kwargs{allowRetry=bool:true,materializeTransactions=bool:false}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "new_client",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -274,22 +248,10 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [
-      "ref:exception",
-      "kwargs{connectionPool=ref:pool}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "translate_exception",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
       "ref:message",
       "kwargs{binds=ref:binds,connectionPool=ref:pool,sql=ref:sql}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: sqlite3_adapter.rb:698-702 pass no `cause:` — Ruby sets Exception#cause implicitly from `$!` at the `raise` site, which JS does not, so the driver error has to be threaded through the constructor to keep the chain."
   },
   {
     "package": "activerecord",

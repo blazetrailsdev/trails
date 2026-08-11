@@ -156,7 +156,7 @@ describe("Thenable", () => {
 
   describe("BatchEnumerator", () => {
     it("BatchEnumerator is directly awaitable", async () => {
-      const batches = await Author.all().inBatches({ batchSize: 2 });
+      const batches = await Author.all().inBatches({ of: 2 });
       expect(Array.isArray(batches)).toBe(true);
       expect(batches.length).toBeGreaterThan(0);
     });

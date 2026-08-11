@@ -207,7 +207,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           database: databases[name],
           ...(replica ? { replica: true } : {}),
         }),
-        { owner: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
+        { ownerName: "Base", role, shard, adapterFactory: () => new BetterSQLite3Adapter() },
       );
 
     try {
@@ -314,7 +314,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it("retrieve connection pool with invalid shard", async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "Base", { adapter: "sqlite3", database: dbPath("arunit.sqlite3") }),
-      { owner: "Base" },
+      { ownerName: "Base" },
     );
     expect(Base.connectionHandler.retrieveConnectionPool("Base")).not.toBeUndefined();
     expect(Base.connectionHandler.retrieveConnectionPool("Base", { shard: "foo" })).toBeUndefined();
@@ -404,7 +404,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     const makePool = (shard: string) =>
       Base.connectionHandler.establishConnection(
         new HashConfig("test", shard, { adapter: "sqlite3", database: databases[shard] }),
-        { owner: "Base", role: "writing", shard },
+        { ownerName: "Base", role: "writing", shard },
       );
     try {
       makePool("default");
@@ -422,7 +422,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it("can swap roles while shard swapping is prohibited", async () => {
     Base.connectionHandler.establishConnection(
       new HashConfig("test", "Base", { adapter: "sqlite3", database: dbPath("primary.sqlite3") }),
-      { owner: "Base", role: "reading", shard: "default" },
+      { ownerName: "Base", role: "reading", shard: "default" },
     );
     expect(() => {
       Base.prohibitShardSwapping(() => {
@@ -490,7 +490,12 @@ describe("ConnectionHandlersShardingDbTest", () => {
     const makePool = (owner: string, shard: string) =>
       Base.connectionHandler.establishConnection(
         new HashConfig("test", owner, { adapter: "sqlite3", database: ":memory:" }),
-        { owner, role: "writing", shard, adapterFactory: () => new BetterSQLite3Adapter() },
+        {
+          ownerName: owner,
+          role: "writing",
+          shard,
+          adapterFactory: () => new BetterSQLite3Adapter(),
+        },
       );
 
     try {
@@ -548,7 +553,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       Base.connectionHandler.establishConnection(
         new HashConfig("test", "SecondaryBase", { adapter: "sqlite3", database: ":memory:" }),
         {
-          owner: "SecondaryBase",
+          ownerName: "SecondaryBase",
           role: "writing",
           shard,
           adapterFactory: () => new BetterSQLite3Adapter(),

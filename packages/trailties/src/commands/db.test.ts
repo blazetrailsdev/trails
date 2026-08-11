@@ -58,7 +58,7 @@ async function establishMigrationConnection(
     ...extra,
   });
   const pool = Base.connectionHandler.establishConnection(config, {
-    owner: Base,
+    ownerName: Base,
     clobber: true,
     adapterFactory: () => adapter as never,
   });
