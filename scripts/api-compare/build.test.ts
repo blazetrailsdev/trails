@@ -91,6 +91,16 @@ describe("reconcile", () => {
     expect(r.skipped).toEqual(["a"]);
   });
 
+  it("mints only the calls onlyCall names, and still keeps and drops the rest", () => {
+    const { entries } = parseJsdoc("/**\n * @missingRailsCall a — kept note\n */");
+    const r = reconcile(entries, new Set(["a", "b", "c"]), () => "curated", new Set(["b"]));
+    expect(r.added.map((e) => e.call)).toEqual(["b"]);
+    expect(r.skipped).toEqual(["c"]);
+    expect(r.kept.map((e) => e.call)).toEqual(["a"]);
+    const r2 = reconcile(entries, new Set(), () => "curated", new Set(["b"]));
+    expect(r2.dropped.map((e) => e.call)).toEqual(["a"]);
+  });
+
   it("keeps a pre-existing placeholder tag rather than rewriting it", () => {
     const { entries } = parseJsdoc(`/**\n * @missingRailsCall a — ${DEFAULT_TAG_REASON}\n */`);
     const r = reconcile(entries, new Set(["a"]), reasonFor);

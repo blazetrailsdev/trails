@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "active?",
-    "call": "synchronize",
-    "reason": "@lock.synchronize has no counterpart: trails is single-threaded and ports no adapter mutex."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "begin_isolated_db_transaction",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -110,13 +103,6 @@
     "rubyName": "disable_referential_integrity",
     "call": "quote_table_name",
     "reason": "The body lives in postgresql/referential-integrity.ts — Rails houses it in the ReferentialIntegrity module too (postgresql/referential_integrity.rb:5-36) — and makes both calls there; the adapter member is the include seam."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "disconnect!",
-    "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -301,13 +287,6 @@
     "rubyName": "rename_index",
     "call": "order:quoteTableName,execute",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "reset!",
-    "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

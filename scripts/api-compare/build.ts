@@ -28,7 +28,11 @@
  * Method bodies are NEVER edited — only JSDoc blocks.
  *
  * Usage:
- *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--dry-run]
+ *   pnpm parity:api:build --package <pkg> [--file <tsFile>] [--call <ruby_call>] [--dry-run]
+ *
+ * `--call` (repeatable) migrates one cluster of Ruby calls and leaves every
+ * other flagged call baselined, so a source file whose curated rows mix a
+ * permanent cluster with unrelated tracked debt migrates the cluster alone.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception, matching lint-call-mismatches.ts).
@@ -122,11 +126,19 @@ export interface ReconcileResult {
  *  so it would only add inert prose to a source file while the reason kept
  *  living in the baseline JSON. The generator therefore only ever writes
  *  load-bearing tags, and a tree whose deviations are all still baselined
- *  reconciles to zero edits. */
+ *  reconciles to zero edits.
+ *
+ *  `onlyCall` narrows what a run MINTS to one cluster of Ruby calls (the
+ *  `--call` flag): a call outside it is left baselined exactly as an
+ *  unjustified one is, so a source file whose curated rows are a permanent
+ *  cluster plus unrelated tracked debt migrates the cluster alone. It never
+ *  narrows what a run KEEPS or DROPS — an existing tag outside the filter is
+ *  reconciled as usual, so a filtered run stays idempotent. */
 export function reconcile(
   existing: TagEntry[],
   expected: ReadonlySet<string>,
   reasonFor: (call: string) => string,
+  onlyCall?: ReadonlySet<string>,
 ): ReconcileResult {
   const byCall = new Map(existing.map((e) => [e.call, e]));
   const kept: TagEntry[] = [];
@@ -139,7 +151,8 @@ export function reconcile(
       continue;
     }
     const reason = reasonFor(call).trim();
-    if (!justifies(reason)) skipped.push(call);
+    if (onlyCall && !onlyCall.has(call)) skipped.push(call);
+    else if (!justifies(reason)) skipped.push(call);
     else added.push({ call, reason, rawLines: [] });
   }
   const dropped = existing.filter((e) => !expected.has(e.call));
@@ -246,6 +259,7 @@ export function reconcileFileText(
   text: string,
   expectations: Map<string, MethodExpectation>,
   reasonFor: (rubyName: string, call: string) => string,
+  onlyCall?: ReadonlySet<string>,
 ): {
   text: string | null;
   harvested: { tsName: string; entry: TagEntry }[];
@@ -316,8 +330,11 @@ export function reconcileFileText(
             : undefined,
         );
         const expected = exp?.calls ?? new Set<string>();
-        const r = reconcile(entries, expected, (c) =>
-          exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON,
+        const r = reconcile(
+          entries,
+          expected,
+          (c) => (exp ? firstCuratedReason(exp.rubyNames, c, reasonFor) : DEFAULT_TAG_REASON),
+          onlyCall,
         );
         skipped.push(...r.skipped);
         if (exp) {
@@ -437,6 +454,7 @@ async function main(argv: string[]): Promise<number> {
   const pkg = pkgIdx !== -1 ? argv[pkgIdx + 1] : undefined;
   const fileIdx = argv.indexOf("--file");
   const onlyFile = fileIdx !== -1 ? argv[fileIdx + 1] : undefined;
+  const onlyCall = new Set(argv.flatMap((a, i) => (a === "--call" ? [argv[i + 1]] : [])));
   const dryRun = argv.includes("--dry-run");
   if (!pkg) {
     console.error("parity:api:build: --package <pkg> is required (minimal reconcile-only slice).");
@@ -483,6 +501,7 @@ async function main(argv: string[]): Promise<number> {
         expectations,
         (rubyName, call) =>
           reasons.get(keyOf({ package: pkg, tsFile, rubyName, call })) ?? DEFAULT_TAG_REASON,
+        onlyCall.size > 0 ? onlyCall : undefined,
       );
     } catch (err) {
       console.error(`parity:api:build: ${err instanceof Error ? err.message : String(err)}`);
