@@ -288,7 +288,7 @@
     "rubyArgs": [
       "ref:subquery"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -368,7 +368,7 @@
     "rubyArgs": [
       "ref:name"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -414,7 +414,7 @@
     "rubyArgs": [
       "ref:predicates"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
   },
   {
     "package": "activerecord",

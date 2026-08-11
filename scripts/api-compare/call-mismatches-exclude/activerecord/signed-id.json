@@ -6,7 +6,7 @@
     "call": "underscore",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -75,6 +75,6 @@
       "ref:secret",
       "kwargs{digest=str:SHA256,serializer=const:JSON,urlSafe=bool:true}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
   }
 ]

@@ -57,7 +57,7 @@ export class MySQL extends ToSql {
 
     if (node.orders.length > 0) {
       collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, ", ", collector);
+      this.injectJoin(node.orders, collector, ", ");
     }
 
     if (node.limit) {

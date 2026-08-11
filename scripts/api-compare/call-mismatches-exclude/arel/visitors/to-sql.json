@@ -2,32 +2,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "aggregate",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:expressions",
-      "ref:collector",
-      "str:, "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "collect_nodes_for",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:nodes",
-      "ref:collector",
-      "ref:connector"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "collect_optimizer_hints",
     "call": "maybe_visit",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -38,60 +12,6 @@
     "rubyName": "compile",
     "call": "accept",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "infix_value_with_paren",
-    "call": "grouping_parentheses",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:left",
-      "ref:collector",
-      "bool:false"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "infix_value_with_paren",
-    "call": "grouping_parentheses",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:right",
-      "ref:collector",
-      "bool:false"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "infix_value_with_paren",
-    "call": "infix_value_with_paren",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:left",
-      "ref:collector",
-      "ref:value",
-      "bool:true"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "infix_value_with_paren",
-    "call": "infix_value_with_paren",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:right",
-      "ref:collector",
-      "ref:value",
-      "bool:true"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "arel",
@@ -124,74 +44,9 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Except",
-    "call": "infix_value",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:o",
-      "ref:collector",
-      "str: EXCEPT "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Fragments",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:values",
-      "ref:collector",
-      "str: "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_InsertStatement",
     "call": "maybe_visit",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Intersect",
-    "call": "infix_value",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:o",
-      "ref:collector",
-      "str: INTERSECT "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_JoinSource",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:right",
-      "ref:collector",
-      "str: "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_NamedFunction",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:expressions",
-      "ref:collector",
-      "str:, "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "arel",
@@ -227,37 +82,9 @@
     "call": "collect_nodes_for",
     "kind": "args",
     "rubyArgs": [
-      "ref:havings",
-      "ref:collector",
-      "str: HAVING ",
-      "str: AND "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_SelectCore",
-    "call": "collect_nodes_for",
-    "kind": "args",
-    "rubyArgs": [
       "ref:projections",
       "ref:collector",
       "str: "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_SelectCore",
-    "call": "collect_nodes_for",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:wheres",
-      "ref:collector",
-      "str: WHERE ",
-      "str: AND "
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
@@ -334,19 +161,6 @@
     "rubyName": "visit_Arel_Nodes_Window",
     "call": "collect_nodes_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Window",
-    "call": "inject_join",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:orders",
-      "ref:collector",
-      "str:, "
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "arel",

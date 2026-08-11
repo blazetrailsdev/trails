@@ -23,7 +23,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -404,7 +404,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -754,7 +754,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -861,7 +861,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -900,7 +900,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -961,7 +961,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -973,7 +973,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1013,7 +1013,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1053,7 +1053,7 @@
       "ref:__callee__",
       "ref:tableNames"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1086,7 +1086,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1098,7 +1098,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1110,7 +1110,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1130,7 +1130,7 @@
       "ref:fields",
       "str:Call `select' with at least one field."
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1244,7 +1244,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1350,7 +1350,7 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1362,6 +1362,6 @@
       "ref:__callee__",
       "ref:args"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099 bucket (b) equivalent: Ruby passes `__callee__` (query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`), which has no TS equivalent; the port passes the same value as a literal method-name string and the remaining arguments match Rails exactly."
   }
 ]
