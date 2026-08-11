@@ -15,40 +15,11 @@ export class SQLite extends ToSql {
   }
 
   protected override visitArelNodesSelectStatement(
-    node: Nodes.SelectStatement,
+    o: Nodes.SelectStatement,
     collector: SQLString,
   ): SQLString {
-    if (node.with) {
-      this.visit(node.with, collector);
-      collector.append(" ");
-    }
-
-    for (let i = 0; i < node.cores.length; i++) {
-      if (i > 0) collector.append(" ");
-      this.visit(node.cores[i], collector);
-    }
-
-    if (node.orders.length > 0) {
-      collector.append(" ORDER BY ");
-      this.injectJoin(node.orders, collector, ", ");
-    }
-
-    if (node.limit) {
-      collector.append(" ");
-      this.visit(node.limit, collector);
-    } else if (node.offset) {
-      // SQLite requires LIMIT when using OFFSET; -1 means "no limit".
-      collector.append(" LIMIT -1");
-    }
-
-    if (node.offset) {
-      collector.append(" ");
-      this.visit(node.offset, collector);
-    }
-
-    // SQLite does not support locking; ignore lock clause entirely.
-
-    return collector;
+    if (o.offset && !o.limit) o.limit = new Nodes.Limit(-1);
+    return super.visitArelNodesSelectStatement(o, collector);
   }
 
   protected override visitArelNodesTrue(_node: Nodes.True, collector: SQLString): SQLString {
@@ -62,10 +33,13 @@ export class SQLite extends ToSql {
   }
 
   protected override visitArelNodesIsNotDistinctFrom(
-    node: Nodes.IsNotDistinctFrom,
+    o: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    return this.visitBinaryOp(node, "IS", collector);
+    this.visit(o.left, collector);
+    collector.append(" IS ");
+    this.visit(o.right, collector);
+    return collector;
   }
 
   /**
@@ -75,10 +49,13 @@ export class SQLite extends ToSql {
    * `IS` accordingly.
    */
   protected override visitArelNodesIsDistinctFrom(
-    node: Nodes.IsDistinctFrom,
+    o: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    return this.visitBinaryOp(node, "IS NOT", collector);
+    this.visit(o.left, collector);
+    collector.append(" IS NOT ");
+    this.visit(o.right, collector);
+    return collector;
   }
 
   /**
