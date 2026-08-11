@@ -28,7 +28,15 @@ import { Configurable } from "./configurable.js";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
-import { EncryptableRecord } from "./encryptable-record.js";
+import {
+  EncryptableRecord,
+  decryptAttributes,
+  deterministicEncryptedAttributes,
+  encryptAttributes,
+  encryptedAttributes,
+  encrypts,
+  validateEncryptionAllowed,
+} from "./encryptable-record.js";
 import {
   EncryptedBook,
   EncryptedBookNormalizedFirst,
@@ -207,11 +215,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Post();
     new Author();
-    expect(EncryptableRecord.encryptedAttributes(Post)).toEqual(new Set(["title", "body"]));
-    expect(EncryptableRecord.encryptedAttributes(Author)).toEqual(new Set(["name"]));
-    expect(EncryptableRecord.encryptedAttributes(Post)).not.toEqual(
-      EncryptableRecord.encryptedAttributes(Author),
-    );
+    expect(encryptedAttributes.call(Post)).toEqual(new Set(["title", "body"]));
+    expect(encryptedAttributes.call(Author)).toEqual(new Set(["name"]));
+    expect(encryptedAttributes.call(Post)).not.toEqual(encryptedAttributes.call(Author));
   });
 
   it("deterministic_encrypted_attributes returns the list of deterministic encrypted attributes in a model (each record class holds their own list)", async () => {
@@ -219,8 +225,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost(await freshAdapter());
     new Book();
     new Post();
-    expect(EncryptableRecord.deterministicEncryptedAttributes(Book)).toEqual(new Set(["name"]));
-    expect(EncryptableRecord.deterministicEncryptedAttributes(Post).size).toBe(0);
+    expect(deterministicEncryptedAttributes.call(Book)).toEqual(new Set(["name"]));
+    expect(deterministicEncryptedAttributes.call(Post).size).toBe(0);
   });
 
   it("by default, encryption is not deterministic", async () => {
@@ -843,14 +849,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {
     withEncryptionContext({ frozenEncryption: true }, () => {
-      expect(() => EncryptableRecord.validateEncryptionAllowed({})).toThrow(
+      expect(() => validateEncryptionAllowed.call({})).toThrow(
         "can't be modified because it is encrypted",
       );
     });
   });
 
   it("EncryptableRecord.validateEncryptionAllowed does not throw when encryption is not frozen", () => {
-    expect(() => EncryptableRecord.validateEncryptionAllowed({})).not.toThrow();
+    expect(() => validateEncryptionAllowed.call({})).not.toThrow();
   });
 
   it("EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen adds errors for changed encrypted attrs", async () => {
@@ -888,7 +894,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const post = await Post.create({ title: "Hello", body: "World" });
     await assertEncryptedAttribute(post, "title", "Hello");
     // Re-encrypt: DB gets fresh ciphertext, in-memory stays plaintext.
-    await EncryptableRecord.encryptAttributes(post);
+    await encryptAttributes.call(post);
     expect(post.title).toBe("Hello");
     await assertEncryptedAttribute(await Post.find(post.id), "title", "Hello");
   });
@@ -900,7 +906,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     new Post();
     const post = await Post.create({ title: "Hello", body: "World" });
     await assertEncryptedAttribute(post, "title", "Hello");
-    await EncryptableRecord.decryptAttributes(post);
+    await decryptAttributes.call(post);
     // supportUnencryptedData=true lets the EncryptedAttributeType pass through plaintext.
     const reloaded = await Post.find(post.id);
     expect(reloaded.title).toBe("Hello");
@@ -984,23 +990,23 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
 
   it("wires the case-preserving original_<name> column when ignoreCase is set", () => {
     const modelClass = makeMockModel(["name", "original_name"]);
-    EncryptableRecord.encrypts(modelClass, "name", { deterministic: true, ignoreCase: true });
-    const encrypted = EncryptableRecord.encryptedAttributes(modelClass);
+    encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true });
+    const encrypted = encryptedAttributes.call(modelClass);
     expect(encrypted.has("name")).toBe(true);
     expect(encrypted.has("original_name")).toBe(true);
   });
 
   it("does not wire original_<name> when ignoreCase is absent", () => {
     const modelClass = makeMockModel(["name"]);
-    EncryptableRecord.encrypts(modelClass, "name", { deterministic: true });
-    expect(EncryptableRecord.encryptedAttributes(modelClass).has("original_name")).toBe(false);
+    encrypts.call(modelClass, "name", { deterministic: true });
+    expect(encryptedAttributes.call(modelClass).has("original_name")).toBe(false);
   });
 
   it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {
     Configurable.config.supportUnencryptedData = false;
     const modelClass = makeMockModel(["name"]);
     expect(() =>
-      EncryptableRecord.encrypts(modelClass, "name", { deterministic: true, ignoreCase: true }),
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
     ).toThrow(/must create an additional column named 'original_name'/);
   });
 });

@@ -297,13 +297,16 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * inverse on the built record's class — pre-builds the through join row and
    * wires it onto that inverse so the join is created alongside the target.
    */
-  protected override buildRecord(attributes?: Record<string, unknown>): Base | null {
+  protected override buildRecord(
+    attributes?: Record<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null {
     this.ensureNotNested();
     (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = (
       this as unknown as { scope?: () => unknown }
     ).scope?.();
     try {
-      const record = super.buildRecord(attributes);
+      const record = super.buildRecord(attributes, block);
       if (!record) return record;
       const built = buildThroughInverseFor(this.owner, this.reflection, record);
       if (built) {

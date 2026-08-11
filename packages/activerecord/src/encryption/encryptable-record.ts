@@ -73,29 +73,6 @@ const NOT_CACHED = Symbol("encryption.columnDefault.notCached");
  *   EncryptableRecord.encrypts(User, "email", { deterministic: true })
  */
 export class EncryptableRecord {
-  /**
-   * Declare that attributes should be encrypted. Registers an
-   * EncryptedAttributeType for each named attribute directly into
-   * _attributeDefinitions and notifies Configurable listeners.
-   */
-  static encrypts(modelClass: any, ...namesAndOptions: unknown[]): void {
-    let options: SchemeOptions = {};
-    const names: string[] = [];
-
-    for (const arg of namesAndOptions) {
-      if (typeof arg === "string") {
-        names.push(arg);
-      } else if (typeof arg === "object" && arg !== null) {
-        options = arg as SchemeOptions;
-      }
-    }
-
-    // `encryptAttribute` own-property-guards `_encryptedAttributes` itself.
-    for (const name of names) {
-      this.encryptAttribute(modelClass, name, options);
-    }
-  }
-
   /** @internal */
   static validateColumnSize(modelClass: any, attribute: string): void {
     if (typeof modelClass.validatesLengthOf !== "function") return;
@@ -111,15 +88,6 @@ export class EncryptableRecord {
     if (!alreadyRegistered) {
       modelClass.validatesLengthOf(attribute, { maximum: limit });
     }
-  }
-
-  /** @internal */
-  static hasEncryptedAttributes(modelClass: any): boolean {
-    return (modelClass._encryptedAttributes?.size ?? 0) > 0;
-  }
-
-  static encryptedAttributes(modelClass: any): Set<string> {
-    return modelClass._encryptedAttributes ?? new Set();
   }
 
   /**
@@ -139,86 +107,6 @@ export class EncryptableRecord {
     return attributeName.startsWith(ORIGINAL_ATTRIBUTE_PREFIX)
       ? attributeName.slice(ORIGINAL_ATTRIBUTE_PREFIX.length)
       : undefined;
-  }
-
-  static deterministicEncryptedAttributes(modelClass: any): Set<string> {
-    // Memoized per class like Rails' `@deterministic_encrypted_attributes ||=`
-    // (encryptable_record.rb:58-61); own-property-guarded so STI subclasses
-    // compute their own. Invalidated by `encryptAttribute` on new declarations.
-    if (Object.prototype.hasOwnProperty.call(modelClass, "_deterministicEncryptedAttributes")) {
-      return modelClass._deterministicEncryptedAttributes;
-    }
-    const result = new Set<string>();
-    for (const name of this.encryptedAttributes(modelClass)) {
-      const type = encryptedTypeOf(getAttributeType(modelClass, name));
-      if (type?.deterministic) {
-        result.add(name);
-      }
-    }
-    modelClass._deterministicEncryptedAttributes = result;
-    return result;
-  }
-
-  /**
-   * The single declaration path for encrypted attributes — both `Base.encrypts`
-   * (via encryption.ts#encrypts) and direct callers route through here, mirroring
-   * Rails' single `encrypt_attribute`.
-   *
-   * The scheme is built by `schemeFor` — Rails' one `scheme_for` — inside the
-   * `PendingEncryption` getter, because Rails calls `scheme_for` inside the
-   * `decorate_attributes` block (encryptable_record.rb:85-88).
-   *
-   * @internal
-   */
-  static encryptAttribute(modelClass: any, name: string, options: SchemeOptions = {}): void {
-    // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
-    // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
-    if (!Object.prototype.hasOwnProperty.call(modelClass, "_encryptedAttributes")) {
-      modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
-    }
-    modelClass._encryptedAttributes.add(name);
-    delete modelClass._deterministicEncryptedAttributes;
-
-    const pending: PendingEncryption = {
-      name,
-      get scheme(): Scheme {
-        return schemeFor(options);
-      },
-    };
-
-    if (typeof modelClass.decorateAttributes === "function") {
-      // Durable path (real model classes): push the durable PendingDecorator NOW,
-      // at declaration time, so its position in the pending queue tracks
-      // declaration order relative to `serialize` / `normalizes` — mirroring
-      // Rails, where `encrypts` calls `decorate_attributes` inline
-      // (encryptable_record.rb:87-92) and AttributeRegistration replays in
-      // declaration order. The decorator resolves the column default at replay
-      // time, so it needs no re-push after schema reflection. The
-      // `_pendingEncryptions` buffer remains only for validator re-runs +
-      // frozen-validator install on rebuild (applyPendingEncryptions).
-      this.registerPendingEncryption(modelClass, pending);
-      this.pushEncryptionDecorator(modelClass, name, pending);
-      encryptionHooks.applyPendingEncryptions(modelClass);
-    } else {
-      // Immediate path (plain-object callers without decoration machinery, e.g.
-      // direct `EncryptableRecord.encrypts` tests): register the encrypted type
-      // synchronously so it's readable right after the call.
-      this.registerEncryptedType(modelClass, name, pending.scheme);
-    }
-
-    if (Configurable.config.validateColumnSize) {
-      EncryptableRecord.validateColumnSize(modelClass, name);
-    }
-
-    // Mirrors Rails encryptable_record.rb:94 —
-    // `preserve_original_encrypted(name) if ignore_case`. Wires the
-    // case-preserving `original_<name>` column when the attribute is declared
-    // with ignoreCase, so reads return the true-cased value.
-    if (options.ignoreCase) {
-      this.preserveOriginalEncrypted(modelClass, name);
-    }
-
-    Configurable.encryptedAttributeWasDeclared(modelClass, name);
   }
 
   /**
@@ -364,42 +252,6 @@ export class EncryptableRecord {
   }
 
   /**
-   * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
-   * Declares the case-preserving `original_<name>` encrypted column and
-   * overrides the accessors so reads return the original-cased value.
-   * @internal
-   */
-  static preserveOriginalEncrypted(modelClass: any, name: string): void {
-    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-    // Record the source attribute so the post-reflection hook
-    // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
-    // can re-run the missing-column check against the authoritative DB column
-    // set — closing the fail-open gap when the adapter isn't connected at
-    // declaration time. Own-property guarded like `_encryptedAttributes` so a
-    // subclass declaring ignoreCase doesn't mutate the parent's Set.
-    if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
-      modelClass._ignoreCasePreservedAttributes = new Set<string>(
-        modelClass._ignoreCasePreservedAttributes ?? [],
-      );
-    }
-    modelClass._ignoreCasePreservedAttributes.add(name);
-
-    // Enforce the missing-column requirement against the columns known now.
-    // `columnNames()` forces a schema load when an adapter is connected, so the
-    // check fires for real models; at Base.encrypts static-init with no adapter
-    // it returns [] and requireOriginalColumnPresent defers (see its doc) — the
-    // post-reflection hook above then catches a genuinely absent column.
-    this.requireOriginalColumnPresent(modelClass, name, modelClass.columnNames?.() ?? []);
-
-    // Declare original_<name> with a default scheme, mirroring Rails' bare
-    // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
-    // encryptAttribute's durable branch buffers this in _pendingEncryptions so
-    // the original column rides the same replay-safe machinery as its source.
-    this.encryptAttribute(modelClass, originalName, {});
-    this.overrideAccessorsToPreserveOriginal(modelClass, name, originalName);
-  }
-
-  /**
    * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
    * is absent and `supportUnencryptedData` is false — mirrors Rails
    * encryptable_record.rb:101–103. Checked at declaration time against the
@@ -500,46 +352,6 @@ export class EncryptableRecord {
     }
   }
 
-  /**
-   * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
-   * @internal
-   */
-  static encryptedAttribute(record: any, attributeName: string): boolean {
-    const klass = record.constructor;
-    const name = klass._attributeAliases?.[attributeName] ?? attributeName;
-    if (!this.encryptedAttributes(klass).has(name)) return false;
-    // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
-    // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
-    const type = encryptedTypeOf(klass.typeForAttribute(name));
-    if (!type) return false;
-    return type.isEncrypted(record.readAttributeBeforeTypeCast?.(name));
-  }
-
-  /** @internal */
-  static ciphertextFor(record: any, attributeName: string): unknown {
-    const klass = record.constructor;
-    const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
-    if (this.encryptedAttribute(record, attributeName)) {
-      return record.readAttributeBeforeTypeCast?.(resolvedName);
-    }
-    // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).
-    return record._attributes?.valuesForDatabase?.()?.[resolvedName];
-  }
-
-  /** @internal */
-  static async encrypt(record: any): Promise<void> {
-    if (this.hasEncryptedAttributes(record.constructor)) {
-      await this.encryptAttributes(record);
-    }
-  }
-
-  /** @internal */
-  static async decrypt(record: any): Promise<void> {
-    if (this.hasEncryptedAttributes(record.constructor)) {
-      await this.decryptAttributes(record);
-    }
-  }
-
   /** @internal */
   static _createRecord(record: any, attributeNames?: string[]): unknown {
     // Mirrors Rails: force encrypted attrs into the INSERT column list so a
@@ -551,55 +363,6 @@ export class EncryptableRecord {
       record.constructor._encryptedAttributes ?? new Set<string>();
     const merged = [...new Set<string>([...names, ...encryptedAttrs])];
     return record._createRecord?.(merged);
-  }
-
-  /** @internal */
-  static async encryptAttributes(record: any): Promise<void> {
-    this.validateEncryptionAllowed(record);
-    // Mirrors Rails encrypt_attributes (encryptable_record.rb:187-191):
-    //   update_columns build_encrypt_attribute_assignments
-    // buildEncryptAttributeAssignments returns plaintext values; updateColumns
-    // writes them as the in-memory cast value and serializes each (via
-    // SerializeCastValue.serialize) to ciphertext for the DB write.
-    await record.updateColumns(this.buildEncryptAttributeAssignments(record));
-  }
-
-  /** @internal */
-  static async decryptAttributes(record: any): Promise<void> {
-    this.validateEncryptionAllowed(record);
-    const assignments = this.buildDecryptAttributeAssignments(record);
-    await Contexts.withoutEncryption(() => record.updateColumns(assignments));
-  }
-
-  /** @internal */
-  static validateEncryptionAllowed(_record: any): void {
-    const ctx = Contexts.context;
-    if (ctx.frozenEncryption) {
-      throw new ConfigurationError("can't be modified because it is encrypted");
-    }
-  }
-
-  /** @internal */
-  static buildEncryptAttributeAssignments(record: any): Record<string, unknown> {
-    const klass = record.constructor;
-    const result: Record<string, unknown> = {};
-    for (const name of klass._encryptedAttributes ?? new Set<string>()) {
-      result[name] =
-        typeof record.readAttribute === "function" ? record.readAttribute(name) : record[name];
-    }
-    return result;
-  }
-
-  /** @internal */
-  static buildDecryptAttributeAssignments(record: any): Record<string, unknown> {
-    const klass = record.constructor;
-    const result: Record<string, unknown> = {};
-    for (const name of klass._encryptedAttributes ?? new Set<string>()) {
-      const type = getAttributeType(klass, name) as { deserialize: (v: unknown) => unknown };
-      const encryptedValue = this.ciphertextFor(record, name);
-      result[name] = type.deserialize(encryptedValue);
-    }
-    return result;
   }
 
   /** @internal */
@@ -617,6 +380,292 @@ export class EncryptableRecord {
       }
     }
   }
+}
+
+/**
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord::ClassMethods#encrypts
+ * (encryptable_record.rb:49-55). `this` is the model class, the receiver Ruby's
+ * `class_methods do` block gives the method.
+ */
+export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
+  let options: SchemeOptions = {};
+  const names: string[] = [];
+
+  for (const arg of namesAndOptions) {
+    if (typeof arg === "string") {
+      names.push(arg);
+    } else if (typeof arg === "object" && arg !== null) {
+      options = arg as SchemeOptions;
+    }
+  }
+
+  // `encryptAttribute` own-property-guards `_encryptedAttributes` itself.
+  for (const name of names) {
+    encryptAttribute.call(this, name, options);
+  }
+}
+
+/**
+ * The `class_attribute :encrypted_attributes` reader (encryptable_record.rb:11).
+ * `this` is the model class; the slot is inherited through the prototype chain,
+ * matching `class_attribute`'s subclass visibility.
+ */
+export function encryptedAttributes(this: any): Set<string> {
+  return this._encryptedAttributes ?? new Set<string>();
+}
+
+/**
+ * Mirrors: ...::ClassMethods#deterministic_encrypted_attributes
+ * (encryptable_record.rb:58-62).
+ */
+export function deterministicEncryptedAttributes(this: any): Set<string> {
+  // Memoized per class like Rails' `@deterministic_encrypted_attributes ||=`
+  // (encryptable_record.rb:58-61); own-property-guarded so STI subclasses
+  // compute their own. Invalidated by `encryptAttribute` on new declarations.
+  if (Object.prototype.hasOwnProperty.call(this, "_deterministicEncryptedAttributes")) {
+    return this._deterministicEncryptedAttributes;
+  }
+  const result = new Set<string>();
+  for (const attributeName of encryptedAttributes.call(this)) {
+    const type = encryptedTypeOf(getAttributeType(this, attributeName));
+    if (type?.deterministic) {
+      result.add(attributeName);
+    }
+  }
+  this._deterministicEncryptedAttributes = result;
+  return result;
+}
+
+/**
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#encrypted_attribute?
+ * (encryptable_record.rb:146-154). `this` is the record.
+ *
+ * @internal
+ */
+export function encryptedAttribute(this: any, attributeName: string): boolean {
+  const name = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
+  if (!encryptedAttributes.call(this.constructor).has(name)) return false;
+  // `encryptedTypeOf` unwraps the resolved type: unlike Ruby's DelegateClass,
+  // a TS `Serialized(Encrypted(...))` does not forward `encrypted?`.
+  const type = encryptedTypeOf(this.constructor.typeForAttribute(name));
+  if (!type) return false;
+  return type.isEncrypted(this.readAttributeBeforeTypeCast?.(name));
+}
+
+/**
+ * Mirrors: ActiveRecord::Encryption::EncryptableRecord#ciphertext_for
+ * (encryptable_record.rb:157-163).
+ *
+ * @internal
+ */
+export function ciphertextFor(this: any, attributeName: string): unknown {
+  const resolvedName = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
+  if (encryptedAttribute.call(this, attributeName)) {
+    return this.readAttributeBeforeTypeCast?.(resolvedName);
+  }
+  // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).
+  return this._attributes?.valuesForDatabase?.()?.[resolvedName];
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#encrypt (encryptable_record.rb:166-168).
+ *
+ * @internal
+ */
+export async function encrypt(this: any): Promise<void> {
+  if (hasEncryptedAttributes.call(this)) {
+    await encryptAttributes.call(this);
+  }
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#decrypt (encryptable_record.rb:171-173).
+ *
+ * @internal
+ */
+export async function decrypt(this: any): Promise<void> {
+  if (hasEncryptedAttributes.call(this)) {
+    await decryptAttributes.call(this);
+  }
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#encrypt_attributes (encryptable_record.rb:187-191).
+ *
+ * @internal
+ */
+export async function encryptAttributes(this: any): Promise<void> {
+  validateEncryptionAllowed.call(this);
+
+  // buildEncryptAttributeAssignments returns plaintext values; updateColumns
+  // writes them as the in-memory cast value and serializes each (via
+  // SerializeCastValue.serialize) to ciphertext for the DB write.
+  await this.updateColumns(buildEncryptAttributeAssignments.call(this));
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#decrypt_attributes (encryptable_record.rb:193-198).
+ *
+ * @internal
+ */
+export async function decryptAttributes(this: any): Promise<void> {
+  validateEncryptionAllowed.call(this);
+
+  const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
+  await Contexts.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#validate_encryption_allowed (encryptable_record.rb:200-202).
+ *
+ * @internal
+ */
+export function validateEncryptionAllowed(this: any): void {
+  if (Contexts.context.frozenEncryption) {
+    throw new ConfigurationError("can't be modified because it is encrypted");
+  }
+}
+
+/**
+ * Mirrors: ...EncryptableRecord#has_encrypted_attributes? (encryptable_record.rb:204-206).
+ *
+ * @internal
+ */
+export function hasEncryptedAttributes(this: any): boolean {
+  return encryptedAttributes.call(this.constructor).size > 0;
+}
+
+/**
+ * Mirrors: ...#build_encrypt_attribute_assignments (encryptable_record.rb:208-212).
+ *
+ * @internal
+ */
+export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const attributeName of encryptedAttributes.call(this.constructor)) {
+    result[attributeName] =
+      typeof this.readAttribute === "function"
+        ? this.readAttribute(attributeName)
+        : this[attributeName];
+  }
+  return result;
+}
+
+/**
+ * Mirrors: ...#build_decrypt_attribute_assignments (encryptable_record.rb:214-221).
+ *
+ * @internal
+ */
+export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const attributeName of encryptedAttributes.call(this.constructor)) {
+    const type = getAttributeType(this.constructor, attributeName) as {
+      deserialize: (v: unknown) => unknown;
+    };
+    const encryptedValue = ciphertextFor.call(this, attributeName);
+    result[attributeName] = type.deserialize(encryptedValue);
+  }
+  return result;
+}
+
+/**
+ * The single declaration path for encrypted attributes — both `Base.encrypts`
+ * (via encryption.ts#encrypts) and direct callers route through here, mirroring
+ * Rails' single `encrypt_attribute`.
+ *
+ * The scheme is built by `schemeFor` — Rails' one `scheme_for` — inside the
+ * `PendingEncryption` getter, because Rails calls `scheme_for` inside the
+ * `decorate_attributes` block (encryptable_record.rb:85-88).
+ *
+ * @internal
+ */
+export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
+  const modelClass = this;
+  // Own-property guard mirrors Rails' `class_attribute` semantics — a subclass
+  // encrypting a new attribute must not mutate the parent's (or a sibling's) Set.
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_encryptedAttributes")) {
+    modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
+  }
+  modelClass._encryptedAttributes.add(name);
+  delete modelClass._deterministicEncryptedAttributes;
+
+  const pending: PendingEncryption = {
+    name,
+    get scheme(): Scheme {
+      return schemeFor(options);
+    },
+  };
+
+  if (typeof modelClass.decorateAttributes === "function") {
+    // Durable path (real model classes): push the durable PendingDecorator NOW,
+    // at declaration time, so its position in the pending queue tracks
+    // declaration order relative to `serialize` / `normalizes` — mirroring
+    // Rails, where `encrypts` calls `decorate_attributes` inline
+    // (encryptable_record.rb:87-92) and AttributeRegistration replays in
+    // declaration order. The decorator resolves the column default at replay
+    // time, so it needs no re-push after schema reflection. The
+    // `_pendingEncryptions` buffer remains only for validator re-runs +
+    // frozen-validator install on rebuild (applyPendingEncryptions).
+    EncryptableRecord.registerPendingEncryption(this, pending);
+    EncryptableRecord.pushEncryptionDecorator(this, name, pending);
+    encryptionHooks.applyPendingEncryptions(modelClass);
+  } else {
+    // Immediate path (plain-object callers without decoration machinery, e.g.
+    // direct `EncryptableRecord.encrypts` tests): register the encrypted type
+    // synchronously so it's readable right after the call.
+    EncryptableRecord.registerEncryptedType(this, name, pending.scheme);
+  }
+
+  if (Configurable.config.validateColumnSize) {
+    EncryptableRecord.validateColumnSize(this, name);
+  }
+
+  // Mirrors Rails encryptable_record.rb:94 —
+  // `preserve_original_encrypted(name) if ignore_case`. Wires the
+  // case-preserving `original_<name>` column when the attribute is declared
+  // with ignoreCase, so reads return the true-cased value.
+  if (options.ignoreCase) {
+    preserveOriginalEncrypted.call(this, name);
+  }
+
+  Configurable.encryptedAttributeWasDeclared(modelClass, name);
+}
+
+/**
+ * Mirrors Rails' EncryptableRecord::ClassMethods#preserve_original_encrypted.
+ * Declares the case-preserving `original_<name>` encrypted column and
+ * overrides the accessors so reads return the original-cased value.
+ * @internal
+ */
+export function preserveOriginalEncrypted(this: any, name: string): void {
+  const modelClass = this;
+  const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+  // Record the source attribute so the post-reflection hook
+  // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
+  // can re-run the missing-column check against the authoritative DB column
+  // set — closing the fail-open gap when the adapter isn't connected at
+  // declaration time. Own-property guarded like `_encryptedAttributes` so a
+  // subclass declaring ignoreCase doesn't mutate the parent's Set.
+  if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
+    modelClass._ignoreCasePreservedAttributes = new Set<string>(
+      modelClass._ignoreCasePreservedAttributes ?? [],
+    );
+  }
+  modelClass._ignoreCasePreservedAttributes.add(name);
+
+  // Enforce the missing-column requirement against the columns known now.
+  // `columnNames()` forces a schema load when an adapter is connected, so the
+  // check fires for real models; at Base.encrypts static-init with no adapter
+  // it returns [] and requireOriginalColumnPresent defers (see its doc) — the
+  // post-reflection hook above then catches a genuinely absent column.
+  EncryptableRecord.requireOriginalColumnPresent(this, name, this.columnNames?.() ?? []);
+
+  // Declare original_<name> with a default scheme, mirroring Rails' bare
+  // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
+  // encryptAttribute's durable branch buffers this in _pendingEncryptions so
+  // the original column rides the same replay-safe machinery as its source.
+  encryptAttribute.call(this, originalName, {});
+  EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalName);
 }
 
 /**

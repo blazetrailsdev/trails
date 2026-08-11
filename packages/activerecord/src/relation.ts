@@ -4017,7 +4017,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Base.upsert_all
    */
   async upsertAll(
-    records: Record<string, unknown>[],
+    attributes: Record<string, unknown>[],
     options?: {
       uniqueBy?: string | string[];
       updateOnly?: string | string[];
@@ -4026,7 +4026,7 @@ export class Relation<T extends Base> {
       recordTimestamps?: boolean;
     },
   ): Promise<Result> {
-    return InsertAll.execute(this, records, {
+    return InsertAll.execute(this, attributes, {
       uniqueBy: options?.uniqueBy,
       updateOnly: options?.updateOnly,
       onDuplicate: options?.onDuplicate ?? "update",
@@ -5810,10 +5810,10 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Base.insert
    */
   async insert(
-    attrs: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
   ): Promise<Result> {
-    return this.insertAll([attrs], options);
+    return this.insertAll([attributes], options);
   }
 
   /**
@@ -5822,10 +5822,10 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Base.insert!
    */
   async insertBang(
-    attrs: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     options?: Pick<InsertAllOptions, "returning" | "recordTimestamps">,
   ): Promise<Result> {
-    return this.insertAllBang([attrs], options);
+    return this.insertAllBang([attributes], options);
   }
 
   /**
@@ -5851,10 +5851,10 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Base.upsert
    */
   async upsert(
-    attrs: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     options?: { uniqueBy?: string | string[]; returning?: InsertAllOptions["returning"] },
   ): Promise<Result> {
-    return this.upsertAll([attrs], options);
+    return this.upsertAll([attributes], options);
   }
 
   /**

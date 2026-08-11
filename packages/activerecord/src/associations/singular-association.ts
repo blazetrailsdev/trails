@@ -75,11 +75,11 @@ export class SingularAssociation extends Association {
     // (singular_association.rb:29-33): construction — and the raise a bad
     // attribute produces — happens BEFORE `set_new_record` reaches `load_target`,
     // so an invalid build never queries. Keep that order here.
-    const record = this.buildRecord(attributes);
-    // Rails yields the freshly built record before it's set as the new target
-    // (`build_record(attributes, &block)`), so a passed block can mutate
-    // persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
-    if (record && block) block(record);
+    // Rails yields the freshly built record inside `build_record`
+    // (singular_association.rb:30 → association.rb:383-388), before it's set as
+    // the new target, so a passed block can mutate persisted attributes
+    // (e.g. `build_bulb { |b| b.color = ... }`).
+    const record = this.buildRecord(attributes, block);
     // `set_new_record` → `replace(record, false)` runs `load_target` on EVERY
     // build, so a persisted owner whose target has never been loaded still
     // discovers (and displaces) the row in the DB. The load has to precede
@@ -412,11 +412,10 @@ export class SingularAssociation extends Association {
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    const record = this.buildRecord(attributes);
-    if (!record) return null;
     // Rails yields the record in `build_record` before the save (block can
-    // mutate persisted attributes).
-    if (block) block(record);
+    // mutate persisted attributes) — singular_association.rb:68.
+    const record = this.buildRecord(attributes, block);
+    if (!record) return null;
     // Match Rails' `SingularAssociation#_create_record` ordering: save first,
     // then `set_new_record`. The FK / polymorphic-type columns are already on
     // the built record via `buildRecord` → `initializeAttributes`

@@ -1,4 +1,8 @@
-import { EncryptableRecord, getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
+import {
+  deterministicEncryptedAttributes,
+  getAttributeType,
+  encryptedTypeOf,
+} from "./encryptable-record.js";
 import {
   AdditionalValue,
   ExtendedDeterministicQueries,
@@ -95,7 +99,7 @@ export class EncryptedUniquenessValidator {
     await originalValidateEach(record, attribute, value);
 
     const klass = record.constructor;
-    const deterministicAttrs = EncryptableRecord.deterministicEncryptedAttributes(klass);
+    const deterministicAttrs = deterministicEncryptedAttributes.call(klass);
     if (!deterministicAttrs.has(attribute)) return;
 
     const encryptedType = encryptedTypeOf(getAttributeType(klass, attribute));

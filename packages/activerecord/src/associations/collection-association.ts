@@ -387,8 +387,8 @@ export class CollectionAssociation extends Association {
     return null;
   }
 
-  build(attributes?: Record<string, unknown>): Base {
-    const record = this.buildRecord(attributes);
+  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base {
+    const record = this.buildRecord(attributes, block);
     if (record) {
       this.setOwnerAttributes(record);
       this.addToTarget(record, { replace: true });

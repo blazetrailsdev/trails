@@ -14,7 +14,7 @@ import {
   EncryptedBook,
   UnencryptedBook,
 } from "../test-helpers/models/book-encrypted.js";
-import { EncryptableRecord } from "./encryptable-record.js";
+import { EncryptableRecord, deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
@@ -118,14 +118,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
   it("includes a Serialized(Encrypted) attribute in deterministicEncryptedAttributes", async () => {
     await freshAdapter();
 
-    const deterministic = EncryptableRecord.deterministicEncryptedAttributes(
+    const deterministic = deterministicEncryptedAttributes.call(
       EncryptedBookWithSerializedDeterministicName,
     );
     expect(deterministic.has("name")).toBe(true);
     expect(
-      EncryptableRecord.deterministicEncryptedAttributes(
-        EncryptedBookWithSerializedSecondBinary,
-      ).has("logo"),
+      deterministicEncryptedAttributes.call(EncryptedBookWithSerializedSecondBinary).has("logo"),
     ).toBe(false);
   });
 

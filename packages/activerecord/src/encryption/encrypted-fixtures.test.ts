@@ -19,8 +19,8 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   const { encryptedBooks } = fixtures(["encryptedBooks"]);
 
   it("fixtures get encrypted automatically", async () => {
-    const { EncryptableRecord } = await import("./encryptable-record.js");
-    expect(EncryptableRecord.encryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
+    const { encryptedAttribute } = await import("./encryptable-record.js");
+    expect(encryptedAttribute.call(encryptedBooks("awdr"), "name")).toBe(true);
   });
 });
 
@@ -46,7 +46,7 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
     const book = encryptedBookThatIgnoresCases("rfr");
     expect((book as any).name).toBe("Ruby for Rails");
-    const { EncryptableRecord } = await import("./encryptable-record.js");
-    expect(EncryptableRecord.encryptedAttribute(book, "name")).toBe(true);
+    const { encryptedAttribute } = await import("./encryptable-record.js");
+    expect(encryptedAttribute.call(book, "name")).toBe(true);
   });
 });

@@ -24,7 +24,15 @@ import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorOptionLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
-import { EncryptableRecord, encryptedTypeOf } from "./encryption/encryptable-record.js";
+import {
+  EncryptableRecord,
+  ciphertextFor,
+  decrypt,
+  encrypt,
+  encryptAttribute,
+  encryptedAttribute,
+  encryptedTypeOf,
+} from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import type { Context } from "./encryption/context.js";
@@ -85,7 +93,7 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
   }
 
   for (const name of names) {
-    EncryptableRecord.encryptAttribute(klass, name, options);
+    encryptAttribute.call(klass, name, options);
   }
 }
 
@@ -258,9 +266,8 @@ registerEncryptionHooks({
   applyPendingEncryptions,
   requireOriginalColumnsAfterReflection: (klass: any, columnNames: string[]) =>
     EncryptableRecord.requireOriginalColumnsAfterReflection(klass, columnNames),
-  encryptedAttribute: (record: any, name: string) =>
-    EncryptableRecord.encryptedAttribute(record, name),
-  ciphertextFor: (record: any, name: string) => EncryptableRecord.ciphertextFor(record, name),
-  encrypt: (record: any) => EncryptableRecord.encrypt(record),
-  decrypt: (record: any) => EncryptableRecord.decrypt(record),
+  encryptedAttribute: (record: any, name: string) => encryptedAttribute.call(record, name),
+  ciphertextFor: (record: any, name: string) => ciphertextFor.call(record, name),
+  encrypt: (record: any) => encrypt.call(record),
+  decrypt: (record: any) => decrypt.call(record),
 });
