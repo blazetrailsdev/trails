@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { autoloadModel, _preloadedHolderTarget } from "../associations.js";
-import { AssociationScope } from "./association-scope.js";
+import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
@@ -370,7 +370,7 @@ export class Association {
           );
         this._cachedScope = djas(this);
       } else {
-        this._cachedScope = AssociationScope.scope(this as never);
+        this._cachedScope = AssociationScope.scope(this as unknown as AssociationScopeable);
       }
     }
     return this._cachedScope;
