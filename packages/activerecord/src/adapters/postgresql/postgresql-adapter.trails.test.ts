@@ -332,12 +332,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // `resetBang` defers its body behind `_inFlightReset` and query paths wait
-    // on that barrier — several of them while already holding the connection
-    // lock. So the deferred body must NOT need that lock: a reset that waited
-    // for it would be queued behind a query that is waiting for the reset.
-    // Rails cannot reach the state (its `reset!` blocks under `@lock`), and
-    // this test is what proves the port doesn't either.
+    // `resetBang` is sync and cannot block, so it schedules its body onto the
+    // connection lock (Rails takes that lock inline, postgresql_adapter.rb:372)
+    // and returns. A query already holding the lock must therefore never wait
+    // on the queued reset — it would be waiting on work queued behind itself.
+    // This is what pins the one-mechanism arrangement: query paths serialize
+    // against the reset on the lock alone, never on a second barrier.
     it("a query holding the lock does not wait on a reset queued behind it", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {

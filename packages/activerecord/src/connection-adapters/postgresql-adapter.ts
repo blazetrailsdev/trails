@@ -502,8 +502,9 @@ export class PostgreSQLAdapter
   // Whether the eager load_additional_types pass has run for the current
   // physical connection. Reset on disconnect/discard (a brand-new socket needs
   // it) but NOT on resetBang: DISCARD ALL leaves the in-memory type map intact,
-  // and the reset reconfigure runs inside the _inFlightReset barrier — issuing
-  // the pg_type queries there would deadlock awaitRawConnectionReady.
+  // and the reset reconfigure runs while the reset holds the connection lock —
+  // routing the pg_type queries back through withRawConnection would re-enter
+  // it needlessly.
   private _typeMapEagerLoaded = false;
   // The single StatementPool attached to _rawConnection. PG prepared
   // statements are session-scoped; lifetime tracks _rawConnection.
@@ -534,10 +535,6 @@ export class PostgreSQLAdapter
   // parallel — mirrors Rails' @lock.synchronize around connect (Rails
   // postgresql_adapter.rb:349, abstract_adapter.rb:984).
   private _acquiring: Promise<pg.Client> | null = null;
-  // In-flight reset promise (ROLLBACK + DISCARD ALL). Query paths await
-  // this before proceeding so no query can interleave between the two
-  // SQL commands that resetBang fires asynchronously.
-  private _inFlightReset: Promise<void> | null = null;
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by handleWarnings after.
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
@@ -831,10 +828,10 @@ export class PostgreSQLAdapter
     //
     // The pg_type queries run DIRECTLY on `client` (like the SET statements
     // above), NOT through schemaQuery/withRawConnection. configure runs while
-    // the acquire machinery still holds `_acquiring` (and, on resetBang, inside
-    // the `_inFlightReset` barrier); routing these queries back through the
-    // connection-readiness stack would re-enter connectBang/verify or block on
-    // that barrier and deadlock. Issuing them on the raw socket sidesteps all
+    // the acquire machinery still holds `_acquiring` (and, on resetBang, while
+    // the reset holds the connection lock); routing these queries back through
+    // the connection-readiness stack would re-enter connectBang/verify and
+    // deadlock. Issuing them on the raw socket sidesteps all
     // of it, exactly as Rails runs them inline on the raw connection.
     //
     // Gated per physical socket: resetBang's DISCARD ALL leaves the in-memory
@@ -1299,14 +1296,6 @@ export class PostgreSQLAdapter
     if (this._closed || this._pgClientOptions == null) {
       throw new Error("PostgreSQLAdapter: connection is closed");
     }
-    // Serialize behind any in-flight reset (ROLLBACK + DISCARD ALL) so no
-    // query can interleave between the two commands resetBang fires.
-    while (this._inFlightReset) await this._inFlightReset;
-    // Re-check after the yield: a concurrent close/disconnect/discard
-    // may have run while we were waiting for the reset to complete.
-    if (this._closed || this._pgClientOptions == null) {
-      throw new Error("PostgreSQLAdapter: connection is closed");
-    }
     // Fast path: connection already opened and configured, no drain pending.
     if (this._rawConnection && this._connectionConfigured && !this._needsDeallocateAll) {
       return this._rawConnection;
@@ -1469,19 +1458,18 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Drain the async reset barrier before the base `withRawConnection` loop
-   * yields `this._connection`. `resetBang` defers ROLLBACK + DISCARD ALL +
-   * reconfigure behind `_inFlightReset` (it can't block the way Rails'
-   * `reset!` does); awaiting it here — once per call, pre-loop — guarantees
-   * the yielded socket is scrubbed and reconfigured, with no per-iteration
-   * re-acquire. The connection itself is opened eagerly by `connectBang()`
-   * (initial use) or `reconnect()` (post-failure), so there is nothing left
-   * to acquire here. Replaces the deleted `rawConnectionForBlock` seam.
+   * Re-open / drain the connection before the base `withRawConnection` loop
+   * yields `this._connection`. Serialization against `resetBang` is NOT this
+   * hook's job: the reset body runs under the same `@lock` the loop already
+   * holds (postgresql_adapter.rb:372), so it can only run before or after this
+   * call, never between two of the statements it fires. The connection itself
+   * is opened eagerly by `connectBang()` (initial use) or `reconnect()`
+   * (post-failure), so there is nothing left to acquire here. Replaces the
+   * deleted `rawConnectionForBlock` seam.
    *
    * @internal
    */
   protected override async awaitRawConnectionReady(): Promise<void> {
-    while (this._inFlightReset) await this._inFlightReset;
     // If the reset's reconfigure step failed it tore down the socket; re-open
     // a fresh, configured connection so the loop never yields an unconfigured
     // (or null) one. connect() throws here only if the server is truly down —
@@ -2750,9 +2738,6 @@ export class PostgreSQLAdapter
       this.verifiedBang();
       return;
     }
-    while (this._inFlightReset) await this._inFlightReset;
-    // Re-check after the yield: a concurrent disconnect/close/discard
-    // may have nulled _rawConnection while we were waiting.
     const conn = this._rawConnection;
     if (this._closed || !conn) {
       await this.reconnectBang({ restoreTransactions: true });
@@ -2760,7 +2745,10 @@ export class PostgreSQLAdapter
       return;
     }
     try {
-      await conn.query(";");
+      // Rails' `active?` sends its `;` ping under `@lock`
+      // (postgresql_adapter.rb:348-352), so it can never land between the
+      // statements `reset!` fires under the same lock.
+      await this._transactionManager.synchronize(() => conn.query(";"));
     } catch {
       await this.reconnectBang({ restoreTransactions: true });
     }
@@ -2781,58 +2769,51 @@ export class PostgreSQLAdapter
       super.resetBang();
       return;
     }
-    // Capture the live connection so subsequent DISCARD ALL chains
-    // onto it even if a concurrent reconnect later nulls
-    // _rawConnection. resetBang is sync per AbstractAdapter, so we
-    // can't truly await — chain via .then so DISCARD ALL is sent
-    // only AFTER ROLLBACK's response is processed (matching the
-    // sequence in Rails' reset!, postgresql_adapter.rb:371-382).
+    // Capture the live connection so DISCARD ALL still chains onto it even if
+    // a concurrent reconnect later nulls _rawConnection.
     const live = this._rawConnection;
-    let work: Promise<unknown> = Promise.resolve();
-    if (this._client) {
-      // No CancelRequest: `reset!` waits behind the query on the wire, it never
-      // cancels one — `cancel_any_running_query`'s only callers are
-      // `exec_rollback_db_transaction` / `exec_restart_db_transaction`
-      // (postgresql/database_statements.rb:79, :84). Cancelling here killed a
-      // query a DIFFERENT chain owned, since `resetBang` runs outside the lock
-      // Rails holds (postgresql_adapter.rb:372); node-pg queues this ROLLBACK
-      // behind that query on the same client, which is the ordering Rails gets
-      // from the lock.
-      work = live.query("ROLLBACK").catch(() => {});
-      this._client = null;
-      this._inTransaction = false;
-    }
-    // Gate all query paths behind this promise so no query can interleave
-    // between ROLLBACK and DISCARD ALL. _acquireFreshClient awaits it.
-    // Capture in a local so the .finally() only clears the barrier when
-    // this specific reset is still the active one — prevents a second
-    // concurrent resetBang() from having its barrier cleared prematurely
-    // by the first reset's .finally().
     // DISCARD ALL also resets session-level GUCs (standard_conforming_
     // strings, intervalstyle, client_min_messages, custom variables) —
-    // mark the connection unconfigured so the chain below (and any racing
+    // mark the connection unconfigured so the body below (and any racing
     // acquire) re-runs _maybeConfigureConnection. Matches Rails' reset!,
     // which calls attempt_configure_connection via super
-    // (abstract_adapter.rb:729). Set BEFORE building the chain so the
-    // chained _maybeConfigureConnection sees it false and reconfigures.
+    // (abstract_adapter.rb:729). Set BEFORE scheduling the body so a racing
+    // _maybeConfigureConnection sees it false and reconfigures.
     this._connectionConfigured = false;
-    const reset: Promise<void> = work
-      .then(() => live.query("DISCARD ALL"))
-      // Re-run configure_connection on the SAME socket once DISCARD ALL has
-      // landed, so a connection yielded by withRawConnection (which drains
-      // this barrier via awaitRawConnectionReady) is already reconfigured —
-      // mirroring Rails' blocking reset! → super → configure_connection.
-      // Guard on socket identity: a concurrent reconnect may have swapped in
-      // a new client, in which case its own acquire handles configuration.
-      // On configure failure, tear down the socket (mirroring _doAcquire's
-      // catch) so awaitRawConnectionReady re-opens a fresh, configured
-      // connection rather than yielding an unconfigured one.
-      .then(() => {
+    // Rails wraps the whole body — the conditional ROLLBACK, DISCARD ALL and
+    // super — in ONE @lock.synchronize (postgresql_adapter.rb:372-381), so no
+    // foreign query can interleave between those statements. resetBang is sync
+    // per AbstractAdapter and cannot block for the lock, so the body is
+    // scheduled onto it instead: it runs to completion once, uninterrupted,
+    // and every query path serializes on the same lock rather than on a
+    // separate reset barrier.
+    // The lock lives on the TransactionManager, and `super.resetBang()` swaps
+    // that manager out (`reset_transaction`, database-statements.ts), so hold
+    // the one that is current now: a foreign query entering while the body
+    // runs reads the same manager and queues on the same lock.
+    const lock = this._transactionManager;
+    void lock
+      .synchronize(async () => {
+        if (this._client) {
+          // No CancelRequest: `reset!` waits behind the query on the wire, it
+          // never cancels one — `cancel_any_running_query`'s only callers are
+          // `exec_rollback_db_transaction` / `exec_restart_db_transaction`
+          // (postgresql/database_statements.rb:79, :84).
+          await live.query("ROLLBACK").catch(() => {});
+          this._client = null;
+          this._inTransaction = false;
+        }
+        await live.query("DISCARD ALL");
+        // Guard on socket identity: a concurrent reconnect may have swapped in
+        // a new client, in which case its own acquire handles configuration.
+        // On configure failure, tear down the socket (mirroring _doAcquire's
+        // catch) so awaitRawConnectionReady re-opens a fresh, configured
+        // connection rather than yielding an unconfigured one.
         if (this._rawConnection === live && !this._closed) {
-          // Rails' reset! ends in configure_connection
-          // (postgresql_adapter.rb:371), so the dispatch goes through the
+          // Rails' reset! ends in configure_connection via super
+          // (postgresql_adapter.rb:380), so the dispatch goes through the
           // public, overridable hook.
-          return this.configureConnection().catch((error: unknown) => {
+          await this.configureConnection().catch((error: unknown) => {
             if (this._rawConnection === live) {
               this._rawConnection = null;
               this._connectionConfigured = false;
@@ -2844,17 +2825,15 @@ export class PostgreSQLAdapter
             throw error;
           });
         }
+        // DISCARD ALL drops server-side prepared statements — reset the
+        // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
+        this._statementPool?.reset();
+        // Rails' `super` — clear_cache!(new_connection: true) + reset_transaction
+        // (abstract_adapter.rb:728-731) — runs inside the same lock, last
+        // (postgresql_adapter.rb:380).
+        super.resetBang();
       })
-      .then(() => {})
-      .catch(() => {})
-      .finally(() => {
-        if (this._inFlightReset === reset) this._inFlightReset = null;
-      });
-    this._inFlightReset = reset;
-    // DISCARD ALL drops server-side prepared statements — reset the
-    // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
-    this._statementPool?.reset();
-    super.resetBang();
+      .catch(() => {});
   }
 
   /**
