@@ -225,170 +225,87 @@ export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<boolean> {
-  const record = this as unknown as Base;
-  const assoc: AssociationDefinition = {
-    name: reflection.name,
-    type: "hasMany",
-    options: reflection.options ?? {},
-  } as AssociationDefinition;
-  const inst = associationInstanceGet.call(record, reflection.name) as any;
+  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  if (!association) return true;
+  const autosave = reflection.options?.autosave;
+
+  // By saving the instance variable in a local variable,
+  // we make the whole callback re-entrant.
+  const newRecordBeforeSave = !!(this as any)._newRecordBeforeSave;
+
+  // reconstruct the scope now that we know the owner's id
+  association.resetScope();
+
   // Rails save_collection_association:430-434 routes each marked-for-destruction
   // child through the collection-level `destroy`, so `before_remove`/
   // `after_remove` fire and the record is pruned from the in-memory target. A
   // built (unpersisted) child is destroyed too: `remove_records`
   // (collection_association.rb:385-408) runs the remove callbacks and splices
   // `@target` even when `existing_records` is empty. Snapshot first since
-  // `inst.destroy` splices the live target as it removes each record.
-  if (assoc.options.autosave && inst && typeof inst.destroy === "function") {
-    const snapshot: Base[] = Array.isArray(inst.target) ? [...(inst.target as Base[])] : [];
-    for (const child of snapshot) {
-      if (isMarkedForDestruction(child)) {
-        await inst.destroy(child);
-      }
+  // `association.destroy` splices the live target as it removes each record.
+  if (autosave) {
+    const recordsToDestroy: Base[] = Array.isArray(association.target)
+      ? (association.target as Base[]).filter((record) => isMarkedForDestruction(record))
+      : [];
+    for (const record of recordsToDestroy) {
+      await association.destroy(record);
     }
   }
-  // Rails: save_collection_association resets the scope before iterating so
-  // the per-child save path (which may re-read the scope) doesn't keep a
-  // stale memoized association_scope across the owner save.
-  if (inst && typeof (inst as { resetScope?: () => void }).resetScope === "function") {
-    (inst as { resetScope: () => void }).resetScope();
-  }
-  // Marked-for-destruction children were already routed through the
-  // collection-level destroy in `saveCollectionAssociation` (Rails
-  // save_collection_association:431-434); the snapshot here keeps the save loop
-  // stable and the `continue` skips any that remain (e.g. new records).
-  const children: Base[] = Array.isArray(inst?.target) ? [...(inst.target as Base[])] : [];
+  const records: Base[] = Array.isArray(association.target)
+    ? [...(association.target as Base[])]
+    : [];
 
-  for (const child of children) {
-    if (isMarkedForDestruction(child)) continue;
+  for (const record of records) {
+    if (isMarkedForDestruction(record)) continue;
+    if ((record as any).isDestroyed?.()) continue;
     // Rails associated_records_to_validate_or_save (autosave_association.rb:
-    // 373-381): when the owner was new before save, every target record
-    // gets processed — not just new/changed ones. The dispatch inside
-    // _insertCollectionRecord still picks insert vs update per Rails:442-457.
-    const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
-    // Rails' `associated_records_to_validate_or_save` selects records via
-    // `changed_for_autosave?`, not bare `changed?` — so a persisted child whose
+    // 297-305): when the owner was new before save, every target record gets
+    // processed — not just new/changed ones. Selection goes through
+    // `changed_for_autosave?`, not bare `changed?`, so a persisted child whose
     // own columns are unchanged but which has a changed (auto)saved grandchild
-    // still cascades (autosave_association.rb:302). `changed` alone would skip it.
+    // still cascades.
     if (
-      newRecordBeforeSave ||
-      child.isNewRecord() ||
-      ((child as any).changedForAutosave?.() ?? false)
-    ) {
-      const saved = await _insertCollectionRecord(record, inst, assoc, child);
-      const failureIsIgnored = !assoc.options.autosave && assoc.options.validate === false;
-      // Rails save_collection_association (autosave_association.rb:447-453):
-      // in the non-autosave branch both `errors.add(reflection.name)` and the
-      // `saved` assignment sit under `if reflection.validate?`, so a
-      // `validate: false` collection keeps the loop's `saved = true` default.
-      // Autosave collections insert with validate:false and add no owner error
-      // on failure; nested records never reach a failed insert here
-      // (_insertCollectionRecord short-circuits them to `true`).
-      if (!saved && !failureIsIgnored) {
-        if (!assoc.options.autosave && assoc.options.validate !== false) {
-          propagateErrors(record, assoc.name);
+      !(
+        newRecordBeforeSave ||
+        record.isNewRecord() ||
+        ((record as any).changedForAutosave?.() ?? false)
+      )
+    )
+      continue;
+
+    let saved = true;
+
+    if (autosave !== false && (newRecordBeforeSave || record.isNewRecord())) {
+      association.setInverseInstance(record);
+
+      if (autosave) {
+        saved = !!(await association.insertRecord(record, false));
+      } else if (!reflection.isNested()) {
+        // Rails save_collection_association:447 — the default (non-autosave)
+        // insert branch is `elsif !reflection.nested?`, so a nested
+        // has_many :through (e.g. `Categorization.post_taggings` through an
+        // in-memory `author`) is never inserted on owner save. Skipping here
+        // also avoids the `HasManyThroughNestedAssociationsAreReadonly` raise
+        // from `insert_record`/`ensure_not_nested`.
+        const associationSaved = !!(await association.insertRecord(record));
+
+        // Rails reflection.rb `validate?` — for a collection the default is
+        // true, so only an explicit `validate: false` opts out.
+        if (reflection.options?.validate !== false) {
+          if (!associationSaved) propagateErrors(this as unknown as Base, reflection.name);
+          saved = associationSaved;
         }
-        return false;
       }
+    } else if (autosave) {
+      saved = !!(await record.save({ validate: false }));
     }
+
+    // Rails raises `RecordInvalid.new(association.owner)` here; trails surfaces
+    // the failure by returning false, which makes the registered
+    // after_create/after_update callback raise it instead.
+    if (!saved) return false;
   }
   return true;
-}
-
-/**
- * Mirrors Rails' `save_collection_association` per-record save dispatch
- * (autosave_association.rb:442-457):
- *
- *   if autosave != false && (new_record_before_save || record.new_record?)
- *     association.set_inverse_instance(record)
- *     saved = association.insert_record(record, false)   # NEW INSERT
- *   elsif autosave
- *     saved = record.save(validate: false)               # UPDATE
- *
- * Only genuine inserts route through `insertRecord` (which fires
- * `setOwnerAttributes`/counter-cache); already-persisted changed records
- * use plain `save({validate:false})` so the counter cache isn't
- * incremented on every update.
- *
- * @internal
- */
-async function _insertCollectionRecord(
-  record: Base,
-  inst: any,
-  assoc: AssociationDefinition,
-  child: Base,
-): Promise<boolean> {
-  const newRecordBeforeSave = !!(record as any)._newRecordBeforeSave;
-  const isInsert = child.isNewRecord() || newRecordBeforeSave;
-  if (!isInsert) {
-    return !!(await child.save({ validate: false }));
-  }
-  // Rails save_collection_association:447 — the default (non-autosave) insert
-  // branch is `elsif !reflection.nested?`, so a nested has_many :through (e.g.
-  // `Categorization.post_taggings` through an in-memory `author`) is never
-  // inserted on owner save. Skipping here also avoids the
-  // `HasManyThroughNestedAssociationsAreReadonly` raise from
-  // `insert_record`/`ensure_not_nested`.
-  if (!assoc.options.autosave) {
-    const reflection = (record.constructor as any)._reflectOnAssociation?.(assoc.name);
-    if (reflection?.isNested?.()) return true;
-  }
-  if (inst && typeof inst.insertRecord === "function") {
-    inst.setInverseInstance?.(child);
-    // Mirrors Rails save_collection_association branching: with `autosave:
-    // true` the records were already validated during the validation phase
-    // and we pass `validate: false`; without `autosave` (the default), we
-    // pass `validate: true` so a failing join record surfaces here and
-    // owner.save returns false (has_many_through_associations_test.rb
-    // `save returns falsy when join record has errors`).
-    const validate = !assoc.options.autosave;
-    return !!(await inst.insertRecord(child, validate, false));
-  }
-  return _insertCollectionRecordFallback(record, assoc, child);
-}
-
-async function _insertCollectionRecordFallback(
-  record: Base,
-  assoc: AssociationDefinition,
-  child: Base,
-): Promise<boolean> {
-  const ctor = record.constructor as typeof Base;
-  const foreignKey =
-    assoc.options.foreignKey ?? assoc.options.queryConstraints ?? `${underscore(ctor.name)}_id`;
-  const primaryKey = assoc.options.primaryKey ?? ctor.primaryKey;
-  if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-    if (primaryKey.length !== foreignKey.length) {
-      // Route through the reflection's canonical checkValidityBang (Rails'
-      // single raise site) so the error carries the Rails-faithful message.
-      routeThroughCheckValidity(ctor, assoc.name);
-      // No reflection resolvable — minimal trails-only fallback guard.
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ctor.name,
-        name: assoc.name,
-        primaryKey,
-        foreignKey,
-      });
-    }
-    primaryKey.forEach((pk: string, i: number) => {
-      const pkValue = record._readAttribute(pk);
-      if (pkValue != null) child._writeAttribute(foreignKey[i], pkValue);
-    });
-  } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-    const pkValue = record._readAttribute(primaryKey);
-    if (pkValue != null) child._writeAttribute(foreignKey, pkValue);
-  } else {
-    // Route through the reflection's canonical checkValidityBang (Rails'
-    // single raise site) so the error carries the Rails-faithful message.
-    routeThroughCheckValidity(ctor, assoc.name);
-    // No reflection resolvable — minimal trails-only fallback guard.
-    throw new CompositePrimaryKeyMismatchError({
-      activeRecord: ctor.name,
-      name: assoc.name,
-      primaryKey,
-      foreignKey,
-    });
-  }
-  return !!(await child.save({ validate: false }));
 }
 
 /** @internal */
@@ -396,14 +313,14 @@ export async function saveHasOneAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<boolean> {
-  const record = this as unknown as Base;
+  const owner = this as unknown as Base;
   const assoc: AssociationDefinition = {
     name: reflection.name,
     type: "hasOne",
     options: reflection.options ?? {},
   } as AssociationDefinition;
-  const inst = associationInstanceGet.call(record, reflection.name) as any;
-  const ctor = record.constructor as typeof Base;
+  const association = associationInstanceGet.call(owner, reflection.name) as any;
+  const ctor = owner.constructor as typeof Base;
   // Rails `save_has_one_association` reads `reflection.through_reflection`
   // (autosave_association.rb:489).
   const isThrough = !!reflection?.throughReflection;
@@ -415,15 +332,15 @@ export async function saveHasOneAssociation(
   // autosave-option-independent (Rails creates the join in `replace` regardless
   // of `:autosave`) and only acts when an assignment queued `_pendingReplace`,
   // so it runs unconditionally: it no-ops for a merely-cached target, and it
-  // must precede the `!child` early return so the nil-target destroy arm runs.
+  // must precede the `!record` early return so the nil-target destroy arm runs.
   // An awaited `writer` on a persisted owner already persisted (clearing the
   // marker), so this no-ops there; the sync `build`/`create` path leaves the
   // marker for this callback to flush. Control then FALLS THROUGH to the shared
   // body below — which, per Rails (autosave_association.rb:489), skips only the
   // foreign-key write for through, but still runs the end-record
   // `marked_for_destruction` and (autosave-gated) `record.save` arms.
-  if (isThrough && typeof inst?.persistReplace === "function") {
-    await inst.persistReplace();
+  if (isThrough && typeof association?.persistReplace === "function") {
+    await association.persistReplace();
   }
 
   // A has_one *through* suppresses its through-proxy's independent autosave by
@@ -438,13 +355,13 @@ export async function saveHasOneAssociation(
   // in the `persistReplace` above, so a truthy marker on a non-through
   // association is unambiguously that suppression sentinel. Skip
   // the end-record persistence; the through owns the join row.
-  if (inst?._pendingReplace && !isThrough) {
+  if (association?._pendingReplace && !isThrough) {
     return true;
   }
 
-  const child = inst?.target;
-  if (!child || Array.isArray(child) || !(child instanceof Object)) return true;
-  const childRecord = child as Base;
+  const target = association?.target;
+  if (!target || Array.isArray(target) || !(target instanceof Object)) return true;
+  const record = target as Base;
 
   // Rails: `autosave = reflection.options[:autosave]`. The callback is
   // registered unconditionally (autosave_association.rb:199-200), so `autosave`
@@ -472,15 +389,15 @@ export async function saveHasOneAssociation(
   // Rails save_has_one_association:478 — `return unless record && !record.destroyed?`.
   // Must precede the marked_for_destruction branch (Rails:482) so an
   // already-destroyed child isn't re-destroyed.
-  if (typeof (childRecord as any).isDestroyed === "function" && (childRecord as any).isDestroyed())
+  if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
     return true;
   // Rails: `if autosave && record.marked_for_destruction?` — only destroy the
   // child when the autosave option is enabled.
-  if (autosave && isMarkedForDestruction(childRecord)) {
+  if (autosave && isMarkedForDestruction(record)) {
     // Rails save_has_one_association:482-483 — `record.destroy` runs
     // unconditionally; even a new_record? child runs the destroy callback
     // chain, dependent cascades, and freeze (only the DB DELETE is skipped).
-    await childRecord.destroy();
+    await record.destroy();
     return true;
   }
   // Rails save_has_one_association:484 — `elsif autosave != false`. An explicit
@@ -497,16 +414,16 @@ export async function saveHasOneAssociation(
   // returned above), so a NEW child persists whether or not autosave is set.
   // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
   // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
-  const pkSpec = reflection ? computePrimaryKey(reflection, record) : (ctor.primaryKey ?? "id");
+  const pkSpec = reflection ? computePrimaryKey(reflection, owner) : (ctor.primaryKey ?? "id");
   const pkArr: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
-  const pkForChangeCheck = pkArr.map((k) => record._readAttribute(k));
+  const pkForChangeCheck = pkArr.map((k) => owner._readAttribute(k));
   const changedForSave =
-    typeof (childRecord as any).changedForAutosave === "function"
-      ? (childRecord as any).changedForAutosave()
-      : !!(childRecord as any).changed;
+    typeof (record as any).changedForAutosave === "function"
+      ? (record as any).changedForAutosave()
+      : !!(record as any).changed;
   const recordChanged = reflection
-    ? is_recordChanged(reflection, childRecord, pkForChangeCheck)
-    : childRecord.isNewRecord();
+    ? is_recordChanged(reflection, record, pkForChangeCheck)
+    : record.isNewRecord();
   if ((autosave && changedForSave) || recordChanged) {
     // Rails save_has_one_association:489 — `unless reflection.through_reflection`.
     // A has_one *through* never writes a foreign key onto the end record (its
@@ -530,7 +447,7 @@ export async function saveHasOneAssociation(
       if (explicitPk) {
         primaryKey = explicitPk;
       } else {
-        const candidatePk = computePrimaryKey(reflection ?? assoc, record);
+        const candidatePk = computePrimaryKey(reflection ?? assoc, owner);
         // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
         // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
         // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
@@ -554,29 +471,29 @@ export async function saveHasOneAssociation(
         if (primaryKey.length !== foreignKey.length) {
           // Route through the reflection's canonical checkValidityBang (Rails'
           // single raise site) so the error carries the Rails-faithful message.
-          routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
+          routeThroughCheckValidity(owner.constructor as typeof Base, assoc.name);
           // No reflection resolvable — minimal trails-only fallback guard.
           throw new CompositePrimaryKeyMismatchError({
-            activeRecord: (record.constructor as typeof Base).name,
+            activeRecord: (owner.constructor as typeof Base).name,
             name: assoc.name,
             primaryKey,
             foreignKey,
           });
         }
         primaryKey.forEach((pk: string, i: number) => {
-          const pkValue = record._readAttribute(pk);
-          if (pkValue != null) childRecord._writeAttribute(foreignKey[i], pkValue);
+          const pkValue = owner._readAttribute(pk);
+          if (pkValue != null) record._writeAttribute(foreignKey[i], pkValue);
         });
       } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-        const pkValue = record._readAttribute(primaryKey);
-        if (pkValue != null) childRecord._writeAttribute(foreignKey, pkValue);
+        const pkValue = owner._readAttribute(primaryKey);
+        if (pkValue != null) record._writeAttribute(foreignKey, pkValue);
       } else {
         // Route through the reflection's canonical checkValidityBang (Rails'
         // single raise site) so the error carries the Rails-faithful message.
-        routeThroughCheckValidity(record.constructor as typeof Base, assoc.name);
+        routeThroughCheckValidity(owner.constructor as typeof Base, assoc.name);
         // No reflection resolvable — minimal trails-only fallback guard.
         throw new CompositePrimaryKeyMismatchError({
-          activeRecord: (record.constructor as typeof Base).name,
+          activeRecord: (owner.constructor as typeof Base).name,
           name: assoc.name,
           primaryKey,
           foreignKey,
@@ -584,7 +501,7 @@ export async function saveHasOneAssociation(
       }
       // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
       // after FK assignment, before save (autosave_association.rb:497).
-      inst?.setInverseInstance?.(childRecord);
+      association?.setInverseInstance?.(record);
     }
 
     // Rails save_has_one_association:500-501 — skip the save when the inverse
@@ -595,15 +512,15 @@ export async function saveHasOneAssociation(
         : (reflection?.inverseOf ?? null);
     if (
       inverse &&
-      typeof (childRecord as any).isAutosavingBelongsToFor === "function" &&
-      (childRecord as any).isAutosavingBelongsToFor(inverse)
+      typeof (record as any).isAutosavingBelongsToFor === "function" &&
+      (record as any).isAutosavingBelongsToFor(inverse)
     )
       return true;
 
     // Rails: `record.save(validate: !autosave)`. With autosave enabled the
     // child was already validated in the owner's validation phase, so
     // validate: false; with autosave nil it is validated here at save time.
-    const saved = await childRecord.save({ validate: !autosave });
+    const saved = await record.save({ validate: !autosave });
     if (!saved) {
       // Rails: `raise ActiveRecord::Rollback if !saved && autosave` — a failed
       // save only rolls the owner back when the autosave option is enabled (and
@@ -617,70 +534,26 @@ export async function saveHasOneAssociation(
   return true;
 }
 
-/**
- * Resolve the foreign-key column(s) for a belongs_to association in the
- * same shape `BelongsToAssociation#foreignKeyNames` produces, so the
- * autosave path writes to the columns the writer populated at
- * assignment time. Mirrors `Array(reflection.foreign_key)` in Rails:
- * scalar `${name}_id` unless an explicit `foreignKey`/`queryConstraints`
- * is configured, or the owner has `query_constraints` whose rich reflection
- * derives a composite FK via `deriveFkQueryConstraints`.
- *
- * @internal
- */
-function _resolveBelongsToForeignKey(
-  assoc: AssociationDefinition,
-  _assocRecord?: Base,
-  reflection?: any,
-): string[] {
-  if (assoc.options.foreignKey != null) {
-    const fk = assoc.options.foreignKey;
-    return Array.isArray(fk) ? fk : [fk];
-  }
-  if (assoc.options.queryConstraints != null) {
-    const qc = assoc.options.queryConstraints;
-    return Array.isArray(qc) ? qc : [qc];
-  }
-  // Deferred reflection.foreignKey lookup: the getter runs
-  // `deriveFkQueryConstraints` (reflection.ts), which expands the scalar
-  // `${name}_id` FK into a composite `[fk, qc_key]` pair when the owner
-  // has class-level query_constraints. Without this, owners with
-  // query_constraints would only get the scalar column written and
-  // leave the QC partner stale. The getter can raise
-  // ConfigurationError; that surfaces only on write/null branches that
-  // actually need the FK, never at callback registration.
-  const reflFk = reflection?.foreignKey;
-  if (reflFk != null) {
-    return Array.isArray(reflFk) ? reflFk : [reflFk];
-  }
-  return [`${underscore(assoc.name)}_id`];
-}
-
 /** @internal */
 export async function saveBelongsToAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<boolean> {
-  const record = this as unknown as Base;
-  // FK resolution is deferred to `_resolveBelongsToForeignKey`, which only runs
-  // on the branches that write or null columns: eagerly reading
-  // `reflection.foreignKey` here would trip its query-constraints-derivation
-  // ConfigurationError paths (reflection.ts deriveFkQueryConstraints) on every
-  // belongs_to save, even for an unloaded/untouched association.
+  const owner = this as unknown as Base;
   const assoc: AssociationDefinition = {
     name: reflection.name,
     type: "belongsTo",
     options: reflection.options ?? {},
   } as AssociationDefinition;
-  const inst = associationInstanceGet.call(record, reflection.name) as any;
+  const association = associationInstanceGet.call(owner, reflection.name) as any;
   // Rails save_belongs_to_association:538 — skip when the loaded target is
   // stale (FK changed since the target was cached).
-  if (inst?.isStaleTarget?.()) return true;
-  const associated = inst?.target;
+  if (association?.isStaleTarget?.()) return true;
+  const associated = association?.target;
   if (!associated || Array.isArray(associated) || !(associated instanceof Object)) return true;
-  const assocRecord = associated as Base;
+  const record = associated as Base;
   // Rails save_belongs_to_association:541 — `if record && !record.destroyed?`.
-  if (typeof (assocRecord as any).isDestroyed === "function" && (assocRecord as any).isDestroyed())
+  if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
     return true;
 
   const autosave = assoc.options.autosave;
@@ -688,34 +561,37 @@ export async function saveBelongsToAssociation(
   // Explicit `autosave: false` opts out entirely.
   if (autosave === false) return true;
 
-  if (autosave && isMarkedForDestruction(assocRecord)) {
+  if (autosave && isMarkedForDestruction(record)) {
     // Rails save_belongs_to_association:544-547 — destroy path is only
     // reached when `autosave` is truthy; the destruction nulls the FK on
     // self first so the owner save doesn't keep a dangling reference.
-    const fkList = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
-    for (const key of fkList) record._writeAttribute(key, null);
+    // Rails save_belongs_to_association:545 — `foreign_key = Array(reflection.foreign_key)`.
+    const foreignKey: string[] = Array.isArray(reflection.foreignKey)
+      ? reflection.foreignKey
+      : [reflection.foreignKey];
+    for (const key of foreignKey) owner._writeAttribute(key, null);
     // Rails save_belongs_to_association:544-547 — `record.destroy` runs
     // unconditionally after nulling the owner FK; a new_record? child still
     // runs destroy callbacks, dependent cascades, and freeze.
-    await assocRecord.destroy();
+    await record.destroy();
     return true;
   }
 
   // Rails save_belongs_to_association:549 — `record.new_record? || (autosave && record.changed_for_autosave?)`.
   const beChangedForSave =
     autosave &&
-    (typeof (assocRecord as any).changedForAutosave === "function"
-      ? (assocRecord as any).changedForAutosave()
-      : !!(assocRecord as any).changed);
-  const isNewOrChanged = assocRecord.isNewRecord() || beChangedForSave;
+    (typeof (record as any).changedForAutosave === "function"
+      ? (record as any).changedForAutosave()
+      : !!(record as any).changed);
+  const isNewOrChanged = record.isNewRecord() || beChangedForSave;
   if (isNewOrChanged) {
-    _setAutosavingBelongsToFor(record, assoc, true);
+    _setAutosavingBelongsToFor(owner, assoc, true);
     let saved: boolean | undefined;
     try {
       // Rails save_belongs_to_association:553: `record.save(validate: !autosave)`.
-      saved = await assocRecord.save({ validate: !autosave });
+      saved = await record.save({ validate: !autosave });
     } finally {
-      _setAutosavingBelongsToFor(record, assoc, false);
+      _setAutosavingBelongsToFor(owner, assoc, false);
     }
     if (!saved) {
       // Rails save_belongs_to_association:571 — `saved if autosave`. Only
@@ -738,8 +614,11 @@ export async function saveBelongsToAssociation(
   // skipped, but its FK must still be propagated. We keep `isNewOrChanged` in
   // the guard so the `setTarget` test shortcut — which bypasses the writer and
   // leaves `updated?` false — still propagates the FK as before.
-  if (isNewOrChanged || inst?.isUpdated?.()) {
-    const foreignKey = _resolveBelongsToForeignKey(assoc, assocRecord, reflection);
+  if (isNewOrChanged || association?.isUpdated?.()) {
+    // Rails save_belongs_to_association:562 — `foreign_key = Array(reflection.foreign_key)`.
+    const foreignKey: string[] = Array.isArray(reflection.foreignKey)
+      ? reflection.foreignKey
+      : [reflection.foreignKey];
     // Pair against the target's PK columns in the same shape the writer
     // (BelongsToAssociation#replaceKeys) used, so autosave FK
     // propagation lands on the same columns the writer populated.
@@ -750,7 +629,7 @@ export async function saveBelongsToAssociation(
       // Defer to computePrimaryKey when the target has *explicit* class-level
       // query_constraints and Rails' compute_primary_key (steps 2/3 at
       // autosave_association.rb:577-582) would pick that list.
-      const targetHasQc = hasQueryConstraints.call(assocRecord.constructor as any);
+      const targetHasQc = hasQueryConstraints.call(record.constructor as any);
       const targetQcWouldApply =
         targetHasQc && (assoc.options.queryConstraints != null || assoc.options.foreignKey == null);
       if (!targetQcWouldApply) {
@@ -761,13 +640,13 @@ export async function saveBelongsToAssociation(
         const reflFk = reflection?.foreignKey;
         const reflFkIsComposite = Array.isArray(reflFk) && reflFk.length > 1;
         if (fkIsComposite || reflFkIsComposite) {
-          const pk = (assocRecord.constructor as typeof Base).primaryKey;
+          const pk = (record.constructor as typeof Base).primaryKey;
           if (Array.isArray(pk) && pk.length > 1) primaryKey = pk;
         }
       }
     }
     if (primaryKey === null) {
-      const rawPk = computePrimaryKey(reflection, assocRecord);
+      const rawPk = computePrimaryKey(reflection, record);
       primaryKey = Array.isArray(rawPk) ? rawPk : [rawPk];
     }
     // Rails save_belongs_to_association:563: `primary_key.zip(foreign_key)`.
@@ -778,15 +657,15 @@ export async function saveBelongsToAssociation(
     for (let i = 0; i < primaryKey.length; i++) {
       const fkCol = foreignKey[i];
       if (fkCol == null) continue;
-      const associationId = assocRecord._readAttribute(primaryKey[i]);
+      const associationId = record._readAttribute(primaryKey[i]);
       // Rails save_belongs_to_association:566 — `unless self[fk] == id`.
-      if (record._readAttribute(fkCol) !== associationId) {
-        record._writeAttribute(fkCol, associationId);
+      if (owner._readAttribute(fkCol) !== associationId) {
+        owner._writeAttribute(fkCol, associationId);
       }
     }
     // Rails save_belongs_to_association:568 — `association.loaded!` fires
     // inside the `if association.updated?` branch after the FK write.
-    if (inst?.isUpdated?.()) inst.loadedBang?.();
+    if (association?.isUpdated?.()) association.loadedBang?.();
   }
   return true;
 }
@@ -825,36 +704,32 @@ export function associatedRecordsToValidateOrSave(
   return target.filter((r: any) => r.isNewRecord?.() ?? false);
 }
 
-// Rails guards the recursion with an `@_already_called` hash
-// (autosave_association.rb:313); trails uses a module-level WeakSet keyed by
-// record so the guard needs no instance slot.
-const _nestedCheckInProgress = new WeakSet<object>();
-
 /** @internal */
 export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost): boolean {
   const record = this as any;
-  if (_nestedCheckInProgress.has(record)) return false;
-  _nestedCheckInProgress.add(record);
+  record._nestedRecordsChangedForAutosaveAlreadyCalled ??= false;
+  if (record._nestedRecordsChangedForAutosaveAlreadyCalled) return false;
   try {
-    const associations: AssociationDefinition[] = record.constructor._associations ?? [];
-    for (const reflection of associations) {
-      if (!reflection.options.autosave) continue;
+    record._nestedRecordsChangedForAutosaveAlreadyCalled = true;
+    const reflections: Record<string, any> = record.constructor._reflections ?? {};
+    for (const reflection of Object.values(reflections)) {
+      if (!reflection.options?.autosave) continue;
       const association = associationInstanceGet.call(record, reflection.name) as any;
       if (!association || association.target == null) continue;
       // Rails: `Array.wrap(association.target).any?(&:changed_for_autosave?)`.
-      const children: any[] = Array.isArray(association.target)
+      const target: any[] = Array.isArray(association.target)
         ? association.target
         : [association.target];
       if (
-        children.some((c: any) =>
-          typeof c.changedForAutosave === "function" ? c.changedForAutosave() : false,
+        target.some((r: any) =>
+          typeof r.changedForAutosave === "function" ? r.changedForAutosave() : false,
         )
       )
         return true;
     }
     return false;
   } finally {
-    _nestedCheckInProgress.delete(record);
+    record._nestedRecordsChangedForAutosaveAlreadyCalled = false;
   }
 }
 
