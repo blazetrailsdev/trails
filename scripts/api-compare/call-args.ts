@@ -353,9 +353,57 @@ function stripMixinReceiver(rubyArgs: string[], tsArgs: string[]): string[] {
   return tsArgs;
 }
 
+/** Ruby's reflective self-name pseudo-variables, which Ripper hands the
+ *  extractor as a plain identifier read. Both denote the name of the enclosing
+ *  method — `__callee__` the name it was CALLED through (so an alias reports the
+ *  alias), `__method__` the name it was defined as — and neither has a TS
+ *  spelling, so the port passes the name as a literal. */
+const CALLEE_REFS = new Set(["ref:__callee__", "ref:__method__"]);
+
+/** The resolved-`__callee__` key: the enclosing Ruby method's own name, which
+ *  the extractor already knows because it keys every row by it. */
+const CALLEE_PREFIX = "callee:";
+
+/** Rewrite a normalized Ruby argument list's `__callee__` / `__method__` reads
+ *  to the enclosing method's name (RFC 0099).
+ *
+ * `check_if_method_has_arguments!(__callee__, args)` is the single largest
+ * same-shape block in the argument dimension: the value is statically knowable
+ * and the port passes it as `checkIfMethodHasArgumentsBang("eager_load", …)`,
+ * which is the faithful port and not a shape divergence.
+ *
+ * Applied to the VERDICT's lists only — a row still REPORTS the raw
+ * `ref:__callee__` it always did, so resolving the value does not re-key the
+ * baseline rows of the sites that still diverge for an unrelated reason and make
+ * them read as new ones.
+ */
+function resolveCalleeRefs(args: string[], enclosingRubyName: string | undefined): string[] {
+  if (enclosingRubyName === undefined) return args;
+  return args.map((arg) => (CALLEE_REFS.has(arg) ? CALLEE_PREFIX + enclosingRubyName : arg));
+}
+
+/** Every key a faithful port of `__callee__` can spell: the enclosing method's
+ *  name as an identifier read, or — the shape the port actually uses, since TS
+ *  has no `__callee__` — as a string/symbol literal of the same name. Both go
+ *  through the Ruby→TS name conventions, so `eager_load` also matches
+ *  `"eagerLoad"`, and a `?`/`!`/`=` name matches each spelling the table
+ *  sanctions. */
+function calleeKeys(enclosingRubyName: string): string[] {
+  const names = [enclosingRubyName, ...tsCallNameKeys(enclosingRubyName)];
+  const keys = names.map((name) => `ref:${name}`);
+  for (const name of names) {
+    const literal = normalizeLiteralArg("string", name);
+    if (typeof literal === "string") keys.push(literal);
+  }
+  return keys;
+}
+
 /** Two argument keys naming the same value. Only `ref:` keys have more than one
  *  spelling; a literal key is already canonical. */
 function argKeysEqual(rubyKey: string, tsKey: string): boolean {
+  if (rubyKey.startsWith(CALLEE_PREFIX)) {
+    return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
+  }
   if (rubyKey.startsWith("ref:") && tsKey.startsWith("ref:")) return refKeysEqual(rubyKey, tsKey);
   return rubyKey === tsKey;
 }
@@ -410,8 +458,15 @@ export function pairCallSites(
  *  block-pass on either side, an opaque descriptor anywhere in either list, or
  *  a call name the call-set gate already excludes. A `block` flag is NOT a
  *  skip: both extractors drop the block from the argument list and flag the
- *  site, so the remaining arguments still compare. */
-export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
+ *  site, so the remaining arguments still compare.
+ *
+ *  `enclosingRubyName` is the Ruby method whose body both sites are in — the
+ *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}). */
+export function compareCallArgs(
+  ruby: CallSite,
+  ts: CallSite,
+  enclosingRubyName?: string,
+): CallArgResult {
   const skipped = (reason: CallArgSkipReason): CallArgResult => ({
     verdict: "skip",
     reason,
@@ -430,6 +485,7 @@ export function compareCallArgs(ruby: CallSite, ts: CallSite): CallArgResult {
     return skipped(tsArgs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }
 
-  if (argsEqual(rubyArgs, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
-  return { verdict: "mismatch", class: classify(rubyArgs, tsArgs), rubyArgs, tsArgs };
+  const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
+  if (argsEqual(compared, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };
+  return { verdict: "mismatch", class: classify(compared, tsArgs), rubyArgs, tsArgs };
 }

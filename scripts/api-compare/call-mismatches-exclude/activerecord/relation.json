@@ -16,18 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "annotate",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "eager_load_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -397,18 +385,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "eager_load",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "except",
     "call": "relation_with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -747,18 +723,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "group",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "has_include?",
     "call": "includes_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -854,18 +818,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "includes",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "insert_all!",
     "call": "execute",
     "kind": "args",
@@ -954,18 +906,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "optimizer_hints",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "order",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
@@ -1006,18 +946,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "preload",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "includes_values",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
@@ -1046,18 +974,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "references",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:tableNames"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "references_eager_loaded_tables?",
     "call": "build_joins",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -1079,31 +995,7 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "regroup",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "reorder",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "reselect",
     "call": "check_if_method_has_arguments!",
     "kind": "args",
     "rubyArgs": [
@@ -1118,19 +1010,6 @@
     "rubyName": "scope_for_create",
     "call": "create_with_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "select",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:fields",
-      "str:Call `select' with at least one field."
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -1237,18 +1116,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "unscope",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "update",
     "call": "update",
     "kind": "args",
@@ -1339,29 +1206,5 @@
     "rubyName": "values_for_queries",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "with",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "with_recursive",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
   }
 ]
