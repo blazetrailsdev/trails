@@ -984,7 +984,6 @@ export class ConnectionPool implements ReapablePool {
       }
     }
 
-    // Rails' `ensure` for the checkout branch (connection_pool.rb:420-421).
     const releaseOnDone = () => {
       restoreSticky();
       if (!lease.sticky) this.releaseConnection(lease);
