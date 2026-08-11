@@ -1565,14 +1565,18 @@ export function checkIfMethodHasArgumentsBang(
   methodName: string,
   args: unknown[],
   message?: string,
+  block?: (args: unknown[]) => void,
 ): void {
   if (!args || args.length === 0) {
     throw argumentError(message ?? `The method .${methodName}() must contain arguments.`);
-  }
-  const flat = flattenedArgs(args);
-  args.length = 0;
-  for (const a of flat) {
-    if (!isBlankArgument(a)) args.push(a);
+  } else {
+    block?.(args);
+
+    const flat = flattenedArgs(args);
+    args.length = 0;
+    for (const a of flat) {
+      if (!isBlankArgument(a)) args.push(a);
+    }
   }
 }
 
@@ -1863,7 +1867,12 @@ export function columnReferences(orderArgs: unknown[]): string[] {
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  return orderArgs.map((arg) => (this.model as any)?.sanitizeSqlForOrder?.(arg) ?? arg);
+  // Ruby `order_args.map!` (query_methods.rb:2119) rewrites the caller's array
+  // in place — `order`'s block relies on that to sanitize its own `args`.
+  for (let i = 0; i < orderArgs.length; i++) {
+    orderArgs[i] = (this.model as any)?.sanitizeSqlForOrder?.(orderArgs[i]) ?? orderArgs[i];
+  }
+  return orderArgs;
 }
 
 function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbol)[] {
