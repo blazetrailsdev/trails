@@ -35,7 +35,6 @@ import {
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
-import { filterScopeForCreate } from "./association.js";
 import {
   RecordNotSaved,
   ConfigurationError,
@@ -1436,8 +1435,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     );
     for (const k of Object.keys(exceptFromScope)) assigned.add(k);
 
-    const out = filterScopeForCreate(sfc, assigned, skipAssign);
-    if (out) (record as any)._assignAttributes(out);
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(sfc)) {
+      if (assigned.has(key) && !skipAssign.has(key)) continue;
+      out[key] = value;
+    }
+    if (Object.keys(out).length > 0) (record as any)._assignAttributes(out);
   }
 
   /**

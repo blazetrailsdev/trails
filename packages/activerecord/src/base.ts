@@ -268,7 +268,9 @@ import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
   scopeRegistry as _scopeRegistry,
+  setCurrentScope as _setCurrentScope,
   globalCurrentScope as _globalCurrentScope,
+  setGlobalCurrentScope as _setGlobalCurrentScope,
   scopeAttributes,
   defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
@@ -2286,9 +2288,19 @@ export class Base extends Model {
   }
 
   /**
+   * Mirrors: ActiveRecord::Scoping::ClassMethods#current_scope=
+   */
+  static setCurrentScope = _setCurrentScope;
+
+  /**
    * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope
    */
   static globalCurrentScope = _globalCurrentScope;
+
+  /**
+   * Mirrors: ActiveRecord::Scoping::ClassMethods#global_current_scope=
+   */
+  static setGlobalCurrentScope = _setGlobalCurrentScope;
 
   /**
    * Mirrors: ActiveRecord::Scoping::ClassMethods#scope_registry

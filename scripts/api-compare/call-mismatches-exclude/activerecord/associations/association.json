@@ -2,23 +2,16 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
-    "rubyName": "initialize_attributes",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association.ts",
     "rubyName": "marshal_dump",
     "call": "map",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails association.rb:206-209 maps over instance_variables to build the ivar list; trails association.ts:529-537 dumps the fixed `{loaded, target}` shape — Marshal introspection has no JS analogue, the shape is explicit."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails association.rb:206-209 maps over instance_variables to build the ivar list; trails association.ts:529-537 dumps the fixed `{loaded, target}` shape \u2014 Marshal introspection has no JS analogue, the shape is explicit."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
     "rubyName": "matches_foreign_key?",
     "call": "order:foreignKey,isForeignKeyFor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed \u2014 the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",

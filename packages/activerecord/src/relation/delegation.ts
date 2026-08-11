@@ -540,18 +540,18 @@ export function classMethodDelegator(prop: string): AnyCallable {
     guardBaseMethodDelegation(modelClass, prop);
     const classMethod = (modelClass as any)[prop] as AnyCallable;
     const prev = ScopeRegistry.currentScope(modelClass);
-    ScopeRegistry.setCurrentScope(modelClass, this);
+    (modelClass as any).setCurrentScope(this);
     let result: unknown;
     try {
       result = classMethod.apply(modelClass, args);
     } catch (e) {
-      ScopeRegistry.setCurrentScope(modelClass, prev);
+      (modelClass as any).setCurrentScope(prev);
       throw e;
     }
     if (result instanceof Promise) {
-      return result.finally(() => ScopeRegistry.setCurrentScope(modelClass, prev));
+      return result.finally(() => (modelClass as any).setCurrentScope(prev));
     }
-    ScopeRegistry.setCurrentScope(modelClass, prev);
+    (modelClass as any).setCurrentScope(prev);
     return result;
   };
 }
