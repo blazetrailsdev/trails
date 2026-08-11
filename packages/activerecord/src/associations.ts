@@ -2082,18 +2082,82 @@ function initInternals(record: Base): void {
 
 /**
  * Returns the cached `Association` wrapper for `name`, or `null` if none
- * has been built yet. Mirrors Rails' `@association_cache[name]` lookup —
- * always reads `_associationInstances` (the canonical Association cache,
- * matching how `instance-methods.ts:association()` populates it).
- * `_collectionProxies` is a separate, Trails-specific user-facing layer
- * and is intentionally not consulted here.
+ * has been built yet.
+ *
+ * Rails is a one-liner here — `@association_cache[name]` — because every
+ * writer that produces cached target data (the preloader, the collection
+ * proxy, `Relation#exec_queries`) routes through `association_instance_set`,
+ * so the cache is the single place the data can be. trails' preloader and
+ * `CollectionProxy` still write their targets to the proxy /
+ * preloaded-holder layers instead, so a bare `_associationInstances.get`
+ * misses cached data that Rails would have found. Until those writers route
+ * through `associationInstanceSet` (tracked separately), this reader
+ * consults those layers and materializes the `Association` wrapper for them
+ * so the singular reads its callers make (`isLoaded`, `isUpdated`,
+ * `isStaleTarget`, `setInverseInstance`, `loadedBang`) are reachable.
+ *
+ * Only `AssociationNotFoundError` is swallowed — that is the case Rails'
+ * `association_instance_get` answers with a nil return. Configuration
+ * errors (`validateThroughReflection`, `constantize` for an unregistered
+ * target class, inverse-of validity) propagate, matching Rails'
+ * `Reflection#check_validity!`.
  *
  * Mirrors: ActiveRecord::Associations#association_instance_get
  *
  * @internal
  */
 export function associationInstanceGet(this: Base, name: string): unknown {
-  return this._associationInstances.get(name) ?? null;
+  const record = this as Base & {
+    association?(name: string): unknown;
+    _collectionProxies?: Map<string, unknown>;
+  };
+  const existing = record._associationInstances.get(name) as
+    | { isLoaded?(): boolean; target?: unknown }
+    | undefined;
+  if (typeof record.association !== "function") {
+    return existing?.isLoaded?.() ? existing : null;
+  }
+  // Rails' `replace_on_target` (collection_association.rb:457-490) does NOT
+  // permanently flip `@loaded` — it uses an ephemeral `@_was_loaded` flag
+  // reset in `ensure`. So `CollectionProxy#build` records sit in
+  // `proxy._target` while `loaded === false`, and Rails' callers gate only on
+  // `if association = association_instance_get(...)` being truthy, never on
+  // `loaded?` (autosave_association.rb:420).
+  const proxy = record._collectionProxies?.get?.(name) as
+    | { loaded?: boolean; target?: unknown[] }
+    | undefined;
+  const proxyHasBuiltRecords = Array.isArray(proxy?.target) && proxy.target.length > 0;
+  const existingHasBuiltRecords =
+    Array.isArray(existing?.target) && (existing.target as unknown[]).length > 0;
+  const hasCachedData =
+    !!_preloadedHolderTarget(record, name) ||
+    !!proxy?.loaded ||
+    proxyHasBuiltRecords ||
+    existingHasBuiltRecords ||
+    !!existing?.isLoaded?.();
+  if (!hasCachedData) return null;
+  try {
+    const inst = record.association(name) as { isLoaded?(): boolean; target?: unknown } | undefined;
+    if (inst?.isLoaded?.()) return inst;
+    // In-memory built records (no preload, no DB load). Surface them on the
+    // Association instance's `target` by direct assignment (not `setTarget`,
+    // which flips `loadedBang`) so the Association stays unloaded — matching
+    // the `@_was_loaded` ephemeral flag semantics above.
+    if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
+      inst.target = proxy.target;
+      return inst;
+    }
+    // Association-side build (`record.association(name).build(...)`) populates
+    // `existing.target` directly while `loaded` stays false. Treat that as
+    // cached too.
+    if (existingHasBuiltRecords && inst && inst === existing) {
+      return inst;
+    }
+    return null;
+  } catch (err) {
+    if (err instanceof AssociationNotFoundError) return null;
+    throw err;
+  }
 }
 
 /**
