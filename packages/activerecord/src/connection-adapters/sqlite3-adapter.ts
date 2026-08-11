@@ -2732,7 +2732,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       const code = (e as any)?.code;
       if (code !== undefined) (exc as any).code = code;
     }
-    return translateException(exc, msg, sql, binds, this.pool);
+    const translated = translateException(exc, msg, sql, binds, this.pool);
+    // Ruby chains the driver error implicitly: `translate_exception`'s result is
+    // raised from inside the `rescue`, so `Exception#cause` is `$!` and the
+    // driver error is never named in the argument list
+    // (sqlite3_adapter.rb:698-702). JS sets no cause at a `throw`, so this is
+    // the raise-site stand-in — the same one `translateExceptionClass` applies
+    // for every adapter that goes through the public translator.
+    if (translated !== exc && (translated as { cause?: unknown }).cause === undefined) {
+      (translated as { cause?: unknown }).cause = exc;
+    }
+    return translated;
   }
 
   /** @internal */
@@ -3188,24 +3198,24 @@ function translateException(
     code?.includes("CONSTRAINT_UNIQUE") ||
     /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
   ) {
-    return new RecordNotUnique(message, { sql, binds, connectionPool: pool, cause: exception });
+    return new RecordNotUnique(message, { sql, binds, connectionPool: pool });
   }
   if (
     code?.includes("CONSTRAINT_NOTNULL") ||
     /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
   ) {
-    return new NotNullViolation(message, { sql, binds, connectionPool: pool, cause: exception });
+    return new NotNullViolation(message, { sql, binds, connectionPool: pool });
   }
   if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
-    return new InvalidForeignKey(message, { sql, binds, connectionPool: pool, cause: exception });
+    return new InvalidForeignKey(message, { sql, binds, connectionPool: pool });
   }
   if (msg.includes("String or BLOB exceeded size limit")) {
-    return new ValueTooLong(message, { sql, binds, connectionPool: pool, cause: exception });
+    return new ValueTooLong(message, { sql, binds, connectionPool: pool });
   }
   if (/called on a closed database/i.test(msg)) {
     return new ConnectionNotEstablished(exception, { connectionPool: pool });
   }
-  return new StatementInvalid(message, { sql, binds, connectionPool: pool, cause: exception });
+  return new StatementInvalid(message, { sql, binds, connectionPool: pool });
 }
 
 // `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails

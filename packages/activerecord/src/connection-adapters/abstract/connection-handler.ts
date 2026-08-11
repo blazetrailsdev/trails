@@ -42,6 +42,19 @@ _setAdapterClassResolver(
 export { ConnectionDescriptor };
 export type { ConnectionOwner };
 
+// Ruby resolves `Base` in `establish_connection`'s `owner_name: Base` default
+// (`abstract/connection_handler.rb:115`) when the method runs, so
+// connection_handler.rb takes no load-order dependency on base.rb. An ESM
+// `import` from here would close a cycle (base.ts already imports this file),
+// so `base.ts` pushes itself in at the bottom of its own body instead — the
+// same `_registerBase` shape schema-migration.ts uses.
+let _base: ConnectionOwner | undefined;
+
+/** @internal */
+export function _registerBase(base: ConnectionOwner): void {
+  _base = base;
+}
+
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
   private _preventWrites: boolean;
@@ -67,10 +80,10 @@ export class ConnectionHandler {
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionHandler#determine_owner_name
    *
-   * Returns undefined where Rails returns `owner_name`'s default, `Base`:
-   * trails has no Base-as-default-owner (Base is a model class here, and
-   * importing it would close a cycle), so establishConnection supplies the
-   * fallback descriptor instead.
+   * Returns undefined only when no owner was given at all — `establishConnection`
+   * defaults `ownerName` to `Base` (via `_registerBase`) as
+   * connection_handler.rb:115 does, and supplies a config-name descriptor for
+   * the window before base.ts has loaded.
    *
    * @internal
    */
@@ -140,8 +153,11 @@ export class ConnectionHandler {
       adapterFactory?: () => DatabaseAdapter;
     } = {},
   ): ConnectionPool {
+    // `owner_name: Base` (connection_handler.rb:115). `_base` is unset only
+    // before base.ts has finished loading, where Rails' constant would not
+    // resolve either; fall back to the config-name descriptor then.
     const ownerName =
-      this.determineOwnerName(options.ownerName, config) ??
+      this.determineOwnerName(options.ownerName ?? _base, config) ??
       (config instanceof DatabaseConfig
         ? new ConnectionDescriptor(config.name)
         : new ConnectionDescriptor("primary"));

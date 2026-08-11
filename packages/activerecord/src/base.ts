@@ -103,7 +103,10 @@ import {
   type AssociationCache as _AssociationCache,
   createAssociationCache,
 } from "./association-cache.js";
-import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import {
+  ConnectionHandler,
+  _registerBase as _registerBaseWithConnectionHandler,
+} from "./connection-adapters/abstract/connection-handler.js";
 
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
@@ -5223,3 +5226,4 @@ _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
 _registerBaseWithNamedScoping(Base);
+_registerBaseWithConnectionHandler(Base);
