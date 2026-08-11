@@ -2,6 +2,7 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql, cteRelationSelfWraps } from "./to-sql.js";
+import { sql } from "../arel.js";
 
 /**
  * MySQL visitor — dialect tweaks on top of generic ToSql.
@@ -41,51 +42,27 @@ export class MySQL extends ToSql {
     return collector;
   }
 
+  // :'(
+  // To retrieve all rows from a certain offset up to the end of the result set,
+  // you can use some large number for the second parameter.
+  // https://dev.mysql.com/doc/refman/en/select.html
   protected override visitArelNodesSelectStatement(
     o: Nodes.SelectStatement,
     collector: SQLString,
   ): SQLString {
-    if (o.with) {
-      this.visit(o.with, collector);
-      collector.append(" ");
+    if (o.offset && !o.limit) {
+      // Ruby's Integer is arbitrary-precision; the max unsigned 64-bit value
+      // is past Number.MAX_SAFE_INTEGER, so it has to be a bigint here.
+      o.limit = new Nodes.Limit(18446744073709551615n);
     }
-
-    for (let i = 0; i < o.cores.length; i++) {
-      if (i > 0) collector.append(" ");
-      this.visit(o.cores[i], collector);
-    }
-
-    if (o.orders.length > 0) {
-      collector.append(" ORDER BY ");
-      this.injectJoin(o.orders, collector, ", ");
-    }
-
-    if (o.limit) {
-      collector.append(" ");
-      this.visit(o.limit, collector);
-    } else if (o.offset) {
-      // MySQL requires a LIMIT when using OFFSET; use the max unsigned 64-bit value.
-      collector.append(" LIMIT 18446744073709551615");
-    }
-
-    if (o.offset) {
-      collector.append(" ");
-      this.visit(o.offset, collector);
-    }
-
-    if (o.lock) {
-      collector.append(" ");
-      this.visit(o.lock, collector);
-    }
-
-    return collector;
+    return super.visitArelNodesSelectStatement(o, collector);
   }
 
   protected override visitArelNodesSelectCore(
     o: Nodes.SelectCore,
     collector: SQLString,
   ): SQLString {
-    o.froms ??= new Nodes.SqlLiteral("DUAL", { retryable: true });
+    o.froms ??= sql("DUAL", { retryable: true });
     return super.visitArelNodesSelectCore(o, collector);
   }
 
@@ -123,17 +100,11 @@ export class MySQL extends ToSql {
   // `!~` (which is Postgres). Mirrors Rails MySQL's `infix_value`
   // helper — same shape as visitArelNodesMatches.
   protected override visitArelNodesRegexp(o: Nodes.Regexp, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
-    collector.append(" REGEXP ");
-    this.visit(o.right, collector);
-    return collector;
+    return this.infixValue(o, collector, " REGEXP ");
   }
 
   protected override visitArelNodesNotRegexp(o: Nodes.NotRegexp, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
-    collector.append(" NOT REGEXP ");
-    this.visit(o.right, collector);
-    return collector;
+    return this.infixValue(o, collector, " NOT REGEXP ");
   }
 
   protected override visitArelNodesNullsFirst(
@@ -236,9 +207,7 @@ export class MySQL extends ToSql {
     const core = stmt.cores[stmt.cores.length - 1];
     core.source = new Nodes.JoinSource(new Nodes.Grouping(subselect).as("__active_record_temp"));
     core.projections = [
-      new Nodes.SqlLiteral(this.quoteColumnName((key as unknown as { name: string }).name), {
-        retryable: true,
-      }),
+      sql(this.quoteColumnName((key as unknown as { name: string }).name), { retryable: true }),
     ];
     return stmt;
   }

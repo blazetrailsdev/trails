@@ -12,6 +12,7 @@ export { TreeManager };
 export type { ArelEngine } from "./nodes/node.js";
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { relationName } from "./attributes/attribute.js";
+export { sql, star, fetchAttribute } from "./arel.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { registerNodeDeps } from "./nodes/node.js";
@@ -84,33 +85,3 @@ include(FunctionNode, asRuntime(WindowPredications));
 include(FunctionNode, asRuntime(FilterPredications));
 // Filter includes WindowPredications (nodes/filter.rb:6).
 include(FilterNode, asRuntime(WindowPredications));
-
-/**
- * Arel.sql() — escape hatch for raw SQL.
- *
- * Mirrors: Arel.sql
- */
-export function sql(rawSql: string): SqlLiteral {
-  return new SqlLiteral(rawSql);
-}
-
-/**
- * Arel.star — represents `*` in a projection.
- *
- * Mirrors: Arel.star
- */
-export const star = new SqlLiteral("*");
-
-/**
- * Arel.fetchAttribute() — yield the attribute nodes reachable from `value`.
- *
- * Mirrors: Arel.fetch_attribute (arel.rb:68)
- *
- * @internal
- */
-export function fetchAttribute(value: unknown, block: (attr: Node) => unknown): unknown {
-  if (typeof value !== "string") {
-    return (value as Node).fetchAttribute(block);
-  }
-  return undefined;
-}

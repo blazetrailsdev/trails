@@ -18,6 +18,7 @@ import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
+import { sql } from "./arel.js";
 import { UpdateManager } from "./update-manager.js";
 import { DeleteManager } from "./delete-manager.js";
 import type { UpdateValues } from "./crud.js";
@@ -130,18 +131,14 @@ export class SelectManager extends TreeManager {
    * unwrapped — and it precedes the `String` arm because Ruby's SqlLiteral is
    * a String subclass. `true` is how ActiveRecord's `lock!` / `with_lock`
    * express the default lock.
-   *
-   * `Arel.sql` lives in `index.ts`, which re-exports this file; importing it
-   * here would close a module cycle over index.ts's top-level `include()`
-   * side effects, so its one-line body (`new SqlLiteral(...)`) is inlined.
    */
-  lock(locking: string | Node | boolean = new SqlLiteral("FOR UPDATE")): this {
+  lock(locking: string | Node | boolean = sql("FOR UPDATE")): this {
     if (locking === true) {
-      locking = new SqlLiteral("FOR UPDATE");
+      locking = sql("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
       // Rails' empty `when Arel::Nodes::SqlLiteral` arm (select_manager.rb:56).
     } else if (typeof locking === "string") {
-      locking = new SqlLiteral(locking);
+      locking = sql(locking);
     }
 
     this.ast.lock = new Lock(locking as Node);
@@ -467,7 +464,8 @@ export class SelectManager extends TreeManager {
   protected collapse(exprs: unknown[]): Node {
     exprs = exprs
       .filter((expr) => expr !== null && expr !== undefined)
-      .map((expr) => (typeof expr === "string" ? new SqlLiteral(expr) : (expr as Node)));
+      // FIXME: Don't do this automatically
+      .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);
   }

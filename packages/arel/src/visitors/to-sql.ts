@@ -1766,7 +1766,7 @@ export class ToSql extends Visitor {
 
   /** Mirrors `to_sql.rb#infix_value`. Visits left, emits literal, visits right. */
   protected infixValue(
-    o: { left: Node; right: Node },
+    o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
     collector: SQLString,
     value: string,
   ): SQLString {

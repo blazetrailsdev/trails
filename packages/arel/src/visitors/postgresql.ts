@@ -10,30 +10,38 @@ import { ToSql } from "./to-sql.js";
  */
 export class PostgreSQL extends ToSql {
   protected override visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
-    collector.append(o.caseSensitive ? " LIKE " : " ILIKE ");
-    this.visit(o.right, collector);
-    this.appendEscape(o.escape, collector);
-    return collector;
+    const op = o.caseSensitive ? " LIKE " : " ILIKE ";
+    collector = this.infixValue(o, collector, op);
+    if (o.escape) {
+      collector.append(" ESCAPE ");
+      return this.visit(o.escape, collector);
+    } else {
+      return collector;
+    }
   }
 
   protected override visitArelNodesDoesNotMatch(
     o: Nodes.DoesNotMatch,
     collector: SQLString,
   ): SQLString {
-    this.visit(o.left, collector);
-    collector.append(o.caseSensitive ? " NOT LIKE " : " NOT ILIKE ");
-    this.visit(o.right, collector);
-    this.appendEscape(o.escape, collector);
-    return collector;
+    const op = o.caseSensitive ? " NOT LIKE " : " NOT ILIKE ";
+    collector = this.infixValue(o, collector, op);
+    if (o.escape) {
+      collector.append(" ESCAPE ");
+      return this.visit(o.escape, collector);
+    } else {
+      return collector;
+    }
   }
 
   protected override visitArelNodesRegexp(o: Nodes.Regexp, collector: SQLString): SQLString {
-    return this.visitBinaryOp(o, o.caseSensitive ? "~" : "~*", collector);
+    const op = o.caseSensitive ? " ~ " : " ~* ";
+    return this.infixValue(o, collector, op);
   }
 
   protected override visitArelNodesNotRegexp(o: Nodes.NotRegexp, collector: SQLString): SQLString {
-    return this.visitBinaryOp(o, o.caseSensitive ? "!~" : "!~*", collector);
+    const op = o.caseSensitive ? " !~ " : " !~* ";
+    return this.infixValue(o, collector, op);
   }
 
   protected override visitArelNodesDistinctOn(
