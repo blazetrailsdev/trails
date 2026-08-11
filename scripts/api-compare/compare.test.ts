@@ -231,6 +231,10 @@ describe("significantMissingCalls", () => {
       expect(SIGNIFICANT_CALLS.has(call)).toBe(false);
     }
     expect(SIGNIFICANT_CALLS.has("super")).toBe(false);
+    // Every Ruby `synchronize` is a mutex acquisition, and JS has no mutex: the
+    // faithful port runs the guarded body with no callee, so no TS body could
+    // ever satisfy the call.
+    expect(SIGNIFICANT_CALLS.has("synchronize")).toBe(false);
     // Names with a real JS call form must stay significant — suppressing them
     // would hide a genuinely dropped call. `size`/`empty?`/`first`/`last` look
     // like plain Array/property idioms but on a Relation receiver are real

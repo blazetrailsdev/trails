@@ -45,12 +45,6 @@ export class Reaper {
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static _timers = new Map<number, ReturnType<typeof setInterval>>();
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   static registerPool(pool: ReapablePool, frequency: number): void {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;

@@ -556,12 +556,6 @@ export function classMethodDelegator(prop: string): AnyCallable {
   };
 }
 
-/**
- * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
- *   the ported body is fully synchronous — it has no yield point, so
- *   run-to-completion supplies what the mutex supplies and the port has no
- *   analogue call.
- */
 export function generateMethod(name: string): AnyCallable {
   const holder = { model: null } as any;
   ASDelegation.generate(holder, [name], { to: "model", allowNil: true });

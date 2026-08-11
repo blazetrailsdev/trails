@@ -137,11 +137,6 @@ export class PoolConfig {
    * ||= connection.get_database_version }`. This is the single cache every
    * adapter's `get_database_version` is fetched through; the adapters
    * themselves stay pure.
-   *
-   * @missingRailsCall synchronize — Ruby wraps the memo in
-   *   MonitorMixin#synchronize; trails is single-threaded and has no mutex, so
-   *   the port has no analogue call - same mechanism as the NullPool row in
-   *   abstract/connection-pool.json.
    */
   serverVersion(connection: DatabaseAdapter): unknown {
     // trails-only: `getDatabaseVersion` is a real await on every adapter
@@ -220,13 +215,6 @@ export class PoolConfig {
    * Discards the pool: drains each adapter's pending async `driver.close()`
    * before dropping the pool, so an async-only driver's handle is fully closed
    * before the caller re-opens the DB. No-ops when the pool is uninitialized.
-   *
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body mutates pool state in a fully synchronous core and only
-   *   then awaits the drains that core returns, so no other body observes an
-   *   intermediate state and the mutex has no analogue call. The invariant a
-   *   later refactor must not break is that every state mutation precedes the
-   *   first await.
    */
   async discardPoolBang(): Promise<void> {
     await Promise.all(this._discardPoolBangSync());

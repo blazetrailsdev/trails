@@ -133,10 +133,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // `isConnected()` (trails' `connected?`) the same way. node-mysql2's `ping()`
   // returns a promise, which is why the predicate is awaitable here where
   // Rails' is not.
-  /**
-   * @missingRailsCall synchronize — @lock.synchronize has no counterpart: trails
-   *   is single-threaded and ports no adapter mutex.
-   */
   override async active(): Promise<boolean> {
     if (!this.isConnected()) return false;
     try {
@@ -1479,11 +1475,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * contract by dropping the reference and neutralizing the abandoned socket
    * (`abandonRawSocket`: unref + strip listeners) WITHOUT calling
    * `client.end()`, which would actively close it.
-   *
-   * @missingRailsCall synchronize — Rails wraps discard! in @lock.synchronize
-   *   (Ruby Mutex); trails' single-threaded async model has no lock to acquire,
-   *   matching the existing disconnect!/reconnect! synchronize exclusions in
-   *   this file.
    */
   override discardBang(): void {
     // If a connect is in flight, record its generation so that when it

@@ -643,13 +643,6 @@ export class ConnectionPool implements ReapablePool {
     return this.connectionLease().connection;
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   trails is single-threaded and has no mutex, so the port has no analogue
-   *   call. Cluster-vetted: representative entries in this cluster were read
-   *   against the vendored Rails body; the rest share the same mechanism and
-   *   were classified by it, not line-diffed individually.
-   */
   isConnected(): boolean {
     return this._connections != null && this._connections.some((conn) => conn.isConnected());
   }
@@ -942,12 +935,6 @@ export class ConnectionPool implements ReapablePool {
     return undefined;
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   checkin(conn: DatabaseAdapter): void {
     if (this._isConnectionPinned(conn)) return;
     this.connectionLease().clear(conn);
@@ -1015,12 +1002,6 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   stat(): {
     size: number;
     connections: number;
@@ -1049,11 +1030,6 @@ export class ConnectionPool implements ReapablePool {
    * `Promise` return is an intentional, documented divergence from Rails'
    * synchronous `disconnect` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
-   *
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
    */
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._disconnect(raiseOnAcquisitionTimeout));
@@ -1101,13 +1077,6 @@ export class ConnectionPool implements ReapablePool {
    * immediately for sync drivers (or when nothing is in flight). The `Promise`
    * return is an intentional, documented divergence from Rails' synchronous
    * `discard!` (forced by promise-returning `driver.close()`), NOT a regression.
-   *
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body mutates pool state in a fully synchronous core and only
-   *   then awaits the drains that core returns, so no other body observes an
-   *   intermediate state and the mutex has no analogue call. The invariant a
-   *   later refactor must not break is that every state mutation precedes the
-   *   first await.
    */
   async discardBang(): Promise<void> {
     await Promise.all(this._discardBang());
@@ -1168,13 +1137,6 @@ export class ConnectionPool implements ReapablePool {
    * immediately for sync drivers. The `Promise` return is an intentional,
    * documented divergence from Rails' synchronous `clear_reloadable_connections`
    * (forced by promise-returning `driver.close()`), NOT a regression to revert.
-   *
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body mutates pool state in a fully synchronous core and only
-   *   then awaits the drains that core returns, so no other body observes an
-   *   intermediate state and the mutex has no analogue call. The invariant a
-   *   later refactor must not break is that every state mutation precedes the
-   *   first await.
    */
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await Promise.all(this._clearReloadableConnections(raiseOnAcquisitionTimeout));
@@ -1227,12 +1189,6 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   reap(): void {
     if (this.isDiscarded()) return;
     // In Rails, reap recovers connections whose owner thread has died.
@@ -1247,13 +1203,6 @@ export class ConnectionPool implements ReapablePool {
    * drivers. The `Promise` return is an intentional, documented divergence from
    * Rails' synchronous `flush` (forced by promise-returning `driver.close()`),
    * NOT a regression to revert.
-   *
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body mutates pool state in a fully synchronous core and only
-   *   then awaits the drains that core returns, so no other body observes an
-   *   intermediate state and the mutex has no analogue call. The invariant a
-   *   later refactor must not break is that every state mutation precedes the
-   *   first await.
    */
   async flush(minimumIdle?: number | null): Promise<void> {
     await Promise.all(this._flush(minimumIdle));
@@ -1509,12 +1458,6 @@ export class ConnectionPool implements ReapablePool {
    */
   _eagerWarmPromise: Promise<void> | null = null;
 
-  /**
-   * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
-   *   the ported body is fully synchronous — it has no yield point, so
-   *   run-to-completion supplies what the mutex supplies and the port has no
-   *   analogue call.
-   */
   remove(conn: DatabaseAdapter): void {
     this.connectionLease().clear(conn);
     this._checkedOut.delete(conn);

@@ -979,11 +979,6 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  *
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).
- *
- * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
- *   the ported body is fully synchronous — it has no yield point, so
- *   run-to-completion supplies what the mutex supplies and the port has no
- *   analogue call.
  */
 export function loadSchema(this: SchemaHost): void {
   if (ownSchemaMemo(this, "_schemaLoaded")) return;

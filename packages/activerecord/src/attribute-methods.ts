@@ -336,12 +336,6 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
   return this._attributeMethodsGenerated ?? false;
 }
 
-/**
- * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
- *   the ported body is fully synchronous — it has no yield point, so
- *   run-to-completion supplies what the mutex supplies and the port has no
- *   analogue call.
- */
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // Rails runs `initialize_generated_modules` once per class from the
   // `inherited` hook (attribute_methods.rb:265-272), seeding
@@ -507,12 +501,6 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   this._aliasAttributesMassGenerated = true;
 }
 
-/**
- * @missingRailsCall synchronize — Ruby guards the body with Mutex#synchronize;
- *   the ported body is fully synchronous — it has no yield point, so
- *   run-to-completion supplies what the mutex supplies and the port has no
- *   analogue call.
- */
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
   const amFn = Object.getPrototypeOf(this)?.undefineAttributeMethods;
   if (typeof amFn === "function") amFn.call(this);

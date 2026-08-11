@@ -136,9 +136,6 @@ export interface PerformQueryHost extends HandleWarningsHost {
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
  * (postgresql/database_statements.rb:135-168)
  *
- * @missingRailsCall synchronize — `@lock.synchronize` guards the statement
- * cache against other Ruby threads (database_statements.rb:151); trails'
- * adapter is single-threaded and ports no adapter mutex.
  * @internal
  */
 export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(

@@ -107,13 +107,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "disconnect!",
-    "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "enable_extension",
     "call": "values_at",
     "reason": "Per-entry verified (RFC 0072 converge-pg-extension-cluster-onto-internal-exec-query): Ruby's `split(\".\").values_at(-2, -1)` has no JS analogue; postgresql-adapter.ts#enableExtension expresses the identical destructuring as `[parts.at(-2) ?? null, parts.at(-1)]`, giving nil-schema for a bare name."
@@ -294,13 +287,6 @@
     "rubyName": "rename_index",
     "call": "order:quoteTableName,execute",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "reset!",
-    "call": "synchronize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

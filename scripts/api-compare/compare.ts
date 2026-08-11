@@ -237,7 +237,17 @@ export const NO_JS_CALL_FORM = new Set([
   "to_str", // implicit String coercion — same family as `to_s`
   "key?", // `"k" in opts` / `opts.k !== undefined` on a ported options object
   "has_key?", // ditto
+  "synchronize", // the block runs bare — JS has no mutex to acquire
 ]);
+
+// `synchronize` is the strongest member of that set rather than a marginal one.
+// Every Ruby occurrence is a mutex acquisition — `Mutex#synchronize`,
+// `MonitorMixin#synchronize`, or a wrapper that delegates straight to one
+// (`queue.rb:80`, `asynchronous_queries_tracker.rb:18`) — and JS has no mutex,
+// so a faithful port emits the guarded body with no callee at all. There is no
+// TS body that could ever satisfy the call, which is what separates a
+// NO_JS_CALL_FORM name from a baselined omission: the gate would otherwise
+// carry a row per guarded method forever, with nothing to converge onto.
 
 /**
  * The JS iteration callee an Enumerable iterator's faithful port would name if
