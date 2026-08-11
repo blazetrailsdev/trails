@@ -344,7 +344,7 @@ describe("TestDot", () => {
       const stmt = new UpdateManager()
         .table(users)
         .set([[users.get("name"), "x"]])
-        .group(users.get("dept"))
+        .group([users.get("dept")])
         .having(users.get("active").eq(true)).ast;
       const out = dot.compile(stmt);
       expect(out).toContain("UpdateStatement");
@@ -357,7 +357,7 @@ describe("TestDot", () => {
     it("DeleteStatement emits Rails' six edges and no groups/havings", () => {
       const stmt = new DeleteManager()
         .from(users)
-        .group(users.get("dept"))
+        .group([users.get("dept")])
         .having(users.get("active").eq(true)).ast;
       const out = dot.compile(stmt);
       expect(out).toContain("DeleteStatement");

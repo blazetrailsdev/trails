@@ -560,10 +560,7 @@ export class SelectManager extends TreeManager {
     um.order(...this.orders);
     um.wheres = this.constraints;
     um.key = key;
-    if (groupValuesColumns.length > 0) {
-      const [first, ...rest] = groupValuesColumns;
-      um.group(first, ...rest);
-    }
+    if (groupValuesColumns.length > 0) um.group(groupValuesColumns);
     if (havingClause !== null) um.having(havingClause);
     return um;
   }
@@ -591,10 +588,7 @@ export class SelectManager extends TreeManager {
     dm.order(...this.orders);
     dm.wheres = this.constraints;
     dm.key = key;
-    if (groupValuesColumns.length > 0) {
-      const [first, ...rest] = groupValuesColumns;
-      dm.group(first, ...rest);
-    }
+    if (groupValuesColumns.length > 0) dm.group(groupValuesColumns);
     if (havingClause !== null) dm.having(havingClause);
     return dm;
   }

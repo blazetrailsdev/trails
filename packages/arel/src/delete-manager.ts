@@ -42,7 +42,7 @@ export class DeleteManager extends TreeManager {
    *
    * Mirrors: Arel::DeleteManager#group
    */
-  group(...columns: (Node | string)[]): this {
+  group(columns: (Node | string)[]): this {
     for (const column of columns) {
       if (typeof column === "string") {
         this.ast.groups.push(new Group(new SqlLiteral(column)));
