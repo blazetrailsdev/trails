@@ -25,7 +25,6 @@ import {
   routeThroughCheckValidity,
 } from "./validate-through-reflection.js";
 import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./errors.js";
-import { polymorphicName } from "../inheritance.js";
 import { RecordInvalid } from "../validations.js";
 import { CollectionAssociation, includesRecord } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
@@ -42,6 +41,17 @@ import { camelize, singularize, underscore } from "@blazetrails/activesupport";
  * Mirrors: ActiveRecord::Associations::HasManyAssociation
  */
 export class HasManyAssociation extends CollectionAssociation {
+  /**
+   * Rails' `HasManyAssociation` counter-cache instance methods, installed onto
+   * the prototype at the bottom of this file (the trails mixin idiom) so each
+   * is called on `this` with Rails' own argument list.
+   *
+   * @internal
+   */
+  declare updateCounterInMemory: (difference: number) => void;
+  /** @internal */
+  declare updateCounterIfSuccess: (savedSuccessfully: boolean, difference: number) => boolean;
+
   /**
    * Set on an ad-hoc holder built by a CollectionProxy whose own Relation state
    * has diverged from the seed (whereBang / orderBang / ...): `findTarget` then
@@ -87,7 +97,7 @@ export class HasManyAssociation extends CollectionAssociation {
       case "restrictWithException": {
         const records = await this.loadTarget();
         if (records.length > 0) {
-          throw new DeleteRestrictionError(this.owner, this.reflection.name);
+          throw new DeleteRestrictionError(this.reflection.name);
         }
         break;
       }
@@ -131,10 +141,9 @@ export class HasManyAssociation extends CollectionAssociation {
         break;
       }
 
-      case "nullify":
-        await this.deleteAll("nullify");
-        break;
-
+      // Rails has no `:nullify` case — it falls through to the `else` arm,
+      // whose bare `delete_all` reads `options[:dependent]` itself
+      // (has_many_association.rb:56, collection_association.rb:157).
       default:
         await this.deleteAll();
     }
@@ -154,7 +163,7 @@ export class HasManyAssociation extends CollectionAssociation {
       if (!saved && raise) throw new RecordInvalid(record);
     }
     // Rails: update_counter_if_success(super, 1) — sync counter on successful insert
-    return updateCounterIfSuccess(this, saved, 1);
+    return this.updateCounterIfSuccess(saved, 1);
   }
 
   /**
@@ -374,17 +383,17 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
  * (in_memory − in_database) on the next insert and inflates the counter.
  * @internal
  */
-function updateCounterInMemory(assoc: HasManyAssociation, difference: number): void {
-  const counterCol = assoc.reflection.options.counterCache;
+function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
+  const counterCol = this.reflection.options.counterCache;
   if (!counterCol) return;
-  // `assoc.reflection` is the raw definition; resolve the rich reflection the
+  // `this.reflection` is the raw definition; resolve the rich reflection the
   // same way `deleteRecords` does above.
-  const ctor = assoc.owner.constructor as typeof Base & {
+  const ctor = this.owner.constructor as typeof Base & {
     _reflectOnAssociation?: (n: string) => { isCounterMustBeUpdatedByHasMany?: () => boolean };
   };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name);
+  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
   if (refl?.isCounterMustBeUpdatedByHasMany?.() === false) return;
-  const owner = assoc.owner as any;
+  const owner = this.owner as any;
   const column = String(counterCol);
   const current = Number(owner.readAttribute?.(column) ?? 0);
   owner.writeAttribute?.(column, current + difference);
@@ -427,11 +436,11 @@ function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]
 
 /** @internal */
 function updateCounterIfSuccess(
-  assoc: HasManyAssociation,
+  this: HasManyAssociation,
   savedSuccessfully: boolean,
   difference: number,
 ): boolean {
-  if (savedSuccessfully) updateCounterInMemory(assoc, difference);
+  if (savedSuccessfully) this.updateCounterInMemory(difference);
   return savedSuccessfully;
 }
 
@@ -760,7 +769,7 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
         primaryKey,
         foreignKey,
       );
-      const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+      const conditions: Record<string, unknown> = { [typeCol]: ctor.polymorphicName() };
       for (let i = 0; i < fkCols.length; i++) {
         conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
       }
@@ -775,3 +784,5 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
   }
   return rel;
 }
+
+Object.assign(HasManyAssociation.prototype, { updateCounterInMemory, updateCounterIfSuccess });

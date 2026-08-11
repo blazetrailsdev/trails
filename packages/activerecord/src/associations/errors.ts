@@ -357,14 +357,13 @@ export class EagerLoadPolymorphicError extends ActiveRecordError {
 }
 
 export class DeleteRestrictionError extends ActiveRecordError {
-  readonly record: any;
-  readonly association: string;
-
-  constructor(record: any, association: string) {
-    super(`Cannot delete record because of dependent ${association}`);
+  constructor(name?: string | null) {
+    super(
+      name != null
+        ? `Cannot delete record because of dependent ${name}`
+        : "Delete restriction error.",
+    );
     this.name = "DeleteRestrictionError";
-    this.record = record;
-    this.association = association;
   }
 }
 

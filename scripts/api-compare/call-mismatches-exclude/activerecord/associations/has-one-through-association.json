@@ -2,44 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "construct_join_attributes",
-    "call": "ensure_mutable",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "create_through_record",
-    "call": "construct_join_attributes",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:record"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "create_through_record",
-    "call": "ensure_not_nested",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "create_through_record",
-    "call": "through_association",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "foreign_key_present?",
     "call": "all?",
     "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
@@ -63,13 +25,6 @@
     "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "foreign_key_present?",
     "call": "owner",
-    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "through_reflection",
     "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
   },
   {
@@ -103,13 +58,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "stale_state",
-    "call": "through_reflection",
-    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
     "rubyName": "target_scope",
     "call": "drop",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -120,23 +68,5 @@
     "rubyName": "target_scope",
     "call": "scope_for_association",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "through_association",
-    "call": "through_reflection",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-through-association.ts",
-    "rubyName": "transaction",
-    "call": "through_reflection",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

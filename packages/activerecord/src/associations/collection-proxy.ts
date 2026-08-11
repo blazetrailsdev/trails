@@ -55,7 +55,7 @@ import {
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
-import { findStiClass, stiEnabled, polymorphicName } from "../inheritance.js";
+import { findStiClass, stiEnabled } from "../inheritance.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -1318,7 +1318,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     if (asName) {
       const typeCol = this._assocDef.options.foreignType ?? `${underscore(asName)}_type`;
-      buildAttrs[typeCol] = polymorphicName(ctor);
+      buildAttrs[typeCol] = ctor.polymorphicName();
     }
 
     let targetModel = this.model;

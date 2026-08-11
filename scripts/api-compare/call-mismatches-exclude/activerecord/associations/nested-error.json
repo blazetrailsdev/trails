@@ -8,6 +8,6 @@
     "rubyArgs": [
       "ref:innerError"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "nested_error.rb:9-12 — Rails assigns `@association` BEFORE `super`, so `compute_attribute` reads it off the receiver. TypeScript forbids touching `this` before `super()`, and the computed attribute is an argument TO `super`, so the association must be threaded in explicitly. Genuine TS language shortcoming."
   }
 ]

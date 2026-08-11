@@ -17,6 +17,6 @@
     "call": "scope",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "collection_proxy.rb:949 — the flagged `scope(emptyRel)` is the REFLECTION's `options.scope` lambda applied to the empty relation, not Rails' `CollectionProxy#scope`; the names collide in the extractor. Blocker: trails' `CollectionProxy#scope` body is itself diverged from Rails' `@scope ||= @association.scope`, tracked separately."
   }
 ]

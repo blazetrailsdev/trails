@@ -3,7 +3,6 @@ import type { AssociationDefinition, AssociationOptions } from "../associations.
 import { autoloadModel, _preloadedHolderTarget } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
-import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import {
@@ -342,7 +341,7 @@ export class Association {
       target != null && typeof target.merge === "function"
         ? target.merge(associationScope)
         : associationScope;
-    const globalScope = ScopeRegistry.globalCurrentScope(klass as unknown as object);
+    const globalScope = (klass as unknown as { globalCurrentScope(): any }).globalCurrentScope();
     return globalScope && typeof base?.merge === "function" ? base.merge(globalScope) : base;
   }
 

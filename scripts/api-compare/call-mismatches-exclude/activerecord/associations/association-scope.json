@@ -15,15 +15,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association-scope.ts",
-    "rubyName": "get_bind_values",
-    "call": "polymorphic_name",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association-scope.ts",
     "rubyName": "get_chain",
     "call": "drop",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -31,27 +22,9 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association-scope.ts",
-    "rubyName": "last_chain_scope",
-    "call": "polymorphic_name",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association-scope.ts",
     "rubyName": "next_chain_scope",
     "call": "order:polymorphicName,transformValue",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association-scope.ts",
-    "rubyName": "next_chain_scope",
-    "call": "polymorphic_name",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -67,6 +40,6 @@
     "call": "value_transformation",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "association_scope.rb:52,78 — Rails' `value_transformation` is an `attr_reader`, so `value_transformation.call(value)` is TWO nodes (a 0-arg reader call, then `call`); trails' `this.valueTransformation(value)` reads a TS getter (not a call node) and invokes it in one expression. Same receiver, same argument — extractor pairing artifact, no argument divergence."
   }
 ]
