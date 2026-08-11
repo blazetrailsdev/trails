@@ -162,15 +162,7 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private buildPreviousTypesFor(schemes: Scheme[]): EncryptedAttributeType[] {
-    return schemes.map(
-      (s) =>
-        new EncryptedAttributeType({
-          scheme: s,
-          castType: this.castType,
-          previousType: true,
-          default: this._default,
-        }),
-    );
+    return schemes.map((scheme) => new EncryptedAttributeType({ scheme, previousType: true }));
   }
 
   /** @internal */

@@ -786,21 +786,8 @@ export function predicateBuilder(this: CoreHost): PredicateBuilder {
  * Rails: TypeCaster::Map.new(self)
  * Provides type_cast_for_database used by in_order_of etc.
  */
-export function typeCaster(this: CoreHost): {
-  typeCastForDatabase(column: string, value: unknown): unknown;
-} {
-  const host = this;
-  return {
-    typeCastForDatabase(column: string, value: unknown): unknown {
-      // Check if the model has attribute types that can cast
-      const attrDefs = (host as any)._attributeDefinitions;
-      if (attrDefs instanceof Map) {
-        const def = attrDefs.get(column);
-        if (def?.type?.serialize) return def.type.serialize(value);
-      }
-      return value;
-    },
-  };
+export function typeCaster(this: CoreHost): TypeCasterMap {
+  return new TypeCasterMap(this);
 }
 
 /**
@@ -845,10 +832,7 @@ export function connectionHandler(this: CoreHost, value?: any): any {
 }
 
 export function arelTable(this: CoreHost): Table {
-  return new Table((this as any).tableName, {
-    typeCaster: new TypeCasterMap(this),
-    klass: this as any,
-  });
+  return new Table((this as any).tableName, { klass: this as any });
 }
 
 /** @internal */

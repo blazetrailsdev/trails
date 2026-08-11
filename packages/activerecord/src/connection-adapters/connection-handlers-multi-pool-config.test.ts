@@ -18,8 +18,11 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   });
 
   it("establish connection with pool configs", () => {
-    handler.establishConnection(primaryConfig(), { owner: "primary" });
-    handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
+    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
 
     const defaultPool = handler.retrieveConnectionPool("primary", { shard: "default" });
     const otherPool = handler.retrieveConnectionPool("primary", { shard: "pool_config_two" });
@@ -32,8 +35,11 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   });
 
   it("remove connection", () => {
-    handler.establishConnection(primaryConfig(), { owner: "primary" });
-    handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
+    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
 
     // remove default
     handler.removeConnectionPool("primary");
@@ -45,8 +51,11 @@ describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   });
 
   it("connected?", async () => {
-    handler.establishConnection(primaryConfig(), { owner: "primary" });
-    handler.establishConnection(primaryConfig(), { owner: "primary", shard: "pool_config_two" });
+    handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
 
     // connect to default
     await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();

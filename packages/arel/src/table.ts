@@ -13,6 +13,12 @@ import { TableAlias } from "./nodes/table-alias.js";
  *  Kept minimal so arel does not import activerecord. */
 export interface TableKlass {
   readonly _attributeAliases?: Record<string, string>;
+  /**
+   * Rails' `klass&.type_caster` default for `type_caster:` (table.rb:14).
+   *
+   * @internal
+   */
+  typeCaster?(): unknown;
 }
 
 /** Delegation target of `Table`'s type-cast methods (Rails' `TypeCaster::Map` /
@@ -61,7 +67,7 @@ export class Table extends Node {
     const as = options?.as ?? null;
     this.tableAlias = as === name ? null : as;
     this.klass = options?.klass;
-    this.typeCaster = options?.typeCaster ?? null;
+    this.typeCaster = options?.typeCaster ?? options?.klass?.typeCaster?.() ?? null;
   }
 
   /**

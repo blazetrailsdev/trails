@@ -693,7 +693,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     }
     const pool = Base.connectionHandler.establishConnection(
       new HashConfig("test", "UnrelatedAbstract", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "UnrelatedAbstract", role: "writing" },
+      { ownerName: "UnrelatedAbstract", role: "writing" },
     );
     await pool.adapterReady;
     const conn = await UnrelatedAbstract.leaseConnection();
@@ -719,11 +719,11 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     }
     const animalsPool = Base.connectionHandler.establishConnection(
       new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "AnimalsRecord", role: "writing" },
+      { ownerName: "AnimalsRecord", role: "writing" },
     );
     const mealsPool = Base.connectionHandler.establishConnection(
       new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "MealsRecord", role: "writing" },
+      { ownerName: "MealsRecord", role: "writing" },
     );
     await Promise.all([animalsPool.adapterReady, mealsPool.adapterReady]);
     const animals = await AnimalsRecord.leaseConnection();
@@ -752,11 +752,11 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
     const handler = new ConnectionHandler();
     const appPool = handler.establishConnection(
       new HashConfig("test", "ApplicationRecord", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: ApplicationRecord, role: "writing" },
+      { ownerName: ApplicationRecord, role: "writing" },
     );
     const otherPool = handler.establishConnection(
       new HashConfig("test", "OtherAbstract", { adapter: "sqlite3", database: ":memory:" }),
-      { owner: "OtherAbstract", role: "writing" },
+      { ownerName: "OtherAbstract", role: "writing" },
     );
     try {
       await Promise.all([appPool.adapterReady, otherPool.adapterReady]);
@@ -870,7 +870,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
         pool: 5,
         reapingFrequency: null,
       }),
-      { owner: "Secondary" },
+      { ownerName: "Secondary" },
     );
     Secondary.connectionSpecificationName = "Secondary";
   });
@@ -919,7 +919,7 @@ describe("establish_connection accepts a DatabaseConfig", () => {
       pool: 5,
       reapingFrequency: null,
     });
-    Base.connectionHandler.establishConnection(config, { owner: "CapturedConfigModel" });
+    Base.connectionHandler.establishConnection(config, { ownerName: "CapturedConfigModel" });
     CapturedConfigModel.connectionSpecificationName = "CapturedConfigModel";
 
     const captured = CapturedConfigModel.removeConnection()!;

@@ -75,17 +75,17 @@ export class ConnectionHandler {
    * @internal
    */
   determineOwnerName(
-    owner: string | ConnectionOwner | undefined,
+    ownerName: string | ConnectionOwner | undefined,
     config?: DatabaseConfig | string | Record<string, unknown>,
   ): ConnectionDescriptor | ConnectionOwner | undefined {
-    if (typeof owner === "string") {
-      return new ConnectionDescriptor(owner);
+    if (typeof ownerName === "string") {
+      return new ConnectionDescriptor(ownerName);
     }
     const symbolName = symbolConnectionName(config);
     if (symbolName != null) {
       return new ConnectionDescriptor(symbolName);
     }
-    return owner;
+    return ownerName;
   }
 
   connectionPoolNames(): string[] {
@@ -133,7 +133,7 @@ export class ConnectionHandler {
   establishConnection(
     config: DatabaseConfig | string | Record<string, unknown>,
     options: {
-      owner?: string | ConnectionOwner;
+      ownerName?: string | ConnectionOwner;
       role?: string;
       shard?: string;
       clobber?: boolean;
@@ -141,7 +141,7 @@ export class ConnectionHandler {
     } = {},
   ): ConnectionPool {
     const ownerName =
-      this.determineOwnerName(options.owner, config) ??
+      this.determineOwnerName(options.ownerName, config) ??
       (config instanceof DatabaseConfig
         ? new ConnectionDescriptor(config.name)
         : new ConnectionDescriptor("primary"));

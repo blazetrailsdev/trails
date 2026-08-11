@@ -16,7 +16,7 @@ describe("ShardSelectorTest", () => {
     // database of its own.
     const dbConfig = new HashConfig("test", "Base", ambientPoolConfiguration());
     Base.connectionHandler.establishConnection(dbConfig, {
-      owner: "Base",
+      ownerName: "Base",
       role: "writing",
       shard: "shard_one",
     });

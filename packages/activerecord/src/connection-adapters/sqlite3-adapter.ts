@@ -766,12 +766,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       }
     }
     await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", {
+      allowRetry: true,
       materializeTransactions: false,
     });
     this._inTransaction = true;
     if (isolation) {
       this._previousReadUncommitted = (await this.queryValue("PRAGMA read_uncommitted")) ?? 0;
       await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", {
+        allowRetry: true,
         materializeTransactions: false,
       });
     }
@@ -783,7 +785,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       await this.internalExecute(
         `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
         "TRANSACTION",
-        { materializeTransactions: false },
+        { allowRetry: true, materializeTransactions: false },
       );
       this._previousReadUncommitted = null;
     }
@@ -803,14 +805,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       materializeTransactions = true,
       binds = [],
       prepare = false,
+      allowRetry = false,
     }: {
       materializeTransactions?: boolean;
       binds?: unknown[];
       prepare?: boolean;
+      allowRetry?: boolean;
     } = {},
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
-    return this.rawExecute(sql, name, binds, prepare, false, false, materializeTransactions);
+    return this.rawExecute(sql, name, binds, prepare, false, allowRetry, materializeTransactions);
   }
 
   /**
@@ -962,6 +966,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    */
   async commitDbTransaction(): Promise<void> {
     await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", {
+      allowRetry: true,
       materializeTransactions: false,
     });
     this._inTransaction = false;
@@ -977,6 +982,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async rollbackDbTransaction(): Promise<void> {
     try {
       await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", {
+        allowRetry: true,
         materializeTransactions: false,
       });
     } catch (e) {
@@ -3170,7 +3176,7 @@ function translateException(
   message: string,
   sql: string,
   binds: unknown[],
-  connectionPool?: unknown,
+  pool?: unknown,
 ): Error {
   const msg = exception.message;
   const code = (exception as any)?.code as string | undefined;
@@ -3178,24 +3184,24 @@ function translateException(
     code?.includes("CONSTRAINT_UNIQUE") ||
     /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
   ) {
-    return new RecordNotUnique(message, { sql, binds, connectionPool, cause: exception });
+    return new RecordNotUnique(message, { sql, binds, connectionPool: pool, cause: exception });
   }
   if (
     code?.includes("CONSTRAINT_NOTNULL") ||
     /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
   ) {
-    return new NotNullViolation(message, { sql, binds, connectionPool, cause: exception });
+    return new NotNullViolation(message, { sql, binds, connectionPool: pool, cause: exception });
   }
   if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
-    return new InvalidForeignKey(message, { sql, binds, connectionPool, cause: exception });
+    return new InvalidForeignKey(message, { sql, binds, connectionPool: pool, cause: exception });
   }
   if (msg.includes("String or BLOB exceeded size limit")) {
-    return new ValueTooLong(message, { sql, binds, connectionPool, cause: exception });
+    return new ValueTooLong(message, { sql, binds, connectionPool: pool, cause: exception });
   }
   if (/called on a closed database/i.test(msg)) {
-    return new ConnectionNotEstablished(message, { connectionPool, cause: exception });
+    return new ConnectionNotEstablished(exception, { connectionPool: pool });
   }
-  return new StatementInvalid(message, { sql, binds, connectionPool, cause: exception });
+  return new StatementInvalid(message, { sql, binds, connectionPool: pool, cause: exception });
 }
 
 // `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails

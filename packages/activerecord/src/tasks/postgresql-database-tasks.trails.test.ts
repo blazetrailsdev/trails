@@ -41,7 +41,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     const createDatabase = vi.fn(async () => {});
     const establishCalls: Array<Record<string, unknown> | undefined> = [];
     const tasks = new PostgreSQLDatabaseTasks(
-      config({ owner: "trails_owner", template: "template0" }),
+      config({ ownerName: "trails_owner", template: "template0" }),
     );
     vi.spyOn(
       tasks as unknown as { connection(): Promise<unknown> },
@@ -59,7 +59,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(createDatabase).toHaveBeenCalledWith("trails_test", {
       adapter: "postgresql",
       database: "trails_test",
-      owner: "trails_owner",
+      ownerName: "trails_owner",
       template: "template0",
       encoding: "utf8",
     });
