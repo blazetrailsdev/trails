@@ -11,7 +11,8 @@
 // without them (the nested-opaque leak alone was 8 of 17 noise rows, and 94 of
 // 604 activerecord rows).
 
-import type { CallSite, LiteralValue } from "@blazetrails/parity/types";
+import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
+import { stripThis } from "./arity.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
@@ -398,6 +399,57 @@ function calleeKeys(enclosingRubyName: string): string[] {
   return keys;
 }
 
+/**
+ * Drop the `nil`s TS must write to reach a block that Ruby wrote as a trailing
+ * block (RFC 0099).
+ *
+ * `sqlite3_adapter.rb:561` declares
+ * `alter_table(table_name, foreign_keys = …, check_constraints = …, **options)`
+ * and every caller writes `alter_table(table_name) do |definition|`. TS has no
+ * block syntax, so the callback is a trailing PARAMETER and the port has to pad
+ * every defaulted parameter it skips over — `alterTable(tableName, null, null,
+ * null, (definition) => …)`. That padding is forced by the language and carries
+ * no information: the callee applies exactly the default expressions Ruby would.
+ *
+ * Narrow on purpose. Both sides must actually carry a block, the padding must be
+ * a pure `nil` TAIL past the arguments Rails passes, and — {@link
+ * padsDefaultedParams} — the TS callee must genuinely default those parameters.
+ * A `nil` the callee reads as a value is a real divergence and still reads as
+ * one.
+ */
+function stripBlockTailPadding(
+  ruby: CallSite,
+  ts: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (!ruby.flags.includes("block") || !ts.flags.includes("block")) return tsArgs;
+  if (tsArgs.length <= rubyArgs.length) return tsArgs;
+  if (!tsArgs.slice(rubyArgs.length).every((arg) => arg === "nil")) return tsArgs;
+  if (!padsDefaultedParams(calleeSigs, rubyArgs.length, tsArgs.length)) return tsArgs;
+  return tsArgs.slice(0, rubyArgs.length);
+}
+
+/** Whether some TS signature of the callee declares every parameter in
+ *  `[from, to)` with a default or a `?` — the check that keeps
+ *  {@link stripBlockTailPadding} from swallowing a `nil` the callee treats as a
+ *  value. An unresolved callee (no signature in the package) answers no: the
+ *  padding is only provably inert when the declaration says so. */
+function padsDefaultedParams(
+  calleeSigs: ParamInfo[][] | undefined,
+  from: number,
+  to: number,
+): boolean {
+  return (calleeSigs ?? []).some((raw) => {
+    const sig = stripThis(raw);
+    for (let i = from; i < to; i++) {
+      if (sig[i]?.kind !== "optional") return false;
+    }
+    return true;
+  });
+}
+
 /** Two argument keys naming the same value. Only `ref:` keys have more than one
  *  spelling; a literal key is already canonical. */
 function argKeysEqual(rubyKey: string, tsKey: string): boolean {
@@ -511,11 +563,14 @@ export function pairCallSites(
  *  site, so the remaining arguments still compare.
  *
  *  `enclosingRubyName` is the Ruby method whose body both sites are in — the
- *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}). */
+ *  value of `__callee__` / `__method__` there ({@link resolveCalleeRefs}).
+ *  `calleeSigs` are the TS signatures of the method being CALLED, which
+ *  {@link stripBlockTailPadding} reads to tell inert padding from a value. */
 export function compareCallArgs(
   ruby: CallSite,
   ts: CallSite,
   enclosingRubyName?: string,
+  calleeSigs?: ParamInfo[][],
 ): CallArgResult {
   const skipped = (reason: CallArgSkipReason): CallArgResult => ({
     verdict: "skip",
@@ -530,10 +585,11 @@ export function compareCallArgs(
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
   }
-  const tsArgs = normalizeArgsOrFailure(stripMixinReceiver(ruby.args, ts.args));
-  if (!Array.isArray(tsArgs)) {
-    return skipped(tsArgs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
+  const normalizedTs = normalizeArgsOrFailure(stripMixinReceiver(ruby.args, ts.args));
+  if (!Array.isArray(normalizedTs)) {
+    return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }
+  const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
 
   const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
   if (argsEqual(compared, tsArgs)) return { verdict: "match", rubyArgs, tsArgs };

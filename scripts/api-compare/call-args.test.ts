@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { CallSite } from "@blazetrails/parity/types";
+import type { CallSite, ParamInfo } from "@blazetrails/parity/types";
 import { compareCallArgs, normalizeArg, normalizeArgs, pairCallSites } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -114,6 +114,60 @@ describe("normalizeArgs", () => {
   it("is uncomparable when any member is opaque", () => {
     expect(normalizeArgs(["id:x", "?"])).toBeNull();
     expect(normalizeArgs(["id:x", "sym:foo"])).toEqual(["ref:x", "str:foo"]);
+  });
+});
+
+describe("compareCallArgs block-tail nil padding", () => {
+  const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
+  const required = (name: string): ParamInfo => ({ name, kind: "required" });
+  // sqlite3_adapter.rb:561 `alter_table(table_name, foreign_keys = …,
+  // check_constraints = …, **options)`, called as `alter_table(t) do |d| … end`.
+  const rubyCall = site("alter_table", ["id:table_name"], ["block"]);
+  const tsCall = site("alterTable", ["id:tableName", "nil", "nil", "nil"], ["block"]);
+  const sig = [
+    required("tableName"),
+    optional("overrideForeignKeys"),
+    optional("overrideCheckConstraints"),
+    optional("options"),
+    optional("block"),
+  ];
+
+  it("ignores the padding when the callee defaults every padded parameter", () => {
+    expect(compareCallArgs(rubyCall, tsCall, [sig]).verdict).toBe("match");
+  });
+
+  it("still flags the padding when the callee treats a padded parameter as a value", () => {
+    const valued = [...sig];
+    valued[2] = required("overrideCheckConstraints");
+    expect(compareCallArgs(rubyCall, tsCall, [valued]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire without a callee signature to prove the padding inert", () => {
+    expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("does not fire when neither side carries a block", () => {
+    expect(
+      compareCallArgs(
+        site("alter_table", ["id:table_name"]),
+        site("alterTable", ["id:tableName", "nil"]),
+        [sig],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("does not fire on a nil Rails itself passes in the middle of the list", () => {
+    expect(
+      compareCallArgs(
+        site("alter_table", ["id:table_name"], ["block"]),
+        site("alterTable", ["id:tableName", "nil", "id:options"], ["block"]),
+        [sig],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("looks past a leading this receiver on a mixin signature", () => {
+    expect(compareCallArgs(rubyCall, tsCall, [[required("this"), ...sig]]).verdict).toBe("match");
   });
 });
 

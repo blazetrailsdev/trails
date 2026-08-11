@@ -2,17 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "type/type-map.ts",
-    "rubyName": "alias_type",
-    "call": "register_type",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:key"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at type/type_map.rb:36 `register_type(key) do |sql_type|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "type/type-map.ts",
     "rubyName": "fetch",
     "call": "perform_fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
