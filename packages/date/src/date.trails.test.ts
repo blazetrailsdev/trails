@@ -2256,6 +2256,15 @@ describe("initialize_copy", () => {
     expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow("can't modify frozen Date");
   });
 
+  it("carries a DateTime's day-fraction, sub-second and offset across", () => {
+    // The complex arm's `adat->c = bdat->c` (date_core.c:5176) with values the
+    // gem's own test_dup cannot distinguish from zero. ruby 3.3.11 -rdate:
+    //   DateTime.new(2001,2,3,4,5,6,"+09:00").dup.offset #=> (3/8)
+    const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6, "+09:00").dup();
+    expect(dt.toS()).toBe("2001-02-03T04:05:06+09:00");
+    expect(dt.offset.toString()).toBe("3/8");
+  });
+
   it("returns the receiver when it is its own source", () => {
     // The C's `copy == date` early return (date_core.c:5144-5145).
     const d = new RubyDate(2001, 2, 3);
