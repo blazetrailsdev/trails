@@ -901,7 +901,7 @@ export class Association {
   private isViolatesStrictLoading(): boolean {
     if (this._skipStrictLoading) return false;
 
-    if ((this.owner as { validationContext?: unknown }).validationContext != null) return false;
+    if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
 
     if ("strictLoading" in (this.reflection.options as object)) {
       return (this.reflection as { strictLoading?: boolean }).strictLoading ?? false;
