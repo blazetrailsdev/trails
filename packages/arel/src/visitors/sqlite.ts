@@ -18,7 +18,6 @@ export class SQLite extends ToSql {
     o: Nodes.SelectStatement,
     collector: SQLString,
   ): SQLString {
-    // SQLite requires a LIMIT when using OFFSET; -1 means "no limit".
     if (o.offset && !o.limit) o.limit = new Nodes.Limit(-1);
     return super.visitArelNodesSelectStatement(o, collector);
   }

@@ -1,6 +1,3 @@
-import type { Node } from "./nodes/node.js";
-import { SqlLiteral } from "./nodes/sql-literal.js";
-
 /**
  * The bare `Arel.*` module functions (arel.rb:31-72).
  *
@@ -13,6 +10,8 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
  * side effects. `index.ts` re-exports this module, so `Arel.sql` keeps its
  * public name and path.
  */
+import type { Node } from "./nodes/node.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
 
 /**
  * Arel.sql() — escape hatch for raw SQL.
