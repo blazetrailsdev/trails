@@ -9,7 +9,7 @@
       "ref:counter",
       "str:sql.active_record"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: query_assertions.rb:22 passes the SQLCounter OBJECT (Rails subscribes anything responding to `call`); trails' `Notifications.subscribed` takes a function, so the port wraps the counter in an arrow. Converging needs the call-object duck type on Notifications/Fanout; filed separately."
   },
   {
     "package": "activerecord",
@@ -21,7 +21,7 @@
       "ref:counter",
       "str:sql.active_record"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: query_assertions.rb:47 passes the SQLCounter OBJECT (Rails subscribes anything responding to `call`); trails' `Notifications.subscribed` takes a function, so the port wraps the counter in an arrow. Converging needs the call-object duck type on Notifications/Fanout; filed separately."
   },
   {
     "package": "activerecord",

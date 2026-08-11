@@ -26,6 +26,15 @@ export interface CallSite {
   name: string;
   args: string[];
   flags: string[];
+  /**
+   * Ruby side only: the receiver expression, in the same descriptor spelling as
+   * `args`, when the site has one and it is describable. Absent for a
+   * receiver-less call (`:fcall` / `:vcall`) and for an opaque receiver.
+   * `stripBuiltinReceiver` (call-args.ts) compares it against TS argument 1 for
+   * a `RECEIVER_AS_FIRST_ARG` name whose receiver is a simple `id:`/`const:`
+   * ref.
+   */
+  recv?: string;
 }
 
 export interface ParamInfo {

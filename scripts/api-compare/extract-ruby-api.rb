@@ -2384,7 +2384,18 @@ class ApiExtractor
       site_flags << "weak" if (callee[0] == :call || callee[0] == :command_call) &&
                               inert_receiver?(callee[1])
       descriptors = describe_args(args, site_flags)
-      sites << { name: name, args: descriptors, flags: site_flags.uniq }
+      site = { name: name, args: descriptors, flags: site_flags.uniq }
+      # The RECEIVER expression, for the built-in table in call-args.ts: a name
+      # on RECEIVER_AS_FIRST_ARG is one TS cannot define on a receiver, so the
+      # port writes Ruby's receiver as argument 1 and the comparator needs the
+      # receiver to compare it against. Same `callee[1]` the `weak` verdict
+      # above reads. A chained receiver describes as `call:…` and the
+      # comparator falls back to stripping — see stripBuiltinReceiver.
+      if callee[0] == :call || callee[0] == :command_call
+        recv = describe_arg(callee[1], site_flags)
+        site[:recv] = recv if recv && recv != "?"
+      end
+      sites << site
     end
 
     walk_for_call_args(args, sites)

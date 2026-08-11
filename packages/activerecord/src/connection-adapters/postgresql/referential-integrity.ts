@@ -32,29 +32,6 @@ export function enableReferentialIntegritySql(
   return tables.map((t) => `ALTER TABLE ${this.quoteTableName(t)} ENABLE TRIGGER ALL`);
 }
 
-// Mirrors: ReferentialIntegrity#check_all_foreign_keys_valid!
-// Marks every FK constraint as unvalidated then immediately re-validates, causing
-// the database to raise if any constraint is currently violated.
-export const CHECK_ALL_FOREIGN_KEYS_SQL = `
-do $$
-  declare r record;
-BEGIN
-FOR r IN (
-  SELECT FORMAT(
-    'UPDATE pg_catalog.pg_constraint SET convalidated=false WHERE conname = ''%1$I'' AND connamespace::regnamespace = ''%2$I''::regnamespace; ALTER TABLE %2$I.%3$I VALIDATE CONSTRAINT %1$I;',
-    constraint_name,
-    table_schema,
-    table_name
-  ) AS constraint_check
-  FROM information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY'
-)
-  LOOP
-    EXECUTE (r.constraint_check);
-  END LOOP;
-END;
-$$;
-`.trim();
-
 // Host for the instance methods: the adapter supplies its transaction/execute
 // machinery and table listing, plus the `*Sql` host (`quoteTableName`).
 interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
@@ -157,7 +134,28 @@ export async function disableReferentialIntegrity(
 export async function checkAllForeignKeysValidBang(this: ReferentialIntegrityHost): Promise<void> {
   await this.transaction(
     async () => {
-      await this.execute(CHECK_ALL_FOREIGN_KEYS_SQL);
+      // Marks every FK constraint as unvalidated then immediately re-validates,
+      // causing the database to raise if any constraint is currently violated.
+      const sql = `
+do $$
+  declare r record;
+BEGIN
+FOR r IN (
+  SELECT FORMAT(
+    'UPDATE pg_catalog.pg_constraint SET convalidated=false WHERE conname = ''%1$I'' AND connamespace::regnamespace = ''%2$I''::regnamespace; ALTER TABLE %2$I.%3$I VALIDATE CONSTRAINT %1$I;',
+    constraint_name,
+    table_schema,
+    table_name
+  ) AS constraint_check
+  FROM information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY'
+)
+  LOOP
+    EXECUTE (r.constraint_check);
+  END LOOP;
+END;
+$$;
+`.trim();
+      await this.execute(sql);
     },
     { requiresNew: true },
   );

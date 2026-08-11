@@ -15,30 +15,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "begin_db_transaction",
-    "call": "internal_begin_transaction",
-    "kind": "args",
-    "rubyArgs": [
-      "str:immediate",
-      "nil"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "begin_isolated_db_transaction",
-    "call": "internal_begin_transaction",
-    "kind": "args",
-    "rubyArgs": [
-      "str:deferred",
-      "ref:isolation"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

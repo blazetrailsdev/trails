@@ -1,15 +1,1 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/write.ts",
-    "rubyName": "define_method_attribute=",
-    "call": "define_attribute_accessor_method",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:owner",
-      "ref:canonicalName",
-      "kwargs{writer=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  }
-]
+[]

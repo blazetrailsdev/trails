@@ -346,7 +346,7 @@ export class SchemaStatements {
   }
 
   async createTable(
-    name: string,
+    tableName: string,
     optionsOrFn?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
@@ -399,20 +399,20 @@ export class SchemaStatements {
     const { id: _id, primaryKey: _primaryKey, force: _force, ...validatedOptions } = options;
     this.validateCreateTableOptionsBang(validatedOptions);
 
-    if (name.length > 64) {
-      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    if (tableName.length > 64) {
+      throw new Error(`Table name '${tableName}' is too long; the limit is 64 characters`);
     }
 
     if (options.force && options.ifNotExists) {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
 
-    const td = this.buildCreateTableDefinition(name, options, definer);
+    const td = this.buildCreateTableDefinition(tableName, options, definer);
 
     if (options.force) {
-      await this.dropTable(name, { force: options.force, ifExists: true });
+      await this.dropTable(tableName, { force: options.force, ifExists: true });
     } else {
-      await this.schemaCache.clearDataSourceCacheBang(name);
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
 
     await this.execute(await this.schemaCreation.accept(td));
@@ -421,14 +421,17 @@ export class SchemaStatements {
       for (const [columnName, indexOptions] of td.indexes) {
         // Rails overrides any per-index `if_not_exists:` with the table
         // definition's, since it splats `**index_options` first.
-        await this.addIndex(name, columnName, { ...indexOptions, ifNotExists: td.ifNotExists });
+        await this.addIndex(tableName, columnName, {
+          ...indexOptions,
+          ifNotExists: td.ifNotExists,
+        });
       }
     }
 
     if (this.supportsComments?.() && !this.supportsCommentsInCreate?.()) {
       const tableComment = presence(td.comment);
       if (tableComment != null && typeof this.changeTableComment === "function") {
-        await this.changeTableComment(name, tableComment);
+        await this.changeTableComment(tableName, tableComment);
       }
       // Mirrors Rails: adapters that can't inline column comments in CREATE
       // emit a COMMENT ON COLUMN per column so inline `comment:` options
@@ -443,9 +446,9 @@ export class SchemaStatements {
           name: string;
           options?: { comment?: string | null };
         }>) {
-          const columnComment = presence(column.options?.comment);
-          if (columnComment != null) {
-            await commentAdapter.changeColumnComment(name, column.name, columnComment);
+          const comment = presence(column.options?.comment);
+          if (comment != null) {
+            await commentAdapter.changeColumnComment(tableName, column.name, comment);
           }
         }
       }
@@ -468,9 +471,9 @@ export class SchemaStatements {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    for (const name of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(name);
-      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(name)}`);
+    for (const tableName of tableNames) {
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
+      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(tableName)}`);
     }
   }
 
@@ -618,8 +621,10 @@ export class SchemaStatements {
   async tableExists(tableName: string): Promise<boolean> {
     if (!isPresent(tableName)) return false;
     try {
-      const sql = this.dataSourceSql(tableName, { type: "BASE TABLE" });
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (
+        (await this.queryValues(this.dataSourceSql(tableName, { type: "BASE TABLE" }), "SCHEMA"))
+          .length > 0
+      );
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.tables()).includes(String(tableName));
@@ -916,8 +921,7 @@ export class SchemaStatements {
     const tableName = this.findJoinTableName(table1, table2, opts);
     const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
+    const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
     await this.createTable(tableName, { ...tableOpts, id: false }, (t) => {
       t.references(t1Ref, mergedColOpts);
@@ -1280,13 +1284,15 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    const sql = this.dataSourceSql(null, { type: "BASE TABLE" });
-    return (await this.queryValues(sql, "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(null, { type: "BASE TABLE" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async views(): Promise<string[]> {
-    const sql = this.dataSourceSql(null, { type: "VIEW" });
-    return (await this.queryValues(sql, "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(null, { type: "VIEW" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async viewExists(viewName: string): Promise<boolean> {
@@ -1300,8 +1306,10 @@ export class SchemaStatements {
     // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return false;
     try {
-      const sql = this.dataSourceSql(viewName, { type: "VIEW" });
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (
+        (await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA")).length >
+        0
+      );
     } catch (e) {
       if (e instanceof NotImplementedError) {
         return (await this.views()).includes(String(viewName));
@@ -1392,8 +1400,7 @@ export class SchemaStatements {
 
   async dataSources(): Promise<string[]> {
     try {
-      const sql = this.dataSourceSql();
-      const values = await this.queryValues(sql, "SCHEMA");
+      const values = await this.queryValues(this.dataSourceSql(), "SCHEMA");
       return values.map(String);
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
@@ -1406,8 +1413,7 @@ export class SchemaStatements {
   async dataSourceExists(name: string): Promise<boolean> {
     if (!isPresent(name)) return false;
     try {
-      const sql = this.dataSourceSql(name);
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (await this.queryValues(this.dataSourceSql(name), "SCHEMA")).length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.dataSources()).includes(String(name));
@@ -1469,8 +1475,7 @@ export class SchemaStatements {
     const { columnOptions = {}, tableName: _, ...rest } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
 
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
+    const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
     return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, (td) => {
       td.references(t1Ref, mergedColOpts);
@@ -1531,12 +1536,12 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<CreateIndexDefinition> {
-    const [idx, algorithm, ifNotExists] = await this.addIndexOptions(
+    const [index, algorithm, ifNotExists] = await this.addIndexOptions(
       tableName,
       columnName,
       options,
     );
-    return new CreateIndexDefinition(idx, algorithm, ifNotExists);
+    return new CreateIndexDefinition(index, algorithm, ifNotExists);
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
@@ -1563,8 +1568,8 @@ export class SchemaStatements {
 
     if (Array.isArray(result.primaryKey)) {
       if (!result.column) {
-        result.column = (result.primaryKey as string[]).map((pk) =>
-          this.foreignKeyColumnFor(toTable, pk),
+        result.column = (result.primaryKey as string[]).map((pkColumn) =>
+          this.foreignKeyColumnFor(toTable, pkColumn),
         );
       }
     } else {
@@ -2096,11 +2101,14 @@ export class SchemaStatements {
   ): Promise<void> {
     const idxs = await this.indexes(newName);
     for (const index of idxs) {
-      const generatedName = this.indexName(tableName, { column: index.columns, ...options } as any);
-      if (generatedName === index.name) {
+      const generatedIndexName = this.indexName(tableName, {
+        column: index.columns,
+        ...options,
+      } as any);
+      if (generatedIndexName === index.name) {
         await this.renameIndex(
           newName,
-          generatedName,
+          generatedIndexName,
           this.indexName(newName, { column: index.columns, ...options } as any),
         );
       }
@@ -2121,11 +2129,11 @@ export class SchemaStatements {
       const oldColumns = [...index.columns];
       const pos = oldColumns.indexOf(newColName);
       oldColumns[pos] = colName;
-      const generatedName = this.indexName(tableName, { column: oldColumns });
-      if (generatedName === index.name) {
+      const generatedIndexName = this.indexName(tableName, { column: oldColumns });
+      if (generatedIndexName === index.name) {
         await this.renameIndex(
           tableName,
-          generatedName,
+          generatedIndexName,
           this.indexName(tableName, { column: index.columns }),
         );
       }
@@ -2461,7 +2469,7 @@ export class SchemaStatements {
     columnNames: string[],
     _options: Record<string, unknown> = {},
   ): string[] {
-    return columnNames.map((col) => this.removeColumnForAlter(tableName, col));
+    return columnNames.map((columnName) => this.removeColumnForAlter(tableName, columnName));
   }
 
   /** @internal */

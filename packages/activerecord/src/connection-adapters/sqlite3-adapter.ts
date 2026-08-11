@@ -741,12 +741,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   // Mirrors: SQLite3::DatabaseStatements#begin_deferred_transaction
   async beginDeferredTransaction(isolation?: string | null): Promise<void> {
-    return this.internalBeginTransaction("DEFERRED", isolation ?? null);
+    return this.internalBeginTransaction("deferred", isolation ?? null);
   }
 
   // Mirrors: SQLite3::DatabaseStatements#begin_isolated_db_transaction
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    return this.internalBeginTransaction("DEFERRED", isolation);
+    return this.internalBeginTransaction("deferred", isolation);
   }
 
   // Mirrors: SQLite3::DatabaseStatements#internal_begin_transaction
@@ -949,7 +949,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // DEVIATION: Rails has no re-entrancy guard; the pool proxy can replay a
     // begin against an already-open connection and SQLite rejects nested BEGIN.
     if (this._inTransaction) return;
-    return this.internalBeginTransaction("IMMEDIATE", null);
+    return this.internalBeginTransaction("immediate", null);
   }
 
   async beginTransaction(): Promise<void> {

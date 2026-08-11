@@ -62,7 +62,7 @@
     "rubyArgs": [
       "str:_ensure_no_duplicate_errors"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "RFC 0099: autosave_association.rb:233 passes the callback as a METHOD NAME symbol; trails' `afterValidation` (callbacks.ts:56) takes `(modelClass, fn)` only and has no symbol-name arm, so the name cannot be passed. Converging needs the symbol arm on the callback registry; filed separately."
   },
   {
     "package": "activerecord",

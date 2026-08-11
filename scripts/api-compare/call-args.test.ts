@@ -175,6 +175,21 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
       compareCallArgs(site("camelize", []), site("camelize", ["id:name", "bool:false"])).verdict,
     ).toBe("mismatch");
   });
+
+  it("compares a SIMPLE recorded receiver against TS argument 1", () => {
+    const ruby = { ...site("camelize", []), recv: "id:name" };
+    expect(compareCallArgs(ruby, site("camelize", ["id:name"])).verdict).toBe("match");
+    const mismatched = compareCallArgs(ruby, site("camelize", ["id:other"]));
+    expect(mismatched.verdict).toBe("mismatch");
+    expect(mismatched.class).toBe("naming");
+  });
+
+  it("keeps the strip for a CHAINED receiver", () => {
+    // reflection.rb:454 `name.to_s.camelize` — the extractor describes the
+    // receiver as the inner call, which the port has no spelling for.
+    const ruby = { ...site("camelize", []), recv: "call:to_s" };
+    expect(compareCallArgs(ruby, site("camelize", ["id:name"])).verdict).toBe("match");
+  });
 });
 
 describe("compareCallArgs block-tail nil padding", () => {
