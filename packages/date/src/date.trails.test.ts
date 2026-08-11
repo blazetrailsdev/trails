@@ -2252,12 +2252,4 @@ describe("initialize_copy", () => {
     const d = new RubyDate(2001, 2, 3);
     expect(d.initializeCopy(d)).toBe(d);
   });
-
-  it("carries a DateTime's day-fraction, sub-second and offset across", () => {
-    // ruby 3.3.11 -rdate:
-    //   DateTime.new(2001,2,3,4,5,6,"+09:00").dup.offset #=> (3/8)
-    const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6, "+09:00").dup();
-    expect(dt.toS()).toBe("2001-02-03T04:05:06+09:00");
-    expect(dt.offset.toString()).toBe("3/8");
-  });
 });

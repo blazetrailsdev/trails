@@ -6529,11 +6529,11 @@ export class Date {
   }
 
   /**
-   * @internal `date_core.c` `get_d1` (`date_core.c:1103-1107`) — the receiver's
-   * live `DateData` read straight out, lazy fields and all: a `jd` the
-   * proleptic-Gregorian arm has not filled in yet stays `undefined` here,
-   * exactly as the C copies a struct whose `HAVE_JD` bit is clear rather than
-   * forcing `get_s_jd`. {@link DateTime} overrides it for its own fields.
+   * @internal `date_core.c` `get_d1` (`:1103-1107`) — the receiver's live
+   * `DateData` read straight out, lazy fields and all: a `jd` the
+   * proleptic-Gregorian arm has not filled in stays `undefined`, as the C
+   * copies a struct whose `HAVE_JD` bit is clear rather than forcing
+   * `get_s_jd`. {@link DateTime} overrides it for its own fields.
    */
   dat(): DateData {
     return {
@@ -6556,7 +6556,9 @@ export class Date {
    *
    * `rb_check_frozen(copy)` is `Object.isFrozen` — the same `TypeError` JS
    * raises on a write to a frozen object — and the `copy == date` early return
-   * (`:5144-5145`) comes before the copy, as it does there. The last arm is the
+   * (`:5144-5145`) comes before the copy, as it does there. The middle arm
+   * (`:5150-5169`) widens a simple source into a complex receiver, which is why
+   * its day fraction, sub-second and offset are all zero. The last arm is the
    * one the C raises on (`:5172-5175`): a complex source cannot be loaded into
    * a simple receiver, which is why `(Date.new(2001, 1, 1) + Rational(1, 2)).dup`
    * is an `ArgumentError` in MRI too — `Date`'s allocator is
@@ -6575,8 +6577,6 @@ export class Date {
         this.sg = bdat.sg;
         this.#civil = bdat.civil;
       } else {
-        // `:5150-5169`, the simple half widened into the complex arm: no day
-        // fraction, sub-second or offset to carry, so all three are zero.
         this.nth = bdat.nth;
         this.#jd = bdat.jd;
         this.#df = 0;
@@ -8450,10 +8450,9 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
-   * The `ComplexDateData` half of {@link Date#dat} — `df`, `sf` and `of` are
+   * The `ComplexDateData` half of {@link Date#dat}: `df`, `sf` and `of` are
    * always live on a `DateTime`, and the time of day the proleptic-Gregorian
-   * arm of `datetime_initialize` stores instead of a day-fraction rides along
-   * with the civil triple it goes with.
+   * arm of `datetime_initialize` stores rides along with its civil triple.
    */
   override dat(): DateData {
     return {
@@ -8474,7 +8473,9 @@ export class DateTime extends DateWithoutParseStatics {
    * different data, and TS class fields are private to the class that declares
    * them — so `adat->c = bdat->c` (`:5176`) is spelled where `c` lives. A
    * `DateTime` is always complex, so the raise at `:5173-5175` cannot be
-   * reached from here; the simple-source arm is the C's `:5150-5169`.
+   * reached from here. On the simple-source arm (`:5150-5169`) the day is taken
+   * whole rather than left to a `get_c_jd` that would find no time of day
+   * beside the civil triple it copied.
    */
   override initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
@@ -8484,9 +8485,6 @@ export class DateTime extends DateWithoutParseStatics {
     const bdat = date.dat();
     this.nth = bdat.nth;
     if (simpleDatP(date)) {
-      // A simple source has no day-fraction, sub-second or offset, and keeps
-      // its civil triple with no time of day beside it — so the day is taken
-      // whole rather than left to a `get_c_jd` that would find no time.
       this.#jd = bdat.jd ?? date.mLocalJd();
       this.#df = 0;
       this.#sf = new Rational(0, 1);

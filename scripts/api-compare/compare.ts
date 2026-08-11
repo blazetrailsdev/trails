@@ -1950,12 +1950,10 @@ export function main() {
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
-    // (file → name → declaring class → tagged calls). Qualified by class so a
-    // tag on one class never speaks for a same-named sibling in the same file;
-    // a top-level function declares under `""`.
+    // (file → name → declaring class → tagged calls), so a tag on one class
+    // never speaks for a same-named sibling; a top-level function is `""`.
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
-    // (file → name → every class in that file declaring it), the population
-    // `resolveTsOwner` disambiguates a matched pair against.
+    // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency

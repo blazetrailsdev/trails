@@ -209,9 +209,8 @@ export function renderJsdoc(rest: string[], entries: TagEntry[], indent: string)
     return oneLineProse(body[0]) === "" ? null : body[0];
   }
   // Normalize a one-line `/** ... */` comment to block form when tags exist.
-  // Its opener replaces the existing comment IN PLACE, after the declaration
-  // line's own indent — so, unlike the synthesized block above, it must not
-  // carry one of its own.
+  // Its opener replaces the comment IN PLACE, after the declaration line's own
+  // indent, so — unlike the synthesized block above — it carries none itself.
   if (ordered.length > 0 && body.length === 1) {
     const inner = oneLineProse(body[0]);
     body = ["/**", ...(inner ? [`${indent} * ${inner}`] : []), `${indent} */`];
@@ -309,11 +308,8 @@ export function reconcileFileText(
   const seen = new Set<string>();
   const skipped: string[] = [];
 
-  // The class a declaration is written in, `""` at the top level. Expectations
-  // are keyed by it, so a tag is minted only on the declaration whose Ruby
-  // counterpart actually makes the call — never on a same-named sibling in
-  // another class of the same file (`NullPool#checkout`, which Rails does not
-  // even define, next to `ConnectionPool#checkout`).
+  // The class a declaration is written in — `""` at the top level — which is
+  // half of the {@link expectationKey} a tag is minted under.
   const enclosingClassName = (node: ts.Node): string => {
     for (let p = node.parent; p; p = p.parent) {
       if (ts.isClassDeclaration(p) || ts.isClassExpression(p)) return p.name?.text ?? "";
