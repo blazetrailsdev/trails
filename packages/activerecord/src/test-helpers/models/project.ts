@@ -34,9 +34,9 @@ export class Project extends Base {
 
   static {
     this.belongsTo("mentor");
-    this.hasAndBelongsToMany("developers", {
-      scope: (q: any) => q.distinct().order("developers.name desc, developers.id desc"),
-    });
+    this.hasAndBelongsToMany("developers", (q: any) =>
+      q.distinct().order("developers.name desc, developers.id desc"),
+    );
     this.hasAndBelongsToMany("readonlyDevelopers", {
       scope: (q: any) => q.readonly(),
       className: "Developer",
