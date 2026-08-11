@@ -23,10 +23,6 @@ import { DeleteManager } from "./delete-manager.js";
 import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
-// `Arel.sql` lives in the package entry (arel.rb's port). It is a hoisted
-// function declaration and index.ts declares no classes, so importing it back
-// from a module index.ts re-exports cannot trip a class-extends TDZ.
-import { sql } from "./index.js";
 import { And } from "./nodes/and.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
@@ -139,13 +135,13 @@ export class SelectManager extends TreeManager {
    * here would close a module cycle over index.ts's top-level `include()`
    * side effects, so its one-line body (`new SqlLiteral(...)`) is inlined.
    */
-  lock(locking: string | Node | boolean = sql("FOR UPDATE")): this {
+  lock(locking: string | Node | boolean = new SqlLiteral("FOR UPDATE")): this {
     if (locking === true) {
-      locking = sql("FOR UPDATE");
+      locking = new SqlLiteral("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
       // Rails' empty `when Arel::Nodes::SqlLiteral` arm (select_manager.rb:56).
     } else if (typeof locking === "string") {
-      locking = sql(locking);
+      locking = new SqlLiteral(locking);
     }
 
     this.ast.lock = new Lock(locking as Node);
@@ -471,8 +467,7 @@ export class SelectManager extends TreeManager {
   protected collapse(exprs: unknown[]): Node {
     exprs = exprs
       .filter((expr) => expr !== null && expr !== undefined)
-      // FIXME: Don't do this automatically (select_manager.rb:260)
-      .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
+      .map((expr) => (typeof expr === "string" ? new SqlLiteral(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);
   }

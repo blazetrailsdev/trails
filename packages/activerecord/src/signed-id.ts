@@ -91,8 +91,7 @@ export function signedId(
   return verifier.generate(coerce(instance.id), {
     expiresIn: options?.expiresIn,
     expiresAt: options?.expiresAt,
-    // `|| undefined` normalizes Rails' empty combined purpose (no purpose and
-    // no `signed_id_verifier_secret` scope) to "absent" for the TS verifier.
+    // `|| undefined`: an empty combined purpose means "absent" to the verifier.
     purpose: ctor.combineSignedIdPurposes(options?.purpose) || undefined,
   });
 }

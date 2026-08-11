@@ -33,9 +33,9 @@ export class Map {
     // The resolved type already carries every decoration (NormalizedValueType,
     // Serialized, EncryptedAttributeType): `_baseTypeForAttribute` delegates to
     // `klass.typeForAttribute`, which resolves through the decorated default
-    // attribute set, so no query-side re-wrap is needed.
-    // Rails' `klass.type_for_attribute` does the `to_s` (model_schema.rb), so
-    // callers hand it the column as-is — a Symbol, a String or an Arel node.
+    // attribute set, so no query-side re-wrap is needed. Rails' `to_s` lives in
+    // `klass.type_for_attribute` (model_schema.rb), so callers pass the column
+    // as-is — a Symbol, a String, or an Arel node.
     return this._baseTypeForAttribute(String(name));
   }
 

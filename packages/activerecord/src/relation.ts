@@ -1165,8 +1165,7 @@ export class Relation<T extends Base> {
     // Cast each value to its database form so the CASE/IN predicates match a typed
     // column (e.g. enum integer mappings, date/time serialization) instead of the
     // JS-native string/number form. An Arel node finds no attribute type and falls
-    // through to ValueType (no-op cast); the `to_s` happens inside the type caster,
-    // exactly where Rails' `klass.type_for_attribute` does it.
+    // through to ValueType (no-op cast).
     const typeCaster = new TypeCasterMap(this.model);
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
     const normalized = values.map((v) => {
@@ -2690,9 +2689,8 @@ export class Relation<T extends Base> {
    */
   private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
     // Rails' SqlLiteral IS a String subclass, so `tables_in_string(join.left)`
-    // reaches `blank?`/`scan` with no conversion (relation.rb:1477, 1491). TS has
-    // no String subclass, so the unwrap lives here — in the callee, once, where
-    // Rails needs none — rather than at each call site.
+    // reaches `blank?`/`scan` unconverted (relation.rb:1477, 1491). TS has no
+    // String subclass, so the unwrap lives here rather than at each call site.
     if (string instanceof Nodes.SqlLiteral) string = string.value;
     else if (string instanceof Nodes.Node) string = string.toSql();
     if (!string) return [];
