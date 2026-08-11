@@ -255,10 +255,9 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
   // at read time in core.ts#matchesStack, so a `connected_to_many` scope
   // doesn't leak across abstract subclasses that happen to share a CCFS.
   const klasses = new Set<any>(normalized);
-  // Rails unwinds with `connected_to_stack.pop` (connection_handling.rb:177);
-  // trails' unwind runs through `withCleanup` around a possibly-async body, so
-  // it removes this specific entry by identity instead — hence capturing the
-  // literal here rather than popping. The argument itself is Rails'.
+  // Rails ends with `connected_to_stack.pop` (connection_handling.rb:177); this
+  // unwind runs through `withCleanup` around a possibly-async body, so it removes
+  // this entry by identity — which is why the literal is captured here.
   let entry!: Parameters<typeof appendToConnectedToStack>[0];
   appendToConnectedToStack((entry = { role, shard, preventWrites, klasses }));
 

@@ -67,8 +67,6 @@ export class Table extends Node {
     const as = options?.as ?? null;
     this.tableAlias = as === name ? null : as;
     this.klass = options?.klass;
-    // Mirrors Rails' `type_caster: klass&.type_caster` default (table.rb:14),
-    // which is why `arel_table` passes `klass:` alone.
     this.typeCaster = options?.typeCaster ?? options?.klass?.typeCaster?.() ?? null;
   }
 
