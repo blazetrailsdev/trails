@@ -222,7 +222,7 @@ export interface AbstractAdapter {
   // carry // @ts-expect-error on those overrides. Callers typed as AbstractAdapter
   // should use the base call forms; PG-specific forms require a concrete type.
   createTable(
-    name: string,
+    tableName: string,
     optionsOrFn?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
