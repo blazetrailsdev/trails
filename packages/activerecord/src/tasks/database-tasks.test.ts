@@ -11,7 +11,7 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { stdout, stderr } from "@blazetrails/activesupport";
+import { stdout, stderr, setEnv } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -1088,7 +1088,15 @@ describe("DatabaseTasksMigrateStatusTest", () => {
 
 describe("DatabaseTasksMigrateErrorTest", () => {
   it("migrate raise error on invalid version format", async () => {
-    await expect(DatabaseTasks.migrate("abc")).rejects.toThrow(/Invalid format/);
+    // Rails: `ENV["VERSION"] = "unknown"; DatabaseTasks.migrate`
+    // (`database_tasks_test.rb:1191-1196`) — the target version is the
+    // environment variable, never a `migrate` argument.
+    setEnv("TRAILS_MIGRATION_VERSION", "abc");
+    try {
+      await expect(DatabaseTasks.migrate()).rejects.toThrow(/Invalid format/);
+    } finally {
+      setEnv("TRAILS_MIGRATION_VERSION", undefined);
+    }
   });
 
   it("migrate raise error on failed check target version", async () => {
