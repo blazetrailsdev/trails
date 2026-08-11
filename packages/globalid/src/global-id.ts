@@ -97,19 +97,17 @@ export class GlobalID {
     for (const [k, v] of Object.entries(rest)) {
       if (v != null) filteredParams[k] = String(v);
     }
-    const modelName = model.constructor.name;
     const params = Object.keys(filteredParams).length ? filteredParams : null;
-    return new this(GID.build({ app, modelName, modelId: model.id, params }), options);
+    return new this(GID.create(app, model, params), options);
   }
 
   /** Mirrors: GlobalID.parse — falls back to base64-decoded form. */
   static parse(gid: string | GlobalID, options: GlobalIDOptions = {}): GlobalID | null {
     if (gid instanceof this) return gid;
-    const str = String(gid);
     try {
-      return new this(GID.parse(str), options);
+      return new this(gid, options);
     } catch {
-      return this.parseEncodedGid(str, options);
+      return this.parseEncodedGid(gid, options);
     }
   }
 
@@ -120,8 +118,8 @@ export class GlobalID {
   private static parseEncodedGid(gid: string, options: GlobalIDOptions): GlobalID | null {
     try {
       const b64 = gid.replace(/-/g, "+").replace(/_/g, "/");
-      const decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
-      return new this(GID.parse(decoded), options);
+      const urlsafeDecode64 = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+      return new this(urlsafeDecode64, options);
     } catch {
       return null;
     }

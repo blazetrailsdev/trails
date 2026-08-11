@@ -131,12 +131,12 @@ export class Application extends Engine {
   }
 
   /** 1000 iterations match Rails for cookie compatibility. */
-  keyGenerator(secret: string | null = this.secretKeyBase()): CachingKeyGenerator {
-    if (secret === null) throw new Error("Missing secret_key_base.");
-    let gen = this._keyGenerators.get(secret);
+  keyGenerator(secretKeyBase: string | null = this.secretKeyBase()): CachingKeyGenerator {
+    if (secretKeyBase === null) throw new Error("Missing secret_key_base.");
+    let gen = this._keyGenerators.get(secretKeyBase);
     if (!gen) {
-      gen = new CachingKeyGenerator(new KeyGenerator(secret, { iterations: 1000 }));
-      this._keyGenerators.set(secret, gen);
+      gen = new CachingKeyGenerator(new KeyGenerator(secretKeyBase, { iterations: 1000 }));
+      this._keyGenerators.set(secretKeyBase, gen);
     }
     return gen;
   }
