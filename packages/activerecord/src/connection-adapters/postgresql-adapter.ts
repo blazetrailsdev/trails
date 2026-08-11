@@ -2018,13 +2018,26 @@ export class PostgreSQLAdapter
     });
   }
 
-  // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb private)
+  // Mirrors: PostgreSQL::DatabaseStatements#cancel_any_running_query (database_statements.rb:127-133)
   // Sends a CancelRequest to abort any in-flight query on the transaction connection
   // before issuing ROLLBACK / ROLLBACK AND CHAIN. Best-effort: errors are
-  // swallowed. There is no `@raw_connection.block` half
-  // (postgresql/database_statements.rb:128) to reproduce: the connection lock
-  // covers each query's whole life, so a caller that reaches here holds the
-  // lock and nothing this adapter issued is still on the wire.
+  // swallowed, as Ruby's `rescue PG::Error` swallows them.
+  //
+  // Both of Ruby's two lines are BLOCKING, and both halves matter: `cancel` is
+  // PQcancel, which returns only once the request socket has been sent and
+  // closed, and `block` waits for the cancelled command to come back before
+  // the method returns. Together they mean the cancel is delivered, and its
+  // effect consumed, entirely inside the chain that owns the query.
+  //
+  // A CancelRequest is addressed to a BACKEND, not to a statement: whatever
+  // that backend is running when the packet lands is what dies. So dropping
+  // either half turns the cancel into a delayed round that fires at whatever
+  // query happens to be on the wire milliseconds later — measured at 25/25
+  // against PG 17 when the request is fired without awaiting delivery, which
+  // is the RFC 0061 run-end `QueryCanceled` unhandled rejection (a query whose
+  // awaiter is already gone rejecting long after its chain ended). Awaiting
+  // both halves is the ownership proof; the pre-2026-08-11 shape sampled
+  // `transactionStatus` and then fired blind.
   private async _cancelAnyRunningQuery(): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
@@ -2041,25 +2054,64 @@ export class PostgreSQLAdapter
     }
     if (txClient?.processID == null) return;
     try {
-      // Open a FRESH TCP connection to send a CancelRequest — mirrors
-      // libpq PQcancel / Ruby PG::Connection#cancel: new socket, send
-      // the 16-byte cancel message, close. Leaves the original
-      // transaction socket untouched; does NOT consume a pool slot.
-      const cancelCon = new pg.Connection() as PgConnectionWithCancel;
-      cancelCon.on("error", () => {});
-      cancelCon.once("connect", () => {
-        cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
+      // `@raw_connection.cancel` — open a FRESH TCP connection, send the
+      // 16-byte CancelRequest, and wait for the server to close it, exactly as
+      // libpq PQcancel does. Leaves the original transaction socket untouched;
+      // does NOT consume a pool slot.
+      await new Promise<void>((resolve) => {
+        const cancelCon = new pg.Connection() as PgConnectionWithCancel;
+        cancelCon.on("error", () => resolve());
+        cancelCon.on("end", () => resolve());
+        cancelCon.once("connect", () => {
+          cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
+        });
+        const { host, port } = txClient;
+        if (host?.startsWith("/")) {
+          cancelCon.connect(`${host}/.s.PGSQL.${port}`);
+        } else {
+          cancelCon.connect(port, host);
+        }
       });
-      const { host, port } = txClient;
-      if (host?.startsWith("/")) {
-        cancelCon.connect(`${host}/.s.PGSQL.${port}`);
-      } else {
-        cancelCon.connect(port, host);
-      }
+      // `@raw_connection.block` — the cancelled command still has to come back.
+      // Returning before it does would leave the cancel's effect (and the
+      // command's own rejection) to land after this chain is gone.
+      await this._blockUntilCommandSettles(txClient);
     } catch {
       // cancel is best-effort — a drain failure must not mask the rollback,
       // as Rails' `rescue PG::Error` on cancel_any_running_query does not.
     }
+  }
+
+  /**
+   * Mirrors `PG::Connection#block` as `cancel_any_running_query` uses it
+   * (postgresql/database_statements.rb:131): wait until the command on the
+   * wire has produced its terminating message. libpq blocks on the socket;
+   * node-pg is event-driven, so the wait is on the same terminating-message
+   * events `_attachReadyForQueryListener` tracks `_commandSettled` from, plus
+   * the socket's own end/error so a connection that dies under the cancel
+   * cannot hang the rollback. Like Ruby's, it has no timeout of its own.
+   *
+   * @internal
+   */
+  private _blockUntilCommandSettles(client: pg.Client): Promise<void> {
+    if (this._commandSettled) return Promise.resolve();
+    const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
+    if (connection == null) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const settle = (): void => {
+        connection.off("readyForQuery", settle);
+        connection.off("commandComplete", settle);
+        connection.off("errorMessage", settle);
+        connection.off("end", settle);
+        connection.off("error", settle);
+        resolve();
+      };
+      connection.on("readyForQuery", settle);
+      connection.on("commandComplete", settle);
+      connection.on("errorMessage", settle);
+      connection.on("end", settle);
+      connection.on("error", settle);
+    });
   }
 
   // Mirrors: DatabaseStatements#begin_isolated_db_transaction (database_statements.rb:68)

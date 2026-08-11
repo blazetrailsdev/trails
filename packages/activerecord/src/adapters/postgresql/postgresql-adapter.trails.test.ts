@@ -312,6 +312,40 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection-recurrence:
+    // a CancelRequest is addressed to a backend, not to a statement, so firing
+    // it without waiting for delivery (`cancel`) and for the cancelled command
+    // to come back (`block` — postgresql/database_statements.rb:130-131) lets
+    // it land on whatever query is on the wire milliseconds later. Before the
+    // fix the sleep below was still running when cancelAnyRunningQuery
+    // resolved, and the follow-up SELECT died with "canceling statement due to
+    // user request".
+    it("cancelAnyRunningQuery does not leak its cancel onto a later query", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.beginDbTransaction();
+        let sleepError: unknown;
+        const sleep = other.execute("SELECT pg_sleep(2)").catch((e) => {
+          sleepError = e;
+        });
+        await new Promise<void>((r) => setTimeout(r, 200));
+        await (
+          other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
+        )._cancelAnyRunningQuery();
+        // The `block` half: the cancelled command has already settled by the
+        // time the cancel returns, so nothing of it is left in flight.
+        expect(sleepError).toBeInstanceOf(QueryCanceled);
+        await sleep;
+        // The cancel aborted the transaction, so end it before probing — a
+        // leaked cancel shows up as QueryCanceled on one of these two, not as
+        // the 25P02 an aborted transaction block answers with.
+        await other.rollbackDbTransaction();
+        await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
+      } finally {
+        await other.close();
+      }
+    });
+
     // Rails' `cancel_any_running_query` has nothing to cancel once the lock
     // covers each query's whole life — `rollback_transaction` takes the same
     // lock (abstract/transaction.rb:611) and finds an idle transaction status.
