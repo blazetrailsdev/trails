@@ -412,12 +412,12 @@ export class CollectionAssociation extends Association {
    * nil that makes `CollectionProxy#<<` falsy.
    */
   async concat(...records: Base[]): Promise<Base[] | undefined> {
-    const flattened = records.flat();
+    records = records.flat();
     if (this.owner.isNewRecord()) {
       await this.skipStrictLoading(() => this.loadTarget());
-      return this.concatRecords(flattened);
+      return this.concatRecords(records);
     }
-    return this.transaction(() => this.concatRecords(flattened));
+    return this.transaction(() => this.concatRecords(records));
   }
 
   /**
@@ -475,7 +475,7 @@ export class CollectionAssociation extends Association {
    *
    * @internal
    */
-  protected async concatRecords(records: Base[], shouldRaise = false): Promise<Base[]> {
+  protected async concatRecords(records: Base[], raise = false): Promise<Base[]> {
     await concatRecordsLoop(records, async (record, resultStillTrue) => {
       (this as any).raiseOnTypeMismatchBang(record);
       // Mirror Rails' `add_to_target(record) { insert_record }`
@@ -489,7 +489,7 @@ export class CollectionAssociation extends Association {
         // `resultStillTrue === false` → a prior record failed, so Rails'
         // `result &&= insert_record` short-circuits the save.
         if (this.owner.isNewRecord() || !resultStillTrue) return;
-        inserted = await this.insertRecord(record, true, shouldRaise);
+        inserted = await this.insertRecord(record, true, raise);
       });
       return inserted;
     });
@@ -521,10 +521,10 @@ export class CollectionAssociation extends Association {
 
     const normalized = dependent === "delete" ? "deleteAll" : dependent;
     const optionDep = this.options.dependent;
-    const effectiveDependent =
+    dependent =
       normalized ?? (optionDep === "destroy" || optionDep === "delete" ? "deleteAll" : optionDep);
 
-    await this.deleteOrNullifyAllRecords(effectiveDependent);
+    await this.deleteOrNullifyAllRecords(dependent);
 
     this.reset();
     this.loadedBang();
@@ -753,9 +753,9 @@ export class CollectionAssociation extends Association {
    */
   override async loadTarget(): Promise<Base[]> {
     if (this.findTargetNeeded()) {
-      const cached = this.doFindTarget();
-      if (cached !== undefined && Array.isArray(cached)) {
-        this.target = this.mergeTargetLists(cached, this.target);
+      const findTarget = this.doFindTarget();
+      if (findTarget !== undefined && Array.isArray(findTarget)) {
+        this.target = this.mergeTargetLists(findTarget, this.target);
       } else {
         const found = await this.findTarget();
         if (found !== undefined && found !== null && Array.isArray(found)) {
@@ -1562,9 +1562,9 @@ function isIncludeInMemory(assoc: CollectionAssociation, record: Base): boolean 
   // For through reflections, also check through the source chain.
   const refl = assoc.reflection as any;
   if (refl.isThroughReflection?.()) {
-    const throughName = refl.options?.through;
-    if (throughName) {
-      const throughAssoc = (assoc.owner as any).association?.(throughName);
+    const name = refl.options?.through;
+    if (name) {
+      const throughAssoc = (assoc.owner as any).association?.(name);
       const sourceRefl = refl.sourceReflection?.();
       if (throughAssoc && sourceRefl) {
         const sourceName = sourceRefl.name;

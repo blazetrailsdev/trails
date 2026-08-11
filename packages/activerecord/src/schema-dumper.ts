@@ -717,27 +717,27 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  async table(tableName: string, lines: string[]): Promise<void> {
+  async table(table: string, lines: string[]): Promise<void> {
     // Mirrors Rails' reliance on `@connection.primary_key(table)`: capture the
     // authoritative PK column order before iterating columns so `emitTable` /
     // `resolvePrimaryKeyColumns` render composite/promoted keys in key order.
     const adapter = this._adapter();
     if (adapter && typeof adapter.primaryKeys === "function") {
       try {
-        this.primaryKeyOrderCache[tableName] = await adapter.primaryKeys(tableName);
+        this.primaryKeyOrderCache[table] = await adapter.primaryKeys(table);
       } catch {
         // Live introspection is best-effort; fall through to declaration order.
       }
     }
-    this.tableName = tableName;
+    this.tableName = table;
     try {
-      const columns = await this._source.columns(tableName);
-      const rawIndexes = await this._source.indexes(tableName);
-      const indexes = await this.filterIndexesForDump(tableName, rawIndexes);
-      const adapterTableOpts = await this.fetchTableOptions(tableName);
+      const columns = await this._source.columns(table);
+      const rawIndexes = await this._source.indexes(table);
+      const indexes = await this.filterIndexesForDump(table, rawIndexes);
+      const adapterTableOpts = await this.fetchTableOptions(table);
       const inlineLines: string[] = [];
-      const remaining = await this.gatherInlineConstraints(tableName, inlineLines);
-      this.emitTable(lines, tableName, columns, indexes, adapterTableOpts, inlineLines);
+      const remaining = await this.gatherInlineConstraints(table, inlineLines);
+      this.emitTable(lines, table, columns, indexes, adapterTableOpts, inlineLines);
       if (remaining && remaining.length > 0) lines.push("", ...remaining);
       lines.push("");
     } finally {
@@ -767,7 +767,7 @@ export abstract class SchemaDumper {
    * @internal
    */
   protected async checkConstraintsInCreate(
-    tableName: string,
+    table: string,
     lines: string[],
   ): Promise<string[] | undefined> {
     const host = this._hookHost("checkConstraints") as
@@ -782,7 +782,7 @@ export abstract class SchemaDumper {
     // raises NotImplementedError when unsupported (e.g. MySQL <8.0.16, MariaDB
     // <10.2.1) must not be queried.
     if (host.supportsCheckConstraints && !(await host.supportsCheckConstraints())) return undefined;
-    const checkConstraints = ((await host.checkConstraints(tableName)) ?? []) as {
+    const checkConstraints = ((await host.checkConstraints(table)) ?? []) as {
       expression: string;
       name?: string;
       validate?: boolean;
@@ -801,7 +801,7 @@ export abstract class SchemaDumper {
     }
 
     if (checkInvalid.length > 0) {
-      const tableNameStr = JSON.stringify(this.removePrefixAndSuffix(tableName));
+      const tableNameStr = JSON.stringify(this.removePrefixAndSuffix(table));
       const addCheckConstraintStatements = checkInvalid.map((check) => {
         const [expr, ...opts] = this.checkParts(check);
         const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
@@ -985,8 +985,8 @@ export abstract class SchemaDumper {
   /** @internal */
   indexesInCreate(tableName: string, lines: string[], indexes: IndexInfo[] = []): void {
     const stripped = this.removePrefixAndSuffix(tableName);
-    for (const idx of indexes) {
-      const [cols, ...opts] = this.indexParts(idx);
+    for (const index of indexes) {
+      const [cols, ...opts] = this.indexParts(index);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
       lines.push(`  await ctx.addIndex(${JSON.stringify(stripped)}, ${cols}${optStr});`);
     }
@@ -1116,12 +1116,12 @@ export abstract class SchemaDumper {
    */
   formatColspec(colspec: Record<string, unknown>): string {
     return Object.entries(colspec)
-      .map(([k, v]) => {
-        const value =
-          v && typeof v === "object" && !Array.isArray(v)
-            ? `{ ${this.formatColspec(v as Record<string, unknown>)} }`
-            : String(v);
-        return `${k}: ${value}`;
+      .map(([key, value]) => {
+        return `${key}: ${
+          value && typeof value === "object" && !Array.isArray(value)
+            ? `{ ${this.formatColspec(value as Record<string, unknown>)} }`
+            : String(value)
+        }`;
       })
       .join(", ");
   }

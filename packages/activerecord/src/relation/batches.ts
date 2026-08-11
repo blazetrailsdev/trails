@@ -124,16 +124,16 @@ export function batchCondition(
   // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
   const positions = cursorArr.map((col, i) => [col, valArr[i], operators[i]] as const);
   const [firstCol, firstVal, firstOp] = positions[positions.length - 1];
-  let clause: any = table.get(firstCol)[firstOp](firstVal);
+  let whereClause: any = table.get(firstCol)[firstOp](firstVal);
 
   for (let i = positions.length - 2; i >= 0; i--) {
     const [col, val, op] = positions[i];
     const attr = table.get(col);
     const strictOp = op === "lteq" ? "lt" : op === "gteq" ? "gt" : op;
-    clause = attr[strictOp](val).or(attr.eq(val).and(clause));
+    whereClause = attr[strictOp](val).or(attr.eq(val).and(whereClause));
   }
 
-  return relation.where(clause);
+  return relation.where(whereClause);
 }
 
 /** @internal */

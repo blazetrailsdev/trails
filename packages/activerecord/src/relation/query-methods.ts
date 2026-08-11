@@ -2381,9 +2381,9 @@ export function buildWithExpressionFromValue(this: QueryMethodsHost, value: unkn
     if (value.length === 0)
       throw argumentError("Empty array passed to buildWithExpressionFromValue");
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0]);
-    const parts = value.map((part) => buildWithExpressionFromValue.call(this, part));
+    const parts = value.map((query) => buildWithExpressionFromValue.call(this, query));
     return parts.reduce(
-      (result: unknown, part: unknown) => new Nodes.UnionAll(result as any, part as any),
+      (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
     );
   }
   throw argumentError(`Unsupported argument type: \`${String(value)}\` ${typeof value}`);
