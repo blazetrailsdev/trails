@@ -83,7 +83,6 @@ hand.
 | Path                                        | Kind              | Enforced by                    |
 | ------------------------------------------- | ----------------- | ------------------------------ |
 | `api-compare/call-mismatches-exclude/`      | exclude (sharded) | `lint-call-mismatches.ts`      |
-| `api-compare/call-mismatches-wide-exclude/` | exclude (sharded) | `lint-call-mismatches.ts`      |
 | `api-compare/call-mismatches-unreviewed/`   | mark (sharded)    | `lint-call-mismatches.ts`      |
 | `api-compare/arity-exclude.json`            | exclude           | `lint-arity-excludes.ts`       |
 | `api-compare/inheritance-exclude.json`      | exclude           | `lint-inheritance-excludes.ts` |
