@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, setEnv } from "@blazetrails/activesupport";
 import {
   env,
   setExitCode,
@@ -609,6 +609,25 @@ async function withMigrationTasksForDb(
 }
 
 /**
+ * Runs `fn` with `TRAILS_MIGRATION_VERSION` set to `targetVersion`, so
+ * `DatabaseTasks.target_version` sees it exactly as it sees Rails'
+ * `ENV["VERSION"]` (`tasks/database_tasks.rb:268`).
+ */
+async function withTargetVersionEnv(
+  targetVersion: string | null,
+  fn: () => Promise<void>,
+): Promise<void> {
+  if (targetVersion === null) return fn();
+  const was = env.TRAILS_MIGRATION_VERSION;
+  setEnv("TRAILS_MIGRATION_VERSION", targetVersion);
+  try {
+    await fn();
+  } finally {
+    setEnv("TRAILS_MIGRATION_VERSION", was);
+  }
+}
+
+/**
  * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
  * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
  * routing (single-primary fast path, then `db_configs_with_versions` sorted so
@@ -616,7 +635,7 @@ async function withMigrationTasksForDb(
  * for each config are registered up front and the whole run happens inside a
  * single `configs_for` registration rather than a per-database loop.
  */
-async function runMigrateAll(targetVersion: string | null): Promise<void> {
+async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
   const migrationsFor = new Map<string, Awaited<ReturnType<typeof discoverMigrations>>>();
@@ -653,7 +672,7 @@ async function runMigrateAll(targetVersion: string | null): Promise<void> {
 
   await withRegisteredConfigurations(configs, envName, () =>
     DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
-      await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll({ targetVersion }));
+      await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll());
       for (const { name, raw, hashConfig } of entries) {
         const prefix = multiDb ? `[${name}] ` : "";
         await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
@@ -715,22 +734,23 @@ export function dbCommand(): Command {
       // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
-      if (opts.database === undefined) {
-        await runMigrateAll(targetVersion);
-        return;
-      }
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(
-          ctx,
-          () => DatabaseTasks.migrate(undefined, { targetVersion }),
-          {
+      // Rails has no `--version` flag: the target version IS the env var
+      // `target_version` reads (`database_tasks.rb:268`), so bridge it there
+      // rather than threading an argument Rails does not have.
+      await withTargetVersionEnv(targetVersion, async () => {
+        if (opts.database === undefined) {
+          await runMigrateAll();
+          return;
+        }
+        await forEachDatabase(opts, async (ctx) => {
+          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), {
             afterPending: (pending) => {
               if (pending === 0) {
                 console.log(`${ctx.prefix}All migrations are up to date.`);
               }
             },
-          },
-        );
+          });
+        });
       });
     });
 

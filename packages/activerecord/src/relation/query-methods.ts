@@ -1565,14 +1565,18 @@ export function checkIfMethodHasArgumentsBang(
   methodName: string,
   args: unknown[],
   message?: string,
+  block?: (args: unknown[]) => void,
 ): void {
   if (!args || args.length === 0) {
     throw argumentError(message ?? `The method .${methodName}() must contain arguments.`);
-  }
-  const flat = flattenedArgs(args);
-  args.length = 0;
-  for (const a of flat) {
-    if (!isBlankArgument(a)) args.push(a);
+  } else {
+    block?.(args);
+
+    const flat = flattenedArgs(args);
+    args.length = 0;
+    for (const a of flat) {
+      if (!isBlankArgument(a)) args.push(a);
+    }
   }
 }
 
@@ -1582,15 +1586,6 @@ export function flattenedArgs(args: unknown[]): unknown[] {
   // (plain objects) and every other value pass through untouched, so
   // `with({ cte: rel })` keeps its CTE definition hash intact.
   return args.flatMap((e) => (Array.isArray(e) ? flattenedArgs(e) : e));
-}
-
-/** @internal */
-export function flattenedOrderArgs(args: unknown[]): unknown[] {
-  // order/reorder mirror Rails' `args.flatten!` (query_methods.rb:659/755) so a
-  // nested blank array like `order([nil])` collapses and compact_blanks away.
-  // A bind array `[Arel.sql("x = ?"), ...binds]` has already been collapsed into
-  // one SqlLiteral by sanitize_order_arguments, which runs first.
-  return args.flatMap((e) => (Array.isArray(e) ? flattenedOrderArgs(e) : e));
 }
 
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
@@ -1863,7 +1858,10 @@ export function columnReferences(orderArgs: unknown[]): string[] {
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  return orderArgs.map((arg) => (this.model as any)?.sanitizeSqlForOrder?.(arg) ?? arg);
+  for (let i = 0; i < orderArgs.length; i++) {
+    orderArgs[i] = (this.model as any)?.sanitizeSqlForOrder?.(orderArgs[i]) ?? orderArgs[i];
+  }
+  return orderArgs;
 }
 
 function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbol)[] {

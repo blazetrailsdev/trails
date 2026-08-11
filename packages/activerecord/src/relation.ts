@@ -1001,7 +1001,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, { orderArgs: true });
+    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, () => {
+      this.sanitizeOrderArguments(args as unknown[]);
+    });
     return this._clone().orderBang(...args);
   }
 
@@ -1124,8 +1126,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, {
-      orderArgs: true,
+    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, () => {
+      this.sanitizeOrderArguments(args as unknown[]);
     });
     return this._clone().reorderBang(...args);
   }
@@ -1543,24 +1545,15 @@ export class Relation<T extends Base> {
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("joins", args as unknown[], undefined, { normalize: false });
+    this.checkIfMethodHasArgumentsBang("joins", args as unknown[]);
     const rel = this._clone();
-    // Rails' `check_if_method_has_arguments!` runs `args.flatten!` +
-    // `args.compact_blank!` before `spawn.joins!` (query_methods.rb:868-871).
-    // flattenedArgs recurses into arrays only (plain objects like
-    // `{ post: "author" }` pass through); isBlankArgument drops `{}` / `[]` /
-    // `null` / `""` so blank specs never reach join state. A `joins(["a","b"])`
-    // array flattens to two association names here, matching Rails — there is no
-    // longer a `(table, on)` heuristic to disambiguate against, so the flatten
-    // is uniform.
-    const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     // Rails joins! uses `joins_values |= args` — one array union over the whole
     // set, deduplicating by eql?/hash (structural for Arel `Nodes.Binary`, plain
     // strings, and Hash specs alike). structuralUnionEq mirrors that (=== first,
     // then eql/structural), and a single unified store preserves insertion order
     // across named and raw joins. The named-vs-raw partition the builders need is
     // derived on read (see `_namedInnerJoins` / `_joinValues`).
-    for (const arg of flatArgs) {
+    for (const arg of args) {
       if (!rel._joinsValues.some((v) => _qm.structuralUnionEq(v, arg)))
         rel._joinsValues.push(arg as AssociationSpec | string | Nodes.Join);
     }
@@ -1615,17 +1608,13 @@ export class Relation<T extends Base> {
     callee: string,
     args: Array<AssociationSpec | AssociationSpec[]>,
   ): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(callee, args, undefined, { normalize: false });
+    this.checkIfMethodHasArgumentsBang(callee, args);
     const rel = this._clone();
-    // Rails' check_if_method_has_arguments! flatten!s + compact_blank!s before
-    // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
-    // `leftJoins([])` drop their blank specs instead of polluting join state.
-    const specs = _qm.flattenedArgs(args).filter((s) => !_qm.isBlankArgument(s));
     // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
     // raises for a non-Hash/Symbol/Array arg lazily at SQL-build time, in
     // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
     // `buildJoinBuckets` for the raise.
-    for (const spec of specs) {
+    for (const spec of args) {
       // Rails' left_outer_joins! unions with `|=` (eql?/hash), so a Hash spec
       // passed twice folds structurally — not by JS reference identity.
       if (!rel._leftOuterJoinsValues.some((v) => _qm.structuralUnionEq(v, spec))) {
@@ -3609,7 +3598,9 @@ export class Relation<T extends Base> {
     // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
     // Uses the broader column_name_matcher (allows functions like UPPER(col))
     // rather than column_name_with_order_matcher (which is stricter, for order).
-    const stringColumns = columns.filter((c): c is string => typeof c === "string");
+    const stringColumns = this.flattenedArgs(columns).filter(
+      (c): c is string => typeof c === "string",
+    );
     if (stringColumns.length > 0) {
       disallowRawSqlBang(stringColumns, { permit: resolveColumnNameMatcher(this._conn()) });
     }
@@ -5520,7 +5511,7 @@ export class Relation<T extends Base> {
     methodName: string | symbol,
     args: unknown[],
     message?: string,
-    options?: { normalize?: boolean; orderArgs?: boolean },
+    block?: (args: unknown[]) => void,
   ): void {
     // Rails passes a Symbol via __callee__; we collapse it to its
     // description so the error message reads `.select()` rather than
@@ -5528,36 +5519,7 @@ export class Relation<T extends Base> {
     // description) fall through to "<anonymous>".
     const name =
       typeof methodName === "symbol" ? (methodName.description ?? "<anonymous>") : methodName;
-    const raiseIfBlank = () => {
-      // Rails raises on `args.blank?` — the *outer* varargs array being empty —
-      // BEFORE any flatten/compact, so `joins([])` / `reorder(nil)` (a single
-      // blank element) do not raise.
-      if (!args || args.length === 0) {
-        throw argumentError(message ?? `The method .${name}() must contain arguments.`);
-      }
-    };
-    // `normalize: false` performs only the blank raise, skipping the shared
-    // `flatten!`/`compact_blank!` mutation. Used by the joins family, whose bang
-    // variants do their own array flattening and blank-skipping.
-    if (options?.normalize === false) {
-      raiseIfBlank();
-      return;
-    }
-    // `orderArgs` runs Rails' order/reorder normalization: raise-on-blank, then
-    // the `sanitize_order_arguments(args)` block, then `flatten!` +
-    // `compact_blank!` (query_methods.rb:656-660/752-756). Sanitizing first is
-    // what collapses a bind array `[Arel.sql("x = ?"), ...binds]` into a single
-    // interpolated SqlLiteral, so the subsequent flatten can't scatter its binds.
-    // `order([nil])` / `reorder([{}])` flatten then compact to empty (no-op).
-    if (options?.orderArgs) {
-      raiseIfBlank();
-      const sanitized = _qm.sanitizeOrderArguments.call(this as any, args);
-      const flat = _qm.flattenedOrderArgs(sanitized).filter((a) => !_qm.isBlankArgument(a));
-      args.length = 0;
-      args.push(...flat);
-      return;
-    }
-    return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message);
+    return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message, block);
   }
 
   /**

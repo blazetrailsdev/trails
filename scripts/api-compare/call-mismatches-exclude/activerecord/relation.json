@@ -817,18 +817,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "joins",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "joins",
     "call": "joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -873,18 +861,6 @@
     "rubyName": "only",
     "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "order",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -962,18 +938,6 @@
     "rubyName": "references_eager_loaded_tables?",
     "call": "references_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "reorder",
-    "call": "check_if_method_has_arguments!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:__callee__",
-      "ref:args"
-    ],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/query_methods.rb:2213 `check_if_method_has_arguments!(method_name, args, message = nil)`: Rails passes `__callee__`, which has no TS equivalent, and the port passes the same value as a literal method-name string; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",

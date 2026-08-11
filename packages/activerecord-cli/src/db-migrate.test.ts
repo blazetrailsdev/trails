@@ -73,7 +73,7 @@ describe("DbMigrateTest", () => {
   it("db:migrate calls migrate with no args", async () => {
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
-    expect(migrateSpy).toHaveBeenCalledWith(undefined, { skipInitialize: true });
+    expect(migrateSpy).toHaveBeenCalledWith({ skipInitialize: true });
   });
 
   it("db:migrate --version passes version string", async () => {
