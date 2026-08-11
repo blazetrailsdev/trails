@@ -17,6 +17,30 @@ export function wrap<T>(value: T | T[] | null | undefined): T[] {
 }
 
 /**
+ * Ruby's `Kernel#Array` — the one-or-many normalization Rails leans on
+ * directly (e.g. `encryption/cipher.rb:26`, `relation/batches.rb:260`).
+ *
+ * It is NOT `Array.wrap`: `Kernel#Array` tries `to_ary` and then `to_a`, so a
+ * Hash becomes its pairs and an Enumerable becomes its elements, where
+ * `Array.wrap` would wrap either in a one-element array. `Array(nil)` is `[]`
+ * in both.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (Kernel#Array), which Rails calls
+ * without defining, so there is no Ruby file in any gem for the port to mirror;
+ * JS has no global equivalent (`Array(3)` builds a 3-hole array, not `[3]`).
+ */
+export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) return value;
+  // `to_ary` / `to_a`: anything iterable (bar a String, which defines neither)
+  // spreads; a Map's entries mirror Ruby's Hash#to_a pairs.
+  if (typeof value === "object" && typeof (value as any)[Symbol.iterator] === "function") {
+    return [...(value as unknown as Iterable<T>)];
+  }
+  return [value] as T[];
+}
+
+/**
  * Split an array into groups of `n`, padding the last group with `fillWith`.
  */
 export function inGroupsOf<T>(

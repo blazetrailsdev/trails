@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { deriveArClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
+import { deriveArClosure, filterFilesToClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
 
 const REAL_VENDOR = path.resolve(__dirname, "../../vendor/rails/activerecord/lib/active_record.rb");
 
@@ -94,5 +94,46 @@ describe("deriveArClosure", () => {
       expect(files).toContain("core_ext/array/wrap.rb");
       expect(files).not.toContain("core_ext/uri.rb");
     });
+  });
+});
+
+describe("filterFilesToClosure", () => {
+  const files = [
+    { rubyFile: "core_ext/module/delegation.rb", matched: 3, total: 4 },
+    { rubyFile: "core_ext/array/wrap.rb", matched: 1, total: 1 },
+    { rubyFile: "core_ext/uri.rb", matched: 2, total: 5 },
+  ];
+  const closure = ["core_ext/module/delegation.rb", "core_ext/array/wrap.rb"];
+
+  it("restricts the rows of a support gem to the closure file set", () => {
+    expect(filterFilesToClosure(files, closure, false).map((f) => f.rubyFile)).toEqual([
+      "core_ext/module/delegation.rb",
+      "core_ext/array/wrap.rb",
+    ]);
+  });
+
+  it("drops every row when the package has no closure entry", () => {
+    expect(filterFilesToClosure(files, undefined, false)).toEqual([]);
+  });
+
+  it("does not filter a data-layer package", () => {
+    expect(filterFilesToClosure(files, closure, true)).toEqual(files);
+    expect(filterFilesToClosure(files, undefined, true)).toEqual(files);
+  });
+
+  it("leaves the whole-package totals untouched", () => {
+    const sum = (rows: typeof files): [number, number] => [
+      rows.reduce((n, f) => n + f.matched, 0),
+      rows.reduce((n, f) => n + f.total, 0),
+    ];
+    const before = sum(files);
+    filterFilesToClosure(files, closure, false);
+    filterFilesToClosure(files, closure, true);
+    expect(files).toHaveLength(3);
+    expect(sum(files)).toEqual(before);
+    // The closure subtotal is a strict subset — it never exceeds the summary.
+    const [cm, ct] = sum(filterFilesToClosure(files, closure, false));
+    expect(cm).toBeLessThanOrEqual(before[0]);
+    expect(ct).toBeLessThanOrEqual(before[1]);
   });
 });

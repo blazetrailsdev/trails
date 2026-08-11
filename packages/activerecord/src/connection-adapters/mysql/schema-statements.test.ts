@@ -103,7 +103,7 @@ describe("MySQL::SchemaStatements", () => {
 
   it("createTableDefinition returns MySQL TableDefinition", async () => {
     const conn = await Base.leaseConnection();
-    expect(createTableDefinition.call(conn as never, "users").tableName).toBe("users");
+    expect(createTableDefinition.call(conn as never, "users").name).toBe("users");
   });
 
   it("defaultType: parses string/integer/function defaults", () => {

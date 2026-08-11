@@ -15,6 +15,8 @@ import { type Compressor } from "./config.js";
 import { Configurable } from "./configurable-slot.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import type { Context } from "./context.js";
+import { isPresent } from "@blazetrails/activesupport";
+
 import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
@@ -34,6 +36,21 @@ export interface SchemeOptions {
   messageSerializer?: MessageSerializerLike;
 }
 
+/**
+ * The `{ encrypt, decrypt }` pair `Base.encrypts`' `encryptor:` option has
+ * always accepted needs adapting to the full contract. Rails has no such step
+ * and no such call — it lives here, off `initialize`, so the two
+ * `Encryptor.new` calls in the constructor stay the two scheme.rb:32-33 makes.
+ *
+ * @noRailsEquivalent CONVERGEABLE (story:
+ * converge-encryption-simple-encryptor-onto-encryptor-like) — dies with the shim.
+ */
+function shimUnlessFullEncryptor(encryptor: EncryptorOptionLike): EncryptorLike {
+  return typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"
+    ? (encryptor as EncryptorLike)
+    : new LegacyEncryptorShim(encryptor);
+}
+
 export class Scheme {
   private _keyProviderParam?: unknown;
   private _cachedKeyProviderFromKey?: DerivedSecretKeyProvider;
@@ -43,8 +60,11 @@ export class Scheme {
   downcase: boolean;
   ignoreCase: boolean;
   previousSchemes: Scheme[];
-  private _encryptor: EncryptorLike;
-  // Original options as-passed — used by _toOptions() / merge() to distinguish
+  private compress: boolean;
+  private compressor?: Compressor;
+  /** Rails' `@context_properties` — the leftover `**` kwargs (scheme.rb:13). */
+  private _contextProperties: Partial<Context>;
+  // Original options as-passed — used by toH() / merge() to distinguish
   // "not set" (undefined) from "explicitly set to false", mirroring Rails'
   // @context_properties + nil-defaulted ivars + to_h.compact pattern.
   private _opts: SchemeOptions;
@@ -58,24 +78,22 @@ export class Scheme {
     this.ignoreCase = options.ignoreCase ?? false;
     this.previousSchemes = options.previousSchemes ?? [];
 
-    if (options.encryptor) {
-      const encryptor = options.encryptor;
-      this._encryptor =
-        typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"
-          ? (encryptor as EncryptorLike)
-          : new LegacyEncryptorShim(encryptor);
-    } else {
-      this._encryptor = new Encryptor({
-        compress: options.compress,
-        compressor: options.compressor,
-      });
+    this._contextProperties = {};
+    if (options.encryptor !== undefined) {
+      this._contextProperties.encryptor = shimUnlessFullEncryptor(options.encryptor);
     }
+    if (options.messageSerializer !== undefined) {
+      this._contextProperties.messageSerializer = options.messageSerializer;
+    }
+    this.compress = options.compress ?? true;
+    this.compressor = options.compressor;
 
     this.validateConfigBang();
-  }
 
-  get encryptor(): EncryptorLike {
-    return this._encryptor;
+    if (!this.compress)
+      this._contextProperties.encryptor = new Encryptor({ compress: this.compress });
+    if (options.compressor)
+      this._contextProperties.encryptor = new Encryptor({ compressor: options.compressor });
   }
 
   get keyProvider(): unknown {
@@ -102,18 +120,12 @@ export class Scheme {
   }
 
   merge(other: Scheme): Scheme {
-    return new Scheme({ ...this._toOptions(), ...other._toOptions() });
+    return new Scheme({ ...this.toH(), ...other.toH() });
   }
 
   withContext<T>(fn: () => T): T {
-    const { encryptor, compress, compressor, messageSerializer } = this._opts;
-    const hasEncryptorOverride =
-      encryptor !== undefined || compress === false || compressor !== undefined;
-    if (hasEncryptorOverride || messageSerializer !== undefined) {
-      const ctx: Partial<Context> = {};
-      if (hasEncryptorOverride) ctx.encryptor = this._encryptor;
-      if (messageSerializer !== undefined) ctx.messageSerializer = messageSerializer;
-      return Contexts.withEncryptionContext(ctx, fn);
+    if (isPresent(this._contextProperties)) {
+      return Contexts.withEncryptionContext(this._contextProperties, fn);
     }
     return fn();
   }
@@ -122,7 +134,8 @@ export class Scheme {
     return this.deterministic === other.deterministic;
   }
 
-  private _toOptions(): SchemeOptions {
+  /** Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68). */
+  toH(): SchemeOptions {
     const o = this._opts;
     const opts: SchemeOptions = {};
     if (o.keyProvider !== undefined) opts.keyProvider = o.keyProvider;
@@ -136,9 +149,7 @@ export class Scheme {
       opts.supportUnencryptedData = o.supportUnencryptedData;
     if (o.compress !== undefined) opts.compress = o.compress;
     if (o.compressor !== undefined) opts.compressor = o.compressor;
-    if (o.encryptor !== undefined) opts.encryptor = o.encryptor;
-    if (o.messageSerializer !== undefined) opts.messageSerializer = o.messageSerializer;
-    return opts;
+    return { ...opts, ...(this._contextProperties as Partial<SchemeOptions>) };
   }
 
   /** @internal */
@@ -176,10 +187,10 @@ export class Scheme {
     if (this._keyProviderParam != null && this.key != null) {
       throw new Configuration("key and keyProvider can't be used simultaneously");
     }
-    if (this._opts.compress === false && this._opts.compressor !== undefined) {
+    if (!this.compress && this.compressor !== undefined) {
       throw new Configuration("compressor can't be used with compress: false");
     }
-    if (this._opts.compressor !== undefined && this._opts.encryptor !== undefined) {
+    if (this.compressor !== undefined && this._contextProperties.encryptor !== undefined) {
       throw new Configuration("compressor can't be used with encryptor");
     }
   }

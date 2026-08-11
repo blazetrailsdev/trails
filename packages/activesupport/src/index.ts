@@ -246,6 +246,7 @@ export {
 
 export {
   wrap,
+  kernelArray,
   inGroupsOf,
   inGroups,
   splitArray,

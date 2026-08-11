@@ -454,7 +454,7 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("createTableDefinition returns TableDefinition", () => {
-    expect(makeStatements().createTableDefinition("orders").tableName).toBe("orders");
+    expect(makeStatements().createTableDefinition("orders").name).toBe("orders");
   });
 
   it("createAlterTable returns AlterTable", () => {

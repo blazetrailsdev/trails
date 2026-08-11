@@ -121,12 +121,12 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       inflate: (data: Buffer | Uint8Array) => Buffer.from(data).toString("utf-8"),
     };
     const scheme = new Scheme({ compressor: customCompressor });
-    expect(scheme.encryptor).toBeTruthy();
+    expect(scheme.toH().encryptor).toBeTruthy();
   });
 
   it("should create a encryptor well when compress is false", () => {
     const scheme = new Scheme({ compress: false });
-    expect(scheme.encryptor).toBeTruthy();
+    expect(scheme.toH().encryptor).toBeTruthy();
   });
 
   describe("isSupportUnencryptedData", () => {
@@ -181,7 +181,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     const base = new Scheme({ encryptor: customEncryptor });
     const override = new Scheme({ deterministic: true });
     const merged = base.merge(override);
-    expect(merged.encryptor).toBe(customEncryptor);
+    expect(merged.toH().encryptor).toBe(customEncryptor);
   });
 
   it("withContext calls block directly when no context properties are set", () => {

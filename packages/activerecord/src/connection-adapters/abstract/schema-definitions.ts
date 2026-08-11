@@ -836,7 +836,7 @@ export class ReferenceDefinition {
       table.column(colName, colType, colOpts);
     }
     if (this.index) {
-      table.index(this.columnNames(), this.indexOptions(table.tableName));
+      table.index(this.columnNames(), this.indexOptions(table.name));
     }
     if (this.foreignKey) {
       table.foreignKey(this.foreignTableName(), this.foreignKeyOptions() as AddForeignKeyOptions);
@@ -951,7 +951,7 @@ export class AlterTable {
       this.name = nameOrTd;
     } else {
       this._td = nameOrTd;
-      this.name = nameOrTd.tableName;
+      this.name = nameOrTd.name;
     }
   }
 
@@ -1009,7 +1009,7 @@ export class AlterTable {
  * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition
  */
 export class TableDefinition {
-  readonly tableName: string;
+  readonly name: string;
   readonly columns: ColumnDefinition[] = [];
   /**
    * Rails stores the caller's options untouched — `indexes << [column_name,
@@ -1029,7 +1029,7 @@ export class TableDefinition {
   protected _adapter: TableDefinitionConn;
 
   constructor(
-    tableName: string,
+    name: string,
     tdOptions: {
       adapterName?: "sqlite" | "postgres" | "mysql";
       adapter: TableDefinitionConn;
@@ -1042,7 +1042,7 @@ export class TableDefinition {
       collation?: string;
     },
   ) {
-    this.tableName = tableName;
+    this.name = name;
     this._adapterName = tdOptions.adapterName ?? "sqlite";
     this._adapter = tdOptions.adapter;
     this.temporary = tdOptions.temporary ?? false;
@@ -1199,11 +1199,11 @@ export class TableDefinition {
     if (existing) {
       if (existing.options.primaryKey) {
         throw new ArgumentError(
-          `you can't redefine the primary key column '${name}' on '${this.tableName}'. To define a custom primary key, pass { id: false } to create_table.`,
+          `you can't redefine the primary key column '${name}' on '${this.name}'. To define a custom primary key, pass { id: false } to create_table.`,
         );
       } else {
         throw new ArgumentError(
-          `you can't define an already defined column '${name}' on '${this.tableName}'.`,
+          `you can't define an already defined column '${name}' on '${this.name}'.`,
         );
       }
     }
@@ -1230,9 +1230,9 @@ export class TableDefinition {
     const prefix = this._adapter.tableNamePrefix ?? globalTableNamePrefix();
     const suffix = this._adapter.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;
-    const opts = this._adapter.foreignKeyOptions(this.tableName, prefixedToTable, { ...options });
+    const opts = this._adapter.foreignKeyOptions(this.name, prefixedToTable, { ...options });
     return new ForeignKeyDefinition(
-      this.tableName,
+      this.name,
       prefixedToTable,
       opts.column as string | string[],
       (opts.primaryKey as string | string[] | undefined) ?? "id",
@@ -1252,11 +1252,11 @@ export class TableDefinition {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): CheckConstraintDefinition {
-    const resolved = this._adapter.checkConstraintOptions(this.tableName, expression, options) as {
+    const resolved = this._adapter.checkConstraintOptions(this.name, expression, options) as {
       name?: string;
       validate?: boolean;
     };
-    return new CheckConstraintDefinition(this.tableName, expression, resolved);
+    return new CheckConstraintDefinition(this.name, expression, resolved);
   }
 
   /** @internal */
