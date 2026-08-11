@@ -1556,10 +1556,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
     // Mirrors Rails' AbstractMysqlAdapter#translate_exception, which builds
     // every translated error with `connection_pool: @pool`
-    // (abstract_mysql_adapter.rb:815-856). Attaching it here rather than in the
-    // public wrapper is what gives the direct `_translateException` throw sites
-    // a pool too. Use setPool/setConnectionPool (both guarded) so a pool
-    // attached at construction isn't overwritten.
+    // (abstract_mysql_adapter.rb:815-856) — so the direct `_translateException`
+    // throw sites get a pool too, not just the public wrapper's callers. Both
+    // setters are guarded, so a pool passed at construction survives.
     if (translated instanceof ConnectionNotEstablished) {
       translated.setPool(this.pool);
     } else if (translated instanceof AdapterError) {
