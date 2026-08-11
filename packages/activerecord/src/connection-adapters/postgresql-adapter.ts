@@ -4085,11 +4085,6 @@ export class PostgreSQLAdapter
 
   /**
    * @internal postgresql/schema_statements.rb:1051-1056.
-   *
-   * @missingRailsCall new — Rails builds the deferred half of the ALTER with
-   *   `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS
-   *   body uses an arrow function, the JS analogue, so there is no `new` to
-   *   match.
    */
   async changeColumnForAlter(
     tableName: string,
@@ -4108,11 +4103,6 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   *
-   * @missingRailsCall new — Rails builds the deferred half of the ALTER with
-   *   `Proc.new { ... }` (postgresql/schema_statements.rb:1054, :1062); the TS
-   *   body uses an arrow function, the JS analogue, so there is no `new` to
-   *   match.
    */
   changeColumnNullForAlter(
     tableName: string,
