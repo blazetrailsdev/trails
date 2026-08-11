@@ -2417,9 +2417,8 @@ export class Model {
    */
   assignAttributes(newAttributes: unknown): void {
     assertHashAttributes(newAttributes);
-    const attrs = newAttributes;
-    if (isMassAssignmentEmpty(attrs)) return;
-    this._assignAttributes(this.sanitizeForMassAssignment(attrs));
+    if (isMassAssignmentEmpty(newAttributes)) return;
+    this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
   }
 
   /**

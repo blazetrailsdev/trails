@@ -335,8 +335,8 @@ export class ToSql extends Visitor {
     // collector << quote(o.value_for_database).to_s — the quoted literal is
     // appended directly (visit_Arel_Nodes_Quoted is an alias). Only BindParam
     // uses add_bind. Inlines exactly like visitQuoted.
-    const value = resolveValueForDatabase(node.valueForDatabase());
-    collector.append(this.quote(value));
+    const valueForDatabase = resolveValueForDatabase(node.valueForDatabase());
+    collector.append(this.quote(valueForDatabase));
     return collector;
   }
 
@@ -621,7 +621,7 @@ export class ToSql extends Visitor {
     // empty filter, so hints that sanitize to empty still emit the comment. The
     // node only exists when `optimizer_hints(*hints)` got a non-empty splat
     // (select_manager.rb:147-149), which is the only emptiness Rails guards.
-    const hints = node.hints.map((h) => this.sanitizeAsSqlComment(h)).join(" ");
+    const hints = node.hints.map((v) => this.sanitizeAsSqlComment(v)).join(" ");
     collector.append(` /*+ ${hints} */`);
     return collector;
   }
@@ -1152,6 +1152,7 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesIn(node: Nodes.In, collector: SQLString): SQLString {
+    const attr = node.left;
     let values = node.right;
     if (Array.isArray(values)) {
       collector.preparable = false;
@@ -1164,7 +1165,7 @@ export class ToSql extends Visitor {
         return collector;
       }
     }
-    this.visit(node.left, collector);
+    this.visit(attr, collector);
     // Duck-type check for SelectManager subquery - visit wraps it in parens
     if (
       values &&
@@ -1191,6 +1192,7 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesNotIn(node: Nodes.NotIn, collector: SQLString): SQLString {
+    const attr = node.left;
     let values = node.right;
     if (Array.isArray(values)) {
       collector.preparable = false;
@@ -1203,7 +1205,7 @@ export class ToSql extends Visitor {
         return collector;
       }
     }
-    this.visit(node.left, collector);
+    this.visit(attr, collector);
     if (Array.isArray(values)) {
       collector.append(" NOT IN (");
       for (let i = 0; i < values.length; i++) {
@@ -1257,17 +1259,20 @@ export class ToSql extends Visitor {
   // -- Predicates --
 
   private visitArelNodesEquality(node: Nodes.Equality, collector: SQLString): SQLString {
-    if (this.unboundableSign(node.right) !== 0) {
+    const right = node.right;
+
+    if (this.unboundableSign(right) !== 0) {
       return collector.append("1=0");
     }
-    if (this.rightIsNull(node.right)) {
-      this.visit(node.left, collector);
-      collector.append(" IS NULL");
-      return collector;
-    }
+
     this.visit(node.left, collector);
-    collector.append(" = ");
-    this.visit(node.right, collector);
+
+    if (this.rightIsNull(right)) {
+      collector.append(" IS NULL");
+    } else {
+      collector.append(" = ");
+      this.visit(right, collector);
+    }
     return collector;
   }
 
@@ -1300,17 +1305,20 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesNotEqual(node: Nodes.NotEqual, collector: SQLString): SQLString {
-    if (this.unboundableSign(node.right) !== 0) {
+    const right = node.right;
+
+    if (this.unboundableSign(right) !== 0) {
       return collector.append("1=1");
     }
-    if (this.rightIsNull(node.right)) {
-      this.visit(node.left, collector);
-      collector.append(" IS NOT NULL");
-      return collector;
-    }
+
     this.visit(node.left, collector);
-    collector.append(" != ");
-    this.visit(node.right, collector);
+
+    if (this.rightIsNull(right)) {
+      collector.append(" IS NOT NULL");
+    } else {
+      collector.append(" != ");
+      this.visit(right, collector);
+    }
     return collector;
   }
 
@@ -1719,9 +1727,9 @@ export class ToSql extends Visitor {
    * subsequent node emits `joinStr` and visits.
    */
   protected injectJoin(list: Node[], collector: SQLString, joinStr: string): SQLString {
-    list.forEach((n, i) => {
+    list.forEach((x, i) => {
       if (i > 0) collector.append(joinStr);
-      this.visit(n, collector);
+      this.visit(x, collector);
     });
     return collector;
   }

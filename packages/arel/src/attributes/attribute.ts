@@ -93,8 +93,8 @@ export class Attribute extends Node {
    *
    * @internal
    */
-  quotedNode(value: unknown): Node {
-    return buildQuoted(value, this);
+  quotedNode(other: unknown): Node {
+    return buildQuoted(other, this);
   }
 
   // -- Ordering --
@@ -156,8 +156,8 @@ export class Attribute extends Node {
 
   // -- Aliasing --
 
-  as(aliasName: string): As {
-    return new As(this, new SqlLiteral(aliasName, { retryable: true }));
+  as(other: string): As {
+    return new As(this, new SqlLiteral(other, { retryable: true }));
   }
 
   // -- Aggregate functions --

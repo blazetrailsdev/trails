@@ -163,17 +163,17 @@ export const Predications = {
   notEq(this: Node & PredicationHost, other: unknown): NotEqual {
     return new NotEqual(this, this.quotedNode(other));
   },
-  gt(this: Node & PredicationHost, other: unknown): GreaterThan {
-    return new GreaterThan(this, this.quotedNode(other));
+  gt(this: Node & PredicationHost, right: unknown): GreaterThan {
+    return new GreaterThan(this, this.quotedNode(right));
   },
-  gteq(this: Node & PredicationHost, other: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this, this.quotedNode(other));
+  gteq(this: Node & PredicationHost, right: unknown): GreaterThanOrEqual {
+    return new GreaterThanOrEqual(this, this.quotedNode(right));
   },
-  lt(this: Node & PredicationHost, other: unknown): LessThan {
-    return new LessThan(this, this.quotedNode(other));
+  lt(this: Node & PredicationHost, right: unknown): LessThan {
+    return new LessThan(this, this.quotedNode(right));
   },
-  lteq(this: Node & PredicationHost, other: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this, this.quotedNode(other));
+  lteq(this: Node & PredicationHost, right: unknown): LessThanOrEqual {
+    return new LessThanOrEqual(this, this.quotedNode(right));
   },
 
   isDistinctFrom(this: Node & PredicationHost, other: unknown): IsDistinctFrom {
@@ -185,7 +185,7 @@ export const Predications = {
 
   matches(
     this: Node & PredicationHost,
-    pattern: unknown,
+    other: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
   ): Matches {
@@ -193,25 +193,21 @@ export const Predications = {
     // `quotedNode` (→ buildQuoted) already unwraps SelectManager/TreeManager
     // `.ast` and passes Nodes through untouched, so we don't need a
     // separate branch for AST-bearing inputs here.
-    return new Matches(this, this.quotedNode(pattern), escape, caseSensitive);
+    return new Matches(this, this.quotedNode(other), escape, caseSensitive);
   },
   doesNotMatch(
     this: Node & PredicationHost,
-    pattern: unknown,
+    other: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
-    return new DoesNotMatch(this, this.quotedNode(pattern), escape, caseSensitive);
+    return new DoesNotMatch(this, this.quotedNode(other), escape, caseSensitive);
   },
-  matchesRegexp(this: Node & PredicationHost, pattern: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this, this.quotedNode(pattern), caseSensitive);
+  matchesRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): RegexpNode {
+    return new RegexpNode(this, this.quotedNode(other), caseSensitive);
   },
-  doesNotMatchRegexp(
-    this: Node & PredicationHost,
-    pattern: string,
-    caseSensitive = true,
-  ): NotRegexp {
-    return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
+  doesNotMatchRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): NotRegexp {
+    return new NotRegexp(this, this.quotedNode(other), caseSensitive);
   },
 
   in(this: Node & PredicationHost, other: unknown): In {

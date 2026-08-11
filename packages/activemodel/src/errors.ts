@@ -88,8 +88,8 @@ export class Errors<TBase extends object = object> {
    *     @errors.append(NestedError.new(@base, error, override_options))
    *   end
    */
-  import(error: ActiveModelError, options?: { attribute?: string; type?: string }): void {
-    this._errors.push(new NestedError(this._base, error, options));
+  import(error: ActiveModelError, overrideOptions?: { attribute?: string; type?: string }): void {
+    this._errors.push(new NestedError(this.base, error, overrideOptions));
   }
 
   /**
@@ -251,7 +251,7 @@ export class Errors<TBase extends object = object> {
     } & Record<string, unknown>,
   ): ActiveModelError {
     const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
-    const error = new ActiveModelError(this._base, normAttr, normType, normOpts);
+    const error = new ActiveModelError(this.base, normAttr, normType, normOpts);
     const strict = normOpts.strict;
     if (strict) {
       const ExceptionClass: new (message?: string) => globalThis.Error =
@@ -281,13 +281,14 @@ export class Errors<TBase extends object = object> {
       | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
     options?: Record<string, unknown>,
   ): boolean {
-    const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
+    let normType: string;
+    [attribute, normType, options] = this.normalizeArguments(attribute, type, options);
     if (normType.startsWith(":")) {
       // Symbol branch: strict attribute/type/options match.
-      return this._errors.some((e) => e.strictMatch(normAttr, normType, normOpts));
+      return this._errors.some((e) => e.strictMatch(attribute, normType, options));
     }
     // String branch: full-message lookup (Rails else clause in added?).
-    return this.messagesFor(normAttr).includes(normType);
+    return this.messagesFor(attribute).includes(normType);
   }
 
   /**
@@ -304,13 +305,14 @@ export class Errors<TBase extends object = object> {
       | string
       | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
   ): boolean {
-    const [normAttr, normType] = this.normalizeArguments(attribute, type);
+    let normType: string;
+    [attribute, normType] = this.normalizeArguments(attribute, type);
     if (normType.startsWith(":")) {
       // Symbol branch: check for errors of this exact type.
-      return this.where(normAttr, normType).length > 0;
+      return this.where(attribute, normType).length > 0;
     }
     // String branch: full-message lookup (Rails else clause).
-    return this.messagesFor(normAttr).includes(normType);
+    return this.messagesFor(attribute).includes(normType);
   }
 
   get fullMessages(): string[] {
@@ -326,7 +328,7 @@ export class Errors<TBase extends object = object> {
   }
 
   fullMessage(attribute: string, message: string): string {
-    return ActiveModelError.fullMessage(attribute, message, this._base);
+    return ActiveModelError.fullMessage(attribute, message, this.base);
   }
 
   generateMessage(
@@ -334,7 +336,7 @@ export class Errors<TBase extends object = object> {
     type: string = ":invalid",
     options?: Record<string, unknown>,
   ): string {
-    return ActiveModelError.generateMessage(attribute, type, this._base, options);
+    return ActiveModelError.generateMessage(attribute, type, this.base, options);
   }
 
   /**

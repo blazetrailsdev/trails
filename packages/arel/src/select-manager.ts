@@ -115,10 +115,10 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#as
    */
-  as(alias: string): TableAlias {
+  as(other: string): TableAlias {
     return this.createTableAlias(
       this.grouping(this.ast),
-      new SqlLiteral(alias, { retryable: true }),
+      new SqlLiteral(other, { retryable: true }),
     );
   }
 
@@ -172,12 +172,12 @@ export class SelectManager extends TreeManager {
   /**
    * Add GROUP BY.
    */
-  group(...exprs: (Node | string)[]): this {
-    for (const e of exprs) {
-      if (typeof e === "string") {
-        this.core.groups.push(new Group(new SqlLiteral(e)));
+  group(...columns: (Node | string)[]): this {
+    for (const column of columns) {
+      if (typeof column === "string") {
+        this.core.groups.push(new Group(new SqlLiteral(column)));
       } else {
-        this.core.groups.push(new Group(e));
+        this.core.groups.push(new Group(column));
       }
     }
     return this;
@@ -211,23 +211,23 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#join (select_manager.rb:102-113).
    */
   join(
-    table: Node | string | null | undefined,
+    relation: Node | string | null | undefined,
     klass: new (left: Node, right: Node | null) => Join = InnerJoin,
   ): this {
-    if (table == null) return this;
-
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
+    if (relation == null) return this;
 
     // Rails: `case relation when String, Nodes::SqlLiteral` (select_manager.rb:105-109).
     // SqlLiteral subclasses String in Ruby, so both arms share the emptiness
     // check and the StringJoin promotion.
-    if (typeof table === "string" || table instanceof SqlLiteral) {
-      const text = typeof table === "string" ? table : table.value;
+    if (typeof relation === "string" || relation instanceof SqlLiteral) {
+      const text = typeof relation === "string" ? relation : relation.value;
       if (text.length === 0) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
 
-    this.core.source.right.push(this.createJoin(tableNode, null, klass));
+    if (typeof relation === "string") relation = new SqlLiteral(relation);
+
+    this.core.source.right.push(this.createJoin(relation, null, klass));
     return this;
   }
 
@@ -236,8 +236,8 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#outer_join (select_manager.rb:115-117).
    */
-  outerJoin(table: Node | string | null | undefined): this {
-    return this.join(table, OuterJoin);
+  outerJoin(relation: Node | string | null | undefined): this {
+    return this.join(relation, OuterJoin);
   }
 
   /**
@@ -252,20 +252,20 @@ export class SelectManager extends TreeManager {
    * Define a named window.
    */
   window(name: string): NamedWindow {
-    const win = new NamedWindow(name);
-    this.core.windows.push(win);
-    return win;
+    const window = new NamedWindow(name);
+    this.core.windows.push(window);
+    return window;
   }
 
   /**
    * Add projections (columns to SELECT).
    */
   project(...projections: (Node | string)[]): this {
-    for (const p of projections) {
-      if (typeof p === "string") {
-        this.core.projections.push(new SqlLiteral(p));
+    for (const x of projections) {
+      if (typeof x === "string") {
+        this.core.projections.push(new SqlLiteral(x));
       } else {
-        this.core.projections.push(p);
+        this.core.projections.push(x);
       }
     }
     return this;
@@ -404,12 +404,12 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#lateral
    */
-  lateral(alias?: string): Lateral {
+  lateral(tableName?: string): Lateral {
     // Mirrors Rails: `lateral(table_name = nil)` builds the base — either the
     // raw AST or `as(table_name)` (a TableAlias wrapping a Grouping) — and
     // wraps it in a Lateral. The TableAlias lives inside the Lateral, not
     // outside (select_manager.rb).
-    const base = alias === undefined ? this.ast : this.as(alias);
+    const base = tableName === undefined ? this.ast : this.as(tableName);
     return new Lateral(base);
   }
 
@@ -427,8 +427,8 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#take (select_manager.rb). Pass `null`
    * to clear; raw amounts flow through `new Limit(amount)` unwrapped.
    */
-  take(amount: number | Node | null): this {
-    this.ast.limit = amount == null ? null : new Limit(amount);
+  take(limit: number | Node | null): this {
+    this.ast.limit = limit == null ? null : new Limit(limit);
     return this;
   }
 
@@ -465,11 +465,11 @@ export class SelectManager extends TreeManager {
 
   // Mirrors Arel::SelectManager#collapse (select_manager.rb:256-268).
   protected collapse(exprs: unknown[]): Node {
-    const filtered = exprs
-      .filter((e) => e !== null && e !== undefined)
-      .map((e) => (typeof e === "string" ? new SqlLiteral(e) : (e as Node)));
-    if (filtered.length === 1) return filtered[0];
-    return this.createAnd(filtered);
+    exprs = exprs
+      .filter((expr) => expr !== null && expr !== undefined)
+      .map((expr) => (typeof expr === "string" ? new SqlLiteral(expr) : (expr as Node)));
+    if (exprs.length === 1) return exprs[0] as Node;
+    return this.createAnd(exprs as Node[]);
   }
 
   private get core(): SelectCore {

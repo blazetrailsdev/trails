@@ -32,11 +32,11 @@ export class ConfirmationValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
-    const confirmation =
+    const confirmed =
       (rec.readAttribute as ((a: string) => unknown) | undefined)?.(confirmationAttr) ??
       rec[confirmationAttr];
-    if (confirmation == null) return;
-    if (!this.isConfirmationValueEqual(record, attribute, value, confirmation)) {
+    if (confirmed == null) return;
+    if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
       const modelClass = rec.constructor as
         | { humanAttributeName?: (a: string) => string }
         | undefined;
