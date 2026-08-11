@@ -236,74 +236,47 @@ export async function saveCollectionAssociation(
   // reconstruct the scope now that we know the owner's id
   association.resetScope();
 
-  // Rails save_collection_association:430-434 routes each marked-for-destruction
-  // child through the collection-level `destroy`, so `before_remove`/
-  // `after_remove` fire and the record is pruned from the in-memory target. A
-  // built (unpersisted) child is destroyed too: `remove_records`
-  // (collection_association.rb:385-408) runs the remove callbacks and splices
-  // `@target` even when `existing_records` is empty. Snapshot first since
-  // `association.destroy` splices the live target as it removes each record.
-  if (autosave) {
-    const recordsToDestroy: Base[] = Array.isArray(association.target)
-      ? (association.target as Base[]).filter((record) => isMarkedForDestruction(record))
-      : [];
-    for (const record of recordsToDestroy) {
-      await association.destroy(record);
-    }
-  }
-  const records: Base[] = Array.isArray(association.target)
-    ? [...(association.target as Base[])]
-    : [];
-
-  for (const record of records) {
-    if (isMarkedForDestruction(record)) continue;
-    if ((record as any).isDestroyed?.()) continue;
-    // Rails associated_records_to_validate_or_save (autosave_association.rb:
-    // 297-305): when the owner was new before save, every target record gets
-    // processed — not just new/changed ones. Selection goes through
-    // `changed_for_autosave?`, not bare `changed?`, so a persisted child whose
-    // own columns are unchanged but which has a changed (auto)saved grandchild
-    // still cascades.
-    if (
-      !(
-        newRecordBeforeSave ||
-        record.isNewRecord() ||
-        ((record as any).changedForAutosave?.() ?? false)
-      )
-    )
-      continue;
-
-    let saved = true;
-
-    if (autosave !== false && (newRecordBeforeSave || record.isNewRecord())) {
-      association.setInverseInstance(record);
-
-      if (autosave) {
-        saved = !!(await association.insertRecord(record, false));
-      } else if (!reflection.isNested()) {
-        // Rails save_collection_association:447 — the default (non-autosave)
-        // insert branch is `elsif !reflection.nested?`, so a nested
-        // has_many :through (e.g. `Categorization.post_taggings` through an
-        // in-memory `author`) is never inserted on owner save. Skipping here
-        // also avoids the `HasManyThroughNestedAssociationsAreReadonly` raise
-        // from `insert_record`/`ensure_not_nested`.
-        const associationSaved = !!(await association.insertRecord(record));
-
-        // Rails reflection.rb `validate?` — for a collection the default is
-        // true, so only an explicit `validate: false` opts out.
-        if (reflection.options?.validate !== false) {
-          if (!associationSaved) propagateErrors(this as unknown as Base, reflection.name);
-          saved = associationSaved;
-        }
+  let records: Base[] | null = associatedRecordsToValidateOrSave(
+    association,
+    newRecordBeforeSave,
+    autosave,
+  );
+  if (records) {
+    if (autosave) {
+      const recordsToDestroy = records.filter((record: Base) => isMarkedForDestruction(record));
+      for (const record of recordsToDestroy) {
+        await association.destroy(record);
       }
-    } else if (autosave) {
-      saved = !!(await record.save({ validate: false }));
+      records = records.filter((record: Base) => !recordsToDestroy.includes(record));
     }
 
-    // Rails raises `RecordInvalid.new(association.owner)` here; trails surfaces
-    // the failure by returning false, which makes the registered
-    // after_create/after_update callback raise it instead.
-    if (!saved) return false;
+    for (const record of records) {
+      if ((record as any).isDestroyed?.()) continue;
+
+      let saved = true;
+
+      if (autosave !== false && (newRecordBeforeSave || record.isNewRecord())) {
+        association.setInverseInstance(record);
+
+        if (autosave) {
+          saved = !!(await association.insertRecord(record, false));
+        } else if (!reflection.isNested()) {
+          const associationSaved = !!(await association.insertRecord(record));
+
+          if (reflection.options?.validate !== false) {
+            if (!associationSaved) propagateErrors(this as unknown as Base, reflection.name);
+            saved = associationSaved;
+          }
+        }
+      } else if (autosave) {
+        saved = !!(await record.save({ validate: false }));
+      }
+
+      // Rails raises `RecordInvalid.new(association.owner)`; trails surfaces the
+      // failure by returning false, which makes the registered
+      // after_create/after_update callback raise it instead.
+      if (!saved) return false;
+    }
   }
   return true;
 }
