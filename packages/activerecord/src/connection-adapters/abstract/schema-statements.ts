@@ -1695,7 +1695,7 @@ export class SchemaStatements {
     where?: (conditions: Record<string, unknown>) => unknown;
     limitValue?: number | null;
     offsetValue?: number | null;
-    arel?: unknown;
+    arel?: () => unknown;
   }): Promise<unknown> {
     const pk = relation.primaryKey;
     if (!pk) return relation;
@@ -1724,16 +1724,13 @@ export class SchemaStatements {
     }
 
     // Rails: select_rows(limited.arel, "SQL").map { |r| r.last(primary_key.length) }
-    // — selectRows yields positional column arrays, so the trailing pk values
-    // survive the leading order columns PG/MySQL prepend in columns_for_distinct.
-    const arel = typeof limited.arel === "function" ? limited.arel() : limited;
-    const sql = typeof arel === "string" ? arel : (arel?.toSql?.() ?? String(arel));
+    // — the ARel node goes to the adapter, which compiles and binds it
+    // (schema_statements.rb:1440); flattening to SQL here would strand the
+    // binds. selectRows yields positional column arrays, so the trailing pk
+    // values survive the leading order columns PG/MySQL prepend in
+    // columns_for_distinct.
     const pkLen = pkNames.length;
-    const adapter = this as any;
-    const rows: unknown[][] =
-      typeof adapter.selectRows === "function"
-        ? ((await adapter.selectRows(sql, "SQL")) as unknown[][])
-        : (await adapter.execute(sql)).map((row: Record<string, unknown>) => Object.values(row));
+    const rows = (await (this as any).selectRows(limited.arel(), "SQL")) as unknown[][];
     const limitedIds: unknown[][] = rows.map((row) => row.slice(-pkLen));
 
     if (limitedIds.length === 0) {

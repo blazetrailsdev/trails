@@ -635,6 +635,11 @@ describe("indexNameForRemoveFrom early return", () => {
 });
 
 describe("distinctRelationForPrimaryKey", () => {
+  // Rails hands `select_rows` the ARel node (schema_statements.rb:1440) so the
+  // adapter compiles and binds it; a node with no `toSql` would flatten to
+  // "[object Object]" on the way through a string-compiling port.
+  const arelNode = { __arel: true };
+
   function makeRelation(over: Record<string, unknown> = {}) {
     const calls = { reselect: [] as unknown[], where: [] as Record<string, unknown>[] };
     const rel: any = {
@@ -650,7 +655,7 @@ describe("distinctRelationForPrimaryKey", () => {
         // distinctBang on the original would be observable.
         return { ...this, distinctBang: () => {}, arel: this.arel };
       },
-      arel: () => ({ toSql: () => "SELECT DISTINCT ..." }),
+      arel: () => arelNode,
       // Rails uses where! (in-place); mirror that with whereBang.
       whereBang(c: Record<string, unknown>) {
         calls.where.push(c);
@@ -675,7 +680,7 @@ describe("distinctRelationForPrimaryKey", () => {
     const result = await ss.distinctRelationForPrimaryKey(rel);
 
     expect(rel._calls.reselect).toEqual(['"posts"."id"']);
-    expect(selectRows).toHaveBeenCalledWith("SELECT DISTINCT ...", "SQL");
+    expect(selectRows).toHaveBeenCalledWith(arelNode, "SQL");
     expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
     expect(rel._limitValue).toBeNull();
     expect(rel._offsetValue).toBeNull();

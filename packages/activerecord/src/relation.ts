@@ -6181,21 +6181,21 @@ export class Relation<T extends Base> {
       const records = await this.toArray();
       return records.some((r) => r.equals(record));
     }
-    // Unloaded fast path: probe existence by primary key. Composite-PK models
-    // (Rails `record.class.composite_primary_key?`) carry a tuple id, which
-    // exists()'s array branch reads as `[sql, ...binds]`; route those through a
-    // PK-column hash instead so each component is bound to its column.
+    // Unloaded fast path: probe existence by primary key. The composite-PK arm
+    // (Rails `record.class.composite_primary_key?`) is a `primary_key.zip(id)`
+    // hash rather than the tuple, which exists()'s array branch would read as
+    // `[sql, ...binds]`.
     const recordClass = record.constructor as typeof Base;
-    if (recordClass.compositePrimaryKey) {
-      const pk = recordClass.primaryKey as string[];
-      const id = record.id as unknown[];
-      const conditions: Record<string, unknown> = {};
-      pk.forEach((col, i) => {
-        conditions[col] = id[i];
-      });
-      return this.exists(conditions);
-    }
-    return this.exists(record.id);
+    const id = recordClass.compositePrimaryKey
+      ? Object.fromEntries(
+          (recordClass.primaryKey as string[]).map((column, index) => [
+            column,
+            (record.id as unknown[])[index],
+          ]),
+        )
+      : record.id;
+
+    return this.exists(id);
   }
 
   /**
