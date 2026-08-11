@@ -899,11 +899,15 @@ export class Association {
   }
 
   private isViolatesStrictLoading(): boolean {
-    const ownerAny = this.owner as any;
     if (this._skipStrictLoading) return false;
-    return !!(
-      ownerAny._strictLoading && !ownerAny._strictLoadingWhitelist?.includes(this.reflection.name)
-    );
+
+    if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
+
+    if ("strictLoading" in (this.reflection.options as object)) {
+      return (this.reflection as { strictLoading?: boolean }).strictLoading ?? false;
+    }
+
+    return this.owner.isStrictLoading() && !this.owner.isStrictLoadingNPlusOneOnly();
   }
 
   /**

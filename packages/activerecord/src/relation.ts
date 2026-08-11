@@ -1034,19 +1034,19 @@ export class Relation<T extends Base> {
    *   select(record => record.active)   // block form (returns array)
    */
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
-  select(...args: any[]): Relation<T> | Promise<T[]> {
+  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  select(...fields: any[]): Relation<T> | Promise<T[]> {
     // Block form first — mirrors Rails' `if block_given?` guard before
     // check_if_method_has_arguments!. A trailing function argument is the TS
     // equivalent of a Ruby block.
-    if (args.length >= 1 && typeof args[args.length - 1] === "function") {
-      if (args.length > 1) {
+    if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
+      if (fields.length > 1) {
         throw new ArgumentError("`select' with block doesn't take arguments.");
       }
-      return this.toArray().then((records) => records.filter(args[0]));
+      return this.toArray().then((records) => records.filter(fields[0]));
     }
-    this.checkIfMethodHasArgumentsBang("select", args, "Call `select' with at least one field.");
-    const fields = this.processSelectArgs(args);
+    this.checkIfMethodHasArgumentsBang("select", fields, "Call `select' with at least one field.");
+    fields = this.processSelectArgs(fields);
     return this._clone()._selectBang(...fields);
   }
 
@@ -1055,10 +1055,10 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#reselect
    */
-  reselect(...columns: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reselect", columns as unknown[]);
-    const fields = this.processSelectArgs(columns as unknown[]);
-    return this._clone().reselectBang(...fields);
+  reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("reselect", args as unknown[]);
+    args = this.processSelectArgs(args as unknown[]) as typeof args;
+    return this._clone().reselectBang(...args);
   }
 
   /**
@@ -1087,9 +1087,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#group
    */
-  group(...columns: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("group", columns as unknown[]);
-    return this._clone().groupBang(...(columns as string[]));
+  group(...args: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("group", args as unknown[]);
+    return this._clone().groupBang(...(args as string[]));
   }
 
   /**
@@ -1113,9 +1113,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#regroup
    */
-  regroup(...columns: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("regroup", columns);
-    return this._clone().regroupBang(...columns);
+  regroup(...args: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("regroup", args);
+    return this._clone().regroupBang(...args);
   }
 
   /**
@@ -1294,8 +1294,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#lock
    */
-  lock(clause: string | boolean = true): Relation<T> {
-    return this._clone().lockBang(clause);
+  lock(locks: string | boolean = true): Relation<T> {
+    return this._clone().lockBang(locks);
   }
 
   /**
@@ -1357,9 +1357,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#annotate
    */
-  annotate(...comments: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("annotate", comments);
-    return this._clone().annotateBang(...comments);
+  annotate(...args: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("annotate", args);
+    return this._clone().annotateBang(...args);
   }
 
   /**
@@ -1367,9 +1367,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#optimizer_hints
    */
-  optimizerHints(...hints: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("optimizer_hints", hints);
-    return this._clone().optimizerHintsBang(...hints);
+  optimizerHints(...args: string[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("optimizer_hints", args);
+    return this._clone().optimizerHintsBang(...args);
   }
 
   /**
@@ -1389,8 +1389,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#from
    */
-  from(source: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T> {
-    return this._clone().fromBang(source, subqueryName);
+  from(value: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T> {
+    return this._clone().fromBang(value, subqueryName);
   }
 
   /**
@@ -1398,8 +1398,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#create_with
    */
-  createWith(attrs: Record<string, unknown> | null): Relation<T> {
-    return this._clone().createWithBang(attrs);
+  createWith(value: Record<string, unknown> | null): Relation<T> {
+    return this._clone().createWithBang(value);
   }
 
   /**
@@ -1407,9 +1407,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#unscope
    */
-  unscope(...types: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("unscope", types as unknown[]);
-    return this._clone().unscopeBang(...types);
+  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("unscope", args as unknown[]);
+    return this._clone().unscopeBang(...args);
   }
 
   /**
@@ -2056,9 +2056,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#includes
    */
-  includes(...associations: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("includes", associations);
-    return this._clone().includesBang(...associations);
+  includes(...args: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("includes", args);
+    return this._clone().includesBang(...args);
   }
 
   /**
@@ -2066,9 +2066,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#preload
    */
-  preload(...associations: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("preload", associations);
-    return this._clone().preloadBang(...associations);
+  preload(...args: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("preload", args);
+    return this._clone().preloadBang(...args);
   }
 
   /**
@@ -2076,9 +2076,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#eager_load
    */
-  eagerLoad(...associations: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("eager_load", associations);
-    return this._clone().eagerLoadBang(...associations);
+  eagerLoad(...args: AssociationSpec[]): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("eager_load", args);
+    return this._clone().eagerLoadBang(...args);
   }
 
   // -- Relation state --
@@ -2688,13 +2688,13 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#tables_in_string
    */
-  private tablesInString(sql: string): string[] {
-    if (!sql) return [];
+  private tablesInString(string: string): string[] {
+    if (!string) return [];
     // Mirrors Rails' tables_in_string regex: /[a-zA-Z_][.\w]+(?=.?\.)/
     // The `.?` lookahead allows one non-dot char (e.g. a closing `"`) between
     // the identifier and the qualifying dot, so `"posts"."col"` correctly
     // yields `posts`. Downcase to match Rails' Oracle compat comment.
-    const matches = sql.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
+    const matches = string.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
     return matches.map((s) => s.toLowerCase()).filter((s) => s !== "raw_sql_");
   }
 
@@ -2949,20 +2949,20 @@ export class Relation<T extends Base> {
     queries: [string, unknown[]][],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const adapter = this._conn();
-    if (typeof adapter?.explain !== "function") {
+    const c = this._conn();
+    if (typeof c?.explain !== "function") {
       return "EXPLAIN not supported by this adapter";
     }
     // No `_toSql()` fallback: collecting over the always-executing
     // exec_queries path means a real relation always yields at least one
     // captured query (with adapter-quoted SQL — backticks on MySQL), and a
     // query-less relation (`.none()`) yields empty output, matching Rails.
-    const clause = await this.buildExplainClause(adapter, options);
+    const clause = await this.buildExplainClause(c, options);
     const parts: string[] = [];
     for (const [sql, binds] of queries) {
       let msg = `${clause} ${sql}`;
-      if (binds.length > 0) msg += ` ${this._renderExplainBinds(adapter, binds)}`;
-      const plan = await adapter.explain(sql, binds, options);
+      if (binds.length > 0) msg += ` ${this._renderExplainBinds(c, binds)}`;
+      const plan = await c.explain(sql, binds, options);
       parts.push(`${msg}\n${plan}`);
     }
     return parts.join("\n\n");
@@ -3437,36 +3437,36 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#async_count
    */
-  asyncCount(column?: string) {
-    return this.count(column);
+  asyncCount(columnName?: string) {
+    return this.count(columnName);
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_sum
    */
-  asyncSum(column?: string) {
-    return this.sum(column);
+  asyncSum(identityOrColumn?: string) {
+    return this.sum(identityOrColumn);
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_minimum
    */
-  asyncMinimum(column: string) {
-    return this.minimum(column);
+  asyncMinimum(columnName: string) {
+    return this.minimum(columnName);
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_maximum
    */
-  asyncMaximum(column: string) {
-    return this.maximum(column);
+  asyncMaximum(columnName: string) {
+    return this.maximum(columnName);
   }
 
   /**
    * Mirrors: ActiveRecord::Relation#async_average
    */
-  asyncAverage(column: string) {
-    return this.average(column);
+  asyncAverage(columnName: string) {
+    return this.average(columnName);
   }
 
   /**
@@ -3900,15 +3900,15 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#find_or_create_by
    */
   async findOrCreateBy(
-    conditions: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
     // Rails (relation.rb:231): find_by(attributes) || create_or_find_by(attributes)
     // — the create leg rides create_or_find_by so a concurrent insert that wins
     // the race is recovered via its RecordNotUnique rescue instead of raising.
-    const existing = await this.findBy(conditions);
+    const existing = await this.findBy(attributes);
     if (existing) return existing;
-    return this.createOrFindBy(conditions, extra);
+    return this.createOrFindBy(attributes, extra);
   }
 
   /**
@@ -3917,16 +3917,16 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#find_or_initialize_by
    */
   async findOrInitializeBy(
-    conditions: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
-    const existing = await this.findBy(conditions);
+    const existing = await this.findBy(attributes);
     if (existing) return existing;
     // Same scope_for_create precedence as findOrCreateBy: scope attrs
-    // first, createWith overrides, caller's conditions + extra win.
+    // first, createWith overrides, caller's attributes + extra win.
     return new (this._model as any)({
       ...this.scopeForCreate(),
-      ...conditions,
+      ...attributes,
       ...extra,
     }) as T;
   }
@@ -3937,7 +3937,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#create_or_find_by
    */
   async createOrFindBy(
-    conditions: Record<string, unknown>,
+    attributes: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
     // Rails:
@@ -3952,7 +3952,7 @@ export class Relation<T extends Base> {
         () =>
           this._model.create({
             ...this.scopeForCreate(),
-            ...conditions,
+            ...attributes,
             ...extra,
           }) as Promise<T>,
         { requiresNew: true },
@@ -3973,9 +3973,9 @@ export class Relation<T extends Base> {
       // is materialized + row-locked inside it; otherwise plain find_by!, no
       // lock.
       if (this._conn().isTransactionOpen()) {
-        return this.where(conditions).lock().findByBang(conditions);
+        return this.where(attributes).lock().findByBang(attributes);
       }
-      return this.findByBang(conditions);
+      return this.findByBang(attributes);
     }
   }
 
@@ -4019,7 +4019,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Base.insert_all
    */
   async insertAll(
-    records: Record<string, unknown>[],
+    attributes: Record<string, unknown>[],
     options?: {
       uniqueBy?: string | string[];
       returning?: InsertAllOptions["returning"];
@@ -4029,7 +4029,7 @@ export class Relation<T extends Base> {
     // Rails' Relation#insert_all always passes `on_duplicate: :skip` (regardless
     // of unique_by); the conflict target is only narrowed when unique_by is
     // given, otherwise `ON CONFLICT DO NOTHING` skips every constraint violation.
-    return InsertAll.execute(this, records, {
+    return InsertAll.execute(this, attributes, {
       uniqueBy: options?.uniqueBy,
       onDuplicate: "skip",
       returning: options?.returning,
@@ -5716,21 +5716,21 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#with
    */
   with(
-    ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
   ): Relation<T> {
     // Mirrors Rails `with` (query_methods.rb:493): `raise ArgumentError ... if
     // block_given?`. A trailing function argument is the TS equivalent of a Ruby
     // block — `with` takes CTE definition hashes, never a callback.
-    if (ctes.some((cte) => typeof cte === "function")) {
+    if (args.some((cte) => typeof cte === "function")) {
       throw argumentError("ActiveRecord::Relation#with does not accept a block");
     }
     // Rails `with` follows the block guard with `check_if_method_has_arguments!`
     // (query_methods.rb:494). The shared helper raises on empty varargs, then
     // mirrors `args.flatten!` (arrays only — CTE definition hashes survive) and
     // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
-    // `with(null)` no-ops). It mutates `ctes` in place.
-    this.checkIfMethodHasArgumentsBang("with", ctes);
-    return this._clone().withBang(...ctes);
+    // `with(null)` no-ops). It mutates `args` in place.
+    this.checkIfMethodHasArgumentsBang("with", args);
+    return this._clone().withBang(...args);
   }
 
   /**
@@ -5739,15 +5739,15 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#with_recursive
    */
   withRecursive(
-    ...ctes: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
   ): Relation<T> {
     // Rails `with_recursive` (query_methods.rb:518-521) calls only
     // `check_if_method_has_arguments!(__callee__, args)` before `spawn.with_recursive!`
     // — unlike `with`, it has no `block_given?` guard. The shared helper raises on
     // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
-    // (so `withRecursive(null)` no-ops). It mutates `ctes` in place.
-    this.checkIfMethodHasArgumentsBang("with_recursive", ctes);
-    return this._clone().withRecursiveBang(...ctes);
+    // (so `withRecursive(null)` no-ops). It mutates `args` in place.
+    this.checkIfMethodHasArgumentsBang("with_recursive", args);
+    return this._clone().withRecursiveBang(...args);
   }
 
   // -- Other query methods --
@@ -5757,8 +5757,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#references
    */
-  references(...tables: Array<string | Nodes.SqlLiteral>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("references", tables);
+  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T> {
+    this.checkIfMethodHasArgumentsBang("references", tableNames);
     // Tag bare-string references as manual so they don't act as eager-load join
     // aliases — mirrors Rails seeding @references only from SqlLiteral
     // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so
@@ -5771,13 +5771,13 @@ export class Relation<T extends Base> {
     // whose value is not already a known reference before this call.
     const seen = new Set(this._referencesValues);
     const manual: string[] = [];
-    for (const t of tables) {
+    for (const t of tableNames) {
       const name = t instanceof Nodes.SqlLiteral ? t.value : t;
       if (seen.has(name)) continue; // first occurrence wins (Rails `|=` keeps it)
       seen.add(name);
       if (!(t instanceof Nodes.SqlLiteral)) manual.push(name);
     }
-    const rel = this._clone().referencesBang(...tables) as Relation<T>;
+    const rel = this._clone().referencesBang(...tableNames) as Relation<T>;
     rel._manualReferences = [...new Set([...rel._manualReferences, ...manual])];
     return rel;
   }

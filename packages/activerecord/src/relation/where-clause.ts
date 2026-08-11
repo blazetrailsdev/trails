@@ -115,8 +115,8 @@ export class WhereClause {
   }
 
   get ast(): Nodes.Node {
-    const wrapped = this.predicatesWithWrappedSqlLiterals();
-    return wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
+    const predicates = this.predicatesWithWrappedSqlLiterals();
+    return predicates.length === 1 ? predicates[0] : new Nodes.And(predicates);
   }
 
   /** Mirrors: where_clause.rb:75 `def ==(other)`, aliased `eql?`. */

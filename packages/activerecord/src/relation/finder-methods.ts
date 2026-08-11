@@ -728,14 +728,14 @@ export function raiseRecordNotFoundExceptionBang(
     : ` [${this.arel().whereSql(this.model)?.value ?? ""}]`;
 
   const name = this.model.name;
-  const k = key ?? String(this.model.primaryKey);
+  key ??= String(this.model.primaryKey);
 
   if (ids === undefined || ids === null) {
     // Rails: `error << " with#{conditions}" if conditions`.
     throw new RecordNotFound(
       `Couldn't find ${name}${conditions ? ` with${conditions}` : ""}`,
       name,
-      k,
+      key,
     );
   }
 
@@ -749,19 +749,24 @@ export function raiseRecordNotFoundExceptionBang(
     // renders a scalar (`'id'=1`). (Ruby `Array#to_s` would print `[1]` only
     // if raise_record_not_found_exception! were called directly with a
     // 1-element array — never via a finder.)
-    throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}${conditions}`, name, k, ids);
+    throw new RecordNotFound(
+      `Couldn't find ${name} with '${key}'=${ids}${conditions}`,
+      name,
+      key,
+      ids,
+    );
   }
 
   const error = formatNotFoundAllMessage(
     name,
-    k,
+    key,
     wrapped.join(", "),
     conditions,
     resultSize,
     expectedSize,
     notFoundIds,
   );
-  throw new RecordNotFound(error, name, k, ids);
+  throw new RecordNotFound(error, name, key, ids);
 }
 
 export const FinderMethods = {
@@ -907,30 +912,30 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
 
 /** @internal */
 export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const pk = rel.model.primaryKey as string;
+  const primaryKey = rel.model.primaryKey as string;
   const offsetValue: number = (rel as any)._offsetValue ?? 0;
   const limitValue: number | null = (rel as any)._limitValue ?? null;
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
-  let relation = (rel as any).where({ [pk]: ids });
+  let relation = (rel as any).where({ [primaryKey]: ids });
   relation._limitValue = null;
   relation._offsetValue = null;
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select(rel.table.get(pk));
+    relation = relation.select(rel.table.get(primaryKey));
   }
   const records: any[] = await relation.toArray();
 
-  const pkType = (rel.model as any).typeForAttribute(pk);
-  const castKey = (v: unknown) => String(pkType.cast(v));
+  const primaryKeyType = (rel.model as any).typeForAttribute(primaryKey);
+  const castKey = (id: unknown) => String(primaryKeyType.cast(id));
 
   if (records.length !== ids.length) {
     // Rails find_some_ordered: raise_record_not_found_exception!(ids, result.size, ids.size)
-    (rel as any).raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, pk);
+    (rel as any).raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, primaryKey);
   }
   const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
   return records.sort((a: any, b: any) => {
-    const ai = idIndex.get(castKey(a.readAttribute?.(pk) ?? a[pk])) ?? 0;
-    const bi = idIndex.get(castKey(b.readAttribute?.(pk) ?? b[pk])) ?? 0;
+    const ai = idIndex.get(castKey(a.readAttribute?.(primaryKey) ?? a[primaryKey])) ?? 0;
+    const bi = idIndex.get(castKey(b.readAttribute?.(primaryKey) ?? b[primaryKey])) ?? 0;
     return ai - bi;
   });
 }
