@@ -193,13 +193,13 @@ describe("compareCallArgs block-tail nil padding", () => {
   ];
 
   it("ignores the padding when the callee defaults every padded parameter", () => {
-    expect(compareCallArgs(rubyCall, tsCall, [sig]).verdict).toBe("match");
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [sig]).verdict).toBe("match");
   });
 
   it("still flags the padding when the callee treats a padded parameter as a value", () => {
     const valued = [...sig];
     valued[2] = required("overrideCheckConstraints");
-    expect(compareCallArgs(rubyCall, tsCall, [valued]).verdict).toBe("mismatch");
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [valued]).verdict).toBe("mismatch");
   });
 
   it("does not fire without a callee signature to prove the padding inert", () => {
@@ -211,6 +211,7 @@ describe("compareCallArgs block-tail nil padding", () => {
       compareCallArgs(
         site("alter_table", ["id:table_name"]),
         site("alterTable", ["id:tableName", "nil"]),
+        undefined,
         [sig],
       ).verdict,
     ).toBe("mismatch");
@@ -221,13 +222,16 @@ describe("compareCallArgs block-tail nil padding", () => {
       compareCallArgs(
         site("alter_table", ["id:table_name"], ["block"]),
         site("alterTable", ["id:tableName", "nil", "id:options"], ["block"]),
+        undefined,
         [sig],
       ).verdict,
     ).toBe("mismatch");
   });
 
   it("looks past a leading this receiver on a mixin signature", () => {
-    expect(compareCallArgs(rubyCall, tsCall, [[required("this"), ...sig]]).verdict).toBe("match");
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [[required("this"), ...sig]]).verdict).toBe(
+      "match",
+    );
   });
 });
 
@@ -530,6 +534,20 @@ describe("pairCallSites", () => {
       [site("loaded", ["id:owner"])],
     );
     expect(pairs.map((p) => p.ruby.args)).toEqual([["id:owner"]]);
+  });
+
+  it("scores arity after the built-in receiver is stripped, not before", () => {
+    // The port's correct site for a RECEIVER_AS_FIRST_ARG name carries one
+    // argument MORE than Rails'. Scored on raw counts, the arity bonus goes to
+    // the site that merely has the same raw count — the wrong one.
+    const pairs = pairCallSites(
+      [site("pluralize", ["id:count", "id:locale"])],
+      [
+        site("pluralize", ["id:word", "id:count", "id:lang"]),
+        site("pluralize", ["id:count", "id:other"]),
+      ],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:word", "id:count", "id:lang"]]);
   });
 
   it("scores an opaque list on its arity rather than dropping it", () => {

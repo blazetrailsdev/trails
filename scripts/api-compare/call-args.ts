@@ -544,13 +544,21 @@ function tsCallNameKeys(rubyName: string): string[] {
  * the port's three, one of which passes an uncomparable `?? null`, would
  * otherwise abandon the uncomparable-but-plausible site for the one that scores
  * a single positional hit — turning a skip into a manufactured shape row.
+ *
+ * Arity is read off the STRIPPED lists, the ones the verdict is reached on.
+ * On the raw lists it is backwards for every {@link RECEIVER_AS_FIRST_ARG}
+ * name: the port's correct site there always carries one argument MORE than
+ * Rails' (the receiver), so a raw comparison hands the arity bonus to the site
+ * that happens to have the same raw count — the wrong one — and the greedy
+ * assignment takes it whenever the key matches tie.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
+  const strippedTs = stripReceiverArgs(ruby.name, ruby.args, ts.args);
+  const sameArity = ruby.args.length === strippedTs.length ? 1 : 0;
   const rubyArgs = normalizeArgs(ruby.args);
-  const tsArgs = normalizeArgs(stripReceiverArgs(ruby.name, ruby.args, ts.args));
-  const sameArity = ruby.args.length === ts.args.length ? 1 : 0;
+  const tsArgs = normalizeArgs(strippedTs);
   if (rubyArgs === null || tsArgs === null) {
-    return sameArity * 1_000 + Math.min(ruby.args.length, ts.args.length);
+    return sameArity * 1_000 + Math.min(ruby.args.length, strippedTs.length);
   }
   if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
   let matches = 0;
