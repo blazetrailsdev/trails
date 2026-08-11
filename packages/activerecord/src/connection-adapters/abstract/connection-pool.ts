@@ -1540,10 +1540,10 @@ export class ConnectionPool implements ReapablePool {
     return this._leases.get(String(executionContextId()));
   }
 
-  // Rails' private ConnectionPool instance methods, defined below as
-  // `this`-typed functions and mixed in here (CLAUDE.md "Module mixins"), so
-  // every call site reads as Rails' does — `try_to_checkout_new_connection`
-  // takes no argument, not an explicit pool.
+  // Rails' private ConnectionPool instance methods (`connection_pool.rb:862-930`),
+  // defined below as `this`-typed functions and mixed in here (CLAUDE.md "Module
+  // mixins"), so every call site carries Rails' argument list —
+  // `try_to_checkout_new_connection` takes none, not an explicit pool.
   private acquireConnection = acquireConnection;
   private bulkMakeNewConnections = bulkMakeNewConnections;
   private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
@@ -1734,13 +1734,12 @@ function checkoutForExclusiveAccess(pool: Pool, checkoutTimeout: number): Databa
  * @internal
  */
 function withNewConnectionsBlocked<R>(this: Pool, block: () => R): R {
-  const p = this;
-  p._threadsBlockingNewConnections = (p._threadsBlockingNewConnections ?? 0) + 1;
+  this._threadsBlockingNewConnections = (this._threadsBlockingNewConnections ?? 0) + 1;
   try {
     return block();
   } finally {
-    p._threadsBlockingNewConnections! -= 1;
-    if (p._threadsBlockingNewConnections === 0) {
+    this._threadsBlockingNewConnections! -= 1;
+    if (this._threadsBlockingNewConnections === 0) {
       const waiters = this.numWaitingInQueue();
       let need = waiters;
       this._available?.clear?.();
@@ -1852,8 +1851,7 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: string | numbe
  * @internal
  */
 function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
-  const p = this;
-  if ((p._threadsBlockingNewConnections ?? 0) > 0) return null;
+  if ((this._threadsBlockingNewConnections ?? 0) > 0) return null;
   if (!this._connections || this._connections.length >= this.size) return null;
   if (!this.automaticReconnect) {
     throw new ConnectionNotEstablished(
@@ -1879,7 +1877,7 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
  */
 function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   // Only AbstractAdapter has a `pool` slot reserved for this back-reference;
-  // concrete driver adapters use `pool` for their own driver this. Mirror the
+  // concrete driver adapters use `pool` for their own driver pool. Mirror the
   // gate already used by ConnectionPool#newConnection.
   if (conn instanceof AbstractAdapter) {
     (conn as unknown as { this?: ConnectionPool }).this = this;

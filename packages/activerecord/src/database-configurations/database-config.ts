@@ -98,10 +98,11 @@ export class DatabaseConfig {
   readonly name: string;
   #configuration: DatabaseConfigOptions;
 
-  // Rails is `attr_reader :configuration_hash` — no writer. The one trails-only
-  // path that must replace the hash (connection-handling's adapter backfill)
-  // goes through _setConfigurationHash, which reaches the private field via
-  // this static-block closure rather than a Rails-visible public writer.
+  // Rails is `attr_reader :configuration_hash` — no writer, but it reassigns
+  // `@configuration_hash` from inside the class (`url_config.rb:43`). The paths
+  // that replace the hash go through _setConfigurationHash, which reaches the
+  // private field via this static-block closure rather than a Rails-visible
+  // public writer.
   static {
     writeConfigurationHash = (config, hash) => {
       config.#configuration = hash;
