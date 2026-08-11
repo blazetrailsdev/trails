@@ -364,8 +364,7 @@ function toI(value: unknown): number {
 async function updateCounter(assoc: HasManyAssociation, difference: number): Promise<void> {
   const reflection = assoc.reflection;
   if (!reflection.hasCachedCounter?.()) return;
-  const column = reflection.counterCacheColumn?.();
-  if (!column) return;
+  const column = reflection.counterCacheColumn?.() as string;
   const owner = assoc.owner as any;
   if (typeof owner.incrementBang === "function") {
     await owner.incrementBang(column, difference);
@@ -387,8 +386,7 @@ async function updateCounter(assoc: HasManyAssociation, difference: number): Pro
 function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
   const reflection = this.reflection;
   if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
-  const column = reflection.counterCacheColumn?.();
-  if (!column) return;
+  const column = reflection.counterCacheColumn?.() as string;
   const owner = this.owner as any;
   const current = Number(owner.readAttribute?.(column) ?? 0);
   owner.writeAttribute?.(column, current + difference);

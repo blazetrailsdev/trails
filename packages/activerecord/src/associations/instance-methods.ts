@@ -32,8 +32,7 @@ import {
  */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
-  // `macro` on a rich reflection, `type` on a lightweight definition — a
-  // reflection's `type` is the polymorphic `*_type` column, not the macro.
+  // A reflection's `type` is the polymorphic `*_type` column, not the macro.
   switch (assocDef.macro ?? assocDef.type) {
     case "belongsTo":
       if (opts.polymorphic) return new BelongsToPolymorphicAssociation(this, assocDef as any);
@@ -157,14 +156,10 @@ export function association(this: Base, name: string): AssociationInstance {
     throw _associationNotFound(this, name);
   }
 
-  // Rails builds the association FROM the class's reflection
-  // (`associations.rb:290-296`: `reflection.association_class.new(self,
-  // reflection)`), so `Association#reflection` is the rich
-  // `AssociationReflection` — `source_reflection`, `counter_cache_column`,
-  // `foreign_key`, `association_primary_key` are all just reads off it. Ours
-  // scans `_associations` for the lightweight definition (it carries the
-  // subclass-override ordering and the macro used for dispatch above), then
-  // hands the reflection to the constructor.
+  // Rails constructs from the reflection (`associations.rb:290-296`:
+  // `reflection.association_class.new(self, reflection)`); the `_associations`
+  // scan above stays only because it carries the subclass-override ordering
+  // and the macro `_buildAssociationInstance` dispatches on.
   const instance = _buildAssociationInstance.call(
     this,
     (ctor._reflectOnAssociation?.(name) as unknown as AssocDef | undefined) ?? assocDef,

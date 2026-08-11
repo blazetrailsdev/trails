@@ -246,11 +246,6 @@ export class CollectionAssociation extends Association {
    * primary key. Mirrors `reflection.association_primary_key`.
    */
   protected associationPrimaryKey(): string | string[] {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (
-        n: string,
-      ) => { associationPrimaryKey?: string | string[] } | undefined;
-    };
     return this.reflection.associationPrimaryKey ?? (this.klass as any).primaryKey ?? "id";
   }
 

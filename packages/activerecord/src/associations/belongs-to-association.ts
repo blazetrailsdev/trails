@@ -387,12 +387,6 @@ export class BelongsToAssociation extends SingularAssociation {
    * explicit `counterCache: "<column>"` / `{ column }` forms.
    */
   private counterCacheColumn(): string | null {
-    // Prefer the reflection's own `counterCacheColumn()` (mirrors Rails
-    // `reflection.counter_cache_column`): it resolves the inverse has_many to
-    // recover the demodulized column name for flat-named CPK models
-    // (`CpkBook` → `CpkOrder.books` → `books_count`, not `cpk_books_count`).
-    // Fall back to the plain owner-name derivation only when the rich
-    // reflection isn't available.
     const fromReflection = this.reflection.counterCacheColumn?.();
     if (fromReflection !== undefined && fromReflection !== null) return fromReflection;
     return belongsToCounterCacheColumn(

@@ -746,10 +746,9 @@ export class Association {
       if (!inverseName) return null;
       const recordAny = record as any;
       if (typeof recordAny.association !== "function") return null;
-      // Rails' `record.association(name)` raises `AssociationNotFoundError`
-      // for a name the record's class does not declare; `invertible_for?`
-      // has already established the inverse reflection exists on the OWNER
-      // side, which for a polymorphic belongs_to is not the same class.
+      // `invertible_for?` establishes the inverse exists on the OWNER's side,
+      // which for a polymorphic belongs_to is a different class than the
+      // record's — so `record.association` can still raise here.
       try {
         return recordAny.association(inverseName);
       } catch {
