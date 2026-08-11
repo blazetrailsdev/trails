@@ -1588,15 +1588,6 @@ export function flattenedArgs(args: unknown[]): unknown[] {
   return args.flatMap((e) => (Array.isArray(e) ? flattenedArgs(e) : e));
 }
 
-/** @internal */
-export function flattenedOrderArgs(args: unknown[]): unknown[] {
-  // order/reorder mirror Rails' `args.flatten!` (query_methods.rb:659/755) so a
-  // nested blank array like `order([nil])` collapses and compact_blanks away.
-  // A bind array `[Arel.sql("x = ?"), ...binds]` has already been collapsed into
-  // one SqlLiteral by sanitize_order_arguments, which runs first.
-  return args.flatMap((e) => (Array.isArray(e) ? flattenedOrderArgs(e) : e));
-}
-
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
 
 /** @internal */
