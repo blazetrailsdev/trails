@@ -21,10 +21,10 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
-  _inFlightReset: Promise<void> | null;
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
+  transactionManager: { synchronize: <T>(fn: () => Promise<T> | T) => Promise<T> };
   close: () => Promise<void>;
   isConnected: () => boolean;
 }
@@ -98,7 +98,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     expect(adapter.isConnected()).toBe(false);
   });
 
-  it("resetBang barrier: real _acquireFreshClient waits until DISCARD ALL resolves", async () => {
+  it("resetBang runs ROLLBACK + DISCARD ALL + reconfigure under one lock", async () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
 
     const order: string[] = [];
@@ -109,8 +109,8 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
 
     const fakeClient = {
       query: vi.fn(async (sql: string) => {
+        order.push(sql);
         if (sql === "DISCARD ALL") {
-          order.push("discard-start");
           await discardGate;
           order.push("discard-end");
         }
@@ -119,40 +119,36 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
       end: async () => {},
       on: () => fakeClient,
     };
-    // Pre-seed the connection so _doAcquire reuses it rather than
-    // opening a new socket (avoids real network I/O).
+    // Pre-seed the connection so nothing opens a real socket, and mark the
+    // adapter mid-transaction so the conditional ROLLBACK arm runs (Rails'
+    // `transaction_status != PQTRANS_IDLE`, postgresql_adapter.rb:375).
     adapter._rawConnection = fakeClient;
+    adapter._client = fakeClient;
 
-    // resetBang() clears _connectionConfigured, so _acquireFreshClient
-    // will call _maybeConfigureConnection via _doAcquire after the
-    // barrier clears. Stub it to avoid real SET queries on the fake client.
+    // resetBang() clears _connectionConfigured, so the body reconfigures.
+    // Stub it to avoid real SET queries on the fake client.
     vi.spyOn(
       adapter as unknown as { _maybeConfigureConnection: () => Promise<void> },
       "_maybeConfigureConnection",
     ).mockResolvedValue(undefined);
 
-    // Fire resetBang (sync) — sets _inFlightReset before returning.
+    // Fired from outside the lock, as a pool reap/checkin is.
     adapter.resetBang();
-    expect(adapter._inFlightReset).not.toBeNull();
 
-    // Concurrent acquire using the REAL _acquireFreshClient — must queue
-    // behind the in-flight reset.
-    const acquirePromise = adapter._acquireFreshClient().then((c) => {
-      order.push("acquire-done");
-      return c;
+    // A foreign chain taking the same lock — Rails' `@lock.synchronize`
+    // (postgresql_adapter.rb:372) is what keeps it out of the reset body.
+    const foreign = adapter.transactionManager.synchronize(() => {
+      order.push("foreign");
     });
 
-    // Yield several microtask ticks; DISCARD ALL gate holds everything up.
-    for (let i = 0; i < 5; i++) await Promise.resolve();
-    expect(order).toEqual(["discard-start"]);
+    // Yield several microtask ticks; the DISCARD ALL gate holds the lock.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    expect(order).toEqual(["ROLLBACK", "DISCARD ALL"]);
 
-    // Release DISCARD ALL — the acquire should now proceed.
     resolveDiscard();
-    await acquirePromise;
+    await foreign;
 
-    expect(order).toEqual(["discard-start", "discard-end", "acquire-done"]);
-    // Barrier is cleared after reset completes.
-    expect(adapter._inFlightReset).toBeNull();
+    expect(order).toEqual(["ROLLBACK", "DISCARD ALL", "discard-end", "foreign"]);
   });
 
   it("serializes the initial connect so concurrent callers share one pg.Client", async () => {

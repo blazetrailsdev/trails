@@ -2429,12 +2429,10 @@ export class AbstractAdapter implements Quoting {
       // Rails: `connect! if @raw_connection.nil? && reconnect_can_restore_state?`
       // (abstract_adapter.rb:985), and `connect!` is `verify!` (rb:778-781).
       if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
-      // Drain any deferred connection-readiness work (PostgreSQLAdapter's
-      // async reset barrier: ROLLBACK + DISCARD ALL + reconfigure) ONCE here,
-      // before any query runs. Rails' `reset!` blocks, so the connection is
-      // already scrubbed by the time the loop yields it; trails' `resetBang`
-      // can't block, so it defers behind a promise this hook awaits. Pre-loop
-      // (not per-iteration) — a no-op for adapters with no deferred work.
+      // Drain any deferred connection-readiness work (PostgreSQLAdapter
+      // re-opens a socket a failed reconfigure tore down, and drains orphaned
+      // prepared statements) ONCE here, before any query runs. Pre-loop (not
+      // per-iteration) — a no-op for adapters with no deferred work.
       await this.awaitRawConnectionReady();
       if (materializeTransactions) await this.materializeTransactions();
 
@@ -2501,7 +2499,7 @@ export class AbstractAdapter implements Quoting {
    * on retry. Mysql2Adapter overrides this to re-await its driver-level
    * connect so reconnectBang() + continue picks up a fresh handle. PG no
    * longer overrides it: connectBang()/reconnect() populate _connection
-   * eagerly and awaitRawConnectionReady() drains the reset barrier pre-loop.
+   * eagerly and awaitRawConnectionReady() re-opens a torn-down socket pre-loop.
    *
    * Mirrors: AbstractAdapter#with_raw_connection (yield @raw_connection)
    */
@@ -2513,10 +2511,11 @@ export class AbstractAdapter implements Quoting {
    * @internal
    * Overridable readiness barrier awaited once per `withRawConnection` call,
    * after the eager `connectBang()` and before any query. Default no-op.
-   * PostgreSQLAdapter overrides it to drain its async reset barrier
-   * (`_inFlightReset`: ROLLBACK → DISCARD ALL → reconfigure) so the connection
-   * yielded by the loop is guaranteed scrubbed + reconfigured, matching Rails
-   * where `reset!` blocks before `with_raw_connection` ever yields.
+   * PostgreSQLAdapter overrides it to re-open a socket a failed reconfigure
+   * tore down and to drain orphaned prepared statements, so the connection
+   * yielded by the loop is guaranteed live and configured. Serializing against
+   * `reset!` is not its job — that runs under the same lock this call is
+   * already inside (postgresql_adapter.rb:372).
    */
   protected async awaitRawConnectionReady(): Promise<void> {}
 
