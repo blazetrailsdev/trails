@@ -2546,42 +2546,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._invalidateAssociationIds();
   }
 
-  private async _deleteThroughAllSql(): Promise<number> {
-    const ctor = this._record.constructor as typeof Base;
-    const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
-    const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
-    if (!throughAssoc) return 0;
-
-    const throughClassName =
-      throughAssoc.options.className ?? camelize(singularize(throughAssoc.name));
-    const throughModel = resolveAssocClass(this._record, throughAssoc.name, throughClassName);
-    const throughAs = throughAssoc.options.as;
-    let conditions: Record<string, unknown>;
-    if (throughAs) {
-      const poly = this._throughOwnerPolymorphic(throughAssoc, ctor, throughAs);
-      if (poly.idValue == null) return 0;
-      conditions = { [poly.idCol]: poly.idValue, [poly.typeCol]: poly.typeValue };
-    } else {
-      conditions = this._throughOwnerAttrs(throughAssoc, ctor);
-      if (Object.values(conditions).some((v) => v == null)) return 0;
-    }
-    if (this._assocDef.options.sourceType) {
-      const sourceName = this._assocDef.options.source ?? singularize(this._assocName);
-      conditions[`${underscore(sourceName)}_type`] = this._assocDef.options.sourceType;
-    }
-    return (throughModel as any).where(conditions).deleteAll();
-  }
-
-  private async _nullifyThroughAll(): Promise<number> {
-    const assoc = this._record.association(this._assocName) as unknown as {
-      loadTarget: () => Promise<Base[]>;
-      deleteRecords: (records: Base[], method: string) => Promise<number>;
-    };
-    const target = await assoc.loadTarget();
-    if (target.length === 0) return 0;
-    return assoc.deleteRecords(target, "nullify");
-  }
-
   /**
    * Resolve the effective `:dependent` strategy for a record-level `delete`,
    * mirroring Rails `HasManyAssociation#delete_records`: `:destroy` destroys each
@@ -3806,83 +3770,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Delete all records from the collection according to the dependent strategy.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete_all
+   * (collection_proxy.rb:474-476): `@association.delete_all(dependent).tap {
+   * reset_scope }`. The argument validation, the `:destroy` → `:delete_all`
+   * normalization and the delete/nullify dispatch all live in
+   * `CollectionAssociation#deleteAll` / `deleteOrNullifyAllRecords`, exactly as
+   * in Rails.
    */
   async deleteAll(dependent?: string): Promise<number> {
-    this._ensureThroughWritable();
-    // Rails' `delete_all(dependent = nil)` only permits an explicit `:nullify`
-    // or `:delete_all` from a caller; any other symbol raises ArgumentError
-    // (collection_association.rb:151-153). The camelCase `"deleteAll"` and the
-    // `:destroy`/`:delete` mappings below apply only to the internal *option*
-    // default (`options.dependent`), never to a user-passed argument.
-    if (dependent !== undefined && dependent !== "nullify" && dependent !== "delete_all") {
-      throw new ArgumentError("Valid values are :nullify or :delete_all");
-    }
-    // Rails normalizes dependent: :destroy → :delete_all for deleteAll,
-    // because deleteAll should never run destroy callbacks (use destroyAll for that).
-    const raw = dependent ?? (this._assocDef.options.dependent as string | undefined);
-    let strategy: "delete_all" | "nullify";
-    switch (raw) {
-      case undefined:
-      case "delete_all":
-      case "deleteAll":
-      case "delete":
-      case "destroy":
-        strategy = "delete_all";
-        break;
-      case "nullify":
-        strategy = "nullify";
-        break;
-      default:
-        throw new Error(
-          `deleteAll only accepts "nullify", "delete_all", "deleteAll", "delete", or "destroy". Received: "${raw}"`,
-        );
-    }
-
-    // If the proxy's inherited Relation state has been mutated in place
-    // (e.g. cp.whereBang(...)), go through super.deleteAll() /
-    // super.updateAll() directly — scope() would rebuild the
-    // unmutated association scope and delete/nullify MORE rows than
-    // the caller constrained. NOT `this.deleteAll()` / `this.updateAll()`
-    // here: those resolve back to CollectionProxy's own methods and
-    // would recurse.
-    const diverged = this._relationStateDiverged();
-    // Through and diverged paths bypass scope(), which is where AR
-    // gates strict-loading. Enforce directly so deleteAll is
-    // consistent regardless of through/diverged state. The
-    // non-diverged non-through branch goes through scope() which
-    // produces an AR and enforces the same gate on its own.
-    if (this._isThrough || diverged) {
-      this._checkStrictLoading();
-    }
-    let count: number;
-    if (strategy === "delete_all") {
-      if (this._isThrough) {
-        // For through associations, delete join rows via SQL — not the target records
-        count = await this._deleteThroughAllSql();
-      } else if (diverged) {
-        count = await super.deleteAll();
-      } else {
-        count = await this.scope().deleteAll();
+    const count = await (
+      this._record.association(this._assocName) as unknown as {
+        deleteAll(dependent?: string): Promise<number>;
       }
-    } else {
-      // Nullify: set-based SQL update to null FKs (no per-record callbacks)
-      if (this._isThrough) {
-        // Rails `delete_or_nullify_all_records(:nullify)` → `delete_records`
-        // (has_many_through_association.rb:136-175) UPDATEs the source FK on the
-        // join rows to NULL — it does NOT delete them — and decrements the
-        // owner's counter caches. Delegate to the association layer (as `clear`
-        // does) so nullify semantics and counters are handled in one place,
-        // rather than `_deleteThroughAllSql`, which would DELETE the join rows.
-        count = await this._nullifyThroughAll();
-      } else {
-        const nullUpdates = this._buildNullifyUpdates();
-        if (diverged) {
-          count = await super.updateAll(nullUpdates);
-        } else {
-          count = await this.scope().updateAll(nullUpdates);
-        }
-      }
-    }
+    ).deleteAll(dependent);
+    // In Rails the proxy reads the association's `@target`, so the `reset` /
+    // `loaded!` inside `delete_all` is what empties the collection the proxy
+    // shows. The trails CollectionProxy keeps its own copy of the target, so
+    // the same reset has to be replayed on it here.
     this._target = [];
     this._targetLoaded = true;
     this._invalidateAssociationIds();

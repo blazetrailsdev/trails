@@ -217,9 +217,10 @@ export class HasManyAssociation extends CollectionAssociation {
    * then decrements the counter cache by the affected count.
    * @internal
    */
-  protected override async deleteOrNullifyAllRecords(method?: string): Promise<void> {
+  protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
     const count = await deleteCount(this, method ?? "", (this as any).scope());
     await updateCounter(this, -count);
+    return count;
   }
 
   /**
