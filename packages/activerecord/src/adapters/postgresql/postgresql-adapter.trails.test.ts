@@ -312,6 +312,48 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    // Same for `reset!`, which Rails runs under `@lock` and where it issues
+    // ROLLBACK / DISCARD ALL but never a CancelRequest — the two
+    // `cancel_any_running_query` callers are exec_rollback/restart
+    // (postgresql/database_statements.rb:79, :84), not `reset!`
+    // (postgresql_adapter.rb:371-381). The port cancelled here, killing a query
+    // another chain owned; with nothing left to observe that rejection it
+    // surfaced as vitest's run-end unhandled QueryCanceled.
+    it("reset does not cancel a query issued by another chain", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.beginDbTransaction();
+        const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
+        await new Promise<void>((r) => setTimeout(r, 100));
+        other.resetBang();
+        await expect(foreign).resolves.toHaveLength(1);
+      } finally {
+        await other.close();
+      }
+    });
+
+    // `resetBang` defers its body behind `_inFlightReset` and query paths wait
+    // on that barrier — several of them while already holding the connection
+    // lock. So the deferred body must NOT need that lock: a reset that waited
+    // for it would be queued behind a query that is waiting for the reset.
+    // Rails cannot reach the state (its `reset!` blocks under `@lock`), and
+    // this test is what proves the port doesn't either.
+    it("a query holding the lock does not wait on a reset queued behind it", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.execute("SELECT 1 AS n");
+        // Fired from OUTSIDE the lock, as a pool reap/checkin is.
+        setTimeout(() => other.resetBang(), 0);
+        await other.transactionManager.synchronize(async () => {
+          await new Promise<void>((r) => setTimeout(r, 50));
+          const rows = await other.execute("SELECT 1 AS n");
+          expect(rows).toHaveLength(1);
+        });
+      } finally {
+        await other.close();
+      }
+    });
+
     // Regression for RFC 0061 pg-query-canceled-unhandled-rejection-recurrence:
     // a CancelRequest is addressed to a backend, not to a statement, so firing
     // it without waiting for delivery (`cancel`) and for the cancelled command
