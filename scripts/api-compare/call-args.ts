@@ -12,8 +12,8 @@
 // 604 activerecord rows).
 
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
-import { stripThis } from "./arity.js";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import { stripThis } from "./arity.js";
 import { normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
@@ -583,6 +583,10 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
  * maximal — a candidate whose two endpoints are both free is always taken — so
  * within one name it consumes exactly the min(Ruby, TS) sites the source-order
  * zip did, and nothing that used to be compared silently stops being compared.
+ *
+ * Greedy over the globally best-scoring candidate, ties broken by source order
+ * on the Ruby then the TS side, so the verdict never depends on the order the
+ * candidates were enumerated in.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
@@ -596,10 +600,6 @@ export function pairCallSites(
       candidates.push({ rubyIdx, tsIdx, score: argSimilarity(ruby, tsSites[tsIdx]) });
     });
   });
-  // Greedy over the globally best-scoring candidate, ties broken by source
-  // order on the Ruby then the TS side — so the verdict never depends on the
-  // order the candidates were enumerated in, and an indistinguishable pair
-  // still zips the way it always did.
   candidates.sort((a, b) => b.score - a.score || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx);
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();
