@@ -104,7 +104,7 @@ describe("DbMigrateTest", () => {
     // so the single-primary fast path (and with it `migrate`) is never reached.
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
-    expect(DatabaseTasks.configsFor("development")).toHaveLength(2);
+    expect(DatabaseTasks.configsFor({ envName: "development" })).toHaveLength(2);
     expect(migrateSpy).not.toHaveBeenCalled();
   });
 

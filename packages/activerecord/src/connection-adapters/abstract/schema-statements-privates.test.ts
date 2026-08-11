@@ -278,7 +278,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     // it falls through to the lookup and simply matches nothing.
     const ss = makeStatements();
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
-      new CheckConstraintDefinition("users", "age > 0", "chk_rails_x"),
+      new CheckConstraintDefinition("users", "age > 0", { name: "chk_rails_x" }),
     ]);
     expect(await ss.checkConstraintExists("users", { name: "" })).toBe(false);
     await expect(ss.checkConstraintExists("users", {})).rejects.toThrow(
@@ -310,7 +310,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
-      new CheckConstraintDefinition("users", "age > 0", name),
+      new CheckConstraintDefinition("users", "age > 0", { name }),
     ]);
     await ss.addCheckConstraint("users", "age > 0", { ifNotExists: true });
     expect((ss as any).execute).not.toHaveBeenCalled();
@@ -328,7 +328,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
-      new CheckConstraintDefinition("users", "age > 0", name),
+      new CheckConstraintDefinition("users", "age > 0", { name }),
     ]);
     expect(
       await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),

@@ -17,18 +17,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-handler.ts",
     "rubyName": "establish_connection",
-    "call": "instrument",
-    "kind": "args",
-    "rubyArgs": [
-      "str:!connection.active_record",
-      "ref:payload"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-handler.ts",
-    "rubyName": "establish_connection",
     "call": "resolve_pool_config",
     "kind": "args",
     "rubyArgs": [

@@ -50,7 +50,7 @@ describe("ForeignKeyDefinition#export_name_on_schema_dump?", () => {
 
 describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
   const chk = (name: string): CheckConstraintDefinition =>
-    new CheckConstraintDefinition("trades", "price > 0", name);
+    new CheckConstraintDefinition("trades", "price > 0", { name });
 
   it("honors a custom SchemaDumper.chkIgnorePattern at call time", () => {
     expect(chk("ignored_chk_trades_price").isExportNameOnSchemaDump).toBe(true);

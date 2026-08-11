@@ -956,7 +956,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     return Promise.all(
       rows.map(async (row) => {
-        const name = row["name"] as string;
+        const options = { name: row["name"] as string };
         let expression = row["expression"] as string;
         if (expression.startsWith("(") && expression.endsWith(")")) {
           expression = expression.slice(1, -1);
@@ -968,7 +968,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
           // used in the SchemaDumper).
           expression = expression.replace(/\\'/g, "'");
         }
-        return new CheckConstraintDefinition(tableName, expression, name);
+        return new CheckConstraintDefinition(tableName, expression, options);
       }),
     );
   }

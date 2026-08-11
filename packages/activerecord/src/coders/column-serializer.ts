@@ -50,7 +50,7 @@ export class ColumnSerializer {
    */
   dump(object: unknown): string | null {
     if (object == null) return null;
-    this.assertValidValue(object, "dump");
+    this.assertValidValue(object, { action: "dump" });
     return this._coder.dump(object);
   }
 
@@ -66,7 +66,7 @@ export class ColumnSerializer {
     }
 
     let object = this._coder.load(payload);
-    this.assertValidValue(object, "load");
+    this.assertValidValue(object, { action: "load" });
 
     if (object == null && this._objectClass !== (Object as unknown)) {
       object = new (this._objectClass as new () => unknown)();
@@ -78,7 +78,7 @@ export class ColumnSerializer {
   /**
    * Mirrors: ActiveRecord::Coders::ColumnSerializer#assert_valid_value
    */
-  assertValidValue(object: unknown, action = "serialize"): void {
+  assertValidValue(object: unknown, { action }: { action: string }): void {
     if (object == null) return;
     // Object is the universal superclass — mirrors Ruby's `Object === anything`.
     if (this._objectClass === (Object as unknown)) return;

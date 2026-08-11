@@ -1155,7 +1155,7 @@ export class Relation<T extends Base> {
     } catch {
       orderMatcher = abstractColumnNameWithOrderMatcher();
     }
-    disallowRawSqlBang([column], orderMatcher);
+    disallowRawSqlBang([column], { permit: orderMatcher });
 
     if (values.length === 0) return this.none();
 
@@ -3392,7 +3392,7 @@ export class Relation<T extends Base> {
     // thread through to the recursion (`apply_join_dependency(eager_loading: false)
     // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
     if (this._eagerLoadingForSql()) {
-      return this.applyJoinDependency(false).exists(conditions);
+      return this.applyJoinDependency({ eagerLoading: false }).exists(conditions);
     }
     // Mirrors Rails FinderMethods#construct_relation_for_exists
     // (finder_methods.rb:438): shape the existence probe and apply the argument's
@@ -3607,7 +3607,7 @@ export class Relation<T extends Base> {
     // rather than column_name_with_order_matcher (which is stricter, for order).
     const stringColumns = columns.filter((c): c is string => typeof c === "string");
     if (stringColumns.length > 0) {
-      disallowRawSqlBang(stringColumns, resolveColumnNameMatcher(this._conn()));
+      disallowRawSqlBang(stringColumns, { permit: resolveColumnNameMatcher(this._conn()) });
     }
 
     const table = this.table;
@@ -3747,7 +3747,7 @@ export class Relation<T extends Base> {
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency(this._groupColumns.length === 0)._buildArel()
+        ? this.applyJoinDependency()._buildArel()
         : this._buildArel();
       arel.source.left = table;
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
@@ -3831,7 +3831,7 @@ export class Relation<T extends Base> {
       // implicitly here (the no-arg default, finder_methods.rb:457), so a
       // grouped delete skips the limit/offset materialization guard.
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency(this._groupColumns.length === 0)._buildArel()
+        ? this.applyJoinDependency()._buildArel()
         : this._buildArel();
       // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
       // target back to the bare table before `compile_delete`. For the common
@@ -4681,7 +4681,9 @@ export class Relation<T extends Base> {
    * when `eager_loading` is truthy.
    * @internal
    */
-  applyJoinDependency(eagerLoading = true): Relation<T> {
+  applyJoinDependency({
+    eagerLoading = this._groupColumns.length === 0,
+  }: { eagerLoading?: boolean } = {}): Relation<T> {
     if (!this._eagerLoadingForSql()) return this;
     const eagerSpecs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),

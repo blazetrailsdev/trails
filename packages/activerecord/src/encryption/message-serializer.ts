@@ -49,9 +49,9 @@ export class MessageSerializer implements MessageSerializerLike {
       level,
     );
     // A present payload decodes to a Buffer; anything else becomes a null payload.
-    const message = new Message(
-      typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
-    );
+    const message = new Message({
+      payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
+    });
     let nestedCount = 0;
     for (const [key, value] of headers.entries()) {
       if (value instanceof Message) {

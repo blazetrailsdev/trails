@@ -2214,7 +2214,7 @@ export class Base extends Model {
       const r = new (_relationCtorFor(this))(this);
       return wrapWithScopeProxy(r);
     };
-    const rel = DefaultScoping.buildDefaultScope(this, buildBase, allQueries) ?? buildBase();
+    const rel = DefaultScoping.buildDefaultScope(this, buildBase, { allQueries }) ?? buildBase();
     return this._applyStiTypeCondition(rel);
   }
 

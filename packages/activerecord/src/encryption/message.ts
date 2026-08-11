@@ -11,10 +11,16 @@ export class Message {
   payload: string | Buffer;
   headers: Properties;
 
-  constructor(payload?: string | Buffer | null) {
+  constructor({
+    payload,
+    headers = {},
+  }: {
+    payload?: string | Buffer | null;
+    headers?: Record<string, unknown>;
+  } = {}) {
     this.validatePayloadType(payload);
     this.payload = payload ?? "";
-    this.headers = new Properties();
+    this.headers = new Properties(headers);
   }
 
   equals(otherMessage: { payload: string | Buffer; headers: Properties | object }): boolean {

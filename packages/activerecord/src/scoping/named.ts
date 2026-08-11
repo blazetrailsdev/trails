@@ -171,7 +171,9 @@ export function defaultScoped(
   options?: { allQueries?: boolean | null },
 ): any {
   const rel = scope ?? this._buildUnscopedRelation?.();
-  return Default.buildDefaultScope(this as any, () => rel, options?.allQueries) ?? rel;
+  return (
+    Default.buildDefaultScope(this as any, () => rel, { allQueries: options?.allQueries }) ?? rel
+  );
 }
 
 /**

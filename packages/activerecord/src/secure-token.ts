@@ -37,8 +37,8 @@ export function hasSecureToken(
   attribute: string = "token",
   options?: { length?: number; on?: "create" | "initialize" },
 ): void {
-  const tokenLength = options?.length ?? MINIMUM_TOKEN_LENGTH;
-  if (tokenLength < MINIMUM_TOKEN_LENGTH) {
+  const length = options?.length ?? MINIMUM_TOKEN_LENGTH;
+  if (length < MINIMUM_TOKEN_LENGTH) {
     throw new MinimumLengthError(
       `Token requires a minimum length of ${MINIMUM_TOKEN_LENGTH} characters.`,
     );
@@ -55,7 +55,7 @@ export function hasSecureToken(
   Object.defineProperty(this.prototype, methodName, {
     value: function (this: Base): Promise<true | undefined> {
       return this.updateBang({
-        [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken(tokenLength),
+        [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken({ length }),
       });
     },
     writable: true,
@@ -73,9 +73,9 @@ export function hasSecureToken(
   // SecureTokenTest runs against `:create` too.
   const generateIfBlank = (record: any): void => {
     if (record.isNewRecord() && !record.queryAttribute(attribute)) {
-      record[attribute] = (record.constructor as typeof Base).generateUniqueSecureToken(
-        tokenLength,
-      );
+      record[attribute] = (record.constructor as typeof Base).generateUniqueSecureToken({
+        length,
+      });
     }
   };
   if (options?.on === "initialize") {
@@ -89,6 +89,8 @@ export function hasSecureToken(
  * Mirrors: ActiveRecord::SecureToken::ClassMethods#generate_unique_secure_token
  * (secure_token.rb:57).
  */
-export function generateUniqueSecureToken(length: number = MINIMUM_TOKEN_LENGTH): string {
+export function generateUniqueSecureToken({
+  length = MINIMUM_TOKEN_LENGTH,
+}: { length?: number } = {}): string {
   return secureRandomBase58(length);
 }

@@ -78,7 +78,7 @@ describe("PostgreSQL::OID::Range", () => {
 
     expect(range.begin).toBe(-Infinity);
     expect(range.end).toBe(Infinity);
-    expect(infinityCalls).toEqual([{ negative: true }, undefined]);
+    expect(infinityCalls).toEqual([{ negative: true }, { negative: false }]);
   });
 
   it("maps range bounds", () => {

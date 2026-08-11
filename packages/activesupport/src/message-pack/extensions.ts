@@ -66,6 +66,23 @@ function nanosecondOfSecond(time: {
 }
 
 /**
+ * Mirrors: `DateTime#sec_fraction` — Ruby's DateTime carries the sub-second part
+ * as a Rational directly; `Temporal.PlainDateTime` splits it across
+ * milli/micro/nanosecond, so it is recomposed here.
+ */
+function secFraction(datetime: Temporal.PlainDateTime): Rational {
+  return rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND);
+}
+
+/**
+ * Mirrors: `DateTime#offset` — a `Temporal.PlainDateTime` is zone-less, which is
+ * the Ruby `DateTime` this branch packs, so the offset is always zero.
+ */
+function offset(_datetime: Temporal.PlainDateTime): Rational {
+  return rational(0, 1);
+}
+
+/**
  * Encodes a bigint as MessagePack::Bigint's `CL>*` ext payload: a sign byte (0
  * positive / 1 negative) followed by 32-bit big-endian chunks, least-significant
  * chunk first. Byte-identical to `MessagePack::Bigint.to_msgpack_ext`.
@@ -244,8 +261,8 @@ export const Extensions = {
     packer.write(datetime.hour);
     packer.write(datetime.minute);
     packer.write(datetime.second);
-    Extensions.writeRational(rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND), packer);
-    Extensions.writeRational(rational(0, 1), packer);
+    Extensions.writeRational(secFraction(datetime), packer);
+    Extensions.writeRational(offset(datetime), packer);
   },
 
   readDatetime(unpacker: Unpacker): Temporal.PlainDateTime {

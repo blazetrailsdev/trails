@@ -36,7 +36,9 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  const configs = all ? DatabaseTasks.eachLocalConfiguration() : DatabaseTasks.configsFor(env);
+  const configs = all
+    ? DatabaseTasks.eachLocalConfiguration()
+    : DatabaseTasks.configsFor({ envName: env });
   if (!all && configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -58,7 +60,9 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  const configs = all ? DatabaseTasks.eachLocalConfiguration() : DatabaseTasks.configsFor(env);
+  const configs = all
+    ? DatabaseTasks.eachLocalConfiguration()
+    : DatabaseTasks.configsFor({ envName: env });
   if (!all && configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -168,7 +172,7 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  if (DatabaseTasks.configsFor(env).length === 0) {
+  if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
@@ -246,7 +250,7 @@ export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
   installSeedLoader(cwd);
 
   const env = DatabaseConfigurations.currentEnv();
-  const configs = DatabaseTasks.configsFor(env);
+  const configs = DatabaseTasks.configsFor({ envName: env });
   if (configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -289,7 +293,7 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
   }
 
   const env = DatabaseConfigurations.currentEnv();
-  if (DatabaseTasks.configsFor(env).length === 0) {
+  if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
@@ -322,7 +326,7 @@ export async function dbVersion(cwd: string, args: string[]): Promise<number> {
   const env = DatabaseConfigurations.currentEnv();
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
-    : DatabaseTasks.configsFor(env);
+    : DatabaseTasks.configsFor({ envName: env });
 
   if (configs.length === 0) {
     console.error(
@@ -368,7 +372,7 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
   // host check: that belongs to `each_local_configuration`, not to these tasks.
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
-    : DatabaseTasks.configsFor(env);
+    : DatabaseTasks.configsFor({ envName: env });
 
   if (configs.length === 0) {
     console.error(

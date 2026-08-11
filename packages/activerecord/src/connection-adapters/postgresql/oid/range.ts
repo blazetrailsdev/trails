@@ -175,8 +175,14 @@ export class RangeType extends ValueType<Range> {
     };
   }
 
-  private infinity(options?: { negative?: boolean }): unknown {
-    return this.subtype.infinity?.(options) ?? (options?.negative ? -Infinity : Infinity);
+  private infinity({ negative = false }: { negative?: boolean } = {}): unknown {
+    if (this.subtype.infinity) {
+      return this.subtype.infinity({ negative });
+    } else if (negative) {
+      return -Infinity;
+    } else {
+      return Infinity;
+    }
   }
 
   /**

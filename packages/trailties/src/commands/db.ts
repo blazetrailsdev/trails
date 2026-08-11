@@ -281,7 +281,7 @@ async function withRegisteredConfiguration<T>(
 
 /**
  * Multi-config variant: register every HashConfig for the env so
- * `DatabaseTasks.configsFor(envName)` fans out across them. Used by
+ * `DatabaseTasks.configsFor({ envName })` fans out across them. Used by
  * commands that mirror Rails' `with_temporary_pool_for_each` /
  * `configs_for(env_name:).each` — schema:cache:dump, schema:cache:clear
  * — which need to hit every named DB (primary + animals + ...) in a
@@ -1191,7 +1191,7 @@ export function dbCommand(): Command {
           new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
-        for (const config of DatabaseTasks.configsFor(envName)) {
+        for (const config of DatabaseTasks.configsFor({ envName })) {
           await DatabaseTasks.withTemporaryPool(config, async (pool) => {
             const adapter = await pool.leaseConnection();
             const filename = DatabaseTasks.cacheDumpFilename(config);
@@ -1217,7 +1217,7 @@ export function dbCommand(): Command {
           new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
-        for (const config of DatabaseTasks.configsFor(envName)) {
+        for (const config of DatabaseTasks.configsFor({ envName })) {
           const filename = DatabaseTasks.cacheDumpFilename(config);
           // clearSchemaCache is a no-op on ENOENT; don't log "Cleared"
           // unless we actually removed something.

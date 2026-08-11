@@ -79,18 +79,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "data_source_sql",
-    "call": "quoted_scope",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name",
-      "kwargs{type=ref:type}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "dbconsole",
     "call": "database_cli",
     "reason": "Rails reads the cli name only to pass it to `find_cmd_and_exec` (postgresql_adapter.rb); that PTY exec is Ruby-only and unported, so our `dbconsole` returns the arg list and never needs the lookup."

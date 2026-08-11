@@ -115,7 +115,10 @@ function _sanitizeSqlHashForAssignment(
 /**
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#disallow_raw_sql!
  */
-export function disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void {
+export function disallowRawSqlBang(
+  args: (string | symbol | Nodes.Node)[],
+  { permit }: { permit?: RegExp } = {},
+): void {
   const columnMatcher =
     permit ?? /^(?:"?\w+"?\.)?"?\w+"?(?:\s+(?:ASC|DESC))?(?:\s+NULLS\s+(?:FIRST|LAST))?$/i;
   const unexpected: string[] = [];
@@ -266,7 +269,7 @@ export function sanitizeSqlForAssignment(
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClassSync(): unknown;
-    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], permit?: RegExp): void;
+    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
   condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
@@ -289,10 +292,9 @@ export function sanitizeSqlForOrder(
       const adapterClass = this.adapterClassSync() as {
         columnNameWithOrderMatcher(): RegExp;
       };
-      this.disallowRawSqlBang(
-        [first as string | symbol | Nodes.Node],
-        adapterClass.columnNameWithOrderMatcher(),
-      );
+      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], {
+        permit: adapterClass.columnNameWithOrderMatcher(),
+      });
       const sanitized = this.sanitizeSqlArray(firstText, ...condition.slice(1));
       return arelSql(sanitized);
     }

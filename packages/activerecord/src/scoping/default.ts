@@ -37,7 +37,7 @@ export class Default {
   static buildDefaultScope(
     modelClass: any,
     buildRelation: () => any,
-    allQueries?: boolean | null,
+    { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
     if (modelClass.abstractClass) return undefined;
 

@@ -6,7 +6,7 @@ import { Decryption, ForbiddenClass } from "./errors.js";
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages", () => {
     const serializer = new MessageSerializer();
-    const message = new Message("hello");
+    const message = new Message({ payload: "hello" });
     message.addHeader("iv", "test-iv");
     const serialized = serializer.dump(message);
     const loaded = serializer.load(serialized);
@@ -19,10 +19,10 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("serializes messages with nested messages in their headers", () => {
     const serializer = new MessageSerializer();
-    const inner = new Message("inner-payload");
+    const inner = new Message({ payload: "inner-payload" });
     inner.addHeader("iv", "inner-iv");
 
-    const outer = new Message("outer-payload");
+    const outer = new Message({ payload: "outer-payload" });
     outer.headers.set("nested", inner);
 
     const serialized = serializer.dump(outer);
@@ -75,7 +75,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     // must be UTF-8-encoded — latin1 would diverge for 0x80..0xFF and truncate
     // code points > 0xFF (e.g. emoji).
     const serializer = new MessageSerializer();
-    const message = new Message("payload");
+    const message = new Message({ payload: "payload" });
     message.addHeader("tag", "café 😀");
     const dumped = serializer.dump(message);
     const parsed = JSON.parse(dumped) as { h: { tag: string } };

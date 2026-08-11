@@ -13,7 +13,7 @@ describe("SecureTokenTest", () => {
 
   class OverridingUser extends Base {
     static _tableName = "users";
-    static generateUniqueSecureToken(length: number = 24): string {
+    static generateUniqueSecureToken({ length = 24 }: { length?: number } = {}): string {
       return "x".repeat(length);
     }
   }
@@ -34,7 +34,7 @@ describe("SecureTokenTest", () => {
   });
 
   it("generate_unique_secure_token is a class method on every model", () => {
-    expect(Base.generateUniqueSecureToken(24)).toHaveLength(24);
+    expect(Base.generateUniqueSecureToken({ length: 24 })).toHaveLength(24);
   });
 
   it("an overridden generate_unique_secure_token is used on create", async () => {
