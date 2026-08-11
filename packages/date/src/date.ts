@@ -730,7 +730,10 @@ const SMALLBUF = 100;
  * raise there, up to one doubling tighter than MRI.
  *
  * A JS string grows on its own, so the buffer itself is unobservable; the pass
- * boundary is not, because it is what the two `ERANGE` arms measure against.
+ * boundary is not, because it is what the two `ERANGE` arms measure against. A
+ * pass answers `undefined` where the C hits `ERANGE`, so `len != 0 || (**buf ==
+ * '\0' && errno != ERANGE)` (`date_core.c:7080`) is "the pass answered" —
+ * empty output included.
  */
 export function strftime(
   value:
@@ -750,8 +753,6 @@ export function strftime(
       : value;
   const flen = format.length;
   if (flen === 0) return "";
-  // `len != 0 || (**buf == '\0' && errno != ERANGE)` (`date_core.c:7080`): a
-  // pass that did not hit ERANGE answers, empty output included.
   const first = dateStrftime(subject, format, SMALLBUF);
   if (first !== undefined) return first;
   for (let size = 1024; ; size *= 2) {

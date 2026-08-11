@@ -1134,12 +1134,11 @@ export class Relation<T extends Base> {
   /**
    * Order by specific values of a column.
    *
-   * Mirrors: ActiveRecord::Relation#in_order_of
+   * Mirrors: ActiveRecord::Relation#in_order_of (query_methods.rb:718) — the
+   * permit matcher comes off `model.adapter_class`, a class-level lookup that
+   * leases no connection.
    */
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
-    // Mirrors Rails: `model.disallow_raw_sql!([column], permit:
-    // model.adapter_class.column_name_with_order_matcher)`
-    // (query_methods.rb:718) — a class-level lookup that leases no connection.
     disallowRawSqlBang([column], {
       permit: (
         this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }

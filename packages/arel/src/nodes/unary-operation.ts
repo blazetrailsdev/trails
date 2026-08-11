@@ -15,12 +15,11 @@ import { Descending } from "./descending.js";
  */
 export class UnaryOperation extends Unary {
   readonly operator: string;
-  readonly operand: Node;
+  declare readonly expr: Node;
 
   constructor(operator: string, operand: Node) {
     super(operand);
     this.operator = operator;
-    this.operand = operand;
   }
 
   as(aliasName: string): As {

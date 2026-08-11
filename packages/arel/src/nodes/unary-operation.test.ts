@@ -8,8 +8,8 @@ describe("TestUnaryOperation", () => {
     const attr = users.get("age");
     const node = new Nodes.UnaryOperation("-", attr);
     expect(node.operator).toBe("-");
-    expect(node.operand).toBe(attr);
-    expect(node.operand).toBeInstanceOf(Nodes.Attribute);
+    expect(node.expr).toBe(attr);
+    expect(node.expr).toBeInstanceOf(Nodes.Attribute);
   });
 
   it("operation alias", () => {
@@ -23,7 +23,7 @@ describe("TestUnaryOperation", () => {
   it("expr", () => {
     const attr = users.get("id");
     const node = new Nodes.UnaryOperation("-", attr);
-    expect(node.operand).toBe(attr);
+    expect(node.expr).toBe(attr);
   });
 
   it("equality with same ivars", () => {

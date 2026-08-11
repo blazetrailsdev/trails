@@ -779,9 +779,6 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesGrouping(o: Nodes.Grouping, collector: SQLString): SQLString {
-    // A nested Grouping recurses back here rather than adding a second pair of
-    // parentheses, and an Array expr — the composite-key row-value tuple —
-    // dispatches to `visitArray`, which is where Rails' comma join lives too.
     if (o.expr instanceof Nodes.Grouping) {
       this.visit(o.expr, collector);
     } else {
@@ -1549,7 +1546,7 @@ export class ToSql extends Visitor {
     // The operator is emitted verbatim with a space on each side; callers
     // are responsible for the operator's own whitespace.
     collector.append(` ${o.operator} `);
-    this.visit(o.expr as Node, collector);
+    this.visit(o.expr, collector);
     return collector;
   }
 

@@ -687,9 +687,6 @@ export abstract class SchemaDumper {
       return table;
     }
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // `Regexp.escape(@options[:table_name_prefix].to_s)` (schema_dumper.rb:371):
-    // the escape is what `prefix` HOLDS, and `to_s` renders a missing option as
-    // the empty string.
     const prefix = escape((this._options.tableNamePrefix as string | undefined) ?? "");
     const suffix = escape((this._options.tableNameSuffix as string | undefined) ?? "");
     const re = new RegExp(`^${prefix}(.+)${suffix}$`);
