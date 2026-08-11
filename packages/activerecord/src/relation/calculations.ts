@@ -788,7 +788,7 @@ export async function performCount(
       return groupedAggregate(
         joinedRel,
         "count",
-        column != null && column !== "*" ? column : pk,
+        column != null && column !== "*" && column !== "all" ? column : pk,
         true,
       ) as Promise<Map<unknown, number>>;
     }
@@ -865,7 +865,7 @@ export async function performCount(
           // to a no-match relation, so the count is 0.
           if (limitedIds.length === 0) return 0;
 
-          const colForCount = column != null && column !== "*" ? column : pk;
+          const colForCount = column != null && column !== "*" && column !== "all" ? column : pk;
           const countManager = table.project(
             (aggregateColumn(this, colForCount) as any).count(true).as("count"),
           );
@@ -890,7 +890,7 @@ export async function performCount(
         }
         // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
         // count("*") routes through JD and uses PK — COUNT(DISTINCT *) is invalid.
-        const colForCount = column != null && column !== "*" ? column : pk;
+        const colForCount = column != null && column !== "*" && column !== "all" ? column : pk;
         const manager = table.project(
           (aggregateColumn(this, colForCount) as any).count(true).as("count"),
         );
@@ -917,7 +917,7 @@ export async function performCount(
         // through the shared `build_joins` port so one `AliasTracker` spans the
         // manual joins AND the eager JD.
         const table = this._model.arelTable;
-        if (column != null && column !== "*") {
+        if (column != null && column !== "*" && column !== "all") {
           if (this._limitValue !== null || this._offsetValue !== null) {
             // Rails `apply_join_dependency` (finder_methods.rb:463-478) routes an
             // eager collection join + limit/offset through

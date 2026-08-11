@@ -200,7 +200,7 @@ export class BelongsToAssociation extends SingularAssociation {
       this.removeInverseInstance(this.target);
     }
 
-    this.replaceKeys(record);
+    this.replaceKeys(record, { force: true });
     this.target = record;
     this.loadedBang();
   }
@@ -360,18 +360,30 @@ export class BelongsToAssociation extends SingularAssociation {
    * Handles composite keys by zipping FK columns with PK columns.
    * Rails: replace_keys(record, force: false)
    */
-  protected replaceKeys(record: Base | null): void {
+  protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
     const fks = this.foreignKeyNames();
     const pks = this.associationPrimaryKeys(record);
 
-    for (let i = 0; i < fks.length; i++) {
+    const targetKeyValues = fks.map((_fk, i) => {
       const pkCol = pks[i] ?? pks[0];
-      const value = record
+      return record
         ? typeof (record as any)._readAttribute === "function"
           ? (record as any)._readAttribute(pkCol)
           : (record as any)[pkCol]
         : null;
+    });
 
+    // Rails skips the write entirely when the owner already holds the target's
+    // key (belongs_to_association.rb:137/146) — writing anyway would dirty the
+    // FK attribute on an assignment that changes nothing.
+    const readOwner = (fk: string): unknown =>
+      typeof (this.owner as any)._readAttribute === "function"
+        ? (this.owner as any)._readAttribute(fk)
+        : (this.owner as any)[fk];
+    if (!force && fks.every((fk, i) => readOwner(fk) === targetKeyValues[i])) return;
+
+    for (let i = 0; i < fks.length; i++) {
+      const value = targetKeyValues[i];
       if (typeof (this.owner as any)._writeAttribute === "function") {
         (this.owner as any)._writeAttribute(fks[i], value);
       } else {

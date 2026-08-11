@@ -917,6 +917,13 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
   // reload_schema_from_cache, resetting @find_by_statement_cache. Clearing it
   // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
   // itself leaves the cache alone.
+  // Rails: `connection_pool.active_connection&.clear_cache!` (model_schema.rb:524)
+  // — drop the prepared statements built against the pre-reset columns.
+  void (
+    connectionPool.call(this as unknown as typeof Base).activeConnection as {
+      clearCacheBang?: () => unknown;
+    } | null
+  )?.clearCacheBang?.();
   (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   // Mirrors Rails reset_column_information's
   // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop

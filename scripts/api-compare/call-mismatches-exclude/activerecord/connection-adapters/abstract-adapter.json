@@ -23,17 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "disconnect!",
-    "call": "clear_cache!",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{newConnection=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_delete",
     "call": "affected_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -118,35 +107,13 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "reconnect!",
-    "call": "clear_cache!",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{newConnection=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "reset!",
-    "call": "clear_cache!",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{newConnection=bool:true}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "select_all",
     "call": "empty",
     "kind": "args",
     "rubyArgs": [
       "kwargs{async=ref:async}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "database_statements.rb:79 `ActiveRecord::Result.empty(async: async)` returns EMPTY_ASYNC, a `FutureResult.wrap(EMPTY)` (result.rb:247). FutureResult and the whole load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so there is no async Result to select — story call-args-ar-select-async-kwarg."
   },
   {
     "package": "activerecord",
@@ -167,7 +134,7 @@
       "ref:binds",
       "kwargs{async=ref:async}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "database_statements.rb:85 forwards `async:` into `select_all`, which turns it into `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
   },
   {
     "package": "activerecord",
@@ -181,7 +148,7 @@
       "ref:binds",
       "kwargs{async=ref:async}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "database_statements.rb:102 forwards `async:` into `select_all`, which turns it into `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
   },
   {
     "package": "activerecord",
@@ -195,7 +162,7 @@
       "ref:binds",
       "kwargs{async=ref:async}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "database_statements.rb:90 forwards `async:` into `select_rows` → `select_all` → `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
   },
   {
     "package": "activerecord",

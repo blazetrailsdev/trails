@@ -718,7 +718,7 @@ export class ConnectionPool implements ReapablePool {
     return this.connectionLease().sticky === null;
   }
 
-  releaseConnection(): boolean {
+  releaseConnection(_existingLease: Lease | null = null): boolean {
     const conn = this.connectionLease().release();
     if (conn) {
       this.checkin(conn);
@@ -974,11 +974,6 @@ export class ConnectionPool implements ReapablePool {
       if (preventPermanent && !stickyWas) lease.sticky = stickyWas;
     };
 
-    const releaseOnDone = () => {
-      restoreSticky();
-      if (!lease.sticky) this.releaseConnection();
-    };
-
     const needsCheckout = !lease.connection;
     if (needsCheckout) {
       try {
@@ -988,6 +983,12 @@ export class ConnectionPool implements ReapablePool {
         throw err;
       }
     }
+
+    // Rails' `ensure` for the checkout branch (connection_pool.rb:420-421).
+    const releaseOnDone = () => {
+      restoreSticky();
+      if (!lease.sticky) this.releaseConnection(lease);
+    };
 
     try {
       return await fn(lease.connection!);

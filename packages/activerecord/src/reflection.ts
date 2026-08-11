@@ -2,6 +2,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
 import { cachedFindByStatement } from "./core.js";
+import { TableMetadata } from "./table-metadata.js";
 import {
   underscore,
   pluralize,
@@ -277,14 +278,18 @@ export class AbstractReflection {
   }
 
   joinScope(table: TableRef, foreignTable: TableRef, foreignKlass: typeof Base): any {
-    let scope = this.klassJoinScope(table);
+    const predicateBuilder = (this.klass as any).predicateBuilder.with(
+      new TableMetadata(this.klass, table),
+    );
+    const scopeChainItems = this.joinScopes(table, predicateBuilder);
+    let scope = this.klassJoinScope(table, predicateBuilder);
 
     const typeCol = this._concrete().type;
     if (typeCol) {
       scope = scope.where({ [typeCol]: polymorphicName(foreignKlass) });
     }
 
-    for (const chainScope of this.joinScopes(table)) {
+    for (const chainScope of scopeChainItems) {
       scope = scope.merge(chainScope);
     }
 

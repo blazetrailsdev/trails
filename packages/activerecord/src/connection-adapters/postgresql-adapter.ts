@@ -1868,7 +1868,10 @@ export class PostgreSQLAdapter
     }
     if (!this._client) throw new ActiveRecordError("No active transaction");
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION");
+      await this.internalExecute("ROLLBACK", "TRANSACTION", {
+        allowRetry: false,
+        materializeTransactions: true,
+      });
     } catch (e) {
       // Connection-level error — closing the socket implicitly aborts
       // the server-side TX. Swallow and reconnect so the next caller
@@ -1891,9 +1894,7 @@ export class PostgreSQLAdapter
 
   /**
    * Mirrors: `PostgreSQL::DatabaseStatements#exec_rollback_db_transaction`
-   * (`postgresql/database_statements.rb:78-81`). `internalExecute` already
-   * defaults `allowRetry: false` / `materializeTransactions: true`, so the two
-   * statements below are Ruby's two lines.
+   * (`postgresql/database_statements.rb:78-81`).
    *
    * Deviation, language-forced: the `finally` releases trails' single
    * persistent pg.Client. Ruby's adapter *is* the connection and has no
@@ -1904,7 +1905,10 @@ export class PostgreSQLAdapter
   async execRollbackDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
     try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION");
+      await this.internalExecute("ROLLBACK", "TRANSACTION", {
+        allowRetry: false,
+        materializeTransactions: true,
+      });
     } finally {
       this._client = null;
       this._inTransaction = false;
@@ -1960,7 +1964,10 @@ export class PostgreSQLAdapter
   // Mirrors: DatabaseStatements#exec_restart_db_transaction (database_statements.rb:83)
   async execRestartDbTransaction(): Promise<void> {
     await this._cancelAnyRunningQuery();
-    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION");
+    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
   }
 
   /**
@@ -2998,11 +3005,19 @@ export class PostgreSQLAdapter
    * Returns the pool's chained DEALLOCATEs so the caller can await them before
    * putting its own query on the socket; Rails' `clear_cache!` blocks on them.
    */
-  override clearCacheBang(): void | Promise<void> {
-    void super.clearCacheBang();
-    if (this._rawConnection && this._statementPool) {
+  override clearCacheBang({
+    newConnection = false,
+  }: { newConnection?: boolean } = {}): void | Promise<void> {
+    void super.clearCacheBang({ newConnection });
+    if (!this._statementPool) return;
+    if (newConnection) {
+      // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
+      // map without DEALLOCATE: the session that owned those statement names is
+      // gone, so naming them again is an error, not a cleanup.
+      this._statementPool.reset();
+    } else if (this._rawConnection) {
       return this._statementPool.clear();
-    } else if (this._statementPool) {
+    } else {
       this._statementPool.reset();
       this._needsDeallocateAll = true;
     }
@@ -3572,6 +3587,7 @@ export class PostgreSQLAdapter
 
   async renameTable(oldName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
+    await this.clearCacheBang();
     const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(oldName);
     const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
     await this.schemaCache.clearDataSourceCacheBang(oldName);

@@ -40,7 +40,7 @@
     "rubyArgs": [
       "ref:this"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "predicate_builder.rb:16-20 constructs five handlers, registering `ArrayHandler.new(self)` for BOTH Array and Set; the port normalizes Set to Array before dispatch (predicate-builder.ts:332) so only four are constructed. Converging is the handler-registry port tracked by story call-args-ar-predicate-builder-set-handler."
   },
   {
     "package": "activerecord",

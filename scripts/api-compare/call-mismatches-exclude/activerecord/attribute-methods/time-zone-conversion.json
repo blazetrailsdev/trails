@@ -15,6 +15,6 @@
     "rubyArgs": [
       "ref:value"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "time_zone_conversion.rb:48 `map(value) { ... }` is the DelegateClass hop to the SUBTYPE's own `map` hook (postgresql/oid/range.rb:50-54); the port maps arrays inline with `Array#map` and never reaches a subtype hook, so the `value` argument has no receiver. Converging needs the subtype `map` hook ported — story call-args-ar-time-zone-converter-subtype-map."
   }
 ]

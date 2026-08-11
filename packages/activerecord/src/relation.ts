@@ -1058,8 +1058,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#distinct
    */
-  distinct(): Relation<T> {
-    return this._clone().distinctBang();
+  distinct(value = true): Relation<T> {
+    return this._clone().distinctBang(value);
   }
 
   /**
@@ -2230,7 +2230,7 @@ export class Relation<T extends Base> {
    */
   async size(): Promise<number> {
     if (this._loaded) return this._records.length;
-    return this.count() as Promise<number>;
+    return this.count("all") as Promise<number>;
   }
 
   /**
