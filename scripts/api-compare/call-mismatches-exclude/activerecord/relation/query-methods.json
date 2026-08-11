@@ -288,7 +288,7 @@
     "rubyArgs": [
       "ref:subquery"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1608 `Arel::SelectManager.new(subquery).project(select_value).tap do |arel|`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -368,7 +368,7 @@
     "rubyArgs": [
       "ref:name"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1955 `with_table = Arel::Table.new(name)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -414,7 +414,7 @@
     "rubyArgs": [
       "ref:predicates"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb `excluding!`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",

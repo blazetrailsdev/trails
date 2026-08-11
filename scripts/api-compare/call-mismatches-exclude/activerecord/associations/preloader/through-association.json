@@ -20,7 +20,7 @@
     "call": "loaded?",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at associations/preloader/through_association.rb:13 `if loaded?(owner)` and :20 `owners.first.association(through_reflection.name).loaded?`: the body calls `loaded?` twice — once with an owner argument, once on a receiver — and the comparator paired the port's single `loaded(owner)` against the receiverless occurrence."
   },
   {
     "package": "activerecord",

@@ -20,7 +20,7 @@
     "call": "pluralize",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:60 `middle_name = [lhs_model.name.downcase.pluralize,`: Rails invokes `pluralize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -50,7 +50,7 @@
     "call": "camelize",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:50 `join_model.name                = \"HABTM_#{association_name.to_s.camelize}\"`: Rails invokes `camelize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -66,6 +66,6 @@
     "call": "singularize",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at associations/builder/has_and_belongs_to_many.rb:40 `rhs_name = name.to_s.singularize.to_sym`: Rails invokes `singularize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   }
 ]

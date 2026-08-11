@@ -27,7 +27,7 @@
     "call": "presence",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/abstract/schema_statements.rb:318 `if table_comment = td.comment.presence`: Rails invokes `presence` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -111,7 +111,7 @@
     "call": "keys",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/abstract/schema_statements.rb:1506 `raise ArgumentError, \"Algorithm must be one of the following: #{index_algorithms.keys.map(&:inspect).join(', ')}\"`: Rails invokes `keys` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",
@@ -202,7 +202,7 @@
     "call": "pluralize",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/abstract/schema_statements.rb:1086 `reference_name = Base.pluralize_table_names ? ref_name.to_s.pluralize : ref_name`: Rails invokes `pluralize` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
   },
   {
     "package": "activerecord",

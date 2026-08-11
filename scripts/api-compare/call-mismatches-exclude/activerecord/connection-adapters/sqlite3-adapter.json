@@ -8,7 +8,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb `add_check_constraint`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -19,7 +19,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:341 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -30,7 +30,7 @@
     "rubyArgs": [
       "ref:fromTable"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb `add_foreign_key`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -41,7 +41,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:404 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -96,7 +96,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:386 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -107,7 +107,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:369 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -118,7 +118,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:380 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -260,7 +260,7 @@
     "rubyArgs": [
       "ref:queryValue"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/sqlite3_adapter.rb:477 `SQLite3Adapter::Version.new(query_value(\"SELECT sqlite_version(*)\", \"SCHEMA\"))`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -285,7 +285,7 @@
     "rubyArgs": [
       "kwargs{connectionPool=ref:pool}"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/sqlite3_adapter.rb:120 `raise ActiveRecord::NoDatabaseError.new(connection_pool: @pool)`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   },
   {
     "package": "activerecord",
@@ -337,7 +337,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:350 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",
@@ -348,7 +348,7 @@
     "rubyArgs": [
       "ref:tableName"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at connection_adapters/sqlite3_adapter.rb:357 `alter_table(table_name) do |definition|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",

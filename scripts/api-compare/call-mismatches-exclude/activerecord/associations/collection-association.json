@@ -38,7 +38,7 @@
     "call": "all",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent: an ActiveSupport core-ext call on a built-in receiver (`name.singularize`). TS cannot monkey-patch the String/Array/Object prototypes, so the port calls the free function with the Ruby receiver as argument 1; the remaining arguments match Rails exactly."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at associations/collection_association.rb:81 `klass.all.raise_record_not_found_exception!(...)`: Rails' `all` is the AR scoping method, while the TS occurrence the comparator matched is JS `Promise.all(...)` — a name collision, not the same call."
   },
   {
     "package": "activerecord",

@@ -8,7 +8,7 @@
     "rubyArgs": [
       "ref:key"
     ],
-    "reason": "RFC 0099 bucket (b) equivalent: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `alter_table(table_name) do |definition|`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
+    "reason": "RFC 0099 bucket (b) equivalent, verified at type/type_map.rb:36 `register_type(key) do |sql_type|`: Rails passes a block to a method whose earlier parameters are defaulted (sqlite3_adapter.rb:561 `def alter_table(table_name, foreign_keys = ..., check_constraints = ..., **options)`). TS has no block syntax, so the callback is a trailing parameter and the intervening defaulted parameters are padded with nil, which the callee defaults exactly as Ruby's default expressions do."
   },
   {
     "package": "activerecord",

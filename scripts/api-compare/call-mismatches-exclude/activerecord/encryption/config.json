@@ -8,6 +8,6 @@
     "rubyArgs": [
       "kwargs{hashDigestClass=const:SHA1}"
     ],
-    "reason": "RFC 0099 bucket (c) tooling noise: the body contains several `new` calls and the comparator pairs the Ruby and TS occurrences positionally, so this row compares a TS error construction against an unrelated Ruby one rather than a matched call site."
+    "reason": "RFC 0099 bucket (c) tooling noise, verified at encryption/config.rb `support_sha1_for_non_deterministic_encryption=`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
   }
 ]
