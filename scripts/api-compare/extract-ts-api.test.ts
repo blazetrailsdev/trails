@@ -256,6 +256,19 @@ describe("body call capture", () => {
     expect(quote.callSeq).toEqual(["typeCast", "quoteString"]);
   });
 
+  it("credits an expression-bodied arrow's outermost call", () => {
+    // The body IS the CallExpression, so a walk that starts at the body's
+    // CHILDREN never sees `where` — Ruby's walk_for_calls is handed the whole
+    // body node and credits the equivalent one-expression body (RFC 0084).
+    const info = extractFromFiles("/p", {
+      "quoting.ts": `export const f = (x: unknown) => where(x);`,
+    });
+    const f = fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === "f")!;
+    expect(f.calls).toEqual(["where"]);
+    expect(f.callSeq).toEqual(["where"]);
+    expect(f.skeleton).toEqual(["ref:where"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const cls = extractFromSource(
       `class Foo {

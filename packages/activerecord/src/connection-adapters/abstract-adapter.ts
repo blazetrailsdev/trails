@@ -1029,13 +1029,12 @@ export class AbstractAdapter implements Quoting {
     // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
     // (abstract/quoting.rb:161) before quoting. Returns a bare literal — the
     // ` DEFAULT ` keyword is owned by the caller (add_column_options!).
-    let serialized: unknown = value;
     const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
     if (sqlType) {
       const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
-      if (typeof castType?.serialize === "function") serialized = castType.serialize(value);
+      if (typeof castType?.serialize === "function") value = castType.serialize(value);
     }
-    return this.quote(serialized);
+    return this.quote(value);
   }
 
   quotedTrue(): string {
@@ -1328,13 +1327,17 @@ export class AbstractAdapter implements Quoting {
             await this.attemptConfigureConnection();
           });
           return;
-        } catch (error) {
-          const translated = this.translateExceptionClass(error, undefined, undefined);
+        } catch (originalException) {
+          const translatedException = this.translateExceptionClass(
+            originalException,
+            undefined,
+            undefined,
+          );
           const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
 
           if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
-            if (this.isRetryableConnectionError(translated)) {
+            if (this.isRetryableConnectionError(translatedException)) {
               await this.backoff(this.connectionRetries - retriesAvailable);
               continue;
             }
@@ -1344,7 +1347,7 @@ export class AbstractAdapter implements Quoting {
           // translated exception (Rails' `raise translated_exception`).
           this._lastActivity = 0;
           this._verified = false;
-          throw translated;
+          throw translatedException;
         }
       }
     });
@@ -2442,27 +2445,31 @@ export class AbstractAdapter implements Quoting {
       for (;;) {
         try {
           return await block(await this.rawConnectionForBlock());
-        } catch (e) {
-          const translated = this.translateExceptionClass(e, null, null) as Error;
-          this.invalidateTransaction(translated);
+        } catch (originalException) {
+          const translatedException = this.translateExceptionClass(
+            originalException,
+            null,
+            null,
+          ) as Error;
+          this.invalidateTransaction(translatedException);
           const expired = deadline !== null && deadline < Date.now();
           if (!expired && retriesAvailable > 0) {
             retriesAvailable -= 1;
-            if (this.isRetryableQueryError(translated)) {
+            if (this.isRetryableQueryError(translatedException)) {
               await this.backoff(this.connectionRetries - retriesAvailable);
               continue;
             }
-            if (reconnectable && this.isRetryableConnectionError(translated)) {
+            if (reconnectable && this.isRetryableConnectionError(translatedException)) {
               await this.reconnectBang({ restoreTransactions: true });
               reconnectable = false;
               continue;
             }
           }
-          if (!this.isRetryableQueryError(translated)) {
+          if (!this.isRetryableQueryError(translatedException)) {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw translated;
+          throw translatedException;
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }

@@ -651,8 +651,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
     const raw = this.extractNewCommentValue(commentOrChanges);
     // Mirrors Rails: `comment = "" if comment.nil?` then `COMMENT #{quote(comment)}`.
-    const c = raw == null ? "" : String(raw);
-    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(c)}`);
+    const comment = raw == null ? "" : String(raw);
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} COMMENT ${this.quote(comment)}`,
+    );
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
@@ -801,7 +803,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     options: ColumnOptions = {},
   ): Promise<ChangeColumnDefinition> {
     const column = await this.columnFor(tableName, columnName);
-    const resolvedType = type ?? column.sqlType ?? "";
+    type ??= column.sqlType ?? "";
 
     const opts: Record<string, unknown> = { ...options };
 
@@ -817,10 +819,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     if (opts["collation"] === null) {
       delete opts["collation"];
-    } else if (
-      !Object.prototype.hasOwnProperty.call(opts, "collation") &&
-      this.isTextType(resolvedType)
-    ) {
+    } else if (!Object.prototype.hasOwnProperty.call(opts, "collation") && this.isTextType(type)) {
       opts["collation"] = column.collation ?? undefined;
     }
 
@@ -829,8 +828,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
 
     const td = this.createTableDefinition(tableName);
-    const colDef = td.newColumnDefinition(column.name, resolvedType as any, opts as any);
-    return new ChangeColumnDefinition(colDef, column.name);
+    const cd = td.newColumnDefinition(column.name, type as any, opts as any);
+    return new ChangeColumnDefinition(cd, column.name);
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
@@ -865,15 +864,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<CreateIndexDefinition | undefined> {
-    const [idx, algorithmClause, ifNotExists] = await this.addIndexOptions(
+    const [index, algorithm, ifNotExists] = await this.addIndexOptions(
       tableName,
       columnName,
       options,
     );
-    if (ifNotExists && (await this.indexExists(tableName, idx.columns, { name: idx.name }))) {
+    if (ifNotExists && (await this.indexExists(tableName, columnName, { name: index.name }))) {
       return undefined;
     }
-    return new CreateIndexDefinition(idx, algorithmClause);
+    return new CreateIndexDefinition(index, algorithm);
   }
 
   addSqlCommentBang(sql: string, comment: string): string {
@@ -1076,9 +1075,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // stripping so an order that becomes empty after stripping doesn't consume
     // an alias index slot.
     const orderColumns = (orders ?? [])
-      .map((o) => (typeof o === "string" ? o : visitor.compile(o)))
-      .filter((o) => o.trim().length > 0)
-      .map((o) => o.replace(/\s+(?:ASC|DESC)\b/gi, "").trim())
+      .map((s) => (typeof s === "string" ? s : visitor.compile(s)))
+      .filter((s) => s.trim().length > 0)
+      .map((s) => s.replace(/\s+(?:ASC|DESC)\b/gi, "").trim())
       .filter((col) => col.length > 0)
       .map((col, i) => `${col} AS alias_${i}`);
     if (orderColumns.length === 0) return columns;

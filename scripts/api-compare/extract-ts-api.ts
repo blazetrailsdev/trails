@@ -922,6 +922,7 @@ export function extractFromProgram(
             const calls = extractCalls(body);
             const callSeq = extractCallSeq(body);
             const callArgs = extractCallArgs(body);
+            const skeleton = extractSkeleton(body);
             const internal = hasInternalJsDocTag(decl);
             // A renamed export (`export { withRoutesHelpers as with }`) is its
             // own surface entry: the declaration's tag justifies the DECLARED
@@ -956,6 +957,7 @@ export function extractFromProgram(
               ...(calls !== undefined ? { calls } : {}),
               ...(callSeq !== undefined ? { callSeq } : {}),
               ...(callArgs !== undefined ? { callArgs } : {}),
+              ...(skeleton !== undefined ? { skeleton } : {}),
               ...(exportedMissingRailsCalls !== undefined
                 ? { missingRailsCalls: exportedMissingRailsCalls }
                 : {}),
@@ -2708,7 +2710,9 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     }
     ts.forEachChild(n, visit);
   };
-  ts.forEachChild(node, visit);
+  // The body ITSELF, not just its children: an expression-bodied arrow
+  // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_skeleton covers it.
+  visit(node);
   return tokens.length === 0 ? undefined : tokens;
 }
 
@@ -2974,7 +2978,9 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
     }
     ts.forEachChild(n, visit);
   };
-  ts.forEachChild(node, visit);
+  // The body ITSELF, not just its children: an expression-bodied arrow
+  // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_calls covers it.
+  visit(node);
   if (names.size === 0) return undefined;
   return [...names];
 }

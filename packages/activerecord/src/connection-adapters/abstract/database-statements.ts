@@ -703,8 +703,9 @@ export async function insert(
   binds: unknown[] = [],
 ): Promise<unknown> {
   const host = this as DatabaseStatementsHost;
-  const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
-  const result = await execInsert.call(this, sql, name, resolvedBinds, pk, sequenceName);
+  let sql: string;
+  [sql, binds] = toSqlAndBinds(arel, binds);
+  const result = await execInsert.call(this, sql, name, binds, pk, sequenceName);
   if (idValue !== undefined && idValue !== null) return idValue;
   return host.lastInsertedId!(result);
 }
@@ -720,8 +721,9 @@ export async function update(
   name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
-  const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
-  return execUpdate.call(this, sql, name, resolvedBinds);
+  let sql: string;
+  [sql, binds] = toSqlAndBinds(arel, binds);
+  return execUpdate.call(this, sql, name, binds);
 }
 
 /**
@@ -735,8 +737,9 @@ export async function deleteStatement(
   name: string | null = null,
   binds: unknown[] = [],
 ): Promise<number> {
-  const [sql, resolvedBinds] = toSqlAndBinds(arel, binds);
-  return execDelete.call(this, sql, name, resolvedBinds);
+  let sql: string;
+  [sql, binds] = toSqlAndBinds(arel, binds);
+  return execDelete.call(this, sql, name, binds);
 }
 // Rails name: delete — aliased to avoid JS reserved word conflict.
 // Consumers can import as: import { delete as delete_ } from "..."
@@ -1503,15 +1506,9 @@ async function insertStatement(
   binds: unknown[] = [],
   opts?: { returning?: string[] | null },
 ): Promise<unknown> {
-  const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
-  const result = await this.execInsert(
-    sql,
-    name,
-    resolvedBinds,
-    pk,
-    sequenceName,
-    opts?.returning ?? null,
-  );
+  let sql: string;
+  [sql, binds] = toSqlAndBinds.call(this, arel, binds);
+  const result = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
   // execInsert may return a Result (PG/adapter with RETURNING support) or a
   // number/insertId (MySQL/SQLite via executeMutation). Delegate to the
   // adapter's lastInsertedId when available; fall back to treating the
@@ -1711,8 +1708,9 @@ export const DatabaseStatements = {
     name: string | null = null,
     binds: unknown[] = [],
   ): Promise<number> {
-    const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
-    return this.execUpdate(sql, name, resolvedBinds);
+    let sql: string;
+    [sql, binds] = toSqlAndBinds.call(this, arel, binds);
+    return this.execUpdate(sql, name, binds);
   },
 
   async delete(
@@ -1721,8 +1719,9 @@ export const DatabaseStatements = {
     name: string | null = null,
     binds: unknown[] = [],
   ): Promise<number> {
-    const [sql, resolvedBinds] = toSqlAndBinds.call(this, arel, binds);
-    return this.execDelete(sql, name, resolvedBinds);
+    let sql: string;
+    [sql, binds] = toSqlAndBinds.call(this, arel, binds);
+    return this.execDelete(sql, name, binds);
   },
 
   rawExecute,
