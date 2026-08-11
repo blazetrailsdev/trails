@@ -966,8 +966,8 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  indexesInCreate(tableName: string, stream: string[], indexes: IndexInfo[] = []): void {
-    const stripped = this.removePrefixAndSuffix(tableName);
+  indexesInCreate(table: string, stream: string[], indexes: IndexInfo[] = []): void {
+    const stripped = this.removePrefixAndSuffix(table);
     for (const index of indexes) {
       const [cols, ...opts] = this.indexParts(index);
       const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
