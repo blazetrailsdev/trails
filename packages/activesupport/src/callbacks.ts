@@ -745,13 +745,13 @@ export class CallbackSequence {
     this.userConditions = userConditions;
   }
 
-  before(b: Before): this {
-    (this.beforeList ??= []).unshift(b);
+  before(before: Before): this {
+    (this.beforeList ??= []).unshift(before);
     return this;
   }
 
-  after(a: After): this {
-    (this.afterList ??= []).push(a);
+  after(after: After): this {
+    (this.afterList ??= []).push(after);
     return this;
   }
 

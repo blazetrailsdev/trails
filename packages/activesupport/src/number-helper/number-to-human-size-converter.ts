@@ -13,9 +13,9 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   }
 
   protected convert(): string {
-    const opts = this.options;
-    if (!("stripInsignificantZeros" in opts)) {
-      opts.stripInsignificantZeros = true;
+    const options = this.options;
+    if (!("stripInsignificantZeros" in options)) {
+      options.stripInsignificantZeros = true;
     }
 
     const num = this.numberAsFloat();
@@ -30,7 +30,7 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
 
     const exp = this.exponent(Math.abs(num));
     const humanSize = num / Math.pow(BASE, exp);
-    const numberToFormat = NumberToRoundedConverter.convert(humanSize, opts);
+    const numberToFormat = NumberToRoundedConverter.convert(humanSize, options);
     const unit = this.unit(num, STORAGE_UNITS[exp]);
     return this.conversionFormat().replaceAll("%n", numberToFormat).replaceAll("%u", String(unit));
   }

@@ -458,7 +458,7 @@ export class ToSql extends Visitor {
     this.collectOptimizerHints(node, collector);
     this.maybeVisit(node.setQuantifier ?? null, collector);
 
-    this.collectNodesFor(node.projections, collector, " ", ", ");
+    this.collectNodesFor(node.projections, collector, " ");
 
     if (node.source && !node.source.isEmpty()) {
       collector.append(" FROM ");
@@ -466,9 +466,9 @@ export class ToSql extends Visitor {
     }
 
     this.collectNodesFor(node.wheres, collector, " WHERE ", " AND ");
-    this.collectNodesFor(node.groups, collector, " GROUP BY ", ", ");
+    this.collectNodesFor(node.groups, collector, " GROUP BY ");
     this.collectNodesFor(node.havings, collector, " HAVING ", " AND ");
-    this.collectNodesFor(node.windows, collector, " WINDOW ", ", ");
+    this.collectNodesFor(node.windows, collector, " WINDOW ");
 
     this.maybeVisit(node.comment ?? null, collector);
 
@@ -694,11 +694,11 @@ export class ToSql extends Visitor {
   // -- Set operations --
 
   protected visitArelNodesUnion(node: Nodes.Union, collector: SQLString): SQLString {
-    return this.infixValueWithParen(node, collector, " UNION ", false);
+    return this.infixValueWithParen(node, collector, " UNION ");
   }
 
   protected visitArelNodesUnionAll(node: Nodes.UnionAll, collector: SQLString): SQLString {
-    return this.infixValueWithParen(node, collector, " UNION ALL ", false);
+    return this.infixValueWithParen(node, collector, " UNION ALL ");
   }
 
   protected visitArelNodesIntersect(node: Nodes.Intersect, collector: SQLString): SQLString {
@@ -2119,7 +2119,7 @@ export class ToSql extends Visitor {
   protected visitArelNodesLateral(node: Nodes.Lateral, collector: SQLString): SQLString {
     // Mirrors Rails: `collector << "LATERAL "; grouping_parentheses(o.expr, ...)`.
     collector.append("LATERAL ");
-    return this.groupingParentheses(node.subquery, collector, true);
+    return this.groupingParentheses(node.subquery, collector);
   }
 
   protected appendEscape(escape: Node | null, collector: SQLString): void {

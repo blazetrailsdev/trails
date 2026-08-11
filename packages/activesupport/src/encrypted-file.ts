@@ -149,8 +149,8 @@ export class EncryptedFile {
       // the re-encrypt step, so it must not be world-readable.
       await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
       await block(tmpPath);
-      const updated = await fs.readFile!(tmpPath, "utf8");
-      if (updated !== contents) await this.write(updated);
+      const updatedContents = await fs.readFile!(tmpPath, "utf8");
+      if (updatedContents !== contents) await this.write(updatedContents);
     } finally {
       try {
         await fs.unlink!(tmpPath);
@@ -167,13 +167,13 @@ export class EncryptedFile {
     }
   }
 
-  private encrypt(key: string, plaintext: string): string {
+  private encrypt(key: string, contents: string): string {
     this.checkKeyLength(key);
-    return this.encryptor(key).encryptAndSign(plaintext);
+    return this.encryptor(key).encryptAndSign(contents);
   }
 
-  private decrypt(key: string, ciphertext: string): string {
-    return this.encryptor(key).decryptAndVerify(ciphertext) as string;
+  private decrypt(key: string, contents: string): string {
+    return this.encryptor(key).decryptAndVerify(contents) as string;
   }
 
   private encryptor(key: string): MessageEncryptor {
