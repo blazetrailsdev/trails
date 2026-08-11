@@ -537,14 +537,21 @@ function tsCallNameKeys(rubyName: string): string[] {
  * outranks any number of positional key matches — a 3-argument list agreeing on
  * all 3 must never outrank the 4-argument list that agrees on all 4.
  *
- * An opaque list has no keys to score; its arity is still known, so it competes
- * on that alone rather than being excluded from the assignment.
+ * An opaque list has no keys to score, so it scores as if every position agreed
+ * — below an exact agreement, above any PARTIAL one of the same arity. That is
+ * the honest reading (the site is uncomparable, not divergent) and it is
+ * load-bearing: `attributes.rb:245`'s single `Attribute.from_database` against
+ * the port's three, one of which passes an uncomparable `?? null`, would
+ * otherwise abandon the uncomparable-but-plausible site for the one that scores
+ * a single positional hit — turning a skip into a manufactured shape row.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
   const rubyArgs = normalizeArgs(ruby.args);
   const tsArgs = normalizeArgs(stripReceiverArgs(ruby.name, ruby.args, ts.args));
   const sameArity = ruby.args.length === ts.args.length ? 1 : 0;
-  if (rubyArgs === null || tsArgs === null) return sameArity * 1_000;
+  if (rubyArgs === null || tsArgs === null) {
+    return sameArity * 1_000 + Math.min(ruby.args.length, ts.args.length);
+  }
   if (argsEqual(rubyArgs, tsArgs)) return 1_000_000;
   let matches = 0;
   for (let i = 0; i < Math.min(rubyArgs.length, tsArgs.length); i++) {
@@ -591,7 +598,8 @@ export function pairCallSites(
   });
   // Greedy over the globally best-scoring candidate, ties broken by source
   // order on the Ruby then the TS side — so the verdict never depends on the
-  // order the candidates were enumerated in.
+  // order the candidates were enumerated in, and an indistinguishable pair
+  // still zips the way it always did.
   candidates.sort((a, b) => b.score - a.score || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx);
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();

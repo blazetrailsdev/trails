@@ -382,5 +382,17 @@
       "kwargs{clobber=ref:clobber}"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "migrate_all",
+    "call": "migrate",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:version",
+      "kwargs{skipInitialize=bool:true}"
+    ],
+    "reason": "RFC 0099: pre-existing shape divergence, previously recorded against the other `migrate` occurrence in this body and re-keyed when the similarity pairing landed. database_tasks.rb passes the version POSITIONALLY (`migrate(version, skip_initialize: true)`); the port passes `null` positionally and carries the version as a `targetVersion` option. Pending per-body convergence review."
   }
 ]

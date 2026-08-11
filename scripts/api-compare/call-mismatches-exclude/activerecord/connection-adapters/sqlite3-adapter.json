@@ -178,17 +178,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "get_database_version",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:queryValue"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at connection_adapters/sqlite3_adapter.rb:477 `SQLite3Adapter::Version.new(query_value(\"SELECT sqlite_version(*)\", \"SCHEMA\"))`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "get_database_version",
     "call": "query_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

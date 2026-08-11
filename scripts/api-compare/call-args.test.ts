@@ -532,12 +532,23 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ruby.args)).toEqual([["id:owner"]]);
   });
 
-  it("scores an opaque list on its arity alone rather than dropping it", () => {
+  it("scores an opaque list on its arity rather than dropping it", () => {
     const pairs = pairCallSites(
       [site("visit", ["id:o", "hash"])],
       [site("visit", ["id:o"]), site("visit", ["id:o", "hash"])],
     );
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:o", "hash"]]);
+  });
+
+  it("prefers an uncomparable site of the same arity over a partial agreement", () => {
+    const pairs = pairCallSites(
+      [site("from_database", ["id:name", "id:default", "id:type_for_column"])],
+      [
+        site("fromDatabase", ["id:name", "nil", "id:type"]),
+        site("fromDatabase", ["id:name", "?", "id:seed_type"]),
+      ],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:name", "?", "id:seed_type"]]);
   });
 
   it("camelizes the Ruby call name to find its TS site", () => {
