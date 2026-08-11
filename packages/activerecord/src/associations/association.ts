@@ -620,9 +620,6 @@ export class Association {
 
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
     exceptFromScopeAttributes ??= {};
-    // `reflection.type` is the polymorphic-belongs-to type column — NOT the
-    // STI inheritance column. It lives on the rich Reflection; the
-    // lightweight AssociationDefinition only carries `options.as`.
     const skipAssign = [...this.resolveForeignKey(), this.resolveReflectionType()].filter(
       (key) => key != null,
     );
@@ -833,6 +830,14 @@ export class Association {
     return (Array.isArray(fk) ? fk : [fk]).filter((k) => k != null).map(String);
   }
 
+  /**
+   * Mirrors: AssociationReflection#type (reflection.rb) — the
+   * polymorphic-belongs-to foreign-type column, NOT the STI inheritance
+   * column. `this.reflection` is the lightweight AssociationDefinition, whose
+   * `type` is the macro name, so the rich Reflection is resolved through
+   * `_reflectOnAssociation` (the sibling of `resolveForeignKey`) and
+   * `options.as` covers the window before macro registration finishes.
+   */
   private resolveReflectionType(): string | null {
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => { type?: string | null } | null;
