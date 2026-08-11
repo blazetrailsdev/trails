@@ -2071,8 +2071,7 @@ export class SchemaStatements {
       !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
     ) {
       checks.push(
-        (i) =>
-          this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),
+        (i) => this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),
       );
     }
 
