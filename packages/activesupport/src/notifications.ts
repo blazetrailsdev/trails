@@ -154,7 +154,7 @@ export class Notifications {
       block = blockOrOptions as () => T | Promise<T>;
       options = maybeOptions ?? {};
     }
-    const sub = this._notifier.subscribe(
+    const subscriber = this._notifier.subscribe(
       pattern,
       callback as FanoutListener,
       options.monotonic ?? false,
@@ -162,7 +162,7 @@ export class Notifications {
     try {
       return await block();
     } finally {
-      this._notifier.unsubscribe(sub);
+      this._notifier.unsubscribe(subscriber);
     }
   }
 
@@ -179,8 +179,8 @@ export class Notifications {
   }
 
   /** Remove a previously registered subscriber. */
-  static unsubscribe(subscriber: NotificationSubscriber): void {
-    this._notifier.unsubscribe(subscriber as unknown as FanoutSubscriber);
+  static unsubscribe(subscriberOrName: NotificationSubscriber): void {
+    this._notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
   }
 
   /** Remove all subscribers. Useful in tests. */

@@ -83,10 +83,10 @@ export class MemoryStore extends Store implements CacheStore {
   // Mirrors Rails MemoryStore#cleanup (memory_store.rb): instrumented, deletes
   // every expired entry.
   override cleanup(options?: CacheOptions): void {
-    const merged = this.mergedOptions(options);
+    options = this.mergedOptions(options);
     this.instrument("cleanup", null, { size: this.data.size }, () => {
       for (const [key, rec] of this.data) {
-        if (this.recordExpired(rec)) this.deleteEntry(key, merged);
+        if (this.recordExpired(rec)) this.deleteEntry(key, options);
       }
     });
   }
@@ -94,13 +94,13 @@ export class MemoryStore extends Store implements CacheStore {
   // Mirrors Rails MemoryStore#delete_matched (memory_store.rb): instrumented with
   // the matcher, which is run through keyMatcher so a namespaced store scopes the
   // deletion to its own (namespace-prefixed) keys.
-  override deleteMatched(pattern: string | RegExp, options?: CacheOptions): void {
-    const merged = this.mergedOptions(options);
-    const raw = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    const matcher = this.keyMatcher(raw, merged);
+  override deleteMatched(matcher: string | RegExp, options?: CacheOptions): void {
+    options = this.mergedOptions(options);
+    if (typeof matcher === "string") matcher = new RegExp(matcher);
+    matcher = this.keyMatcher(matcher, options);
     this.instrument("delete_matched", String(matcher), undefined, () => {
       for (const key of this.data.keys()) {
-        if (key.match(matcher) !== null) this.deleteEntry(key, merged);
+        if (key.match(matcher) !== null) this.deleteEntry(key, options);
       }
     });
   }
@@ -126,10 +126,10 @@ export class MemoryStore extends Store implements CacheStore {
   // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
   // the entry's expiresAt/version.
   private modifyValue(name: string, amount: number, options?: CacheOptions): number {
-    const merged = this.mergedOptions(options);
-    const key = this.normalizeKey(name, merged);
-    const version = this.normalizeVersion(name, merged) ?? null;
-    const entry = this.readEntry(key, merged);
+    options = this.mergedOptions(options);
+    const key = this.normalizeKey(name, options);
+    const version = this.normalizeVersion(name, options) ?? null;
+    const entry = this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
       // Rails seeds with `Integer(amount)` (raises on NaN/Infinity) but returns
       // the raw `amount` (memory_store.rb:248-249), so `increment("foo", 1.5)`

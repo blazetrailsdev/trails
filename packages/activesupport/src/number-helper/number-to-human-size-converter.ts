@@ -13,25 +13,25 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   }
 
   protected convert(): string {
-    const opts = this.options;
-    if (!("stripInsignificantZeros" in opts)) {
-      opts.stripInsignificantZeros = true;
+    const options = this.options;
+    if (!("stripInsignificantZeros" in options)) {
+      options.stripInsignificantZeros = true;
     }
 
-    const num = this.numberAsFloat();
+    const number = this.numberAsFloat();
 
-    if (this.smallerThanBase(num)) {
-      const numberToFormat = String(Math.trunc(num));
-      const unit = this.unit(num, "byte");
+    if (this.smallerThanBase(number)) {
+      const numberToFormat = String(Math.trunc(number));
+      const unit = this.unit(number, "byte");
       return this.conversionFormat()
         .replaceAll("%n", numberToFormat)
         .replaceAll("%u", String(unit));
     }
 
-    const exp = this.exponent(Math.abs(num));
-    const humanSize = num / Math.pow(BASE, exp);
-    const numberToFormat = NumberToRoundedConverter.convert(humanSize, opts);
-    const unit = this.unit(num, STORAGE_UNITS[exp]);
+    const exp = this.exponent(Math.abs(number));
+    const humanSize = number / Math.pow(BASE, exp);
+    const numberToFormat = NumberToRoundedConverter.convert(humanSize, options);
+    const unit = this.unit(number, STORAGE_UNITS[exp]);
     return this.conversionFormat().replaceAll("%n", numberToFormat).replaceAll("%u", String(unit));
   }
 
@@ -53,7 +53,7 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
     return Math.max(0, Math.min(exp, max));
   }
 
-  private smallerThanBase(num: number): boolean {
-    return Math.abs(Math.trunc(num)) < BASE;
+  private smallerThanBase(number: number): boolean {
+    return Math.abs(Math.trunc(number)) < BASE;
   }
 }

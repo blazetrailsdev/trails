@@ -35,25 +35,25 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
   }
 
   protected convert(): string {
-    const opts = this.options;
-    if (!("stripInsignificantZeros" in opts)) {
-      opts.stripInsignificantZeros = true;
+    const options = this.options;
+    if (!("stripInsignificantZeros" in options)) {
+      options.stripInsignificantZeros = true;
     }
 
-    const precision = (opts.precision ?? 3) as number;
-    const significant = (opts.significant ?? true) as boolean;
+    const precision = (options.precision ?? 3) as number;
+    const significant = (options.significant ?? true) as boolean;
 
-    const roundMode = opts.roundMode as string | undefined;
+    const roundMode = options.roundMode as string | undefined;
 
-    let num = this.numberAsFloat();
-    num = new RoundingHelper({ precision, significant, roundMode }).round(num);
+    let number = this.numberAsFloat();
+    number = new RoundingHelper({ precision, significant, roundMode }).round(number);
 
     const units = this.opts.units;
-    const exponent = this.calculateExponent(units, Math.abs(num));
-    num = num / Math.pow(10, exponent);
+    const exponent = this.calculateExponent(units, Math.abs(number));
+    number = number / Math.pow(10, exponent);
 
-    const roundedNumber = NumberToRoundedConverter.convert(num, opts);
-    const unit = this.determineUnit(units, exponent, Math.trunc(num));
+    const roundedNumber = NumberToRoundedConverter.convert(number, options);
+    const unit = this.determineUnit(units, exponent, Math.trunc(number));
     const format = this.getFormat();
     return format.replaceAll("%n", roundedNumber).replaceAll("%u", String(unit)).trim();
   }
