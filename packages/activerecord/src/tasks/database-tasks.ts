@@ -571,7 +571,7 @@ export class DatabaseTasks {
 
   static async charsetCurrent(
     envName: string = DatabaseTasks.env,
-    dbName: string = "primary",
+    dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
     if (dbConfig.length === 0) return null;
@@ -599,7 +599,7 @@ export class DatabaseTasks {
 
   static async collationCurrent(
     envName: string = DatabaseTasks.env,
-    dbName: string = "primary",
+    dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
     if (dbConfig.length === 0) return null;
