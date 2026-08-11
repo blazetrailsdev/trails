@@ -255,7 +255,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const build = (): Error => {
       if (isMysql2DriverTimeout(e)) {
         const msg = e instanceof Error ? e.message : String(e);
-        return new AdapterTimeout(msg, { sql, binds });
+        return new AdapterTimeout(msg, { sql, binds, connectionPool: this.pool });
       }
       if (isMysql2ConnectionError(e)) {
         // Mirrors `Mysql2Adapter#translate_exception`'s
@@ -264,9 +264,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // everything else in this family is ConnectionFailed.
         const msg = (e as Error).message;
         if (/MySQL client is not connected/i.test(msg)) {
-          return new ConnectionNotEstablished(msg);
+          // mysql2_adapter.rb:177 passes the driver exception itself here, while
+          // :179 below passes the message — the asymmetry is Rails'.
+          return new ConnectionNotEstablished(e as Error, { connectionPool: this.pool });
         }
-        return new ConnectionFailed(msg, { sql, binds });
+        return new ConnectionFailed(msg, { sql, binds, connectionPool: this.pool });
       }
       return super._translateException(e, sql, binds);
     };

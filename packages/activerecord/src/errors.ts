@@ -294,11 +294,18 @@ export class QueryAborted extends StatementInvalid {
 
 /** Mirrors `ActiveRecord::ConnectionFailed`. */
 export class ConnectionFailed extends QueryAborted {
+  /**
+   * Rails' PG translator builds this one from the driver exception rather than a
+   * message string (`postgresql_adapter.rb:815`); Ruby's `Exception.new` takes
+   * any object and `to_s`es it, so an Error is accepted here and kept as the
+   * cause.
+   */
   constructor(
-    message?: string,
+    message?: string | Error,
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
-    super(message, options);
+    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
+    super(message instanceof Error ? message.message : message, { ...options, cause });
     this.name = "ConnectionFailed";
   }
 }

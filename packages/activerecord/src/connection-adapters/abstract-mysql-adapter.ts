@@ -1491,7 +1491,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         // generic Error) get promoted to ConnectionNotEstablished when the
         // message indicates the client lost the server handshake.
         if (/MySQL client is not connected/i.test(msg)) {
-          return new ConnectionNotEstablished(msg);
+          return new ConnectionNotEstablished(e, { connectionPool: this.pool });
         }
       }
       switch (errno) {
@@ -1554,16 +1554,22 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = e;
     }
+    // Mirrors Rails' AbstractMysqlAdapter#translate_exception, which builds
+    // every translated error with `connection_pool: @pool`
+    // (abstract_mysql_adapter.rb:815-856) — so the direct `_translateException`
+    // throw sites get a pool too, not just the public wrapper's callers. Both
+    // setters are guarded, so a pool passed at construction survives.
+    if (translated instanceof ConnectionNotEstablished) {
+      translated.setPool(this.pool);
+    } else if (translated instanceof AdapterError) {
+      translated.setConnectionPool(this.pool);
+    }
     return translated;
   }
 
   /** @internal */
   translateException(exception: unknown, opts: { sql: string; binds: unknown[] }): Error {
-    const translated = this._translateException(exception, opts.sql, opts.binds);
-    // Mirrors Rails' AbstractAdapter#translate_exception, which attaches the
-    // originating pool (`connection_pool`) to every exception it builds.
-    if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
-    return translated;
+    return this._translateException(exception, opts.sql, opts.binds);
   }
 
   /** @internal */
