@@ -191,7 +191,7 @@ export class Association {
       if (!(e instanceof NameError)) throw e;
     }
     const className =
-      opts.className ?? camelize(this.reflection.type === "hasMany" ? singularize(name) : name);
+      opts.className ?? camelize(this.reflection.macro === "hasMany" ? singularize(name) : name);
     autoloadModel(className);
     constantize(className);
   }
@@ -314,10 +314,6 @@ export class Association {
   scope(): any {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
     // Branch 1: disable_joins — delegate to DisableJoinsAssociationScope.
     if (this.disableJoins) {
       const djas = getDjasScopeBuilder();
@@ -325,7 +321,7 @@ export class Association {
         throw new Error(
           "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
         );
-      return djas({ owner: this.owner, reflection: richReflection, klass });
+      return djas(this);
     }
     // Branch 2: klass.current_scope.proxy_association == self.
     // Fires when CollectionProxy.scoping sets an AssociationRelation as
@@ -366,23 +362,15 @@ export class Association {
       this.resetScope();
     }
     if (this._cachedScope === undefined) {
-      const ctor = this.owner.constructor as typeof Base & {
-        _reflectOnAssociation?: (n: string) => unknown;
-      };
-      const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
       if (this.disableJoins) {
         const djas = getDjasScopeBuilder();
         if (!djas)
           throw new Error(
             "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
           );
-        this._cachedScope = djas({ owner: this.owner, reflection: richReflection, klass });
+        this._cachedScope = djas(this);
       } else {
-        this._cachedScope = AssociationScope.scope({
-          owner: this.owner,
-          reflection: richReflection as never,
-          klass: klass as never,
-        });
+        this._cachedScope = AssociationScope.scope(this as never);
       }
     }
     return this._cachedScope;
@@ -402,7 +390,7 @@ export class Association {
     if (
       typeof ownerAny.isStrictLoadingNPlusOneOnly === "function" &&
       ownerAny.isStrictLoadingNPlusOneOnly() &&
-      (this.reflection.type === "hasMany" || this.reflection.type === "hasAndBelongsToMany")
+      (this.reflection.macro === "hasMany" || this.reflection.macro === "hasAndBelongsToMany")
     ) {
       recordAny.strictLoadingBang();
     } else {
@@ -746,44 +734,22 @@ export class Association {
   }
 
   private inverseAssociationFor(record: Base): Association | null {
-    // Rails routes both polymorphic and non-polymorphic through
-    // `inverse_reflection_for(record)` (association.rb:350-361). For
-    // polymorphic belongs_to, the override raises
-    // `InverseOfAssociationNotFoundError` when the configured
-    // inverse name doesn't exist on the assigned record's class
-    // (belongs_to_polymorphic_association.rb:35-37, reflection.rb:678).
-    let inverseName: string | null = null;
-    if ((this.reflection.options as any).polymorphic) {
-      const inv = this.inverseReflectionFor(record) as any;
-      if (!inv) return null;
-      inverseName = typeof inv === "string" ? inv : (inv.name ?? null);
-    } else {
-      // Route through `reflection.inverseName()` rather than reading
-      // `options.inverseOf` directly, so automatic inverse detection
-      // (via `automaticInverseOf()`) fires when `inverseOf` is not
-      // explicitly set. Mirrors Rails' `inverse_reflection_for`, which
-      // returns `reflection.inverse_of` (reflection.rb:258 → inverse_name).
-      const ctor = this.owner.constructor as {
-        _reflectOnAssociation?: (n: string) => { inverseName?: () => string | null } | null;
-      };
-      const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
-      inverseName =
-        richReflection?.inverseName?.() ??
-        (this.reflection.options.inverseOf as string | undefined) ??
-        null;
-    }
-    if (!inverseName) return null;
-    // Rails gates `inverse_association_for` on `invertible_for?` (association.rb
-    // :350-367). For the base (has_many / has_one) direction that requires
-    // `foreign_key_for?(record)` — the record must actually carry the FK —
-    // without which an inverse can wire onto a record that lacks the FK column.
-    // `isInvertibleFor` is overridden by `BelongsToAssociation` (no FK check)
-    // and `HasManyThroughAssociation` (always false), mirroring their Rails
-    // overrides. The inverse-reflection-present half is already covered by the
-    // `inverseName` resolution above.
-    if (!this.isInvertibleFor(record)) return null;
-    const recordAny = record as any;
-    if (typeof recordAny.association === "function") {
+    if (this.isInvertibleFor(record)) {
+      const inverseReflection = this.inverseReflectionFor(record) as
+        | { name?: string }
+        | string
+        | null;
+      const inverseName =
+        typeof inverseReflection === "string"
+          ? inverseReflection
+          : (inverseReflection?.name ?? null);
+      if (!inverseName) return null;
+      const recordAny = record as any;
+      if (typeof recordAny.association !== "function") return null;
+      // Rails' `record.association(name)` raises `AssociationNotFoundError`
+      // for a name the record's class does not declare; `invertible_for?`
+      // has already established the inverse reflection exists on the OWNER
+      // side, which for a polymorphic belongs_to is not the same class.
       try {
         return recordAny.association(inverseName);
       } catch {
@@ -981,35 +947,23 @@ export class Association {
   }
 
   protected inverseReflectionFor(_record: Base): unknown {
-    return (this.reflection as any).inverseOf ?? null;
+    return (this.reflection as { inverseOf?: () => unknown }).inverseOf?.() ?? null;
   }
 
   /**
-   * Mirrors Rails' `Association#invertible_for?` (association.rb:365-367):
-   * `foreign_key_for?(record) && inverse_reflection_for(record)`. The
-   * inverse-reflection-present half is checked by the caller
-   * (`inverseAssociationFor` resolves the inverse name first), so here we
-   * gate on the foreign-key half. Overridden by `BelongsToAssociation` and
-   * `HasManyThroughAssociation`.
+   * Mirrors Rails' `Association#invertible_for?` (association.rb:365-367).
+   * Overridden by `BelongsToAssociation` and `HasManyThroughAssociation`.
    * @internal
    */
   protected isInvertibleFor(record: Base): boolean {
-    return this.isForeignKeyFor(record);
+    return this.isForeignKeyFor(record) && !!this.inverseReflectionFor(record);
   }
 
   protected isForeignKeyFor(record: Base): boolean {
     // Rails: `Array(reflection.foreign_key).all? { |key| record._has_attribute?(key) }`
     // (association.rb:370-373), where `_has_attribute?` checks the record's
-    // attribute SET (`@attributes.key?`). Resolve the computed foreign key
-    // from the rich reflection (the lightweight `options.foreignKey` is unset
-    // when the FK is derived rather than explicit), then probe the record via
-    // its `_has_attribute?` instance method.
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
-    };
-    const fk =
-      ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey ??
-      (this.reflection.options as any).foreignKey;
+    // attribute SET (`@attributes.key?`).
+    const fk = this.reflection.foreignKey ?? (this.reflection.options as any).foreignKey;
     const fkArr = Array.isArray(fk) ? fk : [fk];
     const hasAttr = (record as any)._hasAttribute as ((k: string) => boolean) | undefined;
     return fkArr.every((key) => {

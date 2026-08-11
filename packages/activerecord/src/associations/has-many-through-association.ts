@@ -575,7 +575,7 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
   // constructJoinAttributes (which keys off source_reflection) can't run.
   // Build the join row from the habtm options instead — matches Rails'
   // build_through_record path for habtm under the hood.
-  if ((this.reflection as any).type === "hasAndBelongsToMany") {
+  if (this.reflection.macro === "hasAndBelongsToMany") {
     return buildHabtmThroughRecord(this, record);
   }
   const cache = throughRecordsCache(this);
@@ -1091,7 +1091,7 @@ function ensureMutable(this: HasManyThroughAssociation): void {
   // HABTM associations are always mutable: the join model's right side is an
   // implicit belongsTo, but our habtm reflection doesn't expose that chain.
   // Rails reaches the same conclusion via source_reflection.belongs_to?.
-  if ((this.reflection as any).type === "hasAndBelongsToMany") return;
+  if (this.reflection.macro === "hasAndBelongsToMany") return;
 
   const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(this.reflection.name);

@@ -251,8 +251,7 @@ export class CollectionAssociation extends Association {
         n: string,
       ) => { associationPrimaryKey?: string | string[] } | undefined;
     };
-    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
-    return richReflection?.associationPrimaryKey ?? (this.klass as any).primaryKey ?? "id";
+    return this.reflection.associationPrimaryKey ?? (this.klass as any).primaryKey ?? "id";
   }
 
   /**
@@ -835,18 +834,7 @@ export class CollectionAssociation extends Association {
         reflection: this.reflection as unknown as AssociationReflection,
       });
     }
-    // Resolve the *rich* reflection (the registered Reflection instance) the
-    // same way `Association#scope` does. `this.reflection` is the lightweight
-    // AssociationDefinition, which has no `activeRecordPrimaryKey` getter — so
-    // `foreignKeyPresentFor` would fall back to `"id"` and report a custom-PK
-    // owner's FK absent, wrongly nullifying the scope for a new-record owner
-    // whose custom PK is present (e.g. `Subscriber#subscriptions`).
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
-      this.reflection) as unknown as AssociationReflection;
-    return foreignKeyPresentFor(reflection, this.owner);
+    return foreignKeyPresentFor(this.reflection as unknown as AssociationReflection, this.owner);
   }
 
   /**

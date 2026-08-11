@@ -146,16 +146,9 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
    * inverse name does not exist on that class.
    */
   protected override inverseReflectionFor(record: Base): unknown {
-    // `this.reflection` is the lightweight `AssociationDefinition` attached
-    // at macro time. The rich `Reflection` (carrying `polymorphicInverseOf`)
-    // lives on the owner class via `_reflectOnAssociation` — resolve it
-    // there so the Rails-parity raise actually fires on the regular
-    // association-writer path. Falls back to the lightweight reflection
-    // when polymorphicInverseOf is somehow present on it (test fixtures).
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
+    const refl = this.reflection as unknown as {
+      polymorphicInverseOf?: (klass: typeof Base) => unknown;
     };
-    const refl: any = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
     if (typeof refl.polymorphicInverseOf === "function") {
       return refl.polymorphicInverseOf(record.constructor as typeof Base);
     }

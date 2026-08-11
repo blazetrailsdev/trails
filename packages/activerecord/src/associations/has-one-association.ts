@@ -184,12 +184,7 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   protected override foreignKeyPresent(): boolean {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
-      this.reflection) as unknown as AssociationReflection;
-    return foreignKeyPresentFor(reflection, this.owner);
+    return foreignKeyPresentFor(this.reflection as unknown as AssociationReflection, this.owner);
   }
 
   /**
@@ -534,9 +529,7 @@ export class HasOneAssociation extends SingularAssociation {
     const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
     const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
     const fk = this.foreignKeyColumn();
-    const fks = Array.isArray(this.reflection.options.foreignKey)
-      ? this.reflection.options.foreignKey
-      : [fk];
+    const fks = Array.isArray(this.reflection.foreignKey) ? this.reflection.foreignKey : [fk];
 
     for (let i = 0; i < fks.length; i++) {
       const pkCol = pks[i] ?? pks[0];
