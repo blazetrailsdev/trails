@@ -2783,9 +2783,15 @@ export class PostgreSQLAdapter
     const live = this._rawConnection;
     let work: Promise<unknown> = Promise.resolve();
     if (this._client) {
-      work = this._cancelAnyRunningQuery()
-        .then(() => live.query("ROLLBACK"))
-        .catch(() => {});
+      // No CancelRequest: `reset!` waits behind the query on the wire, it never
+      // cancels one — `cancel_any_running_query`'s only callers are
+      // `exec_rollback_db_transaction` / `exec_restart_db_transaction`
+      // (postgresql/database_statements.rb:79, :84). Cancelling here killed a
+      // query a DIFFERENT chain owned, since `resetBang` runs outside the lock
+      // Rails holds (postgresql_adapter.rb:372); node-pg queues this ROLLBACK
+      // behind that query on the same client, which is the ordering Rails gets
+      // from the lock.
+      work = live.query("ROLLBACK").catch(() => {});
       this._client = null;
       this._inTransaction = false;
     }
