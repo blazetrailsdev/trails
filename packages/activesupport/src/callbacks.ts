@@ -669,11 +669,9 @@ export class Callback {
             ? new InstanceExec1(this.filter as (target: object) => unknown)
             : new InstanceExec0(this.filter as () => unknown);
     } else if (typeof this.filter === "string" && !this.filter.startsWith(":")) {
-      // Rails CallTemplate.build/Callback.build reject a String filter; only a
-      // Symbol (a method name) or a proc is permitted. A Ruby Symbol is a JS
-      // string, so — as CLAUDE.md prescribes wherever the control flow turns on
-      // Symbol-vs-String — the Symbol keeps its leading colon and a bare string
-      // is the String arm that raises.
+      // A Ruby Symbol is a JS string; here the control flow turns on
+      // Symbol-vs-String, so the Symbol keeps its leading colon and a bare
+      // string is Callback.build's String arm, which raises.
       throw new Error(
         `Passing string to define a callback is not supported: ${String(this.filter)}`,
       );
@@ -684,9 +682,6 @@ export class Callback {
       // `around`/`before`/`after` and `scope: [:kind, :name]` calls `aroundSave`.
       callTemplate = new ObjectCall(this.filter, this.objectCallMethodName());
     } else {
-      // Symbol filter (`:around_save_collection_association`) → MethodCall.
-      // A Ruby Symbol is a JS string carrying its leading colon; a JS symbol
-      // property key is dispatched as-is.
       callTemplate = new MethodCall(
         typeof this.filter === "string" ? this.filter.slice(1) : (this.filter as PropertyKey),
       );
@@ -1331,7 +1326,7 @@ export namespace Callbacks {
     target: T,
     name: string,
     kind: CallbackKind,
-    callback: AnyCallback<T> | CallbackObject,
+    callback: AnyCallback<T> | CallbackObject | string,
     options: CallbackOptions<T> = {},
   ): void {
     const chains = getCallbackChains(target);
@@ -1410,7 +1405,7 @@ export function setCallback<T extends object>(
   target: T,
   name: string,
   kind: CallbackKind,
-  callback: AnyCallback<T> | CallbackObject,
+  callback: AnyCallback<T> | CallbackObject | string,
   options: CallbackOptions<T> = {},
 ): void {
   Callbacks.setCallback(target, name, kind, callback, options);

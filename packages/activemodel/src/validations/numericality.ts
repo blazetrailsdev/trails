@@ -94,9 +94,6 @@ export class NumericalityValidator extends EachValidator {
       count,
     });
 
-    // Mirrors numericality.rb:58-63 — the compare branch of the
-    // `options.slice(*RESERVED_OPTIONS)` loop, dispatching through
-    // `value.public_send(COMPARE_CHECKS[option], option_value)`.
     for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
       const rawOptionValue = this.options[option];
       if (rawOptionValue === undefined) continue;
@@ -107,7 +104,7 @@ export class NumericalityValidator extends EachValidator {
         scale,
       );
       if (optionValue === undefined) continue;
-      if (!compareOperator(COMPARE_CHECKS[option], num - optionValue)) {
+      if (!compareOperator(COMPARE_CHECKS[option], num, optionValue)) {
         record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
       }
     }

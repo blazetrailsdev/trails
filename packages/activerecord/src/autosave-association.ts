@@ -1303,10 +1303,6 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
 
   if (isCollection) {
-    // `around_save :around_save_collection_association` — the method-name
-    // filter is load-bearing: CallbackChain#remove_duplicates dedups on it, so
-    // the hook runs once per save no matter how many collection associations
-    // are declared, and across the inheritance chain.
     model.aroundSave(":aroundSaveCollectionAssociation");
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
@@ -1406,8 +1402,5 @@ export function defineAutosaveValidationCallbacks(klass: any, reflection: any): 
   if (typeof klass.validate === "function") {
     klass.validate(validationName);
   }
-  // Mirrors Rails autosave_association.rb:233 —
-  // `after_validation :_ensure_no_duplicate_errors`. The method-name filter is
-  // what dedups the callback across every association on the class.
   klass.afterValidation(":_ensureNoDuplicateErrors");
 }

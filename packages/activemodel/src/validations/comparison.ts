@@ -24,7 +24,7 @@ export class ComparisonValidator extends EachValidator {
 
       try {
         const cmp = this.compare(value, optionValue);
-        if (!compareOperator(COMPARE_CHECKS[option], cmp)) {
+        if (!compareOperator(COMPARE_CHECKS[option], cmp, 0)) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,

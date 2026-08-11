@@ -43,30 +43,36 @@ export interface Comparability {
 }
 
 /**
- * Applies a COMPARE_CHECKS operator to a `<=>` result.
+ * Applies a COMPARE_CHECKS operator to two values.
  *
  * Rails dispatches the operator directly off the value —
  * `value.public_send(COMPARE_CHECKS[option], option_value)`
  * (comparison.rb:27, numericality.rb:60). TypeScript has neither
- * `public_send` nor operator methods, so the operator Symbol is applied
- * to the comparison result the caller computed.
+ * `public_send` nor operator methods, so the operator Symbol selects the
+ * JS operator instead. Callers whose values are not directly comparable
+ * (ComparisonValidator's Temporal/string/number mix) pass their `<=>`
+ * result against `0`, exactly as Ruby's Comparable defines the operators.
  *
  * @noRailsEquivalent PERMANENT: TypeScript has no `public_send` and no operator
  * methods, so a Ruby comparison-operator Symbol cannot be dispatched off the value
  */
-export function compareOperator(op: (typeof COMPARE_CHECKS)[CompareKey], cmp: number): boolean {
+export function compareOperator(
+  op: (typeof COMPARE_CHECKS)[CompareKey],
+  a: number,
+  b: number,
+): boolean {
   switch (op) {
     case ":>":
-      return cmp > 0;
+      return a > b;
     case ":>=":
-      return cmp >= 0;
+      return a >= b;
     case ":==":
-      return cmp === 0;
+      return a === b;
     case ":<":
-      return cmp < 0;
+      return a < b;
     case ":<=":
-      return cmp <= 0;
+      return a <= b;
     case ":!=":
-      return cmp !== 0;
+      return a !== b;
   }
 }
