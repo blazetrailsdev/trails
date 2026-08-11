@@ -202,9 +202,12 @@ interface ThroughAssociationHandle {
 }
 
 /**
- * Minimal shape of the owner's Association holder used by the build paths to
- * reach `Association#initialize_attributes` (association.rb:217) — the one
- * implementation of the `scope_for_create.except!` fill. @internal
+ * Minimal shape of the owner's Association holder. Rails builds collection
+ * records through `Association#build_record` (association.rb:383), which
+ * fills scope_for_create via
+ * `Association#initialize_attributes` (association.rb:217); the proxy is a
+ * Relation rather than that Association, so `_build` / `_buildThrough` reach
+ * the holder for it. @internal
  */
 interface InitializeAttributesHolder {
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void;
@@ -1346,10 +1349,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     const record = new targetModel(buildAttrs);
-    // Rails builds collection records through `CollectionAssociation#build_record`,
-    // which routes the scope_for_create fill through the one
-    // `Association#initialize_attributes` (association.rb:217). The proxy is a
-    // Relation, not that Association, so reach the owner's holder for it.
     (
       this._record.association(this._assocName) as unknown as InitializeAttributesHolder
     ).initializeAttributes(record, attrs);
