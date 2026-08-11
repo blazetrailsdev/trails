@@ -322,6 +322,60 @@ describe("compareCallArgs", () => {
     expect(result.class).toBe("shape");
   });
 
+  it("resolves __callee__ to the enclosing method name the port passes", () => {
+    expect(
+      compareCallArgs(
+        site("check_if_method_has_arguments!", ["id:__callee__", "id:args"]),
+        site("checkIfMethodHasArgumentsBang", ["str:eager_load", "id:args"]),
+        "eager_load",
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        site("check_if_method_has_arguments!", ["id:__callee__", "id:args"]),
+        site("checkIfMethodHasArgumentsBang", ["str:eagerLoad", "id:args"]),
+        "eager_load",
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("resolves __method__ the same way, and accepts a symbol or identifier spelling", () => {
+    expect(
+      compareCallArgs(
+        site("send", ["id:__method__"]),
+        site("send", ["sym:optimizer_hints"]),
+        "optimizer_hints",
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        site("send", ["id:__method__"]),
+        site("send", ["id:optimizerHints"]),
+        "optimizer_hints",
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a port that passes some OTHER method's name", () => {
+    const result = compareCallArgs(
+      site("check_if_method_has_arguments!", ["id:__callee__", "id:args"]),
+      site("checkIfMethodHasArgumentsBang", ["str:preload", "id:args"]),
+      "eager_load",
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+    expect(result.rubyArgs).toEqual(["ref:__callee__", "ref:args"]);
+  });
+
+  it("leaves __callee__ unresolved when the enclosing method is unknown", () => {
+    expect(
+      compareCallArgs(
+        site("check_if_method_has_arguments!", ["id:__callee__"]),
+        site("checkIfMethodHasArgumentsBang", ["str:eager_load"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
   it("reports the normalized lists on a mismatch", () => {
     const result = compareCallArgs(site("visit", ["id:o"]), site("visit", ["id:node"]));
     expect(result.rubyArgs).toEqual(["ref:o"]);
