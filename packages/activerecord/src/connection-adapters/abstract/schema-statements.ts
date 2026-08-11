@@ -346,7 +346,7 @@ export class SchemaStatements {
   }
 
   async createTable(
-    name: string,
+    tableName: string,
     optionsOrFn?:
       | {
           id?: boolean | ColumnType | IdHashOptions;
@@ -396,23 +396,23 @@ export class SchemaStatements {
     // they never reach `validate_create_table_options!(options)`
     // (schema_statements.rb:307). We bundle every kwarg into one object, so
     // they are split back out here before validating.
-    const { id: _id, primaryKey: _primaryKey, force: _force, ...validatedOptions } = options;
-    this.validateCreateTableOptionsBang(validatedOptions);
+    const { id: _id, primaryKey: _primaryKey, force: _force, ...withoutOwnKwargs } = options;
+    this.validateCreateTableOptionsBang(withoutOwnKwargs);
 
-    if (name.length > 64) {
-      throw new Error(`Table name '${name}' is too long; the limit is 64 characters`);
+    if (tableName.length > 64) {
+      throw new Error(`Table name '${tableName}' is too long; the limit is 64 characters`);
     }
 
     if (options.force && options.ifNotExists) {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
 
-    const td = this.buildCreateTableDefinition(name, options, definer);
+    const td = this.buildCreateTableDefinition(tableName, options, definer);
 
     if (options.force) {
-      await this.dropTable(name, { force: options.force, ifExists: true });
+      await this.dropTable(tableName, { force: options.force, ifExists: true });
     } else {
-      await this.schemaCache.clearDataSourceCacheBang(name);
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
 
     await this.execute(await this.schemaCreation.accept(td));
@@ -421,14 +421,17 @@ export class SchemaStatements {
       for (const [columnName, indexOptions] of td.indexes) {
         // Rails overrides any per-index `if_not_exists:` with the table
         // definition's, since it splats `**index_options` first.
-        await this.addIndex(name, columnName, { ...indexOptions, ifNotExists: td.ifNotExists });
+        await this.addIndex(tableName, columnName, {
+          ...indexOptions,
+          ifNotExists: td.ifNotExists,
+        });
       }
     }
 
     if (this.supportsComments?.() && !this.supportsCommentsInCreate?.()) {
       const tableComment = presence(td.comment);
       if (tableComment != null && typeof this.changeTableComment === "function") {
-        await this.changeTableComment(name, tableComment);
+        await this.changeTableComment(tableName, tableComment);
       }
       // Mirrors Rails: adapters that can't inline column comments in CREATE
       // emit a COMMENT ON COLUMN per column so inline `comment:` options
@@ -443,9 +446,9 @@ export class SchemaStatements {
           name: string;
           options?: { comment?: string | null };
         }>) {
-          const columnComment = presence(column.options?.comment);
-          if (columnComment != null) {
-            await commentAdapter.changeColumnComment(name, column.name, columnComment);
+          const comment = presence(column.options?.comment);
+          if (comment != null) {
+            await commentAdapter.changeColumnComment(tableName, column.name, comment);
           }
         }
       }
@@ -468,9 +471,9 @@ export class SchemaStatements {
       throw new ArgumentError("dropTable requires at least one table name");
     }
     const ifExists = options.ifExists ? " IF EXISTS" : "";
-    for (const name of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(name);
-      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(name)}`);
+    for (const tableName of tableNames) {
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
+      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(tableName)}`);
     }
   }
 
@@ -552,9 +555,7 @@ export class SchemaStatements {
     // Rails resolves the concrete index name via `index_name_for_remove`, which
     // raises ArgumentError when the spec matches no index (or is ambiguous), and
     // then drops by that real name — never a silent DROP ... IF EXISTS.
-    const positional = typeof columnName === "string" ? columnName : null;
-    const resolveOpts = Array.isArray(columnName) ? { ...opts, column: columnName } : opts;
-    const indexName = await this.indexNameForRemove(tableName, positional, resolveOpts);
+    const indexName = await this.indexNameForRemove(tableName, columnName, opts);
 
     if (this.adapterName === "mysql") {
       await this.execute(
@@ -618,8 +619,10 @@ export class SchemaStatements {
   async tableExists(tableName: string): Promise<boolean> {
     if (!isPresent(tableName)) return false;
     try {
-      const sql = this.dataSourceSql(tableName, { type: "BASE TABLE" });
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (
+        (await this.queryValues(this.dataSourceSql(tableName, { type: "BASE TABLE" }), "SCHEMA"))
+          .length > 0
+      );
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.tables()).includes(String(tableName));
@@ -902,22 +905,21 @@ export class SchemaStatements {
   async createJoinTable(
     table1: string,
     table2: string,
-    options?: JoinTableOptions | ((t: TableDefinition) => void),
+    optionsOrFn?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let opts: JoinTableOptions = {};
+    let options: JoinTableOptions = {};
     let definer: ((t: TableDefinition) => void) | undefined;
-    if (typeof options === "function") {
-      definer = options;
-    } else if (options) {
-      opts = options;
+    if (typeof optionsOrFn === "function") {
+      definer = optionsOrFn;
+    } else if (optionsOrFn) {
+      options = optionsOrFn;
       definer = fn;
     }
-    const tableName = this.findJoinTableName(table1, table2, opts);
-    const { columnOptions = {}, tableName: _t, ...tableOpts } = opts;
+    const tableName = this.findJoinTableName(table1, table2, options);
+    const { columnOptions = {}, tableName: _t, ...tableOpts } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
+    const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
     await this.createTable(tableName, { ...tableOpts, id: false }, (t) => {
       t.references(t1Ref, mergedColOpts);
@@ -975,20 +977,28 @@ export class SchemaStatements {
 
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
   ): string {
     // Rails `index_name`: the `column` branch routes through generate_index_name
     // (length/hash fallback) by default; the bare `_and_` join is only used when
     // `options[:_uses_legacy_index_name]` is set (Rails migration compatibility).
-    if (options.column != null) {
-      if (options._usesLegacyIndexName) {
-        const cols = Array.isArray(options.column) ? options.column : [options.column];
-        return `index_${tableName}_on_${cols.join("_and_")}`;
+    if (typeof options !== "string" && !Array.isArray(options)) {
+      if (options.column != null) {
+        if (options._usesLegacyIndexName) {
+          const cols = Array.isArray(options.column) ? options.column : [options.column];
+          return `index_${tableName}_on_${cols.join("_and_")}`;
+        }
+        return this.generateIndexName(tableName, options.column);
       }
-      return this.generateIndexName(tableName, options.column);
+      if (options.name != null) return options.name;
+      throw new ArgumentError("You must specify the index name");
     }
-    if (options.name != null) return options.name;
-    throw new ArgumentError("You must specify the index name");
+    // Rails' `else` arm: a non-Hash `options` is a column name (or list of
+    // them) and re-enters through index_name_options (schema_statements.rb:1006).
+    return this.indexName(tableName, this.indexNameOptions(options));
   }
 
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
@@ -1280,13 +1290,15 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    const sql = this.dataSourceSql(null, { type: "BASE TABLE" });
-    return (await this.queryValues(sql, "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(null, { type: "BASE TABLE" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async views(): Promise<string[]> {
-    const sql = this.dataSourceSql(null, { type: "VIEW" });
-    return (await this.queryValues(sql, "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(null, { type: "VIEW" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async viewExists(viewName: string): Promise<boolean> {
@@ -1300,8 +1312,10 @@ export class SchemaStatements {
     // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return false;
     try {
-      const sql = this.dataSourceSql(viewName, { type: "VIEW" });
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (
+        (await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA")).length >
+        0
+      );
     } catch (e) {
       if (e instanceof NotImplementedError) {
         return (await this.views()).includes(String(viewName));
@@ -1392,8 +1406,7 @@ export class SchemaStatements {
 
   async dataSources(): Promise<string[]> {
     try {
-      const sql = this.dataSourceSql();
-      const values = await this.queryValues(sql, "SCHEMA");
+      const values = await this.queryValues(this.dataSourceSql(), "SCHEMA");
       return values.map(String);
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
@@ -1406,8 +1419,7 @@ export class SchemaStatements {
   async dataSourceExists(name: string): Promise<boolean> {
     if (!isPresent(name)) return false;
     try {
-      const sql = this.dataSourceSql(name);
-      return (await this.queryValues(sql, "SCHEMA")).length > 0;
+      return (await this.queryValues(this.dataSourceSql(name), "SCHEMA")).length > 0;
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.dataSources()).includes(String(name));
@@ -1469,8 +1481,7 @@ export class SchemaStatements {
     const { columnOptions = {}, tableName: _, ...rest } = options;
     const mergedColOpts = { null: false, index: false, ...columnOptions };
 
-    const t1Ref = this.referenceNameForTable(table1);
-    const t2Ref = this.referenceNameForTable(table2);
+    const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
     return this.buildCreateTableDefinition(joinTableName, { ...rest, id: false }, (td) => {
       td.references(t1Ref, mergedColOpts);
@@ -1531,12 +1542,12 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<CreateIndexDefinition> {
-    const [idx, algorithm, ifNotExists] = await this.addIndexOptions(
+    const [index, algorithm, ifNotExists] = await this.addIndexOptions(
       tableName,
       columnName,
       options,
     );
-    return new CreateIndexDefinition(idx, algorithm, ifNotExists);
+    return new CreateIndexDefinition(index, algorithm, ifNotExists);
   }
 
   async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
@@ -1563,8 +1574,8 @@ export class SchemaStatements {
 
     if (Array.isArray(result.primaryKey)) {
       if (!result.column) {
-        result.column = (result.primaryKey as string[]).map((pk) =>
-          this.foreignKeyColumnFor(toTable, pk),
+        result.column = (result.primaryKey as string[]).map((pkColumn) =>
+          this.foreignKeyColumnFor(toTable, pkColumn),
         );
       }
     } else {
@@ -1646,8 +1657,10 @@ export class SchemaStatements {
   }
 
   async assumeMigratedUptoVersion(version: number | string): Promise<void> {
+    // Ruby's String#to_i: leading whitespace/sign, underscore separators, and a
+    // non-numeric tail all collapse to the leading integer run (or 0).
     const leading = /^\s*([+-]?\d+(?:_\d+)*)/.exec(String(version));
-    const verNum = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
+    version = leading ? parseInt(leading[1].replace(/_/g, ""), 10) : 0;
 
     const pool = this._pool;
     const smTable = this.quoteTableName(pool.schemaMigration.tableName);
@@ -1656,15 +1669,12 @@ export class SchemaStatements {
     const migrated = await migrationContext.getAllVersions();
     const allVersions = migrationContext.migrations.map((m) => m.version);
 
-    // Insert the target version if not already migrated. Rails passes the
-    // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —
-    // pass `verNum`, not the `ver` string, so adapter dispatch matches.
-    if (!migrated.includes(verNum)) {
-      await this.execute(`INSERT INTO ${smTable} (version) VALUES (${this.quote(verNum)})`);
+    if (!migrated.includes(version)) {
+      await this.execute(`INSERT INTO ${smTable} (version) VALUES (${this.quote(version)})`);
     }
 
     // Insert all known migration versions below the target that haven't been run
-    const inserting = allVersions.filter((v) => v < verNum && !migrated.includes(v));
+    const inserting = allVersions.filter((v) => v < version && !migrated.includes(v));
     if (inserting.length > 0) {
       const duplicate = inserting.find((v) => inserting.filter((x) => x === v).length > 1);
       if (duplicate !== undefined) {
@@ -1809,8 +1819,7 @@ export class SchemaStatements {
     // or "(data->'foo')") is an expression — kept verbatim as the index columns,
     // with the index name derived from its `\w+` runs joined by "_".
     const columnNames = this.indexColumnNames(columnName);
-    const indexName =
-      options.name?.toString() ?? this.indexName(tableName, this.indexNameOptions(columnNames));
+    const indexName = options.name?.toString() ?? this.indexName(tableName, columnNames);
 
     this.validateIndexLengthBang(tableName, indexName, options.internal);
 
@@ -2030,7 +2039,7 @@ export class SchemaStatements {
   /** @internal */
   async indexNameForRemove(
     tableName: string,
-    columnName: string | null | undefined,
+    columnName: string | string[] | null | undefined,
     options: { name?: string; column?: string | string[] },
   ): Promise<string> {
     if (this.canRemoveIndexByName(columnName, options) && options.name) {
@@ -2040,11 +2049,14 @@ export class SchemaStatements {
     const checks: Array<(idx: IndexDefinition) => boolean> = [];
     let columnNames: string[];
 
-    if (!options.name && this.isExpressionColumnName(columnName ?? "")) {
+    if (
+      !options.name &&
+      this.isExpressionColumnName(typeof columnName === "string" ? columnName : "")
+    ) {
       // Rails: `options[:name] = index_name(table_name, column_name)` — a String
       // column is scanned for \w+ words, joined with "_", and passed through
       // generate_index_name, so the index-name length/hash fallback applies.
-      const joined = (columnName!.match(/\w+/g) ?? []).join("_");
+      const joined = ((columnName as string).match(/\w+/g) ?? []).join("_");
       options = { ...options, name: this.generateIndexName(tableName, joined) };
       columnNames = [];
     } else {
@@ -2096,11 +2108,14 @@ export class SchemaStatements {
   ): Promise<void> {
     const idxs = await this.indexes(newName);
     for (const index of idxs) {
-      const generatedName = this.indexName(tableName, { column: index.columns, ...options } as any);
-      if (generatedName === index.name) {
+      const generatedIndexName = this.indexName(tableName, {
+        column: index.columns,
+        ...options,
+      } as any);
+      if (generatedIndexName === index.name) {
         await this.renameIndex(
           newName,
-          generatedName,
+          generatedIndexName,
           this.indexName(newName, { column: index.columns, ...options } as any),
         );
       }
@@ -2121,11 +2136,11 @@ export class SchemaStatements {
       const oldColumns = [...index.columns];
       const pos = oldColumns.indexOf(newColName);
       oldColumns[pos] = colName;
-      const generatedName = this.indexName(tableName, { column: oldColumns });
-      if (generatedName === index.name) {
+      const generatedIndexName = this.indexName(tableName, { column: oldColumns });
+      if (generatedIndexName === index.name) {
         await this.renameIndex(
           tableName,
-          generatedName,
+          generatedIndexName,
           this.indexName(tableName, { column: index.columns }),
         );
       }
@@ -2396,7 +2411,7 @@ export class SchemaStatements {
 
   /** @internal */
   canRemoveIndexByName(
-    columnName: string | undefined | null,
+    columnName: string | string[] | undefined | null,
     options: Record<string, unknown>,
   ): boolean {
     return canRemoveIndexByName(columnName, options);
@@ -2461,7 +2476,7 @@ export class SchemaStatements {
     columnNames: string[],
     _options: Record<string, unknown> = {},
   ): string[] {
-    return columnNames.map((col) => this.removeColumnForAlter(tableName, col));
+    return columnNames.map((columnName) => this.removeColumnForAlter(tableName, columnName));
   }
 
   /** @internal */

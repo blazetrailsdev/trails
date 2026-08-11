@@ -22,8 +22,8 @@ export interface MigrationAssigns {
 export async function currentMigrationNumber(dirname: string): Promise<number> {
   const path = getPath();
   let max = 0;
-  for (const f of await migrationLookupAt(dirname)) {
-    const n = parseInt(path.basename(f).split("_")[0], 10);
+  for (const file of await migrationLookupAt(dirname)) {
+    const n = parseInt(path.basename(file).split("_")[0], 10);
     if (!Number.isNaN(n) && n > max) max = n;
   }
   return max;

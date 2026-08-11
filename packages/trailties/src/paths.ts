@@ -21,13 +21,13 @@ export class Root {
   }
 
   add(path: string, options: PathOptions = {}): Path {
-    const withVals =
+    const with_ =
       options.with === undefined
         ? [path]
         : Array.isArray(options.with)
           ? options.with
           : [options.with];
-    const node = new Path(this, path, withVals, options);
+    const node = new Path(this, path, with_, options);
     this._entries.set(path, node);
     return node;
   }

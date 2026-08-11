@@ -367,7 +367,10 @@ export interface AbstractAdapter {
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(
     tableName: string,
-    options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
   ): string;
   /** @internal */
   generateIndexName(tableName: string, column: string | string[]): string;
@@ -381,7 +384,7 @@ export interface AbstractAdapter {
   /** @internal */
   indexNameForRemove(
     tableName: string,
-    columnName: string | null | undefined,
+    columnName: string | string[] | null | undefined,
     options: { name?: string; column?: string | string[] },
   ): Promise<string>;
   tableExists(tableName: string): Promise<boolean>;
@@ -2452,8 +2455,8 @@ export class AbstractAdapter implements Quoting {
             null,
           ) as Error;
           this.invalidateTransaction(translatedException);
-          const expired = deadline !== null && deadline < Date.now();
-          if (!expired && retriesAvailable > 0) {
+          const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
+          if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
             if (this.isRetryableQueryError(translatedException)) {
               await this.backoff(this.connectionRetries - retriesAvailable);

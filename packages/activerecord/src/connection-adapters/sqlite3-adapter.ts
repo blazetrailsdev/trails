@@ -2507,28 +2507,28 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     const COLLATE_REGEX = /.*"(\w+)".*collate\s+"(\w+)".*/i;
     const AI_REGEX = /.*"(\w+)".+PRIMARY KEY AUTOINCREMENT/i;
     const GENERATED_REGEX = /.*"(\w+)".+GENERATED ALWAYS AS \((.+)\) (?:STORED|VIRTUAL)/i;
-    const strings = await this.tableStructureSql(
+    const columnStrings = await this.tableStructureSql(
       tableName,
       basicStructure.map((column) => String(column["name"])),
     );
-    if (!strings.length) return basicStructure.map((c) => ({ ...c }));
-    const collations: Record<string, string> = {};
+    if (!columnStrings.length) return basicStructure.map((c) => ({ ...c }));
+    const collationHash: Record<string, string> = {};
     const autoIncrements: Record<string, boolean> = {};
-    const generated: Record<string, string> = {};
-    for (const s of strings) {
-      const cm = COLLATE_REGEX.exec(s);
-      if (cm) collations[cm[1]] = cm[2];
-      const aim = AI_REGEX.exec(s);
+    const generatedColumns: Record<string, string> = {};
+    for (const columnString of columnStrings) {
+      const cm = COLLATE_REGEX.exec(columnString);
+      if (cm) collationHash[cm[1]] = cm[2];
+      const aim = AI_REGEX.exec(columnString);
       if (aim) autoIncrements[aim[1]] = true;
-      const gm = GENERATED_REGEX.exec(s);
-      if (gm) generated[gm[1]] = gm[2];
+      const gm = GENERATED_REGEX.exec(columnString);
+      if (gm) generatedColumns[gm[1]] = gm[2];
     }
     return basicStructure.map((col) => {
       const name = String(col["name"]);
       const out: Record<string, unknown> = { ...col };
-      if (collations[name] !== undefined) out["collation"] = collations[name];
+      if (collationHash[name] !== undefined) out["collation"] = collationHash[name];
       if (autoIncrements[name]) out["auto_increment"] = true;
-      if (generated[name] !== undefined) out["dflt_value"] = generated[name];
+      if (generatedColumns[name] !== undefined) out["dflt_value"] = generatedColumns[name];
       return out;
     });
   }
@@ -2691,17 +2691,20 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     columns: string[],
     rename: Record<string, string> = {},
   ): Promise<void> {
-    // rename maps {srcCol: destCol}; build dest→src for lookup
-    const destToSrc: Record<string, string> = Object.fromEntries(columns.map((n) => [n, n]));
-    for (const [srcCol, destCol] of Object.entries(rename)) destToSrc[destCol] = srcCol;
-    const fromCols = (await this.columns(from)).map((c) => c.name);
-    const validCols = columns.filter((col) => fromCols.includes(destToSrc[col]));
-    if (!validCols.length) return;
-    const fromColsToCopy = validCols.map((col) => destToSrc[col]);
-    const quotedDest = validCols.map((c) => quoteColumnName(c)).join(", ");
-    const quotedSrc = fromColsToCopy.map((c) => quoteColumnName(c)).join(", ");
+    // rename maps {srcCol: destCol}; Rails' `rename.each { |a| ... }` builds the
+    // dest→src direction of the same mapping.
+    const columnMappings: Record<string, string> = Object.fromEntries(
+      columns.map((name) => [name, name]),
+    );
+    for (const [srcCol, destCol] of Object.entries(rename)) columnMappings[destCol] = srcCol;
+    const fromColumns = (await this.columns(from)).map((c) => c.name);
+    columns = columns.filter((col) => fromColumns.includes(columnMappings[col]));
+    if (!columns.length) return;
+    const fromColumnsToCopy = columns.map((col) => columnMappings[col]);
+    const quotedColumns = columns.map((col) => quoteColumnName(col)).join(", ");
+    const quotedFromColumns = fromColumnsToCopy.map((col) => quoteColumnName(col)).join(", ");
     await this.internalExecQuery(
-      `INSERT INTO ${quoteTableName(to)} (${quotedDest}) SELECT ${quotedSrc} FROM ${quoteTableName(from)}`,
+      `INSERT INTO ${quoteTableName(to)} (${quotedColumns}) SELECT ${quotedFromColumns} FROM ${quoteTableName(from)}`,
     );
   }
 

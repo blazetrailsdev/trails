@@ -306,8 +306,8 @@ export class GID {
     this.setModelComponents(path, true);
   }
   /** @internal Mirrors URI::GID#query= — assigns parsed params via a setter. */
-  protected set query(value: string | undefined) {
-    this.setParams(this.parseQueryParams(value));
+  protected set query(query: string | undefined) {
+    this.setParams(this.parseQueryParams(query));
   }
   /** @internal Mirrors URI::GID#set_query (Ruby ≤ 2.1 alias of query=). */
   protected setQuery(query: string | undefined): void {
@@ -349,10 +349,10 @@ export class GID {
   protected setModelComponents(path: string, validate = false): void {
     const parts = path.split("/");
     const modelName = parts[1];
-    const rawModelId = parts.slice(2).join("/");
+    const modelId = parts.slice(2).join("/");
     if (validate) {
       this.validateComponent(modelName);
-      this.validateModelIdSection(rawModelId, modelName);
+      this.validateModelIdSection(modelId, modelName);
     }
   }
   /** @internal Mirrors URI::GID#validate_component — must be non-blank. */

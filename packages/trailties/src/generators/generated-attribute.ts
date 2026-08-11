@@ -48,27 +48,27 @@ export class GeneratedAttribute {
       indexType = type;
       type = undefined;
     }
-    const [parsedType, opts] = parseTypeAndOptions(type);
-    const finalType = parsedType ?? "string";
+    // Destructured alongside the `type` reassignment Rails makes (generated_attribute.rb:44).
+    let opts: AttrOptions;
+    // eslint-disable-next-line prefer-const
+    [type, opts] = parseTypeAndOptions(type);
     if (DANGEROUS.has(name)) {
       throw new GeneratorError(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
       );
     }
-    if (parsedType && !GeneratedAttribute.validType(parsedType)) {
-      throw new GeneratorError(
-        `Could not generate field '${name}' with unknown type '${parsedType}'.`,
-      );
+    if (type && !GeneratedAttribute.validType(type)) {
+      throw new GeneratorError(`Could not generate field '${name}' with unknown type '${type}'.`);
     }
     if (indexType && !GeneratedAttribute.validIndexType(indexType)) {
       throw new GeneratorError(
         `Could not generate field '${name}' with unknown index '${indexType}'.`,
       );
     }
-    if (parsedType && GeneratedAttribute.reference(finalType) && indexType === "uniq") {
+    if (type && GeneratedAttribute.reference(type) && indexType === "uniq") {
       opts.index = { unique: true };
     }
-    return new GeneratedAttribute(name, finalType, indexType as IndexType, opts);
+    return new GeneratedAttribute(name, type ?? "string", indexType as IndexType, opts);
   }
 
   static validType = (t: string): boolean => DEFAULT_TYPES.has(t);

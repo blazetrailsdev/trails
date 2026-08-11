@@ -33,15 +33,14 @@ export class SpellChecker {
   }
 
   correct(input: string): string[] {
-    const rawInput = String(input);
-    const normalizedInput = normalize(rawInput);
+    const normalizedInput = normalize(input);
     const inputLen = codepointLength(normalizedInput);
     const jwThreshold = inputLen > 3 ? 0.834 : 0.77;
 
     const candidates: Array<{ word: string; index: number; score: number }> = [];
     for (let i = 0; i < this.#dictionary.length; i++) {
       const word = this.#dictionary[i];
-      if (rawInput === String(word)) continue;
+      if (String(input) === String(word)) continue;
       const jw = JaroWinkler.distance(normalize(word), normalizedInput);
       if (jw < jwThreshold) continue;
       candidates.push({
@@ -67,9 +66,9 @@ export class SpellChecker {
     if (corrections.length === 0) {
       corrections = candidates
         .filter((c) => {
-          const w = normalize(c.word);
-          const len = Math.min(inputLen, codepointLength(w));
-          return Levenshtein.distance(w, normalizedInput) < len;
+          const word = normalize(c.word);
+          const length = Math.min(inputLen, codepointLength(word));
+          return Levenshtein.distance(word, normalizedInput) < length;
         })
         .slice(0, 1)
         .map((c) => c.word);

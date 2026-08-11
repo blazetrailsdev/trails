@@ -362,20 +362,20 @@ export class AbstractController {
   }
 
   /** @internal */
-  _findActionName(name: string): string | undefined {
-    return this._validActionName(name) ? this.methodForAction(name) : undefined;
+  _findActionName(actionName: string): string | undefined {
+    return this._validActionName(actionName) ? this.methodForAction(actionName) : undefined;
   }
 
   /** @internal */
-  methodForAction(name: string): string | undefined {
-    if (this.isActionMethod(name)) return name;
+  methodForAction(actionName: string): string | undefined {
+    if (this.isActionMethod(actionName)) return actionName;
     if (typeof (this as any).actionMissing === "function") return "_handleActionMissing";
     return undefined;
   }
 
   /** @internal Rails `_valid_action_name?` — reject path-separator names. */
-  _validActionName(name: string): boolean {
-    return !name.includes("/");
+  _validActionName(actionName: string): boolean {
+    return !actionName.includes("/");
   }
 
   /** Rails `Base.supports_path?` — whether this controller renders URL paths. */

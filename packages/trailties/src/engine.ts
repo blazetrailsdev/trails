@@ -50,12 +50,15 @@ export class Engine extends Trailtie {
   ): Promise<string> {
     const p = await getPathAsync();
     const fs = await getFsAsync();
-    let cur = rootPath;
-    while (cur && (await isDirectory(fs, cur)) && !(await fs.exists(p.join(cur, flag)))) {
-      const parent = p.dirname(cur);
-      cur = parent !== cur ? parent : undefined;
+    while (
+      rootPath &&
+      (await isDirectory(fs, rootPath)) &&
+      !(await fs.exists(p.join(rootPath, flag)))
+    ) {
+      const parent = p.dirname(rootPath);
+      rootPath = parent !== rootPath ? parent : undefined;
     }
-    const found = cur && (await fs.exists(p.join(cur, flag))) ? cur : fallback;
+    const found = rootPath && (await fs.exists(p.join(rootPath, flag))) ? rootPath : fallback;
     if (!found) throw new Error(`Could not find root path for ${this.name}`);
     return await realpathOr(fs, found);
   }
