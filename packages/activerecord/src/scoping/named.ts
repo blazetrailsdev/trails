@@ -165,15 +165,28 @@ export function scopeForAssociation(this: NamedHost, scope?: any): any {
  * Mirrors: ActiveRecord::Scoping::Named::ClassMethods#default_scoped —
  * `build_default_scope(scope, all_queries: all_queries) || scope`
  */
+export function defaultScoped(this: NamedHost, options: { allQueries?: boolean | null }): any;
 export function defaultScoped(
   this: NamedHost,
   scope?: any,
   options?: { allQueries?: boolean | null },
+): any;
+export function defaultScoped(
+  this: NamedHost,
+  scopeOrOptions?: any,
+  options?: { allQueries?: boolean | null },
 ): any {
+  // Ruby `default_scoped(scope = relation, all_queries: nil)` is callable with
+  // the kwargs alone (`default_scoped(all_queries: true)`, persistence.rb:330),
+  // and TypeScript cannot skip a leading optional positional — so the kwargs
+  // object may arrive in its place. It is a plain object; a `scope` is always a
+  // Relation instance.
+  const kwargsOnly =
+    scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
+  const scope = kwargsOnly ? undefined : scopeOrOptions;
+  const opts = kwargsOnly ? (scopeOrOptions as { allQueries?: boolean | null }) : options;
   const rel = scope ?? this._buildUnscopedRelation?.();
-  return (
-    Default.buildDefaultScope(this as any, () => rel, { allQueries: options?.allQueries }) ?? rel
-  );
+  return Default.buildDefaultScope(this as any, () => rel, { allQueries: opts?.allQueries }) ?? rel;
 }
 
 /**

@@ -715,11 +715,11 @@ export class CollectionAssociation extends Association {
       // empty (the owner's save is what creates them).
       const toRemove = this.difference(this.target, otherArray);
       let removable = true;
-      for (const r of toRemove) {
-        if (!this.callback("beforeRemove", r)) {
-          removable = false;
-          break;
-        }
+      try {
+        for (const r of toRemove) this.callback("beforeRemove", r);
+      } catch (e) {
+        if (!isAbortSignal(e)) throw e;
+        removable = false;
       }
       if (removable) {
         for (const r of toRemove) {
@@ -1143,13 +1143,15 @@ export class CollectionAssociation extends Association {
     records: Base[],
     method: string,
   ): Promise<boolean> {
-    // Rails remove_records: catch(:abort) { each before_remove } || return —
-    // an aborted before_remove halts removal (target untouched); returns false.
-    for (const record of records) {
-      if (!this.callback("beforeRemove", record)) {
-        this._lastRemoveAborted = true;
-        return false;
-      }
+    // Rails remove_records: catch(:abort) { each before_remove } || return
+    // (collection_association.rb:399-402) — an aborted before_remove halts
+    // removal (target untouched); returns false.
+    try {
+      for (const record of records) this.callback("beforeRemove", record);
+    } catch (e) {
+      if (!isAbortSignal(e)) throw e;
+      this._lastRemoveAborted = true;
+      return false;
     }
     this._lastRemoveAborted = false;
     if (existingRecords.length > 0) {
@@ -1396,7 +1398,14 @@ export class CollectionAssociation extends Association {
 
     let yielded = false;
     try {
-      if (!skipCallbacks && !this.callback("beforeAdd", record)) return null;
+      if (!skipCallbacks) {
+        try {
+          this.callback("beforeAdd", record);
+        } catch (e) {
+          if (!isAbortSignal(e)) throw e;
+          return null;
+        }
+      }
       this.setInverseInstance(record);
       this._wasLoaded = true;
       if (block) {
@@ -1531,7 +1540,7 @@ export interface CallbackHost {
   owner: Base;
   reflection: { name: string; options: object };
   /** @internal */
-  callback(method: string, record: Base): boolean;
+  callback(method: string, record: Base): void;
   /** @internal */
   callbacksFor(callbackName: string): unknown[];
 }
@@ -1541,9 +1550,13 @@ export interface CallbackHost {
  * `CollectionAssociation#callback` (collection_association.rb:492), whose
  * lookup half is `callbacks_for` (:498): looks up the registered callbacks for
  * `method` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
- * each. Returns `false` if any callback aborts (Rails `throw :abort`,
- * modelled here as a callback returning `false`), so callers can halt the
- * add/remove like Rails' `catch(:abort) ... || return`.
+ * each — nothing more. Like Rails, the abort is NOT caught here: a `throw
+ * :abort` (the sentinel thrown by `throwAbort`) propagates out, and only the
+ * two Rails call sites that wrap the before-callbacks in `catch(:abort)`
+ * (`remove_records`, collection_association.rb:399-402; `replace_on_target`,
+ * :462-465) catch it and take their early return. The after-callback sites
+ * (:408, :485) run outside any catch, so an abort from `after_add` /
+ * `after_remove` propagates there exactly as it does in Ruby.
  *
  * Arity note: like Rails, the stored procs take `(method, owner, record)` and
  * this dispatcher passes the callback name straight through as `method`. The symbol and proc arms
@@ -1555,29 +1568,13 @@ export interface CallbackHost {
  * `callback` is private in Rails, hence `@internal`.
  * @internal
  */
-export function callback(this: CallbackHost, method: string, record: Base): boolean {
-  // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
-  // (collection_association.rb:400-402, 462-464); after callbacks run outside
-  // the catch (:408, :485), so a `throw :abort` from after_add/after_remove
-  // propagates rather than being silently swallowed.
-  const catchAbort = method.startsWith("before");
+export function callback(this: CallbackHost, method: string, record: Base): void {
   for (const cb of this.callbacksFor(method)) {
     if (typeof cb !== "function") continue;
     // A before callback halts the add/remove ONLY by throwing the abort sentinel
     // (faithful `throw :abort`); a `false` return no longer halts (Rails 5+).
-    if (catchAbort) {
-      try {
-        (cb as any)(method, this.owner, record);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        return false;
-      }
-    } else {
-      // after callbacks run outside the catch; their return value is ignored.
-      (cb as any)(method, this.owner, record);
-    }
+    (cb as any)(method, this.owner, record);
   }
-  return true;
 }
 
 /**
