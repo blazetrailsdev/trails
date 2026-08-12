@@ -7,6 +7,7 @@
  * behavior belongs to, so a reader knows where each test's subject lives.
  */
 import type { AssociationProxy } from "./associations/collection-proxy.js";
+import { throwAbort } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel, assignNestedAttributes } from "./index.js";
 import { Associations } from "./associations.js";
@@ -44,6 +45,56 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 
     expect(eye.association("iris").isLoaded()).toBe(true);
     expect(eye.afterSaveCallbacksStack).toEqual([false, false]);
+  });
+
+  it("an autosaved has_one whose save is cancelled rolls the owner back", async () => {
+    // Covers `save_has_one_association`'s
+    // `raise ActiveRecord::Rollback if !saved && autosave`
+    // (autosave_association.rb:502). With `autosave: true` the child is saved
+    // with `validate: false`, so only a non-validation failure — here a
+    // `before_save` that throws abort — reaches the raise. The Rollback is
+    // swallowed by the owner's transaction, which leaves `save` falsy with no
+    // row written. `save!` is itself wrapped in `with_transaction_returning_status`
+    // (transactions.rb:366), so the same Rollback leaves its status unset and it
+    // returns nil rather than raising RecordNotSaved.
+    class CancellingFace extends Base {
+      declare description: string | null;
+      declare human_id: number | null;
+
+      static {
+        this._tableName = "faces";
+        this.beforeSave(function () {
+          throwAbort();
+        });
+      }
+    }
+    registerModel("CancellingFace", CancellingFace);
+
+    class HumanWithCancellingFace extends Base {
+      declare name: string | null;
+      declare cancellingFace: InstanceType<typeof CancellingFace> | null;
+
+      static {
+        this._tableName = "humans";
+        this.hasOne("cancellingFace", {
+          className: "CancellingFace",
+          autosave: true,
+          foreignKey: "human_id",
+        });
+      }
+    }
+    registerModel("HumanWithCancellingFace", HumanWithCancellingFace);
+
+    const human = new HumanWithCancellingFace({ name: "Steve" });
+    cacheAssoc(human, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
+
+    expect(await human.save()).toBeFalsy();
+    expect(await HumanWithCancellingFace.where({ name: "Steve" }).count()).toBe(0);
+
+    const human2 = new HumanWithCancellingFace({ name: "Steve" });
+    cacheAssoc(human2, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
+    expect(await human2.saveBang()).toBeUndefined();
+    expect(await HumanWithCancellingFace.where({ name: "Steve" }).count()).toBe(0);
   });
 });
 
