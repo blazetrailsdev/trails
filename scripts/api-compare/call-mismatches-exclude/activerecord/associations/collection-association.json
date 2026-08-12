@@ -35,6 +35,15 @@
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "ids_writer",
+    "call": "index_by",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby calling convention, not a divergence: `records.index_by { … }` is a receiver call with a block (collection_association.rb:68-75), and ActiveSupport's TS `indexBy` is a free function, so the receiver and the block become its two arguments — same call, same key function, arity shifted by the language."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_writer",
     "call": "values_at",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -85,14 +94,5 @@
     "rubyName": "reset",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "index_by",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby calling convention, not a divergence: `records.index_by { … }` is a receiver call with a block (collection_association.rb:68-75), and ActiveSupport's TS `indexBy` is a free function, so the receiver and the block become its two arguments — same call, same key function, arity shifted by the language."
   }
 ]
