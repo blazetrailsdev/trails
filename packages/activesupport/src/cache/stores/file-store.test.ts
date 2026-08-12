@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { FileStore } from "../file-store.js";
+import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
+import type { StoreOptions } from "../store.js";
 // Rails reaches the private path helper with `@cache.send(:normalize_key, key, {})`
 // (file_store_test.rb:63).
 function pathFor(store: FileStore, key: string): string {
@@ -161,6 +163,11 @@ describe("FileStoreTest", () => {
     store.write("foo", "old", { version: "v1" });
     const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
     expect(result).toEqual({ foo: "foo-generated" });
+  });
+
+  // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
+  cacheStoreCompressionBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 });
 

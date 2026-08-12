@@ -1247,6 +1247,9 @@ export function buildCrossPackageModules(ruby: ApiManifest): {
  */
 const TEST_SUPPORT_SEGMENTS = new Set([
   "test-helpers",
+  // Rails' shared test-behavior mixins live in `test/**/behaviors/`
+  // (e.g. activesupport/test/cache/behaviors/), which is test tree, not lib.
+  "behaviors",
   "dx-tests",
   "support",
   "cases",

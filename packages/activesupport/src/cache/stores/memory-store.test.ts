@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
+import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
+import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
 import { Notifications } from "../../notifications.js";
 
@@ -62,6 +64,14 @@ describe("MemoryStoreTest", () => {
     store.write("key", "original", { unlessExist: true });
     store.write("key", "overwrite", { unlessExist: true });
     expect(store.read("key")).toBe("original");
+  });
+
+  // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
+  // MemoryStore overrides `compression_always_disabled_by_default?`
+  // (memory_store_test.rb:93-96).
+  cacheStoreCompressionBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
+    compressionAlwaysDisabledByDefault: true,
   });
 });
 
