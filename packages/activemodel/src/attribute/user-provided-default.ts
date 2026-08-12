@@ -43,16 +43,11 @@ export class UserProvidedDefault extends FromUser {
   }
 
   override withType(type: Type): Attribute {
-    return new UserProvidedDefault(
-      this.name,
-      this.userProvidedValue,
-      type,
-      this.getOriginalAttribute(),
-    );
+    return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
   marshalDump(): [string, unknown, Type, Attribute | null] {
-    return [this.name, this.valueBeforeTypeCast, this.type, this.getOriginalAttribute()];
+    return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
   }
 
   static marshalLoad(data: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
@@ -72,7 +67,7 @@ export class UserProvidedDefault extends FromUser {
       typeof val === "function" || val === null || typeof val !== "object"
         ? val
         : structuredClone(val);
-    return new UserProvidedDefault(this.name, clonedVal, this.type, this.getOriginalAttribute());
+    return new UserProvidedDefault(this.name, clonedVal, this.type, this.originalAttribute);
   }
 }
 

@@ -1,4 +1,4 @@
-import { humanize, deepDup } from "@blazetrails/activesupport";
+import { humanize, deepDup, except } from "@blazetrails/activesupport";
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 
@@ -24,7 +24,7 @@ interface ModelClass {
 // (activemodel/lib/active_model/error.rb:10-11). Both snake and camel
 // spellings are accepted since our codebase normalizes to camel while
 // Rails-ported code may leak snake-cased keys.
-const CALLBACKS_OPTIONS = new Set<string>([
+const CALLBACKS_OPTIONS: string[] = [
   "if",
   "unless",
   "on",
@@ -33,8 +33,8 @@ const CALLBACKS_OPTIONS = new Set<string>([
   "strict",
   "allowNil",
   "allowBlank",
-]);
-const MESSAGE_OPTIONS = new Set<string>(["message"]);
+];
+const MESSAGE_OPTIONS: string[] = ["message"];
 
 /**
  * Value equality that matches Ruby `==` for the common option shapes:
@@ -234,33 +234,21 @@ export class Error {
     // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
     // A Ruby Symbol reaches us as a colon-prefixed string (`":blank"`), which is the discriminator.
     if (this.rawType.startsWith(":")) {
-      const opts: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(this.options)) {
-        if (!CALLBACKS_OPTIONS.has(k)) opts[k] = v;
-      }
-      return Error.generateMessage(this.attribute, this.rawType, this.base, opts);
+      return Error.generateMessage(
+        this.attribute,
+        this.rawType,
+        this.base,
+        except(this.options, ...CALLBACKS_OPTIONS),
+      );
     }
     return this.rawType;
   }
 
   get details(): Record<string, unknown> {
-    const result: Record<string, unknown> = { error: this.rawType };
-    for (const [key, value] of Object.entries(this.options)) {
-      if (
-        key !== "if" &&
-        key !== "unless" &&
-        key !== "on" &&
-        key !== "allow_nil" &&
-        key !== "allow_blank" &&
-        key !== "allowNil" &&
-        key !== "allowBlank" &&
-        key !== "strict" &&
-        key !== "message"
-      ) {
-        result[key] = value;
-      }
-    }
-    return result;
+    return {
+      error: this.rawType,
+      ...except(this.options, ...CALLBACKS_OPTIONS, ...MESSAGE_OPTIONS),
+    };
   }
 
   get detail(): Record<string, unknown> {
@@ -300,10 +288,11 @@ export class Error {
   strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
     if (!this.match(attribute, type)) return false;
     const expected = options ?? {};
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
-    }
+    const own: Record<string, unknown> = except(
+      this.options,
+      ...CALLBACKS_OPTIONS,
+      ...MESSAGE_OPTIONS,
+    );
     const expectedKeys = Object.keys(expected);
     const ownKeys = Object.keys(own);
     if (expectedKeys.length !== ownKeys.length) return false;
@@ -330,11 +319,7 @@ export class Error {
    * @internal Rails-private helper.
    */
   protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
-    }
-    return [this.base, this.attribute, this.rawType, own];
+    return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
   /**

@@ -95,14 +95,9 @@ export class NumericalityValidator extends EachValidator {
     });
 
     for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
-      const rawOptionValue = this.options[option];
-      if (rawOptionValue === undefined) continue;
-      const optionValue = this.optionAsNumber(
-        record,
-        rawOptionValue as NumericValue,
-        precision,
-        scale,
-      );
+      let optionValue = this.options[option] as NumericValue | undefined;
+      if (optionValue === undefined) continue;
+      optionValue = this.optionAsNumber(record, optionValue, precision, scale);
       if (optionValue === undefined) continue;
       if (!compareOperator(COMPARE_CHECKS[option], num, optionValue)) {
         record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
