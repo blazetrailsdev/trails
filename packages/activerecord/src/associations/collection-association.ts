@@ -427,11 +427,13 @@ export class CollectionAssociation extends Association {
    * persisted-owner transaction (collection_association.rb:127-135) — the
    * nil that makes `CollectionProxy#<<` falsy.
    */
-  async concat(...records: Base[]): Promise<Base[] | undefined> {
+  concat(...records: Base[]): Promise<Base[] | undefined> | Base[] | undefined {
     records = records.flat();
     if (this.owner.isNewRecord()) {
-      await this.skipStrictLoading(() => this.loadTarget());
-      return this.concatRecords(records);
+      const loaded = this.skipStrictLoading(() => this.loadTarget());
+      return isThenable(loaded)
+        ? loaded.then(() => this.concatRecords(records))
+        : this.concatRecords(records);
     }
     return this.transaction(() => this.concatRecords(records));
   }
@@ -444,13 +446,13 @@ export class CollectionAssociation extends Association {
    * `HasManyThroughAssociation` picks up.
    * @internal
    */
-  protected transaction<R>(block: () => Promise<R>): Promise<R | undefined> {
+  protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
     // Rails: reflection.klass.transaction(&block) — uses the reflection's klass, not assoc.klass
     const klass = (this.reflection as any).klass ?? this.klass;
     if (klass && typeof klass.transaction === "function") {
-      return klass.transaction(block);
+      return klass.transaction(() => Promise.resolve(block()));
     }
-    return block();
+    return Promise.resolve(block());
   }
 
   /**
@@ -537,8 +539,8 @@ export class CollectionAssociation extends Association {
    *
    * @internal
    */
-  protected async concatRecords(records: Base[], raise = false): Promise<Base[]> {
-    await concatRecordsLoop(records, async (record, resultStillTrue) => {
+  protected concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
+    const looped = concatRecordsLoop(records, (record, resultStillTrue) => {
       (this as any).raiseOnTypeMismatchBang(record);
       // Mirror Rails' `add_to_target(record) { insert_record }`
       // (collection_association.rb:440-446): the insert runs *inside* the
@@ -547,17 +549,19 @@ export class CollectionAssociation extends Association {
       // before_add abort (`added == null`) skips the yield, so `inserted`
       // stays true and the fold leaves `result` unchanged.
       let inserted = true;
-      await this.addToTarget(record, {}, async () => {
+      const added = this.addToTarget(record, {}, () => {
         // `resultStillTrue === false` → a prior record failed, so Rails'
         // `result &&= insert_record` short-circuits the save.
         if (this.owner.isNewRecord() || !resultStillTrue) return;
-        inserted = await this.insertRecord(record, true, raise, () => {
+        return this.insertRecord(record, true, raise, () => {
           this._wasLoaded = this.isLoaded();
+        }).then((result) => {
+          inserted = result;
         });
       });
-      return inserted;
+      return isThenable(added) ? added.then(() => inserted) : inserted;
     });
-    return records;
+    return isThenable(looped) ? looped.then(() => records) : records;
   }
 
   /**
@@ -643,7 +647,9 @@ export class CollectionAssociation extends Association {
    * Remove specific records from the association using the :dependent
    * strategy. Calls before_remove/after_remove callbacks.
    */
-  async delete(...records: Array<Base | number | string | bigint>): Promise<Base[] | undefined> {
+  delete(
+    ...records: Array<Base | number | string | bigint>
+  ): Promise<Base[] | undefined> | Base[] | undefined {
     // Pass the raw splat (do NOT pre-flatten) so deleteOrDestroy's
     // `records.empty?` check sees the un-flattened arg list, matching Rails:
     // `delete()` → [] → nil, but `delete([])` → [[]] (size 1) → [] → [].
@@ -816,16 +822,21 @@ export class CollectionAssociation extends Association {
   /**
    * Load target from database and merge with in-memory records.
    */
-  override async loadTarget(): Promise<Base[]> {
+  override loadTarget(): Promise<Base[]> | Base[] {
+    const loaded = (): Base[] => {
+      this.loadedBang();
+      return this.target;
+    };
     if (this.findTargetNeeded()) {
       // Every collection subclass overrides `findTarget` to return `Base[]`;
       // the cast only narrows the singular-shaped base signature.
-      const findTarget = (await this.findTarget()) as Base[];
-      this.target = this.mergeTargetLists(findTarget, this.target);
+      return Promise.resolve(this.findTarget()).then((findTarget) => {
+        this.target = this.mergeTargetLists(findTarget as Base[], this.target);
+        return loaded();
+      });
     }
 
-    this.loadedBang();
-    return this.target;
+    return loaded();
   }
 
   /**
@@ -850,24 +861,19 @@ export class CollectionAssociation extends Association {
   addToTarget(
     record: Base,
     options: { skipCallbacks?: boolean; replace?: boolean },
-    save: () => Promise<void>,
-  ): Promise<Base | null>;
+    save: () => Promise<void> | void,
+  ): Promise<Base | null> | Base | null;
   addToTarget(
     record: Base,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
-    save?: () => Promise<void>,
+    save?: () => Promise<void> | void,
   ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace = false } = options;
     const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
       ?.distinctValue;
     const shouldReplace = replace || distinctValue;
     if (save) {
-      return this.replaceOnTarget(
-        record,
-        skipCallbacks,
-        { replace: shouldReplace },
-        save,
-      ) as Promise<Base | null>;
+      return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }, save);
     }
     return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }) as Base | null;
   }
@@ -1070,10 +1076,10 @@ export class CollectionAssociation extends Association {
     return opts.foreignType ?? `${underscore(opts.as)}_type`;
   }
 
-  protected async deleteOrDestroy(
+  protected deleteOrDestroy(
     records: Array<Base | number | string | bigint>,
     method?: string,
-  ): Promise<Base[] | undefined> {
+  ): Promise<Base[] | undefined> | Base[] | undefined {
     // Rails delete_or_destroy opens with `return if records.empty?`
     // (collection_association.rb:385) BEFORE the flatten on the next line, so
     // the check is against the raw splat: `delete()` → [] → nil, but an
@@ -1089,23 +1095,29 @@ export class CollectionAssociation extends Association {
     // `raise_on_type_mismatch!` after `records.flatten` and raises. So run the
     // id-check on the raw splat, then flatten, then type-check the flattened
     // values — the order the non-through proxy path already follows.
-    const coerced = await this.coerceToRecords(records);
-    const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
-    for (const record of resolved) (this as any).raiseOnTypeMismatchBang(record);
-    const existingRecords = resolved.filter((r) => !r.isNewRecord());
-    // A `before_remove` abort halts removal (removeRecords returns false); like
-    // Rails, leave the target untouched and report no removed records.
-    let removed = false;
-    if (existingRecords.length === 0) {
-      removed = await this.removeRecords(existingRecords, resolved, method ?? "");
-    } else {
-      await this.transaction(async () => {
-        removed = await this.removeRecords(existingRecords, resolved, method ?? "");
-      });
-    }
+    const coerced = this.coerceToRecords(records);
     // Rails remove_records aborts via `catch(:abort) { ... } || return` → nil
     // (collection_association.rb:399-402), so a halted before_remove returns nil.
-    return removed ? resolved : undefined;
+    const remove = (coerced: Base[]): Promise<Base[] | undefined> | Base[] | undefined => {
+      const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
+      for (const record of resolved) (this as any).raiseOnTypeMismatchBang(record);
+      const existingRecords = resolved.filter((r) => !r.isNewRecord());
+      // A `before_remove` abort halts removal (removeRecords returns false); like
+      // Rails, leave the target untouched and report no removed records.
+      if (existingRecords.length === 0) {
+        const removed = this.removeRecords(existingRecords, resolved, method ?? "");
+        return isThenable(removed)
+          ? removed.then((r) => (r ? resolved : undefined))
+          : removed
+            ? resolved
+            : undefined;
+      }
+      let removed = false;
+      return this.transaction(async () => {
+        removed = await this.removeRecords(existingRecords, resolved, method ?? "");
+      }).then(() => (removed ? resolved : undefined));
+    };
+    return isThenable(coerced) ? coerced.then(remove) : remove(coerced);
   }
 
   /**
@@ -1116,21 +1128,25 @@ export class CollectionAssociation extends Association {
    * join (see HMT `idsReader`).
    * @internal
    */
-  private async coerceToRecords(records: Array<Base | number | string | bigint>): Promise<Base[]> {
+  private coerceToRecords(
+    records: Array<Base | number | string | bigint>,
+  ): Promise<Base[]> | Base[] {
     const isId = (r: Base | number | string | bigint): r is number | string | bigint =>
       typeof r === "number" || typeof r === "string" || typeof r === "bigint";
+    // Records passed as records need no lookup at all, so this stays inline —
+    // the arm `delete_or_destroy` takes for a new owner.
     if (!records.some(isId)) return records as Base[];
     const ids = records.map((r) => (isId(r) ? r : this.primaryKeyValue(r)));
     if (this.reflection.options.through) {
-      const target = await this.loadTarget();
-      return ids.map((id) => {
-        const found = target.find((r) => String(this.primaryKeyValue(r)) === String(id));
-        if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
-        return found;
-      });
+      return Promise.resolve(this.loadTarget()).then((target) =>
+        ids.map((id) => {
+          const found = target.find((r) => String(this.primaryKeyValue(r)) === String(id));
+          if (!found) throw new Error(`Couldn't find ${this.klass.name} with ID ${String(id)}`);
+          return found;
+        }),
+      );
     }
-    const found = await this.find(...ids);
-    return Array.isArray(found) ? found : found ? [found] : [];
+    return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }
 
   /**
@@ -1143,11 +1159,11 @@ export class CollectionAssociation extends Association {
    * prunes the instance already sitting in the loaded target.
    * @internal
    */
-  protected async removeRecords(
+  protected removeRecords(
     existingRecords: Base[],
     records: Base[],
     method: string,
-  ): Promise<boolean> {
+  ): Promise<boolean> | boolean {
     // Rails remove_records: catch(:abort) { each before_remove } || return
     // (collection_association.rb:399-402) — an aborted before_remove halts
     // removal (target untouched); returns false.
@@ -1159,22 +1175,30 @@ export class CollectionAssociation extends Association {
       return false;
     }
     this._lastRemoveAborted = false;
+    // Rails' tail after `delete_records` (collection_association.rb:404-409).
+    const pruned = (): boolean => {
+      this.target = this.target.filter((r) => !includesRecord(records, r));
+      for (const record of records) {
+        // A `dependent: :destroy` record is frozen once destroyed, so clearing its
+        // inverse foreign key would raise FrozenError. Rails leaves the destroyed
+        // record's attributes untouched here (remove_records only prunes @target),
+        // so skip inverse removal for already-destroyed records.
+        if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
+          continue;
+        this.removeInverseInstance(record);
+      }
+      this._associationIds = null;
+      for (const record of records) this.callback("afterRemove", record);
+      return true;
+    };
+    // `delete_records` is the only I/O in this body and Rails skips it outright
+    // when nothing persisted is being removed, so a new-owner removal runs
+    // start to finish inline.
     if (existingRecords.length > 0) {
-      await this.deleteRecords(existingRecords, method);
+      const deleted = this.deleteRecords(existingRecords, method);
+      if (isThenable(deleted)) return deleted.then(pruned);
     }
-    this.target = this.target.filter((r) => !includesRecord(records, r));
-    for (const record of records) {
-      // A `dependent: :destroy` record is frozen once destroyed, so clearing its
-      // inverse foreign key would raise FrozenError. Rails leaves the destroyed
-      // record's attributes untouched here (remove_records only prunes @target),
-      // so skip inverse removal for already-destroyed records.
-      if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
-        continue;
-      this.removeInverseInstance(record);
-    }
-    this._associationIds = null;
-    for (const record of records) this.callback("afterRemove", record);
-    return true;
+    return pruned();
   }
 
   /**
@@ -1182,7 +1206,7 @@ export class CollectionAssociation extends Association {
    * `CollectionAssociation#delete_records` (raises NotImplementedError).
    * @internal
    */
-  protected async deleteRecords(_records: Base[], _method: string): Promise<number> {
+  protected deleteRecords(_records: Base[], _method: string): Promise<number> | number {
     throw new Error(`deleteRecords must be implemented by ${this.constructor.name}`);
   }
 
@@ -1371,7 +1395,7 @@ export class CollectionAssociation extends Association {
     record: Base,
     skipCallbacks: boolean,
     { replace, inversing = false }: { replace: boolean; inversing?: boolean },
-    block?: () => Promise<void>,
+    block?: () => Promise<void> | void,
   ): Base | null | Promise<Base | null> {
     // Ruby's `@target.index(record)` uses `Core#==`, not JS reference identity,
     // so a re-fetched persisted record dedups against the one already buffered.
@@ -1413,12 +1437,17 @@ export class CollectionAssociation extends Association {
       this.setInverseInstance(record);
       this._wasLoaded = true;
       if (block) {
-        yielded = true;
-        return block()
-          .then(afterYield)
-          .finally(() => {
+        const yield_ = block();
+        // Only a block that actually owes I/O defers the rest; a synchronous
+        // yield (a new-record owner's `concat_records`, whose `insert_record`
+        // never runs) finishes inline, under the sync `ensure` below.
+        if (isThenable(yield_)) {
+          yielded = true;
+          return yield_.then(afterYield).finally(() => {
             this._wasLoaded = null;
           });
+        }
+        return afterYield();
       }
       return afterYield();
     } finally {
@@ -1455,19 +1484,42 @@ export class CollectionAssociation extends Association {
  *
  * @internal
  */
-export async function concatRecordsLoop(
+export function concatRecordsLoop(
   records: Base[],
-  addRecord: (record: Base, resultStillTrue: boolean) => Promise<boolean>,
-): Promise<void> {
+  addRecord: (record: Base, resultStillTrue: boolean) => Promise<boolean> | boolean,
+): Promise<void> | void {
   let result = true;
-  for (const record of records) {
+  for (let i = 0; i < records.length; i++) {
     // `add_to_target` always runs (so the record is type-checked and buffered),
     // but the insert inside `addRecord` is gated on the current `result` to match
     // Ruby's `result &&= insert_record(...)` short-circuit.
-    const inserted = await addRecord(record, result);
+    const inserted = addRecord(records[i], result);
+    // The first record whose add owes I/O turns the whole loop asynchronous;
+    // everything before it has already run inline (a new-record owner never
+    // reaches `insert_record`, so the loop stays synchronous end to end).
+    if (isThenable(inserted)) {
+      const rest = records.slice(i + 1);
+      return inserted.then(async (first) => {
+        result = result && first;
+        for (const record of rest) {
+          result = result && (await addRecord(record, result));
+        }
+        if (!result) throw new Rollback();
+      });
+    }
     result = result && inserted;
   }
   if (!result) throw new Rollback();
+}
+
+/**
+ * A value the sync-hybrid chain must chain behind rather than use directly —
+ * the port's stand-in for Ruby, where every one of these bodies has already
+ * finished by the time it returns.
+ * @internal
+ */
+export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
+  return typeof (value as { then?: unknown } | null | undefined)?.then === "function";
 }
 
 /**

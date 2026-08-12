@@ -268,7 +268,7 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   protected loadTargetForBuild(): Promise<unknown> {
-    return this.loadTarget();
+    return Promise.resolve(this.loadTarget());
   }
 
   /**

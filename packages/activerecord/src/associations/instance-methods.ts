@@ -183,7 +183,7 @@ export function association(this: Base, name: string): AssociationInstance {
 export async function loadBelongsTo(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "belongsTo");
   const result = await bypassStrictLoading.call(this, () =>
-    association.call(this, name).loadTarget(),
+    Promise.resolve(association.call(this, name).loadTarget()),
   );
   return result as Base | null;
 }
@@ -199,7 +199,7 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
 export async function loadHasOne(this: Base, name: string): Promise<Base | null> {
   assertSingularAssociation.call(this, name, "hasOne");
   const result = await bypassStrictLoading.call(this, () =>
-    association.call(this, name).loadTarget(),
+    Promise.resolve(association.call(this, name).loadTarget()),
   );
   return result as Base | null;
 }

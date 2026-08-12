@@ -22,6 +22,7 @@ import {
   throughTargetScope,
 } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
+import { isThenable } from "./collection-association.js";
 import { runAllCallbacks } from "@blazetrails/activemodel";
 
 function safeKlass(refl: { klass?: unknown } | null | undefined): any {
@@ -57,7 +58,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare throughRecordsFor: (record: Base) => Base[];
   /** @internal */
-  declare deleteThroughRecords: (records: Base[]) => Promise<void>;
+  declare deleteThroughRecords: (records: Base[]) => void;
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
@@ -189,15 +190,20 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * the join rows alongside the owner.
    * @internal
    */
-  protected override async concatRecords(records: Base[], _raise = false): Promise<Base[]> {
+  protected override concatRecords(records: Base[], _raise = false): Promise<Base[]> | Base[] {
     this.ensureNotNested();
-    const added = await super.concatRecords(records, true);
-    if (this.owner.isNewRecord() && added) {
-      for (const record of added.flat()) {
-        this.buildThroughRecord(record);
+    const concatenated = super.concatRecords(records, true);
+    const buildThroughRecords = (added: Base[]): Base[] => {
+      if (this.owner.isNewRecord() && added) {
+        for (const record of added.flat()) {
+          this.buildThroughRecord(record);
+        }
       }
-    }
-    return added;
+      return added;
+    };
+    return isThenable(concatenated)
+      ? concatenated.then(buildThroughRecords)
+      : buildThroughRecords(concatenated);
   }
 
   /**
@@ -379,11 +385,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * then drop the matching join rows from the through target.
    * @internal
    */
-  protected override async removeRecords(
+  protected override removeRecords(
     existingRecords: Base[],
     records: Base[],
     method: string,
-  ): Promise<boolean> {
+  ): Promise<boolean> | boolean {
     // Rails HMT#remove_records (has_many_through_association.rb:116-118) is
     // `super; delete_through_records(records)` — the method result is
     // `delete_through_records`'s `records.each` (a truthy array), NOT super's
@@ -393,8 +399,14 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // returns the records on abort, not nil. Discard super's boolean and report
     // truthy so deleteOrDestroy hands back `resolved`; the empty-args guard is
     // the only through path that yields nil.
-    await super.removeRecords(existingRecords, records, method);
-    await this.deleteThroughRecords(records);
+    const removed = super.removeRecords(existingRecords, records, method);
+    if (isThenable(removed)) {
+      return removed.then(() => {
+        this.deleteThroughRecords(records);
+        return true;
+      });
+    }
+    this.deleteThroughRecords(records);
     return true;
   }
 
@@ -446,7 +458,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       count = await scope.deleteAll();
     }
 
-    await this.deleteThroughRecords(records);
+    this.deleteThroughRecords(records);
 
     // Rails' counter-cache tail (has_many_through_association.rb:159-173). Kept
     // inline (rather than in a helper) so the ported `delete_records` body makes
@@ -833,15 +845,15 @@ function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[
 }
 
 /** @internal */
-function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]): Promise<void> {
+function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]): void {
   // Mirrors Rails `delete_through_records`: prune the matching join rows from
   // the through target, then evict the per-record `@through_records` cache so a
   // built-then-removed target is not re-associated when the owner is saved.
   const throughName = this.reflection.options.through;
-  if (!throughName) return Promise.resolve();
+  if (!throughName) return;
   const proxy = throughProxy(this);
   const cache = throughRecordsCache(this);
-  if (!proxy) return Promise.resolve();
+  if (!proxy) return;
   for (const record of records) {
     const toDelete = this.throughRecordsFor(record);
     if (Array.isArray(proxy.target)) {
@@ -854,7 +866,6 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
     }
     cache.delete(record);
   }
-  return Promise.resolve();
 }
 
 /**
