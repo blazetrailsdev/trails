@@ -610,7 +610,6 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 
 /**
  * Mirrors: ActiveRecord::Core.preventing_writes? (`core.rb:205-213`).
- *
  */
 export function isPreventingWrites(className?: string): boolean {
   const stack = connectedToStack();
