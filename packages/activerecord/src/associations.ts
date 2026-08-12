@@ -1607,7 +1607,9 @@ export async function countHasMany(
       }
       const rel = scope(record, assocName, options);
       if (!rel) return 0;
-      const result = await rel.count();
+      // counter_cache.rb:57 `object.send(counter_association).count(:all)`: the
+      // `:all` keeps a `select` declared on the association off the COUNT.
+      const result = await rel.count("all");
       if (typeof result !== "number") {
         throw new Error(
           `countHasMany expected a numeric count but got ${typeof result} — ` +
@@ -1621,7 +1623,8 @@ export async function countHasMany(
   }
   const rel = scope(record, assocName, options);
   if (!rel) return 0;
-  const result = await rel.count();
+  // counter_cache.rb:57 `object.send(counter_association).count(:all)`.
+  const result = await rel.count("all");
   if (typeof result !== "number") {
     throw new Error(
       `countHasMany expected a numeric count but got ${typeof result} — ` +

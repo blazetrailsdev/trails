@@ -25,6 +25,38 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "any?",
+    "reason": "Per-entry verified (RFC 0072 calculation cluster): Rails calculations.rb:222/228/240 tests `group_values.any?`; activesupport exports `many` but no `any` free function, so the port spells the same test as `this.groupValues.length > 0` — same branch, same order."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "apply_join_dependency",
+    "reason": "Per-entry verified: Rails calculations.rb:232 `relation = apply_join_dependency`. Rails' apply_join_dependency EXECUTES `distinct_relation_for_primary_key` for a limited collection join, which a synchronous TS method cannot do, so `calculate` calls the awaitable block-form sibling `Relation#_applyJoinDependencyAsync` (finder_methods.rb:456-488, block arm) instead; the leading underscore keeps it off the compare population."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:result"
+    ],
+    "reason": "Per-entry verified: Rails calculations.rb:224/228 `@async ? Promise::Complete.new(result) : result` — trails has no `@async` relation flag, so only the synchronous arm is ported and the sole `new` in the body is the `Hash.new` (`new Map()`) the grouped result uses, which takes no arguments."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "table",
+    "reason": "Per-entry verified: Rails calculations.rb:238 `Array(model.primary_key || table[Arel.star])` reads `table` only for the no-primary-key fallback; the port spells that fallback as the `*` literal it compiles to, so no table read happens on the branch."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "distinct!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -160,7 +192,13 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_simple_calculation",
     "call": "type_cast_calculated_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "kind": "args",
+    "rubyArgs": [
+      "ref:first",
+      "ref:operation",
+      "ref:type"
+    ],
+    "reason": "Per-entry verified: Rails calculations.rb:509 folds `result.cast_values.first` with the resolved `type`; the port reaches this call only on the contradiction arm (calculations.rb:487-493), where the result is `Result.empty` — `cast_values.first` is nil and `type` is unused for the count/sum identities, so both are passed as null."
   },
   {
     "package": "activerecord",
@@ -203,20 +241,6 @@
     "rubyName": "perform_calculation",
     "call": "any?",
     "reason": "Per-entry verified (RFC 0072 calculation cluster): Rails calculations.rb:447/453 uses `group_values.any?` / `select_values.empty?`; trails relation/calculations.ts performCalculation spells the same tests as `rel._groupColumns.length > 0` and `rel.selectValues.length === 0`, JS's spelling of `#any?`/`#empty?`. Equivalent, not an omission."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "arel_columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "select_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

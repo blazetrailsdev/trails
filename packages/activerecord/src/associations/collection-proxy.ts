@@ -1731,7 +1731,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       hasActiveCachedCounter: () => reflection.hasActiveCachedCounter?.() ?? false,
       counterCacheColumn: () => reflection.counterCacheColumn?.() ?? null,
       readCounterAttribute: (col) => this._record.readAttribute(col),
-      countViaScope: () => this.count(),
+      // has_many_association.rb:84 `scope.count(:all)`: the `:all` keeps a
+      // `select` declared on the association off the COUNT.
+      countViaScope: () => this.count("all"),
       // Rails clamps by `association_scope.limit_value` — the association's own
       // scope, not any in-place proxy (`whereBang`/`limitBang`) mutation. So we
       // read the limit from the rebuilt scope even on the diverged count path,

@@ -88,9 +88,18 @@ interface CalculationRelation {
   /** @internal Rebase-then-report none short-circuit; see Relation. */
   _isEmptyRelation(): boolean;
   _isDistinct: boolean;
+  /** Mirrors `Relation#distinct!` (query_methods.rb). */
+  distinctBang(value?: boolean): unknown;
   _groupColumns: string[];
-  /** Mirrors `Relation#order_values`; read by the count-column resolution. */
-  _orderClauses: unknown[];
+  /** Mirrors `Relation#group_values`. */
+  groupValues: string[];
+  /** The `select_values` store — written by `calculate`'s has_include? arm. */
+  _selectColumns: (string | symbol | Nodes.Node)[] | null;
+  /**
+   * Mirrors `Relation#order_values`; read by the count-column resolution and
+   * cleared by `calculate`'s has_include? arm.
+   */
+  _orderClauses: Array<string | Nodes.Node>;
   _whereClause: { isContradiction(): boolean };
   /** Mirrors `Relation#having_clause`; grouped calculations ride the relation's own arel. */
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
@@ -100,6 +109,10 @@ interface CalculationRelation {
   _applyJoinsToManager(manager: any): void;
   /** @internal Rails `apply_join_dependency`; see Relation. */
   applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
+  /** @internal Awaitable `apply_join_dependency`; see Relation. */
+  _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
+  /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
+  calculate(operation: string, columnName?: string | Nodes.Node): Promise<unknown>;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -414,6 +427,31 @@ function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | No
 }
 
 /**
+ * The table a calculation's manager is seeded FROM: the relation's own table,
+ * which is the model's `arel_table` unless the relation was built on a table
+ * ALIAS. Rails gets this for free — `execute_simple_calculation` runs
+ * `relation.arel`, and `build_arel` starts from `table` — but our arms project
+ * explicitly, so they have to seed the manager the same way. A `Nodes.TableAlias`
+ * is a bare AST node with no `project` helper, hence the `SelectManager`.
+ * @internal
+ */
+function relationTable(rel: CalculationRelation): any {
+  return (rel as unknown as { table?: unknown }).table ?? rel._model.arelTable;
+}
+
+/** @internal Seed a SelectManager FROM {@link relationTable}. */
+function projectOnRelationTable(
+  rel: CalculationRelation,
+  ...projections: unknown[]
+): SelectManager {
+  const table = relationTable(rel);
+  if (table instanceof Table) return table.project(...(projections as never[]));
+  const m = new SelectManager(table as never);
+  m.project(...(projections as never[]));
+  return m;
+}
+
+/**
  * Rails `calculate` obtains the eager-joined relation from
  * `apply_join_dependency` (calculations.rb:217-238) — the single place that
  * builds the eager JoinDependency out of `eager_load_values | includes_values`
@@ -443,10 +481,10 @@ async function singleAggregate(
   // Rails routes aggregates through apply_join_dependency when eager loading,
   // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
   rel._checkEagerLoadable();
-  const table = rel._model.arelTable;
+  const table = relationTable(rel);
   const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
   const projection = aggNode.as("val");
-  const manager = table.project(projection);
+  const manager = projectOnRelationTable(rel, projection);
   // Rails routes sum/average/maximum/minimum through apply_join_dependency when
   // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
   eagerJoinedRelation(rel, rel._groupColumns.length === 0)._applyJoinsToManager(manager);
@@ -467,6 +505,10 @@ async function singleAggregate(
   const rows = result.toArray();
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
+    // calculations.rb:627-630 `type_cast_calculated_value`: an empty result set
+    // is `nil.to_i` for count and `type.deserialize(0)` for sum; the remaining
+    // operations keep nil.
+    if (fn === "count") return 0;
     return fn === "sum" ? castAggValue(null, fn, colType, coerceNumeric) : null;
   }
   return castAggValue(val, fn, colType, coerceNumeric);
@@ -757,371 +799,69 @@ function isEmptyCalculationScope(rel: CalculationRelation): boolean {
   return rel._groupColumns.length === 0 && rel._whereClause.isContradiction();
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#count (calculations.rb:94-104). Rails'
+ * block form (`count { |r| ... }`) is `Enumerable#count` on the loaded
+ * records; every other arm is `calculate(:count, column_name)`.
+ */
 export async function performCount(
   this: CalculationRelation,
-  column?: string | Nodes.Node,
+  columnName?: string | Nodes.Node,
 ): Promise<number | Map<unknown, number>> {
-  if (this._limitValue === 0) return 0;
-  // Safe to test contradiction here: every calc method is wrapped by
-  // `inQueryConnection`, which awaits `_materializeDeferredDistinctPkPredicates()`
-  // before invoking this perform fn — so a deferred distinct-PK marker that
-  // resolves to an empty id set is already an empty `IN` (contradiction) by now,
-  // same as pluck/exists which materialize inside their own inner functions.
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : 0;
+  return calculate.call(this, "count", columnName) as Promise<number | Map<unknown, number>>;
+}
 
-  // Mirrors calculations.rb:231: `calculate`'s has_include? check precedes the
-  // group dispatch. When eager-loading with a group, Rails' `calculate`
-  // (calculations.rb:217-238) applies the eager join then dispatches to the
-  // grouped calculation — groupedAggregate has no hasInclude guard.
-  if (this._groupColumns.length > 0 && hasInclude(this, column ?? null)) {
-    // CPK + grouped eagerLoad not yet supported; fall through to plain groupedAggregate.
-    if (!Array.isArray(this.model.primaryKey)) {
-      const pk = this.model.primaryKey;
-      // Mirror `calculate` (calculations.rb:217-238): apply the eager join then
-      // dispatch to the grouped calculation. The eager associations stay on the
-      // relation so `groupedAggregate` folds them through the shared
-      // `build_joins` port (ONE `AliasTracker`) rather than pre-resolving them
-      // with a parallel tracker. Only set distinct when the relation isn't
-      // already distinct (calculations.rb:233-236).
-      const joinedRel = (this._isDistinct ? this : (this as any).distinct()) as CalculationRelation;
-      // count("*") → pk: COUNT(DISTINCT *) is invalid SQL.
-      return groupedAggregate(
-        joinedRel,
-        "count",
-        column != null && column !== "*" && column !== "all" ? column : pk,
-        true,
-      ) as Promise<Map<unknown, number>>;
+/**
+ * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
+ */
+export async function calculate(
+  this: CalculationRelation,
+  operation: string,
+  columnName?: string | Nodes.Node,
+): Promise<unknown> {
+  operation = operation.toLowerCase();
+
+  // Rails' `@none`. `_isEmptyRelation()` is the shared none-short-circuit
+  // chokepoint: on an AssociationRelation it first rebases a stale new-owner
+  // `1=0` seed onto the live association scope, so a calculation on a relation
+  // spawned off a new owner picks up the persisted FK after `save`.
+  if (this._isEmptyRelation()) {
+    switch (operation) {
+      case "count":
+      case "sum":
+        return this.groupValues.length > 0 ? new Map() : 0;
+      case "average":
+      case "minimum":
+      case "maximum":
+        return this.groupValues.length > 0 ? new Map() : null;
     }
   }
 
-  if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "count", column ?? "*", true) as Promise<Map<unknown, number>>;
-  }
-  this._checkEagerLoadable();
-
-  // Mirrors Rails calculations.rb: when has_include? is true, apply_join_dependency
-  // converts eager_load associations to LEFT OUTER JOINs and uses DISTINCT on PK to
-  // prevent fan-out. Without this, the INNER JOIN alone would fan-out multiple rows
-  // per record when a record has multiple associated records.
-  if (hasInclude(this, column ?? null)) {
-    // `eagerLoading: false` rather than the `group_values.empty?` formula the
-    // other arms use (which is `true` here): these arms materialize the limited
-    // primary keys themselves below, so `applyJoinDependency`'s own
-    // limit/offset guard for that same case must not fire. No path in this file
-    // reaches that guard, since `performCount` never passes `true`.
-    //
-    // Re-derived per manager: `joinConstraints` aliases the join dependency's
-    // nodes in place, so the id and count queries cannot share one instance.
-    const eagerJoined = (): CalculationRelation => eagerJoinedRelation(this, false);
-    if (eagerJoined() !== this) {
-      const pk = this.model.primaryKey;
-      if (!Array.isArray(pk)) {
-        const table = this._model.arelTable;
-        if (this._limitValue !== null || this._offsetValue !== null) {
-          // Rails finder_methods.rb apply_join_dependency: with a limit/offset on an
-          // eager-loaded count, Rails does NOT nest the limit inside the count. It first
-          // runs `limited_ids_for` — a standalone `SELECT DISTINCT pk ... LIMIT/OFFSET`
-          // query — to materialize the actual id values, then re-counts over a relation
-          // filtered by `pk IN (<literal ids>)` with the limit/offset removed
-          // (`relation.except(:limit, :offset).where!(primary_key => limited_ids)`).
-          // Running the id query separately (literal `IN`, not a nested subquery) honors
-          // any requested aggregate column AND avoids MariaDB's "doesn't yet support
-          // 'LIMIT & IN/ALL/ANY/SOME subquery'" restriction.
-          const idSubquery = table.project(table.get(pk));
-          idSubquery.distinct();
-          eagerJoined()._applyJoinsToManager(idSubquery);
-          this._applyWheresToManager(idSubquery, table);
-          // Mirror Rails `distinct_relation_for_primary_key`
-          // (schema_statements.rb:1429-1452): the limited id subquery retains
-          // the relation's `order_values` so the LIMIT/OFFSET selects a
-          // deterministic, Rails-ordered top-n set of primary keys before the
-          // re-count — otherwise an arbitrary limited id set can diverge.
-          this._applyOrderToManager(idSubquery);
-          // Rails builds the DISTINCT select via `columns_for_distinct(pk,
-          // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
-          // <non-selected>`, so those adapters prepend the (aliased) order
-          // expressions to the select list. Re-project through the adapter hook
-          // so the ordered id fetch is valid cross-adapter (sqlite's base hook
-          // returns the pk unchanged). The pk column keeps its name, so the
-          // by-name `row[pk]` extraction below still finds it.
-          const pkColumn = `${this._conn().quoteTableName(table.name)}.${this._conn().quoteColumnName(pk)}`;
-          const distinctSelect = this._conn().columnsForDistinct(pkColumn, idSubquery.orders);
-          idSubquery.projections = (
-            Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
-          ).map((s) => new Nodes.SqlLiteral(s));
-          applyFromToManager(this, idSubquery);
-          applyHavingToManager(this, idSubquery);
-          if (this._limitValue !== null) idSubquery.take(this._limitValue);
-          if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
-          const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
-          const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
-          const idResult = await this._conn().selectAll(
-            idWithCtes,
-            `${this.model.name} Ids`,
-            idCtedBinds,
-          );
-          const limitedIds = idResult.toArray().map((row) => row[pk]);
-          // `pk IN ()` is invalid SQL — Rails' `where!(primary_key => [])` short-circuits
-          // to a no-match relation, so the count is 0.
-          if (limitedIds.length === 0) return 0;
-
-          const colForCount = column != null && column !== "*" && column !== "all" ? column : pk;
-          const countManager = table.project(
-            (aggregateColumn(this, colForCount) as any).count(true).as("count"),
-          );
-          eagerJoined()._applyJoinsToManager(countManager);
-          // Rails `where!(pk => limited_ids)` adds the id filter to the relation that
-          // STILL carries the original where + from, only nulling limit/offset. Re-apply
-          // them so a collection-level predicate (e.g. `comments.body = 'x'`) keeps
-          // constraining the count, not just the id set.
-          this._applyWheresToManager(countManager, table);
-          applyFromToManager(this, countManager);
-          applyHavingToManager(this, countManager);
-          countManager.where(table.get(pk).in(limitedIds));
-          const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
-          const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
-          const limitedResult = await this._conn().selectAll(
-            withCtes,
-            `${this.model.name} Count`,
-            ctedBinds,
-          );
-          const limitedRows = limitedResult.toArray();
-          return Number(limitedRows[0]?.count ?? 0);
+  if (hasInclude(this, columnName ?? null)) {
+    // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
+    // thenable, so the joined relation is delivered to a block instead (the
+    // block form `apply_join_dependency` also has).
+    return this._applyJoinDependencyAsync((relation) => {
+      if (operation === "count") {
+        if (!this._isDistinct && !isDistinctSelect(this, columnName ?? selectForCount(this))) {
+          relation.distinctBang();
+          const primaryKey = this.model.primaryKey;
+          relation._selectColumns =
+            primaryKey == null
+              ? [new Nodes.SqlLiteral("*")]
+              : Array.isArray(primaryKey)
+                ? [...primaryKey]
+                : [primaryKey];
         }
-        // Mirrors Rails recursive calculate() on the JD relation: COUNT(DISTINCT requested_col).
-        // count("*") routes through JD and uses PK — COUNT(DISTINCT *) is invalid.
-        const colForCount = column != null && column !== "*" && column !== "all" ? column : pk;
-        const manager = table.project(
-          (aggregateColumn(this, colForCount) as any).count(true).as("count"),
-        );
-        eagerJoined()._applyJoinsToManager(manager);
-        this._applyWheresToManager(manager, table);
-        applyFromToManager(this, manager);
-        applyHavingToManager(this, manager);
-        const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
-        const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-        const result = await this._conn().selectAll(
-          withCtes,
-          `${this.model.name} Count`,
-          ctedBinds,
-        );
-        const rows = result.toArray();
-        return Number(rows[0]?.count ?? 0);
-      } else {
-        // Composite-PK eager count. Rails `calculate` (calculations.rb:231-238)
-        // sets `select_values = Array(model.primary_key)` and recurses with
-        // `distinct!`, counting over the multi-column PK. `COUNT(DISTINCT c1,
-        // c2)` isn't valid SQL on SQLite/PG, so a specific requested column is
-        // counted distinctly inline while `count(*)` wraps a DISTINCT-pk-columns
-        // subquery (mirroring the non-eager composite path). The eager JD folds
-        // through the shared `build_joins` port so one `AliasTracker` spans the
-        // manual joins AND the eager JD.
-        const table = this._model.arelTable;
-        if (column != null && column !== "*" && column !== "all") {
-          if (this._limitValue !== null || this._offsetValue !== null) {
-            // Rails `apply_join_dependency` (finder_methods.rb:463-478) routes an
-            // eager collection join + limit/offset through
-            // `distinct_relation_for_primary_key` (schema_statements.rb:1429-1452):
-            // materialize the limited DISTINCT pk TUPLES first (bounding which
-            // ROWS participate, joined+ordered), then re-count over
-            // `WHERE pk IN (tuples)` with the limit/offset cleared. So the limit
-            // constrains rows, and `COUNT(DISTINCT column)` runs across only those
-            // rows — NOT a `DISTINCT column ... LIMIT n` value list, which would
-            // truncate distinct values instead of rows.
-            const idSubquery = table.project(...pk.map((c: string) => table.get(c)));
-            idSubquery.distinct();
-            eagerJoined()._applyJoinsToManager(idSubquery);
-            this._applyWheresToManager(idSubquery, table);
-            this._applyOrderToManager(idSubquery);
-            // Rails `distinct_relation_for_primary_key` builds the DISTINCT
-            // select via `columns_for_distinct(primary_key_columns,
-            // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
-            // <non-selected>`, so those adapters prepend the (aliased) order
-            // expressions to the select list. Re-project through the adapter
-            // hook so the ordered composite-pk id fetch is valid cross-adapter
-            // (sqlite's base hook returns the pk columns unchanged). The pk
-            // columns keep their names, so the by-name `row[c]` tuple
-            // extraction below still finds them.
-            const pkColumns = pk.map(
-              (c: string) =>
-                `${this._conn().quoteTableName(table.name)}.${this._conn().quoteColumnName(c)}`,
-            );
-            const distinctSelect = this._conn().columnsForDistinct(pkColumns, idSubquery.orders);
-            idSubquery.projections = (
-              Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
-            ).map((s) => new Nodes.SqlLiteral(s));
-            applyFromToManager(this, idSubquery);
-            applyHavingToManager(this, idSubquery);
-            if (this._limitValue !== null) idSubquery.take(this._limitValue);
-            if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
-            const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
-            const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
-            const idResult = await this._conn().selectAll(
-              idWithCtes,
-              `${this.model.name} Ids`,
-              idCtedBinds,
-            );
-            const tuples = idResult.toArray().map((row) => pk.map((c) => row[c]));
-            // `pk IN ()` is invalid SQL — an empty limited set is a no-match → 0.
-            if (tuples.length === 0) return 0;
-
-            const countManager = table.project(
-              (aggregateColumn(this, column) as any).count(true).as("count"),
-            );
-            eagerJoined()._applyJoinsToManager(countManager);
-            this._applyWheresToManager(countManager, table);
-            applyFromToManager(this, countManager);
-            applyHavingToManager(this, countManager);
-            // Rails `distinct_relation_for_primary_key` restricts via
-            // `where!(pk.zip(limited_ids.transpose).to_h)` — a per-column `IN`
-            // (`author_id IN (...) AND id IN (...)`), not a tuple `IN`.
-            pk.forEach((c: string, i: number) => {
-              countManager.where(table.get(c).in(tuples.map((t) => t[i])));
-            });
-            const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
-            const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
-            const result = await this._conn().selectAll(
-              withCtes,
-              `${this.model.name} Count`,
-              ctedBinds,
-            );
-            return Number(result.toArray()[0]?.count ?? 0);
-          }
-          const manager = table.project(
-            (aggregateColumn(this, column) as any).count(true).as("count"),
-          );
-          eagerJoined()._applyJoinsToManager(manager);
-          this._applyWheresToManager(manager, table);
-          applyFromToManager(this, manager);
-          applyHavingToManager(this, manager);
-          const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
-          const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-          const result = await this._conn().selectAll(
-            withCtes,
-            `${this.model.name} Count`,
-            ctedBinds,
-          );
-          return Number(result.toArray()[0]?.count ?? 0);
-        }
-        const innerManager = table.project(...pk.map((c: string) => table.get(c)));
-        innerManager.distinct();
-        eagerJoined()._applyJoinsToManager(innerManager);
-        this._applyWheresToManager(innerManager, table);
-        applyFromToManager(this, innerManager);
-        applyHavingToManager(this, innerManager);
-        if (this._limitValue !== null) innerManager.take(this._limitValue);
-        if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
-        const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
-        const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-        const outerManager = table.project(countAll.as("count"));
-        outerManager.from(new Nodes.SqlLiteral(`(${innerSql}) AS subquery`));
-        const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
-        const [withCtes, ctedBinds] = prependCtes(this, outerSql, [
-          ...allInnerBinds,
-          ...outerBinds,
-        ]);
-        const result = await this._conn().selectAll(
-          withCtes,
-          `${this.model.name} Count`,
-          ctedBinds,
-        );
-        return Number(result.toArray()[0]?.count ?? 0);
+        // PostgreSQL: ORDER BY expressions must appear in SELECT list when using DISTINCT
+        if (this.groupValues.length === 0) relation._orderClauses = [];
       }
-    }
+
+      return relation.calculate(operation, columnName);
+    });
+  } else {
+    return performCalculation(this, operation, columnName ?? null);
   }
-
-  if (this._limitValue !== null || this._offsetValue !== null) {
-    return performCalculation(this, "count", column ?? null) as Promise<number>;
-  }
-
-  // Use the relation's table — the model's arel_table unless the relation was
-  // built on a table alias — so COUNT's FROM/WHERE match the alias the predicate
-  // builder qualified the conditions with. `Table#project` seeds a SelectManager
-  // FROM the table; a table ALIAS (Nodes.TableAlias) is a bare AST node without
-  // that helper, so seed the manager directly via `new SelectManager(node)`.
-  const baseTable = this._model.arelTable;
-  const table = (this as unknown as { table?: typeof baseTable }).table ?? baseTable;
-  const project = (...projections: unknown[]): SelectManager => {
-    if (table instanceof Table) return table.project(...(projections as never[]));
-    const m = new SelectManager(table as never);
-    m.project(...(projections as never[]));
-    return m;
-  };
-
-  // "all" is the JS analogue of Rails' :all symbol — aggregate_column maps both
-  // it and "*" to Arel.star, i.e. COUNT(*) (calculations.rb:414-423).
-  const effectiveColumn = column === "*" || column === "all" ? undefined : column;
-
-  // Rails: when no explicit column, check if select_values has a single Arel attribute
-  // and use it as the count column (mirrors calculations.rb#execute_simple_calculation).
-  const selectColsNonLimited = (this as any)._selectColumns as unknown[] | null | undefined;
-  const singleSelectColForCount =
-    !effectiveColumn &&
-    selectColsNonLimited?.length === 1 &&
-    selectColsNonLimited[0] instanceof Nodes.Node
-      ? selectColsNonLimited[0]
-      : null;
-  const resolvedColumn = effectiveColumn ?? singleSelectColForCount ?? undefined;
-
-  if (resolvedColumn) {
-    const countNode = (aggregateColumn(this, resolvedColumn) as any).count(this._isDistinct);
-    const manager = project(countNode.as("count"));
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    applyFromToManager(this, manager);
-    applyHavingToManager(this, manager);
-    const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
-    const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
-    const rows = result.toArray();
-    return Number(rows[0]?.count ?? 0);
-  }
-
-  if (this._isDistinct) {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) {
-      // Multi-column DISTINCT COUNT requires a subquery since
-      // COUNT(DISTINCT col1, col2) isn't valid on SQLite/PG
-      const innerManager = project(...pk.map((c: string) => table.get(c)));
-      innerManager.distinct();
-      this._applyJoinsToManager(innerManager);
-      this._applyWheresToManager(innerManager, table);
-      applyFromToManager(this, innerManager);
-      applyHavingToManager(this, innerManager);
-      const [innerSqlWithFrom, allInnerBinds] = compileManagerWithBinds(this, innerManager);
-      const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-      const outerManager = project(countAll.as("count"));
-      outerManager.from(new Nodes.SqlLiteral(`(${innerSqlWithFrom}) AS subquery`));
-      const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
-      const [withCtes, ctedBinds] = prependCtes(this, outerSql, [...allInnerBinds, ...outerBinds]);
-      const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
-      const rows = result.toArray();
-      return Number(rows[0]?.count ?? 0);
-    }
-    const countNode = table.get(pk).count(true);
-    const manager = project(countNode.as("count"));
-    this._applyJoinsToManager(manager);
-    this._applyWheresToManager(manager, table);
-    applyFromToManager(this, manager);
-    applyHavingToManager(this, manager);
-    const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
-    const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-    const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
-    const rows = result.toArray();
-    return Number(rows[0]?.count ?? 0);
-  }
-
-  const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-  const manager = project(countAll.as("count"));
-  this._applyJoinsToManager(manager);
-  this._applyWheresToManager(manager, table);
-  applyFromToManager(this, manager);
-  applyHavingToManager(this, manager);
-  const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
-  const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
-  const result = await this._conn().selectAll(withCtes, `${this.model.name} Count`, ctedBinds);
-  const rows = result.toArray();
-  return Number(rows[0]?.count ?? 0);
 }
 
 export async function performSum(
@@ -1133,7 +873,7 @@ export async function performSum(
     return column && resolveColType(this, column) instanceof BigIntegerType ? 0n : 0;
   }
   if (!column) return 0;
-  const sum = await performCalculation(this, "sum", column);
+  const sum = await calculate.call(this, "sum", column);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
 }
@@ -1149,7 +889,7 @@ export async function performAverage(
   // interval, etc.). Numeric averages still narrow to JS number at the
   // call site.
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  return performCalculation(this, "average", column);
+  return calculate.call(this, "average", column);
 }
 
 export async function performMinimum(
@@ -1157,7 +897,7 @@ export async function performMinimum(
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  return performCalculation(this, "minimum", column);
+  return calculate.call(this, "minimum", column);
 }
 
 export async function performMaximum(
@@ -1165,7 +905,7 @@ export async function performMaximum(
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
-  return performCalculation(this, "maximum", column);
+  return calculate.call(this, "maximum", column);
 }
 
 /**
@@ -1180,6 +920,16 @@ export async function performMaximum(
  * rules then reject every subclass override.
  */
 export interface CalculationMethods {
+  calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
+  calculate(
+    operation: "sum",
+    column: string,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  calculate(
+    operation: "average" | "minimum" | "maximum",
+    column: string,
+  ): Promise<unknown | null | Map<unknown, unknown>>;
+  calculate(operation: string, column?: string | Nodes.Node): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(column?: string | Nodes.Node): Promise<number | bigint | Map<unknown, number | bigint>>;
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
@@ -1212,6 +962,7 @@ function inQueryConnection<A extends unknown[], R>(
 }
 
 export const Calculations = {
+  calculate: inQueryConnection(calculate),
   count: inQueryConnection(performCount),
   sum: inQueryConnection(performSum),
   average: inQueryConnection(performAverage),
@@ -1404,14 +1155,9 @@ function buildCountSubquery(
   columnName: string | Nodes.Node | null,
   distinct: boolean,
 ): [SelectManager, unknown[]] {
-  const baseTable = relation._model.arelTable;
-  const table = (relation as unknown as { table?: typeof baseTable }).table ?? baseTable;
-  const project = (...projections: unknown[]): SelectManager => {
-    if (table instanceof Table) return table.project(...(projections as never[]));
-    const m = new SelectManager(table as never);
-    m.project(...(projections as never[]));
-    return m;
-  };
+  const table = relationTable(relation);
+  const project = (...projections: unknown[]): SelectManager =>
+    projectOnRelationTable(relation, ...projections);
 
   const isAll = columnName == null || columnName === "*" || columnName === "all";
   let columnAlias: Nodes.Node;
@@ -1471,6 +1217,11 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<unknown> {
+  // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,
+  // which compiles to an empty `IN`) yields `ActiveRecord::Result.empty` with no
+  // query at all, and `type_cast_calculated_value` folds that empty result to
+  // the operation's identity. Checked after the query builder is chosen, as
+  // Rails does.
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
     if (rel._limitValue === 0) return 0;
     const [queryBuilder, innerBinds] = buildCountSubquery(
@@ -1478,10 +1229,16 @@ export async function executeSimpleCalculation(
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
+    if (rel._whereClause.isContradiction()) {
+      return typeCastCalculatedValue(null, operation, null);
+    }
     const [outerSql, outerBinds] = compileManagerWithBinds(rel, queryBuilder);
     const [withCtes, ctedBinds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
     const result = await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
     return Number(result.toArray()[0]?.count ?? 0);
+  }
+  if (rel._whereClause.isContradiction()) {
+    return typeCastCalculatedValue(null, operation, null);
   }
   const fn = operation.toLowerCase() as AggFn;
   // DIVERGENCE (Rails calculations.rb:468-511): the ungrouped aggregate body —
@@ -1616,16 +1373,11 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 
 /** @internal */
 export function selectForCount(rel: CalculationRelation): string {
-  const sel = (rel as any)._selectColumns;
-  if (!sel || sel.length === 0) return "*";
-  return sel
-    .map((column: unknown) => {
-      if (column instanceof Nodes.Node) {
-        const visitor = rel._conn?.()?.visitor;
-        return visitor ? visitor.compile(column) : String(column);
-      }
-      return String(column);
-    })
+  // "*" is the JS analogue of Rails' `:all` symbol (calculations.rb:646-654).
+  if (rel.selectValues.length === 0) return "*";
+  const visitor = rel._conn().visitor;
+  return (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
+    .map((column) => (visitor ? visitor.compile(column) : String(column)))
     .join(", ");
 }
 

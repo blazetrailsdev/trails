@@ -3462,44 +3462,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Generic calculation method.
-   *
-   * Mirrors: ActiveRecord::Relation#calculate
-   */
-  async calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
-  async calculate(
-    operation: "sum",
-    column: string,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  async calculate(
-    operation: "average",
-    column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
-  async calculate(
-    operation: "minimum" | "maximum",
-    column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
-  async calculate(
-    operation: "count" | "sum" | "average" | "minimum" | "maximum",
-    column?: string,
-  ): Promise<unknown | null | Map<unknown, unknown>> {
-    switch (operation) {
-      case "count":
-        return this.count(column);
-      case "sum":
-        return this.sum(column);
-      case "average":
-        return this.average(column!);
-      case "minimum":
-        return this.minimum(column!);
-      case "maximum":
-        return this.maximum(column!);
-      default:
-        throw new Error(`Unknown calculation: ${operation}`);
-    }
-  }
-
-  /**
    * Pluck values for columns.
    *
    * Mirrors: ActiveRecord::Relation#pluck
@@ -4705,6 +4667,35 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * Rails `apply_join_dependency { |relation| ... }` (finder_methods.rb:456-488)
+   * for callers that can await: it EXECUTES `distinct_relation_for_primary_key`
+   * when a limit/offset rides a collection reflection. The synchronous
+   * {@link applyJoinDependency} above cannot run that query and rejects the
+   * combination instead, so `calculate` — which is async all the way down —
+   * routes here and gets Rails' materialized-ids rewrite. Only the block form
+   * is offered: a `Relation` is thenable, so it cannot be carried out of a
+   * promise without the await loading it.
+   * @internal
+   */
+  async _applyJoinDependencyAsync<R>(
+    run: (relation: Relation<T>) => Promise<R>,
+    { eagerLoading = this._groupColumns.length === 0 }: { eagerLoading?: boolean } = {},
+  ): Promise<R> {
+    const eagerSpecs = [
+      ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+    ];
+    if (eagerSpecs.length === 0) return run(this);
+    const jd = this._buildEagerJoinDependency(eagerSpecs);
+    const basePk = (this._model as any).primaryKey ?? "id";
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    if (eagerLoading && hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+      const limitedIds = await this._materializeLimitedIds(jd, basePk);
+      return run(this._applyEagerJoinDependency(jd, basePk, limitedIds));
+    }
+    return run(this._exceptEagerValues(jd));
+  }
+
+  /**
    * Limitability of Rails' first `using_limitable_reflections?` clause: the
    * reflections of `construct_join_dependency(eager_load_values | includes_values)`
    * (finder_methods.rb:457-470, join_dependency.rb:81-82). Specs are resolved
@@ -5027,14 +5018,25 @@ export class Relation<T extends Base> {
    */
   private _applyEagerJoinDependency(
     jd: JoinDependency,
-    basePk: string,
+    basePk: string | string[],
     limitedIds?: unknown[],
   ): Relation<T> {
     let rel = this._exceptEagerValues(jd);
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
-      const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
-      rel = rel.where(this.table.get(basePk).in(ids as never));
+      if (Array.isArray(basePk)) {
+        // Rails `where!(**Array(primary_key).zip(limited_ids.transpose).to_h)`
+        // (schema_statements.rb:1448) — a per-column `IN`, not a tuple `IN`.
+        // Only the materialized form exists for a composite key: the inline
+        // subquery fallback has no single column to nest under.
+        const tuples = (limitedIds ?? []) as unknown[][];
+        basePk.forEach((column, i) => {
+          rel = rel.where(this.table.get(column).in(tuples.map((tuple) => tuple[i]) as never));
+        });
+      } else {
+        const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
+        rel = rel.where(this.table.get(basePk).in(ids as never));
+      }
       rel._limitValue = null;
       rel._offsetValue = null;
     }
@@ -5094,7 +5096,7 @@ export class Relation<T extends Base> {
    */
   private _buildEagerIdSubquery(
     jd: JoinDependency,
-    basePk: string,
+    basePk: string | string[],
     distinctSelectSql?: string,
   ): SelectManager {
     const table = this.table;
@@ -5102,7 +5104,9 @@ export class Relation<T extends Base> {
     // `project` — seed the manager from it instead, as Rails does by spawning
     // the relation itself (`relation.reselect(values).distinct!`).
     const idSubquery = new SelectManager(table).project(
-      distinctSelectSql !== undefined ? new Nodes.SqlLiteral(distinctSelectSql) : table.get(basePk),
+      ...(distinctSelectSql !== undefined
+        ? [new Nodes.SqlLiteral(distinctSelectSql)]
+        : (Array.isArray(basePk) ? basePk : [basePk]).map((column) => table.get(column))),
     );
     idSubquery.distinct();
     // This subquery is its own `build_joins` statement: fold the eager JD into
@@ -5135,12 +5139,18 @@ export class Relation<T extends Base> {
    * the last write — which is the pk, since it is projected last.
    * @internal
    */
-  private async _materializeLimitedIds(jd: JoinDependency, basePk: string): Promise<unknown[]> {
+  private async _materializeLimitedIds(
+    jd: JoinDependency,
+    basePk: string | string[],
+  ): Promise<unknown[]> {
     const distinctSelect = this._distinctSelectForLimitedIds(basePk);
     const [idSql, idBinds] = this._compileAstWithBinds(
       this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
     );
     const idRows = await this._conn().execute(idSql, idBinds);
+    // Rails `results.last(Array(relation.primary_key).length)`
+    // (schema_statements.rb:1441) — a composite key yields one tuple per row.
+    if (Array.isArray(basePk)) return idRows.map((row) => basePk.map((column) => row[column]));
     return idRows.map((row) => row[basePk] ?? Object.values(row).pop());
   }
 
@@ -5157,14 +5167,21 @@ export class Relation<T extends Base> {
    * `[col, dir]` tuples are flattened to a SqlLiteral so they compile as plain
    * SQL.
    */
-  private _distinctSelectForLimitedIds(basePk: string): string {
+  private _distinctSelectForLimitedIds(basePk: string | string[]): string {
     const table = this.table;
-    // Bind-free column ref — compile straight through the visitor (no bind
-    // inlining needed) and hand the rendered text to the adapter's string
-    // `columns_for_distinct`.
-    const pkSql = this._arelVisitor().compile(table.get(basePk));
+    // Bind-free column refs — compile straight through the visitor (no bind
+    // inlining needed) and hand the rendered text to the adapter's
+    // `columns_for_distinct`. Rails maps over `Array(relation.primary_key)`
+    // (schema_statements.rb:1430), so a composite key contributes every column.
+    const pkColumns = (Array.isArray(basePk) ? basePk : [basePk]).map((column) =>
+      this._arelVisitor().compile(table.get(column)),
+    );
+    const pkSql = pkColumns.length === 1 ? pkColumns[0] : pkColumns;
     const adapter = this._conn() as unknown as {
-      columnsForDistinct?: (cols: string, orders: (string | Nodes.Node)[]) => string | string[];
+      columnsForDistinct?: (
+        cols: string | string[],
+        orders: (string | Nodes.Node)[],
+      ) => string | string[];
     };
     // Qualify a bare known-column order to the base table (mirroring
     // `_applyOrderToManager` and Rails' order_values, which are qualified Arel
