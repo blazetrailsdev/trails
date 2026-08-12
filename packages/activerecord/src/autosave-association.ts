@@ -440,7 +440,7 @@ export async function saveHasOneAssociation(
     // when the autosave option is enabled (and adds no owner error; child
     // validation errors were already imported during the validation phase).
     if (!saved && autosave) throw new Rollback();
-    return saved !== false && saved != null;
+    return saved ?? false;
   }
   return true;
 }
@@ -891,7 +891,8 @@ export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) 
  *   `_newRecordBeforeSave` tracking, then `afterCreate` + `afterUpdate` to
  *   persist children. Raises `RecordInvalid` on failure so `save()` returns
  *   false and the enclosing DB transaction is rolled back.
- * - HasOne: same as collection minus the around_save.
+ * - HasOne: `afterCreate` + `afterUpdate` that call the save method, which
+ *   raises `Rollback` itself when an autosaved child fails to save.
  * - BelongsTo: `beforeSave` that halts the chain on failure.
  *
  * @internal
@@ -954,9 +955,6 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // unconditionally keeps a nil/true-autosave NEW/changed child's persistence
     // in-save (via the `_record_changed?` → `new_record?` leg) rather than
     // deferring it to the post-commit `flushPendingReplaces` net.
-    // The failure path is `save_has_one_association`'s own
-    // `raise ActiveRecord::Rollback` (autosave_association.rb:502), not a
-    // translation of the return value here.
     afterCreate(model, async (record: any) => {
       await record[saveMethod]();
     });
