@@ -96,9 +96,9 @@ export class HashBuilder {
     const existing = currentHash[name];
     if (Array.isArray(existing)) {
       (existing as XmlHash[]).push(newHash);
-    } else if (existing != null) {
+    } else if (typeof existing === "object" && existing !== null) {
       currentHash[name] = [existing, newHash];
-    } else {
+    } else if (existing == null) {
       currentHash[name] = newHash;
     }
 

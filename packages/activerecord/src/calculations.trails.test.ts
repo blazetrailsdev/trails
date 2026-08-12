@@ -349,11 +349,16 @@ describe("typeFor", () => {
 // answer has to come out of `calculate`'s `@none` arm (calculations.rb:220-230)
 // and `execute_simple_calculation`'s `where_clause.contradiction?` arm
 // (calculations.rb:487-497) — not from a guard bolted on top of each aggregate.
-// The empty sum is the piece that arm has to keep: Rails reaches it via
+// The two arms answer an empty bigint sum differently in Rails, and both land
+// on a plain zero. `@none` hard-codes the literal `0` (calculations.rb:222),
+// ignoring the column type entirely. The contradiction arm goes through
 // `type_cast_calculated_value`'s `type.deserialize(value || 0)`
-// (calculations.rb:629), so the zero comes out of the SAME column type the
-// executed query's value would have been cast through — a big_integer column's
-// empty sum has the shape a populated one has, not a hard-coded literal.
+// (calculations.rb:629) — and `ActiveModel::Type::BigInteger < Integer`
+// (big_integer.rb:25) casts `0` to Ruby's one Integer, so Rails cannot produce a
+// distinct bignum zero there either. trails' `BigIntegerType` narrows
+// safe-range values to a JS `number` by the same documented contract, which is
+// what a POPULATED bigint sum already returns through `castAggValue`. Both
+// assertions below pin that equivalence.
 // ==========================================================================
 
 describe("empty-scope aggregate identities", () => {
