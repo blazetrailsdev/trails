@@ -113,7 +113,7 @@ interface CalculationRelation {
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
   _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
   /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
-  calculate(operation: string, columnName?: string | Nodes.Node): Promise<unknown>;
+  calculate(operation: string, columnName?: string | Nodes.Node | number): Promise<unknown>;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -685,7 +685,7 @@ export async function performCount(
 export async function calculate(
   this: CalculationRelation,
   operation: string,
-  columnName?: string | Nodes.Node,
+  columnName?: string | Nodes.Node | number,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -732,12 +732,20 @@ export async function calculate(
   }
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#sum (calculations.rb:171-177).
+ *
+ * The identity default falls through `aggregate_column` → `arel_column`, whose
+ * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
+ * the no-argument answer comes out of `calculate` rather than a guard. The
+ * block arm (`map(&block).sum(initial_value_or_column)`, calculations.rb:172-173)
+ * is tracked by the `port-relation-sum-block-arm` story.
+ */
 export async function performSum(
   this: CalculationRelation,
-  column?: string | Nodes.Node,
+  initialValueOrColumn: string | Nodes.Node | number = 0,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
-  if (!column) return 0;
-  const sum = await calculate.call(this, "sum", column);
+  const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
 }
@@ -882,9 +890,12 @@ function truncate(name: string): string {
 /** @internal */
 export function aggregateColumn(
   rel: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | Nodes.Node | number,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
+  // Ruby `arel_column`'s `field.to_s` (query_methods.rb:1993), which is what
+  // turns `sum`'s Integer identity default into the literal it sums over.
+  columnName = String(columnName);
   const table = rel._model.arelTable;
   // Ruby `when :all then Arel.star` (calculations.rb:418-419) — ":all" is
   // spelled "*"/"all" here. "1" is the count-subquery's literal projection.
@@ -916,7 +927,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 /** @internal */
 export function hasInclude(
   rel: CalculationRelation,
-  columnName: string | Nodes.Node | null,
+  columnName: string | Nodes.Node | number | null,
 ): boolean {
   const anyRel = rel as any;
   // eager_load_values.any? → always triggers (part of eager_loading?)
@@ -949,7 +960,7 @@ function aggregateTarget(columnName: string | string[] | Nodes.Node | null): str
 export function performCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | number | null,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -984,7 +995,7 @@ export function performCalculation(
 /** @internal */
 export function isDistinctSelect(
   _rel: CalculationRelation,
-  columnName: string | string[] | Nodes.Node,
+  columnName: string | string[] | Nodes.Node | number,
 ): boolean {
   return typeof columnName === "string" && /\bDISTINCT[\s(]/i.test(columnName);
 }

@@ -29,7 +29,12 @@ function getPackageTestFiles(): Record<string, string[]> {
 
   for (const pkg of packages) {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
-    const files = globSync(pattern, { cwd: ROOT_DIR }).sort();
+    // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
+    const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
+    const files = [
+      ...globSync(pattern, { cwd: ROOT_DIR }),
+      ...globSync(behaviorPattern, { cwd: ROOT_DIR }),
+    ].sort();
 
     result[pkg] = files;
   }

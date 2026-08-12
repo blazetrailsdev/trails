@@ -1,5 +1,8 @@
-import { beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../entry.js";
+import { coder } from "../coder.js";
+import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
+import { deflate, inflate } from "../../gzip.js";
 import type { Store, StoreOptions } from "../store.js";
 
 // Mirrors Rails `CacheStoreCompressionBehavior`
@@ -15,6 +18,15 @@ const LARGE_STRING = "0".repeat(2 * 1024);
 
 const SMALL_OBJECT = { data: SMALL_STRING };
 const LARGE_OBJECT = { data: LARGE_STRING };
+
+// Ruby names `Marshal` and `Zlib` directly; trails' equivalents are the
+// fidelity coder (cache/coder.ts) framed as a cache coder, and the gzip pair
+// `Store#initialize` itself installs as the default `:compressor`.
+const MARSHAL_CODER = {
+  dump: (entry: Entry): string => coder.dump(entry.pack()),
+  load: (payload: string): Entry => Entry.unpack(coder.load(payload) as unknown[]),
+};
+const ZLIB = { deflate, inflate };
 
 /** @internal */
 export interface CompressionBehaviorHost {
@@ -33,6 +45,22 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
   beforeEach(() => {
     cache = host.lookupStore();
   });
+
+  afterEach(() => {
+    setFormatVersion(7.0);
+  });
+
+  // Ruby `ActiveSupport::Cache.with(format_version:)` (Object#with), which
+  // restores the previous value once the block returns.
+  function withFormat<T>(formatVersion: number, block: () => T): T {
+    const previous = getFormatVersion();
+    setFormatVersion(formatVersion);
+    try {
+      return block();
+    } finally {
+      setFormatVersion(previous);
+    }
+  }
 
   function computeEntrySizeReduction(value: unknown, withOptions: StoreOptions = {}): number {
     const entry = new Entry(value);
@@ -88,6 +116,26 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     }
   }
 
+  it("compression works with cache format version 7.0 (using Marshal70WithFallback)", () => {
+    cache = withFormat(7.0, () => host.lookupStore({ compress: true }));
+    assertCompression(true);
+  });
+
+  it("compression works with cache format version >= 7.1 (using Cache::Coder)", () => {
+    cache = withFormat(7.1, () => host.lookupStore({ compress: true }));
+    assertCompression(true);
+  });
+
+  it("compression is disabled with custom coder", () => {
+    cache = withFormat(7.1, () => host.lookupStore({ coder: MARSHAL_CODER }));
+    assertCompression(false);
+  });
+
+  it("compression works with custom serializer", () => {
+    cache = withFormat(7.1, () => host.lookupStore({ compress: true, serializer: coder }));
+    assertCompression(true);
+  });
+
   it("compression by default", () => {
     cache = host.lookupStore();
     assertCompression(!host.compressionAlwaysDisabledByDefault);
@@ -124,12 +172,55 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     assertCompression(":all", { compressThreshold: 1 });
   });
 
+  it("compression ignores nil", () => {
+    assertNotCompress(null);
+    assertNotCompress(null, { compress: true, compressThreshold: 1 });
+  });
+
   it("compression ignores incompressible data", () => {
     assertNotCompress("", { compress: true, compressThreshold: 1 });
     // Ruby's `[*0..127].pack("C*")`.
     assertNotCompress(Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join(""), {
       compress: true,
       compressThreshold: 1,
+    });
+  });
+
+  it("compressor can be specified", () => {
+    const lossyCompressor = {
+      deflate(_dumped: string): string {
+        return "yolo";
+      },
+      inflate(compressed: string): string | undefined {
+        return compressed === "yolo" ? coder.dump("lossy!") : undefined;
+      },
+    };
+
+    cache = withFormat(7.1, () =>
+      host.lookupStore({ compress: true, compressor: lossyCompressor, serializer: coder }),
+    );
+    const key = crypto.randomUUID();
+
+    cache.write(key, LARGE_OBJECT);
+    expect(cache.read(key)).toBe("lossy!");
+  });
+
+  it("compressor can be nil", () => {
+    cache = withFormat(7.1, () => host.lookupStore({ compressor: null }));
+    assertCompression(false);
+  });
+
+  it("specifying a compressor raises when cache format version < 7.1", () => {
+    withFormat(7.0, () => {
+      expect(() => host.lookupStore({ compressor: ZLIB })).toThrow(/compressor/i);
+    });
+  });
+
+  it("specifying a compressor raises when also specifying a coder", () => {
+    withFormat(7.1, () => {
+      expect(() => host.lookupStore({ compressor: ZLIB, coder: MARSHAL_CODER })).toThrow(
+        /compressor/i,
+      );
     });
   });
 }
