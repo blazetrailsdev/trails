@@ -1136,6 +1136,11 @@ export class CollectionAssociation extends Association {
   /**
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#remove_records —
    * before/after-remove callbacks, `deleteRecords`, in-memory target prune.
+   *
+   * The prune is Rails' `@target -= records` (collection_association.rb:404):
+   * an Array difference by `==` — class + id — not by object identity, so a
+   * record the id-coercing `find` in `delete_or_destroy` re-materialized still
+   * prunes the instance already sitting in the loaded target.
    * @internal
    */
   protected async removeRecords(
@@ -1157,10 +1162,6 @@ export class CollectionAssociation extends Association {
     if (existingRecords.length > 0) {
       await this.deleteRecords(existingRecords, method);
     }
-    // Rails `@target -= records` (collection_association.rb:404) is an Array
-    // difference by `==` — class + id — not by object identity, so a record the
-    // id-coercing `find` in `delete_or_destroy` re-materialized still prunes the
-    // instance already sitting in the loaded target.
     this.target = this.target.filter((r) => !includesRecord(records, r));
     for (const record of records) {
       // A `dependent: :destroy` record is frozen once destroyed, so clearing its

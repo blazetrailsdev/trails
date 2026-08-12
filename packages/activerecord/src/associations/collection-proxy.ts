@@ -2152,9 +2152,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Delete associated records by nullifying the FK (or removing join record for through).
+   * Deletes the `records` supplied according to the `:dependent` option, and
+   * removes them from the collection.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
+   * (collection_proxy.rb:620-622) — `@association.delete(*records).tap {
+   * reset_scope }`. The removal body itself (id coercion,
+   * `raise_on_type_mismatch!`, the `catch(:abort)` around `before_remove`,
+   * `delete_records`, the `@target` prune, `after_remove`) lives once on
+   * `CollectionAssociation#delete_or_destroy` / `#remove_records`
+   * (collection_association.rb:385-408), which writes the same in-memory target
+   * this proxy reads.
    */
   // @ts-expect-error CP and Relation share the method name for genuinely
   //   different operations: Relation#delete removes by PK; CP#delete removes
@@ -2162,14 +2170,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   divergence — renaming either would break the Rails API surface.
   //   Accepts Integer/String keys too, mirroring Rails' delete_or_destroy.
   async delete(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    this._ensureThroughWritable();
-    // Rails: `@association.delete(*records).tap { reset_scope }`
-    // (collection_proxy.rb:620-622). The whole removal body — the id coercion,
-    // `raise_on_type_mismatch!`, the single `catch(:abort)` around the
-    // `before_remove` loop, `delete_records`, the `@target` prune and
-    // `after_remove` — lives once on `CollectionAssociation#delete_or_destroy` /
-    // `#remove_records` (collection_association.rb:385-408), which writes the
-    // same in-memory target this proxy reads (the shared target store).
     const removed = await this._collectionAssociation().delete(
       ...(records as Array<Base | number | string | bigint>),
     );
@@ -2249,19 +2249,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Destroy associated records (runs callbacks and deletes from DB).
+   * Destroys the `records` supplied and removes them from the collection,
+   * always removing the row from the database regardless of `:dependent`.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
+   * (collection_proxy.rb:692-694) — `@association.destroy(*records).tap {
+   * reset_scope }`, which is `delete_or_destroy(records, :destroy)` and so
+   * shares every step with {@link delete}.
    */
   // @ts-expect-error CP and Relation share the method name for genuinely
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    this._ensureThroughWritable();
-    // Rails: `@association.destroy(*records).tap { reset_scope }`
-    // (collection_proxy.rb:692-694) — `delete_or_destroy(records, :destroy)`,
-    // sharing every step with `delete` above.
     const removed = await this._collectionAssociation().destroy(
       ...(records as Array<Base | number | string | bigint>),
     );
