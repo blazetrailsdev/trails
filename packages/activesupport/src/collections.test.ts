@@ -448,13 +448,18 @@ describe("groupBy", () => {
       { type: "b", v: 2 },
       { type: "a", v: 3 },
     ];
-    expect(groupBy(items, (x) => x.type)).toEqual({
-      a: [
-        { type: "a", v: 1 },
-        { type: "a", v: 3 },
-      ],
-      b: [{ type: "b", v: 2 }],
-    });
+    expect(groupBy(items, (x) => x.type)).toEqual(
+      new Map([
+        [
+          "a",
+          [
+            { type: "a", v: 1 },
+            { type: "a", v: 3 },
+          ],
+        ],
+        ["b", [{ type: "b", v: 2 }]],
+      ]),
+    );
   });
 });
 

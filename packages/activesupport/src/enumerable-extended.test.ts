@@ -142,8 +142,8 @@ describe("EnumerableTests", () => {
       { type: "a", v: 3 },
     ];
     const grouped = groupBy(items, (x) => x.type);
-    expect(grouped["a"]).toHaveLength(2);
-    expect(grouped["b"]).toHaveLength(1);
+    expect(grouped.get("a")).toHaveLength(2);
+    expect(grouped.get("b")).toHaveLength(1);
   });
 
   it("compact_blank — removes blank values", () => {
