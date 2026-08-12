@@ -2975,12 +2975,10 @@ export class CheckPending {
     this._migrations = options.migrations ?? [];
   }
 
-  // Rails wraps this body in `@mutex.synchronize` (migration.rb:657) to guard
-  // the `@watcher ||= build_watcher` memo and the `@needs_check` flag it flips.
-  // Neither piece of state exists in the port — trails registers migrations
-  // programmatically, so there is no FileUpdateChecker to memoize and no
-  // needs-check flag — and nothing else on `this` is written across the awaits
-  // below. There is no critical section here to restore.
+  // Rails' `@mutex.synchronize` (migration.rb:657) guards the
+  // `@watcher ||= build_watcher` memo and the `@needs_check` flag. trails
+  // registers migrations programmatically, so it has neither, and nothing else
+  // on `this` is written across the awaits below — no critical section to hold.
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
       await this._migrator.loadMigrated();

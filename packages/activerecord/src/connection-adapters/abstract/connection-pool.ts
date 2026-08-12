@@ -822,11 +822,9 @@ export class ConnectionPool implements ReapablePool {
     let clean = true;
 
     // The block Rails runs under `@pinned_connection.lock.synchronize`
-    // (connection_pool.rb:344-362). `rollbackTransaction` is a real await in
-    // trails, so without the lock a second `unpinConnectionBang` — or a
-    // concurrent `pinConnectionBang` — enters while the pin is half torn down:
-    // it sees the not-yet-decremented `pin.depth`, rolls the same transaction
-    // back a second time, or checks the connection in twice.
+    // (connection_pool.rb:344-362). trails' `rollbackTransaction` is a real
+    // await, so without the lock a second unpin enters while the pin is half
+    // torn down and rolls the same transaction back again.
     const block = async () => {
       try {
         if (isTransactionAware(connection)) {
@@ -851,11 +849,10 @@ export class ConnectionPool implements ReapablePool {
       }
     };
 
-    // `TransactionManager#synchronize` is the trails-native spelling of the
-    // per-connection lock, and it is re-entrant on the same async chain, so the
-    // nested `rollbackTransaction` (which takes the same lock) cannot
-    // self-deadlock. A connection with no transaction manager has no lock to
-    // take and no transaction to roll back.
+    // `TransactionManager#synchronize` is the trails spelling of Rails'
+    // per-connection lock; it is re-entrant on the async chain, so the nested
+    // `rollbackTransaction` (same lock) cannot self-deadlock. A connection with
+    // no transaction manager has neither a lock to take nor a transaction.
     if (isTransactionAware(connection)) {
       await connection.transactionManager.synchronize(block);
     } else {
