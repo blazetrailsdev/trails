@@ -7,7 +7,6 @@ import {
 } from "./timestamp.js";
 import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
 import type { Temporal } from "@blazetrails/date";
-import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { beforeCommittedBang as transactionsBeforeCommittedBang } from "./transactions.js";
@@ -83,7 +82,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
 
   // Touch belongs_to / has_one parents that have touch: option — mirrors the
   // reflect_on_all_associations loop in Rails' touch_later.
-  for (const r of reflectOnAllAssociations(ctor)) {
+  for (const r of ctor.reflectOnAllAssociations()) {
     const touch = r.options?.touch;
     if (!touch) continue;
     if (r.macro === "belongsTo") {

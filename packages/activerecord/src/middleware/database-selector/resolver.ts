@@ -34,7 +34,7 @@ export class Resolver {
   }
 
   async read<T>(blk: () => T | Promise<T>): Promise<T> {
-    return this.isReadFromPrimaryQ() ? this.readFromPrimary(blk) : this.readFromReplica(blk);
+    return this.isReadFromPrimary() ? this.readFromPrimary(blk) : this.readFromReplica(blk);
   }
 
   async write<T>(blk: () => T | Promise<T>): Promise<T> {
@@ -55,7 +55,7 @@ export class Resolver {
     return this.delay;
   }
 
-  private isReadFromPrimaryQ(): boolean {
+  private isReadFromPrimary(): boolean {
     return !this.isTimeSinceLastWriteOk();
   }
 

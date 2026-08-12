@@ -337,11 +337,11 @@ const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelat
  *
  * @internal
  */
-export function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
-  let methods = _generatedRelationMethodsByModel.get(modelClass);
+export function generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
+  let methods = _generatedRelationMethodsByModel.get(this);
   if (!methods) {
     methods = new GeneratedRelationMethods();
-    _generatedRelationMethodsByModel.set(modelClass, methods);
+    _generatedRelationMethodsByModel.set(this, methods);
   }
   return methods;
 }
@@ -357,7 +357,7 @@ export function includeRelationMethods(modelClass: typeof Base, delegate: object
   // Deviation: Ruby's recursion + include-order MRO is reproduced structurally
   // by an install priority (base_class = 0, own = highest) instead.
   stiCarrierChain(modelClass).forEach((ancestor, priority) => {
-    generatedRelationMethods(ancestor).includeInto(delegate, priority);
+    ancestor.generatedRelationMethods().includeInto(delegate, priority);
   });
 }
 
@@ -509,7 +509,7 @@ export function generateRelationMethod(
   name: string,
   fn: AnyCallable,
 ): void {
-  generatedRelationMethods(modelClass).generate(name, fn);
+  modelClass.generatedRelationMethods().generate(name, fn);
 }
 
 /**

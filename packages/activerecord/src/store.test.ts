@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Base, storedAttributes, ConfigurationError } from "./index.js";
+import { Base, ConfigurationError } from "./index.js";
 import { storeAccessor } from "./store.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { fixtures } from "./test-fixtures.js";
@@ -308,7 +308,7 @@ describe("StoreTest", () => {
   });
 
   it("all stored attributes are returned", () => {
-    expect(storedAttributes(AdminUser)["settings"]).toEqual(["color", "homepage", "favoriteFood"]);
+    expect(AdminUser.storedAttributes()["settings"]).toEqual(["color", "homepage", "favoriteFood"]);
   });
 
   it("stored_attributes are tracked per class", () => {
@@ -323,8 +323,8 @@ describe("StoreTest", () => {
       }
     }
 
-    expect(storedAttributes(FirstModel)["data"]).toEqual(["color"]);
-    expect(storedAttributes(SecondModel)["data"]).toEqual(["width", "height"]);
+    expect(FirstModel.storedAttributes()["data"]).toEqual(["color"]);
+    expect(SecondModel.storedAttributes()["data"]).toEqual(["width", "height"]);
   });
 
   it("stored_attributes are tracked per subclass", () => {
@@ -344,10 +344,10 @@ describe("StoreTest", () => {
       }
     }
 
-    expect(storedAttributes(FirstModel)["data"]).toEqual(["color"]);
-    expect(storedAttributes(SecondModel)["data"]).toEqual(["color", "width", "height"]);
-    expect(storedAttributes(ThirdModel)["data"]).toEqual(["color", "area", "volume"]);
-    expect(storedAttributes(FirstModel)["data"]).toEqual(["color"]);
+    expect(FirstModel.storedAttributes()["data"]).toEqual(["color"]);
+    expect(SecondModel.storedAttributes()["data"]).toEqual(["color", "width", "height"]);
+    expect(ThirdModel.storedAttributes()["data"]).toEqual(["color", "area", "volume"]);
+    expect(FirstModel.storedAttributes()["data"]).toEqual(["color"]);
   });
 
   it("YAML coder initializes the store when a Nil value is given", () => {
@@ -398,7 +398,7 @@ describe("StoreTest", () => {
   });
 
   it("prefix/suffix do not affect stored attributes", () => {
-    expect(storedAttributes(AdminUser)["configs"]).toEqual([
+    expect(AdminUser.storedAttributes()["configs"]).toEqual([
       "secretQuestion",
       "twoFactorAuth",
       "loginRetry",

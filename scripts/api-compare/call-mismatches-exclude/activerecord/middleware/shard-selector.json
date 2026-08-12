@@ -13,7 +13,7 @@
     "call": "resolver",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "Ruby's `resolver.call(request)` (shard_selector.rb:51) reads the Proc attribute with no arguments and invokes it through Proc#call; a JS function IS the callable, so `this.resolver(request)` lands Ruby's Proc#call arguments on the attribute read — Function.prototype.call would rebind `this` to the request. RFC 0099 bucket: Ruby Proc#call, no TS spelling that keeps both call sites."
   },
   {
     "package": "activerecord",

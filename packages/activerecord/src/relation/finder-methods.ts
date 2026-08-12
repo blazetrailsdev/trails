@@ -865,7 +865,7 @@ export async function findWithIds(rel: FinderRelation, ids: unknown[]): Promise<
   const normalized = normalizeFindArgs(rel.model.name, rel.primaryKey, ids);
   if (normalized.emptyArray) return [];
   if (normalized.wantArray) {
-    return findSome(rel, normalized.ids);
+    return (rel as any).findSome(normalized.ids);
   }
   return findOne(rel, normalized.ids[0]);
 }
@@ -884,7 +884,7 @@ export async function findOne(rel: FinderRelation, id: unknown): Promise<any> {
 
 /** @internal */
 export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
-  if (!hasOrder(rel)) return findSomeOrdered(rel, ids);
+  if (!hasOrder(rel)) return (rel as any).findSomeOrdered(ids);
 
   const pk = rel.primaryKey as string;
   let relation = (rel as any).where({ [pk]: ids });

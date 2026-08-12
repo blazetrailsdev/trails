@@ -46,7 +46,11 @@ import type { Relation } from "./relation.js";
 // `relationClassFor` builds every per-model relation subclass from. relation.ts
 // no longer imports base.js for its value, so this edge is one-way.
 import "./relation.js";
-import { wrapWithScopeProxy, relationClassFor } from "./relation/delegation.js";
+import {
+  wrapWithScopeProxy,
+  relationClassFor,
+  generatedRelationMethods as _generatedRelationMethods,
+} from "./relation/delegation.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
@@ -70,6 +74,8 @@ import {
   narrowToProjectedColumns,
   defineDynamicSelectReaders,
   subclassFromAttributesForNew,
+  isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
+  usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
 import {
@@ -341,9 +347,9 @@ import {
   registerSerializeFn as _registerSerializeFn,
   localStoredAttributesMethod as _localStoredAttributesMethod,
   storedAttributes as _storedAttributes,
-  readStoreAttributeMethod as _readStoreAttributeMethod,
-  writeStoreAttributeMethod as _writeStoreAttributeMethod,
-  storeAccessorForMethod as _storeAccessorForMethod,
+  readStoreAttribute as _readStoreAttribute,
+  writeStoreAttribute as _writeStoreAttribute,
+  storeAccessorFor as _storeAccessorFor,
 } from "./store.js";
 import { serialize as _serializeAttribute } from "./serialize.js";
 import { respondToMissing } from "./dynamic-matchers.js";
@@ -2165,6 +2171,9 @@ export class Base extends Model {
   /** Mirrors: ActiveRecord::Store::ClassMethods#local_stored_attributes */
   declare static localStoredAttributes: typeof _localStoredAttributesMethod;
 
+  /** Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes */
+  static storedAttributes = _storedAttributes;
+
   // -- Scopes registry (used by Relation) --
   static _scopes: Map<string, (rel: any, ...args: any[]) => any> = new Map();
   /** Accumulated default_scope declarations. @internal */
@@ -3205,7 +3214,7 @@ export class Base extends Model {
       // are assigned AFTER the clean re-snapshot so they appear as dirty for new
       // records — matching Rails' new-record dirty semantics where assign_attributes
       // runs after init_internals / initialize_internals_callback.
-      const _storeKeys = new Set(Object.values(_storedAttributes(ctor2)).flat());
+      const _storeKeys = new Set(Object.values(ctor2.storedAttributes()).flat());
       const _storeAttrs: Record<string, unknown> = {};
       let attrsForSuper = attrs;
       if (_storeKeys.size > 0) {
@@ -4192,6 +4201,29 @@ export class Base extends Model {
   // Mirrors: ActiveRecord::ModelSchema.immutable_strings_by_default (model_schema.rb:170).
   static immutableStringsByDefault = false;
 
+  /** Whether this class inherits directly from ActiveRecord::Base (i.e. is not
+   * an STI subclass).
+   * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record? */
+  static isDescendsFromActiveRecord = _isDescendsFromActiveRecord;
+
+  /** Whether the given row carries a non-empty inheritance-column value that
+   * this class can dispatch on.
+   * Mirrors: ActiveRecord::Inheritance::ClassMethods#using_single_table_inheritance?
+   * @internal */
+  static usingSingleTableInheritance = _usingSingleTableInheritance;
+
+  /** Generates the `<association>Attributes=` writer for a nested-attributes
+   * association.
+   * Mirrors: ActiveRecord::NestedAttributes::ClassMethods#generate_association_writer
+   * @internal */
+  static generateAssociationWriter = _NestedAttributes.generateAssociationWriter;
+
+  /** The memoized per-model module holding the relation methods generated for
+   * this class's delegation carriers.
+   * Mirrors: ActiveRecord::Delegation::DelegateCache#generated_relation_methods
+   * @internal */
+  static generatedRelationMethods = _generatedRelationMethods;
+
   /** The value stored in a polymorphic `*_type` column for this class —
    * the full namespaced name when `storeFullClassName`, else demodulized.
    * Mirrors: ActiveRecord::Inheritance::ClassMethods#polymorphic_name */
@@ -4751,9 +4783,9 @@ include(Base, {
   // PrimaryKey
   toKey: _toKey,
   // Store (private instance helpers)
-  readStoreAttribute: _readStoreAttributeMethod,
-  writeStoreAttribute: _writeStoreAttributeMethod,
-  storeAccessorFor: _storeAccessorForMethod,
+  readStoreAttribute: _readStoreAttribute,
+  writeStoreAttribute: _writeStoreAttribute,
+  storeAccessorFor: _storeAccessorFor,
 });
 include(Base, _PrimaryKey);
 include(Base, LockingPessimistic.InstanceMethods);

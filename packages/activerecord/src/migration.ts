@@ -207,9 +207,17 @@ export class PendingMigrationError extends MigrationError {
    * anyway raises rather than inventing a message Rails never produces.
    */
   constructor(
-    message?: string,
-    { pendingMigrations }: { pendingMigrations?: MigrationProxy[] } = {},
+    message?: string | { pendingMigrations?: MigrationProxy[] },
+    options: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
+    // Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
+    // pass the kwarg on its own; TS has no kwargs, so an options-only first
+    // argument stands in for that call shape (`migration.rb:159`).
+    if (typeof message !== "string") {
+      options = message ?? options;
+      message = undefined;
+    }
+    const { pendingMigrations } = options;
     if (message == null) {
       if (pendingMigrations == null) {
         throw new ArgumentError(
@@ -1598,7 +1606,7 @@ export class Migration {
     const migrations = await this.pendingMigrations();
 
     if (migrations.length > 0) {
-      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+      throw new PendingMigrationError({ pendingMigrations: migrations });
     }
   }
 
@@ -1621,7 +1629,7 @@ export class Migration {
     const migrations = pendingMigrations.flat();
 
     if (migrations.length > 0) {
-      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+      throw new PendingMigrationError({ pendingMigrations: migrations });
     }
   }
 

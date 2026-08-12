@@ -2,18 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "nested-attributes.ts",
-    "rubyName": "accepts_nested_attributes_for",
-    "call": "generate_association_writer",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:associationName",
-      "ref:type"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "nested-attributes.ts",
     "rubyName": "assign_nested_attributes_for_collection_association",
     "call": "order:isRejectNewRecord,association",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."

@@ -40,13 +40,7 @@ import {
 import { threadedConnectionFor } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import { attributesForCreate } from "./attribute-methods.js";
-import {
-  getStiBase,
-  isStiSubclass,
-  isDescendsFromActiveRecord,
-  stiName,
-  defineDynamicSelectReaders,
-} from "./inheritance.js";
+import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isSuppressed } from "./suppressor.js";
 import {
@@ -1730,7 +1724,7 @@ export function becomesBang<
     // route through the public writer so the change is dirty-tracked and a
     // subsequent partial UPDATE actually persists the new STI type.
     // `sti_type` is `nil` for an STI base class (descends_from_active_record?).
-    const value = isDescendsFromActiveRecord(klass) ? null : stiName(klass);
+    const value = klass.isDescendsFromActiveRecord() ? null : stiName(klass);
     (instance as unknown as { writeAttribute(name: string, value: unknown): void }).writeAttribute(
       inheritanceCol,
       value,

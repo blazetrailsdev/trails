@@ -162,7 +162,7 @@ export function acceptsNestedAttributesFor(
     assocExists.type === "hasMany" || assocExists.type === "hasAndBelongsToMany"
       ? "collection"
       : "one_to_one";
-  generateAssociationWriter(modelClass, associationName, type);
+  modelClass.generateAssociationWriter(associationName, type);
 
   // Wrap save to flush pending nested attributes after the parent is persisted
   const originalSave = modelClass.prototype.save;
@@ -551,11 +551,12 @@ export function checkRecordLimitBang(
 }
 
 /** @internal */
-function generateAssociationWriter(
-  modelClass: typeof Base,
+export function generateAssociationWriter(
+  this: typeof Base,
   associationName: string,
   type: "collection" | "one_to_one",
 ): void {
+  const modelClass = this;
   const attrName = `${associationName}Attributes`;
   // Register so persistence.create/createBang can re-dispatch after construction
   // (the Base constructor routes attrs through writeAttribute, bypassing setters).

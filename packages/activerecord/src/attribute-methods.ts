@@ -165,9 +165,15 @@ export function accessedFields(this: AttributeRecord): string[] {
  * (attribute_methods.rb:14, `class GeneratedAttributeMethods < Module`).
  */
 export class GeneratedAttributeMethods extends Module {
-  constructor(private readonly ownerName?: string) {
-    super();
-  }
+  /**
+   * The owning model's name. Ruby gets it from
+   * `const_set(:GeneratedAttributeMethods, GeneratedAttributeMethods.new)`
+   * (attribute_methods.rb:43), which names the module after the class it is
+   * set on; JS modules carry no such binding, so the owner stamps it at the
+   * same point in `initialize_generated_modules`.
+   * @internal
+   */
+  ownerName?: string;
 
   inspect(): string {
     return `${this.ownerName}::GeneratedAttributeMethods`;
@@ -272,7 +278,8 @@ export function dangerousAttributeMethods(): Set<string> {
  * ancestry does.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  this._generatedAttributeMethods = new GeneratedAttributeMethods(this.name);
+  this._generatedAttributeMethods = new GeneratedAttributeMethods();
+  this._generatedAttributeMethods.ownerName = this.name;
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);

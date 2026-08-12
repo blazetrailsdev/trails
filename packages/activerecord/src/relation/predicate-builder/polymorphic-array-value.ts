@@ -10,7 +10,6 @@
  *        OR (commentable_type = 'Image' AND commentable_id = 2)
  */
 import type { Base } from "../../base.js";
-import { polymorphicName } from "../../inheritance.js";
 import { rubyInspectArray } from "../ruby-inspect.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 export class PolymorphicArrayValue {
@@ -89,8 +88,8 @@ export class PolymorphicArrayValue {
   private typeToIdsMapping(): Map<string | null, unknown[]> {
     const map = new Map<string | null, unknown[]>();
     for (const value of this.values) {
-      const klass = this.klass(value);
-      const type = klass ? (this.polymorphicName(klass) ?? null) : null;
+      const klass = this.klass(value) as typeof Base | null;
+      const type = klass?.polymorphicName?.() ?? null;
       const id = this.convertToId(value);
       if (!map.has(type)) map.set(type, []);
       map.get(type)!.push(id);
@@ -130,13 +129,5 @@ export class PolymorphicArrayValue {
       if (pk in value) return (value as any)[pk];
     }
     return value;
-  }
-
-  /** @internal */
-  private polymorphicName(klass: unknown): string | null {
-    if (typeof klass === "function") {
-      return polymorphicName(klass as typeof Base);
-    }
-    return (klass as { name?: string } | null)?.name ?? null;
   }
 }
