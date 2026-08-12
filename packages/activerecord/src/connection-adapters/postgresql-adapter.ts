@@ -1252,7 +1252,7 @@ export class PostgreSQLAdapter
     // (postgresql_adapter.rb:358-370). The null-then-reload below leaves the
     // type map absent across an await, so without the lock a concurrent
     // reader — or a second reloadTypeMap — observes a null map mid-reload.
-    return this._transactionManager.synchronize(async () => {
+    return this.lock.synchronize(async () => {
       this._typeMap = null;
       await this.loadAdditionalTypes();
       // A type-map reload signals the database's type universe changed — an
@@ -2747,7 +2747,7 @@ export class PostgreSQLAdapter
       // Rails' `active?` sends its `;` ping under `@lock`
       // (postgresql_adapter.rb:348-352), so it can never land between the
       // statements `reset!` fires under the same lock.
-      await this._transactionManager.synchronize(() => conn.query(";"));
+      await this.lock.synchronize(() => conn.query(";"));
     } catch {
       await this.reconnectBang({ restoreTransactions: true });
     }
@@ -2786,12 +2786,10 @@ export class PostgreSQLAdapter
     // scheduled onto it instead: it runs to completion once, uninterrupted,
     // and every query path serializes on the same lock rather than on a
     // separate reset barrier.
-    // The lock lives on the TransactionManager, and `super.resetBang()` swaps
-    // that manager out (`reset_transaction`, database-statements.ts), so hold
-    // the one that is current now: a foreign query entering while the body
-    // runs reads the same manager and queues on the same lock.
-    const lock = this._transactionManager;
-    void lock
+    // The lock is `@lock` on the adapter itself (abstract_adapter.rb:181-192),
+    // which `super.resetBang()` leaves in place — a foreign query entering
+    // while the body runs takes that same monitor and queues behind it.
+    void this.lock
       .synchronize(async () => {
         if (this._client) {
           // No CancelRequest: `reset!` waits behind the query on the wire, it
@@ -4305,7 +4303,7 @@ export class PostgreSQLAdapter
     // Off the withRawConnection loop. This runs as the first step of
     // `_performQuery` (the adapter's one perform_query), which is itself the block
     // executing inside withRawConnection on the same async chain. Re-entering
-    // withRawConnection would NOT deadlock — TransactionManager.synchronize is
+    // withRawConnection would NOT deadlock — the adapter's `lock.synchronize` is
     // reentrant per async chain (the ported MonitorMixin: getStore() === data.owner
     // passes straight through). It is bypassed because this SET SESSION is a
     // sub-step of an already-in-flight query on the already-acquired live

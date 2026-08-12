@@ -258,6 +258,22 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("records `constructor` for an instantiation but not for a class reference", () => {
+    // Shape from persistence.rb:949-955: `self.class.primary_key` first,
+    // `RecordNotDestroyed.new` last — the sequence must not invert.
+    const cls = extractFromSource(
+      `class Foo {
+        raiseNotDestroyed() {
+          const key = this.constructor.primaryKey;
+          throw new RecordNotDestroyed(\`\${this.constructor.name} \${key}\`, this);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "raiseNotDestroyed")!;
+    expect(m.callSeq).toEqual(["primaryKey", "name", "constructor"]);
+    expect(m.calls).not.toContain("class");
+  });
+
   it("records a callback argument after the call it is passed to, as Ruby records a block", () => {
     const cls = extractFromSource(
       `class Foo {

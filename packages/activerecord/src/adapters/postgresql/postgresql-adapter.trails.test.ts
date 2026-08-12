@@ -305,7 +305,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         // connection lock for the query's whole life, so nothing is abandoned.
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        await other.transactionManager.synchronize(() => other.rollbackDbTransaction());
+        await other.lock.synchronize(() => other.rollbackDbTransaction());
         await expect(foreign).resolves.toHaveLength(1);
       } finally {
         await other.close();
@@ -344,7 +344,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.execute("SELECT 1 AS n");
         // Fired from OUTSIDE the lock, as a pool reap/checkin is.
         setTimeout(() => other.resetBang(), 0);
-        await other.transactionManager.synchronize(async () => {
+        await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
           const rows = await other.execute("SELECT 1 AS n");
           expect(rows).toHaveLength(1);

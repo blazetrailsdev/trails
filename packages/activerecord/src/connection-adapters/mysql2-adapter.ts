@@ -1420,7 +1420,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // with another connection-lifecycle body. The lock is reentrant per async
     // chain, so the common caller (`reconnectBang`, which already holds it)
     // re-enters rather than deadlocking.
-    return this._transactionManager.synchronize(async () => {
+    return this.lock.synchronize(async () => {
       this._connectGeneration++;
       // Mirror Rails' private `Mysql2Adapter#reconnect` (mysql2_adapter.rb:150):
       // `@raw_connection&.close; @raw_connection = nil; connect`. Crucially it does

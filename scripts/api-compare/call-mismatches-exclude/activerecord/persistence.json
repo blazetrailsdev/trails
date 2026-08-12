@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "_raise_record_not_destroyed",
-    "call": "order:constructor,primaryKey",
-    "reason": "Extractor call-resolution artifact, not a body divergence: the TS body reads `this.constructor.primaryKey` then `this.constructor.name`, the same order as Rails' `self.class.primary_key` then `self.class` (persistence.rb:951-952), and the extracted `callSeq` is `constructor, primaryKey`. Ruby `class` resolves against the later `name` read rather than `constructor`, inverting the reported pair. The body itself was converged to Rails' `ensure`-clears shape in the same PR."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "_update_record",
     "call": "attributes_for_update",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
