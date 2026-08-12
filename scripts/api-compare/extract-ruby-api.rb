@@ -2326,8 +2326,13 @@ class ApiExtractor
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
       # the parent method; record as "super" so calls-parity can flag a ported
-      # override that drops the super call.
+      # override that drops the super call. Its arguments precede it, as every
+      # other call's do — the TS `super(...)` is an ordinary CallExpression.
+      lambdas = []
+      node.drop(1).each { |child| walk_arg_node(child, calls, weak, lambdas) }
       calls << "super"
+      lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
+      return
     end
 
     node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
