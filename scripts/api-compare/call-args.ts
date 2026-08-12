@@ -203,7 +203,8 @@ function normalizeRef(rawName: string): string {
  *   receiver, so the key is `ref:toS` and the receiver's name is not on the
  *   Ruby side at all. The faithful port is either `toString()` or — because a
  *   TS string is already a string — the bare local, and no rename is
- *   detectable either way. `shard.to_sym`
+ *   detectable either way — and `toString` is itself identifier-shaped, so the
+ *   one test covers both spellings. `shard.to_sym`
  *   (connection_handling.rb:103, :254) records the same way as `ref:toSym`,
  *   and a Ruby Symbol IS a JS string (CLAUDE.md, "Symbols vs strings"), so the
  *   port is the bare local and the receiver is again unrecoverable. The list is
@@ -220,9 +221,7 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey === tsKey) return true;
   const rubyName = rubyKey.slice("ref:".length);
   const tsName = tsKey.slice("ref:".length);
-  if (RECEIVER_DROPPING_CONVERSIONS.has(rubyName)) {
-    return tsName === "toString" || IDENTIFIER_STRING.test(tsName);
-  }
+  if (RECEIVER_DROPPING_CONVERSIONS.has(rubyName)) return IDENTIFIER_STRING.test(tsName);
   if (JS_RESERVED_WORDS.has(rubyName) && tsName === `${rubyName}_`) return true;
   if (!/[?!=]$/.test(rubyName)) return false;
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
@@ -618,8 +617,8 @@ function kwargsKeysEqual(rubyKey: string, tsKey: string): boolean {
 }
 
 /** The key→value pairs of an already-normalized `kwargs{…}` descriptor. A
- *  fragment with no `=` is a double-splat or a shorthand the normalizer left
- *  whole; it keys itself so two of them still have to match. */
+ *  fragment carrying no `=` keys itself, so it can only ever match the
+ *  identical fragment. */
 function kwargPairs(descriptor: string): Map<string, string> {
   const pairs = new Map<string, string>();
   for (const pair of splitPairs(descriptor.slice("kwargs{".length, -1))) {
