@@ -3385,7 +3385,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Persistence#save (the super that Transactions#save calls)
    */
-  private async _createOrUpdate(): Promise<boolean> {
+  private async _createOrUpdate(block?: (record: this) => void): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
     let saved = false;
     let wasNewRecord = false;
@@ -3396,11 +3396,11 @@ export class Base extends Model {
     const saveOk = await cbRunAll(ctor.prototype, "save", this, async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
-        const createOk = await this._createRecord();
+        const createOk = await this._createRecord(block);
         if (createOk) saved = true;
         else saved = false;
       } else {
-        const updateOk = await this._updateRecord();
+        const updateOk = await this._updateRecord(block);
         if (updateOk) saved = true;
         else saved = false;
       }
@@ -4648,8 +4648,14 @@ export interface Base extends Included<typeof AutosaveAssociation> {
     options?: { touch?: boolean | string | string[] },
   ): Promise<this>;
   toggleBang(attribute: string): Promise<boolean | undefined>;
-  save(options?: { validate?: boolean; touch?: boolean }): Promise<boolean | undefined>;
-  saveBang(options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined>;
+  save(
+    options?: { validate?: boolean; touch?: boolean },
+    block?: (record: this) => void,
+  ): Promise<boolean | undefined>;
+  saveBang(
+    options?: { validate?: boolean; touch?: boolean },
+    block?: (record: this) => void,
+  ): Promise<true | undefined>;
   destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown>): Promise<boolean | undefined>;
@@ -4673,9 +4679,9 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   /** @internal */
   hasTransactionalCallbacks(): boolean;
   /** @internal */
-  _createRecord(): Promise<boolean>;
+  _createRecord(block?: (record: this) => void): Promise<boolean>;
   /** @internal */
-  _updateRecord(): Promise<boolean>;
+  _updateRecord(block?: (record: this) => void): Promise<boolean>;
   slice(...keys: string[]): Record<string, unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;

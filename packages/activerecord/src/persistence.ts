@@ -695,6 +695,7 @@ interface SaveRecord {
 export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
+  block?: (record: T) => void,
 ): Promise<boolean | undefined> {
   // Mirrors ActiveRecord::Suppressor#save: a suppressed record returns `true`
   // immediately, before validations or the INSERT/UPDATE. This is why
@@ -779,7 +780,8 @@ export async function save<T extends SaveRecord>(
         }
       }
 
-      return self.createOrUpdate();
+      // Rails: `create_or_update(**options, &block)` (persistence.rb:390-408).
+      return self.createOrUpdate(block);
     })) as boolean | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
@@ -795,10 +797,17 @@ export async function save<T extends SaveRecord>(
 /** Mirrors: ActiveRecord::Base#save! — `create_or_update(**options) || raise`. */
 export async function saveBang<
   T extends SaveRecord & {
-    save(o?: { validate?: boolean; touch?: boolean }): Promise<boolean | undefined>;
+    save(
+      o?: { validate?: boolean; touch?: boolean },
+      block?: (record: T) => void,
+    ): Promise<boolean | undefined>;
   },
->(this: T, options?: { validate?: boolean; touch?: boolean }): Promise<true | undefined> {
-  const result = await this.save(options);
+>(
+  this: T,
+  options?: { validate?: boolean; touch?: boolean },
+  block?: (record: T) => void,
+): Promise<true | undefined> {
+  const result = await this.save(options, block);
   if (result === false) {
     // Mirrors Rails' two save! layers: ActiveRecord::Validations#save! raises
     // RecordInvalid when validations failed (errors present); otherwise

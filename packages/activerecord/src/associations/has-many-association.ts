@@ -158,7 +158,7 @@ export class HasManyAssociation extends CollectionAssociation {
     record: Base,
     validate = true,
     raise = false,
-    block?: () => void,
+    block?: (record: Base) => void,
   ): Promise<boolean> {
     this.setOwnerAttributes(record);
     return super.insertRecord(record, validate, raise, block);

@@ -266,7 +266,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     record: Base,
     validate = true,
     raise = false,
-    block?: () => void,
+    block?: (record: Base) => void,
   ): Promise<boolean> {
     this.ensureNotNested();
     const needsTargetSave = record.isNewRecord() || record.hasChangesToSave;
