@@ -806,6 +806,12 @@ export class Association {
    *     owner.read_attribute(reflection.foreign_key) == record.id
    *   end
    *
+   * `String(...)` is Ruby's own `attr_name.to_s` at the head of `read_attribute`
+   * (attribute_methods/read.rb:30), not a TS convenience: a composite
+   * `reflection.foreign_key` is an Array in both languages, and stringifying it
+   * yields a name no attribute carries, so both sides read nil and the arm is
+   * false. Passing the Array through instead throws in the alias lookup.
+   *
    * Value-equality (`associationKeysEqual`) bridges a child FK (int4 number)
    * and an owner PK (int8 BigInt under PG bigserial) as Ruby's `Integer ==`
    * does, so the inverse still wires across the number/BigInt boundary.
@@ -814,12 +820,21 @@ export class Association {
   matchesForeignKey(record: Base): boolean {
     if (this.isForeignKeyFor(record)) {
       return (
-        this.keyValuesEqual(this.foreignKeyValues(record), this.idValues(this.owner)) ||
+        associationKeysEqual(
+          record.readAttribute(String(this.reflection.foreignKey)),
+          this.owner.id,
+        ) ||
         (this.isForeignKeyFor(this.owner) &&
-          this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record)))
+          associationKeysEqual(
+            this.owner.readAttribute(String(this.reflection.foreignKey)),
+            record.id,
+          ))
       );
     }
-    return this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record));
+    return associationKeysEqual(
+      this.owner.readAttribute(String(this.reflection.foreignKey)),
+      record.id,
+    );
   }
 
   private resolveForeignKey(): string[] {
@@ -848,20 +863,6 @@ export class Association {
     if (rich?.type != null) return rich.type;
     const as = (this.reflection.options as AssociationOptions).as;
     return as ? `${underscore(as)}_type` : null;
-  }
-
-  private foreignKeyValues(record: Base): unknown[] {
-    return this.resolveForeignKey().map((key) => (record as any)._readAttribute(key));
-  }
-
-  private idValues(record: Base): unknown[] {
-    const pk = (record.constructor as typeof Base).primaryKey;
-    return (Array.isArray(pk) ? pk : [pk]).map((key) => (record as any)._readAttribute(key));
-  }
-
-  private keyValuesEqual(a: unknown[], b: unknown[]): boolean {
-    if (a.length === 0 || a.length !== b.length) return false;
-    return a.every((value, i) => associationKeysEqual(value, b[i]));
   }
 
   private ensureKlassExistsBang(): typeof Base {
@@ -1034,19 +1035,6 @@ export class Association {
       ownerAny._afterCommitJobs ??= [];
       ownerAny._afterCommitJobs.push([jobClass, options]);
     }
-  }
-
-  private isMatchesForeignKey(record: Base): boolean {
-    const fk = (this.reflection.options as any).foreignKey;
-    const fkArr: string[] = Array.isArray(fk) ? fk : [String(fk)];
-    if (this.isForeignKeyFor(record)) {
-      return (
-        fkArr.every((key) => (record as any).readAttribute(key) === (this.owner as any).id) ||
-        (this.isForeignKeyFor(this.owner) &&
-          fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id))
-      );
-    }
-    return fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id);
   }
 }
 

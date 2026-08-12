@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
-    "rubyName": "aliases",
-    "call": "order:map,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
     "rubyName": "build",
     "call": "build",
     "kind": "args",
