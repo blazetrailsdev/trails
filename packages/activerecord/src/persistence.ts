@@ -1793,6 +1793,8 @@ type PersistenceInstanceChainHost = {
   _attributes: any;
   _dirty: { reinstateNewRecordChanges(attributes: unknown, skip: Set<string>): void };
   changes: Record<string, [unknown, unknown]>;
+  readAttribute(name: string): unknown;
+  willSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
 };
@@ -2002,22 +2004,19 @@ async function instanceUpdateRecord(
 
   const table = ctor.arelTable;
 
-  const changedAttrs = { ...this.changes };
-
   // With partial_writes=false Rails includes all columns; with it on, only dirty ones.
-  const candidateNames = ctor.partialUpdates
-    ? Object.keys(changedAttrs).filter((key: string) => ctor._attributeDefinitions.has(key))
+  let attributeNames = ctor.partialUpdates
+    ? Object.keys(this.changes).filter((key: string) => ctor._attributeDefinitions.has(key))
     : ctor.attributeNames().filter((key: string) => ctor._attributeDefinitions.has(key));
-  // Rails: `attribute_names = attributes_for_update(attribute_names)`.
-  const declaredChanges = attributesForUpdate.call(this as any, candidateNames);
+  attributeNames = attributesForUpdate.call(this as any, attributeNames);
 
   // Mirrors Rails _update_record's `if attribute_names.empty?` branch: no
   // columns to write ⇒ affected_rows = 0 but @_trigger_update_callback = true.
-  if (declaredChanges.length === 0) {
+  if (attributeNames.length === 0) {
     (this as any)._triggerUpdateCallback = true;
   } else {
     const dbValues = this._attributes.valuesForDatabase();
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = attributeNames.map(
       (key: string) => [table.get(key), writePathValueNode(dbValues[key])],
     );
 
@@ -2029,7 +2028,7 @@ async function instanceUpdateRecord(
     let lockAttributeWas: import("@blazetrails/activemodel").Attribute | null = null;
     let lockWhereValue: unknown;
     if (ctor.lockingEnabled) {
-      const rawVersion = this._readAttribute(lockCol);
+      const rawVersion = this.readAttribute(lockCol);
       const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
       // Mirrors Rails _lock_value_for_database:
       // - User explicitly changed lock_version (e.g. person.lock_version = 42):
@@ -2039,12 +2038,12 @@ async function instanceUpdateRecord(
       // Must be read BEFORE mutating _attributes below.
       const lockAttr = this._attributes.getAttribute(lockCol);
       lockAttributeWas = lockAttr; // snapshot for stale restore (mirrors Rails lock_attribute_was)
-      if ((this as any).willSaveChangeToAttribute(lockCol)) {
+      if (this.willSaveChangeToAttribute(lockCol)) {
         lockWhereValue = lockAttr.valueForDatabase;
       } else {
         lockWhereValue = lockAttr.originalValueForDatabase();
       }
-      const lockIdx = declaredChanges.indexOf(lockCol);
+      const lockIdx = attributeNames.indexOf(lockCol);
       if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
       this._writeAttribute(lockCol, currentVersion + 1);
       // Rails increments `self[locking_column]` and lets `_update_record` pass
@@ -2073,10 +2072,10 @@ async function instanceUpdateRecord(
     applyDefaultAndGlobalConstraints(um as any, ctor);
 
     const [updateSql, updateBinds] = adapter.toSqlAndBinds(um);
-    const affected = await adapter.execUpdate(updateSql, `${ctor.name} Update`, updateBinds);
+    const affectedRows = await adapter.execUpdate(updateSql, `${ctor.name} Update`, updateBinds);
     // Mirrors Rails Locking::Optimistic#_update_row (optimistic.rb:110):
     // `raise StaleObjectError if affected_rows != 1` — not just `=== 0`.
-    if (ctor.lockingEnabled && affected !== 1) {
+    if (ctor.lockingEnabled && affectedRows !== 1) {
       // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
       // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
       // records don't lose their original null valueBeforeTypeCast.
@@ -2100,7 +2099,7 @@ async function instanceUpdateRecord(
     // A stale update whose WHERE matched no row (row deleted by another
     // instance earlier in the transaction) leaves the flag false, so
     // after_update_commit / after_rollback(on: :update) don't fire.
-    (this as any)._triggerUpdateCallback = affected === 1;
+    (this as any)._triggerUpdateCallback = affectedRows === 1;
   }
 
   this._previouslyNewRecord = false;
