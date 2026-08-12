@@ -2975,6 +2975,10 @@ export class CheckPending {
     this._migrations = options.migrations ?? [];
   }
 
+  // Rails' `@mutex.synchronize` (migration.rb:657) guards the
+  // `@watcher ||= build_watcher` memo and the `@needs_check` flag. trails
+  // registers migrations programmatically, so it has neither, and nothing else
+  // on `this` is written across the awaits below — no critical section to hold.
   async call(env: Record<string, unknown>): Promise<unknown> {
     if (this._migrator) {
       await this._migrator.loadMigrated();

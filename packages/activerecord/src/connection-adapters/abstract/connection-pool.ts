@@ -821,26 +821,42 @@ export class ConnectionPool implements ReapablePool {
     const connection = pin.connection;
     let clean = true;
 
-    try {
-      if (isTransactionAware(connection)) {
-        if (connection.transactionManager.currentTransaction.open) {
-          await connection.transactionManager.rollbackTransaction();
-        } else {
-          clean = false;
-          connection.resetBang();
+    // The block Rails runs under `@pinned_connection.lock.synchronize`
+    // (connection_pool.rb:344-362). trails' `rollbackTransaction` is a real
+    // await, so without the lock a second unpin enters while the pin is half
+    // torn down and rolls the same transaction back again.
+    const block = async () => {
+      try {
+        if (isTransactionAware(connection)) {
+          if (connection.transactionManager.currentTransaction.open) {
+            await connection.transactionManager.rollbackTransaction();
+          } else {
+            clean = false;
+            connection.resetBang();
+          }
+        }
+      } finally {
+        pin.depth--;
+        if (pin.depth === 0) {
+          if (fromFixture) {
+            this._fixturePin = null;
+          } else {
+            this._pinnedConnections.delete(ctxId);
+          }
+          this._cacheConfig.decrementPinnedCount();
+          this.checkin(connection);
         }
       }
-    } finally {
-      pin.depth--;
-      if (pin.depth === 0) {
-        if (fromFixture) {
-          this._fixturePin = null;
-        } else {
-          this._pinnedConnections.delete(ctxId);
-        }
-        this._cacheConfig.decrementPinnedCount();
-        this.checkin(connection);
-      }
+    };
+
+    // `TransactionManager#synchronize` is the trails spelling of Rails'
+    // per-connection lock; it is re-entrant on the async chain, so the nested
+    // `rollbackTransaction` (same lock) cannot self-deadlock. A connection with
+    // no transaction manager has neither a lock to take nor a transaction.
+    if (isTransactionAware(connection)) {
+      await connection.transactionManager.synchronize(block);
+    } else {
+      await block();
     }
 
     return clean;
