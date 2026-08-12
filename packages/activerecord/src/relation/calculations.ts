@@ -501,12 +501,6 @@ async function singleAggregate(
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,
-  // which compiles to an empty `IN`) yields `ActiveRecord::Result.empty` with no
-  // query at all, and folds through the same cast as an executed query — so the
-  // empty answer picks up the column type the executed arm would have cast
-  // through (`type.deserialize(value || 0)`, calculations.rb:629), rather than a
-  // hard-coded identity.
   const queryResult = rel._whereClause.isContradiction()
     ? Result.empty()
     : await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
@@ -1214,7 +1208,6 @@ export async function executeSimpleCalculation(
     const queryResult = rel._whereClause.isContradiction()
       ? Result.empty()
       : await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
-    // `operation` is "count" on this arm, so Rails leaves `type` unassigned.
     const type = null;
     return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
   }

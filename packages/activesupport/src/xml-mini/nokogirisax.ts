@@ -107,8 +107,6 @@ export class HashBuilder {
 
   endElement(_name: string): void {
     const currentHash = this.currentHash;
-    // Ruby evaluates `current_hash.length` before `current_hash.delete(HASH_SIZE_KEY)`,
-    // so the length still counts the size sentinel.
     const length = Object.keys(currentHash).length;
     const hashSize = currentHash[HashBuilder.HASH_SIZE_KEY] as number;
     delete currentHash[HashBuilder.HASH_SIZE_KEY];
