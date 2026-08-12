@@ -610,7 +610,7 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   // drop virtual columns (persistence.rb / attribute_methods.rb:519-524). The
   // partial-inserts selection (attribute_names_for_partial_inserts) and the
   // Locking::Optimistic locking-column union happen UPSTREAM in the create
-  // path (base.ts._performInsert), mirroring the Rails super chain
+  // path (persistence.ts._createRecord), mirroring the Rails super chain
   // Dirty#_create_record → Locking::Optimistic#_create_record → Persistence —
   // so this function stays the generic, locking-agnostic filter Rails ships.
   return attributeNames.filter((name) => {

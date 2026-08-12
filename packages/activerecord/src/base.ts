@@ -3446,156 +3446,11 @@ export class Base extends Model {
     this._instanceRecordTimestamps = value;
   }
 
-  private _performInsert(attributeNames?: string[]): void {
-    const ctor = this.constructor as typeof Base;
-
-    // Use the connection threaded by the enclosing `withQueryConnection` wrap
-    // (Rails' `with_connection` block parameter) rather than the deprecated
-    // `.connection` getter, so the INSERT doesn't flip the lease permanent.
-    // Resolved after the suppression guard so a suppressed write on a
-    // connectionless model never touches `.connection` (Rails resolves lazily).
-    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
-
-    // Initialize the locking column from its schema default so a new record's
-    // lock value is never nil at insert time. Rails reflects the column
-    // (default 0) into every new record's attributes at class load, so the
-    // unconditional union threaded by LockingOptimistic._createRecord
-    // (Locking::Optimistic#_create_record, optimistic.rb:78-82) below always
-    // carries a concrete value.
-    // trails loads schema lazily, so a record built before the column was
-    // reflected (e.g. a model `new`'d before its first schema load) has no
-    // locking attribute at all — the union would then add the column name but
-    // `valuesForDatabase` emits nothing for it, writing an explicit NULL into a
-    // NOT NULL lock column. Seed it here, once reflection has certainly run for
-    // the INSERT, to its reflected default (LockingType.cast coerces null → 0).
-    // The INSERT value reads straight from `valuesForDatabase()` below, so this
-    // seed is what actually carries the 0 into the row.
-    if (ctor.lockingEnabled) {
-      const lockCol = ctor.lockingColumn;
-      const lockDef = ctor._attributeDefinitions.get(lockCol);
-      if (lockDef && this._readAttribute(lockCol) == null) {
-        this._writeAttribute(lockCol, lockDef.type.cast(lockDef.defaultValue));
-      }
-    }
-
-    const attrs = this._attributes.valuesForDatabase();
-    // Rails create super chain, threading attribute_names down to
-    // attributes_for_create. The default (self.attribute_names) is the set of
-    // declared columns present in the value map; an explicit `attributeNames`
-    // arg overrides it (Persistence#_create_record(attribute_names)).
-    const selfNames =
-      attributeNames ?? Object.keys(attrs).filter((k) => ctor._attributeDefinitions.has(k));
-    // Rails AttributeMethods::Dirty#_create_record default arg:
-    // attribute_names_for_partial_inserts (dirty.rb). The dirty set is populated
-    // before the INSERT by reinstateNewRecordChanges (callbacks.ts _createRecord),
-    // so for a new record changedAttributeNamesToSave holds the attrs assigned
-    // away from their schema defaults — exactly as Rails' construction-time dirty.
-    let names: string[];
-    if (ctor.partialInserts) {
-      const changed = (this as any).changedAttributeNamesToSave as string[] | undefined;
-      names = changed ?? selfNames;
-    } else {
-      names = selfNames.filter((name) => {
-        const col = (ctor as any).columnForAttribute?.(name);
-        const autoPopulated = col?.isAutoPopulated?.() ?? col?.defaultFunction != null;
-        return !(autoPopulated && !(this as any).attributeChanged?.(name));
-      });
-    }
-    // Rails Locking::Optimistic#_create_record: attribute_names |= [locking_column]
-    // — "We always want to persist the locking version, even if we don't detect a
-    // change from the default, since the database might have no default." Threaded
-    // through the now-wired mirror so the union lives in the locking layer
-    // (optimistic.rb), not in the generic attributes_for_create.
-    names = LockingOptimistic._createRecord.call(
-      this as any,
-      names,
-      (n: string[]) => n,
-    ) as string[];
-    // Rails Persistence#attributes_for_create: & column_names, drop nil pk, drop virtual.
-    const columns = _attributesForCreate.call(this, names);
-    const values: unknown[] = columns.map((k) => attrs[k]);
-
-    // Build the column→value map for the Rails-faithful `_insert_record` class
-    // method: every non-array column value is bound as a prepared-statement
-    // parameter (see writePathValueNode), matching Rails' type_casted_binds.
-    const valuesMap: Record<string, unknown> = {};
-    columns.forEach((c, i) => {
-      valuesMap[c] = writePathValueNode(values[i]);
-    });
-
-    this._pendingOperation = (async () => {
-      // Rails Persistence#_create_record threads `_returning_columns_for_insert`
-      // into `_insert_record` and zips EVERY auto-populated column
-      // (auto-increment PK plus DB-computed defaults) off the RETURNING row.
-      // Pass the full list to adapters that can emit RETURNING (PG, SQLite
-      // >= 3.35, MariaDB) so those non-PK columns come back on `create`.
-      // Adapters that can't (MySQL 8, older SQLite) surface only the scalar
-      // generated id, so leave `returning` null and fall back to writing that
-      // id into the first still-unset returning column below.
-      const returningColumns = await ctor._returningColumnsForInsert(adapter as any);
-      const supportsReturning =
-        (await (
-          adapter as { supportsInsertReturning?(): Promise<boolean> }
-        ).supportsInsertReturning?.()) ?? false;
-      const returning = supportsReturning && returningColumns.length > 0 ? returningColumns : null;
-
-      // Route through the ported `_insert_record` class method
-      // (ActiveRecord::Persistence::ClassMethods#_insert_record) rather than a
-      // bespoke InsertManager build. With a `returning` list it yields the
-      // returning-column values array; without one, the scalar generated id.
-      const rawReturn = await _Persistence._insertRecord.call(
-        ctor,
-        adapter as any,
-        valuesMap,
-        returning,
-      );
-
-      // Write a generated value into a column only when still unset. The
-      // `!_read_attribute` guard is truthy for nil AND false (but not 0 / "").
-      const writeBack = (column: string, value: unknown): boolean => {
-        if (value == null) return false;
-        const current = this._readAttribute(column);
-        if (current != null && current !== false) return false;
-        const type = (ctor as any).typeForAttribute?.(column);
-        this._writeAttribute(column, type?.deserialize ? type.deserialize(value) : value);
-        return true;
-      };
-
-      if (returning) {
-        // Explicit RETURNING: the adapter returns values positionally matched to
-        // `returning`. Mirrors `_create_record`'s
-        // `returning_columns.zip(returning_values)` — every auto-populated
-        // column (PK plus DB-computed defaults) is written back.
-        const returnValues = Array.isArray(rawReturn) ? rawReturn : [rawReturn];
-        returning.forEach((column, i) => writeBack(column, returnValues[i]));
-      } else {
-        // No explicit RETURNING (composite-PK / id-less): the adapter surfaces a
-        // single scalar. Write it into the first still-unset returning column —
-        // e.g. a composite PK [shop_id, id] where shop_id is supplied.
-        const insertedId = Array.isArray(rawReturn) ? rawReturn[0] : rawReturn;
-        for (const column of returningColumns) {
-          if (writeBack(column, insertedId)) break;
-        }
-      }
-      // After INSERT, reset lock_version to a FromDatabase attribute carrying the
-      // actual serialized value (e.g. 0). This mirrors Rails' behavior: during INSERT
-      // @value_for_database is memoized to 0, so changes_applied! → forgetting_assignment
-      // produces from_database(0), not from_database(nil). Without this, freshly-created
-      // records are indistinguishable from NULL-in-DB records when building the WHERE
-      // clause for subsequent UPDATE/DELETE.
-      if (ctor.lockingEnabled) {
-        const lockCol = ctor.lockingColumn;
-        const writtenLockValue = attrs[lockCol] ?? null;
-        this._attributes.writeFromDatabase(lockCol, writtenLockValue);
-      }
-    })();
-  }
-
   private _performUpdate(): void {
     const ctor = this.constructor as typeof Base;
 
     // Thread the `withQueryConnection` connection rather than the deprecated
-    // `.connection` getter (see `_performInsert`); resolved after the suppression
+    // `.connection` getter (see `_createRecord` in persistence.ts); resolved after the suppression
     // guard so a suppressed write never touches `.connection`.
     const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
@@ -3882,7 +3737,7 @@ export class Base extends Model {
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
         // Thread the `withQueryConnection` connection rather than the deprecated
-        // `.connection` getter (see `_performInsert`); resolved here, at the
+        // `.connection` getter (see `_createRecord` in persistence.ts); resolved here, at the
         // actual DELETE, so a connectionless model never touches `.connection`.
         const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
         const [deleteSql, deleteBinds] = adapter.toSqlAndBinds(dm);
