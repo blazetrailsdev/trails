@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { association as associationProxy } from "../associations.js";
-import { underscore, isAbortSignal } from "@blazetrails/activesupport";
+import { underscore, isAbortSignal, compactBlank, indexBy } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
@@ -9,7 +9,6 @@ import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
-import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
 
 /**
@@ -261,84 +260,61 @@ export class CollectionAssociation extends Association {
    * `RecordNotFound` when not every id resolves, then `replace`s.
    */
   async idsWriter(ids: unknown[]): Promise<void> {
-    const Klass = this.klass as any;
+    const klass = this.klass as any;
     // Rails `ids_writer`: `primary_key = reflection.association_primary_key`.
     // For a through/custom-PK association this is the association's own key
     // (e.g. `Category.primary_key == "name"`), not the target model's `id`, so
     // the lookup + not-found message key must come from the rich reflection.
-    const pk = this.associationPrimaryKey();
-    const filteredIds = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
+    const primaryKey = this.associationPrimaryKey();
+    const pkType = klass.typeForAttribute(primaryKey);
+    ids = compactBlank(ids == null ? [] : Array.isArray(ids) ? ids : [ids]);
+    ids = ids.map((id) => pkType.cast(id));
 
-    let records: Base[];
-    if (filteredIds.length === 0) {
-      records = [];
-    } else if (Array.isArray(pk)) {
-      // Composite-PK child: resolve each tuple id via a per-column lookup
-      // (`klass.where(primary_key => ids)` over an array of tuples). Per-id
-      // resolution keeps the original order and duplicates, matching Rails'
-      // `index_by … values_at(*ids)`.
-      const found = await Promise.all(
-        filteredIds.map((id) => {
-          const conditions: Record<string, unknown> = {};
-          const idParts = Array.isArray(id) ? id : [id];
-          pk.forEach((col: string, i: number) => {
-            conditions[col] = idParts[i];
-          });
-          return Klass.findBy(conditions) as Promise<Base | null>;
-        }),
-      );
-      records = found.filter((r): r is Base => r != null);
-    } else {
-      // Simple PK: one query, then index_by PK and map each id back to its
-      // record (Rails' `where(pk => ids).index_by { … }.values_at(*ids)`).
-      const rows: Base[] = await Klass.where({ [pk]: filteredIds }).toArray();
-      const byKey = new Map<string, Base>(
-        rows.map((r) => [String((r as any)._readAttribute(pk)), r]),
-      );
-      records = filteredIds.map((id) => byKey.get(String(id))).filter((r): r is Base => r != null);
-    }
-
-    // Rails: `if records.size != ids.size … raise_record_not_found_exception!`.
-    // Reuse the shared "Couldn't find all" builder (also used by performFind)
-    // so there is a single not-found message source.
-    if (records.length !== filteredIds.length) {
-      // Rails `ids_writer` (collection_association.rb:79-81):
-      //   found_ids = records.map { |r| r._read_attribute(primary_key) }
-      //   not_found_ids = ids - found_ids
-      //   klass.all.raise_record_not_found_exception!(ids, records.size, ids.size, primary_key, not_found_ids)
-      // The `not_found_ids` sentence is appended to the message.
-      const keyFor = (v: unknown): string =>
-        Array.isArray(v) ? v.map(String).join(",") : String(v);
-      const foundKeys = new Set(
-        records.map((r) =>
-          keyFor(
-            Array.isArray(pk)
-              ? pk.map((col: string) => (r as any)._readAttribute(col))
-              : (r as any)._readAttribute(pk),
-          ),
+    // Ruby Hash keys compare by value, so Rails can `index_by` a composite
+    // tuple and read it straight back with `values_at(*ids)`. A JS object keys
+    // an array by its `toString`, and a Map by identity, so both arms index
+    // under this explicit string form of the key — that is all `indexKey` is.
+    const indexKey = (key: unknown): string =>
+      Array.isArray(key) ? key.map(String).join(",") : String(key);
+    let indexed: Record<string, Base>;
+    if (klass.compositePrimaryKey) {
+      // `where(cols, tuples)` is the trails spelling of Rails' array-key
+      // `klass.where(primary_key => ids)`, which a JS object literal cannot
+      // express (predicate-builder.ts:388).
+      const rows: Base[] = await klass.where(primaryKey, ids).toArray();
+      indexed = indexBy<Base, string>(rows, (record) =>
+        indexKey(
+          (primaryKey as string[]).map((primaryKey) => (record as any)._readAttribute(primaryKey)),
         ),
       );
-      const notFoundIds = filteredIds.filter((id) => !foundKeys.has(keyFor(id)));
-      raiseNotFoundAll(
-        Klass.name,
-        pk,
-        {
-          ids: filteredIds,
-          wantArray: true,
-          tuples: Array.isArray(pk) ? (filteredIds as unknown[][]) : null,
-        },
-        records.length,
-        filteredIds.length,
-        "",
-        notFoundIds,
+    } else {
+      const rows: Base[] = await klass.where({ [primaryKey as string]: ids }).toArray();
+      indexed = indexBy<Base, string>(rows, (record) =>
+        indexKey((record as any)._readAttribute(primaryKey as string)),
       );
     }
+    const records: Base[] = ids
+      .map((id) => indexed[indexKey(id)])
+      .filter((record): record is Base => record != null);
 
-    // Rails' `ids_writer` ends in `replace(records)` (collection_association.rb:83).
-    // Mirror that direct call, then run the persisted-owner half `replace`
-    // defers (the awaitable `writer` does the same two steps).
-    const plan = this.replace(records);
-    if (plan) await this.persistReplacePlan(plan);
+    if (records.length !== ids.length) {
+      const foundIds = records.map((record) =>
+        Array.isArray(primaryKey)
+          ? primaryKey.map((primaryKey) => (record as any)._readAttribute(primaryKey))
+          : (record as any)._readAttribute(primaryKey),
+      );
+      const foundKeys = new Set(foundIds.map(indexKey));
+      const notFoundIds = ids.filter((id) => !foundKeys.has(indexKey(id)));
+      klass
+        .all()
+        .raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, primaryKey, notFoundIds);
+    } else {
+      // Rails' `replace(records)` is synchronous; ours defers the
+      // persisted-owner half to the plan the sync `replace` returns (the
+      // awaitable `writer` does the same two steps).
+      const plan = this.replace(records);
+      if (plan) await this.persistReplacePlan(plan);
+    }
   }
 
   override reset(): void {
@@ -765,18 +741,10 @@ export class CollectionAssociation extends Association {
    */
   override async loadTarget(): Promise<Base[]> {
     if (this.findTargetNeeded()) {
-      const findTarget = this.doFindTarget();
-      if (findTarget !== undefined && Array.isArray(findTarget)) {
-        this.target = this.mergeTargetLists(findTarget, this.target);
-      } else {
-        const found = await this.findTarget();
-        if (found !== undefined && found !== null && Array.isArray(found)) {
-          // Rails applies set_strict_loading per record in find_target's DB
-          // execute block — only freshly loaded records, never cached ones.
-          for (const record of found) this.setStrictLoading(record);
-          this.target = this.mergeTargetLists(found, this.target);
-        }
-      }
+      // Every collection subclass overrides `findTarget` to return `Base[]`;
+      // the cast only narrows the singular-shaped base signature.
+      const findTarget = (await this.findTarget()) as Base[];
+      this.target = this.mergeTargetLists(findTarget, this.target);
     }
 
     this.loadedBang();

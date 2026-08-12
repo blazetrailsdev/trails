@@ -183,13 +183,17 @@ export class HasManyAssociation extends CollectionAssociation {
     // flight. See `_loaderWritebackSuppressed`.
     this._loaderWritebackSuppressed++;
     try {
-      return await findTarget(
+      const records = await findTarget(
         this.owner,
         this.reflection.name,
         this.reflection.options,
         this._queryExecutor,
         this._skipStrictLoading,
       );
+      // Rails applies `set_strict_loading` per record inside `find_target`'s
+      // instantiation block (association.rb:269-271), not in `load_target`.
+      for (const record of records) this.setStrictLoading(record);
+      return records;
     } finally {
       this._loaderWritebackSuppressed--;
     }
