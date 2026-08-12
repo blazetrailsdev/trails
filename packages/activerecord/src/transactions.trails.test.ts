@@ -9,7 +9,7 @@
  * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
  */
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
-import { throwAbort } from "@blazetrails/activesupport";
+import { throwAbort, LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-fixtures.js";
@@ -153,6 +153,7 @@ describe("TransactionTest", () => {
         supportsRestartDbTransaction: () => false,
         addTransactionRecord: vi.fn(),
         active: () => true,
+        lock: new LoadInterlockAwareMonitor(),
       };
       const tm = new TransactionManager(conn as never);
       await expect(
@@ -185,6 +186,7 @@ describe("TransactionTest", () => {
         supportsRestartDbTransaction: () => false,
         addTransactionRecord: vi.fn(),
         active: () => true,
+        lock: new LoadInterlockAwareMonitor(),
       };
       const tm = new TransactionManager(conn as never);
       // Force inner frame to SavepointTransaction (not

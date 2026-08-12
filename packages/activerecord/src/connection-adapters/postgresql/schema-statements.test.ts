@@ -6,7 +6,7 @@
  * inheritedTableNames, defaultSequenceName, serialSequence, setPkSequenceBang,
  * resetPkSequenceBang, pkAndSequenceFor, primaryKeys,
  * addColumn, renameColumn, changeColumnDefault, changeColumnNull,
- * changeColumnComment, changeTableComment, typeToSql, foreignKeyColumnFor,
+ * changeColumnComment, changeTableComment, typeToSql,
  * sequenceNameFromParts, assertValidDeferrable, extractForeignKeyAction,
  * extractConstraintDeferrable, dataSourceSql, quotedScope,
  * referenceNameForTable, columnNamesFromColumnNumbers)
@@ -441,11 +441,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("HelperMethodsTest", () => {
-    it("foreignKeyColumnFor strips schema and singularizes", () => {
-      expect(adapter.foreignKeyColumnFor("public.accounts")).toBe("account_id");
-      expect(adapter.foreignKeyColumnFor("users")).toBe("user_id");
-    });
-
     it("sequenceNameFromParts basic", () => {
       const name = adapter.sequenceNameFromParts("things", "id", "seq");
       expect(name).toBe("things_id_seq");

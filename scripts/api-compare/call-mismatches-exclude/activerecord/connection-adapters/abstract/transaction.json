@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "begin_transaction",
-    "call": "lock",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "begin_transaction",
     "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -30,36 +23,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "commit_transaction",
-    "call": "lock",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "materialize_transactions",
-    "call": "lock",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
     "rubyName": "rollback_transaction",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "rollback_transaction",
-    "call": "lock",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/transaction.ts",
-    "rubyName": "within_new_transaction",
-    "call": "lock",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -33,6 +33,39 @@ describe("MonitorMixin", () => {
     ).resolves.toBe("inner");
   });
 
+  it("queues a detached task that outlives the holder that spawned it", async () => {
+    const host = new Monitored();
+    const log: string[] = [];
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    let detached!: Promise<void>;
+
+    // The detached task inherits the holder's AsyncContext, but the holder has
+    // released by the time it runs — so its owner token no longer matches and
+    // it must take the lock like any other chain rather than walking in.
+    await host.synchronize(async () => {
+      detached = (async () => {
+        await gate;
+        await host.synchronize(() => {
+          log.push("detached");
+        });
+      })();
+    });
+
+    const other = host.synchronize(async () => {
+      log.push("other:enter");
+      openGate();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      log.push("other:exit");
+    });
+
+    await Promise.all([other, detached]);
+
+    expect(log).toEqual(["other:enter", "other:exit", "detached"]);
+  });
+
   it("releases the lock when the block raises", async () => {
     const host = new Monitored();
     await expect(

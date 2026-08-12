@@ -4306,7 +4306,7 @@ export class PostgreSQLAdapter
     // `_performQuery` (the adapter's one perform_query), which is itself the block
     // executing inside withRawConnection on the same async chain. Re-entering
     // withRawConnection would NOT deadlock — TransactionManager.synchronize is
-    // reentrant per async chain (transaction.ts: getStore() === _currentLockOwner
+    // reentrant per async chain (the ported MonitorMixin: getStore() === data.owner
     // passes straight through). It is bypassed because this SET SESSION is a
     // sub-step of an already-in-flight query on the already-acquired live
     // handle: re-entering the leaf loop would redundantly re-run its verify /

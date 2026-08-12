@@ -1,0 +1,52 @@
+/**
+ * Trails-only: pins the Array arm of `CollectionAssociation#_create_record`
+ * (collection_association.rb:358-360) and `HasManyAssociation#_create_record`
+ * (has_many_association.rb:143-149) at the OO association surface. Rails
+ * exercises the arm through `CollectionProxy#create`; these tests reach the
+ * association directly because that is the decomposition the port had missing.
+ */
+import { describe, it, expect, beforeAll } from "vitest";
+import { registerModel } from "../index.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
+import { fixtures } from "../test-fixtures.js";
+
+interface CreatingAssociation {
+  create(
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<Comment | Comment[] | null>;
+}
+
+const commentsOf = (post: Post): CreatingAssociation =>
+  (post as unknown as { association(name: string): CreatingAssociation }).association("comments");
+
+describe("CollectionAssociation#_create_record Array arm", () => {
+  const { posts } = fixtures(["posts", "comments"]);
+
+  beforeAll(() => {
+    registerModel(Post);
+    registerModel(Comment);
+  });
+
+  it("returns an array of records, one per attribute hash", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const records = (await commentsOf(post).create([
+      { body: "first" },
+      { body: "second" },
+    ])) as Comment[];
+
+    expect(Array.isArray(records)).toBe(true);
+    expect(records.length).toBe(2);
+    expect(records.map((record) => record.body)).toEqual(["first", "second"]);
+    for (const record of records) expect(record.isPersisted()).toBe(true);
+  });
+
+  it("moves the in-memory counter cache by the element count exactly once", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const before = post.commentsCount as number;
+
+    await commentsOf(post).create([{ body: "one" }, { body: "two" }, { body: "three" }]);
+
+    expect(post.commentsCount).toBe(before + 3);
+  });
+});

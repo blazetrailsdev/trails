@@ -11,7 +11,11 @@ describe("PostgreSQLAdapter#reloadTypeMap", () => {
     const adapter = Object.create(PostgreSQLAdapter.prototype) as InstanceType<
       typeof PostgreSQLAdapter
     >;
+    const { LoadInterlockAwareMonitor } = await import("@blazetrails/activesupport");
     const a = adapter as unknown as Record<string, unknown>;
+    // `Object.create` skips the field initializers, so install the monitor the
+    // adapter would have built as `@lock` (abstract_adapter.rb:181-192).
+    a.lock = new LoadInterlockAwareMonitor();
     a._transactionManager = new TransactionManager(adapter as never);
     a._typeMap = { loaded: 0 };
     const observed: unknown[] = [];

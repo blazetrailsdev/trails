@@ -114,3 +114,12 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
 export interface MonitorMixin {
   synchronize<T>(block: () => T | Promise<T>): Promise<T>;
 }
+
+/**
+ * Ruby stdlib's `Monitor` — the class that is nothing but `Object` plus
+ * `MonitorMixin`, and the superclass Rails' own monitors derive from
+ * (`ActiveSupport::Concurrency::LoadInterlockAwareMonitor < Monitor`).
+ */
+export class Monitor implements MonitorMixin {
+  synchronize = synchronize;
+}

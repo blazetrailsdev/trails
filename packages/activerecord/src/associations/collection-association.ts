@@ -492,20 +492,23 @@ export class CollectionAssociation extends Association {
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#_create_record
    * (collection_association.rb:354-372).
    *
-   * Rails' Array arm — `_create_record` recursing over an Array of attribute
-   * hashes — has no counterpart here for the same reason it has none in
-   * `HasManyAssociation#_createRecord`: the multi-record form is the loop in
-   * `CollectionProxy#create`, which reaches this method once per element.
-   *
    * @internal
    */
   protected override async _createRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void,
-  ): Promise<Base | null> {
+  ): Promise<Base | Base[] | null> {
     if (!this.owner.isPersisted()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
+    }
+
+    if (Array.isArray(attributes)) {
+      const records: Base[] = [];
+      for (const attr of attributes) {
+        records.push((await this._createRecord(attr, raise, block)) as Base);
+      }
+      return records;
     }
 
     const record = this.buildRecord(attributes, block);
