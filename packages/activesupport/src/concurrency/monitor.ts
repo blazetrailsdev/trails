@@ -61,6 +61,11 @@ function monData(self: object): MonData {
  * made from inside the critical section runs straight through rather than
  * deadlocking on the lock it already holds.
  *
+ * Waiters park on a `while`, not an `if`: several can be waiting on the same
+ * chain promise and all wake when it resolves, but the first to resume claims
+ * the lock synchronously — installing a new chain — before any other resumes,
+ * so the rest re-test and park again.
+ *
  * Assign it onto a class to spell Ruby's `include MonitorMixin`:
  *
  * ```ts
@@ -82,10 +87,6 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
     }
   }
 
-  // A `while`, not an `if`: several callers can be parked on the same chain
-  // promise, and they all wake when it resolves. The first to resume claims the
-  // lock synchronously (installing a new chain) before any other resumes, so
-  // the rest re-test and park again.
   while (data.chain) {
     await data.chain;
   }
