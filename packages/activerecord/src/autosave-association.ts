@@ -1017,9 +1017,6 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
         (a: any) => a.name === collectionName,
       );
       if (assocDef?.options?.autosave === false) return;
-      // Rails registers `save_collection_association` directly
-      // (autosave_association.rb:196-197); the RecordInvalid raise lives inside
-      // it, at `:460`, so there is nothing to translate here.
       await record[saveMethod]();
     });
     afterUpdate(model, async (record: any) => {
