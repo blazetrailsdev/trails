@@ -794,7 +794,7 @@ describe("HasOneAssociationsTest", () => {
     // Rails persists the child synchronously on `firm.account = a`. The JS
     // property setter cannot `await`, so the Rails-faithful immediate-persist
     // path is reached through the awaitable writer
-    // (`association(name).writer(value)` → `persistImmediate`); the bare `=`
+    // (`association(name).writer(value)` → `replace`); the bare `=`
     // setter defers to the owner's next save. Assigning through the writer
     // therefore stands in for `firm.account = a` here.
     const firm = (await Firm.find(1)) as any;

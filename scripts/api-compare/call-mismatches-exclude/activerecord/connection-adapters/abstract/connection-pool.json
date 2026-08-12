@@ -68,12 +68,5 @@
     "rubyName": "stat",
     "call": "count",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "unpin_connection!",
-    "call": "order:checkin,lock",
-    "reason": "Extractor closure-hoist artifact, not a body divergence: the port now takes `connection.lock.synchronize(block)` exactly where connection_pool.rb:344 does, but `block` is a hoisted arrow (the non-transaction-aware branch runs the same body without a lock), so its `checkin` is recorded at the arrow's definition, ahead of the `lock` read."
   }
 ]

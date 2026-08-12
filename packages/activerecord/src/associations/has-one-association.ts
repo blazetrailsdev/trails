@@ -74,7 +74,10 @@ export class HasOneAssociation extends SingularAssociation {
     // property setter is faithful — set the FK/inverse in memory and let the
     // owner's first `save()` autosave persist. No displacement can need DB
     // removal (a new owner keys no persisted row), so nothing is queued.
-    this.replace(record);
+    // `save` is passed false because Rails' `save &&= owner.persisted?`
+    // (has_one_association.rb:66) already reduced it to false for this owner,
+    // which is exactly what makes the remainder of `replace` awaitless.
+    this.replace(record, false);
   }
 
   /**
@@ -86,91 +89,10 @@ export class HasOneAssociation extends SingularAssociation {
    * defers to the owner's next save (`autosaveHasOne`).
    */
   override writer(record: Base | null): void | Promise<void> {
-    // Delegate to an async helper rather than making `writer` itself `async`, so
-    // the base `void | Promise<void>` signature (shared with the through
-    // override, which can return synchronously) is preserved.
-    return this.writeImmediate(record);
-  }
-
-  private async writeImmediate(record: Base | null): Promise<void> {
-    // Rails' `replace` raises on a class mismatch as its very first statement,
-    // before `load_target` (has_one_association.rb:60). The persist path below no
-    // longer routes through `replace` up front (the target is committed only
-    // after the transaction succeeds), so hoist the check here — a saved owner
-    // must reject `writer(someOtherModel)` before any DB I/O.
-    if (record) (this as any).raiseOnTypeMismatchBang(record);
-    // Mirror Rails `replace`'s leading `load_target`: materialize the currently
-    // associated record (possibly a DB row on a freshly-found owner) so it can
-    // be nullified/removed, rather than silently orphaning it.
-    if (!this.loaded) await this.loadTarget();
-    const displaced = this.target;
-    // Rails: `return target unless load_target || record`
-    // (has_one_association.rb:61) — nothing associated and nothing being
-    // assigned means no work, so return before the gate and before
-    // `self.target = record`. This does NOT leave the association unloaded:
-    // `load_target` calls `loaded!` unconditionally (association.rb:192), as
-    // does the `loadTarget()` above.
-    if (!displaced && !record) return;
-    // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
-    // gate (:64-65): only touch the DB when the assignment actually changes
-    // something, so a no-op re-assignment (e.g. `writer(null)` with no target)
-    // opens no transaction. `hasChangesToSave` is a getter, read (not called)
-    // per #4900. The `?.` is now just nil-safety on `record`; Rails' `return
-    // target unless load_target || record` is ported as the early return above.
-    const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
-    if (changed) {
-      // Rails: `save &&= owner.persisted?` (:66) — a new owner does not gate the
-      // block itself, only `transaction_if` (:68) and `record.save` (:75).
-      // `remove_target!` (:69) runs regardless; its own
-      // `target.persisted? && owner.persisted?` gate (:108) skips the DB save.
-      const save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
-      return this.persistImmediate(record, displaced, save);
-    }
-    this.replace(record);
-  }
-
-  /**
-   * The awaitable immediate-persist body for `HasOneAssociation#replace`'s
-   * transaction (has_one_association.rb:68-84): remove the displaced record
-   * (:69), then re-derive the foreign key and save the new record (:71-80), and
-   * promote the new target only after the transaction commits. `save` is Rails'
-   * post-`&&=` flag (:66): false for a non-persisted owner, which both skips the
-   * transaction (:68) and gates the new record's save (:75).
-   *
-   * `this.target` is left as `displaced` throughout — writeImmediate has not
-   * called `replace` — so a throw anywhere in the block (a failed `remove_target!`
-   * nullify, or the `RecordNotSaved` on a failed save) leaves the OLD record
-   * cached, exactly as Rails reaches `self.target = record` (:84) only after the
-   * block. Same target-on-failure invariant as `detachDisplacedTarget`.
-   */
-  private async persistImmediate(
-    record: Base | null,
-    displaced: Base | null,
-    save: boolean,
-  ): Promise<void> {
-    await transactionIf(this, save, async () => {
-      // `this.target` is still `displaced`, so `removeTargetBang` removes it.
-      if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
-        await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
-      }
-      if (record) {
-        this.setOwnerAttributes(record);
-        this.setInverseInstance(record);
-        if (save && !(await record.save())) {
-          this.nullifyOwnerAttributes(record);
-          if (displaced) this.setOwnerAttributes(displaced);
-          throw new RecordNotSaved(
-            `Failed to save the new associated ${this.reflection.name}.`,
-            record,
-          );
-        }
-      }
-    });
-    // Transaction committed: promote the new record to the target (Rails'
-    // `self.target = record`, :84). `replace` re-applies the FK/inverse (a no-op
-    // repeat of the in-transaction work) and, for `record === null`, clears the
-    // inverse on the now-removed displaced record.
-    this.replace(record);
+    // Rails' `SingularAssociation#writer` is `replace(record)`
+    // (singular_association.rb:19-21); `replace` returns a promise on the
+    // persisting arm, so the base `void | Promise<void>` signature carries it.
+    return this.replace(record);
   }
 
   /**
@@ -349,23 +271,91 @@ export class HasOneAssociation extends SingularAssociation {
     return this.loadTarget();
   }
 
-  protected override replace(record: Base | null, _save = true): void {
-    if (record) (this as any).raiseOnTypeMismatchBang(record);
-    const assigningAnother = !sameRecord(this.target, record);
-    if (assigningAnother || record?.hasChangesToSave === true) {
-      if (record) {
-        // Set the foreign key (from the owner's — possibly still-nil — primary
-        // key) and inverse in memory. Persistence is Rails'
-        // `save_has_one_association` (our `autosaveHasOne`), which re-derives the
-        // FK once the owner has a primary key and saves the record. This method
-        // does no DB I/O; the immediate-persist path lives in `writer` →
-        // `persistImmediate`.
-        this.setOwnerAttributes(record);
-        this.setInverseInstance(record);
-      }
+  /**
+   * Mirrors Rails' `HasOneAssociation#replace` (has_one_association.rb:59-85).
+   *
+   * The `save = false` arm — Rails' `set_new_record` → `replace(record, false)`,
+   * and a new owner, whose `save &&= owner.persisted?` (:66) has already reduced
+   * the flag — reaches no DB I/O in Rails either: `transaction_if(false)` yields
+   * directly and `if save && !record.save` (:75) is skipped, leaving only the
+   * in-memory `set_owner_attributes` / `set_inverse_instance`. That arm is
+   * therefore synchronous here, which is what lets the synchronous callers
+   * (`setNewRecord`, `syncWrite`) reach it at all. `remove_target!` (:69) needs
+   * an `await` those callers cannot issue, so it is run by the awaiting callers
+   * (`detachDisplacedTarget`) — see `setNewRecord`.
+   *
+   * The persisting arm is the same body with the awaits Rails does not need,
+   * returned as a promise so `writer` can hand it to the caller.
+   */
+  protected override replace(record: Base | null, save: false): void;
+  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
+  protected override replace(record: Base | null, save = true): void | Promise<void> {
+    if (save) {
+      return (async () => {
+        // Rails raises the class mismatch as `replace`'s very first statement
+        // (:60), before `load_target`. Raised inside the promise on this arm so
+        // a saved owner's `await owner.set#{Name}(x)` rejects rather than
+        // throwing out of the synchronous call — the JS spelling of the same
+        // raise site.
+        if (record) (this as any).raiseOnTypeMismatchBang(record);
+        // Rails' leading `load_target` (:61): materialize the currently
+        // associated record (possibly a DB row on a freshly-found owner) so it
+        // can be nullified/removed rather than silently orphaned.
+        if (!this.loaded) await this.loadTarget();
+        const displaced = this.target;
+        // Rails: `return target unless load_target || record` (:61) — nothing
+        // associated and nothing being assigned means no work. This does NOT
+        // leave the association unloaded: `load_target` calls `loaded!`
+        // unconditionally (association.rb:192), as does the `loadTarget()`.
+        if (!displaced && !record) return;
+        // `hasChangesToSave` is a getter, read (not called) per #4900.
+        const assigningAnotherRecord = !sameRecord(displaced, record);
+        if (assigningAnotherRecord || record?.hasChangesToSave === true) {
+          // Rails: `save &&= owner.persisted?` (:66).
+          save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
+          // `this.target` is left as `displaced` for the whole block — Rails
+          // reaches `self.target = record` (:84) only after it — so a throw
+          // anywhere inside (a failed `remove_target!` nullify, or the
+          // `RecordNotSaved` on a failed save) leaves the OLD record cached.
+          await transactionIf(this, save, async () => {
+            if (displaced && !(displaced as any).isDestroyed?.() && assigningAnotherRecord) {
+              await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
+            }
+            if (record) {
+              this.setOwnerAttributes(record);
+              this.setInverseInstance(record);
+              if (save && !(await record.save())) {
+                this.nullifyOwnerAttributes(record);
+                if (displaced) this.setOwnerAttributes(displaced);
+                throw new RecordNotSaved(
+                  `Failed to save the new associated ${this.reflection.name}.`,
+                  record,
+                );
+              }
+            }
+          });
+        }
+        this.target = record;
+        this.loadedBang();
+      })();
     }
-    this.target = record;
-    this.loadedBang();
+    {
+      if (record) (this as any).raiseOnTypeMismatchBang(record);
+      const assigningAnotherRecord = !sameRecord(this.target, record);
+      if (assigningAnotherRecord || record?.hasChangesToSave === true) {
+        if (record) {
+          // Set the foreign key (from the owner's — possibly still-nil — primary
+          // key) and inverse in memory. Persistence is Rails'
+          // `save_has_one_association` (our `autosaveHasOne`), which re-derives
+          // the FK once the owner has a primary key and saves the record.
+          this.setOwnerAttributes(record);
+          this.setInverseInstance(record);
+        }
+      }
+      this.target = record;
+      this.loadedBang();
+      return;
+    }
   }
 
   /**

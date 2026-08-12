@@ -5,7 +5,7 @@
  *
  * It is a thin delegation to `association(name).writer(value)`, so it inherits
  * the Rails-faithful immediate-persist replace path
- * (`HasOneAssociation#writeImmediate/persistImmediate`, and the
+ * (`HasOneAssociation#replace`'s persisting arm, and the
  * `HasOneThroughAssociation#writer` → `persistReplace` override for through).
  * Rails reaches that path through the synchronous `=` setter, which in JS
  * cannot await, so these assertions have no verbatim Rails test to mirror.
@@ -178,10 +178,11 @@ describe("has_one replace with no loaded target and no record", () => {
   // has_changes_to_save?` gate and before `self.target = record`.
   //
   // The association still ends up LOADED either way — `load_target` calls
-  // `loaded!` unconditionally (association.rb:192) — and a `replace(null)` over
-  // a null target is itself a no-op, so the end state is identical with or
-  // without the early return. The only way to pin the ported structure is to
-  // assert `replace` is never reached, which is what this does.
+  // `loaded!` unconditionally (association.rb:192) — and the trailing
+  // `self.target = record` over a null target is itself a no-op, so the end
+  // state is identical with or without the early return. What the early return
+  // does guarantee is that nothing past it runs: no `remove_target!` and no
+  // transaction, which is what this pins.
   fixtures(["companies", "accounts"]);
 
   beforeAll(() => {
@@ -192,13 +193,18 @@ describe("has_one replace with no loaded target and no record", () => {
   it("returns before reaching replace, leaving the association empty", async () => {
     const firm = (await Firm.create({ name: "no account" })) as Base;
     const assoc = (
-      firm as unknown as { association(n: string): { replace(r: unknown): void } }
+      firm as unknown as { association(n: string): { removeTargetBang(m: string): Promise<void> } }
     ).association("account");
-    const replace = vi.spyOn(assoc, "replace");
+    const removeTargetBang = vi.spyOn(assoc, "removeTargetBang");
+    const transaction = vi.spyOn(
+      Account as unknown as { transaction: () => unknown },
+      "transaction",
+    );
 
     await set(firm).setAccount(null);
 
-    expect(replace).not.toHaveBeenCalled();
+    expect(removeTargetBang).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
     expect(await (firm as unknown as { account: Promise<Base | null> }).account).toBe(null);
     expect(await Account.where({ firm_id: (firm as unknown as { id: number }).id }).count()).toBe(
       0,
