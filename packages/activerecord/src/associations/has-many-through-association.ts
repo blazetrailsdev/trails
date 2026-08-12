@@ -683,9 +683,20 @@ function buildHabtmThroughRecord(assoc: HasManyThroughAssociation, record: Base)
   };
   const throughProxy = (assoc.owner as any).association?.(throughName) as {
     build?: (a: Record<string, unknown>) => Base;
+    setOwnerAttributes?: (record: Base) => void;
   } | null;
   if (throughProxy && typeof throughProxy.build === "function") {
-    return throughProxy.build(joinAttrs);
+    const joinRecord = throughProxy.build(joinAttrs);
+    // Rails reaches the owner FK on a join row through `set_owner_attributes`
+    // in `HasManyAssociation#insert_record` (has_many_association.rb:61-64),
+    // which runs at save time — after the owner's own INSERT, so a join row
+    // built while the owner was still a new record still gets a real FK.
+    // `joinAttrs` above is computed at BUILD time, so on the new-owner path
+    // its owner FK is null; this call is the insert-time refresh, made here
+    // rather than inside the ported `CollectionAssociation#build`
+    // (collection_association.rb:117-123), which Rails leaves free of it.
+    throughProxy.setOwnerAttributes?.(joinRecord);
+    return joinRecord;
   }
   return new (throughModel as any)(joinAttrs);
 }

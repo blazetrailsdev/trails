@@ -806,6 +806,12 @@ export class Association {
    *     owner.read_attribute(reflection.foreign_key) == record.id
    *   end
    *
+   * `String(...)` is Ruby's own `attr_name.to_s` at the head of `read_attribute`
+   * (attribute_methods/read.rb:30), not a TS convenience: a composite
+   * `reflection.foreign_key` is an Array in both languages, and stringifying it
+   * yields a name no attribute carries, so both sides read nil and the arm is
+   * false. Passing the Array through instead throws in the alias lookup.
+   *
    * Value-equality (`associationKeysEqual`) bridges a child FK (int4 number)
    * and an owner PK (int8 BigInt under PG bigserial) as Ruby's `Integer ==`
    * does, so the inverse still wires across the number/BigInt boundary.
@@ -815,18 +821,18 @@ export class Association {
     if (this.isForeignKeyFor(record)) {
       return (
         associationKeysEqual(
-          record.readAttribute(this.reflection.foreignKey as string),
+          record.readAttribute(String(this.reflection.foreignKey)),
           this.owner.id,
         ) ||
         (this.isForeignKeyFor(this.owner) &&
           associationKeysEqual(
-            this.owner.readAttribute(this.reflection.foreignKey as string),
+            this.owner.readAttribute(String(this.reflection.foreignKey)),
             record.id,
           ))
       );
     }
     return associationKeysEqual(
-      this.owner.readAttribute(this.reflection.foreignKey as string),
+      this.owner.readAttribute(String(this.reflection.foreignKey)),
       record.id,
     );
   }
