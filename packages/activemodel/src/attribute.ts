@@ -28,7 +28,7 @@ export abstract class Attribute {
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
   readonly type: Type;
-  private originalAttribute: Attribute | null;
+  protected originalAttribute: Attribute | null;
   private _value: unknown;
   private _hasValue: boolean;
   private _cachedValueForDatabase: unknown;

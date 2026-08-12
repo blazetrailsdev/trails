@@ -205,11 +205,11 @@ export class AttributeSet {
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
-    const newAttrs = new Map<string, Attribute>();
+    const newAttributes = new Map<string, Attribute>();
     for (const [name, attr] of this.attributes) {
-      newAttrs.set(name, fn(attr));
+      newAttributes.set(name, fn(attr));
     }
-    return new AttributeSet(newAttrs);
+    return new AttributeSet(newAttributes);
   }
 
   reverseMergeBang(target: AttributeSet): this {
