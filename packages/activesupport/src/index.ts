@@ -241,6 +241,7 @@ export {
 } from "./hash-utils.js";
 
 export {
+  asJson,
   ToJsonWithActiveSupportEncoder,
   type ToJsonWithActiveSupportEncoderHost,
 } from "./core-ext/object/json.js";

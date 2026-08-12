@@ -14,6 +14,8 @@ import { Associations } from "./associations.js";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
+import { Ship } from "./test-helpers/models/ship.js";
+import { Developer } from "./test-helpers/models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -426,5 +428,54 @@ describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
     pirate.association("birds").setTarget([doomed] as any);
 
     expect(await pirate.save()).toBe(true);
+  });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociation marked_for_destruction?", () => {
+  fixtures([]);
+
+  it("save_collection_association selects the records to destroy through marked_for_destruction?", async () => {
+    // autosave_association.rb:436 — `records.select(&:marked_for_destruction?)`.
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    let doomed = false;
+    class DoomedBird extends CanonicalBird {
+      override markedForDestruction = (): boolean => doomed;
+    }
+    registerModel("CollectionDoomedBird", DoomedBird);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    const bird = new DoomedBird({ name: "polly", pirate_id: pirate.id });
+    await bird.save();
+    doomed = true;
+    pirate.association("birds").setTarget([bird] as any);
+
+    expect(await pirate.save()).toBe(true);
+    expect(await CanonicalBird.where({ id: bird.id }).count()).toBe(0);
+  });
+});
+
+describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", () => {
+  fixtures([]);
+
+  it("save_has_one_association destroys the record through marked_for_destruction?", async () => {
+    // autosave_association.rb:481 — `if autosave && record.marked_for_destruction?`.
+    registerModel(CanonicalPirate);
+    registerModel(Ship);
+    registerModel(Developer);
+    let doomed = false;
+    class DoomedShip extends Ship {
+      override markedForDestruction = (): boolean => doomed;
+    }
+    registerModel("HasOneDoomedShip", DoomedShip);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    const ship = new DoomedShip({ name: "Black Pearl", pirate_id: pirate.id });
+    await ship.save();
+    doomed = true;
+    pirate.association("ship").setTarget(ship as any);
+
+    await pirate.save();
+    expect(await Ship.where({ id: ship.id }).count()).toBe(0);
   });
 });

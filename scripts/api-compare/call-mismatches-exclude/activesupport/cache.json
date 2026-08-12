@@ -9,6 +9,15 @@
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
+    "rubyName": "expanded_version",
+    "call": "to_param",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "RFC 0099 bucket (b) equivalent, verified at cache.rb:994-1000 `key.cache_version.to_param` / `key.map { ... }.tap(&:compact!).to_param`: Rails invokes `to_param` on a built-in receiver (Object/Array), which TS cannot monkey-patch, so the port calls the free `toParam` helper with that receiver as argument 1; there are no further arguments on either side."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache.ts",
     "rubyName": "handle_invalid_expires_in",
     "call": "report",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

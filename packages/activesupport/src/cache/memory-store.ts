@@ -29,6 +29,11 @@ function toI(value: unknown): number {
 }
 
 export class MemoryStore extends Store implements CacheStore {
+  /** Advertise cache versioning support (memory_store.rb:87-90). */
+  static supportsCacheVersioning(): boolean {
+    return true;
+  }
+
   private data: Map<string, MemoryRecord> = new Map();
   private sizeLimit: number;
 

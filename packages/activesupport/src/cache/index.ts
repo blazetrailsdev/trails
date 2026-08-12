@@ -44,7 +44,7 @@ export type { CacheLogger } from "./store.js";
 export { MemoryStore } from "./memory-store.js";
 export { NullStore } from "./null-store.js";
 export { FileStore } from "./file-store.js";
-export { expandCacheKey } from "./expand-cache-key.js";
+export { expandCacheKey, formatVersion, setFormatVersion, lookupStore } from "../cache.js";
 export { coder, Coder } from "./coder.js";
 export type { CoderSerializer, CoderCompressor } from "./coder.js";
 export { Entry } from "./entry.js";

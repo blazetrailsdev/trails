@@ -14,7 +14,7 @@
 import { KeyError } from "../core-ext/key-error.js";
 
 import { Entry } from "./entry.js";
-import { DeserializationError } from "./index.js";
+import { DeserializationError } from "./deserialization-error.js";
 import { Store } from "./store.js";
 import { coder } from "./coder.js";
 import { deflate, inflate } from "../gzip.js";

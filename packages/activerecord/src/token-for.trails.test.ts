@@ -13,6 +13,14 @@ import { fixtures } from "./test-fixtures.js";
 class TokenUser extends User {
   static {
     this.generatesTokenFor("lookup");
+    // token_for.rb:24 — `model.instance_eval(&block)`, so a receiver-less body
+    // reads the model. A `function` block is trails' spelling of that; an arrow
+    // takes the same value from its `model` parameter.
+    this.generatesTokenFor("token_snapshot", {
+      generator: function (this: TokenUser) {
+        return this.token;
+      },
+    });
   }
 }
 
@@ -26,6 +34,15 @@ describe("token-for relation finders", () => {
   afterEach(async () => {
     setTokenForSecret(null);
     await TokenUser.deleteAll();
+  });
+
+  it("evaluates the token block in the context of the record", async () => {
+    const user = await TokenUser.create({ token: "first" });
+    const token = user.generateTokenFor("token_snapshot");
+    expect(await TokenUser.findByTokenFor("token_snapshot", token)).not.toBeNull();
+
+    await user.update({ token: "second" });
+    expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
   });
 
   it("raises Ruby's Hash#fetch KeyError when a relation looks up an unknown purpose", async () => {

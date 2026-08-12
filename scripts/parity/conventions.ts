@@ -797,6 +797,29 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["mon_enter", "synchronize", "initialize", "mon_try_enter", "mon_exit"],
     rubyFiles: ["concurrency/load_interlock_aware_monitor.rb"],
   },
+  {
+    reason:
+      "MemoryStore#synchronize (memory_store.rb:191-193) is `@monitor." +
+      "synchronize(&block)` — the Monitor that makes MemoryStore thread-safe " +
+      "across Ruby threads. JavaScript has no threads and no preemption inside " +
+      "a synchronous body, so every read_entry/write_entry the Ruby method " +
+      "wraps is already atomic and a ported wrapper could only be an inert " +
+      "`block()` call. Scoped to memory_store.rb so it cannot silence a " +
+      "genuine `synchronize` elsewhere.",
+    names: ["synchronize"],
+    rubyFiles: ["cache/memory_store.rb"],
+  },
+  {
+    reason:
+      "FileStore#lock_file (file_store.rb:147-159) takes an advisory " +
+      "`File::LOCK_EX` flock around a read-modify-write so concurrent " +
+      "PROCESSES serialize on the entry file. There is no flock in the async " +
+      "fs surface trails is allowed to use (no node:* imports), and no " +
+      "portable equivalent, so the increment/decrement path runs unguarded. " +
+      "Scoped to cache/file_store.rb.",
+    names: ["lock_file"],
+    rubyFiles: ["cache/file_store.rb"],
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */

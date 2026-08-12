@@ -8,6 +8,11 @@ import { Store } from "./store.js";
 // only clear/cleanup/increment/decrement/delete_matched and the private entry
 // hooks are overridden.
 export class NullStore extends Store implements CacheStore {
+  /** Advertise cache versioning support (null_store.rb:17-20). */
+  static supportsCacheVersioning(): boolean {
+    return true;
+  }
+
   override clear(): void {}
 
   override cleanup(): void {}

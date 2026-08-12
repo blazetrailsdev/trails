@@ -10,6 +10,11 @@ import { type CacheEntry, isExpired } from "./entry-record.js";
 const FILENAME_MAX_SIZE = 228;
 
 export class FileStore extends Store implements CacheStore {
+  /** Advertise cache versioning support (file_store.rb:25-28). */
+  static supportsCacheVersioning(): boolean {
+    return true;
+  }
+
   private cacheDir: string;
 
   constructor(cacheDir: string, options?: CacheOptions) {

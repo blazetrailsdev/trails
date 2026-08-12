@@ -40,7 +40,7 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
+import { markForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 
@@ -1785,7 +1785,7 @@ describe("AssociationsTest", () => {
     // preserving in-memory records (marked-for-destruction kept); trails'
     // `toArray()` merges in-memory over DB rows the same way.
     const parts = await (ship as any).parts.toArray();
-    expect(isMarkedForDestruction(parts[0])).toBe(true);
+    expect(parts[0].markedForDestruction()).toBe(true);
   });
 
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {

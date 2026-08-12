@@ -162,12 +162,8 @@ export function markForDestruction(record: Base): void {
   (record as any)[MARKED_FOR_DESTRUCTION] = true;
 }
 
-export function isMarkedForDestruction(record: Base): boolean {
-  return !!(record as any)[MARKED_FOR_DESTRUCTION];
-}
-
 export function isDestroyable(record: Base): boolean {
-  return !record.isNewRecord() && isMarkedForDestruction(record);
+  return !record.isNewRecord() && record.markedForDestruction();
 }
 
 export function build(_model: typeof Base, reflection: { options: Record<string, unknown> }): void {
@@ -237,7 +233,7 @@ export async function saveCollectionAssociation(
   );
   if (records) {
     if (autosave) {
-      const recordsToDestroy = records.filter((record: Base) => isMarkedForDestruction(record));
+      const recordsToDestroy = records.filter((record: Base) => record.markedForDestruction());
       for (const record of recordsToDestroy) {
         await association.destroy(record);
       }
@@ -354,7 +350,7 @@ export async function saveHasOneAssociation(
     return true;
   // Rails: `if autosave && record.marked_for_destruction?` — only destroy the
   // child when the autosave option is enabled.
-  if (autosave && isMarkedForDestruction(record)) {
+  if (autosave && record.markedForDestruction()) {
     // Rails save_has_one_association:482-483 — `record.destroy` runs
     // unconditionally; even a new_record? child runs the destroy callback
     // chain, dependent cascades, and freeze (only the DB DELETE is skipped).
@@ -466,7 +462,7 @@ export async function saveBelongsToAssociation(
   // Explicit `autosave: false` opts out entirely.
   if (autosave === false) return true;
 
-  if (autosave && isMarkedForDestruction(record)) {
+  if (autosave && record.markedForDestruction()) {
     // Rails save_belongs_to_association:544-547 — destroy path is only
     // reached when `autosave` is truthy; the destruction nulls the FK on
     // self first so the owner save doesn't keep a dangling reference.

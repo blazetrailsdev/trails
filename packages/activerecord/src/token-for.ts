@@ -5,7 +5,7 @@
  */
 
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActiveSupportJSON, getEnv } from "@blazetrails/activesupport";
+import { asJson, getEnv } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 export { InvalidSignature };
@@ -13,21 +13,19 @@ export { InvalidSignature };
 let _tokenForSecret: string | (() => string) | null = null;
 // `generated_token_verifier` is a `class_attribute`, so each class has its own
 // slot that subclasses inherit until they assign their own (see resolvedVerifier
-// / ownVerifier). Entries are tagged with the secret generation; bumping the
-// generation on setTokenForSecret invalidates all cached verifiers without
-// enumerating the WeakMap.
-const tokenVerifierRegistry = new WeakMap<
-  object,
-  { verifier: MessageVerifier | null; gen: number }
->();
-let _secretGeneration = 0;
+// / ownVerifierEntry).
+const tokenVerifierRegistry = new WeakMap<object, { verifier: MessageVerifier | null }>();
+// The value the railtie initializer assigns onto ActiveRecord::Base at boot
+// (railtie.rb:328-334, `self.generated_token_verifier ||= app.message_verifier(...)`).
+// trails has no railtie/application, so the boot-time assignment lands in this
+// module-level slot, which the reader falls back to when no class has written.
+let _defaultVerifier: MessageVerifier | null = null;
 
 /**
  * Configure the secret used for token generation/verification.
  * If not set, falls back to BLAZETRAILS_SECRET_KEY_BASE or
- * BLAZETRAILS_SIGNED_ID_SECRET env vars. Throws if no secret
- * is configured. Bumps the secret generation so cached verifiers are rebuilt
- * on the next token op (or `generated_token_verifier` read).
+ * BLAZETRAILS_SIGNED_ID_SECRET env vars. Rebuilds the boot-time verifier from
+ * the new secret, mirroring the railtie initializer's assignment.
  *
  * Trails-only seam with no Rails counterpart. `token_for.rb` itself resolves no
  * secret — line 11 only declares the `generated_token_verifier` class_attribute.
@@ -42,24 +40,24 @@ let _secretGeneration = 0;
  */
 export function setTokenForSecret(secret: string | (() => string) | null): void {
   _tokenForSecret = secret;
-  _secretGeneration++;
+  buildDefaultVerifier();
 }
 
 /**
- * This class's *own* verifier slot (ignoring stale-generation entries), or
- * undefined when the class has never written. A present entry whose `verifier`
+ * This class's *own* verifier slot, or undefined when the class has never
+ * written. A present entry whose `verifier`
  * is null is an explicit nil shadow (Rails: `self.generated_token_verifier = nil`
  * assigns nil to this class), distinct from "no own slot".
  */
 function ownVerifierEntry(modelClass: object): { verifier: MessageVerifier | null } | undefined {
-  const entry = tokenVerifierRegistry.get(modelClass);
-  return entry && entry.gen === _secretGeneration ? entry : undefined;
+  return tokenVerifierRegistry.get(modelClass);
 }
 
 /**
  * Resolved `class_attribute` value: the nearest class on the chain with an own
  * slot wins — even a nil shadow stops the walk (so an explicit `= null` does not
- * inherit the parent's verifier). Returns null when nothing up the chain wrote.
+ * inherit the parent's verifier). Falls back to the boot-time verifier the
+ * railtie stand-in built, and is null when no secret is configured at all.
  */
 function resolvedVerifier(modelClass: object): MessageVerifier | null {
   let current: any = modelClass;
@@ -68,29 +66,24 @@ function resolvedVerifier(modelClass: object): MessageVerifier | null {
     if (entry) return entry.verifier;
     current = Object.getPrototypeOf(current);
   }
-  return null;
+  return _defaultVerifier;
 }
 
-/**
- * Ruby's `Object#as_json` (core_ext/object/json.rb), which `payload_for` calls
- * on the block's return value: the JSON-ready projection of the value, so the
- * payload compares equal to the one decoded back out of a token.
- */
-function asJson(value: unknown): unknown {
-  return ActiveSupportJSON.decode(ActiveSupportJSON.encode(value));
-}
-
-function resolveSecret(): string {
+function resolveSecret(): string | null {
   if (_tokenForSecret) {
     return typeof _tokenForSecret === "function" ? _tokenForSecret() : _tokenForSecret;
   }
   const envSecret = getEnv("BLAZETRAILS_SECRET_KEY_BASE") ?? getEnv("BLAZETRAILS_SIGNED_ID_SECRET");
   if (typeof envSecret === "string" && envSecret.length > 0) return envSecret;
-  throw new Error(
-    "TokenFor requires a configured secret. Call setTokenForSecret() " +
-      "or set BLAZETRAILS_SECRET_KEY_BASE or BLAZETRAILS_SIGNED_ID_SECRET.",
-  );
+  return null;
 }
+
+function buildDefaultVerifier(): void {
+  const secret = resolveSecret();
+  _defaultVerifier = secret === null ? null : new MessageVerifier(secret);
+}
+
+buildDefaultVerifier();
 
 /**
  * TokenDefinition — encapsulates token behavior for a specific purpose.
@@ -122,26 +115,27 @@ export class TokenDefinition {
     return [this.definingClass.name, this.purpose, this.expiresIn ?? ""].join("\n");
   }
 
+  /**
+   * Mirrors: ActiveRecord::TokenFor::TokenDefinition#message_verifier
+   * (token_for.rb:19-21) — a plain class_attribute read. Ruby gets nil here
+   * when nothing configured a verifier and NoMethodErrors on the next
+   * `generate`/`verified`; the non-null assertion keeps that shape.
+   */
   messageVerifier(): MessageVerifier {
-    // Rails: `defining_class.generated_token_verifier ||= MessageVerifier.new(...)`
-    // — return the resolved (own or inherited) verifier if set, otherwise build
-    // from the secret and assign it to the defining class's own slot.
-    const cls = this.definingClass;
-    let verifier = generatedTokenVerifier(cls);
-    if (!verifier) {
-      verifier = new MessageVerifier(resolveSecret());
-      setGeneratedTokenVerifier(cls, verifier);
-    }
-    return verifier;
+    return this.definingClass.generatedTokenVerifier!;
   }
 
+  /**
+   * Mirrors: ActiveRecord::TokenFor::TokenDefinition#payload_for
+   * (token_for.rb:23-25). `model.instance_eval(&block)` runs the block with the
+   * model as `self`, and yields the receiver to it, so both are passed here.
+   * BigInt is not JSON-serializable; PG bigserial PKs surface as BigInt, so the
+   * id is coerced exactly as signed-id.ts#signedId coerces it.
+   */
   payloadFor(model: Base): unknown[] {
-    // BigInt is not JSON-serializable; coerce to a plain number so the token
-    // payload round-trips. PG bigserial PKs surface as BigInt (mirrors the
-    // coercion in signed-id.ts#signedId).
     const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
     const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
-    return this.block ? [id, asJson(this.block(model))] : [id];
+    return this.block ? [id, asJson(this.block.call(model, model))] : [id];
   }
 
   generateToken(model: Base): string {
@@ -255,11 +249,8 @@ export function setTokenDefinitions(
 
 /**
  * Rails: `class_attribute :generated_token_verifier` — the MessageVerifier used
- * to sign/verify tokens, resolved per class (own slot, else inherited). The
- * reader returns nil until `message_verifier` lazily builds and memoizes it
- * (`||=`); mirror that by returning the resolved value (null before the first
- * token op) rather than forcing secret resolution, so reading the accessor
- * before any token is generated never throws.
+ * to sign/verify tokens, resolved per class (own slot, else inherited, else the
+ * boot-time value the railtie stand-in assigned — see setTokenForSecret).
  *
  * Mirrors: ActiveRecord::TokenFor#generated_token_verifier
  */
@@ -274,8 +265,7 @@ export function generatedTokenVerifier(modelClass: typeof Base): MessageVerifier
  * building from the secret. Assigns to this class's own slot (subclasses inherit
  * via the reader until they assign their own). Assigning null writes an explicit
  * nil shadow on this class — Rails' generated writer assigns to the class, so the
- * reader returns nil (not the parent's verifier) and the next token op lazily
- * builds this class's own verifier.
+ * reader returns nil rather than the parent's verifier.
  *
  * Mirrors: ActiveRecord::TokenFor#generated_token_verifier=
  * @internal
@@ -284,7 +274,7 @@ export function setGeneratedTokenVerifier(
   modelClass: typeof Base,
   verifier: MessageVerifier | null,
 ): void {
-  tokenVerifierRegistry.set(modelClass, { verifier, gen: _secretGeneration });
+  tokenVerifierRegistry.set(modelClass, { verifier });
 }
 
 /**
@@ -314,9 +304,7 @@ export function generatesTokenFor(
  * Mirrors: ActiveRecord::TokenFor#generate_token_for
  */
 export function generateTokenFor(record: Base, purpose: string): string {
-  return tokenDefinitions(record.constructor as typeof Base)
-    .fetch(purpose)
-    .generateToken(record);
+  return (record.constructor as typeof Base).tokenDefinitions.fetch(purpose).generateToken(record);
 }
 
 /**

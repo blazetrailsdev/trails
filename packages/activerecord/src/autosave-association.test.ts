@@ -44,7 +44,6 @@ import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import {
   markForDestruction,
-  isMarkedForDestruction,
   computePrimaryKey,
   addAutosaveAssociationCallbacks,
 } from "./autosave-association.js";
@@ -102,8 +101,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     markForDestruction(pirate);
     markForDestruction(ship);
 
-    expect(isMarkedForDestruction(await pirate.reload())).toBe(false);
-    expect(isMarkedForDestruction(await ship.reload())).toBe(false);
+    expect((await pirate.reload()).markedForDestruction()).toBe(false);
+    expect((await ship.reload()).markedForDestruction()).toBe(false);
   });
 
   it("should destroy a child association as part of the save transaction if it was marked for destruction", async () => {
@@ -370,7 +369,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_1" });
 
     const parrots = await proxy;
-    expect(parrots.some((p) => isMarkedForDestruction(p))).toBe(false);
+    expect(parrots.some((p) => p.markedForDestruction())).toBe(false);
     for (const p of parrots) markForDestruction(p);
 
     // Rails `assert_no_difference "Parrot.count"`: HABTM mark_for_destruction
