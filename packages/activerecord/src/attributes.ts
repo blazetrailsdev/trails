@@ -189,7 +189,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     // matters for LockingType, where deserialize(null) → 0.
     const columns = cachedColumnsHash(cacheHost);
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
-    const attrMap = new Map<string, Attribute>();
+    const attributesHash = new Map<string, Attribute>();
     for (const [name, def] of defs) {
       const source = def.source ?? (def.userProvided === false ? "schema" : "user");
       const column = columns[name];
@@ -199,7 +199,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         // Rails lacks), and phase 2 replays those same decorators, so seeding
         // from `def.type` applies each one twice.
         const seedType = def.reflectedColumnType ?? def.type;
-        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, seedType));
+        attributesHash.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, seedType));
       } else if (column !== undefined) {
         // User type-override on a real DB column (e.g. enum, serialize,
         // normalizes, encryption): seed with the REFLECTED column type, not the
@@ -213,19 +213,19 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         // where the adapter is in hand; fall back to the def's own type before
         // the schema has reflected.
         const seedType = def.reflectedColumnType ?? def.type;
-        attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
+        attributesHash.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
-        attrMap.set(name, base.withUserDefault(def.defaultValue));
+        attributesHash.set(name, base.withUserDefault(def.defaultValue));
       } else {
-        attrMap.set(name, Attribute.fromDatabase(name, null, def.type));
+        attributesHash.set(name, Attribute.fromDatabase(name, null, def.type));
       }
     }
 
     // Phase 2: replay user-declared attribute() calls from the pending queue.
     // These always win over schema columns, matching Rails' ordering guarantee.
     // Mirrors: apply_pending_attribute_modifications(attribute_set)
-    const attributeSet = new AttributeSet(attrMap);
+    const attributeSet = new AttributeSet(attributesHash);
     applyPendingAttributeModifications(cacheHost, attributeSet);
 
     cacheHost._cachedDefaultAttributes = attributeSet;

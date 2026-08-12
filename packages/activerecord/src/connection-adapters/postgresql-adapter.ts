@@ -3373,7 +3373,7 @@ export class PostgreSQLAdapter
     const rawSqlType = col?.sqlType ?? col?.type ?? null;
     const self = this;
     const lookup = {
-      lookupCastTypeFromColumn(c: {
+      lookupCastTypeFromColumn(column: {
         sqlType?: string | null;
         oid?: number | null;
         fmod?: number | null;
@@ -3386,8 +3386,8 @@ export class PostgreSQLAdapter
         // an array column that OID resolves to OID::Array(subtype) — an
         // array-aware type whose serialize returns ArrayData, which
         // quoteDefaultExpression handles directly.
-        if (c.oid != null) {
-          return self.lookupCastTypeFromColumn(c) as {
+        if (column.oid != null) {
+          return self.lookupCastTypeFromColumn(column) as {
             serialize?(v: unknown): unknown;
           } | null;
         }
@@ -3395,7 +3395,7 @@ export class PostgreSQLAdapter
         // sql_type with the live regtype query (postgresql/quoting.rb:195),
         // which handles typmods and `[]` array suffixes server-side — an
         // array sql_type resolves to the array type's OID directly.
-        return self.lookupCastType(c.sqlType ?? "");
+        return self.lookupCastType(column.sqlType ?? "");
       },
     };
     return pgQuoteDefaultExpression.call(
@@ -3564,15 +3564,15 @@ export class PostgreSQLAdapter
     return singularize(table);
   }
 
-  async renameTable(oldName: string, newName: string): Promise<void> {
+  async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
     await this.clearCacheBang();
-    const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(oldName);
+    const [oldSchema, unqualifiedOld] = this.extractSchemaQualifiedName(tableName);
     const [, unqualifiedNew] = this.extractSchemaQualifiedName(newName);
-    await this.schemaCache.clearDataSourceCacheBang(oldName);
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
     await this.execute(
-      `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteColumnName(unqualifiedNew)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteColumnName(unqualifiedNew)}`,
     );
     // Rails reads max_identifier_length here, which lazily runs the SHOW query
     // on first use; warm the memo so the truncation limit is the real server
@@ -3609,7 +3609,7 @@ export class PostgreSQLAdapter
         }
       }
     }
-    await this.renameTableIndexes(oldName, newName);
+    await this.renameTableIndexes(tableName, newName);
   }
 
   async addIndex(

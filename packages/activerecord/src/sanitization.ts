@@ -345,11 +345,11 @@ export const ClassMethods = {
  *
  * @internal
  */
-function replaceBindVariables(quoter: Quoter, statement: string, values: unknown[]): string {
+function replaceBindVariables(connection: Quoter, statement: string, values: unknown[]): string {
   raiseIfBindArityMismatch(statement, statement.match(/\?/g)?.length ?? 0, values.length);
   const bound = [...values];
   let result = statement;
-  result = result.replace(/\?/g, () => replaceBindVariable(quoter, bound.shift()));
+  result = result.replace(/\?/g, () => replaceBindVariable(connection, bound.shift()));
   return result;
 }
 
@@ -361,7 +361,7 @@ function replaceBindVariables(quoter: Quoter, statement: string, values: unknown
  *
  * @internal
  */
-function replaceBindVariable(quoter: Quoter, value: unknown): string {
+function replaceBindVariable(connection: Quoter, value: unknown): string {
   // Rails checks `ActiveRecord::Relation === value` first and inlines the
   // relation's SQL as a subquery. Duck-typed here to avoid importing Relation
   // (circular): a Relation exposes both `toSql` and `toArray`, which a record
@@ -369,7 +369,7 @@ function replaceBindVariable(quoter: Quoter, value: unknown): string {
   if (isRelationLike(value)) {
     return (value as { toSql(): string }).toSql();
   }
-  return quoteBoundValue(quoter, value);
+  return quoteBoundValue(connection, value);
 }
 
 function isRelationLike(value: unknown): value is { toSql(): string } {
@@ -389,7 +389,7 @@ function isRelationLike(value: unknown): value is { toSql(): string } {
  * @internal
  */
 function replaceNamedBindVariables(
-  quoter: Quoter,
+  connection: Quoter,
   statement: string,
   bindVars: Record<string, unknown>,
 ): string {
@@ -408,7 +408,7 @@ function replaceNamedBindVariables(
         if (!Object.prototype.hasOwnProperty.call(bindVars, name)) {
           throw new PreparedStatementInvalid(`missing value for :${name} in ${statement}`);
         }
-        return replaceBindVariable(quoter, bindVars[name]);
+        return replaceBindVariable(connection, bindVars[name]);
       }
     },
   );
@@ -424,10 +424,10 @@ function replaceNamedBindVariables(
  *
  * @internal
  */
-function quoteBoundValue(quoter: Quoter, value: unknown): string {
+function quoteBoundValue(connection: Quoter, value: unknown): string {
   if (hasIdForDatabase(value)) {
-    const cast = quoter.castBoundValue(value.idForDatabase());
-    return quoter.quote(cast);
+    const cast = connection.castBoundValue(value.idForDatabase());
+    return connection.quote(cast);
   }
 
   // Handle collections recognized by isEnumerable (Array and Set only).
@@ -437,20 +437,20 @@ function quoteBoundValue(quoter: Quoter, value: unknown): string {
   if (isEnumerable(value)) {
     const values = Array.from(value);
     if (values.length === 0) {
-      const cast = quoter.castBoundValue(null);
-      return quoter.quote(cast);
+      const cast = connection.castBoundValue(null);
+      return connection.quote(cast);
     }
     return values
       .map((v) => {
         const idVal = hasIdForDatabase(v) ? v.idForDatabase() : v;
-        const cast = quoter.castBoundValue(idVal);
-        return quoter.quote(cast);
+        const cast = connection.castBoundValue(idVal);
+        return connection.quote(cast);
       })
       .join(",");
   }
 
-  const cast = quoter.castBoundValue(value);
-  return quoter.quote(cast);
+  const cast = connection.castBoundValue(value);
+  return connection.quote(cast);
 }
 
 function hasIdForDatabase(value: unknown): value is { idForDatabase(): unknown } {

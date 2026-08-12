@@ -81,7 +81,7 @@ export class TableMetadata {
       return new TableMetadata(associationKlass, arelTable, reflection);
     }
 
-    const typeCaster = new TypeCasterConnection(this._klass as any, tableName);
+    const typeCaster = new TypeCasterConnection(this.klass as any, tableName);
     const arelTable = new Table(tableName, { typeCaster });
     return new TableMetadata(null, arelTable, reflection);
   }

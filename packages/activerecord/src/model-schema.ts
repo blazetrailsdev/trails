@@ -749,18 +749,18 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
 
   const pk = this.primaryKey;
   const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
-  const types = new Map<string, any>();
+  const attributeTypes = new Map<string, any>();
   const defaults = new Map<string, Attribute>();
   for (const [name, def] of this._attributeDefinitions) {
     const type = def.type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
-    types.set(name, type);
+    attributeTypes.set(name, type);
     if (!pkSet.has(name) && def.defaultValue !== undefined) {
       const val = typeof def.defaultValue === "function" ? def.defaultValue() : def.defaultValue;
       defaults.set(name, Attribute.withCastValue(name, val, type));
     }
   }
 
-  this._attributesBuilder = new AttributeSetBuilder(types, defaults);
+  this._attributesBuilder = new AttributeSetBuilder(attributeTypes, defaults);
   return this._attributesBuilder;
 }
 

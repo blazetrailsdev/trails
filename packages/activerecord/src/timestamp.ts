@@ -474,10 +474,10 @@ export function createOrUpdate(this: TimestampInstanceHost, touch = true): Promi
 /** @internal */
 export async function recordUpdateTimestamps(this: TimestampInstanceHost): Promise<void> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
-    const time = currentTimeFromProperTimezone();
-    for (const col of timestampAttributesForUpdateInModel.call(this.constructor)) {
-      if (!this.willSaveChangeToAttribute?.(col)) {
-        this._writeAttribute?.(col, time);
+    const currentTime = currentTimeFromProperTimezone();
+    for (const column of timestampAttributesForUpdateInModel.call(this.constructor)) {
+      if (!this.willSaveChangeToAttribute?.(column)) {
+        this._writeAttribute?.(column, currentTime);
       }
     }
   }
@@ -509,9 +509,9 @@ export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): Temporal
 
 /** @internal */
 export function clearTimestampAttributes(this: TimestampInstanceHost): void {
-  for (const attr of allTimestampAttributesInModel.call(this.constructor)) {
-    (this as unknown as Record<string, unknown>)[attr] = null;
-    this.clearAttributeChange?.(attr);
+  for (const attributeName of allTimestampAttributesInModel.call(this.constructor)) {
+    (this as unknown as Record<string, unknown>)[attributeName] = null;
+    this.clearAttributeChange?.(attributeName);
   }
 }
 

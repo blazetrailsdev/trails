@@ -167,15 +167,14 @@ export class UniquenessValidator extends EachValidator {
     if (value == null && o.allowNil === true) return;
     if (isBlank(value) && o.allowBlank === true) return;
 
-    const finderClass = findFinderClassFor(record, this._klass);
-    const modelClass = finderClass ?? record.constructor;
-    if (!modelClass.where) return;
+    const finderClass = findFinderClassFor(record, this._klass) ?? record.constructor;
+    if (!finderClass.where) return;
 
-    const mapped = mapEnumAttribute(modelClass, attribute, value);
+    const mapped = mapEnumAttribute(finderClass, attribute, value);
 
     if (
       record.isPersisted?.() &&
-      !(await isValidationNeeded(this, modelClass, record, attribute))
+      !(await isValidationNeeded(this, finderClass, record, attribute))
     ) {
       return;
     }
@@ -190,16 +189,16 @@ export class UniquenessValidator extends EachValidator {
     // that constructs the validator directly with a strict option.
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
-    let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);
+    let [relation] = await buildRelation(finderClass, attribute, mapped, this.options);
 
     if (record.isPersisted?.()) {
-      const pk = modelClass.primaryKey;
+      const pk = finderClass.primaryKey;
       // Rails raises UnknownPrimaryKey rather than excluding the record by id
       // when a persisted record's finder class has no primary key — there is
       // no way to exclude the row itself from the existence check.
       if (pk == null) {
         throw new UnknownPrimaryKey(
-          modelClass,
+          finderClass,
           "Cannot validate uniqueness for persisted record without primary key.",
         );
       }

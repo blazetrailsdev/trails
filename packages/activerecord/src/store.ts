@@ -469,26 +469,30 @@ function defineStoreAccessorDirtyMethods(
  *   store(User, 'settings', { accessors: ['theme'], prefix: true })
  *   store(User, 'settings', { accessors: ['theme'], coder: JSON })
  */
-export function store(modelClass: typeof Base, attribute: string, options: StoreOptions): void {
+export function store(
+  modelClass: typeof Base,
+  storeAttribute: string,
+  options: StoreOptions,
+): void {
   // Mirror Rails three-step: build_column_serializer → IndifferentCoder → serialize
-  const baseCoder = buildColumnSerializer(attribute, options.coder, Object, options.yaml);
+  const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
   // Validate: if a coder was resolved, it must implement dump/load. Strings, numbers,
   // and arbitrary objects without these methods would crash silently later.
   if (
-    baseCoder != null &&
-    (typeof (baseCoder as any).dump !== "function" || typeof (baseCoder as any).load !== "function")
+    coder != null &&
+    (typeof (coder as any).dump !== "function" || typeof (coder as any).load !== "function")
   ) {
     throw new ConfigurationError(
-      `store coder for '${attribute}' must implement dump() and load(), ` +
-        `but got ${typeof baseCoder}.`,
+      `store coder for '${storeAttribute}' must implement dump() and load(), ` +
+        `but got ${typeof coder}.`,
     );
   }
-  const indifferentCoder = new IndifferentCoder(attribute, baseCoder as CoderLike | null);
-  setStoreCoder(modelClass, attribute, indifferentCoder);
+  const indifferentCoder = new IndifferentCoder(storeAttribute, coder as CoderLike | null);
+  setStoreCoder(modelClass, storeAttribute, indifferentCoder);
   // Structured column types (json/jsonb/hstore) have a type-level accessor and
   // handle their own cast/serialize. Only patch readAttribute for plain text/string
   // columns that have no type-level accessor.
-  const colType = (modelClass as any).typeForAttribute?.(attribute);
+  const colType = (modelClass as any).typeForAttribute?.(storeAttribute);
   if (!colType || typeof colType.accessor !== "function") {
     if (!_serializeAttr) {
       throw new ConfigurationError(
@@ -496,18 +500,18 @@ export function store(modelClass: typeof Base, attribute: string, options: Store
           `Ensure base.ts (or the activerecord index) is imported before calling store().`,
       );
     }
-    _serializeAttr(modelClass, attribute, { coder: indifferentCoder as any });
+    _serializeAttr(modelClass, storeAttribute, { coder: indifferentCoder as any });
   }
 
   if (options.accessors !== undefined) {
-    storeAccessor(modelClass, attribute, {
+    storeAccessor(modelClass, storeAttribute, {
       accessors: options.accessors,
       prefix: options.prefix,
       suffix: options.suffix,
     });
   } else {
     // Still register the column in storedAttributes even with no accessors.
-    addLocalStoredAttribute(modelClass, attribute, []);
+    addLocalStoredAttribute(modelClass, storeAttribute, []);
   }
 }
 

@@ -65,9 +65,8 @@ export class Point extends ValueType<PointValue> {
       return this.buildPoint(value[0], value[1]);
     }
     if (typeof value === "object") {
-      const hash = value as Record<string, unknown>;
-      if (Object.keys(hash).length === 0) return null;
-      const [x, y] = valuesArrayFromHash(hash);
+      if (Object.keys(value as Record<string, unknown>).length === 0) return null;
+      const [x, y] = valuesArrayFromHash(value as Record<string, unknown>);
       return this.buildPoint(x, y);
     }
     return null;

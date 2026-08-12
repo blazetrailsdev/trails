@@ -715,7 +715,8 @@ export function strictLoadingViolationBang(
     });
     return;
   }
-  throw new StrictLoadingViolationError(reflectionLike.strictLoadingViolationMessage(ownerClass));
+  const message = reflectionLike.strictLoadingViolationMessage(ownerClass);
+  throw new StrictLoadingViolationError(message);
 }
 
 export function initializeFindByCache(this: CoreHost): void {
@@ -776,9 +777,7 @@ export function filterAttributes(
 export function predicateBuilder(this: CoreHost): PredicateBuilder {
   if (Object.prototype.hasOwnProperty.call(this, "_predicateBuilder") && this._predicateBuilder)
     return this._predicateBuilder;
-  const table = this.arelTable;
-  const metadata = new TableMetadata(this as any, table);
-  this._predicateBuilder = new PredicateBuilder(metadata);
+  this._predicateBuilder = new PredicateBuilder(new TableMetadata(this as any, this.arelTable));
   return this._predicateBuilder;
 }
 

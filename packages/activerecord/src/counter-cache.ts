@@ -364,8 +364,8 @@ export async function _createRecord(
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
   const id = await superFn();
-  for (const name of counterCachedAssociationNames(this.constructor)) {
-    await this.association(name).incrementCounters();
+  for (const associationName of counterCachedAssociationNames(this.constructor)) {
+    await this.association(associationName).incrementCounters();
   }
   return id;
 }
@@ -380,8 +380,8 @@ export async function destroyRow(
 ): Promise<number> {
   const affectedRows = await superFn();
   if (affectedRows > 0) {
-    for (const name of counterCachedAssociationNames(this.constructor)) {
-      const assoc = this.association(name);
+    for (const associationName of counterCachedAssociationNames(this.constructor)) {
+      const association = this.association(associationName);
       const dba = this.destroyedByAssociation as {
         foreignKey?: unknown;
         options?: Record<string, unknown>;
@@ -389,9 +389,10 @@ export async function destroyRow(
       const destroyedByForeignKey =
         dba?.foreignKey ?? derivedForeignKey(dba, this.constructor.name);
       const reflectionForeignKey =
-        assoc.reflection?.foreignKey ?? derivedForeignKey(assoc.reflection, name);
+        association.reflection?.foreignKey ??
+        derivedForeignKey(association.reflection, associationName);
       if (!dba || !_foreignKeysEqual(destroyedByForeignKey, reflectionForeignKey)) {
-        await assoc.decrementCounters();
+        await association.decrementCounters();
       }
     }
   }

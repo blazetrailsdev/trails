@@ -145,8 +145,7 @@ export class TokenDefinition {
   }
 
   generateToken(model: Base): string {
-    const data = this.payloadFor(model);
-    return this.messageVerifier().generate(data, {
+    return this.messageVerifier().generate(this.payloadFor(model), {
       purpose: this.fullPurpose(),
       expiresIn: this.expiresIn,
     });
@@ -160,9 +159,9 @@ export class TokenDefinition {
   ): Promise<Base | null> {
     const verified = this.messageVerifier().verified(token, { purpose: this.fullPurpose() });
     const payload = Array.isArray(verified) && verified.length > 0 ? verified : null;
-    const record = payload ? await block(payload[0]) : null;
-    return record && JSON.stringify(this.payloadFor(record)) === JSON.stringify(payload)
-      ? record
+    const model = payload ? await block(payload[0]) : null;
+    return model && JSON.stringify(this.payloadFor(model)) === JSON.stringify(payload)
+      ? model
       : null;
   }
 }
