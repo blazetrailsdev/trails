@@ -5,7 +5,7 @@ import { IndexDefinition } from "./connection-adapters/abstract/schema-definitio
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 
-import { stiName, isFinderNeedsTypeCondition } from "./inheritance.js";
+import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
@@ -385,7 +385,7 @@ export class InsertAll {
     // STI is active on this path, so the column resolves to a name; `?? "type"`
     // only satisfies the now-nullable getter's type.
     const inheritanceCol = this.model.inheritanceColumn ?? "type";
-    const type = stiName(this.model);
+    const type = this.model.stiName();
     for (const insert of this.inserts) {
       if (!(inheritanceCol in insert)) {
         insert[inheritanceCol] = type;

@@ -4783,18 +4783,12 @@ extend(Base, CounterCache.ClassMethods);
 {
   const superUpdateCounters = CounterCache.updateCounters;
   extend(Base, {
-    updateCounters(
-      this: typeof Base,
-      id: unknown,
-      counters: Record<string, number>,
-      options?: { touch?: boolean | string | string[] },
-    ) {
+    updateCounters(this: typeof Base, id: unknown, counters: CounterCache.CounterCacheCounters) {
       return LockingOptimistic.updateCounters.call(
         this,
-        (cid, ccounters, copts) => superUpdateCounters.call(this, cid, ccounters, copts),
+        (cid, ccounters) => superUpdateCounters.call(this, cid, ccounters),
         id,
         counters,
-        options,
       );
     },
   });

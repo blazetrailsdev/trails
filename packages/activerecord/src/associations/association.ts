@@ -11,7 +11,6 @@ import {
   except,
   safeConstantize,
   singularize,
-  underscore,
 } from "@blazetrails/activesupport";
 import {
   AssociationTargetReplacedDuringLoad,
@@ -620,9 +619,10 @@ export class Association {
 
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
     exceptFromScopeAttributes ??= {};
-    const skipAssign = [...this.resolveForeignKey(), this.resolveReflectionType()].filter(
-      (key) => key != null,
-    );
+    const skipAssign: (string | string[])[] = [
+      this.reflection.foreignKey,
+      this.reflection.type,
+    ].filter((key) => key != null);
     let assignedKeys = record.changedAttributeNamesToSave;
     assignedKeys = assignedKeys.concat(Object.keys(exceptFromScopeAttributes).map(String));
     const attributes = except(
@@ -835,34 +835,6 @@ export class Association {
       this.owner.readAttribute(String(this.reflection.foreignKey)),
       record.id,
     );
-  }
-
-  private resolveForeignKey(): string[] {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | null;
-    };
-    const fk =
-      ctor._reflectOnAssociation?.(this.reflection.name)?.foreignKey ??
-      (this.reflection.options as any).foreignKey;
-    return (Array.isArray(fk) ? fk : [fk]).filter((k) => k != null).map(String);
-  }
-
-  /**
-   * Mirrors: AssociationReflection#type (reflection.rb) — the
-   * polymorphic-belongs-to foreign-type column, NOT the STI inheritance
-   * column. `this.reflection` is the lightweight AssociationDefinition, whose
-   * `type` is the macro name, so the rich Reflection is resolved through
-   * `_reflectOnAssociation` (the sibling of `resolveForeignKey`) and
-   * `options.as` covers the window before macro registration finishes.
-   */
-  private resolveReflectionType(): string | null {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { type?: string | null } | null;
-    };
-    const rich = ctor._reflectOnAssociation?.(this.reflection.name);
-    if (rich?.type != null) return rich.type;
-    const as = (this.reflection.options as AssociationOptions).as;
-    return as ? `${underscore(as)}_type` : null;
   }
 
   private ensureKlassExistsBang(): typeof Base {

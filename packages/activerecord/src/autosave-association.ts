@@ -10,7 +10,7 @@ import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { underscore } from "@blazetrails/activesupport";
+import { throwAbort, underscore } from "@blazetrails/activesupport";
 import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
@@ -378,12 +378,8 @@ export async function saveHasOneAssociation(
   const pkSpec = computePrimaryKey(reflection, owner);
   const primaryKey: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
   const primaryKeyValue = primaryKey.map((key) => owner._readAttribute(key));
-  const changedForSave =
-    typeof (record as any).changedForAutosave === "function"
-      ? (record as any).changedForAutosave()
-      : !!(record as any).changed;
   const recordChanged = is_recordChanged(reflection, record, primaryKeyValue);
-  if ((autosave && changedForSave) || recordChanged) {
+  if ((autosave && record.changedForAutosave()) || recordChanged) {
     // Rails save_has_one_association:489 — `unless reflection.through_reflection`.
     // A has_one *through* never writes a foreign key onto the end record (its
     // owner-linkage lives on the join row, persisted above via
@@ -487,13 +483,7 @@ export async function saveBelongsToAssociation(
   }
 
   // Rails save_belongs_to_association:549 — `record.new_record? || (autosave && record.changed_for_autosave?)`.
-  const beChangedForSave =
-    autosave &&
-    (typeof (record as any).changedForAutosave === "function"
-      ? (record as any).changedForAutosave()
-      : !!(record as any).changed);
-  const isNewOrChanged = record.isNewRecord() || beChangedForSave;
-  if (isNewOrChanged) {
+  if (record.isNewRecord() || (autosave && record.changedForAutosave())) {
     _setAutosavingBelongsToFor(owner, assoc, true);
     let saved: boolean | undefined;
     try {
@@ -585,7 +575,7 @@ export function associatedRecordsToValidateOrSave(
     typeof (this as any)?.customValidationContext === "function" &&
     (this as any).customValidationContext();
   if (newRecord || customValidationContext) return target;
-  if (autosave) return target.filter((r: any) => r.changedForAutosave?.() ?? false);
+  if (autosave) return target.filter((r: any) => r.changedForAutosave());
   return target.filter((r: any) => r.isNewRecord?.() ?? false);
 }
 
@@ -605,12 +595,7 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
       const target: any[] = Array.isArray(association.target)
         ? association.target
         : [association.target];
-      if (
-        target.some((r: any) =>
-          typeof r.changedForAutosave === "function" ? r.changedForAutosave() : false,
-        )
-      )
-        return true;
+      if (target.some((r: any) => r.changedForAutosave())) return true;
     }
     return false;
   } finally {
@@ -630,7 +615,7 @@ export async function validateHasOneAssociation(
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
     (this as any).customValidationContext();
-  if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
+  if (!record.changedForAutosave() && !customCtx) return;
   // Mirrors Rails: skip if the inverse belongs_to is currently validating or autosaving
   // to prevent infinite mutual-validation loops.
   const inverse =
@@ -660,7 +645,7 @@ export async function validateBelongsToAssociation(
   const customCtx =
     typeof (this as any).customValidationContext === "function" &&
     (this as any).customValidationContext();
-  if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
+  if (!record.changedForAutosave() && !customCtx) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
     await isAssociationValid.call(this, inst, record);
@@ -917,25 +902,14 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
-    // Mirrors Rails: save_collection_association runs for every collection
-    // association unless `autosave: false` opts out. The option's true-form
-    // gates additional behavior (validating already-persisted records,
-    // destroying marked-for-destruction children); its absence still
-    // propagates inserts of new children so owner.save surfaces failures —
-    // see autosave_association.rb `save_collection_association`.
-    const collectionName = reflection.name;
+    // Doesn't use after_save as that would save associations added in
+    // after_create/after_update twice (autosave_association.rb:196-198). The
+    // registration is unconditional: the `autosave != false` decision lives
+    // INSIDE `save_collection_association` (autosave_association.rb:429-431).
     afterCreate(model, async (record: any) => {
-      const assocDef = record.constructor._associations?.find(
-        (a: any) => a.name === collectionName,
-      );
-      if (assocDef?.options?.autosave === false) return;
       await record[saveMethod]();
     });
     afterUpdate(model, async (record: any) => {
-      const assocDef = record.constructor._associations?.find(
-        (a: any) => a.name === collectionName,
-      );
-      if (assocDef?.options?.autosave === false) return;
       await record[saveMethod]();
     });
   } else if (isHasOne) {
@@ -958,21 +932,17 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     });
   } else {
     // belongs_to
-    defineNonCyclicMethod.call(model, saveMethod, function (this: any) {
-      return saveBelongsToAssociation.call(this, reflection);
+    // Mirrors autosave_association.rb:213 — the `== false` check and the
+    // `throw(:abort)` live inside the defined save method, and `before_save`
+    // takes the bare method reference. `Promise.resolve` covers the re-entrant
+    // branch of `defineNonCyclicMethod`, which returns a sync `true` to mirror
+    // Rails' cyclic-guard early return.
+    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
+      if ((await Promise.resolve(saveBelongsToAssociation.call(this, reflection))) === false) {
+        throwAbort();
+      }
     });
-    beforeSave(
-      model,
-      (record: any): Promise<void> =>
-        // Wrap with Promise.resolve so the re-entrant branch of
-        // defineNonCyclicMethod (returns sync `true` to mirror Rails'
-        // cyclic-guard early return) doesn't blow up on `.then`. Mirrors
-        // Rails' callback chain, which tolerates both throw-abort and
-        // truthy returns.
-        Promise.resolve(record[saveMethod]()).then((ok: boolean) =>
-          ok ? undefined : (false as unknown as void),
-        ),
-    );
+    beforeSave(model, (record: any) => record[saveMethod]());
   }
 
   defineAutosaveValidationCallbacks.call(model, reflection);

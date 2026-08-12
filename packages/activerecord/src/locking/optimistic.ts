@@ -5,6 +5,7 @@ import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-m
 import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import { reloadSchemaFromCache } from "../model-schema.js";
+import type { CounterCacheCounters } from "../counter-cache.js";
 
 /**
  * Optimistic locking support for ActiveRecord models.
@@ -156,19 +157,14 @@ export class ClassMethods {
  */
 export async function updateCounters(
   this: typeof Base,
-  superFn: (
-    id: unknown,
-    counters: Record<string, number>,
-    options?: { touch?: boolean | string | string[] },
-  ) => Promise<number>,
+  superFn: (id: unknown, counters: CounterCacheCounters) => Promise<number>,
   id: unknown,
-  counters: Record<string, number>,
-  options?: { touch?: boolean | string | string[] },
+  counters: CounterCacheCounters,
 ): Promise<number> {
   if (this.lockingEnabled) {
     counters = { ...counters, [this.lockingColumn]: 1 };
   }
-  return superFn.call(this, id, counters, options);
+  return superFn.call(this, id, counters);
 }
 
 type InstanceLockingHost = {

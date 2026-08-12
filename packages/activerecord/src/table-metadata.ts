@@ -8,7 +8,7 @@
 import { Table } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
-import { reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
+import { reflectOnAssociation } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 import { columnsHash } from "./model-schema.js";
@@ -99,8 +99,8 @@ export class TableMetadata {
   }
 
   reflectOnAggregation(aggregationName: string): any {
-    if (!this._klass) return null;
-    return reflectOnAggregation(this._klass, aggregationName);
+    // Rails: `klass&.reflect_on_aggregation(aggregation_name)` (table_metadata.rb:66).
+    return this._klass?.reflectOnAggregation(aggregationName) ?? null;
   }
 
   aggregatedWith(aggregationName: string): any {

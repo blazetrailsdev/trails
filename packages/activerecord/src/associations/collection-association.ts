@@ -1,7 +1,13 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { association as associationProxy } from "../associations.js";
-import { underscore, isAbortSignal, compactBlank, indexBy } from "@blazetrails/activesupport";
+import {
+  underscore,
+  isAbortSignal,
+  compactBlank,
+  indexBy,
+  valuesAt,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
@@ -308,9 +314,12 @@ export class CollectionAssociation extends Association {
         indexKey((record as any)._readAttribute(primaryKey as string)),
       );
     }
-    const records: Base[] = ids
-      .map((id) => indexed[indexKey(id)])
-      .filter((record): record is Base => record != null);
+    // Rails: `.values_at(*ids).compact` over the `index_by` result — the keys
+    // are the explicit string form above, so the ids are mapped through
+    // `indexKey` too.
+    const records: Base[] = valuesAt(indexed, ...ids.map(indexKey)).filter(
+      (record): record is Base => record != null,
+    );
 
     if (records.length !== ids.length) {
       const foundIds = records.map((record) =>

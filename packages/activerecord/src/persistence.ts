@@ -10,6 +10,7 @@ import { camelize, singularize } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { parkNestedReaderLoad } from "./nested-attributes.js";
 import type { Base } from "./base.js";
+import type { CounterCacheCounters } from "./counter-cache.js";
 import {
   ArgumentError,
   sanitizeForMassAssignment,
@@ -425,11 +426,7 @@ interface CounterBangRecord extends AttributeIO {
   attributeInDatabase(name: string): unknown;
   clearAttributeChange(name: string): void;
   constructor: {
-    updateCounters(
-      id: unknown,
-      counters: Record<string, number>,
-      options?: { touch?: TouchOption },
-    ): Promise<number>;
+    updateCounters(id: unknown, counters: CounterCacheCounters): Promise<number>;
   };
 }
 
@@ -504,7 +501,7 @@ export async function incrementBang<T extends CounterBangRecord>(
   // relies on the prior in-memory `increment` being folded into the delta.
   const change =
     Number(this.readAttribute(attribute)) - (Number(this.attributeInDatabase(attribute)) || 0);
-  await this.constructor.updateCounters(this.id, { [attribute]: change }, { touch: options.touch });
+  await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
   // Rails: `public_send(:"clear_#{attribute}_change")` — the in-memory
   // increment is now durably persisted, so the attribute should no longer
   // appear dirty (otherwise a later save() would re-persist it). Use the

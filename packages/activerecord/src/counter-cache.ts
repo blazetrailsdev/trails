@@ -28,12 +28,11 @@ export async function incrementCounter(
   this: typeof Base,
   counterName: string,
   id: unknown,
-  by: number = 1,
-  options?: { touch?: CounterCacheTouchOption },
+  { by = 1, touch }: { by?: number; touch?: CounterCacheTouchOption } = {},
 ): Promise<number> {
   // Dispatch through `this.updateCounters` (not the local function) so the
   // Locking::Optimistic override — which bumps the lock version — is honored.
-  return this.updateCounters(id, { [counterName]: by }, options);
+  return this.updateCounters(id, { [counterName]: by, touch });
 }
 
 /**
@@ -45,10 +44,9 @@ export async function decrementCounter(
   this: typeof Base,
   counterName: string,
   id: unknown,
-  by: number = 1,
-  options?: { touch?: CounterCacheTouchOption },
+  { by = 1, touch }: { by?: number; touch?: CounterCacheTouchOption } = {},
 ): Promise<number> {
-  return this.updateCounters(id, { [counterName]: -by }, options);
+  return this.updateCounters(id, { [counterName]: -by, touch });
 }
 
 /**
@@ -65,12 +63,18 @@ export async function decrementCounter(
 export async function updateCounters(
   this: typeof Base,
   id: unknown | unknown[],
-  counters: Record<string, number>,
-  options?: { touch?: CounterCacheTouchOption },
+  counters: CounterCacheCounters,
 ): Promise<number> {
   const relation = this.unscoped().where(buildPkPredicate(this, id));
-  return relation.updateCounters({ ...counters, touch: options?.touch });
+  return relation.updateCounters(counters);
 }
+
+/**
+ * The counters Hash Rails' `update_counters` takes: counter column => delta,
+ * plus the `:touch` key `Relation#update_counters` shifts back off
+ * (relation.rb:926-927).
+ */
+export type CounterCacheCounters = Record<string, number | CounterCacheTouchOption | undefined>;
 
 /**
  * Build an Arel WHERE predicate matching the given id(s) against the
@@ -364,7 +368,7 @@ export async function _createRecord(
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
   const id = await superFn();
-  for (const associationName of counterCachedAssociationNames(this.constructor)) {
+  for (const associationName of this.constructor.counterCachedAssociationNames()) {
     await this.association(associationName).incrementCounters();
   }
   return id;
@@ -380,7 +384,7 @@ export async function destroyRow(
 ): Promise<number> {
   const affectedRows = await superFn();
   if (affectedRows > 0) {
-    for (const associationName of counterCachedAssociationNames(this.constructor)) {
+    for (const associationName of this.constructor.counterCachedAssociationNames()) {
       const association = this.association(associationName);
       const dba = this.destroyedByAssociation as {
         foreignKey?: unknown;

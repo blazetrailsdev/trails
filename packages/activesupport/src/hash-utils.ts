@@ -15,6 +15,15 @@ export class ArgumentError extends Error {
 }
 
 /**
+ * Mirrors Ruby's `Hash#values_at` — the values stored under each of the given
+ * keys, in the order given, with `undefined` where a key is absent (Ruby's
+ * `nil`, which the callers' `compact` drops).
+ */
+export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[] {
+  return keys.map((key) => hash[key]);
+}
+
+/**
  * Deep merge two objects recursively. When both values are objects, they are
  * merged recursively. Otherwise the source value wins.
  */

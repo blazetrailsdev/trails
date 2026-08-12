@@ -23,6 +23,13 @@
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
+    "rubyName": "in_order_of",
+    "call": "values_at",
+    "reason": "TypeScript language shortcoming (activesupport/lib/active_support/core_ext/enumerable.rb:199): Rails reaches the series values through `group_by(&key).values_at(*series)`, keying a Ruby Hash by VALUE. `series` holds arbitrary attribute values (Integer, String, nil) and a JS object keys by string coercion, so the port groups into a `Map` seeded from `series` and walks it in series order — same ordering and filter semantics, no `values_at` receiver. The string-keyed `valuesAt` core-ext added for `ids_writer` cannot express it."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "enumerable-utils.ts",
     "rubyName": "many?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
