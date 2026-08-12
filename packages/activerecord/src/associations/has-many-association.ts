@@ -277,9 +277,11 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /**
    * Mirrors: ActiveRecord::Associations::HasManyAssociation#_create_record
-   * (has_many_association.rb:143-149) — the array arm creates each record
-   * through `super` (which bumps the counter per record), the scalar arm bumps
-   * by one.
+   * (has_many_association.rb:143-149). Rails' array arm — `_create_record`
+   * recursing over an Array of attribute hashes, each recursion bumping the
+   * counter by one — has no counterpart here: `Association#_createRecord`
+   * takes a single attribute hash, and the multi-record form is the loop in
+   * `CollectionProxy#create`, which reaches this method once per element.
    * @internal
    */
   protected override async _createRecord(
@@ -287,9 +289,6 @@ export class HasManyAssociation extends CollectionAssociation {
     shouldRaise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    if (Array.isArray(attributes)) {
-      return super._createRecord(attributes, shouldRaise, block);
-    }
     return this.updateCounterIfSuccess(
       await super._createRecord(attributes, shouldRaise, block),
       1,
