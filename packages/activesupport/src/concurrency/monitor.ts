@@ -15,9 +15,12 @@
  * detached task that inherits the AsyncContext but outlives the holder's
  * release correctly queues for the lock instead of walking into it.
  *
- * @noRailsEquivalent Ruby stdlib `monitor.rb`; `MonitorMixin` has no Rails
- * source file, but Rails classes include it and their critical sections cannot
- * be ported without it.
+ * @noRailsEquivalent PERMANENT
+ *   (`vendor/rails/activerecord/lib/active_record/connection_adapters/pool_config.rb:6` —
+ *   `include MonitorMixin` resolves to Ruby stdlib `monitor.rb`, which is not
+ *   part of Rails, so no vendored Rails file can ever map onto this one. Rails
+ *   classes include it and their critical sections cannot be ported without
+ *   it).
  */
 
 import {
