@@ -4,6 +4,12 @@
  * Ruby reopens `Numeric`; TypeScript cannot, so the reopening is a class of the
  * Ruby name whose members take the receiver as the first parameter — the same
  * idiom `core-ext/object/blank.ts` uses for `NilClass`/`String`/`Time`.
+ *
+ * `EXABYTE` (1024**6) and `ZETTABYTE` (1024**7) exceed `Number.MAX_SAFE_INTEGER`,
+ * so they — and any `exabytes`/`zettabytes` result — are the nearest double
+ * rather than the exact value Ruby's arbitrary-precision `Integer` gives. The
+ * return type stays `number` to match every other Numeric core_ext method; a
+ * `bigint` port would not compose with them.
  */
 
 export class Numeric {
