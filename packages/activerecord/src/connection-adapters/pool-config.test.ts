@@ -88,6 +88,37 @@ describe("PoolConfig", () => {
       await config.disconnectBang();
       expect(spy).toHaveBeenCalled();
     });
+
+    it("serializes concurrent calls with different automaticReconnect values", async () => {
+      const pool = config.pool;
+      const seen: boolean[] = [];
+      let overlapped = false;
+      let inFlight = false;
+      vi.spyOn(pool, "disconnectBang").mockImplementation(async () => {
+        if (inFlight) overlapped = true;
+        inFlight = true;
+        seen.push(pool.automaticReconnect);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        seen.push(pool.automaticReconnect);
+        inFlight = false;
+      });
+
+      await Promise.all([
+        config.disconnectBang({ automaticReconnect: true }),
+        config.disconnectBang({ automaticReconnect: false }),
+      ]);
+
+      expect(overlapped).toBe(false);
+      expect(seen).toEqual([true, true, false, false]);
+    });
+
+    it("defaults automaticReconnect to false", async () => {
+      const pool = config.pool;
+      pool.automaticReconnect = true;
+      vi.spyOn(pool, "disconnectBang").mockResolvedValue(undefined);
+      await config.disconnectBang();
+      expect(pool.automaticReconnect).toBe(false);
+    });
   });
 
   describe("discardPoolBang", () => {

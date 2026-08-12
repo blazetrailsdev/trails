@@ -11,6 +11,7 @@ import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-descriptor.js";
 import { SchemaReflection } from "./schema-cache.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { synchronize } from "@blazetrails/activesupport";
 
 const INSTANCES = new Set<WeakRef<PoolConfig>>();
 const registry =
@@ -21,6 +22,18 @@ const registry =
     : null;
 
 export class PoolConfig {
+  /**
+   * Mirrors: `include MonitorMixin` (`pool_config.rb:6`) — assigned as a
+   * `this`-typed function, the settled trails spelling for a Ruby `include`.
+   * Ruby's monitor is owned by a Thread and ours by an async chain; see
+   * `activesupport/src/concurrency/monitor.ts`.
+   *
+   * @noRailsEquivalent `include MonitorMixin` (`pool_config.rb:6`) — the method
+   * is Rails', but it arrives from a Ruby stdlib module with no Rails source
+   * file, so the extractor has nothing to match it against.
+   */
+  synchronize = synchronize;
+
   readonly role: string;
   readonly shard: string;
   readonly dbConfig: DatabaseConfig;
@@ -137,6 +150,14 @@ export class PoolConfig {
    * ||= connection.get_database_version }`. This is the single cache every
    * adapter's `get_database_version` is fetched through; the adapters
    * themselves stay pure.
+   *
+   * Reviewed against the monitor: Rails' `synchronize` here only prevents two
+   * threads both running `get_database_version`; it is a memoization guard,
+   * not a correctness one — either fetch yields the same version, and Ruby's
+   * monitor is reentrant precisely because `configure_connection` re-enters
+   * this method (see below). Locking it would mean the sync arm — which every
+   * caller of a version-gated adapter branch depends on — could no longer
+   * return a value. Left unlocked deliberately.
    */
   serverVersion(connection: DatabaseAdapter): unknown {
     // trails-only: `getDatabaseVersion` is a real await on every adapter
@@ -163,6 +184,17 @@ export class PoolConfig {
     this._serverVersion = value;
   }
 
+  /**
+   * Mirrors: `PoolConfig#pool` (`pool_config.rb:70-72`) —
+   * `@pool || synchronize { @pool ||= ConnectionPool.new(self) }`.
+   *
+   * Reviewed against the monitor: the critical section is `ConnectionPool.new`,
+   * which is synchronous here as it is in Rails, so the read-check-write runs
+   * to completion with no suspension point and no other task can observe or
+   * race it. Taking the (necessarily async) monitor would mean making this a
+   * method returning a promise, which no caller of a Ruby attribute-shaped
+   * reader can absorb. Left unlocked deliberately.
+   */
   get pool(): ConnectionPool {
     if (!this._pool) {
       this._pool = new ConnectionPool(this);
@@ -174,20 +206,28 @@ export class PoolConfig {
     return this._pool !== null;
   }
 
-  // Missing critical section: Rails guards this body with `synchronize`
-  // (pool_config.rb:61-68) — the MonitorMixin on PoolConfig itself, re-checking
-  // `@pool` inside the lock — so a concurrent caller cannot overwrite
-  // `automatic_reconnect` between this caller's write and its
-  // `@pool.disconnect!`. trails has no lock on this object:
-  // `TransactionManager#synchronize` is per-connection and guards the wrong
-  // one. Converging needs an async monitor PoolConfig can hold —
-  // `port-pool-config-monitor-critical-section`.
-  async disconnectBang(options: { automaticReconnect?: boolean } = {}): Promise<void> {
+  /**
+   * Mirrors: `PoolConfig#disconnect!` (`pool_config.rb:61-68`) — outer `@pool`
+   * guard, `synchronize`, inner `@pool` re-check, then the
+   * `automatic_reconnect` write and `@pool.disconnect!`.
+   *
+   * The monitor is load-bearing here in a way it is not for the other bodies
+   * on this class: `disconnectBang()` is a real suspension point, so without
+   * the lock two concurrent callers with different `automaticReconnect`
+   * values interleave — A writes `true` and suspends, B overwrites it with
+   * `false`, and A's disconnect runs under B's flag.
+   */
+  async disconnectBang({
+    automaticReconnect = false,
+  }: { automaticReconnect?: boolean } = {}): Promise<void> {
     if (!this._pool) return;
-    if (options.automaticReconnect !== undefined) {
-      (this._pool as any).automaticReconnect = options.automaticReconnect;
-    }
-    await this._pool.disconnectBang();
+
+    await this.synchronize(async () => {
+      if (!this._pool) return;
+
+      this._pool.automaticReconnect = automaticReconnect;
+      await this._pool.disconnectBang();
+    });
   }
 
   /**
@@ -210,6 +250,13 @@ export class PoolConfig {
    * hand the drains back so the caller can await them after every config in a
    * sweep has been discarded (the drain is a trails-only step for async-only
    * drivers, with no Rails equivalent). No-ops when the pool is uninitialized.
+   *
+   * Reviewed against `#discard_pool!`'s monitor (`pool_config.rb:74-82`):
+   * everything inside Rails' `synchronize` — `@pool.discard!` and `@pool = nil`
+   * — is synchronous on this side too, so the guard, the discard and the write
+   * are already atomic and the inner `@pool` re-check has nothing to catch. The
+   * lock would also have to be taken from `discardPoolsBang`'s synchronous
+   * sweep, which cannot await. Left unlocked deliberately.
    */
   private _discardPoolBangSync(): Array<Promise<void>> {
     const pool = this._pool;
