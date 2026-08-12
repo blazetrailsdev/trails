@@ -1,108 +1,57 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { Temporal } from "@blazetrails/date";
 
-export interface RenameKeyOptions {
-  /** Convert `snake_case` keys to `dashed-keys`. Defaults to `true`. */
-  dasherize?: boolean;
-  /** Camelize the key first: `true`/`"upper"` for UpperCamel, `"lower"` for lowerCamel. */
-  camelize?: boolean | "lower" | "upper";
-}
-
 /**
- * Dasherize an `underscore_key`, preserving any leading/trailing underscores.
+ * This object decorates files deserialized using `Hash.fromXml` with the
+ * `originalFilename` and `contentType` methods.
  *
- * Mirrors: ActiveSupport::XmlMini._dasherize — the `$2` (interior) capture is
- * non-greedy so surrounding runs of underscores are left untouched and only the
- * interior `_`/space characters become `-`.
+ * Mirrors: ActiveSupport::XmlMini::FileLike (xml_mini.rb:22-31) — a Ruby module
+ * `_parseFile` `extend`s onto the StringIO it returns, so the descriptors are
+ * copied onto that object rather than inherited from a class.
  */
-function underscoreToDash(key: string): string {
-  const match = /^(_*)([\s\S]*?)(_*)$/.exec(key.trim());
-  if (!match) return key;
-  const [, left, middle, right] = match;
-  return `${left}${middle.replace(/[_ ]/g, "-")}${right}`;
-}
+export const FileLike = {
+  /** @internal `@original_filename` */
+  _originalFilename: undefined as string | undefined,
+  /** @internal `@content_type` */
+  _contentType: undefined as string | undefined,
+
+  set originalFilename(value: string | undefined) {
+    this._originalFilename = value;
+  },
+
+  set contentType(value: string | undefined) {
+    this._contentType = value;
+  },
+
+  get originalFilename(): string {
+    return this._originalFilename ?? "untitled";
+  },
+
+  get contentType(): string {
+    return this._contentType ?? "application/octet-stream";
+  },
+};
 
 /**
- * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
+ * A pluggable parse backend — the trails analog of the `XmlMini_REXML`,
+ * `XmlMini_Nokogiri`, … modules `backend` holds (xml_mini.rb:101-109). Rails
+ * `require`s `active_support/xml_mini/<name>` and reads the constant out of
+ * `ActiveSupport`; here the module namespace object of
+ * `./xml-mini/<name>.js` *is* that module.
  *
- * Mirrors: ActiveSupport::XmlMini.rename_key — camelize (when requested) runs
- * first, then dasherize (default `true`) runs on the result. Both transforms
- * compose exactly as in Rails, so `camelize: true` still passes through
- * `_dasherize` (a no-op on an already-camelized, underscore-free key).
+ * Rails' backends return the parsed Hash synchronously; ours are async because
+ * each loads its optional parser package (`@blazetrails/nokogiri`) through a
+ * dynamic import — see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99`.
  */
-export function renameKey(key: string, options: RenameKeyOptions = {}): string {
-  const { camelize: camelizeOpt } = options;
-  const dasherize = options.dasherize === undefined || options.dasherize;
-  let result = key;
-  if (camelizeOpt) {
-    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
-  }
-  if (dasherize) {
-    result = underscoreToDash(result);
-  }
-  return result;
+export interface XmlMiniBackend {
+  parse(data: string | null | undefined): Promise<Record<string, unknown>>;
 }
 
-/**
- * A sink for XML fragments. `toTag` writes one value's tag(s) into it, so the
- * same per-value logic can target either a compact string (the parity default,
- * {@link XmlStringBuilder}) or an indentation-aware sink (ActiveModel's
- * `_hashToXml`).
- *
- * Mirrors: the `Builder::XmlMarkup` role in `ActiveSupport::XmlMini.to_tag`.
- */
-export interface XmlBuilder {
-  /** Emit a leaf `<name attrs>content</name>`, or `<name attrs/>` when `content` is nullish. */
-  tag(name: string, content?: string | null, attributes?: Record<string, string>): void;
-  /** Emit an opening `<name attrs>` for a container. */
-  openTag(name: string, attributes?: Record<string, string>): void;
-  /** Emit a closing `</name>`. */
-  closeTag(name: string): void;
-}
-
-/**
- * A per-level cast-type table threaded through `to_tag`'s container recursion so
- * nested attributes keep an adapter-agnostic `type=` (a bigint id stays
- * `type="integer"` whether it arrives as a number, BigInt, or string). `types`
- * maps a hash key to its explicit `type=` name; `nested` carries the same table
- * for each container-valued key. Rails has no analog — its serialized hash still
- * holds typed Ruby objects — but trails' flattened hash loses the cast type, so
- * ActiveModel resolves it up front and threads it here.
- */
-export interface XmlTypeInfo {
-  types: Record<string, string | undefined>;
-  nested: Record<string, XmlTypeInfo>;
-}
-
-export interface ToTagOptions extends RenameKeyOptions {
-  /** The sink the emitted tag(s) are written to. */
-  builder: XmlBuilder;
-  /** Explicit `type=` name; suppresses runtime type inference when set. */
-  type?: string;
-  /**
-   * Cast types for a container's children, threaded through `emitHash`/
-   * `emitArray` so nested attributes keep an adapter-agnostic `type=`.
-   */
-  typeInfo?: XmlTypeInfo;
-  /**
-   * Underscore each tag key before {@link renameKey} runs. ActiveModel's
-   * serialized keys are camelCase; Rails' are already snake_case, so this is
-   * off by default and set only by `Model#toXml`.
-   */
-  underscoreKeys?: boolean;
-  /** Suppress the inferred `type=` attribute (any truthy value, per Rails). */
-  skipTypes?: boolean | number;
-  /** Overrides `DEFAULT_ENCODINGS[type]` for the `encoding=` attribute. */
-  encoding?: string;
-  /** Explicit child tag name for array elements; defaults to the singularized root. */
-  children?: string;
-  /** Set by `to_tag` when recursing; the tag name passed to nested `toXml`. */
-  root?: unknown;
-  /** Always true once inside `to_tag` (no XML instruction on nested docs). */
-  skipInstruct?: boolean;
-}
+/** The name of a backend, or the backend module itself. */
+export type XmlMiniBackendName = XmlMiniBackend | string;
 
 /** Mirrors: ActiveSupport::XmlMini::DEFAULT_ENCODINGS. */
 const DEFAULT_ENCODINGS: Record<string, string> = {
@@ -141,6 +90,16 @@ function encode64(value: unknown): string {
   return (b64.match(/.{1,60}/g) ?? []).join("\n") + "\n";
 }
 
+/**
+ * Decode Base64 content, mirroring Ruby's `Base64.decode64`: any character
+ * outside the Base64 alphabet (the line breaks `encode64` inserts included) is
+ * ignored. The decoded bytes come back as a binary (Latin-1) string, the same
+ * shape {@link encode64} accepts.
+ */
+function decode64(value: string): string {
+  return Buffer.from(value, "base64").toString("binary");
+}
+
 function formatDateTime(value: unknown): string {
   // boundary: legacy JS Date values serialize as ISO 8601 dateTime.
   if (value instanceof Date) {
@@ -160,6 +119,139 @@ function formatDateTime(value: unknown): string {
     return value.toString();
   }
   return String(value);
+}
+
+/**
+ * The backend `parse` delegates to (Ruby's `@backend`). Rails'
+ * `XmlMini.backend = "REXML"` (xml_mini.rb:210) has no counterpart yet:
+ * `XmlMini_REXML` is unported, so there is no default and `parse` raises until
+ * a backend is set.
+ *
+ * @internal
+ */
+let _backend: XmlMiniBackend | null | undefined;
+
+/**
+ * Parse an XML document into a hash through the current backend.
+ *
+ * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99) — awaitable because
+ * every backend's `parse` is (see {@link XmlMiniBackend}); the delegation itself
+ * still forwards straight to the selected backend.
+ */
+export function parse(data: string | null | undefined): Promise<Record<string, unknown>> {
+  return backend()!.parse(data);
+}
+
+/**
+ * The backend in effect: the execution-state-scoped override set by
+ * {@link withBackend} if there is one, else the process-wide backend.
+ *
+ * Mirrors: ActiveSupport::XmlMini.backend (xml_mini.rb:101-103).
+ *
+ * @missingRailsCall cast_backend_name_to_module — belongs to `backend=`, which
+ * the call gate pairs with this reader (the bare-camel candidate wins over
+ * `setBackend`); {@link setBackend} makes the call.
+ */
+export function backend(): XmlMiniBackend | null | undefined {
+  return currentThreadBackend() ?? _backend;
+}
+
+/**
+ * Set the process-wide backend, by name or module.
+ *
+ * Mirrors: ActiveSupport::XmlMini#backend= (xml_mini.rb:105-109) — awaitable
+ * because resolving a name imports the backend module, which Ruby does
+ * synchronously via `require`.
+ */
+export async function setBackend(name: XmlMiniBackendName | null | undefined): Promise<void> {
+  const backend = name != null ? await castBackendNameToModule(name) : name;
+  if (currentThreadBackend() != null) await setCurrentThreadBackend(backend);
+  _backend = backend;
+}
+
+/**
+ * Run `fn` with `name` as the backend, restoring the previous
+ * execution-state-scoped backend afterwards.
+ *
+ * Mirrors: ActiveSupport::XmlMini#with_backend (xml_mini.rb:111-117).
+ */
+export async function withBackend<T>(
+  name: XmlMiniBackendName | null | undefined,
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const oldBackend = currentThreadBackend();
+  try {
+    await setCurrentThreadBackend(name != null ? await castBackendNameToModule(name) : name);
+    return await fn();
+  } finally {
+    await setCurrentThreadBackend(oldBackend);
+  }
+}
+
+/**
+ * A sink for XML fragments. `toTag` writes one value's tag(s) into it, so the
+ * same per-value logic can target either a compact string (the parity default,
+ * {@link XmlStringBuilder}) or an indentation-aware sink (ActiveModel's
+ * `_hashToXml`).
+ *
+ * Mirrors: the `Builder::XmlMarkup` role in `ActiveSupport::XmlMini.to_tag`.
+ */
+export interface XmlBuilder {
+  /** Emit a leaf `<name attrs>content</name>`, or `<name attrs/>` when `content` is nullish. */
+  tag(name: string, content?: string | null, attributes?: Record<string, string>): void;
+  /** Emit an opening `<name attrs>` for a container. */
+  openTag(name: string, attributes?: Record<string, string>): void;
+  /** Emit a closing `</name>`. */
+  closeTag(name: string): void;
+}
+
+/**
+ * A per-level cast-type table threaded through `to_tag`'s container recursion so
+ * nested attributes keep an adapter-agnostic `type=` (a bigint id stays
+ * `type="integer"` whether it arrives as a number, BigInt, or string). `types`
+ * maps a hash key to its explicit `type=` name; `nested` carries the same table
+ * for each container-valued key. Rails has no analog — its serialized hash still
+ * holds typed Ruby objects — but trails' flattened hash loses the cast type, so
+ * ActiveModel resolves it up front and threads it here.
+ */
+export interface XmlTypeInfo {
+  types: Record<string, string | undefined>;
+  nested: Record<string, XmlTypeInfo>;
+}
+
+export interface RenameKeyOptions {
+  /** Convert `snake_case` keys to `dashed-keys`. Defaults to `true`. */
+  dasherize?: boolean;
+  /** Camelize the key first: `true`/`"upper"` for UpperCamel, `"lower"` for lowerCamel. */
+  camelize?: boolean | "lower" | "upper";
+}
+
+export interface ToTagOptions extends RenameKeyOptions {
+  /** The sink the emitted tag(s) are written to. */
+  builder: XmlBuilder;
+  /** Explicit `type=` name; suppresses runtime type inference when set. */
+  type?: string;
+  /**
+   * Cast types for a container's children, threaded through `emitHash`/
+   * `emitArray` so nested attributes keep an adapter-agnostic `type=`.
+   */
+  typeInfo?: XmlTypeInfo;
+  /**
+   * Underscore each tag key before {@link renameKey} runs. ActiveModel's
+   * serialized keys are camelCase; Rails' are already snake_case, so this is
+   * off by default and set only by `Model#toXml`.
+   */
+  underscoreKeys?: boolean;
+  /** Suppress the inferred `type=` attribute (any truthy value, per Rails). */
+  skipTypes?: boolean | number;
+  /** Overrides `DEFAULT_ENCODINGS[type]` for the `encoding=` attribute. */
+  encoding?: string;
+  /** Explicit child tag name for array elements; defaults to the singularized root. */
+  children?: string;
+  /** Set by `to_tag` when recursing; the tag name passed to nested `toXml`. */
+  root?: unknown;
+  /** Always true once inside `to_tag` (no XML instruction on nested docs). */
+  skipInstruct?: boolean;
 }
 
 /**
@@ -325,6 +417,148 @@ function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOpt
     toTag(k, v, { ...options, type: info?.types[k], typeInfo: info?.nested[k], root: k });
   }
   options.builder.closeTag(root);
+}
+
+/**
+ * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
+ *
+ * Mirrors: ActiveSupport::XmlMini.rename_key (xml_mini.rb:154-161) — camelize (when requested) runs
+ * first, then dasherize (default `true`) runs on the result. Both transforms
+ * compose exactly as in Rails, so `camelize: true` still passes through
+ * `_dasherize` (a no-op on an already-camelized, underscore-free key).
+ */
+export function renameKey(key: string, options: RenameKeyOptions = {}): string {
+  const { camelize: camelizeOpt } = options;
+  const dasherize = options.dasherize === undefined || options.dasherize;
+  let result = key;
+  if (camelizeOpt) {
+    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
+  }
+  if (dasherize) {
+    result = _dasherize(result);
+  }
+  return result;
+}
+
+/**
+ * Dasherize an `underscore_key`, preserving any leading/trailing underscores.
+ *
+ * Mirrors: ActiveSupport::XmlMini._dasherize (xml_mini.rb:163-167) — the `$2` (interior) capture is
+ * non-greedy so surrounding runs of underscores are left untouched and only the
+ * interior `_`/space characters become `-`.
+ *
+ * @internal
+ */
+export function _dasherize(key: string): string {
+  const match = key.trim().match(/^(_*)([\s\S]*?)(_*)$/);
+  if (!match) return key;
+  const [, left, middle, right] = match;
+  return `${left}${middle.replace(/[_ ]/g, "-")}${right}`;
+}
+
+/**
+ * Decode a `type="binary"` value according to its element's `encoding`
+ * attribute, leaving an unrecognized encoding untouched.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_binary (xml_mini.rb:169-178).
+ *
+ * @internal
+ */
+export function _parseBinary(bin: string, entity: Record<string, string | undefined>): string {
+  switch (entity["encoding"]) {
+    case "base64":
+      return decode64(bin);
+    case "hex":
+    case "hexBinary":
+      return _parseHexBinary(bin);
+    default:
+      return bin;
+  }
+}
+
+/**
+ * Decode a `type="file"` value into an IO decorated with the element's `name`
+ * and `content_type` attributes.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_file (xml_mini.rb:180-186) — `Blob` is
+ * the platform's in-memory, readable byte container, so it stands in for
+ * `StringIO.new`; the Latin-1 round-trip hands it {@link decode64}'s bytes
+ * unchanged rather than re-encoding them as UTF-8. Copying {@link FileLike}'s
+ * descriptors onto it is `f.extend(FileLike)`.
+ *
+ * @internal
+ */
+export function _parseFile(
+  file: string,
+  entity: Record<string, string | undefined>,
+): Blob & typeof FileLike {
+  const f = new Blob([Uint8Array.from(decode64(file), (c) => c.charCodeAt(0))]);
+  Object.defineProperties(f, Object.getOwnPropertyDescriptors(FileLike));
+  const fileLike = f as Blob & typeof FileLike;
+  fileLike.originalFilename = entity["name"];
+  fileLike.contentType = entity["content_type"];
+  return fileLike;
+}
+
+/**
+ * Decode a hex-encoded value to its bytes.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_hex_binary (xml_mini.rb:188-190) —
+ * Ruby's `[bin].pack("H*")`.
+ *
+ * @internal
+ */
+export function _parseHexBinary(bin: string): string {
+  return Buffer.from(bin, "hex").toString("binary");
+}
+
+/**
+ * The execution-state-scoped backend override.
+ *
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
+ *
+ * @missingRailsCall cast_backend_name_to_module — belongs to
+ * `current_thread_backend=`, which the call gate pairs with this reader (the
+ * bare-camel candidate wins over `setCurrentThreadBackend`);
+ * {@link setCurrentThreadBackend} makes the call.
+ *
+ * @internal
+ */
+export function currentThreadBackend(): XmlMiniBackend | null | undefined {
+  return IsolatedExecutionState.get("xml_mini_backend");
+}
+
+/**
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend= (xml_mini.rb:196-198).
+ *
+ * @internal
+ */
+export async function setCurrentThreadBackend(
+  name: XmlMiniBackendName | null | undefined,
+): Promise<void> {
+  IsolatedExecutionState.set(
+    "xml_mini_backend",
+    name != null ? await castBackendNameToModule(name) : name,
+  );
+}
+
+/**
+ * Resolve a backend name to its module, loading the module the first time.
+ *
+ * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
+ * (xml_mini.rb:200-206) — Ruby's `require
+ * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
+ * is one dynamic import here, since the module namespace object of
+ * `xml-mini/<name>.js` is the backend module.
+ *
+ * @internal
+ */
+export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
+  if (typeof name !== "string") {
+    return name;
+  } else {
+    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
+  }
 }
 
 /** Render `attrs` as ` k="v"` pairs with escaped values, in insertion order. */

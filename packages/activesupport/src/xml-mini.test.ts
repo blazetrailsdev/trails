@@ -1,5 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { renameKey, toTag, XmlStringBuilder, type ToTagOptions } from "./xml-mini.js";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import {
+  backend,
+  renameKey,
+  setBackend,
+  toTag,
+  withBackend,
+  XmlStringBuilder,
+  type ToTagOptions,
+  type XmlMiniBackend,
+} from "./xml-mini.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { Temporal } from "@blazetrails/date";
 
@@ -201,5 +211,102 @@ describe("ToTagTest", () => {
   it("#to_tag emits an empty array as a self-closing tag", () => {
     toTag("b", [], options);
     expect(builder.target()).toBe('<b type="array"/>');
+  });
+});
+
+// Rails' `module REXML end` stand-ins: a backend is anything answering #parse,
+// and these are only ever compared by identity.
+const REXML: XmlMiniBackend = { parse: async () => ({}) };
+const LibXML: XmlMiniBackend = { parse: async () => ({}) };
+const Nokogiri: XmlMiniBackend = { parse: async () => ({}) };
+
+describe("WithBackendTest", () => {
+  let defaultBackend: XmlMiniBackend | null | undefined;
+
+  beforeEach(() => {
+    defaultBackend = backend();
+  });
+
+  afterEach(async () => {
+    await setBackend(defaultBackend);
+  });
+
+  it("#with_backend should switch backend and then switch back", async () => {
+    await setBackend(REXML);
+    await withBackend(LibXML, async () => {
+      expect(backend()).toBe(LibXML);
+      await withBackend(Nokogiri, () => {
+        expect(backend()).toBe(Nokogiri);
+      });
+      expect(backend()).toBe(LibXML);
+    });
+    expect(backend()).toBe(REXML);
+  });
+
+  it("backend switch inside #with_backend block", async () => {
+    await withBackend(LibXML, async () => {
+      await setBackend(REXML);
+      expect(backend()).toBe(REXML);
+    });
+    expect(backend()).toBe(REXML);
+  });
+});
+
+describe("ThreadSafetyTest", () => {
+  let defaultBackend: XmlMiniBackend | null | undefined;
+
+  beforeEach(() => {
+    defaultBackend = backend();
+  });
+
+  afterEach(async () => {
+    await setBackend(defaultBackend);
+  });
+
+  /**
+   * The Rails tests spawn a Thread and `sleep 0.1 while t.status != "sleep"`.
+   * The trails analog of a thread is an isolated execution state
+   * (AsyncLocalStorage), and the analog of waiting for it to park is awaiting
+   * the signal it sends from inside the block.
+   */
+  function spawn(name: XmlMiniBackend): { entered: Promise<void>; join: () => Promise<void> } {
+    let signalEntered!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => (signalEntered = resolve));
+    const sleep = new Promise<void>((resolve) => (release = resolve));
+    const thread = IsolatedExecutionState.run(() =>
+      withBackend(name, () => {
+        signalEntered();
+        return sleep;
+      }),
+    );
+    return {
+      entered,
+      join: async () => {
+        release();
+        await thread;
+      },
+    };
+  }
+
+  it("#with_backend should be thread-safe", async () => {
+    await setBackend(REXML);
+    const t = spawn(LibXML);
+    await t.entered;
+
+    // We should get `old_backend` here even while another
+    // execution state is using `new_backend`.
+    expect(backend()).toBe(REXML);
+    await t.join();
+  });
+
+  it("nested #with_backend should be thread-safe", async () => {
+    await withBackend(REXML, async () => {
+      const t = spawn(LibXML);
+      await t.entered;
+
+      expect(backend()).toBe(REXML);
+      await t.join();
+    });
   });
 });
