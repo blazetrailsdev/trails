@@ -276,7 +276,7 @@ export class Queue {
   }
 
   /**
-   * @missingRailsCall permit_concurrent_loads — `queue.rb:117` wraps the
+   * `queue.rb:117` wraps the
    * `@cond.wait` in `ActiveSupport::Dependencies.interlock
    * .permit_concurrent_loads`, which releases the autoload interlock so
    * another thread can autoload while this one blocks. Neither the interlock
