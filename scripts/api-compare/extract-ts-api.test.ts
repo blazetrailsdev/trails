@@ -259,11 +259,8 @@ describe("body call capture", () => {
   });
 
   it("records `constructor` for an instantiation but not for a class reference", () => {
-    // `this.constructor` is the port of Ruby's `self.class` — a SKIP name — and
-    // `constructor` is also the name conventions.ts maps Ruby `new` onto, so
-    // crediting the READ lets a class reference stand in for an instantiation
-    // Rails makes. Shape from persistence.rb:949-955 (`self.class.primary_key`
-    // first, `RecordNotDestroyed.new` last): the sequence must not invert.
+    // Shape from persistence.rb:949-955: `self.class.primary_key` first,
+    // `RecordNotDestroyed.new` last — the sequence must not invert.
     const cls = extractFromSource(
       `class Foo {
         raiseNotDestroyed() {

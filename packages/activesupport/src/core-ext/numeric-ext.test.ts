@@ -123,12 +123,6 @@ describe("NumericExtSizeTest", () => {
     expect(Numeric.zettabytes(3)).toBe(3541774862152233910272);
     expect(Numeric.zettabyte(3)).toBe(3541774862152233910272);
 
-    // Ruby's Integer is arbitrary-precision; a JS double is not. The exabyte and
-    // zettabyte results above are exact only because 3 * 1024**6 and 3 * 1024**7
-    // are 3 * 2**60 and 3 * 2**70 — a three-bit significand times a power of two.
-    // They are past Number.MAX_SAFE_INTEGER all the same, so neighbouring
-    // integers are unrepresentable and any non-power-of-two multiplier there
-    // rounds.
     expect(Number.isSafeInteger(Numeric.petabytes(3))).toBe(true);
     expect(Number.isSafeInteger(Numeric.exabytes(3))).toBe(false);
     expect(Number.isSafeInteger(Numeric.zettabytes(3))).toBe(false);
