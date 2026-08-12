@@ -681,38 +681,36 @@ export async function isAssociationValid(
   association: any,
   record: any,
 ): Promise<boolean> {
-  // Mirrors Rails `association_valid?` (autosave_association.rb:371-398), which
-  // reads the reflection off the association and the errors off `self` — so
-  // neither rides in as an extra param.
+  // Rails reads the reflection off the association and the errors off `self`,
+  // so neither rides in as an extra param.
   const owner = this as any;
-  const reflection = association.reflection;
-  if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
-  if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
-  const context =
-    typeof owner?.customValidationContext === "function" && owner.customValidationContext()
-      ? owner._validationContext
-      : undefined;
-  const isChildValid = typeof record.isValid === "function" ? await record.isValid(context) : true;
-  if (isChildValid) return true;
+  if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
+    return true;
 
-  const childErrors: any[] = record.errors?.objects ?? [];
-  const associatedErrors =
-    record.isNewRecord?.() || record.changed || context
-      ? childErrors
-      : childErrors.filter((e: any) => e instanceof AssociationsNestedError);
+  const context = owner.customValidationContext() ? owner._validationContext : undefined;
+  if (await record.isValid(context)) return true;
 
-  const parentErrors = owner?.errors;
-  if (!parentErrors) return isChildValid;
+  let associatedErrors: any[];
+  if (record.changed || record.isNewRecord() || context) {
+    associatedErrors = record.errors.objects;
+  } else {
+    associatedErrors = record.errors.objects.filter(
+      (error: any) => error instanceof AssociationsNestedError,
+    );
+  }
 
-  if (reflection.options?.autosave) {
-    if (owner === record) return isChildValid; // Rails: `return if equal?(record)`
+  if (association.options.autosave) {
+    // Ruby's `return if equal?(record)` returns nil, which every caller here
+    // discards; `false` is its truthiness in TS.
+    if (owner === record) return false;
     for (const error of associatedErrors) {
-      parentErrors.objects.push(new AssociationsNestedError(association, error));
+      owner.errors.objects.push(new AssociationsNestedError(association, error));
     }
   } else if (associatedErrors.length > 0) {
-    parentErrors.add(reflection.name);
+    owner.errors.add(association.reflection.name);
   }
-  return isChildValid;
+
+  return owner.errors.any;
 }
 
 /** @internal */

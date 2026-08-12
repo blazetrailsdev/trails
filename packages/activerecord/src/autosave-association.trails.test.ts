@@ -402,3 +402,29 @@ describe("TestAutosaveAssociationsInGeneral changed_for_autosave?", () => {
     expect(gadget.changedForAutosave()).toBe(true);
   });
 });
+
+describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
+  fixtures([]);
+
+  it("association_valid? dispatches through marked_for_destruction?", async () => {
+    // autosave_association.rb:372 —
+    // `return true if record.destroyed? || (association.options[:autosave] &&
+    // record.marked_for_destruction?)`. `marked_for_destruction?` is a method
+    // call, so an override decides the skip; reading the in-memory flag
+    // directly instead would validate a record Rails skips.
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    class DoomedBird extends CanonicalBird {
+      override markedForDestruction = (): boolean => true;
+    }
+    registerModel("AssociationValidDoomedBird", DoomedBird);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    // `name` is `validates presence` on Bird, so this child is invalid — and
+    // `birds` is autosave through `accepts_nested_attributes_for`.
+    const doomed = new DoomedBird({ name: "" });
+    pirate.association("birds").setTarget([doomed] as any);
+
+    expect(await pirate.save()).toBe(true);
+  });
+});
