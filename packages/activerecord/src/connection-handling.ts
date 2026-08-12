@@ -597,7 +597,7 @@ export function connectionSpecificationName(this: typeof Base): string {
 
   // Branch 3: no own property — derive from class shape.
   // Base is always its own terminal; primary classes (ApplicationRecord) store
-  // their pool under "Base" per PoolConfig#connectionDescriptor's normalization.
+  // their pool under "Base" per ConnectionDescriptor#name (connection_handler.rb:63).
   if (this.name === "Base") return "Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "Base";
@@ -1125,7 +1125,7 @@ export function resolveConfigForConnection(
   // Mirrors Rails: connection_name = primary_class? ? Base.name : name, then
   // self.connection_specification_name = connection_name. The primary class
   // (Base/ApplicationRecord) stores its pool under "Base" — matching
-  // PoolConfig#connectionDescriptor's primary-class normalization — so
+  // ConnectionDescriptor#name's primary-class normalization — so
   // subsequent connectionPool() lookups hit the right key. The reader uses
   // an own-property check so writing here doesn't bleed through JS static
   // inheritance into unrelated subclasses.

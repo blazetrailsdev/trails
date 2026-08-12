@@ -611,10 +611,6 @@ export function currentPreventingWrites(this: CoreHost): boolean {
 /**
  * Mirrors: ActiveRecord::Core.preventing_writes? (`core.rb:205-213`).
  *
- * Rails compares `klass.name == class_name` against a descriptor whose `name`
- * is "ActiveRecord::Base" for a primary class
- * (`abstract/connection_handler.rb:63`); trails' PoolConfig normalizes that
- * name to "Base", so the klass side is normalized to match.
  */
 export function isPreventingWrites(className?: string): boolean {
   const stack = connectedToStack();
@@ -625,9 +621,7 @@ export function isPreventingWrites(className?: string): boolean {
     if (className) {
       for (const klass of entry.klasses) {
         if (typeof klass !== "function") continue;
-        const targetName =
-          typeof klass.primaryClassQ === "function" && klass.primaryClassQ() ? "Base" : klass.name;
-        if (targetName === className) return entry.preventWrites;
+        if (klass.name === className) return entry.preventWrites;
       }
     }
   }
