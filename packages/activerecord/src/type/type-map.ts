@@ -4,7 +4,7 @@
 import { ArgumentError, Type, ValueType } from "@blazetrails/activemodel";
 
 export class TypeMap {
-  private _mapping: Map<string | RegExp, (lookupKey: string) => Type> = new Map();
+  private _mapping: Map<string | RegExp, (...args: string[]) => Type> = new Map();
   private _parent?: TypeMap;
   private _cache: Map<string | null, Type> = new Map();
 
@@ -27,7 +27,7 @@ export class TypeMap {
     return result;
   }
 
-  registerType(key: string | RegExp, value?: Type, block?: (lookupKey: string) => Type): void {
+  registerType(key: string | RegExp, value?: Type, block?: (...args: string[]) => Type): void {
     if (!value && !block) throw new ArgumentError("registerType requires a value or block");
     if (block) {
       this._mapping.set(key, block);

@@ -51,7 +51,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("visitAlterTable routes FK/check drops through the MySQL visitors", async () => {
-    const at = new AlterTable("posts");
+    const at = new AlterTable(new TableDefinition("posts", { adapter: mysqlConn() }));
     at.dropForeignKey("fk_name");
     at.checkConstraintDrops.push("chk");
     const sql = await (

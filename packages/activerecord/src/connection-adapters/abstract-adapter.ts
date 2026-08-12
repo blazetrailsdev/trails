@@ -22,7 +22,11 @@ import {
   NotImplementedError,
   type SQLWarning,
 } from "../errors.js";
-import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  LoadInterlockAwareMonitor,
+  Notifications,
+} from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
@@ -891,7 +895,13 @@ export class AbstractAdapter implements Quoting {
   // NullPool until then (abstract_adapter.rb:153).
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  lock: unknown = null;
+  /**
+   * Rails installs the monitor in `lock_thread=` (abstract_adapter.rb:181-192),
+   * picking `ThreadLoadInterlockAwareMonitor` / `LoadInterlockAwareMonitor` /
+   * `NullLock` by what owns the connection. trails has one concurrency model —
+   * the async chain — so the Fiber arm's monitor is the only one there is.
+   */
+  lock: LoadInterlockAwareMonitor = new LoadInterlockAwareMonitor();
   /** Stable per-instance hex slot + monotonic source for {@link inspect}. @internal */
   private _inspectId?: number;
   private static _inspectSeq?: number;
@@ -1620,8 +1630,10 @@ export class AbstractAdapter implements Quoting {
 
   async unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> {
     // Rails' `cache = prepared_statements_disabled_cache.add?(object_id) if
-    // @prepared_statements` — `Set#add?` returns nil when already present, so
-    // only the outermost block clears the entry on exit.
+    // @prepared_statements` (abstract_adapter.rb:344-349) — `Set#add?` returns
+    // nil when already present, so only the outermost block clears the entry on
+    // exit. JS has no `object_id`: the Set is keyed by the adapter instance
+    // itself, which is the same identity `object_id` stands for in Ruby.
     let cache: Set<unknown> | undefined;
     if (this._preparedStatements && !this.preparedStatementsDisabledCache.has(this)) {
       cache = this.preparedStatementsDisabledCache.add(this);
@@ -2368,8 +2380,9 @@ export class AbstractAdapter implements Quoting {
     key: string | RegExp,
     klass: new (options?: { limit?: number }) => object,
   ): void {
-    mapping.registerType(key, undefined, (sqlType: string) => {
-      return new klass({ limit: this.extractLimit(sqlType) }) as ReturnType<typeof mapping.lookup>;
+    mapping.registerType(key, undefined, (...args: string[]) => {
+      const limit = this.extractLimit(args.at(-1)!);
+      return new klass({ limit }) as ReturnType<typeof mapping.lookup>;
     });
   }
 
@@ -2379,13 +2392,11 @@ export class AbstractAdapter implements Quoting {
     mapping: TypeMap,
     key: string | RegExp,
     klass: new (options?: { precision?: number }) => object,
-    extraOptions: Record<string, unknown> = {},
+    kwargs: Record<string, unknown> = {},
   ): void {
-    mapping.registerType(key, undefined, (sqlType: string) => {
-      return new klass({
-        precision: this.extractPrecision(sqlType),
-        ...extraOptions,
-      }) as ReturnType<typeof mapping.lookup>;
+    mapping.registerType(key, undefined, (...args: string[]) => {
+      const precision = this.extractPrecision(args.at(-1)!);
+      return new klass({ precision, ...kwargs }) as ReturnType<typeof mapping.lookup>;
     });
   }
 

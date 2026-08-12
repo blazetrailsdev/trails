@@ -10,6 +10,7 @@ import {
   ChangeColumnDefaultDefinition,
   ColumnDefinition,
   AlterTable,
+  TableDefinition,
 } from "../abstract/schema-definitions.js";
 
 // Stub host satisfies `PgSchemaCreationHost`: the inherited Quoting
@@ -202,7 +203,7 @@ describe("PostgreSQL SchemaCreation", () => {
       undefined,
       true,
     );
-    const at = new AlterTable("users") as any;
+    const at = new AlterTable({ name: "users" } as unknown as TableDefinition) as any;
     at.foreignKeyAdds.push(fk);
     at.constraintValidations = ["some_constraint"];
     const sql = await s().visitAlterTable(at);

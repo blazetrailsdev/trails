@@ -925,16 +925,8 @@ export class ReferenceDefinition {
  * Mirrors: ActiveRecord::ConnectionAdapters::AlterTable
  */
 export class AlterTable {
-  readonly name: string;
-  /**
-   * Backing TableDefinition. Rails (`abstract/schema_definitions.rb:624`)
-   * constructs `AlterTable.new(td)` so `add_column` can route through
-   * `td.new_column_definition` for adapter-specific normalization. The
-   * legacy single-string constructor is retained for back-compat —
-   * callers that omit it lose dialect-specific column normalization.
-   * @internal
-   */
-  protected readonly _td?: TableDefinition;
+  /** @internal */
+  protected readonly _td: TableDefinition;
   readonly adds: AddColumnDefinition[] = [];
   readonly foreignKeyAdds: ForeignKeyDefinition[] = [];
   readonly foreignKeyDrops: string[] = [];
@@ -946,31 +938,22 @@ export class AlterTable {
     defaultValue: unknown;
   }> = [];
 
-  constructor(nameOrTd: string | TableDefinition) {
-    if (typeof nameOrTd === "string") {
-      this.name = nameOrTd;
-    } else {
-      this._td = nameOrTd;
-      this.name = nameOrTd.name;
-    }
+  constructor(td: TableDefinition) {
+    this._td = td;
+  }
+
+  get name(): string {
+    return this._td.name;
   }
 
   addColumn(name: string, type: ColumnType, options: ColumnOptions = {}): void {
-    const colDef = this._td
-      ? this._td.newColumnDefinition(name, type, options)
-      : new ColumnDefinition(name, type, options);
-    this.adds.push(new AddColumnDefinition(colDef));
+    this.adds.push(new AddColumnDefinition(this._td.newColumnDefinition(name, type, options)));
   }
 
   addForeignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): void {
     // Mirrors Rails' AlterTable#add_foreign_key, which routes through
     // `@td.new_foreign_key_definition(to_table, options)` so the FK def picks up
     // table_name_prefix/suffix and the converged foreign_key_options defaults.
-    if (!this._td) {
-      throw new Error(
-        "AlterTable#addForeignKey requires a backing TableDefinition (construct via createAlterTable)",
-      );
-    }
     this.foreignKeyAdds.push(this._td.newForeignKeyDefinition(toTable, options));
   }
 
@@ -982,11 +965,6 @@ export class AlterTable {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): void {
-    if (!this._td) {
-      throw new Error(
-        "AlterTable#addCheckConstraint requires a backing TableDefinition (construct via createAlterTable)",
-      );
-    }
     this.checkConstraintAdds.push(this._td.newCheckConstraintDefinition(expression, options));
   }
 

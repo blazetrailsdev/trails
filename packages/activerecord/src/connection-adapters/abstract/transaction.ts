@@ -9,8 +9,7 @@ import {
 } from "../../errors.js";
 import {
   Notifications,
-  getAsyncContext,
-  type AsyncContext,
+  type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../ar-config.js";
@@ -301,6 +300,9 @@ export type TransactionConnection = DatabaseAdapter & {
   supportsLazyTransactions?(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
   addTransactionRecord?(record: unknown): void;
+  /** Rails' `@lock` (abstract_adapter.rb:181-192) — the monitor
+   *  `TransactionManager#synchronize` runs its critical sections under. */
+  lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void;
@@ -557,6 +559,10 @@ export class Transaction {
     } else if (this._callbacks) {
       const current = this._connection.currentTransaction?.();
       if (current instanceof Transaction) {
+        // Rails passes `@callbacks` here (abstract/transaction.rb:320-323). The
+        // argument is the same ivar under the repo's `_`-prefixed spelling for
+        // private fields — TS has no `@` sigil, so the underscore IS the port
+        // of it, not a rename.
         current.appendCallbacks(this._callbacks);
       }
     }
@@ -918,14 +924,6 @@ export class TransactionManager {
   private _connection: TransactionConnection;
   private _hasUnmaterializedTransactions = false;
   private _lazyTransactionsEnabled = true;
-  /** @internal AsyncContext carrying the per-acquisition lock-owner token. */
-  private _lockOwner: AsyncContext<symbol> | null = null;
-  /** @internal Cached AsyncContext adapter (refresh on swap, like other call sites). */
-  private _lockOwnerAdapter: ReturnType<typeof getAsyncContext> | null = null;
-  /** @internal Token identifying the chain that currently holds the lock. */
-  private _currentLockOwner: symbol | null = null;
-  /** @internal Outermost-call mutex; non-null while a foreign chain holds it. */
-  private _lockChain: Promise<void> | null = null;
   /**
    * @internal Mirrors Rails' `@materializing_transactions` boolean. Guards
    * re-entrant `materializeTransactions` passes (queries the materialize loop
@@ -1169,59 +1167,19 @@ export class TransactionManager {
   }
 
   /**
-   * Async-chain-aware mutex storage. Mirrors Rails'
-   * `@connection.lock.synchronize` (`abstract/transaction.rb:622`): outermost
-   * `within_new_transaction` calls on the same connection serialize, but a
-   * recursive call from inside the body (e.g. `after_commit` re-entry) skips
-   * re-acquisition to avoid self-deadlock.
-   *
-   * Token-based ownership: each acquisition mints a fresh symbol stored both
-   * in the AsyncContext and in `_currentLockOwner`. Reentry requires both to
-   * match — so a detached task that inherits the AsyncContext but outlives
-   * the holder's release (token cleared) correctly re-acquires the lock.
-   *
-   * @internal
-   */
-  private _lockStorage(): AsyncContext<symbol> {
-    const asyncContext = getAsyncContext();
-    if (!this._lockOwner || this._lockOwnerAdapter !== asyncContext) {
-      this._lockOwner = asyncContext.create<symbol>();
-      this._lockOwnerAdapter = asyncContext;
-    }
-    return this._lockOwner;
-  }
-
-  /**
    * Run `fn` under the per-connection lock that serializes
-   * {@link withinNewTransaction}. Mirrors Rails'
-   * `@connection.lock.synchronize do … end` so callers can extend the lock
-   * scope across pre-/post-transaction work (e.g. DDL setup) without
-   * starting a transaction. Same reentrance rules as
-   * {@link withinNewTransaction}.
+   * {@link withinNewTransaction} — Rails' `@connection.lock.synchronize do … end`
+   * (`abstract/transaction.rb:622`), so callers can extend the lock scope
+   * across pre-/post-transaction work (e.g. DDL setup) without starting a
+   * transaction.
+   *
+   * The lock lives on the CONNECTION, not on the manager: it is the monitor
+   * `AbstractAdapter` installs as `@lock` (abstract_adapter.rb:181-192), the
+   * same one `with_raw_connection` takes, so a write nested inside a
+   * transaction re-enters one lock rather than crossing two.
    */
   async synchronize<T>(fn: () => Promise<T> | T): Promise<T> {
-    const storage = this._lockStorage();
-    if (this._currentLockOwner && storage.getStore() === this._currentLockOwner) {
-      return await fn();
-    }
-    while (this._lockChain) {
-      await this._lockChain;
-    }
-    const owner = Symbol("tm.lock");
-    let release!: () => void;
-    this._lockChain = new Promise<void>((r) => {
-      release = () => {
-        this._lockChain = null;
-        this._currentLockOwner = null;
-        r();
-      };
-    });
-    this._currentLockOwner = owner;
-    try {
-      return await storage.run(owner, () => fn());
-    } finally {
-      release();
-    }
+    return await this._connection.lock.synchronize(fn);
   }
 
   async withinNewTransaction<T>(

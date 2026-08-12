@@ -344,6 +344,13 @@ export class PoolConfig {
     if (value instanceof ConnectionDescriptor) {
       this._connectionDescriptor = value;
     } else {
+      // DEVIATION (RFC 0096): Rails passes `connection_descriptor.name`
+      // verbatim (pool_config.rb:43-50). trails normalizes the primary class's
+      // name to "Base" because the connected-to stack matches pool names
+      // through the same normalization (core.ts `isPreventingWrites`), so an
+      // `ApplicationRecord` pool has to be registered under "Base" for the
+      // stack lookup to find it. Converging means retiring that normalization
+      // on BOTH sides at once — tracked as its own story.
       const isPrimary = value.primaryClassQ();
       const name = isPrimary ? "Base" : value.name;
       this._connectionDescriptor = new ConnectionDescriptor(name, isPrimary);

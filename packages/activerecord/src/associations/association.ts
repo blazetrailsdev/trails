@@ -634,16 +634,16 @@ export class Association {
   }
 
   async create(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
     block?: (record: Base) => void,
-  ): Promise<Base | null> {
+  ): Promise<Base | Base[] | null> {
     return this._createRecord(attributes, false, block);
   }
 
   async createBang(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
     block?: (record: Base) => void,
-  ): Promise<Base> {
+  ): Promise<Base | Base[]> {
     const record = await this._createRecord(attributes, true, block);
     if (!record) {
       throw new Error("Failed to create associated record");
@@ -701,13 +701,13 @@ export class Association {
   }
 
   protected async _createRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void,
-  ): Promise<Base | null> {
+  ): Promise<Base | Base[] | null> {
     // Rails yields the record inside `build_record` (association.rb:383-388),
     // before the save — so the block can mutate attributes that get persisted.
-    const record = this.buildRecord(attributes, block);
+    const record = this.buildRecord(attributes as Record<string, unknown> | undefined, block);
     if (!record) return null;
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();

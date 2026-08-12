@@ -69,4 +69,6 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // active_support/core_ext/hash/keys.rb — `hash.assert_valid_keys(*valid)`,
   // exported by @blazetrails/activesupport as `assertValidKeys(obj, validKeys)`.
   "assert_valid_keys",
+  "to_param",
+  "as_json",
 ]);

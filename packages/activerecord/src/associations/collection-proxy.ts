@@ -1395,7 +1395,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
+    if (Array.isArray(attrs) && (this._isSingular || this._isThrough)) {
       const records: T[] = [];
       for (const a of attrs) {
         records.push(await this.create(a, block));
@@ -1403,13 +1403,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return records;
     }
     if (this._isSingular) {
-      return this._createSingular(attrs, block, false);
+      return this._createSingular(attrs as Record<string, unknown>, block, false);
     }
     if (this._isThrough) this._ensurePersistedOwnerForCreate();
     this._ensureThroughWritable();
     if (this._isThrough) {
       return (await this._createThrough(
-        attrs,
+        attrs as Record<string, unknown>,
         block,
         (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
       )) as T;
@@ -3620,18 +3620,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs)) {
+    if (Array.isArray(attrs) && (this._isSingular || this._isThrough)) {
       const records: T[] = [];
       for (const a of attrs) records.push(await this.createBang(a, block));
       return records;
     }
     if (this._isSingular) {
-      return this._createSingular(attrs, block, true);
+      return this._createSingular(attrs as Record<string, unknown>, block, true);
     }
     if (this._isThrough) this._ensurePersistedOwnerForCreate();
     this._ensureThroughWritable();
     if (this._isThrough) {
-      const record = this._buildRecord(attrs) as T;
+      const record = this._buildRecord(attrs as Record<string, unknown>) as T;
       if (block) block(record);
       if (!this._callbackHost.callback("beforeAdd", record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);

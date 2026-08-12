@@ -492,20 +492,30 @@ export class CollectionAssociation extends Association {
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#_create_record
    * (collection_association.rb:354-372).
    *
-   * Rails' Array arm — `_create_record` recursing over an Array of attribute
-   * hashes — has no counterpart here for the same reason it has none in
-   * `HasManyAssociation#_createRecord`: the multi-record form is the loop in
-   * `CollectionProxy#create`, which reaches this method once per element.
-   *
+   * @missingRailsCall loaded? — the `{ @_was_loaded = loaded? }` block Rails
+   * hands to `insert_record` (collection_association.rb:365-367) feeds
+   * `replace_on_target`'s `@_was_loaded || !loaded?` append gate
+   * (collection_association.rb:481). `replaceOnTarget` reads the flag, but at
+   * this call site both arms of that gate agree — an unloaded association takes
+   * `!loaded?` and a loaded one would set the flag `true` — so writing it is
+   * unobservable here.
    * @internal
    */
   protected override async _createRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void,
-  ): Promise<Base | null> {
+  ): Promise<Base | Base[] | null> {
     if (!this.owner.isPersisted()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
+    }
+
+    if (Array.isArray(attributes)) {
+      const records: Base[] = [];
+      for (const attr of attributes) {
+        records.push((await this._createRecord(attr, raise, block)) as Base);
+      }
+      return records;
     }
 
     const record = this.buildRecord(attributes, block);

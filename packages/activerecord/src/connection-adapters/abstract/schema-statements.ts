@@ -367,7 +367,7 @@ export class SchemaStatements {
       | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
-    let options: {
+    let kwargs: {
       id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
@@ -388,29 +388,33 @@ export class SchemaStatements {
     if (typeof optionsOrFn === "function") {
       definer = optionsOrFn;
     } else if (optionsOrFn) {
-      options = optionsOrFn;
+      kwargs = optionsOrFn;
       definer = fn;
     }
 
     // Rails takes `id:`, `primary_key:` and `force:` as their own kwargs, so
     // they never reach `validate_create_table_options!(options)`
-    // (schema_statements.rb:307). We bundle every kwarg into one object, so
-    // they are split back out here before validating.
-    const { id: _id, primaryKey: _primaryKey, force: _force, ...validatedOptions } = options;
-    this.validateCreateTableOptionsBang(validatedOptions);
+    // (schema_statements.rb:293-294). We bundle every kwarg into one object, so
+    // they are split back out here — `options` is then Rails' `**options`.
+    const { id, primaryKey, force, ...options } = kwargs;
+    this.validateCreateTableOptionsBang(options);
 
     if (tableName.length > 64) {
       throw new Error(`Table name '${tableName}' is too long; the limit is 64 characters`);
     }
 
-    if (options.force && options.ifNotExists) {
+    if (force && options.ifNotExists) {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
 
-    const td = this.buildCreateTableDefinition(tableName, options, definer);
+    const td = this.buildCreateTableDefinition(
+      tableName,
+      { id, primaryKey, force, ...options },
+      definer,
+    );
 
-    if (options.force) {
-      await this.dropTable(tableName, { force: options.force, ifExists: true });
+    if (force) {
+      await this.dropTable(tableName, { force, ifExists: true });
     } else {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
@@ -935,10 +939,17 @@ export class SchemaStatements {
     await this.dropTable(tableName);
   }
 
+  /**
+   * Rails spells the receiver the yielded `Table` is bound to as the second
+   * POSITIONAL parameter — `change_table(table_name, base = self, **options)`
+   * (schema_statements.rb:510-518). TS puts it last because slot 2 is already
+   * the options-or-block union Ruby gets from `**options` plus a real block.
+   */
   async changeTable(
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: Table) => void | Promise<void>,
+    base: unknown = this,
   ): Promise<void> {
     const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
     const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
@@ -953,7 +964,7 @@ export class SchemaStatements {
       if (callback) await callback(bulkTable);
       await this.bulkChangeTable(tableName, recorder.commands);
     } else {
-      const table = this.updateTableDefinition(tableName, this);
+      const table = this.updateTableDefinition(tableName, base);
       if (callback) await callback(table);
     }
   }
@@ -1553,9 +1564,8 @@ export class SchemaStatements {
     // Rails' foreign_key_column_for strips table_name_prefix/suffix before
     // singularizing (schema_statements.rb:1241-1244), so the default column is
     // derived from the bare table name even when new_foreign_key_definition
-    // threads a prefixed to_table through. (The leading schema-qualifier strip
-    // is a trails addition for PG's `schema.table` form.)
-    const name = this.stripTableNamePrefixAndSuffix(tableName.replace(/^.*\./, ""));
+    // threads a prefixed to_table through.
+    const name = this.stripTableNamePrefixAndSuffix(tableName);
     return `${singularize(name)}_${columnName}`;
   }
 
