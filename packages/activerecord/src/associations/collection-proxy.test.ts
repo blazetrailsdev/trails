@@ -864,8 +864,7 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
 });
 
 // The mutation terminals invoked on the PROXY itself (not a spawned relation)
-// route through `Relation`'s implementations with `this` = the proxy — and
-// `deleteAll`'s diverged branch calls `super.deleteAll()` on the proxy — so
+// route through `Relation`'s implementations with `this` = the proxy, so
 // they hit the base `_isEmptyRelation()` chokepoint on the proxy. The
 // `CollectionProxy#_isEmptyRelation` override rebases the stale new-owner
 // `1=0` seed there, giving the mutation side the same rebase reads already
@@ -897,18 +896,30 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
   it("resolves the persisted FK on the diverged deleteAll branch invoked on the proxy after save", async () => {
     const author = new Author({ name: "Proxy Mutation Two" });
     const posts = association<Post>(author, "posts") as any;
-    // Diverge the proxy in place while the owner is new so its base is the
-    // stale `1=0` seed and `deleteAll` takes the `super.deleteAll()` branch.
+    // Diverge the proxy in place while the owner is new, so its own relation
+    // state sits on the stale `1=0` seed.
     posts.whereBang({ title: "drop" });
 
     await author.save();
     const authorId = author.id as number;
     const dropped = await Post.create({ title: "drop", body: "1", author_id: authorId });
     const kept = await Post.create({ title: "keep", body: "2", author_id: authorId });
+    // A post belonging to a DIFFERENT author proves the association scope still
+    // constrains to this owner's FK, not a bare `deleteAll` over the table.
+    const otherAuthor = await Author.create({ name: "Someone Else Two" });
+    const theirs = await Post.create({ title: "drop", body: "3", author_id: otherAuthor.id });
 
-    expect(await posts.deleteAll()).toBe(1);
-    expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([kept.id]);
-    expect(await Post.exists(dropped.id)).toBe(false);
+    // Rails' `CollectionProxy#delete_all` is `@association.delete_all(dependent)`
+    // (collection_proxy.rb:474-476): it runs against the association scope, so
+    // the proxy's in-place `where!` does NOT narrow it — both of this author's
+    // posts leave the collection. `Author has_many :posts` declares no
+    // `:dependent`, so Rails' `delete_count(nil, scope)`
+    // (has_many_association.rb:112-118) nullifies the FK rather than deleting.
+    expect(await posts.deleteAll()).toBe(2);
+    expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([]);
+    expect((await Post.find(dropped.id)).author_id).toBeNull();
+    expect((await Post.find(kept.id)).author_id).toBeNull();
+    expect((await Post.find(theirs.id)).author_id).toBe(otherAuthor.id);
   });
 
   it("resolves the persisted FK on touchAll invoked on the proxy after save", async () => {

@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { association as associationProxy } from "../associations.js";
 import { underscore, isAbortSignal } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
@@ -503,25 +504,39 @@ export class CollectionAssociation extends Association {
    * Removes all records from the association. Honors the :dependent
    * option. If :dependent is :destroy, uses :delete_all strategy instead.
    */
-  async deleteAll(dependent?: string): Promise<void> {
+  async deleteAll(dependent?: string): Promise<number> {
+    // Rails' `[:nullify, :delete_all].include?(dependent)`. `:delete_all` is
+    // spelled both ways in trails: `"delete_all"` (the literal Symbol name, what
+    // the proxy has always accepted from callers) and `"deleteAll"` (the
+    // camelCased form the internal `method` dispatch below runs on).
     if (
       dependent &&
       dependent !== "nullify" &&
-      dependent !== "deleteAll" &&
-      dependent !== "delete"
+      dependent !== "delete_all" &&
+      dependent !== "deleteAll"
     ) {
-      throw new Error("Valid values are 'nullify', 'delete', or 'deleteAll'");
+      throw new ArgumentError("Valid values are :nullify or :delete_all");
     }
 
-    const normalized = dependent === "delete" ? "deleteAll" : dependent;
     const optionDep = this.options.dependent;
     dependent =
-      normalized ?? (optionDep === "destroy" || optionDep === "delete" ? "deleteAll" : optionDep);
+      dependent === "delete_all"
+        ? "deleteAll"
+        : dependent
+          ? dependent
+          : // Rails' `options[:dependent] == :destroy` arm. Canonical trails
+            // models spell `:delete_all` as `"delete"`, which is the same delete
+            // strategy, so it collapses here too rather than falling through to
+            // nullify.
+            optionDep === "destroy" || optionDep === "delete"
+            ? "deleteAll"
+            : optionDep;
 
-    await this.deleteOrNullifyAllRecords(dependent);
+    const count = await this.deleteOrNullifyAllRecords(dependent);
 
     this.reset();
     this.loadedBang();
+    return count;
   }
 
   /**
@@ -533,12 +548,11 @@ export class CollectionAssociation extends Association {
    * deletes the rows; every other method (including the `nil`/`undefined`
    * default from `delete_all` with no `:dependent`) nullifies the FK.
    */
-  protected async deleteOrNullifyAllRecords(method?: string): Promise<void> {
+  protected async deleteOrNullifyAllRecords(method?: string): Promise<number> {
     if (method === "deleteAll") {
-      await this.deleteAllRecords();
-    } else {
-      await this.nullifyAllRecords();
+      return this.deleteAllRecords();
     }
+    return this.nullifyAllRecords();
   }
 
   /**
@@ -1129,14 +1143,13 @@ export class CollectionAssociation extends Association {
     return nullAttrs;
   }
 
-  protected async nullifyAllRecords(): Promise<void> {
+  protected async nullifyAllRecords(): Promise<number> {
     const nullAttrs = this.computeNullifiedOwnerAttributes();
 
     // Prefer scope-based bulk update (hits DB even if target isn't loaded)
     const rel = this.scope();
     if (rel && typeof rel.updateAll === "function") {
-      await rel.updateAll(nullAttrs);
-      return;
+      return rel.updateAll(nullAttrs);
     }
 
     // Fallback: load and update individually
@@ -1153,6 +1166,7 @@ export class CollectionAssociation extends Association {
         await (record as any).save();
       }
     }
+    return this.target.length;
   }
 
   /**
@@ -1191,11 +1205,12 @@ export class CollectionAssociation extends Association {
       : (record as any)[pk];
   }
 
-  private async deleteAllRecords(): Promise<void> {
+  private async deleteAllRecords(): Promise<number> {
     const rel = this.scope();
     if (rel && typeof rel.deleteAll === "function") {
-      await rel.deleteAll();
+      return rel.deleteAll();
     }
+    return 0;
   }
 
   /**

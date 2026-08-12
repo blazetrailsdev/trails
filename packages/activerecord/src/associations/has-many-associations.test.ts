@@ -593,6 +593,14 @@ describe("HasManyAssociationsTest", () => {
     expect((await Client.where(`firm_id=${firm.id}`)).length).toBe(0);
   });
 
+  it("delete all with option delete all", async () => {
+    const firm = companies("first_firm") as any;
+    const clientId = (await firm.dependentClientsOfFirm.first()).id;
+    const count = await firm.dependentClientsOfFirm.count();
+    expect(await firm.dependentClientsOfFirm.deleteAll("delete_all")).toBe(count);
+    expect(await Client.findBy({ id: clientId })).toBeNull();
+  });
+
   it("delete all with option nullify", async () => {
     const firm = companies("first_firm") as any;
     const clientId = (await firm.dependentClientsOfFirm.first()).id;

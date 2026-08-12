@@ -2,17 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-proxy.ts",
-    "rubyName": "delete_all",
-    "call": "delete_all",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:dependent"
-    ],
-    "reason": "collection_proxy.rb:474-476 is `@association.delete_all(dependent).tap { reset_scope }`; the port reimplements the dependent dispatch, the through-join delete and the nullify arms inside the proxy rather than delegating, so there is no association-level `deleteAll(dependent)` call to forward the argument to. Converging is the delegation rewrite tracked by story call-args-ar-collection-proxy-delete-all-delegation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-proxy.ts",
     "rubyName": "scope",
     "call": "scope",
     "kind": "args",

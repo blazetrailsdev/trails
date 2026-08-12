@@ -477,8 +477,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * bulk `scope.deleteAll`, which can't reach the join table.
    * @internal
    */
-  protected override async deleteOrNullifyAllRecords(method?: string): Promise<void> {
-    await this.deleteRecords(await this.loadTarget(), method ?? "");
+  protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
+    return this.deleteRecords(await this.loadTarget(), method ?? "");
   }
 }
 
