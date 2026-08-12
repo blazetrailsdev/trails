@@ -1,6 +1,7 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
-import { coder } from "./coder.js";
+import { Coder, coder } from "./coder.js";
+import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
 import { Store, type StoreOptions } from "./store.js";
@@ -9,6 +10,13 @@ import { type CacheEntry, isExpired } from "./entry-record.js";
 import { registerStoreClass } from "./store-registry.js";
 
 const FILENAME_MAX_SIZE = 228;
+
+// Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45).
+const DEFAULT_COMPRESS_LIMIT = 1024;
+
+// The coder Rails' `Store#initialize` builds when none is given:
+// `Cache::Coder.new(serializer, compressor)` (cache.rb:301-309).
+const fileCoder = new Coder(coder, { deflate, inflate });
 
 export class FileStore extends Store implements CacheStore {
   /** Advertise cache versioning support (file_store.rb:25-28). */
@@ -52,14 +60,26 @@ export class FileStore extends Store implements CacheStore {
   }
 
   /**
-   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813). Rails' default
-   * coder returns a String payload; the trails FileStore's on-disk payload is
-   * the {@link CacheEntry} record, so the Coder round-trip that stands in for
-   * Marshal happens on its `encodedValue`.
+   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
+   * coder's `dump_compressed` under `:compress` — Rails' default
+   * (`@options[:compress] = true unless @options.key?(:compress)`, cache.rb:298)
+   * — and to `dump` otherwise. The coder is `Cache::Coder` over the default
+   * serializer and Zlib (cache.rb:301-309), which `Store#initialize` builds and
+   * holds in `@coder`; trails' `Store` has no such seam yet (RFC 0101 story
+   * `converge-store-serialized-entry-hooks-and-file-store-paths`), so this
+   * store builds the same coder meanwhile. The framed payload carries the
+   * value, the compression flag, `expires_at` and `version`; the surrounding
+   * record keeps `expiresAt` beside it for the directory scans `cleanup` and
+   * `deleteMatched` do without deserializing.
    */
-  private serializeEntry(entry: Entry, _options: StoreOptions): CacheEntry {
+  private serializeEntry(entry: Entry, options: StoreOptions): CacheEntry {
+    const compress = (options.compress as boolean | undefined) ?? true;
+    const compressThreshold =
+      (options.compressThreshold as number | undefined) ?? DEFAULT_COMPRESS_LIMIT;
     return {
-      encodedValue: coder.dump(entry.value),
+      encodedValue: compress
+        ? fileCoder.dumpCompressed(entry, compressThreshold)
+        : fileCoder.dump(entry),
       expiresAt: entry.expiresAt,
       version: entry.version,
       accessedAt: Date.now(),
@@ -72,14 +92,12 @@ export class FileStore extends Store implements CacheStore {
    */
   private deserializeEntry(payload: CacheEntry | null): Entry | null {
     if (payload === null || payload.encodedValue === undefined) return null;
-    let value: unknown;
     try {
-      value = coder.load(payload.encodedValue);
+      return fileCoder.load(payload.encodedValue) as Entry;
     } catch (e) {
       if (e instanceof DeserializationError) return null;
       throw e;
     }
-    return new Entry(value, { expiresAt: payload.expiresAt, version: payload.version ?? null });
   }
 
   protected deleteEntry(key: string, _options: StoreOptions): boolean {
