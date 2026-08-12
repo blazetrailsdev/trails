@@ -154,9 +154,14 @@ export class HasManyAssociation extends CollectionAssociation {
    * owner, then delegate to `CollectionAssociation#insert_record`, which picks
    * the `save!` / `save` arm from `raise`.
    */
-  override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
+  override async insertRecord(
+    record: Base,
+    validate = true,
+    raise = false,
+    block?: () => void,
+  ): Promise<boolean> {
     this.setOwnerAttributes(record);
-    return super.insertRecord(record, validate, raise);
+    return super.insertRecord(record, validate, raise, block);
   }
 
   /**
