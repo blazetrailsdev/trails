@@ -169,7 +169,7 @@ describe("CounterCacheTest", () => {
 
   it("increment counter by specific amount", async () => {
     await assertDifference([reloadRepliesCount], 2, async () => {
-      await Topic.incrementCounter("replies_count", topic.id, 2);
+      await Topic.incrementCounter("replies_count", topic.id, { by: 2 });
     });
   });
 
@@ -217,7 +217,7 @@ describe("CounterCacheTest", () => {
 
   it("decrement counter by specific amount", async () => {
     await assertDifference([reloadRepliesCount], -2, async () => {
-      await Topic.decrementCounter("replies_count", topic.id, 2);
+      await Topic.decrementCounter("replies_count", topic.id, { by: 2 });
     });
   });
 
@@ -600,14 +600,14 @@ describe("CounterCacheTest", () => {
     await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
     const previouslyUpdatedAt = topic.updated_at;
 
-    await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: [] as string[] });
+    await Topic.updateCounters(topic.id, { replies_count: -1, touch: [] as string[] });
 
     expect(epochMs(topic.updated_at)).toBe(epochMs(previouslyUpdatedAt));
   });
 
   it("update counters with touch: true", async () => {
     await assertTouching(topic, ["updated_at"], async () => {
-      await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: true });
+      await Topic.updateCounters(topic.id, { replies_count: -1, touch: true });
     });
   });
 
@@ -629,7 +629,7 @@ describe("CounterCacheTest", () => {
         ],
         2,
         async () => {
-          await Topic.updateCounters([t1.id, t2.id], { replies_count: 2 }, { touch: true });
+          await Topic.updateCounters([t1.id, t2.id], { replies_count: 2, touch: true });
         },
       );
     });
@@ -637,11 +637,11 @@ describe("CounterCacheTest", () => {
 
   it("update multiple counters with touch: true", async () => {
     await assertTouching(topic, ["updated_at"], async () => {
-      await Topic.updateCounters(
-        topic.id,
-        { replies_count: 2, unique_replies_count: 2 },
-        { touch: true },
-      );
+      await Topic.updateCounters(topic.id, {
+        replies_count: 2,
+        unique_replies_count: 2,
+        touch: true,
+      });
     });
   });
 
@@ -662,29 +662,29 @@ describe("CounterCacheTest", () => {
 
   it("increment counters with touch: true", async () => {
     await assertTouching(topic, ["updated_at"], async () => {
-      await Topic.incrementCounter("replies_count", topic.id, 1, { touch: true });
+      await Topic.incrementCounter("replies_count", topic.id, { touch: true });
     });
   });
 
   it("decrement counters with touch: true", async () => {
     await assertTouching(topic, ["updated_at"], async () => {
-      await Topic.decrementCounter("replies_count", topic.id, 1, { touch: true });
+      await Topic.decrementCounter("replies_count", topic.id, { touch: true });
     });
   });
 
   it("update counters with touch: :written_on", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.updateCounters(topic.id, { replies_count: -1 }, { touch: "written_on" });
+      await Topic.updateCounters(topic.id, { replies_count: -1, touch: "written_on" });
     });
   });
 
   it("update multiple counters with touch: :written_on", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.updateCounters(
-        topic.id,
-        { replies_count: 2, unique_replies_count: 2 },
-        { touch: "written_on" },
-      );
+      await Topic.updateCounters(topic.id, {
+        replies_count: 2,
+        unique_replies_count: 2,
+        touch: "written_on",
+      });
     });
   });
 
@@ -703,33 +703,32 @@ describe("CounterCacheTest", () => {
 
   it("increment counters with touch: :written_on", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.incrementCounter("replies_count", topic.id, 1, { touch: "written_on" });
+      await Topic.incrementCounter("replies_count", topic.id, { touch: "written_on" });
     });
   });
 
   it("decrement counters with touch: :written_on", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.decrementCounter("replies_count", topic.id, 1, { touch: "written_on" });
+      await Topic.decrementCounter("replies_count", topic.id, { touch: "written_on" });
     });
   });
 
   it("update counters with touch: %i( updated_at written_on )", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.updateCounters(
-        topic.id,
-        { replies_count: -1 },
-        { touch: ["updated_at", "written_on"] },
-      );
+      await Topic.updateCounters(topic.id, {
+        replies_count: -1,
+        touch: ["updated_at", "written_on"],
+      });
     });
   });
 
   it("update multiple counters with touch: %i( updated_at written_on )", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.updateCounters(
-        topic.id,
-        { replies_count: 2, unique_replies_count: 2 },
-        { touch: ["updated_at", "written_on"] },
-      );
+      await Topic.updateCounters(topic.id, {
+        replies_count: 2,
+        unique_replies_count: 2,
+        touch: ["updated_at", "written_on"],
+      });
     });
   });
 
@@ -750,7 +749,7 @@ describe("CounterCacheTest", () => {
 
   it("increment counters with touch: %i( updated_at written_on )", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.incrementCounter("replies_count", topic.id, 1, {
+      await Topic.incrementCounter("replies_count", topic.id, {
         touch: ["updated_at", "written_on"],
       });
     });
@@ -758,7 +757,7 @@ describe("CounterCacheTest", () => {
 
   it("decrement counters with touch: %i( updated_at written_on )", async () => {
     await assertTouching(topic, ["updated_at", "written_on"], async () => {
-      await Topic.decrementCounter("replies_count", topic.id, 1, {
+      await Topic.decrementCounter("replies_count", topic.id, {
         touch: ["updated_at", "written_on"],
       });
     });

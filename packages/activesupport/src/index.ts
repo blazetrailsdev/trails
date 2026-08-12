@@ -237,6 +237,7 @@ export {
   isPlainObject,
   compact,
   compactBlankObj,
+  valuesAt,
 } from "./hash-utils.js";
 
 export {
