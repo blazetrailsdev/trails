@@ -64,11 +64,11 @@ export class Aes256Gcm {
     return { deterministic: this.deterministic };
   }
 
-  encrypt(clearText: string | Buffer, options?: { deterministic?: boolean }): Message {
+  encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     const inputBuf = Buffer.isBuffer(clearText) ? clearText : Buffer.from(clearText, "utf-8");
-    const iv = this.generateIv(inputBuf, options?.deterministic ?? this.deterministic);
+    const iv = this.generateIv(inputBuf, this.deterministic);
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
@@ -144,9 +144,8 @@ export class Aes256Gcm {
   /**
    * Rails' first parameter is the live `OpenSSL::Cipher` (only so the random
    * branch can call `cipher.random_iv`). WebCrypto has no such object before
-   * the IV exists, so the slot carries the deterministic flag instead — which
-   * Rails reads off `@deterministic`, and this port also lets `encrypt`
-   * override per call.
+   * the IV exists, so the slot carries the deterministic flag instead, which
+   * Rails reads off `@deterministic`.
    *
    * @internal
    */

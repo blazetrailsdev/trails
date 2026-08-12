@@ -346,8 +346,8 @@ export function toSqlAndBinds(
 export function cacheableQuery(
   this: DatabaseStatementsHost | void,
   klass: {
-    query?(sql: string, options?: { retryable?: boolean }): unknown;
-    partialQuery?(parts: unknown, options?: { retryable?: boolean }): unknown;
+    query?(sql: string): unknown;
+    partialQuery?(parts: unknown): unknown;
     partialQueryCollector?(): unknown;
   },
   arel: unknown,
@@ -363,21 +363,18 @@ export function cacheableQuery(
 
   // Prepared path: compile with bind extraction, return Query + raw binds
   if (host?.preparedStatements && klass.query && visitor && node instanceof Nodes.Node) {
-    const [sql, binds, retryable] = visitor.compileWithBinds(node);
-    return [klass.query(sql, { retryable }), binds];
+    const [sql, binds] = visitor.compileWithBinds(node);
+    return [klass.query(sql), binds];
   }
 
   // Unprepared path: compile through PartialQueryCollector to produce
   // parts with Substitute slots, matching Rails' cacheable_query when
   // prepared_statements is false.
   if (klass.partialQueryCollector && klass.partialQuery && visitor && node instanceof Nodes.Node) {
-    const collector = klass.partialQueryCollector() as {
-      value: [unknown[], unknown[]];
-      retryable?: boolean;
-    };
+    const collector = klass.partialQueryCollector() as { value: [unknown[], unknown[]] };
     visitor.compileWithCollector(node, collector);
     const [parts, collectedBinds] = collector.value;
-    return [klass.partialQuery(parts, { retryable: collector.retryable ?? false }), collectedBinds];
+    return [klass.partialQuery(parts), collectedBinds];
   }
 
   // Fallback: compile to SQL string

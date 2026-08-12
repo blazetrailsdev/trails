@@ -1387,14 +1387,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     connectionPool: AbstractAdapter["pool"],
   ): MismatchedForeignKey {
     if (sql) {
-      const details = this.mismatchedForeignKeyDetails(message, sql);
+      const details = this.mismatchedForeignKeyDetails({ message, sql });
       return new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details });
     }
     return new MismatchedForeignKey({
       message,
       binds,
       connectionPool,
-      queryParser: (parsedSql) => this.mismatchedForeignKeyDetails(message, parsedSql),
+      queryParser: (sql) => this.mismatchedForeignKeyDetails({ message, sql }),
     });
   }
 
@@ -1405,10 +1405,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * Mirrors: AbstractMysqlAdapter#mismatched_foreign_key_details (abstract_mysql_adapter.rb:978)
    */
-  protected mismatchedForeignKeyDetails(
-    message: string,
-    sql: string,
-  ): Partial<MismatchedForeignKeyOptions> {
+  protected mismatchedForeignKeyDetails({
+    message,
+    sql,
+  }: {
+    message: string;
+    sql: string;
+  }): Partial<MismatchedForeignKeyOptions> {
     // Extract the referencing column name from MySQL's error message when
     // available (MySQL 8+ includes it: "Referencing column 'x' and referenced")
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
