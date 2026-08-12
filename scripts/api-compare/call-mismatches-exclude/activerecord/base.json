@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "base.ts",
-    "rubyName": "changed_for_autosave?",
-    "call": "marked_for_destruction?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "base.ts",
     "rubyName": "define_delegated_type_methods",
     "call": "define_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

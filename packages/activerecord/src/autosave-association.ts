@@ -32,10 +32,9 @@ interface AutosaveAssociationHost {
   [key: symbol]: unknown;
   isNewRecord(): boolean;
   hasChangesToSave?: unknown;
-  changed?: unknown;
   destroyedByAssociation?: unknown;
   changedForAutosave(): boolean;
-  isChangedForAutosave(): boolean;
+  markedForDestruction(): boolean;
   isValidatingBelongsToFor(association: unknown): boolean;
   isAutosavingBelongsToFor(association: unknown): boolean;
   _alreadyCalled?: Record<string, boolean> | null;
@@ -89,14 +88,9 @@ export const AutosaveAssociation = {
     return (
       this.isNewRecord() ||
       !!this.hasChangesToSave ||
-      !!this.changed ||
-      !!this[MARKED_FOR_DESTRUCTION] ||
+      this.markedForDestruction() ||
       isNestedRecordsChangedForAutosave.call(this)
     );
-  },
-
-  isChangedForAutosave(this: AutosaveAssociationHost): boolean {
-    return this.changedForAutosave();
   },
 
   isValidatingBelongsToFor(this: AutosaveAssociationHost, association: unknown): boolean {
