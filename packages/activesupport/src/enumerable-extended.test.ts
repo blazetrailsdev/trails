@@ -196,6 +196,12 @@ describe("EnumerableTests", () => {
     expect(result.map((p) => p.price)).toEqual([1, 5]);
   });
 
+  it("in_order_of — keys the series by value, not by string coercion", () => {
+    const items = [{ id: "1" }, { id: 1 }, { id: null }];
+    const result = inOrderOf(items, (x) => x.id, [null, 1, "1"]);
+    expect(result).toEqual([{ id: null }, { id: 1 }, { id: "1" }]);
+  });
+
   it("in_order_of — with filter false keeps unmatched elements", () => {
     const values = [pay(5), pay(3), pay(1)];
     const result = inOrderOf(values, (p) => p.price, [1, 5], { filter: false });

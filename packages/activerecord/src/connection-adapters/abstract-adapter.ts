@@ -414,7 +414,13 @@ export interface AbstractAdapter {
   viewExists(viewName: string): Promise<boolean>;
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
+  /**
+   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
+   * callable with the kwargs alone, and TypeScript cannot skip a leading
+   * positional, so the options object may arrive in its place.
+   *
+   * @internal
+   */
   dataSourceSql(options: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;

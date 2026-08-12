@@ -2158,23 +2158,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
+  /**
+   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
+   * callable with the kwargs alone, and TypeScript cannot skip a leading
+   * positional, so the options object may arrive in its place.
+   *
+   * @internal
+   */
   dataSourceSql(options: { type?: string }): string;
   /** @internal */
   dataSourceSql(
     nameOrOptions?: string | null | { type?: string },
     options: { type?: string } = {},
   ): string {
-    // Ruby's `data_source_sql(name = nil, type:)` is callable with the kwargs
-    // alone; TS cannot skip a leading positional, so the options object may
-    // arrive in its place (schema_statements.rb:1890).
-    let name: string | null | undefined;
-    let opts = options;
-    if (nameOrOptions != null && typeof nameOrOptions === "object") {
-      opts = nameOrOptions;
-    } else {
-      name = nameOrOptions;
-    }
+    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
+    const name = kwargsOnly ? null : nameOrOptions;
+    const opts = kwargsOnly ? nameOrOptions : options;
     return sqliteDataSourceSql(name ?? undefined, opts.type);
   }
 
