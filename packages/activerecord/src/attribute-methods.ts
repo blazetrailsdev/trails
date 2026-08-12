@@ -1005,16 +1005,16 @@ export function _touchRow(
 /** @internal */
 export function _updateRecord(
   this: InstanceMethodHost,
-  attributeNames?: string[],
-): Promise<number> {
-  return __updateRecord.call(this as any, attributeNames);
+  superFn: () => Promise<unknown>,
+): Promise<unknown> {
+  return __updateRecord.call(this as any, superFn);
 }
 /** @internal */
 export function _createRecord(
   this: InstanceMethodHost,
-  attributeNames?: string[],
+  superFn: () => Promise<unknown>,
 ): Promise<unknown> {
-  return __createRecord.call(this as any, attributeNames);
+  return __createRecord.call(this as any, superFn);
 }
 /** @internal */
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {

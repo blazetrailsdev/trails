@@ -44,7 +44,7 @@ import {
   InverseOfAssociationRecursiveError,
   CompositePrimaryKeyMismatchError,
 } from "./associations/errors.js";
-import { isFinderNeedsTypeCondition, polymorphicName, typeCondition } from "./inheritance.js";
+import { polymorphicName, typeCondition } from "./inheritance.js";
 
 type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
@@ -315,7 +315,7 @@ export class AbstractReflection {
     // an alias) rather than baked into `klassJoinScope`, so a self-referential
     // STI join filters on the aliased table instead of the model's base table.
     const targetKlass = this.klass as any;
-    if (isFinderNeedsTypeCondition(targetKlass)) {
+    if (targetKlass.isFinderNeedsTypeCondition()) {
       scope = scope.where(typeCondition(targetKlass, table));
     }
 
@@ -463,7 +463,7 @@ export class AbstractReflection {
     const col = this.counterCacheColumn();
     if (!col) return null;
     const inv = this.inverseOf();
-    const candidates: any[] = inv ? [inv] : reflectOnAllAssociations(this.klass, "belongsTo");
+    const candidates: any[] = inv ? [inv] : this.klass.reflectOnAllAssociations("belongsTo");
     return (
       candidates.find((c: any) => {
         try {

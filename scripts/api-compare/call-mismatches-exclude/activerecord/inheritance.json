@@ -49,17 +49,6 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "rubyName": "find_sti_class",
-    "call": "sti_class_for",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:typeName"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "find_sti_class",
     "call": "type_for_attribute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -75,43 +64,12 @@
   {
     "package": "activerecord",
     "tsFile": "inheritance.ts",
-    "rubyName": "polymorphic_class_for",
-    "call": "compute_type",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "sti_class_for",
-    "call": "compute_type",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:typeName"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
     "rubyName": "subclass_from_attributes",
     "call": "find_sti_class",
     "kind": "args",
     "rubyArgs": [
       "ref:subclassName"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "inheritance.ts",
-    "rubyName": "type_condition",
-    "call": "descendants",
-    "kind": "args",
-    "rubyArgs": [],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

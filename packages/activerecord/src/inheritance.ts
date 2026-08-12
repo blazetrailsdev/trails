@@ -529,7 +529,7 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
   // candidate is found via the model's own module nesting rather than the bare
   // (unregistered) demodulized name. With the default flags on, sti_class_for
   // falls back to the bare registry lookup, preserving the prior behavior.
-  return stiClassFor(baseClass, typeName);
+  return baseClass.stiClassFor(typeName);
 }
 
 /**
@@ -777,7 +777,7 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
     if (klass.storeFullStiClass && klass.storeFullClassName) {
       subclass = constantize(typeName) as typeof Base;
     } else {
-      subclass = computeType(modelClass, typeName);
+      subclass = modelClass.computeType(typeName);
     }
   } catch (cause) {
     if (!(cause instanceof NameError)) throw cause;
@@ -808,7 +808,7 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   if (klass.storeFullClassName) {
     return constantize(name) as typeof Base;
   }
-  return computeType(modelClass, name);
+  return modelClass.computeType(name);
 }
 
 /**
@@ -944,7 +944,7 @@ export function typeCondition(modelClass: typeof Base, arelTable?: any): any {
 
   const stiColumn = typeof table.get === "function" ? table.get(inheritCol) : table[inheritCol];
   const stiNames = ([modelClass] as (typeof Base)[])
-    .concat(descendants(modelClass))
+    .concat(modelClass.descendants)
     .map((klass) => stiName(klass));
 
   // Use predicate builder to create an IN clause
