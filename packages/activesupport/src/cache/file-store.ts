@@ -1,6 +1,7 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
-import { coder } from "./coder.js";
+import { Coder, coder } from "./coder.js";
+import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
 import { Store, type StoreOptions } from "./store.js";
@@ -9,6 +10,13 @@ import { type CacheEntry, isExpired } from "./entry-record.js";
 import { registerStoreClass } from "./store-registry.js";
 
 const FILENAME_MAX_SIZE = 228;
+
+// Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45).
+const DEFAULT_COMPRESS_LIMIT = 1024;
+
+// The coder Rails' `Store#initialize` builds when none is given:
+// `Cache::Coder.new(serializer, compressor)` (cache.rb:301-309).
+const fileCoder = new Coder(coder, { deflate, inflate });
 
 export class FileStore extends Store implements CacheStore {
   /** Advertise cache versioning support (file_store.rb:25-28). */
@@ -34,29 +42,62 @@ export class FileStore extends Store implements CacheStore {
   // isExpired()/isMismatched() like Rails read_entry. A malformed payload
   // degrades to a miss, mirroring Rails deserialize_entry's rescue (cache.rb).
   protected readEntry(key: string, _options: StoreOptions): Entry | null {
-    const stored = this.readFile(this.keyToPath(key));
-    if (!stored || stored.encodedValue === undefined) return null;
-    let value: unknown;
+    const payload = this.readFile(this.keyToPath(key));
+    if (payload) {
+      const entry = this.deserializeEntry(payload);
+      return entry instanceof Entry ? entry : null;
+    }
+    return null;
+  }
+
+  // The `unless_exist` refusal is Rails' `write_serialized_entry`
+  // (file_store.rb:123-129), whose own port belongs with the FileStore path
+  // helpers; `write_entry` itself is Rails' `serialize_entry` call.
+  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
+    if (options.unlessExist && getFs().existsSync(this.keyToPath(key))) return false;
+    this.writeFile(this.keyToPath(key), this.serializeEntry(entry, options));
+    return true;
+  }
+
+  /**
+   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
+   * coder's `dump_compressed` under `:compress` — Rails' default
+   * (`@options[:compress] = true unless @options.key?(:compress)`, cache.rb:298)
+   * — and to `dump` otherwise. The coder is `Cache::Coder` over the default
+   * serializer and Zlib (cache.rb:301-309), which `Store#initialize` builds and
+   * holds in `@coder`; trails' `Store` has no such seam yet (RFC 0101 story
+   * `converge-store-serialized-entry-hooks-and-file-store-paths`), so this
+   * store builds the same coder meanwhile. The framed payload carries the
+   * value, the compression flag, `expires_at` and `version`; the surrounding
+   * record keeps `expiresAt` beside it for the directory scans `cleanup` and
+   * `deleteMatched` do without deserializing.
+   */
+  private serializeEntry(entry: Entry, options: StoreOptions): CacheEntry {
+    const compress = (options.compress as boolean | undefined) ?? true;
+    const compressThreshold =
+      (options.compressThreshold as number | undefined) ?? DEFAULT_COMPRESS_LIMIT;
+    return {
+      encodedValue: compress
+        ? fileCoder.dumpCompressed(entry, compressThreshold)
+        : fileCoder.dump(entry),
+      expiresAt: entry.expiresAt,
+      version: entry.version,
+      accessedAt: Date.now(),
+    };
+  }
+
+  /**
+   * Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819), including the
+   * `rescue DeserializationError` that degrades a malformed payload to a miss.
+   */
+  private deserializeEntry(payload: CacheEntry | null): Entry | null {
+    if (payload === null || payload.encodedValue === undefined) return null;
     try {
-      value = coder.load(stored.encodedValue);
+      return fileCoder.load(payload.encodedValue) as Entry;
     } catch (e) {
       if (e instanceof DeserializationError) return null;
       throw e;
     }
-    return new Entry(value, { expiresAt: stored.expiresAt, version: stored.version ?? null });
-  }
-
-  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
-    // Mirrors Rails write_serialized_entry (file_store.rb:124-129): unless_exist
-    // refuses the write when the file merely exists, regardless of expiry.
-    if (options.unlessExist && getFs().existsSync(this.keyToPath(key))) return false;
-    this.writeFile(this.keyToPath(key), {
-      encodedValue: coder.dump(entry.value),
-      expiresAt: entry.expiresAt,
-      version: entry.version,
-      accessedAt: Date.now(),
-    });
-    return true;
   }
 
   protected deleteEntry(key: string, _options: StoreOptions): boolean {

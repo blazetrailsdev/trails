@@ -5,15 +5,13 @@ import { Store } from "./store.js";
 import { integer } from "./integer.js";
 import { registerStoreClass } from "./store-registry.js";
 
-// In-memory record backing a single key. We store the coder-serialized value
-// (so Date/undefined/bigint/non-finite numbers and deep-clone isolation survive
-// the round-trip) alongside the Rails Entry metadata (absolute `expiresAt` in ms,
-// `version`). `accessedAt` drives LRU pruning. readEntry/writeEntry rebuild the
-// Rails second-unit `Entry` so the instrumented Store base owns read/write/fetch.
+// In-memory record backing a single key. Rails stores the `serialize_entry`
+// payload itself (`@data[key] = payload`, memory_store.rb:213-227), which for
+// this store is a DupCoder-dumped `Entry`; `expiresAt` mirrors it for the
+// `unless_exist` check and `accessedAt` drives LRU pruning.
 interface MemoryRecord {
-  encodedValue: string;
+  payload: Entry;
   expiresAt: number | null;
-  version: string | null;
   accessedAt: number;
 }
 
@@ -37,11 +35,14 @@ export class MemoryStore extends Store implements CacheStore {
 
   private data: Map<string, MemoryRecord> = new Map();
   private sizeLimit: number;
+  private _pruning = false;
 
   constructor(options?: {
     sizeLimit?: number;
     namespace?: string | (() => string);
     expiresIn?: number;
+    compress?: boolean;
+    compressThreshold?: number;
   }) {
     super(options ?? {});
     this.sizeLimit = options?.sizeLimit ?? Infinity;
@@ -53,25 +54,45 @@ export class MemoryStore extends Store implements CacheStore {
     const rec = this.data.get(key);
     if (!rec) return null;
     rec.accessedAt = Date.now();
-    return new Entry(coder.load(rec.encodedValue), {
-      expiresAt: rec.expiresAt,
-      version: rec.version,
-    });
+    return this.deserializeEntry(rec.payload);
   }
 
   protected writeEntry(key: string, entry: Entry, options: Record<string, unknown>): boolean {
+    const payload = this.serializeEntry(entry, options);
     if (options.unlessExist) {
       const existing = this.data.get(key);
       if (existing && !this.recordExpired(existing)) return false;
     }
     this.data.set(key, {
-      encodedValue: coder.dump(entry.value),
+      payload,
       expiresAt: entry.expiresAt,
-      version: entry.version,
       accessedAt: Date.now(),
     });
     if (this.data.size > this.sizeLimit) this.evictLRU();
     return true;
+  }
+
+  /**
+   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
+   * coder's `dump_compressed` under `compress`, else `dump`. Rails installs the
+   * coder in `MemoryStore#initialize` (`options[:coder] = DupCoder`,
+   * memory_store.rb:73-75) and holds it in `@coder` on the base; trails' `Store`
+   * has no `@coder` seam yet (RFC 0101 story
+   * `converge-store-serialized-entry-hooks-and-file-store-paths` ports it), so
+   * this store names the coder Rails installs for it directly until that lands.
+   */
+  private serializeEntry(entry: Entry, options: Record<string, unknown>): Entry {
+    options = this.mergedOptions(options as CacheOptions) as Record<string, unknown>;
+    if (options.compress) {
+      return DupCoder.dumpCompressed(entry, (options.compressThreshold as number) ?? 1024);
+    } else {
+      return DupCoder.dump(entry);
+    }
+  }
+
+  /** Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819). */
+  private deserializeEntry(payload: Entry | null): Entry | null {
+    return payload === null ? null : DupCoder.load(payload);
   }
 
   protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {
@@ -156,17 +177,33 @@ export class MemoryStore extends Store implements CacheStore {
     return num;
   }
 
+  /**
+   * Rails guards `prune` against re-entry with the `@pruning` flag
+   * (memory_store.rb:110-127): `cleanup` and the per-key deletion below can both
+   * re-enter through a write, and the inner call must not prune again.
+   */
   prune(targetSize: number, maxTime?: number): void {
-    const start = Date.now();
-    this.cleanup();
-    const sorted = [...this.data.entries()].sort((a, b) => a[1].accessedAt - b[1].accessedAt);
-    let freed = 0;
-    for (const [key] of sorted) {
-      if (freed >= targetSize) break;
-      if (maxTime != null && Date.now() - start > maxTime * 1000) break;
-      this.data.delete(key);
-      freed++;
+    if (this.isPruning()) return;
+    this._pruning = true;
+    try {
+      const startTime = Date.now();
+      this.cleanup();
+      const sorted = [...this.data.entries()].sort((a, b) => a[1].accessedAt - b[1].accessedAt);
+      let freed = 0;
+      for (const [key] of sorted) {
+        if (freed >= targetSize) break;
+        if (maxTime != null && Date.now() - startTime > maxTime * 1000) break;
+        this.data.delete(key);
+        freed++;
+      }
+    } finally {
+      this._pruning = false;
     }
+  }
+
+  /** Returns true if the cache is currently being pruned (memory_store.rb:129-131). */
+  isPruning(): boolean {
+    return this._pruning;
   }
 
   private evictLRU(): void {
@@ -181,18 +218,75 @@ export class MemoryStore extends Store implements CacheStore {
 }
 
 export namespace DupCoder {
-  export function dump(entry: unknown): unknown {
-    if (entry === null || entry === undefined) return entry;
-    if (typeof entry !== "object") return entry;
-    try {
-      return structuredClone(entry);
-    } catch {
+  /**
+   * Mirrors Rails MemoryStore::DupCoder#dump (memory_store.rb:32-38): rebuild
+   * the Entry around a dumped value so the stored value can't alias the
+   * caller's, preserving expires_at/version. Ruby's `entry.value && … != true
+   * && !Numeric` leaves nil/false/true/Numeric entries untouched.
+   */
+  export function dump(entry: Entry): Entry {
+    const value = entry.value;
+    if (
+      value != null &&
+      value !== false &&
+      value !== true &&
+      typeof value !== "number" &&
+      typeof value !== "bigint"
+    ) {
+      return new Entry(dumpValue(value), { expiresAt: entry.expiresAt, version: entry.version });
+    } else {
       return entry;
     }
   }
 
-  export function load(entry: unknown): unknown {
-    return dump(entry);
+  /** Mirrors Rails MemoryStore::DupCoder#dump_compressed (memory_store.rb:40-43). */
+  export function dumpCompressed(entry: Entry, threshold: number): Entry {
+    const compressedEntry = entry.compressed(threshold);
+    return compressedEntry.isCompressed() ? compressedEntry : dump(entry);
+  }
+
+  /** Mirrors Rails MemoryStore::DupCoder#load (memory_store.rb:45-51). */
+  export function load(entry: Entry): Entry {
+    if (!entry.isCompressed() && typeof entry.value === "string") {
+      return new Entry(loadValue(entry.value), {
+        expiresAt: entry.expiresAt,
+        version: entry.version,
+      });
+    } else {
+      return entry;
+    }
+  }
+
+  /**
+   * Rails' `MARSHAL_SIGNATURE` (memory_store.rb:54) is the two leading bytes
+   * every `Marshal.dump` payload carries, which is how `load_value` tells a
+   * serialized value from a String stored verbatim. The trails Marshal
+   * equivalent is the fidelity Coder (coder.ts), whose JSON output carries no
+   * such self-identifying prefix, so `dump_value` prepends the same signature
+   * and `load_value` strips it — same discriminator, same two arms.
+   */
+  const MARSHAL_SIGNATURE = "\x04\x08";
+
+  /**
+   * Mirrors Rails MemoryStore::DupCoder#dump_value (memory_store.rb:56-62).
+   * Ruby's `value.dup` guards against the caller mutating the stored String;
+   * JS strings are immutable, so the String arm returns it as-is.
+   */
+  function dumpValue(value: unknown): string {
+    if (typeof value === "string" && !value.startsWith(MARSHAL_SIGNATURE)) {
+      return value;
+    } else {
+      return MARSHAL_SIGNATURE + coder.dump(value);
+    }
+  }
+
+  /** Mirrors Rails MemoryStore::DupCoder#load_value (memory_store.rb:64-70). */
+  function loadValue(string: string): unknown {
+    if (string.startsWith(MARSHAL_SIGNATURE)) {
+      return coder.load(string.slice(MARSHAL_SIGNATURE.length));
+    } else {
+      return string;
+    }
   }
 }
 

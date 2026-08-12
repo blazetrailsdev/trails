@@ -60,7 +60,6 @@ import {
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
-import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -2155,9 +2154,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Delete associated records by nullifying the FK (or removing join record for through).
+   * Deletes the `records` supplied according to the `:dependent` option, and
+   * removes them from the collection.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#delete
+   * (collection_proxy.rb:620-622) — `@association.delete(*records).tap {
+   * reset_scope }`. The removal body itself (id coercion,
+   * `raise_on_type_mismatch!`, the `catch(:abort)` around `before_remove`,
+   * `delete_records`, the `@target` prune, `after_remove`) lives once on
+   * `CollectionAssociation#delete_or_destroy` / `#remove_records`
+   * (collection_association.rb:385-408), which writes the same in-memory target
+   * this proxy reads.
    */
   // @ts-expect-error CP and Relation share the method name for genuinely
   //   different operations: Relation#delete removes by PK; CP#delete removes
@@ -2165,160 +2172,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   divergence — renaming either would break the Rails API surface.
   //   Accepts Integer/String keys too, mirroring Rails' delete_or_destroy.
   async delete(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    // Rails CollectionAssociation#delete opens with `return if records.empty?`
-    // (collection_association.rb:385) BEFORE flatten, so a no-arg delete returns
-    // nil — not []. An explicit `delete([])` is `[[]]` (size 1) and falls through.
-    if (records.length === 0) return undefined;
-    this._ensureThroughWritable();
-    // Through (incl. HABTM): delegate to the association-layer delete_records.
-    if (this._assocDef.options.through) {
-      const assoc = this._record.association(this._assocName) as unknown as {
-        delete: (...r: Array<Base | number | string | bigint>) => Promise<Base[] | undefined>;
-        _lastRemoveAborted?: boolean;
-      };
-      // Rails' CollectionProxy just delegates; the source @target is pruned
-      // INSIDE the association's remove_records (`@target -= records`) and ONLY
-      // when no before_remove aborts — an abort exits first
-      // (collection_association.rb:399-405), and HMT#remove_records prunes only
-      // the through/join targets while still returning the records
-      // (has_many_through_association.rb:116-118, 209-222). So propagate the
-      // returned records verbatim, but skip the proxy-target prune on abort so
-      // an aborted through delete doesn't make the collection look emptied.
-      const removed = await assoc.delete(...records);
-      if (removed && !assoc._lastRemoveAborted) this._removeFromTarget(removed);
-      return removed;
-    }
-    // Mirror Rails CollectionAssociation#delete → delete_or_destroy
-    // (collection_association.rb): coerce Integer/String args via the scoped
-    // `find` *first*, then flatten. Rails only treats a bare Integer/String
-    // top-level arg as an id (`records.any? { |r| r.is_a?(Integer) || r.is_a?(String) }`),
-    // never one nested in an array — so an id passed as an array (`delete([1, 2])`)
-    // skips `find` and is left to the type check, exactly as Rails does. Flattening
-    // only after `find` makes `delete([a, b])` and `delete(a, b)` behave identically
-    // for the model-object form the proxy callers use; `flat(Infinity)` matches
-    // Ruby's deep `Array#flatten`.
-    const coerced = records.some((r) => typeof r !== "object")
-      ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
-      : records;
-    const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
-
-    // Rails CollectionProxy#delete resolves the strategy from the reflection's
-    // `:dependent` (delete_or_destroy(records, options[:dependent])). Share the
-    // remove_records path with `destroy`, which forces `:destroy`.
-    const aborted = await this._removeRecords(modelRecords, this._deleteStrategy());
-    // Rails remove_records aborts via `catch(:abort) { ... } || return` → nil
-    // (collection_association.rb:399-405), so a halted before_remove returns nil.
-    if (aborted) return undefined;
-    return modelRecords as Base[];
-  }
-
-  /**
-   * Shared implementation of Rails `CollectionAssociation#remove_records`
-   * (collection_association.rb:399-409): fire the abortable `before_remove`
-   * loop, run `delete_records` for the given strategy on the persisted subset,
-   * prune the in-memory target, then fire `after_remove`. Wrapped in a
-   * transaction when any record is persisted, mirroring `delete_or_destroy`.
-   * Both `delete` (strategy from `:dependent`) and `destroy` (forced `:destroy`)
-   * route through here so the two never drift. Returns whether a `before_remove`
-   * callback aborted the operation.
-   */
-  private async _removeRecords(
-    modelRecords: T[],
-    method: "delete_all" | "destroy" | "nullify",
-  ): Promise<boolean> {
-    // Rails delete_or_destroy (collection_association.rb:385-390) type-checks
-    // every record — after id-coercion/flatten, before any DB write — for both
-    // `delete` and `destroy`. Run it here so the two share the guard.
-    this._raiseOnTypeMismatch(modelRecords);
-    // Persisted children are deleted/nullified via the DB; new-record children
-    // have no row — they only participate in the callbacks and target pruning.
-    const persistedRecords = modelRecords.filter((r) => !r.isNewRecord());
-
-    let aborted = false;
-    const removeRecords = async () => {
-      // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
-      // return`: if any record's before_remove halts, the entire operation aborts
-      // and nothing is deleted (the transaction commits with no work done).
-      try {
-        for (const record of modelRecords) this._callbackHost.callback("beforeRemove", record);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        aborted = true;
-        return;
-      }
-      if (persistedRecords.length > 0) {
-        // Mirror Rails HasManyAssociation#delete_records: `:destroy` destroys
-        // each record (callbacks run); `:delete_all` bulk-DELETEs the scoped
-        // rows; otherwise (incl. nil → the has_many default) nullify the FK.
-        if (method === "destroy") {
-          // Rails: records.each(&:destroy!) — bang so a failed destroy raises
-          // RecordNotDestroyed and rolls back the wrapping transaction.
-          for (const record of persistedRecords) {
-            await (record as any).destroyBang();
-          }
-          // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
-          // The destroy callbacks decrement the owner's counter through the child's
-          // belongs_to inverse only when that inverse points at THIS reflection's
-          // counter column; otherwise (e.g. a has_many `counter_cache:` distinct from
-          // the inverse's) decrement here so we don't silently skip it.
-          const reflection = this.reflection as {
-            inverseWhichUpdatesCounterCache?: () => unknown;
-          };
-          if (!reflection.inverseWhichUpdatesCounterCache?.()) {
-            await this._decrementCounterCache(persistedRecords.length);
-          }
-        } else {
-          // Scope to the specific records via composite_query_constraints_list
-          // (persistence.rb:234). Single-column: `where({col: ids})`; composite:
-          // `where(cols, tuples)` (OR-of-AND) to avoid the cartesian-product that
-          // `AND col1 IN (...) AND col2 IN (...)` would produce.
-          const queryCols = compositeQueryConstraintsList.call((this as any)._model as typeof Base);
-          const readCol = (r: Base, col: string) => (r as any)._readAttribute(col);
-          let scope = this.scope();
-          if (queryCols.length === 1) {
-            scope = scope.where({
-              [queryCols[0]]: persistedRecords.map((r) => readCol(r, queryCols[0])),
-            });
-          } else {
-            const tuples = persistedRecords.map((r) => queryCols.map((col) => readCol(r, col)));
-            scope = scope.where(queryCols, tuples);
-          }
-          let count: number;
-          if (method === "delete_all") {
-            count = await scope.deleteAll();
-          } else {
-            const nullUpdates = this._buildNullifyUpdates();
-            count = await scope.updateAll(nullUpdates);
-            for (const record of persistedRecords) {
-              for (const [col, val] of Object.entries(nullUpdates)) {
-                record._writeAttribute(col, val);
-              }
-            }
-          }
-          // Rails delete_records else-branch: update_counter(-delete_count). The
-          // bulk DELETE/UPDATE bypasses callbacks (and thus the belongs_to inverse),
-          // so Rails always decrements the owner's counter cache by the affected
-          // count here — unlike the :destroy branch, which is gated on
-          // inverse_updates_counter_cache?.
-          if (count > 0) await this._decrementCounterCache(count);
-        }
-      }
-      // Remove from target first, then fire after_remove for all records.
-      this._removeFromTarget(modelRecords as Base[]);
-      for (const record of modelRecords) {
-        this._callbackHost.callback("afterRemove", record);
-      }
-    };
-
-    // Rails delete_or_destroy wraps remove_records in a transaction only when
-    // there are existing (persisted) records; new-record-only deletes run outside
-    // any transaction.
-    if (persistedRecords.length > 0) {
-      await this.transaction(removeRecords);
-    } else {
-      await removeRecords();
-    }
-    return aborted;
+    const removed = await this._collectionAssociation().delete(
+      ...(records as Array<Base | number | string | bigint>),
+    );
+    this.resetScope();
+    return removed;
   }
 
   private _removeFromTarget(records: Base[]): void {
@@ -2339,27 +2197,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return !nullPkRecords.has(r);
     });
     this._invalidateAssociationIds();
-  }
-
-  /**
-   * Resolve the effective `:dependent` strategy for a record-level `delete`,
-   * mirroring Rails `HasManyAssociation#delete_records`: `:destroy` destroys each
-   * record, `:delete_all` (or the `delete`/camelCase aliases) bulk-DELETEs, and
-   * everything else — including the nil default for a plain has_many — nullifies
-   * the FK. Unlike `deleteAll`, `delete` does NOT collapse `:destroy` to
-   * `:delete_all`, so destroy callbacks run.
-   */
-  private _deleteStrategy(): "delete_all" | "destroy" | "nullify" {
-    switch (this._assocDef.options.dependent as string | undefined) {
-      case "destroy":
-        return "destroy";
-      case "delete_all":
-      case "deleteAll":
-      case "delete":
-        return "delete_all";
-      default:
-        return "nullify";
-    }
   }
 
   /**
@@ -2414,71 +2251,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Destroy associated records (runs callbacks and deletes from DB).
+   * Destroys the `records` supplied and removes them from the collection,
+   * always removing the row from the database regardless of `:dependent`.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#destroy
+   * (collection_proxy.rb:692-694) — `@association.destroy(*records).tap {
+   * reset_scope }`, which is `delete_or_destroy(records, :destroy)` and so
+   * shares every step with {@link delete}.
    */
   // @ts-expect-error CP and Relation share the method name for genuinely
   //   different operations: Relation#destroy removes by PK; CP#destroy
   //   destroys by record reference (association semantics). Intentional
   //   permanent divergence — same rationale as CP#delete above.
   async destroy(...records: Array<T | number | string | bigint>): Promise<Base[] | undefined> {
-    // Mirror `delete`: Rails delete_or_destroy opens with `return if
-    // records.empty?` (collection_association.rb:385), so a no-arg destroy
-    // returns nil — not []. Keep the two in lockstep on the empty/abort contract.
-    if (records.length === 0) return undefined;
-    // Through (incl. HABTM): delegate to the association-layer destroy, exactly
-    // as Rails CollectionProxy#destroy → `@association.destroy(*records)`. For
-    // has_many :through that runs HasManyThroughAssociation#delete_records
-    // (has_many_through_association.rb:148-163): `scope.destroy_all` on the
-    // THROUGH (join) scope only — built via `construct_join_attributes(*records)`
-    // so duplicate join rows for the same target are all destroyed — then
-    // `remove_records` prunes the in-memory target and fires after_remove (in
-    // that order), wrapped in a transaction when any record is persisted. The
-    // source records themselves are never destroyed. Mirror `delete`'s through
-    // branch and sync the proxy's own target from the returned removed records.
-    if (this._isThrough) {
-      const assoc = this._record.association(this._assocName) as unknown as {
-        destroy: (...r: Array<Base | number | string | bigint>) => Promise<Base[] | undefined>;
-        _lastRemoveAborted?: boolean;
-      };
-      // As in the `delete` through-branch: propagate the returned records, but
-      // skip the proxy-target prune on a before_remove abort so an aborted
-      // through destroy doesn't make the collection look emptied in memory
-      // (collection_association.rb:399-405; has_many_through_association.rb:
-      // 116-118, 209-222).
-      const removed = await assoc.destroy(...(records as Base[]));
-      if (removed && !assoc._lastRemoveAborted) this._removeFromTarget(removed);
-      return removed;
-    }
-    // Mirror Rails CollectionAssociation#destroy → delete_or_destroy
-    // (collection_association.rb:387-389): coerce Integer/String args to records
-    // via the scoped `find` first (so a bare id finds+destroys the row rather
-    // than throwing `record.destroy is not a function`), flatten, then run
-    // raise_on_type_mismatch! before any DB write — exactly as the through
-    // branch does via the association layer. Only a top-level bare id is
-    // coerced; an id nested in an array is left to the type check, matching
-    // Rails and the `delete` branch above. The `filter(Boolean)` is
-    // defensive-only: on a genuine missing id `find` raises RecordNotFound
-    // (Relation#find, collection-proxy.ts non-cache path) exactly as Rails
-    // does — it never returns a falsy element — so the filter only guards the
-    // theoretical null return and never silently drops a real record.
-    const coerced = records.some((r) => typeof r !== "object")
-      ? ([await this.find(...(records as unknown[]))].flat().filter(Boolean) as T[])
-      : (records as T[]);
-    const modelRecords = (coerced as unknown[]).flat(Infinity) as T[];
-
-    // Rails CollectionProxy#destroy → delete_or_destroy(records, :destroy):
-    // the same remove_records path as `delete`, with the strategy forced to
-    // `:destroy`. Share `_removeRecords` so type-check, before_remove/after_remove
-    // callbacks, the counter-cache decrement, and the bang-destroy-in-transaction
-    // behavior stay in lockstep with `delete`. Rails returns the removed records
-    // (collection_association.rb:385-396, via remove_records' `records`); an
-    // aborted before_remove returns none, mirroring `delete`.
-    const aborted = await this._removeRecords(modelRecords, "destroy");
-    // Rails remove_records returns nil on a before_remove abort
-    // (collection_association.rb:399-405); mirror `delete` with undefined.
-    return aborted ? undefined : (modelRecords as Base[]);
+    const removed = await this._collectionAssociation().destroy(
+      ...(records as Array<Base | number | string | bigint>),
+    );
+    this.resetScope();
+    return removed;
   }
 
   /**
