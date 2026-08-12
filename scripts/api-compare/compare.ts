@@ -1832,6 +1832,11 @@ export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([]);
  * bucket read as ~36 matched off the ActionView helper modules. `matched` must
  * mean "a TS member the compare can point at in a file that maps to this Ruby
  * file"; an unmapped file's members are missing, and read as missing.
+ *
+ * Every credit arm after the same-file direct match is cross-file — the include
+ * chain, the mixin/reopening arms, the misplaced-cluster fallback and the
+ * umbrella-config arm — so `main` short-circuits all of them to `missing` when
+ * this returns false.
  */
 export function rubyFileHasTsCounterpart(
   tsFileExists: boolean,
@@ -2926,8 +2931,6 @@ export function main() {
       const actualMethods = misplacedActualFile
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
         : null;
-      // Cross-file credit is only meaningful for a Ruby file that has a TS
-      // counterpart at all — see `rubyFileHasTsCounterpart`.
       const hasTsCounterpart = rubyFileHasTsCounterpart(tsFileExists, misplacedActualFile);
 
       for (const [
@@ -2944,12 +2947,6 @@ export function main() {
           continue;
         }
 
-        // Every arm below this point is cross-file credit — the include chain,
-        // the mixin/reopening arms, the misplaced-cluster fallback, the
-        // umbrella-config arm. None of them applies to a Ruby file with no TS
-        // counterpart of its own (`rubyFileHasTsCounterpart`): there is nothing
-        // for the member to have moved OUT of, so a same-named TS method in an
-        // unrelated file is a name collision, not a port.
         if (!hasTsCounterpart) {
           fileMissing++;
           missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });

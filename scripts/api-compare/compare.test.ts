@@ -1484,10 +1484,7 @@ describe("rubyFileHasTsCounterpart", () => {
     expect(rubyFileHasTsCounterpart(false, "core-ext/object/blank.ts")).toBe(true);
   });
 
-  it("is false for a Ruby file with no port anywhere", () => {
-    // `active_support/execution_wrapper.rb`: `execution-wrapper.ts` does not
-    // exist and no TS file maps to it, yet it read as `matched: 2` off the
-    // cross-file credit for TS names that merely equal `run` / `complete`.
+  it("is false for a Ruby file with no port anywhere, so its members cannot be credited cross-file", () => {
     expect(rubyFileHasTsCounterpart(false, null)).toBe(false);
   });
 });
