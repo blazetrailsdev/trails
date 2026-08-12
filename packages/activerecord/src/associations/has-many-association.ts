@@ -50,6 +50,10 @@ export class HasManyAssociation extends CollectionAssociation {
   declare updateCounterInMemory: (difference: number) => void;
   /** @internal */
   declare updateCounterIfSuccess: <T>(savedSuccessfully: T, difference: number) => T;
+  /** @internal */
+  declare updateCounter: (difference: number, reflection?: AssociationDefinition) => Promise<void>;
+  /** @internal */
+  declare deleteCount: (method: string, scope: any) => Promise<number>;
 
   /**
    * Set on an ad-hoc holder built by a CollectionProxy whose own Relation state
@@ -220,8 +224,8 @@ export class HasManyAssociation extends CollectionAssociation {
    * @internal
    */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
-    const count = await deleteCount(this, method ?? "", (this as any).scope());
-    await updateCounter(this, -count);
+    const count = await this.deleteCount(method ?? "", (this as any).scope());
+    await this.updateCounter(-count);
     return count;
   }
 
@@ -240,18 +244,9 @@ export class HasManyAssociation extends CollectionAssociation {
       // Rails: records.each(&:destroy!).
       for (const record of records) await (record as any).destroyBang();
       // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
-      // The destroy callbacks decrement the owner's counter through the child's
-      // belongs_to inverse (CounterCache#destroy_row) only when that inverse points
-      // at THIS reflection's counter column; otherwise (e.g. a has_many `counter_cache:`
-      // distinct from the inverse's) decrement here so we don't silently skip it.
-      const ctor = this.owner.constructor as typeof Base & {
-        _reflectOnAssociation?: (
-          n: string,
-        ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
-      };
-      const refl = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-      if (!(refl as any).inverseWhichUpdatesCounterCache?.()) {
-        await updateCounter(this, -records.length);
+      // (has_many_association.rb:130).
+      if (!this.reflection.isInverseUpdatesCounterCache?.()) {
+        await this.updateCounter(-records.length);
       }
       return records.length;
     }
@@ -259,7 +254,13 @@ export class HasManyAssociation extends CollectionAssociation {
     // association-layer `delete` with a dependent strategy; non-through has_many
     // `delete` is intercepted by the CollectionProxy. Scope to the given records by
     // their query-constraint columns so we delete/nullify only those rows.
-    const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
+    // Rails: `reflection.klass.composite_query_constraints_list`
+    // (has_many_association.rb:132). The `?? this.klass` arm covers an ad-hoc
+    // holder built from a macro definition, which carries no `klass`; it
+    // resolves to the same class.
+    const queryConstraints = compositeQueryConstraintsList.call(
+      (this.reflection.klass ?? this.klass) as any,
+    );
     const values = records.map((r) =>
       queryConstraints.map((col) => (r as any)._readAttribute(col)),
     );
@@ -278,8 +279,8 @@ export class HasManyAssociation extends CollectionAssociation {
     // (collection-association.ts). Without this the per-record delete path falls
     // through to nullify, which fails for NOT-NULL composite-PK foreign keys.
     const strategy = method === "delete" ? "deleteAll" : method;
-    const count = await deleteCount(this, strategy, scope);
-    if (count > 0) await updateCounter(this, -count);
+    const count = await this.deleteCount(strategy, scope);
+    if (count > 0) await this.updateCounter(-count);
     return count;
   }
 
@@ -321,13 +322,7 @@ export class HasManyAssociation extends CollectionAssociation {
    * @internal
    */
   async countRecords(): Promise<number> {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const refl = (ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection) as {
-      hasActiveCachedCounter?: () => boolean;
-      counterCacheColumn?: () => string | null;
-    };
+    const refl = this.reflection;
     return countRecords({
       hasActiveCachedCounter: () => refl.hasActiveCachedCounter?.() ?? false,
       counterCacheColumn: () => refl.counterCacheColumn?.() ?? null,
@@ -402,12 +397,19 @@ function toI(value: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-/** @internal */
-async function updateCounter(assoc: HasManyAssociation, difference: number): Promise<void> {
-  const reflection = assoc.reflection;
+/**
+ * Mirrors: `HasManyAssociation#update_counter(difference, reflection =
+ * reflection())` (has_many_association.rb:98-102).
+ * @internal
+ */
+async function updateCounter(
+  this: HasManyAssociation,
+  difference: number,
+  reflection: AssociationDefinition = this.reflection,
+): Promise<void> {
   if (!reflection.hasCachedCounter?.()) return;
   const column = reflection.counterCacheColumn?.() as string;
-  const owner = assoc.owner as any;
+  const owner = this.owner as any;
   if (typeof owner.incrementBang === "function") {
     await owner.incrementBang(column, difference);
   } else if (typeof owner.updateCounters === "function") {
@@ -435,12 +437,16 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
   owner.clearAttributeChange?.(column);
 }
 
-/** @internal */
-function deleteCount(assoc: HasManyAssociation, method: string, scope: any): Promise<number> {
+/**
+ * Mirrors: `HasManyAssociation#delete_count(method, scope)`
+ * (has_many_association.rb:112-118).
+ * @internal
+ */
+function deleteCount(this: HasManyAssociation, method: string, scope: any): Promise<number> {
   // Rails: delete_all → scope.delete_all; nullify → scope.update_all(nullified_owner_attributes).
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
   const nullAttrs = (
-    assoc as unknown as {
+    this as unknown as {
       computeNullifiedOwnerAttributes(): Record<string, null>;
     }
   ).computeNullifiedOwnerAttributes();
@@ -798,4 +804,9 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
   return rel;
 }
 
-Object.assign(HasManyAssociation.prototype, { updateCounterInMemory, updateCounterIfSuccess });
+Object.assign(HasManyAssociation.prototype, {
+  updateCounterInMemory,
+  updateCounterIfSuccess,
+  updateCounter,
+  deleteCount,
+});

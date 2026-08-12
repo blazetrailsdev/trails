@@ -192,23 +192,63 @@ describe("PoolConfig", () => {
   });
 
   describe("serverVersion", () => {
-    it("returns a function that caches the version from a connection", () => {
+    it("returns a function that caches the version from a connection", async () => {
       const mockConn = { getDatabaseVersion: vi.fn().mockReturnValue("3.39.0") };
-      const version = config.serverVersion(mockConn as any);
+      const version = await config.serverVersion(mockConn as any);
       expect(version).toBe("3.39.0");
       expect(mockConn.getDatabaseVersion).toHaveBeenCalledTimes(1);
 
-      config.serverVersion(mockConn as any);
+      await config.serverVersion(mockConn as any);
       expect(mockConn.getDatabaseVersion).toHaveBeenCalledTimes(1);
     });
 
-    it("can be set directly via the setter", () => {
+    it("can be set directly via the setter", async () => {
       config.setServerVersion("15.0");
       const mockConn = { getDatabaseVersion: vi.fn() };
-      const version = config.serverVersion(mockConn as any);
+      const version = await config.serverVersion(mockConn as any);
       expect(version).toBe("15.0");
       expect(mockConn.getDatabaseVersion).not.toHaveBeenCalled();
     });
+
+    // `@server_version || synchronize { @server_version ||= ... }`
+    // (`pool_config.rb:39-41`): the monitor is what makes the memo a memo under
+    // concurrency. Both callers arrive before either fetch resolves, so without
+    // the lock both issue the version query.
+    it("two concurrent first callers issue one fetch", async () => {
+      let fetches = 0;
+      const mockConn = {
+        async getDatabaseVersion() {
+          fetches += 1;
+          await new Promise<void>((r) => setTimeout(r, 10));
+          return "15.0";
+        },
+      };
+      const [a, b] = await Promise.all([
+        config.serverVersion(mockConn as any),
+        config.serverVersion(mockConn as any),
+      ]);
+      expect([a, b]).toEqual(["15.0", "15.0"]);
+      expect(fetches).toBe(1);
+    });
+
+    // Ruby's monitor is reentrant, which `configure_connection`
+    // (`abstract_adapter.rb:1212`) depends on: it reads the version back
+    // through this method from inside the fetch that opened the connection.
+    // The ported monitor is reentrant too, so the nested read runs straight
+    // through and recomputes rather than waiting on the lock it is inside.
+    it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {
+      let fetches = 0;
+      const mockConn = {
+        async getDatabaseVersion(): Promise<string> {
+          fetches += 1;
+          await Promise.resolve();
+          if (fetches === 1) await config.serverVersion(mockConn as any);
+          return "15.0";
+        },
+      };
+      expect(await config.serverVersion(mockConn as any)).toBe("15.0");
+      expect(fetches).toBe(2);
+    }, 5000);
   });
 
   describe("static discardPoolsBang", () => {
