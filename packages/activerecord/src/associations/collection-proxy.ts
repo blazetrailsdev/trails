@@ -1406,15 +1406,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
       )) as T;
     }
-    // Rails' `CollectionProxy#create` is `@association.create(...)`
-    // (collection_proxy.rb:308-310), which lands in
-    // `CollectionAssociation#_create_record` — build_record, then
-    // `transaction { add_to_target(record) { insert_record(record, true, raise) } }`.
-    // Routing through the association is what puts the owner FK on the row via
-    // `HasManyAssociation#insert_record`'s `set_owner_attributes`
-    // (has_many_association.rb:61-64) and what reaches
-    // `HasManyAssociation#_create_record`'s in-memory counter bump
-    // (has_many_association.rb:143-149).
+    // Rails: `@association.create(...)` (collection_proxy.rb:308-310).
     return (await this._collectionAssociation()._createRecord(
       attrs,
       false,
@@ -3683,9 +3675,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       assocCallback(this._callbackHost, "afterAdd", record);
       return record;
     }
-    // `create!` is `@association.create!` (collection_proxy.rb:319-321) — the
-    // same `_create_record` with `raise = true`, so the validation failure
-    // surfaces from `insert_record`'s `save!` inside the transaction.
+    // Rails: `@association.create!(...)` (collection_proxy.rb:319-321).
     return (await this._collectionAssociation()._createRecord(
       attrs,
       true,

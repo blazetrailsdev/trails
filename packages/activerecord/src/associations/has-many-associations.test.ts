@@ -279,10 +279,9 @@ describe("HasManyAssociationsTest", () => {
     const firstFirm = companies("first_firm") as any;
     await firstFirm.clientsOfFirm.load();
 
-    // The `create` block is yielded inside `build_record`, i.e. from the
-    // constructor (association.rb:383-388) — before JS class-field initializers
-    // run — so a flag set there would be reset by `throwOnSave = false`. Fail
-    // the insert at `insert_record`'s `record.save` instead.
+    // The `create` block is yielded from the constructor (association.rb:383-388),
+    // before JS class-field initializers run, so `throwOnSave = false` would
+    // reset a flag set there. Fail at `insert_record`'s `record.save` instead.
     const saveSpy = vi.spyOn(Client.prototype as any, "save").mockResolvedValue(false);
     let bad: any;
     try {

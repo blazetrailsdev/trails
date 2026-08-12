@@ -1733,13 +1733,7 @@ function createHabtmJoinModel(
   });
 
   // Mirrors `Builder::HasAndBelongsToMany#add_left_association` /
-  // `#add_right_association` (has_and_belongs_to_many.rb:53-63), which declare
-  // both sides with the real `belongs_to` macro (`required: false`) rather than
-  // hand-registering reflections. Going through the macro is what gives the
-  // join model its association accessors and belongs_to autosave callback —
-  // `build_through_record` assigns the target under `source_reflection.name`
-  // (has_many_through_association.rb:55-66), an association write, never a
-  // foreign-key column write.
+  // `#add_right_association` (has_and_belongs_to_many.rb:53-63).
   (JoinModel as any).belongsTo("leftSide", {
     className: lhsModel.name,
     foreignKey: ownerFk,
