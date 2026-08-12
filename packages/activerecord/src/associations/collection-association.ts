@@ -492,13 +492,6 @@ export class CollectionAssociation extends Association {
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#_create_record
    * (collection_association.rb:354-372).
    *
-   * @missingRailsCall loaded? — the `{ @_was_loaded = loaded? }` block Rails
-   * hands to `insert_record` (collection_association.rb:365-367) feeds
-   * `replace_on_target`'s `@_was_loaded || !loaded?` append gate
-   * (collection_association.rb:481). `replaceOnTarget` reads the flag, but at
-   * this call site both arms of that gate agree — an unloaded association takes
-   * `!loaded?` and a loaded one would set the flag `true` — so writing it is
-   * unobservable here.
    * @internal
    */
   protected override async _createRecord(
