@@ -3703,7 +3703,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     column: string,
   ): Promise<unknown | null | Map<unknown, unknown>>;
   async calculate(operation: string, columnName?: string): Promise<unknown> {
-    const op =
+    operation =
       operation === "avg"
         ? "average"
         : operation === "min"
@@ -3712,8 +3712,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             ? "maximum"
             : operation;
 
-    if (op !== "count" && columnName == null) {
-      throw new Error(`Column name is required for calculation operation: ${op}`);
+    if (operation !== "count" && columnName == null) {
+      throw new Error(`Column name is required for calculation operation: ${operation}`);
     }
     const s = this.scope();
     // Rails: `null_scope? ? scope.calculate(operation, column_name) : super`
@@ -3722,23 +3722,23 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // in-memory fallback at the bottom of this method, which counts loaded
     // records with no rows behind them and must stay unreachable for a null
     // scope no matter what `scope()` grows the ability to answer.
-    if (this.isNullScope()) return s.calculate(op, columnName);
-    if (op === "count" && columnName == null && typeof s.count === "function") {
+    if (this.isNullScope()) return s.calculate(operation, columnName);
+    if (operation === "count" && columnName == null && typeof s.count === "function") {
       return s.count();
     }
     if (typeof s.calculate === "function") {
-      return s.calculate(op, columnName);
+      return s.calculate(operation, columnName);
     }
     // Fallback: compute in-memory from loaded records
     const records = await this.loadTarget();
-    if (op === "count") return records.length;
+    if (operation === "count") return records.length;
     if (columnName == null) {
-      throw new Error(`Column name is required for calculation operation: ${op}`);
+      throw new Error(`Column name is required for calculation operation: ${operation}`);
     }
     const values = records
       .map((r) => r.readAttribute(columnName))
       .filter((v) => v != null) as number[];
-    switch (op) {
+    switch (operation) {
       case "sum":
         return values.reduce((a, b) => Number(a) + Number(b), 0);
       case "average":
@@ -3750,7 +3750,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       case "maximum":
         return values.length > 0 ? Math.max(...values.map(Number)) : null;
       default:
-        throw new Error(`Unknown calculation operation: ${op}`);
+        throw new Error(`Unknown calculation operation: ${operation}`);
     }
   }
 

@@ -115,12 +115,12 @@ export abstract class JoinPart {
     }
   }
 
-  extractRecord(row: Record<string, unknown>, columnAlias: string): Record<string, unknown> {
+  extractRecord(row: Record<string, unknown>, aliases: string): Record<string, unknown> {
     const record: Record<string, unknown> = {};
 
     // Check for JoinDependency-style aliases (t{n}_r{n}) first, since
     // the prefix `t1_` would falsely match generic prefix matching
-    const indexMatch = columnAlias.match(/^t(\d+)$/);
+    const indexMatch = aliases.match(/^t(\d+)$/);
     if (indexMatch) {
       const pattern = new RegExp(`^t${indexMatch[1]}_r(\\d+)$`);
       const baseColumns = this.baseKlass.columnNames();
@@ -139,8 +139,8 @@ export abstract class JoinPart {
       if (matched) return record;
     }
 
-    // Generic prefix matching: keys in the form `${columnAlias}_<attr>`
-    const prefix = `${columnAlias}_`;
+    // Generic prefix matching: keys in the form `${aliases}_<attr>`
+    const prefix = `${aliases}_`;
     for (const [key, value] of Object.entries(row)) {
       if (key.startsWith(prefix)) {
         record[key.slice(prefix.length)] = value;
@@ -150,8 +150,8 @@ export abstract class JoinPart {
     return record;
   }
 
-  instantiate(row: Record<string, unknown>, columnAlias: string): Base | null {
-    const attrs = this.extractRecord(row, columnAlias);
+  instantiate(row: Record<string, unknown>, aliases: string): Base | null {
+    const attrs = this.extractRecord(row, aliases);
     const hasData = Object.values(attrs).some((v) => v !== null && v !== undefined);
     if (!hasData) return null;
     return this.baseKlass._instantiate(attrs);

@@ -502,13 +502,13 @@ export class JoinDependency {
     if (references) {
       for (const tableName of references) this._references.set(tableName, tableName);
     }
-    const joins = this.makeJoinConstraints(this._joinRoot, this._joinType);
+    const joins = this.makeJoinConstraints(this.joinRoot, this.joinType);
 
     for (const oj of joinsToAdd) {
-      if (this._joinRoot.isMatch(oj._joinRoot)) {
-        joins.push(...this.walk(this._joinRoot, oj._joinRoot, oj._joinType));
+      if (this.joinRoot.isMatch(oj.joinRoot)) {
+        joins.push(...this.walk(this.joinRoot, oj.joinRoot, oj.joinType));
       } else {
-        joins.push(...this.makeJoinConstraints(oj._joinRoot, oj._joinType));
+        joins.push(...this.makeJoinConstraints(oj.joinRoot, oj.joinType));
       }
     }
     return joins;

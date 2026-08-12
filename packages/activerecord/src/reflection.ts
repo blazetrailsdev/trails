@@ -336,8 +336,8 @@ export class AbstractReflection {
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
     const klass = this.klass as any;
-    const bare = this.buildScope(table, predicateBuilder);
-    return klass.scopeForAssociation ? klass.scopeForAssociation(bare) : bare;
+    const relation = this.buildScope(table, predicateBuilder);
+    return klass.scopeForAssociation ? klass.scopeForAssociation(relation) : relation;
   }
 
   constraints(): Array<(...args: any[]) => any> {
@@ -500,9 +500,9 @@ export class AbstractReflection {
     if (opts.counterCache) return true;
     const iwucc = this.inverseWhichUpdatesCounterCache();
     if (iwucc && asConcrete(iwucc).options?.counterCache) {
-      const col = this.counterCacheColumn();
+      const counterCacheColumn = this.counterCacheColumn();
       const owner = this._concrete().activeRecord as any;
-      if (col && owner?.hasAttribute?.(col)) return true;
+      if (counterCacheColumn && owner?.hasAttribute?.(counterCacheColumn)) return true;
     }
     return false;
   }
@@ -1010,7 +1010,7 @@ export class AssociationReflection extends MacroReflection {
     try {
       const lookupNames: string[] = [...candidateNames];
       if (this.activeRecord.automaticallyInvertPluralAssociations) {
-        for (const n of candidateNames) lookupNames.push(pluralize(n));
+        for (const inverseName of candidateNames) lookupNames.push(pluralize(inverseName));
       }
       // Pick the first candidate whose reflection is a valid inverse. A
       // hit on an invalid candidate (e.g. inverseOf:false, mismatched FK,
@@ -2327,10 +2327,10 @@ export function create(
   name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
-  activeRecord: typeof Base,
+  ar: typeof Base,
 ): AssociationReflection | ThroughReflection | AggregateReflection {
   const ReflectionClass = reflectionClassFor(macro);
-  const reflection = new ReflectionClass(name, scope, options, activeRecord);
+  const reflection = new ReflectionClass(name, scope, options, ar);
   return options.through
     ? new ThroughReflection(reflection as AssociationReflection)
     : (reflection as AssociationReflection | AggregateReflection);

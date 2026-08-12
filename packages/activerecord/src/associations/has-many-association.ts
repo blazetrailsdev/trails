@@ -278,8 +278,8 @@ export class HasManyAssociation extends CollectionAssociation {
     // it to the delete_all strategy here the same way `deleteAll()` does
     // (collection-association.ts). Without this the per-record delete path falls
     // through to nullify, which fails for NOT-NULL composite-PK foreign keys.
-    const strategy = method === "delete" ? "deleteAll" : method;
-    const count = await this.deleteCount(strategy, scope);
+    method = method === "delete" ? "deleteAll" : method;
+    const count = await this.deleteCount(method, scope);
     if (count > 0) await this.updateCounter(-count);
     return count;
   }
@@ -305,13 +305,10 @@ export class HasManyAssociation extends CollectionAssociation {
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    return this.updateCounterIfSuccess(
-      await super._createRecord(attributes, shouldRaise, block),
-      1,
-    );
+    return this.updateCounterIfSuccess(await super._createRecord(attributes, raise, block), 1);
   }
 
   /**
@@ -408,14 +405,14 @@ async function updateCounter(
   reflection: AssociationDefinition = this.reflection,
 ): Promise<void> {
   if (!reflection.hasCachedCounter?.()) return;
-  const column = reflection.counterCacheColumn?.() as string;
+  const counterCacheColumn = reflection.counterCacheColumn?.() as string;
   const owner = this.owner as any;
   if (typeof owner.incrementBang === "function") {
-    await owner.incrementBang(column, difference);
+    await owner.incrementBang(counterCacheColumn, difference);
   } else if (typeof owner.updateCounters === "function") {
-    await owner.updateCounters({ [column]: difference });
+    await owner.updateCounters({ [counterCacheColumn]: difference });
   } else if (typeof owner.increment === "function") {
-    owner.increment(column, difference);
+    owner.increment(counterCacheColumn, difference);
   }
 }
 
