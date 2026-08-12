@@ -59,5 +59,29 @@
       "kwargs{replace=bool:true}"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "replace_on_target",
+    "call": "callback",
+    "kind": "args",
+    "rubyArgs": [
+      "str:beforeAdd",
+      "ref:record"
+    ],
+    "reason": "Receiver-as-first-argument shape, not an argument divergence: Rails' `callback(:before_add, record)` / `callback(:after_add, record)` (collection_association.rb:463, :485) are instance calls on the association, and the TS `callback` is a free function whose first parameter is that receiver (`assoc`), so the extractor reads it as an extra leading argument. Surfaced by this PR only because the begin/finish split collapsed into one `replaceOnTarget`, which the extractor can now match to `replace_on_target`; the calls themselves predate it. Converges with the file-wide receiver-as-first-argument burndown, not here."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "replace_on_target",
+    "call": "callback",
+    "kind": "args",
+    "rubyArgs": [
+      "str:afterAdd",
+      "ref:record"
+    ],
+    "reason": "Receiver-as-first-argument shape, not an argument divergence: Rails' `callback(:before_add, record)` / `callback(:after_add, record)` (collection_association.rb:463, :485) are instance calls on the association, and the TS `callback` is a free function whose first parameter is that receiver (`assoc`), so the extractor reads it as an extra leading argument. Surfaced by this PR only because the begin/finish split collapsed into one `replaceOnTarget`, which the extractor can now match to `replace_on_target`; the calls themselves predate it. Converges with the file-wide receiver-as-first-argument burndown, not here."
   }
 ]

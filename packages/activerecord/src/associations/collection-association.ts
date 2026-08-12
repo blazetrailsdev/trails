@@ -847,8 +847,16 @@ export class CollectionAssociation extends Association {
     const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
       ?.distinctValue;
     const shouldReplace = replace || distinctValue;
-    if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
-    return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
+    if (save) {
+      return replaceOnTarget(
+        this,
+        record,
+        skipCallbacks,
+        { replace: shouldReplace },
+        save,
+      ) as Promise<Base | null>;
+    }
+    return replaceOnTarget(this, record, skipCallbacks, { replace: shouldReplace }) as Base | null;
   }
 
   /**
@@ -1422,112 +1430,75 @@ function replaceCommonRecordsInMemory(
 ): void {
   const common = diffHooks(assoc).intersection(newTarget, originalTarget);
   for (const record of common) {
-    replaceOnTarget(assoc, record, true, true);
+    replaceOnTarget(assoc, record, true, { replace: true }) as Base | null;
   }
 }
 
 /**
- * Rails `replace_on_target`'s pre-`yield` half: the index lookup, `before_add`
- * abort check, `set_inverse_instance`, and `@association_ids` reset. Returns the
- * replace index (`-1` when appending) or `null` when `before_add` aborted the
- * add (Rails' `catch(:abort) { ... } || return`). Shared by the sync
- * `replaceOnTarget` and the async `replaceOnTargetAsync` so both stay in parity.
+ * Mirrors Rails' `CollectionAssociation#replace_on_target(record,
+ * skip_callbacks, replace:, inversing: false, &block)`
+ * (collection_association.rb:457-489) — one Rails method, one TS function.
+ *
+ * `block` is Rails' `yield(record)`: `concat_records` passes the per-record
+ * insert there. TypeScript cannot `await` inside a function whose other callers
+ * (build/replace) must stay synchronous, so the block's promise is threaded
+ * through `.then` rather than `await`ed, and the function's return type widens
+ * to `Promise<Base | null>` exactly when a block is supplied. Rails'
+ * `ensure @_was_loaded = nil` (:488) therefore runs in a `finally` on that
+ * promise for the block arm and in the sync `finally` otherwise.
+ *
  * @internal
  */
-function beginReplaceOnTarget(
-  assoc: CollectionAssociation,
-  record: Base,
-  skipCallbacks: boolean,
-  replace: boolean,
-): number | null {
-  // Rails: `index = @target.index(record) if replace && (!record.new_record? ||
-  // @replaced_or_added_targets.include?(record))` (collection_association.rb:478).
-  const index =
-    replace && (!record.isNewRecord() || assoc._replacedOrAddedTargets.has(record))
-      ? indexInTarget(assoc, record)
-      : -1;
-  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
-  assoc.setInverseInstance(record);
-  assoc._wasLoaded = true;
-  return index;
-}
-
-/**
- * Rails `replace_on_target`'s post-`yield` half: the target mutation and
- * `after_add` callback.
- * @internal
- */
-function finishReplaceOnTarget(
-  assoc: CollectionAssociation,
-  record: Base,
-  skipCallbacks: boolean,
-  index: number,
-): Base {
-  const target = assoc.target;
-  // Rails re-runs `@target.index(record)` after the `yield` — the block (a
-  // save) can have added the record to `@replaced_or_added_targets` in between.
-  let at = index;
-  if (at === -1 && assoc._replacedOrAddedTargets.has(record)) at = indexInTarget(assoc, record);
-  if (at !== -1 || record.isNewRecord()) assoc._replacedOrAddedTargets.add(record);
-  if (at !== -1) {
-    target[at] = record;
-  } else if (assoc._wasLoaded || !assoc.isLoaded()) {
-    (assoc as any)._associationIds = null;
-    target.push(record);
-  }
-  if (!skipCallbacks) callback(assoc, "afterAdd", record);
-  return record;
-}
-
-/**
- * Ruby's `@target.index(record)` inside `replace_on_target`: `Core#==`, not JS
- * reference identity, so a re-fetched persisted record dedups against the one
- * already buffered.
- * @internal
- */
-function indexInTarget(assoc: CollectionAssociation, record: Base): number {
-  return assoc.target.findIndex((r) => r === record || r.equals(record));
-}
-
-/** @internal */
 function replaceOnTarget(
   assoc: CollectionAssociation,
   record: Base,
   skipCallbacks: boolean,
-  replace: boolean,
-): Base | null {
-  try {
-    const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
-    if (index === null) return null;
-    return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
-  } finally {
-    // Rails' `ensure @_was_loaded = nil` (collection_association.rb:488).
-    assoc._wasLoaded = null;
-  }
-}
+  { replace, inversing = false }: { replace: boolean; inversing?: boolean },
+  block?: () => Promise<void>,
+): Base | null | Promise<Base | null> {
+  // Ruby's `@target.index(record)` uses `Core#==`, not JS reference identity,
+  // so a re-fetched persisted record dedups against the one already buffered.
+  // `-1` stands in for Ruby's `nil` index throughout.
+  const targetIndex = (): number => assoc.target.findIndex((r) => r === record || r.equals(record));
 
-/**
- * Async twin of `replaceOnTarget`: runs `save` at Rails' `yield(record)` point
- * — after `set_inverse_instance`, before the target mutation and after_add.
- * Kept as a separate async function so the sync `replaceOnTarget` callers
- * (build/replace paths) stay synchronous.
- * @internal
- */
-async function replaceOnTargetAsync(
-  assoc: CollectionAssociation,
-  record: Base,
-  skipCallbacks: boolean,
-  replace: boolean,
-  save?: () => Promise<void>,
-): Promise<Base | null> {
+  let index =
+    replace && (!record.isNewRecord() || assoc._replacedOrAddedTargets.has(record))
+      ? targetIndex()
+      : -1;
+
+  const afterYield = (): Base => {
+    const target = assoc.target;
+    if (index === -1 && assoc._replacedOrAddedTargets.has(record)) index = targetIndex();
+    if (inversing || index !== -1 || record.isNewRecord()) {
+      assoc._replacedOrAddedTargets.add(record);
+    }
+    if (index !== -1) {
+      target[index] = record;
+    } else if (assoc._wasLoaded || !assoc.isLoaded()) {
+      (assoc as any)._associationIds = null;
+      target.push(record);
+    }
+    if (!skipCallbacks) callback(assoc, "afterAdd", record);
+    return record;
+  };
+
+  let yielded = false;
   try {
-    const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
-    if (index === null) return null;
-    if (save) await save();
-    return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+    if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
+    assoc.setInverseInstance(record);
+    assoc._wasLoaded = true;
+    if (block) {
+      yielded = true;
+      return block()
+        .then(afterYield)
+        .finally(() => {
+          assoc._wasLoaded = null;
+        });
+    }
+    return afterYield();
   } finally {
     // Rails' `ensure @_was_loaded = nil` (collection_association.rb:488).
-    assoc._wasLoaded = null;
+    if (!yielded) assoc._wasLoaded = null;
   }
 }
 

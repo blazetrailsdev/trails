@@ -1460,15 +1460,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _replaceOnTarget(
     record: T,
-    options: { skipCallbacks?: boolean; replace?: boolean } = {},
+    options: { skipCallbacks?: boolean; replace?: boolean; inversing?: boolean } = {},
   ): T | null {
-    const { skipCallbacks = false, replace = false } = options;
+    const { skipCallbacks = false, replace = false, inversing = false } = options;
     const index = this._targetReplaceIndex(record, replace);
     if (!skipCallbacks && !assocCallback(this._callbackHost, "beforeAdd", record)) {
       return null;
     }
-    _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
-    this._commitToTarget(record, index);
+    if (!inversing) {
+      // Rails' `set_inverse_instance(record)` (collection_association.rb:466).
+      // On the `inversing: true` path the reciprocal (record → owner) side has
+      // already been established by the caller in `associations.ts`, and
+      // re-wiring here would recurse back into `_wireInverseTarget`.
+      _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
+    }
+    this._commitToTarget(record, index, inversing);
     if (!skipCallbacks) assocCallback(this._callbackHost, "afterAdd", record);
     return record;
   }
@@ -1492,11 +1498,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * save), record the identity, then either replace in place or append.
    * @internal
    */
-  private _commitToTarget(record: T, index: number): void {
+  private _commitToTarget(record: T, index: number, inversing = false): void {
     if (index === -1 && this._replacedOrAddedTargets.has(record)) {
       index = this._indexInTarget(record);
     }
-    if (index !== -1 || record.isNewRecord()) {
+    // Rails: `@replaced_or_added_targets << record if inversing || index ||
+    // record.new_record?` (collection_association.rb:476).
+    if (inversing || index !== -1 || record.isNewRecord()) {
       this._replacedOrAddedTargets.add(record);
     }
     if (index !== -1) {
@@ -1530,44 +1538,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (the call at collection_association.rb:294), the path Rails takes when a
    * belongs_to-loaded or preloaded record is folded back into its `has_many`
    * owner: `skip_callbacks` (no before/after_add — inverse wiring is not a user
-   * `<<`), `replace: true`, and `inversing: true`. Per that method we always
-   * record the record in
-   * `@replaced_or_added_targets` (so a later `<<`/`push` of the same record
-   * replaces in place rather than appending a duplicate) and, because
-   * `@_was_loaded` is forced true there, always append to `@target` — loaded or
-   * not. A subsequent real `load()` merges this in-memory record by primary key
+   * `<<`), `replace: true`, and `inversing: true`. The `inversing` arm of that
+   * method's `@replaced_or_added_targets << record if inversing || index ||
+   * record.new_record?` (:476) is what records a *persisted* record here, so a
+   * later `<<`/`push` of the same record replaces in place rather than
+   * appending a duplicate; and because `@_was_loaded` is forced true there we
+   * always append to `@target` — loaded or not. A subsequent real `load()` merges this in-memory record by primary key
    * (the trails analog of `merge_target_lists`), so the early append is not
    * double-counted.
    *
    * This is the single write entry point for inverse has_many targets. The C2
    * (#2591) seam, which used to reach into `proxy._replacedOrAddedTargets` from
    * `associations.ts`, is now internal here. `set_inverse_instance(record)` is
-   * deliberately NOT re-invoked: the reciprocal (record → owner) side is
-   * established by the caller in `associations.ts`, and re-wiring here would
-   * recurse. The seeded record lands in `_target`, which `Base#_associationCache`
+   * deliberately NOT re-invoked (see `_replaceOnTarget`'s `inversing` guard):
+   * the reciprocal (record → owner) side is established by the caller in
+   * `associations.ts`, and re-wiring here would recurse. The seeded record lands in `_target`, which `Base#_associationCache`
    * surfaces to readers (this proxy is the canonical has_many store).
    * @internal
    */
   _wireInverseTarget(record: T): void {
-    // replace && (!new_record? || @replaced_or_added_targets.include?(record))
-    const index =
-      !record.isNewRecord() || this._replacedOrAddedTargets.has(record)
-        ? this._indexInTarget(record)
-        : -1;
-    // Rails re-runs `@target.index(record)` after `set_inverse_instance` / the
-    // `yield` block (collection_association.rb:478-480) because that block can
-    // mutate `_target` / `_replacedOrAddedTargets` between the two searches.
-    // The `inversing: true` path passes no block and we deliberately do not
-    // re-invoke `set_inverse_instance` here (see above), so nothing changes in
-    // between — the re-search would be a no-op and is omitted.
-    // inversing: true → unconditionally tracked.
-    this._replacedOrAddedTargets.add(record);
-    if (index !== -1) {
-      this._target[index] = record;
-    } else {
-      this._target.push(record);
-      this._invalidateAssociationIds();
-    }
+    this._replaceOnTarget(record, { skipCallbacks: true, replace: true, inversing: true });
   }
 
   // NOTE: If _pushThrough fails after the target is saved, the target record
