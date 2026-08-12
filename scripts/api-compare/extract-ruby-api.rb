@@ -2319,33 +2319,103 @@ class ApiExtractor
     return unless node.is_a?(Array)
 
     case node[0]
-    when :fcall, :vcall
-      # Unqualified method call: foo() or foo
-      name = ident_name(node[1])
-      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
-    when :call, :command_call
-      # Qualified method call: obj.foo. Receiver before the call it receives,
-      # matching extract-ts-api.ts#collectCalls; the two orders must agree.
-      walk_for_calls(node[1], calls, weak)
-      name = ident_name(node[3]) if node[3]
-      if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
-         !(name == "new" && proc_new_receiver?(node[1]))
-        calls << name
-        weak << name if inert_receiver?(node[1])
-      end
-      node.drop(4).each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+    when :method_add_arg, :fcall, :vcall, :call, :command, :command_call
+      callee, args = split_call_node(node)
+      walk_call_in_order(callee, args, calls, weak)
       return
-    when :command
-      name = ident_name(node[1])
-      calls << name if name && !name.start_with?("_") && name =~ /\A[a-z]/
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
       # the parent method; record as "super" so calls-parity can flag a ported
-      # override that drops the super call.
+      # override that drops the super call. Its arguments precede it, as every
+      # other call's do — the TS `super(...)` is an ordinary CallExpression.
+      lambdas = []
+      node.drop(1).each { |child| walk_arg_node(child, calls, weak, lambdas) }
       calls << "super"
+      lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
+      return
     end
 
     node.each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
+  end
+
+  # Decompose a call-ish Ripper node into [callee_node, argument_nodes] — the
+  # argument list hangs off a different slot in each of Ripper's five call
+  # shapes. nil when the node is not a call.
+  def split_call_node(node)
+    return nil unless node.is_a?(Array)
+
+    case node[0]
+    when :method_add_arg then [node[1], node.drop(2)]
+    when :command then [[:fcall, node[1]], node.drop(2)]
+    when :command_call then [node[0, 4], node.drop(4)]
+    when :fcall, :vcall, :call then [node, []]
+    end
+  end
+
+  # Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
+  # order, matching extract-ts-api.ts#collectCalls; the two orders must agree.
+  # Recording evaluation rather than lexical order makes the sequence invariant
+  # to hoisting: `add_to_target(build_record(x))` and the port's
+  # `const r = await buildRecord(x); addToTarget(r)` — the hoist an `await`
+  # forces — record the same two names in the same order.
+  #
+  # A BLOCK is not walked here: `:method_add_block` falls through to the plain
+  # child walk, so a block body lands AFTER the name of the call it hangs off.
+  # That is the port's order too — Rails' `xs.each do … end` is normally a
+  # `for` loop, whose body follows the iterated expression — and the TS side
+  # defers function-expression arguments for exactly this reason.
+  def walk_call_in_order(callee, args, calls, weak)
+    name = nil
+    recv = nil
+    case callee[0]
+    when :fcall, :vcall
+      # Unqualified method call: foo() or foo
+      name = ident_name(callee[1])
+    when :call, :command_call
+      # Qualified method call: obj.foo
+      recv = callee[1]
+      walk_for_calls(recv, calls, weak)
+      name = ident_name(callee[3]) if callee[3]
+    else
+      # Not a plain call node (`foo[1](2)`, a chained `method_add_arg`, …) —
+      # walk it whole; its arguments still follow.
+      walk_for_calls(callee, calls, weak)
+    end
+
+    lambdas = []
+    args.each { |child| walk_arg_node(child, calls, weak, lambdas) }
+
+    if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
+       !(name == "new" && recv && proc_new_receiver?(recv))
+      calls << name
+      weak << name if recv && inert_receiver?(recv)
+    end
+
+    lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }
+  end
+
+  # Ripper's argument wrappers — structure, never a call of their own.
+  ARG_WRAPPER_NODES = %i[
+    arg_paren args args_new args_add args_add_star args_add_block
+    bare_assoc_hash assoc_new assoc_splat
+  ].freeze
+
+  # An argument subtree, with lambda literals collected rather than walked: a
+  # `-> { … }` argument (`scope :active, -> { where(…) }`) is a block in
+  # everything but Ripper's node name, and the port spells it as the callback
+  # argument extract-ts-api.ts#collectCalls defers — so its body follows the
+  # call name there, and must here.
+  def walk_arg_node(node, calls, weak, lambdas)
+    return unless node.is_a?(Array)
+
+    kind = node[0]
+    if kind == :lambda
+      lambdas << node
+    elsif kind.is_a?(Array) || ARG_WRAPPER_NODES.include?(kind)
+      node.each { |child| walk_arg_node(child, calls, weak, lambdas) if child.is_a?(Array) }
+    else
+      walk_for_calls(node, calls, weak)
+    end
   end
 
   # The argument half of walk_for_calls (RFC 0025 §1). Every syntactic call

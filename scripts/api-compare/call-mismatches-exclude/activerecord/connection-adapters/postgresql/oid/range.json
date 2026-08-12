@@ -2,15 +2,15 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/oid/range.ts",
-    "rubyName": "extract_bounds",
-    "call": "split",
-    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+    "rubyName": "cast_value",
+    "call": "order:constructor,sanitizeBounds",
+    "reason": "Order artifact of the raise idiom: Rails' `raise ArgumentError, msg` ports to `throw new Error(...)` (range.ts:109), whose `constructor` is credited before the ::Range.new(*sanitize_bounds(...)) at the end of the body."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/oid/range.ts",
-    "rubyName": "serialize",
-    "call": "order:constructor,typeCastSingleForDatabase",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "rubyName": "extract_bounds",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
   }
 ]

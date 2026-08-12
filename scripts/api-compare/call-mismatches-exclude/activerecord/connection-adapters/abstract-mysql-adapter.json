@@ -51,23 +51,16 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "change_column",
-    "call": "order:quoteTableName,execute",
-    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "change_column_default",
-    "call": "order:changeColumnDefaultForAlter,execute",
-    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
+    "call": "order:changeColumnDefaultForAlter,quoteTableName",
+    "reason": "Order artifact of an await-forced hoist: the port lifts the awaited changeColumnDefaultForAlter above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:692); both are pure."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "change_column_null",
-    "call": "order:quoteColumnName,execute",
-    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
+    "call": "order:quoteColumnName,quoteTableName",
+    "reason": "Order artifact of a hoisted local: the port lifts the twice-used quoteColumnName above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:766); both are pure."
   },
   {
     "package": "activerecord",
@@ -206,8 +199,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "rename_column",
-    "call": "order:renameColumnForAlter,execute",
-    "reason": "ORDER-only: Ruby evaluates the interpolated quote_table_name / *_for_alter arguments before `execute`; TS source order puts the `execute` call first, so the extractor's textual ordering can never match. Same body, same call set."
+    "call": "order:renameColumnForAlter,quoteTableName",
+    "reason": "Order artifact of an await-forced hoist: the port lifts the awaited renameColumnForAlter above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:835); both are pure."
   },
   {
     "package": "activerecord",

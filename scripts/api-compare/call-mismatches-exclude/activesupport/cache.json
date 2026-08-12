@@ -30,13 +30,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
-    "rubyName": "new_entry",
-    "call": "order:mergedOptions,constructor",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
     "rubyName": "normalize_version",
     "call": "try",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -46,13 +39,6 @@
     "tsFile": "cache.ts",
     "rubyName": "read_multi_entries",
     "call": "order:deleteEntry,normalizeVersion",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "write",
-    "call": "order:writeEntry,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   }
 ]
