@@ -34,29 +34,52 @@ export class FileStore extends Store implements CacheStore {
   // isExpired()/isMismatched() like Rails read_entry. A malformed payload
   // degrades to a miss, mirroring Rails deserialize_entry's rescue (cache.rb).
   protected readEntry(key: string, _options: StoreOptions): Entry | null {
-    const stored = this.readFile(this.keyToPath(key));
-    if (!stored || stored.encodedValue === undefined) return null;
-    let value: unknown;
-    try {
-      value = coder.load(stored.encodedValue);
-    } catch (e) {
-      if (e instanceof DeserializationError) return null;
-      throw e;
+    const payload = this.readFile(this.keyToPath(key));
+    if (payload) {
+      const entry = this.deserializeEntry(payload);
+      return entry instanceof Entry ? entry : null;
     }
-    return new Entry(value, { expiresAt: stored.expiresAt, version: stored.version ?? null });
+    return null;
   }
 
+  // The `unless_exist` refusal is Rails' `write_serialized_entry`
+  // (file_store.rb:123-129), whose own port belongs with the FileStore path
+  // helpers; `write_entry` itself is Rails' `serialize_entry` call.
   protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
-    // Mirrors Rails write_serialized_entry (file_store.rb:124-129): unless_exist
-    // refuses the write when the file merely exists, regardless of expiry.
     if (options.unlessExist && getFs().existsSync(this.keyToPath(key))) return false;
-    this.writeFile(this.keyToPath(key), {
+    this.writeFile(this.keyToPath(key), this.serializeEntry(entry, options));
+    return true;
+  }
+
+  /**
+   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813). Rails' default
+   * coder returns a String payload; the trails FileStore's on-disk payload is
+   * the {@link CacheEntry} record, so the Coder round-trip that stands in for
+   * Marshal happens on its `encodedValue`.
+   */
+  private serializeEntry(entry: Entry, _options: StoreOptions): CacheEntry {
+    return {
       encodedValue: coder.dump(entry.value),
       expiresAt: entry.expiresAt,
       version: entry.version,
       accessedAt: Date.now(),
-    });
-    return true;
+    };
+  }
+
+  /**
+   * Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819), including the
+   * `rescue DeserializationError` that degrades a malformed payload to a miss.
+   */
+  private deserializeEntry(payload: CacheEntry | null): Entry | null {
+    if (payload === null || payload.encodedValue === undefined) return null;
+    let value: unknown;
+    try {
+      value = coder.load(payload.encodedValue);
+    } catch (e) {
+      if (e instanceof DeserializationError) return null;
+      throw e;
+    }
+    return new Entry(value, { expiresAt: payload.expiresAt, version: payload.version ?? null });
   }
 
   protected deleteEntry(key: string, _options: StoreOptions): boolean {

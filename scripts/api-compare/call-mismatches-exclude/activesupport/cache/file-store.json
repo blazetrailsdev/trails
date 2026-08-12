@@ -94,19 +94,5 @@
       "ref:entry"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "read_entry",
-    "call": "deserialize_entry",
-    "reason": "Pre-existing FileStore divergence, newly visible: `read_entry`/`write_entry` in file-store.ts serialize with the fidelity Coder directly (file-store.ts:38-54) instead of Rails' `Store#deserialize_entry`/`#serialize_entry` (cache.rb:806-819), which trails' `Store` has no `@coder` seam for yet. The two call names only entered the compare population when MemoryStore ported them (PR #6435), so this row records existing debt rather than new; RFC 0101 story `converge-store-serialized-entry-hooks-and-file-store-paths` ports the Store-level seam and converges these two call sites with it."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "write_entry",
-    "call": "serialize_entry",
-    "reason": "Pre-existing FileStore divergence, newly visible: `read_entry`/`write_entry` in file-store.ts serialize with the fidelity Coder directly (file-store.ts:38-54) instead of Rails' `Store#deserialize_entry`/`#serialize_entry` (cache.rb:806-819), which trails' `Store` has no `@coder` seam for yet. The two call names only entered the compare population when MemoryStore ported them (PR #6435), so this row records existing debt rather than new; RFC 0101 story `converge-store-serialized-entry-hooks-and-file-store-paths` ports the Store-level seam and converges these two call sites with it."
   }
 ]
