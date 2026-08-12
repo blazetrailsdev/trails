@@ -24,7 +24,6 @@ import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
   ActiveRecordError,
-  AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -1385,14 +1384,16 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     message: string,
     sql: string | null,
     binds: unknown[],
+    connectionPool: AbstractAdapter["pool"],
   ): MismatchedForeignKey {
     if (sql) {
       const details = this.mismatchedForeignKeyDetails(message, sql);
-      return new MismatchedForeignKey({ message, sql, binds, ...details });
+      return new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details });
     }
     return new MismatchedForeignKey({
       message,
       binds,
+      connectionPool,
       queryParser: (parsedSql) => this.mismatchedForeignKeyDetails(message, parsedSql),
     });
   }
@@ -1482,7 +1483,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
-      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds });
+      if (!(e instanceof Error))
+        return new StatementInvalid(String(e), { sql, binds, connectionPool: this.pool });
       const errno = (e as { errno?: number }).errno;
       const msg = e.message;
       if (typeof errno !== "number") {
@@ -1496,44 +1498,44 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       }
       switch (errno) {
         case ER_DB_CREATE_EXISTS:
-          return new DatabaseAlreadyExists(msg, { sql, binds });
+          return new DatabaseAlreadyExists(msg, { sql, binds, connectionPool: this.pool });
         case ER_DUP_ENTRY:
-          return new RecordNotUnique(msg, { sql, binds });
+          return new RecordNotUnique(msg, { sql, binds, connectionPool: this.pool });
         case ER_NO_REFERENCED_ROW:
         case ER_ROW_IS_REFERENCED:
         case ER_ROW_IS_REFERENCED_2:
         case ER_NO_REFERENCED_ROW_2:
-          return new InvalidForeignKey(msg, { sql, binds });
+          return new InvalidForeignKey(msg, { sql, binds, connectionPool: this.pool });
         case ER_CANNOT_ADD_FOREIGN:
         case ER_FK_INCOMPATIBLE_COLUMNS:
-          return this.mismatchedForeignKey(msg, sql, binds);
+          return this.mismatchedForeignKey(msg, sql, binds, this.pool);
         case ER_CANNOT_CREATE_TABLE:
           if (msg.includes("errno: 150") || msg.includes("errno 150")) {
-            return this.mismatchedForeignKey(msg, sql, binds);
+            return this.mismatchedForeignKey(msg, sql, binds, this.pool);
           }
-          return new StatementInvalid(msg, { sql, binds });
+          return new StatementInvalid(msg, { sql, binds, connectionPool: this.pool });
         case ER_NOT_NULL_VIOLATION:
         case ER_DO_NOT_HAVE_DEFAULT:
-          return new NotNullViolation(msg, { sql, binds });
+          return new NotNullViolation(msg, { sql, binds, connectionPool: this.pool });
         case ER_DATA_TOO_LONG:
-          return new ValueTooLong(msg, { sql, binds });
+          return new ValueTooLong(msg, { sql, binds, connectionPool: this.pool });
         case ER_OUT_OF_RANGE:
-          return new ARRangeError(msg, { sql, binds });
+          return new ARRangeError(msg, { sql, binds, connectionPool: this.pool });
         case ER_LOCK_DEADLOCK:
-          return new Deadlocked(msg, { sql, binds });
+          return new Deadlocked(msg, { sql, binds, connectionPool: this.pool });
         case ER_LOCK_WAIT_TIMEOUT:
-          return new LockWaitTimeout(msg, { sql, binds });
+          return new LockWaitTimeout(msg, { sql, binds, connectionPool: this.pool });
         case ER_QUERY_TIMEOUT:
         case ER_FILSORT_ABORT:
-          return new StatementTimeout(msg, { sql, binds });
+          return new StatementTimeout(msg, { sql, binds, connectionPool: this.pool });
         case ER_QUERY_INTERRUPTED:
-          return new QueryCanceled(msg, { sql, binds });
+          return new QueryCanceled(msg, { sql, binds, connectionPool: this.pool });
         case ER_CONNECTION_KILLED:
         case ER_SERVER_SHUTDOWN:
         case CR_SERVER_GONE_ERROR:
         case CR_SERVER_LOST:
         case ER_CLIENT_INTERACTION_TIMEOUT:
-          return new ConnectionFailed(msg, { sql, binds });
+          return new ConnectionFailed(msg, { sql, binds, connectionPool: this.pool });
         default:
           // Driver errors expose a positive MySQL errno and usually a
           // sqlState. Node/system errors (ECONNREFUSED etc.) also carry
@@ -1541,7 +1543,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
           // errno to avoid re-tagging network failures as
           // StatementInvalid (which would attach misleading sql/binds).
           return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
-            ? new StatementInvalid(msg, { sql, binds })
+            ? new StatementInvalid(msg, { sql, binds, connectionPool: this.pool })
             : e;
       }
     };
@@ -1553,16 +1555,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // as `translateExceptionClass` is for the public translator.
     if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = e;
-    }
-    // Mirrors Rails' AbstractMysqlAdapter#translate_exception, which builds
-    // every translated error with `connection_pool: @pool`
-    // (abstract_mysql_adapter.rb:815-856) — so the direct `_translateException`
-    // throw sites get a pool too, not just the public wrapper's callers. Both
-    // setters are guarded, so a pool passed at construction survives.
-    if (translated instanceof ConnectionNotEstablished) {
-      translated.setPool(this.pool);
-    } else if (translated instanceof AdapterError) {
-      translated.setConnectionPool(this.pool);
     }
     return translated;
   }

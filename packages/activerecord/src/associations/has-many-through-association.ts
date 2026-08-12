@@ -296,19 +296,35 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Builds the target via `super`, then — when the source reflection has an
    * inverse on the built record's class — pre-builds the through join row and
    * wires it onto that inverse so the join is created alongside the target.
+   *
+   * @internal
    */
-  protected override buildRecord(
+  override buildRecord(
     attributes?: Record<string, unknown>,
     block?: (record: Base) => void,
   ): Base | null {
     this.ensureNotNested();
-    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope = (
-      this as unknown as { scope?: () => unknown }
-    ).scope?.();
+    // Rails captures `scope` here inside the caller's `scoping` block, so a
+    // scoped build (`post.people.where(readers: { skimmer: true }).create`)
+    // sees the relation's values. trails carries that relation on the owner's
+    // proxy as `_pendingThroughScope` (association-relation.ts:153) instead of
+    // a current-scope stack, so prefer it when one is in flight.
+    const pendingThroughScope = (
+      this.owner._collectionProxies.get(this.reflection.name) as
+        | { _pendingThroughScope?: unknown }
+        | undefined
+    )?._pendingThroughScope;
+    (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope =
+      pendingThroughScope ?? (this as unknown as { scope?: () => unknown }).scope?.();
     try {
       const record = super.buildRecord(attributes, block);
       if (!record) return record;
-      const built = buildThroughInverseFor(this.owner, this.reflection, record);
+      const built = buildThroughInverseFor(
+        this.owner,
+        this.reflection,
+        record,
+        (this as HasManyThroughAssociation & { _throughScope?: unknown })._throughScope,
+      );
       if (built) {
         const inverseAssoc = (
           record as unknown as { association?: (n: string) => any }
@@ -324,6 +340,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
               inverseAssoc.loadedBang?.();
             }
             inverseAssoc.setInverseInstance?.(built.throughRecord);
+          } else if (typeof inverseAssoc.writer === "function") {
+            // Rails' build_record covers only the collection and has_one
+            // inverses (has_many_through_association.rb:101-107); a belongs_to
+            // source inverse gets its foreign key from the through scope in
+            // `initialize_attributes`. trails' through scope does not carry it
+            // yet, so the writer stands in — tracked as through-scope debt.
+            inverseAssoc.writer(built.throughRecord);
           }
         }
       }

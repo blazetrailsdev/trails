@@ -54,11 +54,9 @@ import {
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
-import { findStiClass, stiEnabled } from "../inheritance.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
-  association,
   autoloadModel,
   resolveAssocClass,
   _routeThroughViaAssociationScope,
@@ -67,11 +65,7 @@ import {
   _violatesStrictLoading,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
-import {
-  buildThroughInverseFor,
-  multisetDifference,
-  multisetIntersection,
-} from "./has-many-through-association.js";
+import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
 import {
   countRecords,
   scope as hasManyScope,
@@ -1277,124 +1271,43 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return ctor._reflectOnAssociation?.(this._assocName)?.foreignKey ?? undefined;
   }
 
+  /**
+   * Mirrors Rails' `Association#build_record` (association.rb:383-388):
+   *
+   *   reflection.build_association(attributes) do |record|
+   *     initialize_attributes(record, attributes)
+   *   end
+   *
+   * Construction, including STI-subclass resolution, belongs to
+   * `AssociationReflection#build_association` → `klass.new(attributes, &block)`
+   * (reflection.rb:182) and `Base.new`'s inheritance-column handling
+   * (inheritance.rb `new` / `subclass_from_attributes`); the foreign key and
+   * the polymorphic type come off `scope_for_create` inside
+   * `initialize_attributes` (association.rb:224). So the proxy hands the whole
+   * job to the association holder rather than assembling them itself.
+   */
   private _buildRaw(attrs: Record<string, unknown> = {}): Base {
-    const ctor = this._record.constructor as typeof Base;
-    const primaryKey = this._assocDef.options.primaryKey ?? ctor.primaryKey;
-
-    // Polymorphic "as" option
-    const asName = this._assocDef.options.as;
-    const foreignKey = asName
-      ? (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        `${underscore(asName)}_id`)
-      : (this._assocDef.options.foreignKey ??
-        this._reflectionForeignKey() ??
-        `${underscore(ctor.name)}_id`);
-
-    const buildAttrs: Record<string, unknown> = { ...attrs };
-    // Composite key: spread each foreign-key column onto its owner primary-key
-    // column value. Coercing an array key to a string ("author_id,book_id")
-    // would produce an unknown attribute — tolerated only while construction
-    // silently swallowed it; the child's setter-dispatched assignment now
-    // raises, so map the real columns.
-    if (Array.isArray(foreignKey) || Array.isArray(primaryKey)) {
-      // Composite fk/pk: pair each foreign-key column with its owner primary-key
-      // column value. Fully parallel arrays (e.g. `foreign_key: [:author_id,
-      // :book_id]` / `primary_key: [:author_id, :id]`) pair by position; a mixed
-      // shape (scalar FK against a composite-PK target, or an array FK against a
-      // scalar PK) normalizes both to arrays and falls back to `pks[0]`, so a
-      // scalar side reads the leading key component. Coercing an array key to a
-      // string ("author_id,book_id") would produce an unknown attribute —
-      // tolerated only while construction swallowed it; the child's now
-      // setter-dispatched assignment raises, so map the real columns.
-      const fks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-      const pks = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-      fks.forEach((fk, i) => {
-        buildAttrs[fk] = this._record._readAttribute(pks[i] ?? pks[0]);
-      });
-    } else {
-      buildAttrs[foreignKey] = this._record._readAttribute(primaryKey);
-    }
-    if (asName) {
-      const typeCol = this._assocDef.options.foreignType ?? `${underscore(asName)}_type`;
-      buildAttrs[typeCol] = ctor.polymorphicName();
-    }
-
-    let targetModel = this.model;
-
-    // STI: resolve subclass from the caller-supplied inheritance column,
-    // falling back to a value from scope_for_create (e.g.
-    // `has_many :posts, -> { where(type: "SpecialPost") }`). Rails resolves
-    // the subclass after scope-merge, so peek at scope here before
-    // instantiation; the full scope_for_create filter still runs below.
-    const sfcForSti = this._scopeForCreateRaw();
-    const inheritanceCol = targetModel.inheritanceColumn;
-    if (inheritanceCol !== null && stiEnabled(targetModel)) {
-      const typeName = (buildAttrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as
-        | string
-        | undefined;
-      if (typeName) targetModel = findStiClass(targetModel, typeName);
-    }
-
-    const record = new targetModel(buildAttrs);
-    this._record.association(this._assocName).initializeAttributes(record, attrs);
-    return record;
+    return (
+      this._record.association(this._assocName) as unknown as {
+        buildRecord(attributes?: Record<string, unknown>): Base;
+      }
+    ).buildRecord(attrs);
   }
 
+  /**
+   * Mirrors Rails' `HasManyThroughAssociation#build_record`
+   * (has_many_through_association.rb:88-100), which calls `super` —
+   * `Association#build_record` (association.rb:383-388) — for the
+   * construction and then wires the pre-built join row onto the target's
+   * inverse. Both halves live on the association holder, so the proxy hands
+   * the whole job to it.
+   */
   private _buildThrough(attrs: Record<string, unknown> = {}): Base {
-    let targetModel = this.model;
-
-    const sfcForSti = this._scopeForCreateRaw();
-    const inheritanceCol = targetModel.inheritanceColumn;
-    if (inheritanceCol !== null && stiEnabled(targetModel)) {
-      const typeName = (attrs[inheritanceCol] ?? sfcForSti[inheritanceCol]) as string | undefined;
-      if (typeName) targetModel = findStiClass(targetModel, typeName);
-    }
-
-    const record = new targetModel(attrs);
-    this._record.association(this._assocName).initializeAttributes(record, attrs);
-    // Mirrors the inverse half of Rails' HasManyThroughAssociation#build_record:
-    // pre-build the join row and wire it onto the target's inverse so the join
-    // is created alongside the target on save.
-    const built = buildThroughInverseFor(
-      this._record,
-      this._assocDef,
-      record,
-      (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope ??
-        (this._isThrough ? this.scope() : this),
-    );
-    if (built?.isCollection) {
-      const invProxy = association(record, built.inverseName) as unknown as CollectionProxy;
-      invProxy._target.push(built.throughRecord);
-    } else if (built?.isHasOne) {
-      const inv = (record as unknown as { association?: (n: string) => any }).association?.(
-        built.inverseName,
-      );
-      if (inv) {
-        if (typeof inv.syncWrite === "function") {
-          inv.syncWrite(built.throughRecord);
-        } else {
-          inv.target = built.throughRecord;
-          inv.loadedBang?.();
-        }
-        inv.setInverseInstance?.(built.throughRecord);
+    return (
+      this._record.association(this._assocName) as unknown as {
+        buildRecord(attributes?: Record<string, unknown>): Base;
       }
-    } else if (built) {
-      // belongs_to inverse: call the writer to set FK on the new target record from the through record.
-      const inv = (record as unknown as { association?: (n: string) => any }).association?.(
-        built.inverseName,
-      );
-      if (inv && typeof inv.writer === "function") {
-        inv.writer(built.throughRecord);
-      }
-    }
-    return record;
-  }
-
-  private _scopeForCreateRaw(): Record<string, unknown> {
-    const fn = (this as unknown as { scopeForCreate?: () => Record<string, unknown> })
-      .scopeForCreate;
-    return typeof fn === "function" ? fn.call(this) : {};
+    ).buildRecord(attrs);
   }
 
   /**

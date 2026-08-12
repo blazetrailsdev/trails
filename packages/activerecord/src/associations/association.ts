@@ -718,10 +718,12 @@ export class Association {
     return record;
   }
 
-  protected buildRecord(
-    attributes?: Record<string, unknown>,
-    block?: (record: Base) => void,
-  ): Base | null {
+  /**
+   * Mirrors: ActiveRecord::Associations::Association#build_record
+   * (association.rb:383-388).
+   * @internal
+   */
+  buildRecord(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
     const Klass = this.klass;
     if (!Klass) return null;
     // Rails' `build_record` passes `initialize_attributes` as the block to
