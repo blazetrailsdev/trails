@@ -81,8 +81,12 @@ export class HomogeneousIn extends Node {
   get procForBinds(): (value: unknown) => unknown {
     // Rails: -> value { ActiveModel::Attribute.with_cast_value(
     //   attribute.name, value, ActiveModel::Type.default_value) }
-    const name = (this.attribute as unknown as { name?: string }).name ?? "";
-    return (value: unknown) => AMAttribute.withCastValue(name, value, defaultValue());
+    return (value: unknown) =>
+      AMAttribute.withCastValue(
+        (this.attribute as unknown as { name?: string }).name ?? "",
+        value,
+        defaultValue(),
+      );
   }
 
   fetchAttribute(block: (attr: Node) => unknown): unknown {
