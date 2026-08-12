@@ -115,22 +115,26 @@ export class TokenDefinition {
     return [this.definingClass.name, this.purpose, this.expiresIn ?? ""].join("\n");
   }
 
-  // token_for.rb:19-21 — `defining_class.generated_token_verifier`, a plain
-  // class_attribute read. Ruby gets nil here when nothing configured a
-  // verifier and NoMethodErrors on the next `generate`/`verified`; the
-  // non-null assertion keeps the same shape for the callers below.
+  /**
+   * Mirrors: ActiveRecord::TokenFor::TokenDefinition#message_verifier
+   * (token_for.rb:19-21) — a plain class_attribute read. Ruby gets nil here
+   * when nothing configured a verifier and NoMethodErrors on the next
+   * `generate`/`verified`; the non-null assertion keeps that shape.
+   */
   messageVerifier(): MessageVerifier {
     return this.definingClass.generatedTokenVerifier!;
   }
 
+  /**
+   * Mirrors: ActiveRecord::TokenFor::TokenDefinition#payload_for
+   * (token_for.rb:23-25). `model.instance_eval(&block)` runs the block with the
+   * model as `self`, and yields the receiver to it, so both are passed here.
+   * BigInt is not JSON-serializable; PG bigserial PKs surface as BigInt, so the
+   * id is coerced exactly as signed-id.ts#signedId coerces it.
+   */
   payloadFor(model: Base): unknown[] {
-    // BigInt is not JSON-serializable; coerce to a plain number so the token
-    // payload round-trips. PG bigserial PKs surface as BigInt (mirrors the
-    // coercion in signed-id.ts#signedId).
     const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
     const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
-    // token_for.rb:24 — `model.instance_eval(&block)`: the block runs with the
-    // model as `self`, and `instance_eval` also yields the receiver to the block.
     return this.block ? [id, asJson(this.block.call(model, model))] : [id];
   }
 

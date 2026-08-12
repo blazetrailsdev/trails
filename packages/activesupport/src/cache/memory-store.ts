@@ -29,7 +29,7 @@ function toI(value: unknown): number {
 }
 
 export class MemoryStore extends Store implements CacheStore {
-  // Advertise cache versioning support (memory_store.rb:87-90).
+  /** Advertise cache versioning support (memory_store.rb:87-90). */
   static supportsCacheVersioning(): boolean {
     return true;
   }

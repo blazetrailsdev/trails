@@ -1,5 +1,4 @@
 import { extractOptions, toParam } from "./hash-utils.js";
-import { RuntimeError } from "./messages/serializer-with-fallback.js";
 import { env } from "./process-adapter.js";
 import { MemoryStore } from "./cache/memory-store.js";
 import { NullStore } from "./cache/null-store.js";
@@ -8,6 +7,17 @@ import type { CacheStore } from "./cache/index.js";
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
+
+/**
+ * Mirror of Ruby's `RuntimeError` — what `retrieve_store_class`'s bare
+ * `raise "Could not find cache store adapter for ..."` produces. @internal
+ */
+class RuntimeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
+}
 
 /** Mirrors Rails `@format_version = 7.0` (cache.rb:55). */
 let _formatVersion = 7.0;
@@ -23,14 +33,14 @@ export function setFormatVersion(value: number): void {
 }
 
 /**
- * Creates a new Store object according to the given options.
+ * Creates a new Store object according to the given options. A Ruby Symbol is
+ * a colon-prefixed string in trails, which is the discriminator Rails' `when
+ * Symbol` arm reads: `:memory_store` names a store class to build, anything
+ * else is returned as-is.
  *
  * Mirrors: ActiveSupport::Cache.lookup_store (cache.rb:85-97)
  */
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
-  // A Ruby Symbol is a colon-prefixed string in trails, which is exactly the
-  // discriminator Rails' `when Symbol` arm reads: `:memory_store` names a store
-  // class to build, any other object is returned as-is.
   if (typeof store === "string" && store.startsWith(":")) {
     const [rest, options] = extractOptions(parameters);
     return new (retrieveStoreClass(store))(...rest, options);
@@ -54,7 +64,7 @@ export function expandCacheKey(key: unknown, namespace?: string | null): string 
   let expandedCacheKey = namespace != null ? `${namespace}/` : "";
 
   const prefix = env["RAILS_CACHE_ID"] ?? env["RAILS_APP_VERSION"];
-  if (prefix) {
+  if (prefix != null) {
     expandedCacheKey += `${prefix}/`;
   }
 

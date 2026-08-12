@@ -435,11 +435,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociation marked_for_destruction?",
   fixtures([]);
 
   it("save_collection_association selects the records to destroy through marked_for_destruction?", async () => {
-    // autosave_association.rb:436 —
-    // `records_to_destroy = records.select(&:marked_for_destruction?)`. The
-    // symbol-to-proc is a method call, so an override decides which children
-    // the collection save destroys; reading the in-memory flag directly
-    // instead would leave an overriding child untouched.
+    // autosave_association.rb:436 — `records.select(&:marked_for_destruction?)`.
     registerModel(CanonicalPirate);
     registerModel(CanonicalBird);
     let doomed = false;
