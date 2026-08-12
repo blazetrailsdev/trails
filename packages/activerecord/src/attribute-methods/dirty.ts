@@ -211,22 +211,23 @@ export function _touchRow(
 }
 
 /** @internal */
-export function _updateRecord(this: DirtyPrivateHost, _attributeNames?: string[]): Promise<number> {
-  return this._performUpdate().then((rows) => {
-    this.changesApplied();
-    return rows;
-  });
+export async function _updateRecord(
+  this: DirtyPrivateHost,
+  superFn: () => Promise<unknown>,
+): Promise<unknown> {
+  const affectedRows = await superFn();
+  this.changesApplied();
+  return affectedRows;
 }
 
 /** @internal */
-export function _createRecord(
+export async function _createRecord(
   this: DirtyPrivateHost,
-  _attributeNames?: string[],
+  superFn: () => Promise<unknown>,
 ): Promise<unknown> {
-  return this._performInsert().then((id) => {
-    this.changesApplied();
-    return id;
-  });
+  const id = await superFn();
+  this.changesApplied();
+  return id;
 }
 
 /** @internal */

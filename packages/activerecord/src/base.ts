@@ -116,7 +116,6 @@ import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
-  registerBaseTimestampCallbacks,
 } from "./callbacks.js";
 import {
   runAllCallbacks as cbRunAll,
@@ -3423,7 +3422,6 @@ export class Base extends Model {
       return saved;
     });
 
-    this._skipTouch = false;
     if (!saveOk) return false;
 
     if (saved) {
@@ -3434,7 +3432,9 @@ export class Base extends Model {
   }
 
   private _pendingOperation: Promise<void> | null = null;
-  private _skipTouch = false;
+  // Mirrors ActiveRecord::Timestamp's @_touch_record ivar (timestamp.rb:104),
+  // set by Timestamp#create_or_update and read by record_update_timestamps.
+  private _touchRecord: boolean | null = null;
   private _instanceRecordTimestamps: boolean | null = null;
 
   // Mirrors: ActiveRecord class_attribute :record_timestamps instance-level override
@@ -3455,16 +3455,6 @@ export class Base extends Model {
     // Resolved after the suppression guard so a suppressed write on a
     // connectionless model never touches `.connection` (Rails resolves lazily).
     const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
-
-    // Auto-populate timestamps (unless touch: false or recordTimestamps disabled)
-    if (!this._skipTouch && this.recordTimestamps !== false) {
-      const now = Timestamp.currentTimeFromProperTimezone();
-      for (const col of Timestamp.allTimestampAttributesInModel.call(ctor)) {
-        if (ctor._attributeDefinitions.has(col) && this._readAttribute(col) == null) {
-          this._writeAttribute(col, now);
-        }
-      }
-    }
 
     // Initialize the locking column from its schema default so a new record's
     // lock value is never nil at insert time. Rails reflects the column
@@ -3610,16 +3600,6 @@ export class Base extends Model {
     const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
 
     const table = ctor.arelTable;
-
-    // Auto-populate update timestamps (unless touch: false or recordTimestamps disabled)
-    if (!this._skipTouch && this.recordTimestamps !== false) {
-      const now = Timestamp.currentTimeFromProperTimezone();
-      for (const col of Timestamp.timestampAttributesForUpdateInModel.call(ctor)) {
-        if (ctor._attributeDefinitions.has(col) && !this.willSaveChangeToAttribute(col)) {
-          this._writeAttribute(col, now);
-        }
-      }
-    }
 
     const changedAttrs = { ...this.changes };
 
@@ -5099,10 +5079,35 @@ include(Base, {
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });
 
+// Rails layers create_or_update / _create_record / _update_record by include
+// order (base.rb:299-316): Timestamp sits above Callbacks, so its body runs
+// first and reaches Callbacks' through `super`. Each layer takes that `super`
+// as an explicit continuation.
 for (const [name, fn] of [
-  ["createOrUpdate", callbacksCreateOrUpdate],
-  ["_createRecord", callbacksCreateRecord],
-  ["_updateRecord", callbacksUpdateRecord],
+  [
+    "createOrUpdate",
+    function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
+      return Timestamp.createOrUpdate.call(this as any, touch, () =>
+        callbacksCreateOrUpdate.call(this, block),
+      );
+    },
+  ],
+  [
+    "_createRecord",
+    function (this: Base, block?: (record: Base) => void): Promise<boolean> {
+      return Timestamp._createRecord.call(this as any, () =>
+        callbacksCreateRecord.call(this, block),
+      ) as Promise<boolean>;
+    },
+  ],
+  [
+    "_updateRecord",
+    function (this: Base, block?: (record: Base) => void): Promise<boolean> {
+      return Timestamp._updateRecord.call(this as any, () =>
+        callbacksUpdateRecord.call(this, block),
+      ) as Promise<boolean>;
+    },
+  ],
 ] as const) {
   Object.defineProperty(Base.prototype, name, {
     value: fn,
@@ -5111,12 +5116,6 @@ for (const [name, fn] of [
     enumerable: false,
   });
 }
-
-// Register Timestamp's internal before_create callback on Base.prototype so
-// timestamps are available to user-defined before_create callbacks (Rails parity:
-// ActiveRecord::Timestamp registers before_create :_assign_timestamps_on_create
-// at include-time, before any subclass callbacks).
-registerBaseTimestampCallbacks(Base.prototype);
 
 // Register Model's super methods for the Validations module.
 // Breaks the recursion on isValid (Base.isValid → validations.isValid → Model.isValid)

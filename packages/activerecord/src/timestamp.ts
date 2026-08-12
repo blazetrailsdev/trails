@@ -280,7 +280,6 @@ interface TimestampHost {
 /** Minimal instance-side surface used by Timestamp private/internal helpers. */
 interface TimestampInstanceHost {
   _touchRecord: boolean | null;
-  _createOrUpdate: (block?: (record: unknown) => void) => Promise<boolean>;
   readAttribute?(name: string): unknown;
   _readAttribute?(name: string): unknown;
   _writeAttribute?(name: string, val: unknown): void;
@@ -442,41 +441,48 @@ export function initInternals(this: TimestampInstanceHost): void {
 }
 
 /** @internal */
-export async function _createRecord(this: TimestampInstanceHost): Promise<unknown> {
-  if (this.constructor.recordTimestamps !== false) {
-    const time = currentTimeFromProperTimezone();
-    for (const col of allTimestampAttributesInModel.call(this.constructor)) {
-      if (this._readAttribute?.(col) == null) {
-        this._writeAttribute?.(col, time);
+export async function _createRecord(
+  this: TimestampInstanceHost,
+  superFn: () => Promise<unknown>,
+): Promise<unknown> {
+  if ((this.recordTimestamps ?? this.constructor.recordTimestamps) !== false) {
+    const currentTime = currentTimeFromProperTimezone();
+
+    for (const column of allTimestampAttributesInModel.call(this.constructor)) {
+      if (this._readAttribute?.(column) == null) {
+        this._writeAttribute?.(column, currentTime);
       }
     }
   }
-  // Rails calls super here (the persistence layer). In trails the persistence
-  // layer is wired separately via callbacks.ts; this method provides the
-  // timestamp-writing half only.
-  return this.id;
+
+  return superFn();
 }
 
 /** @internal */
-export async function _updateRecord(this: TimestampInstanceHost): Promise<boolean> {
+export async function _updateRecord(
+  this: TimestampInstanceHost,
+  superFn: () => Promise<unknown>,
+): Promise<unknown> {
   await recordUpdateTimestamps.call(this);
-  // Rails yields to super (persistence layer) inside record_update_timestamps.
-  // In trails the persistence layer is wired separately via callbacks.ts.
-  return true;
+
+  return superFn();
 }
 
 /** @internal */
 export function createOrUpdate(
   this: TimestampInstanceHost,
   touch = true,
-  block?: (record: unknown) => void,
+  superFn: () => Promise<boolean>,
 ): Promise<boolean> {
   this._touchRecord = touch;
-  return this._createOrUpdate.call(this, block);
+  return superFn();
 }
 
 /** @internal */
-export async function recordUpdateTimestamps(this: TimestampInstanceHost): Promise<void> {
+export async function recordUpdateTimestamps<T>(
+  this: TimestampInstanceHost,
+  block?: () => Promise<T>,
+): Promise<T | undefined> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
     const currentTime = currentTimeFromProperTimezone();
     for (const column of timestampAttributesForUpdateInModel.call(this.constructor)) {
@@ -485,6 +491,8 @@ export async function recordUpdateTimestamps(this: TimestampInstanceHost): Promi
       }
     }
   }
+
+  return block?.();
 }
 
 /** @internal */

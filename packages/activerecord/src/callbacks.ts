@@ -17,11 +17,11 @@ import {
 } from "@blazetrails/activemodel";
 import { subclasses as _subclasses } from "./inheritance.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
+import { recordUpdateTimestamps } from "./timestamp.js";
 import {
-  allTimestampAttributesInModel,
-  currentTimeFromProperTimezone,
-  timestampAttributesForUpdateInModel,
-} from "./timestamp.js";
+  _createRecord as dirtyCreateRecord,
+  _updateRecord as dirtyUpdateRecord,
+} from "./attribute-methods/dirty.js";
 
 type ModelCtor = typeof Base;
 
@@ -262,35 +262,6 @@ function registerCallback(
   );
 }
 
-/**
- * Mirrors Rails' ActiveRecord::Timestamp#_assign_timestamps_on_create, registered
- * as an early before_create callback on Base so timestamps are available to user-defined
- * before_create callbacks (which run after this one in the inherited chain).
- *
- * @internal
- */
-function _assignTimestampsOnCreate(this: any): void {
-  const ctor = this.constructor;
-  if ((this.recordTimestamps ?? ctor.recordTimestamps) !== false) {
-    const time = currentTimeFromProperTimezone();
-    for (const col of allTimestampAttributesInModel.call(ctor)) {
-      if (ctor._attributeDefinitions?.has(col) && !this._readAttribute?.(col)) {
-        this._writeAttribute?.(col, time);
-      }
-    }
-  }
-}
-
-/**
- * Register the internal timestamp before_create callback on Base.prototype.
- * Must be called once after Base is defined, before any subclass registers callbacks.
- *
- * @internal
- */
-export function registerBaseTimestampCallbacks(baseProto: object): void {
-  _registerCallbackOnProto(baseProto, "before", "create", _assignTimestampsOnCreate, {});
-}
-
 // ---------------------------------------------------------------------------
 // Private instance helpers — mirrors ActiveRecord::Callbacks private block.
 // Rails overrides persistence methods to wrap each in _run_*_callbacks { super }.
@@ -311,6 +282,61 @@ export function createOrUpdate(this: any, block?: (record: any) => void): Promis
   );
 }
 
+/**
+ * The Persistence#_create_record body (persistence.rb:920-940) — the bottom of
+ * the create super chain: the INSERT, `@new_record = false`, then the yield.
+ */
+async function persistenceCreateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
+  const ctor = this.constructor;
+  if (!this._performInsert) throw new Error("_performInsert not implemented");
+  // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
+  // insert. Rails new records are dirty from construction, so partial_inserts'
+  // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
+  // correctly includes attrs the user set to a non-default value — e.g. an
+  // hstore column with a DB default of "" that was assigned {key: null}.
+  // Running this after the insert would leave the dirty set empty at column-
+  // selection time and wrongly drop such columns. Only a *null* PK column is
+  // skipped: that's the auto-populated key, tracked via
+  // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
+  // (non-null) PK column — e.g. a composite key — must stay dirty so it's
+  // inserted; otherwise the row is written with a missing key and
+  // find/destroy by that key raises RecordNotFound.
+  const _pk = ctor.primaryKey;
+  const _pkSet = new Set(
+    (Array.isArray(_pk) ? _pk : [_pk]).filter((n: string) => this._readAttribute?.(n) == null),
+  );
+  this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
+  await this._performInsert();
+  if (this._pendingOperation) {
+    await this._pendingOperation;
+    this._pendingOperation = null;
+  }
+  this._previouslyNewRecord = true;
+  this._newRecord = false;
+  // Rails yields here (persistence.rb:936-940).
+  block?.(this);
+  // Rails returns `id`; the trails chain carries a truthy value that becomes
+  // run_callbacks' value in Callbacks#_create_record.
+  return true;
+}
+
+/**
+ * The Persistence#_update_record body (persistence.rb:900-916) — the bottom of
+ * the update super chain: the UPDATE, then the yield.
+ */
+async function persistenceUpdateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
+  if (!this._performUpdate) throw new Error("_performUpdate not implemented");
+  await this._performUpdate();
+  if (this._pendingOperation) {
+    await this._pendingOperation;
+    this._pendingOperation = null;
+  }
+  this._previouslyNewRecord = false;
+  // Rails yields here (persistence.rb:912-916).
+  block?.(this);
+  return true;
+}
+
 /** @internal */
 export async function _createRecord(this: any, block?: (record: any) => void): Promise<boolean> {
   // Rails: _run_create_callbacks { super }, whose value is the block's return
@@ -318,47 +344,16 @@ export async function _createRecord(this: any, block?: (record: any) => void): P
   // create_or_update: `result != false` (persistence.rb:895) — so a nil/absent
   // value is truthy and only an explicit `false` (a halted chain) is falsey.
   // Our signature is Promise<boolean>, so that predicate is applied here.
+  //
+  // `super` walks base.rb's include order below Callbacks (base.rb:299-316):
+  // AttributeMethods::Dirty (changes_applied, dirty.rb:239-243) → CounterCache
+  // (increment_counters, counter_cache.rb:200-207) → Persistence (the INSERT).
   const ctor = this.constructor;
   return (
-    (await runAllCallbacks(ctor.prototype, "create", this, async () =>
-      // Rails includes CounterCache BEFORE Callbacks (base.rb:309 vs :315), so
-      // Callbacks#_create_record's `super` reaches CounterCache#_create_record,
-      // which increments the belongs_to counter caches after the INSERT and
-      // before the after_create callbacks run. Threading the insert body as its
-      // `super` reproduces that ordering.
-      counterCacheCreateRecord.call(this, async () => {
-        if (!this._performInsert) throw new Error("_performInsert not implemented");
-        // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
-        // insert. Rails new records are dirty from construction, so partial_inserts'
-        // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
-        // correctly includes attrs the user set to a non-default value — e.g. an
-        // hstore column with a DB default of "" that was assigned {key: null}.
-        // Running this after the insert would leave the dirty set empty at column-
-        // selection time and wrongly drop such columns. Only a *null* PK column is
-        // skipped: that's the auto-populated key, tracked via
-        // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
-        // (non-null) PK column — e.g. a composite key — must stay dirty so it's
-        // inserted; otherwise the row is written with a missing key and
-        // find/destroy by that key raises RecordNotFound.
-        const _pk = ctor.primaryKey;
-        const _pkSet = new Set(
-          (Array.isArray(_pk) ? _pk : [_pk]).filter((n) => this._readAttribute?.(n) == null),
-        );
-        this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
-        await this._performInsert();
-        if (this._pendingOperation) {
-          await this._pendingOperation;
-          this._pendingOperation = null;
-        }
-        this._previouslyNewRecord = true;
-        this._newRecord = false;
-        // Rails yields here (persistence.rb:936-940); `changes_applied` runs
-        // above it in Dirty#_create_record's `super` (dirty.rb:239-243).
-        block?.(this);
-        this.changesApplied();
-        // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
-        return true;
-      }),
+    (await runAllCallbacks(ctor.prototype, "create", this, () =>
+      dirtyCreateRecord.call(this, () =>
+        counterCacheCreateRecord.call(this, () => persistenceCreateRecord.call(this, block)),
+      ),
     )) !== false
   );
 }
@@ -368,59 +363,14 @@ export async function _updateRecord(this: any, block?: (record: any) => void): P
   // Rails: _run_update_callbacks { record_update_timestamps { super } }, whose
   // value is the block's return. As in _createRecord, Rails' `result != false`
   // (create_or_update, persistence.rb:895) is applied here to keep the
-  // Promise<boolean> signature.
-  // record_update_timestamps writes updated_at/updated_on when @_touch_record
-  // and should_record_timestamps? are true, then yields to the actual update.
+  // Promise<boolean> signature. `super` reaches AttributeMethods::Dirty
+  // (dirty.rb:233-237) and then Persistence (the UPDATE).
   const ctor = this.constructor;
   return (
-    (await runAllCallbacks(ctor.prototype, "update", this, async () => {
-      // Mirror record_update_timestamps: write timestamp columns before the update
-      // when the model has record_timestamps enabled and has changes to save.
-      // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
-      // and the shared currentTimeFromProperTimezone() helper (Temporal.Instant).
-      // With partial_writes=false Rails always issues an UPDATE; treat it as having changes.
-      const hasChanges =
-        !ctor.partialUpdates ||
-        ("hasChangesToSave" in this
-          ? !!(this.hasChangesToSave as boolean)
-          : Object.keys(this.changes ?? {}).length > 0);
-      const instanceRecordTs = this.recordTimestamps ?? ctor.recordTimestamps;
-      const wroteTimestamps = !this._skipTouch && instanceRecordTs !== false && hasChanges;
-      if (wroteTimestamps) {
-        const time = currentTimeFromProperTimezone();
-        const updateAttrs = timestampAttributesForUpdateInModel.call(ctor);
-        for (const col of updateAttrs) {
-          if (ctor._attributeDefinitions?.has(col) && !this.willSaveChangeToAttribute?.(col)) {
-            this.writeAttribute?.(col, time);
-          }
-        }
-      }
-      if (!this._performUpdate) throw new Error("_performUpdate not implemented");
-      // _performUpdate also auto-touches updated_at; skip its inner write when:
-      //   - the outer wrapper just handled timestamps, OR
-      //   - recordTimestamps is disabled, OR
-      //   - there are no dirty changes (Rails no-op — don't auto-touch and don't
-      //     desync updated_at vs updated_on by writing inside the inner layer).
-      // Rails: Timestamp#_update_record writes once via record_update_timestamps;
-      // super does not.
-      const previousSkipTouch = this._skipTouch;
-      const skipInnerTouch = wroteTimestamps || instanceRecordTs === false || !hasChanges;
-      if (skipInnerTouch) this._skipTouch = true;
-      try {
-        await this._performUpdate();
-      } finally {
-        this._skipTouch = previousSkipTouch;
-      }
-      if (this._pendingOperation) {
-        await this._pendingOperation;
-        this._pendingOperation = null;
-      }
-      this._previouslyNewRecord = false;
-      // Rails yields here (persistence.rb:912-916).
-      block?.(this);
-      this.changesApplied();
-      // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
-      return true;
-    })) !== false
+    (await runAllCallbacks(ctor.prototype, "update", this, () =>
+      recordUpdateTimestamps.call(this, () =>
+        dirtyUpdateRecord.call(this, () => persistenceUpdateRecord.call(this, block)),
+      ),
+    )) !== false
   );
 }

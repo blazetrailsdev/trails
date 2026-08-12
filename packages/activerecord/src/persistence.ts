@@ -661,7 +661,7 @@ export async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
 // save / save! / destroy / destroy! — the callback- and transaction-wrapped
 // entry points. They rely on Base-provided internal helpers/state
 // (_createOrUpdate, _destroyRow, _performInsert, _performUpdate,
-// _skipTouch, _pendingOperation) which remain `private` on Base; the
+// _touchRecord, _pendingOperation) which remain `private` on Base; the
 // extracted functions reach them through `(this as any)` since those
 // members intentionally aren't part of the public Persistence API.
 // Mirrors ActiveRecord::Persistence#save, #save!, #destroy, #destroy!
@@ -767,8 +767,6 @@ export async function save<T extends SaveRecord>(
         return false;
       }
 
-      self._skipTouch = options?.touch === false;
-
       // Auto-set STI type column on new records
       if (this._newRecord && isStiSubclass(ctor)) {
         const col = getStiBase(ctor).inheritanceColumn;
@@ -778,7 +776,8 @@ export async function save<T extends SaveRecord>(
       }
 
       // Rails: `create_or_update(**options, &block)` (persistence.rb:390-408).
-      return self.createOrUpdate(block);
+      // `touch:` is consumed by Timestamp#create_or_update (timestamp.rb:125-128).
+      return self.createOrUpdate(options?.touch ?? true, block);
     })) as boolean | undefined;
   } catch (e) {
     // Mirrors Rails' `rescue ActiveRecord::RecordInvalid` in save — autosave
@@ -786,8 +785,6 @@ export async function save<T extends SaveRecord>(
     // has already rolled back at this point.
     if (e instanceof RecordInvalid) return false;
     throw e;
-  } finally {
-    self._skipTouch = false;
   }
 }
 

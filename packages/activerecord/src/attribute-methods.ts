@@ -844,8 +844,6 @@ import {
   changedAttributeNamesToSave as _changedAttributeNamesToSave,
   attributesInDatabase as _attributesInDatabase,
   _touchRow as __touchRow,
-  _updateRecord as __updateRecord,
-  _createRecord as __createRecord,
   attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods/dirty.js";
@@ -1001,20 +999,6 @@ export function _touchRow(
   time?: any,
 ): Promise<number> {
   return __touchRow.call(this as any, attributeNames, time);
-}
-/** @internal */
-export function _updateRecord(
-  this: InstanceMethodHost,
-  attributeNames?: string[],
-): Promise<number> {
-  return __updateRecord.call(this as any, attributeNames);
-}
-/** @internal */
-export function _createRecord(
-  this: InstanceMethodHost,
-  attributeNames?: string[],
-): Promise<unknown> {
-  return __createRecord.call(this as any, attributeNames);
 }
 /** @internal */
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {
