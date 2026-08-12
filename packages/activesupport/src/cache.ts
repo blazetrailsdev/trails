@@ -2,6 +2,7 @@ import { extractOptions, toParam } from "./hash-utils.js";
 import { env } from "./process-adapter.js";
 import { MemoryStore } from "./cache/memory-store.js";
 import { NullStore } from "./cache/null-store.js";
+import { FileStore } from "./cache/file-store.js";
 import type { CacheStore } from "./cache/index.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
@@ -105,10 +106,9 @@ function retrieveCacheKey(key: unknown): string {
  * Ruby resolves the class by `require "active_support/cache/#{store}"` plus a
  * `const_get` on the camelized name, so a store shipped by another gem
  * resolves too. ESM has no such call-time autoload — an import is eager and
- * cannot be built from a runtime name — so the shipped stores are named
- * directly and anything else takes the same raise. `:file_store` is absent
- * because FileStore is a Node-only subpath import kept out of the main bundle
- * (see the export note in index.ts).
+ * cannot be built from a runtime name — so the stores this package ships are
+ * named directly, and any other name raises with the message Ruby's rescued
+ * LoadError produces.
  *
  * Mirrors: ActiveSupport::Cache.retrieve_store_class (cache.rb:135-144)
  *
@@ -120,7 +120,14 @@ function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
       return MemoryStore as unknown as new (...args: any[]) => CacheStore;
     case ":null_store":
       return NullStore as unknown as new (...args: any[]) => CacheStore;
-    default:
-      throw new RuntimeError(`Could not find cache store adapter for ${store.slice(1)}`);
+    case ":file_store":
+      return FileStore as unknown as new (...args: any[]) => CacheStore;
+    default: {
+      const name = store.slice(1);
+      throw new RuntimeError(
+        `Could not find cache store adapter for ${name} ` +
+          `(cannot load such file -- active_support/cache/${name})`,
+      );
+    }
   }
 }

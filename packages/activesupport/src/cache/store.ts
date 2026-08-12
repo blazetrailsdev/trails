@@ -535,8 +535,11 @@ export abstract class Store {
 
   /** Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991). */
   protected normalizeVersion(key: unknown, options?: StoreOptions): string | undefined {
+    // Ruby's `||` falls through on nil AND false, so a `to_param` that answers
+    // false takes `expanded_version`, where `??` alone would keep "false".
     const version = options?.version != null ? toParam(options.version) : null;
-    return (version != null ? String(version) : undefined) ?? this.expandedVersion(key);
+    if (version != null && version !== false) return String(version);
+    return this.expandedVersion(key);
   }
 
   /**
