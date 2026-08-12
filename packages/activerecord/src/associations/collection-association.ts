@@ -1502,7 +1502,8 @@ export function concatRecordsLoop(
       return inserted.then(async (first) => {
         result = result && first;
         for (const record of rest) {
-          result = result && (await addRecord(record, result));
+          const inserted = await addRecord(record, result);
+          result = result && inserted;
         }
         if (!result) throw new Rollback();
       });

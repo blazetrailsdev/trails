@@ -51,6 +51,22 @@ describe("CollectionSyncRemovalChain", () => {
     expect(assoc.target).toEqual([]);
   });
 
+  it("buffers every record after an async insert fails", async () => {
+    const author = await Author.create({ name: "Kelly" });
+    const first = Post.new({ title: "First", body: "hi" });
+    const second = Post.new({ title: "Second", body: "hi" });
+    const assoc = postsAssociation(author);
+    // Rails short-circuits only `insert_record` once `result` is false
+    // (collection_association.rb:441-449); `add_to_target` still runs for every
+    // remaining record, so both stay buffered.
+    (assoc as unknown as { insertRecord(): Promise<boolean> }).insertRecord = () =>
+      Promise.resolve(false);
+
+    await assoc.concat(first, second);
+
+    expect(assoc.target).toEqual([first, second]);
+  });
+
   it("delete on a persisted owner still answers a promise", async () => {
     const author = await Author.create({ name: "Kelly" });
     const post = await (
