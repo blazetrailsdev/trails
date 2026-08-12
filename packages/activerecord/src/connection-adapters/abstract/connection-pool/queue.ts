@@ -3,158 +3,130 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue
  *
- * Rails uses Monitor-based synchronization with condition variables.
- * In single-threaded Node we model the same fairness semantics using
- * Promise-based waiters: `signal` resolves a pending waiter's promise
- * directly with the connection, while `poll` either takes from the
- * internal array (if fairness allows) or creates a new waiter promise.
+ * Rails uses Monitor-based synchronization with condition variables. In
+ * single-threaded Node the monitor is implicit, but the condition variables
+ * are modelled faithfully: `wait` returns a promise that settles when the
+ * queue is signalled or the wait times out, and the waiter — not the
+ * signaller — takes the element off `@queue`, exactly as `wait_poll` does.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
 
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue::BiasedConditionVariable
- *
- * In Rails this wraps two condition variables (one biased, one fallback) and
- * preferentially wakes the biased thread. In Node (single-threaded) the bias
- * is structurally a no-op, but we implement the full API so that callers
- * (ConnectionLeasingQueue, withABiasFor) work identically.
- */
-interface WaiterState {
-  container: Array<(conn: DatabaseAdapter) => void>;
+interface Waiter {
+  resolve: () => void;
+  reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout> | null;
-  settled: boolean;
-  reject?: (err: Error) => void;
-  onSettle?: () => void;
 }
 
-export class BiasedConditionVariable {
-  private _waiters: Array<(conn: DatabaseAdapter) => void> = [];
-  private _otherCond: BiasedConditionVariable | null;
+/**
+ * Ruby's `Monitor#new_cond` condition variable, which `Queue` and
+ * `BiasedConditionVariable` both build on. Node has no threads to block, so a
+ * waiter is a pending promise: `signal` resolves the first one, `broadcast`
+ * resolves them all, and a wait that is never signalled resolves itself when
+ * its timeout elapses (as `ConditionVariable#wait(timeout)` returns).
+ *
+ * @noRailsEquivalent Port of the Ruby stdlib primitive `@lock.new_cond`
+ * returns; there is no Rails-side class to mirror.
+ */
+class ConditionVariable {
+  private _waiters: Waiter[] = [];
 
-  constructor(
-    _lock?: unknown,
-    otherCond?: BiasedConditionVariable | null,
-    _preferredThread?: unknown,
-  ) {
-    this._otherCond = otherCond ?? null;
-  }
-
-  get waitingCount(): number {
-    return this._waiters.length;
-  }
-
-  wait(timeout: number, onSettle?: () => void): Promise<DatabaseAdapter> {
+  wait(timeout: number): Promise<void> {
     return new Promise((resolve, reject) => {
-      const state: WaiterState = {
-        container: this._waiters,
-        timer: null,
-        settled: false,
-        reject,
-        onSettle,
-      };
-
-      const settle = () => {
-        const idx = state.container.indexOf(waiter);
-        if (idx >= 0) state.container.splice(idx, 1);
-        if (state.timer != null) {
-          clearTimeout(state.timer);
-          state.timer = null;
-        }
-        state.onSettle?.();
-      };
-
-      const waiter = (conn: DatabaseAdapter) => {
-        if (state.settled) return;
-        state.settled = true;
-        settle();
-        resolve(conn);
-      };
-      (waiter as any)._state = state;
-
-      state.timer = setTimeout(() => {
-        if (state.settled) return;
-        state.settled = true;
-        settle();
-        const msg =
-          `could not obtain a connection from the pool within ${timeout.toFixed(3)} seconds; ` +
-          `all pooled connections were in use`;
-        reject(new ConnectionTimeoutError(msg));
-      }, timeout * 1000);
-
+      const waiter: Waiter = { resolve, reject, timer: null };
+      waiter.timer = setTimeout(() => this._wake(waiter), Math.max(timeout, 0) * 1000);
       this._waiters.push(waiter);
     });
   }
 
-  /**
-   * In Rails, signal prefers the biased thread's cond, then falls back to
-   * the other cond. In Node (single-threaded) all waiters land on this CV's
-   * _waiters, so we try local first, then delegate to _otherCond.
-   */
-  signal(conn: DatabaseAdapter): boolean {
+  signal(): void {
     const waiter = this._waiters.shift();
-    if (waiter) {
-      waiter(conn);
-      return true;
-    }
-    if (this._otherCond) {
-      return this._otherCond.signal(conn);
-    }
-    return false;
+    if (waiter) this._wake(waiter);
   }
 
-  broadcast(connections: DatabaseAdapter[]): void {
-    const remaining = this.broadcastOnBiased(connections);
-    if (this._otherCond && remaining.length > 0) {
-      this._otherCond.broadcast(remaining);
+  broadcast(): void {
+    while (this._waiters.length > 0) {
+      this._wake(this._waiters.shift()!);
     }
-  }
-
-  broadcastOnBiased(connections: DatabaseAdapter[]): DatabaseAdapter[] {
-    let i = 0;
-    while (i < connections.length && this._waiters.length > 0) {
-      const waiter = this._waiters.shift()!;
-      waiter(connections[i]);
-      i++;
-    }
-    return connections.slice(i);
   }
 
   rejectAll(error: Error): void {
     while (this._waiters.length > 0) {
       const waiter = this._waiters.shift()!;
-      const state = (waiter as any)._state as WaiterState | undefined;
-      if (state && !state.settled) {
-        state.settled = true;
-        if (state.timer != null) {
-          clearTimeout(state.timer);
-          state.timer = null;
-        }
-        state.onSettle?.();
-        state.reject?.(error);
-      }
+      if (waiter.timer != null) clearTimeout(waiter.timer);
+      waiter.reject(error);
     }
-    this._otherCond?.rejectAll(error);
   }
 
-  /**
-   * Transfer all pending waiters to another condition variable.
-   * Used by withABiasFor cleanup to migrate orphaned waiters back to
-   * the restored cond so they can be signaled by future add() calls.
-   * Updates each waiter's container ref so timeout cleanup targets
-   * the correct array.
-   */
-  transferWaitersTo(target: BiasedConditionVariable): void {
-    while (this._waiters.length > 0) {
-      const waiter = this._waiters.shift()!;
-      const waiterState = (waiter as any)._state as WaiterState | undefined;
-      if (waiterState) {
-        waiterState.container = target._waiters;
-      }
-      target._waiters.push(waiter);
+  private _wake(waiter: Waiter): void {
+    const idx = this._waiters.indexOf(waiter);
+    if (idx >= 0) this._waiters.splice(idx, 1);
+    if (waiter.timer != null) {
+      clearTimeout(waiter.timer);
+      waiter.timer = null;
     }
+    waiter.resolve();
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue::BiasedConditionVariable
+ *
+ * Extends the plain condition variable only so it can stand in for one where
+ * `@cond` is duck-typed in Rails; every method is overridden and the inherited
+ * waiter list is unused.
+ */
+export class BiasedConditionVariable extends ConditionVariable {
+  private _realCond = new ConditionVariable();
+  private _otherCond: ConditionVariable;
+  private _preferredThread: unknown;
+  private _numWaitingOnRealCond = 0;
+
+  constructor(_lock: unknown, otherCond: ConditionVariable, preferredThread: unknown) {
+    super();
+    this._otherCond = otherCond;
+    this._preferredThread = preferredThread;
+  }
+
+  override broadcast(): void {
+    this.broadcastOnBiased();
+    this._otherCond.broadcast();
+  }
+
+  broadcastOnBiased(): void {
+    this._numWaitingOnRealCond = 0;
+    this._realCond.broadcast();
+  }
+
+  override signal(): void {
+    let cond: ConditionVariable;
+    if (this._numWaitingOnRealCond > 0) {
+      this._numWaitingOnRealCond -= 1;
+      cond = this._realCond;
+    } else {
+      cond = this._otherCond;
+    }
+    cond.signal();
+  }
+
+  override wait(timeout: number): Promise<void> {
+    // Node is single-threaded, so a waiter reaching here always belongs to the
+    // context that entered `withABiasFor` — `Thread.current == @preferred_thread`.
+    let cond: ConditionVariable;
+    if (this._preferredThread != null) {
+      this._numWaitingOnRealCond += 1;
+      cond = this._realCond;
+    } else {
+      cond = this._otherCond;
+    }
+    return cond.wait(timeout);
+  }
+
+  override rejectAll(error: Error): void {
+    this._realCond.rejectAll(error);
+    this._otherCond.rejectAll(error);
   }
 }
 
@@ -164,7 +136,7 @@ export class BiasedConditionVariable {
  */
 interface BiasableQueueHost {
   _lock?: unknown;
-  _cond: BiasedConditionVariable;
+  _cond: ConditionVariable;
 }
 
 /**
@@ -175,7 +147,7 @@ interface BiasableQueueHost {
  * toward a specific thread.
  */
 export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: () => T): T {
-  let previousCond: BiasedConditionVariable | null = null;
+  let previousCond: ConditionVariable | null = null;
   let newCond: BiasedConditionVariable | null = null;
   synchronize(this, () => {
     previousCond = this._cond;
@@ -186,7 +158,7 @@ export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: ()
   } finally {
     synchronize(this, () => {
       if (previousCond) this._cond = previousCond;
-      if (newCond && previousCond) newCond.transferWaitersTo(previousCond);
+      if (newCond) newCond.broadcastOnBiased();
     });
   }
 }
@@ -206,20 +178,16 @@ export const BiasableQueue = {
 export class Queue {
   private _queue: DatabaseAdapter[] = [];
   protected _lock?: unknown;
-  protected _cond: BiasedConditionVariable;
+  protected _cond: ConditionVariable;
   private _numWaiting = 0;
 
   constructor(lock?: unknown) {
     this._lock = lock;
-    this._cond = new BiasedConditionVariable(lock);
+    this._cond = new ConditionVariable();
   }
 
   get length(): number {
     return this._queue.length;
-  }
-
-  get waitingCount(): number {
-    return this._cond.waitingCount;
   }
 
   isAnyWaiting(): boolean {
@@ -241,31 +209,24 @@ export class Queue {
 
   add(element: DatabaseAdapter): void {
     synchronize(this, () => {
-      if (!this._cond.signal(element)) {
-        this._queue.push(element);
-      }
+      this._queue.push(element);
+      this._cond.signal();
     });
   }
 
   delete(element: DatabaseAdapter): DatabaseAdapter | undefined {
     return synchronize(this, () => {
-      const idx = this._queue.indexOf(element);
-      if (idx >= 0) {
-        this._queue.splice(idx, 1);
-        return element;
+      // Ruby's Array#delete removes EVERY element equal to +element+, and
+      // returns the element (or nil when none matched).
+      let deleted: DatabaseAdapter | undefined;
+      for (let i = this._queue.length - 1; i >= 0; i--) {
+        if (this._queue[i] === element) {
+          this._queue.splice(i, 1);
+          deleted = element;
+        }
       }
-      return undefined;
+      return deleted;
     });
-  }
-
-  /** @internal */
-  remove(conn: DatabaseAdapter): boolean {
-    const idx = this._queue.indexOf(conn);
-    if (idx >= 0) {
-      this._queue.splice(idx, 1);
-      return true;
-    }
-    return false;
   }
 
   poll(): DatabaseAdapter | undefined;
@@ -297,18 +258,39 @@ export class Queue {
     return this._queue.length > this._numWaiting;
   }
 
+  private remove(): DatabaseAdapter | undefined {
+    return this._queue.pop();
+  }
+
   private noWaitPoll(): DatabaseAdapter | undefined {
     if (this.canRemoveNoWait()) {
-      return this._queue.pop();
+      return this.remove();
     }
     return undefined;
   }
 
-  private waitPoll(timeout: number): Promise<DatabaseAdapter> {
-    this._numWaiting++;
-    return this._cond.wait(timeout, () => {
-      this._numWaiting--;
-    });
+  private async waitPoll(timeout: number): Promise<DatabaseAdapter> {
+    this._numWaiting += 1;
+
+    const t0 = Date.now();
+    let elapsed = 0;
+    try {
+      for (;;) {
+        await this._cond.wait(timeout - elapsed);
+
+        if (this.any) return this.remove()!;
+
+        elapsed = (Date.now() - t0) / 1000;
+        if (elapsed >= timeout) {
+          const msg =
+            `could not obtain a connection from the pool within ${timeout.toFixed(3)} seconds ` +
+            `(waited ${elapsed.toFixed(3)} seconds); all pooled connections were in use`;
+          throw new ConnectionTimeoutError(msg);
+        }
+      }
+    } finally {
+      this._numWaiting -= 1;
+    }
   }
 }
 
@@ -384,13 +366,4 @@ function synchronize<R>(_queue: unknown, block: () => R): R {
  */
 function isAny(queue: Queue): boolean {
   return queue.any;
-}
-
-/**
- * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::Queue#remove
- *
- * @internal
- */
-function remove(queue: Queue, conn: DatabaseAdapter): boolean {
-  return queue.remove(conn);
 }
