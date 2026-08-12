@@ -24,8 +24,8 @@
     "package": "activemodel",
     "tsFile": "validations/numericality.ts",
     "rubyName": "validate_each",
-    "call": "order:filteredOptions,isNumber",
-    "reason": "Order artifact of a TS-only pre-guard: the port adds a nil/undefined arm that calls filteredOptions before is_number? is ever reached (numericality.ts:63); Rails calls is_number? first."
+    "call": "order:add,isNumber",
+    "reason": "The pre-existing order divergence previously keyed as order:filteredOptions,isNumber; the first inversion moved when the order stream stopped positioning hoisted-closure calls (RFC 0084)."
   },
   {
     "package": "activemodel",

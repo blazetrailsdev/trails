@@ -57,7 +57,10 @@ export class SingularAssociation extends Association {
   // :95-107) only sets the inverse and `replace_keys` the owner's foreign key,
   // both in memory, and issues no DB work of its own.
   writer(record: Base | null): void | Promise<void> {
-    this.replace(record);
+    // Rails: `def writer(record) replace(record) end`
+    // (singular_association.rb:19-21) — returned, so a subclass whose `replace`
+    // persists (has_one) hands the caller its promise.
+    return this.replace(record);
   }
 
   // has_one widens the return to a Promise: Rails' `set_new_record` →
@@ -438,7 +441,13 @@ export class SingularAssociation extends Association {
     return record;
   }
 
-  protected replace(record: Base | null): void {
+  // Overloaded because a subclass' `replace` can persist (has_one's, whose
+  // Rails body opens a transaction and saves): the one-argument form this class
+  // and belongs_to use reaches no DB I/O and stays synchronous, so the
+  // synchronous `setNewRecord` / `writer` call sites here type as `void`.
+  protected replace(record: Base | null): void;
+  protected replace(record: Base | null, save: boolean): void | Promise<void>;
+  protected replace(record: Base | null, _save = true): void | Promise<void> {
     if (record) {
       this.setInverseInstance(record);
     } else if (this.target) {

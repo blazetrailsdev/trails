@@ -2598,7 +2598,7 @@ function isNegatedOperand(expr: ts.Node): boolean {
  * two sequences are directly comparable.
  */
 function extractCallSeq(node: ts.Node | undefined): string[] | undefined {
-  return collectCalls(node);
+  return collectCalls(node, true);
 }
 
 /**
@@ -2915,11 +2915,29 @@ function isFunctionArgument(node: ts.Node): boolean {
   return ts.isArrowFunction(node) || ts.isFunctionExpression(node);
 }
 
-function collectCalls(node: ts.Node | undefined): string[] | undefined {
+function collectCalls(
+  node: ts.Node | undefined,
+  skipHoistedClosures = false,
+): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
   const resolve = (name: string): string => aliases?.get(name) ?? name;
   const names = new Set<string>();
+  // Names a hoisted closure — `const block = async () => { … }`, later handed
+  // to `lock.synchronize(block)` — is the only source of. Such a body has no
+  // fixed position in the stream: Ruby records a `caller = lambda do … end` at
+  // its DEFINITION (sqlite3_adapter.rb:569-584) but an inline
+  // `lock.synchronize do … end` at the CALL it hangs off
+  // (connection_pool.rb:344), and the port spells both the same way whenever a
+  // branch runs the body without the wrapper. So the ORDER stream drops those
+  // names outright — position unknown is not position wrong — rather than
+  // picking a side and flagging every body that matches the other. The call SET
+  // is unaffected: it is collected with `skipHoistedClosures` off, so every
+  // name inside a hoisted closure still counts toward it. A name the enclosing
+  // body ALSO calls is dropped with it, deliberately: the enclosing occurrence
+  // is no less ambiguous, since Ruby's single counterpart may correspond to
+  // either position.
+  const hoisted = skipHoistedClosures ? hoistedClosureCalls(node) : undefined;
   const addNegated = (expr: ts.Node, ...called: string[]): void => {
     if (!isNegatedOperand(expr)) return;
     for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
@@ -2986,6 +3004,8 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
       for (const block of blocks) visit(block);
       addNegated(n, ...negated);
       return;
+    } else if (skipHoistedClosures && isLocalBoundFunction(n)) {
+      return;
     } else if (ts.isPropertyAccessExpression(n)) {
       // A property READ (`this.joinsValues`, `obj.nested`) is the faithful TS
       // mirror of a Ruby method send: Ruby has no public field access on ANY
@@ -3019,8 +3039,35 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
   // The body ITSELF, not just its children: an expression-bodied arrow
   // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_calls covers it.
   visit(node);
+  if (hoisted) for (const name of hoisted) names.delete(name);
   if (names.size === 0) return undefined;
   return [...names];
+}
+
+/** `const block = () => { … }` / `= function () { … }` — see collectCalls. */
+function isLocalBoundFunction(node: ts.Node): boolean {
+  return (
+    ts.isVariableDeclaration(node) &&
+    ts.isIdentifier(node.name) &&
+    node.initializer !== undefined &&
+    isFunctionArgument(node.initializer)
+  );
+}
+
+/** Every call name reachable from a hoisted closure's body. See collectCalls. */
+function hoistedClosureCalls(node: ts.Node): Set<string> {
+  const found = new Set<string>();
+  const visit = (n: ts.Node): void => {
+    if (isLocalBoundFunction(n)) {
+      for (const name of collectCalls((n as ts.VariableDeclaration).initializer) ?? []) {
+        found.add(name);
+      }
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return found;
 }
 
 /**

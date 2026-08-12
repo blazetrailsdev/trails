@@ -708,6 +708,63 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("keeps a hoisted closure's calls OUT of the order stream, but in the call set", () => {
+    // `ConnectionPool#unpin_connection!` writes the critical section as a Ruby
+    // block on `lock.synchronize`, so `checkin` follows `lock`. Ours hoists the
+    // same body into a local (the non-locking branch runs it bare), which must
+    // not pull `checkin` ahead of the `lock` read — and Ruby itself records a
+    // `caller = lambda do … end` at its definition, so the order stream cannot
+    // pick either side: it skips the body.
+    const cls = extractFromSource(
+      `class Foo {
+        unpin() {
+          const block = () => { this.checkin(); };
+          this.connection.lock.synchronize(block);
+        }
+      }`,
+    );
+    const unpin = cls.instanceMethods.find((m) => m.name === "unpin")!;
+    expect(unpin.callSeq).toEqual(["connection", "lock", "synchronize"]);
+    expect(unpin.calls).toEqual(["checkin", "connection", "lock", "synchronize"]);
+  });
+
+  it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
+    // Deliberate over-drop: the enclosing occurrence is no less ambiguous than
+    // the closure's. Ruby's counterpart may be either the lambda-at-definition
+    // position or the block-at-call one, so neither TS occurrence can be
+    // matched against it. The call SET still records the name.
+    const cls = extractFromSource(
+      `class Foo {
+        touchCallbacks() {
+          const cb = () => { this.touchRecord(); };
+          this.afterCreate(cb);
+          this.afterUpdate(() => { this.touchRecord(); });
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "touchCallbacks")!;
+    expect(m.callSeq).toEqual(["afterCreate", "afterUpdate"]);
+    expect(m.calls).toEqual(["afterCreate", "afterUpdate", "touchRecord"]);
+  });
+
+  it("keeps an INLINE function argument in the order stream", () => {
+    // Only a local binding is ambiguous; a function passed as an argument is
+    // the port's spelling of a Ruby block and stays deferred-but-recorded.
+    const cls = extractFromSource(
+      `class Foo {
+        unpin() {
+          this.connection.lock.synchronize(() => { this.checkin(); });
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "unpin")!.callSeq).toEqual([
+      "connection",
+      "lock",
+      "synchronize",
+      "checkin",
+    ]);
+  });
+
   it("does NOT suppress an in-class instance→static delegation (class receiver)", () => {
     // `QueryAttribute#withCastValue` delegates to its own static of the same name,
     // but the body has real reads (`this.name`, `this.type`) that must be kept.
