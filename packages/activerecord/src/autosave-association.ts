@@ -224,9 +224,9 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
 export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
-): Promise<boolean> {
+): Promise<void> {
   const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  if (!association) return true;
+  if (!association) return;
   const autosave = reflection.options?.autosave;
 
   // By saving the instance variable in a local variable,
@@ -236,7 +236,8 @@ export async function saveCollectionAssociation(
   // reconstruct the scope now that we know the owner's id
   association.resetScope();
 
-  let records: Base[] | null = associatedRecordsToValidateOrSave(
+  let records: Base[] | null = associatedRecordsToValidateOrSave.call(
+    this,
     association,
     newRecordBeforeSave,
     autosave,
@@ -272,13 +273,9 @@ export async function saveCollectionAssociation(
         saved = !!(await record.save({ validate: false }));
       }
 
-      // Rails raises `RecordInvalid.new(association.owner)`; trails surfaces the
-      // failure by returning false, which makes the registered
-      // after_create/after_update callback raise it instead.
-      if (!saved) return false;
+      if (!saved) throw new RecordInvalid(association.owner);
     }
   }
-  return true;
 }
 
 /** @internal */
@@ -665,6 +662,7 @@ function initInternals(this: AutosaveAssociationHost): void {
 
 /** @internal */
 export function associatedRecordsToValidateOrSave(
+  this: AutosaveAssociationHost,
   association: any,
   newRecord: boolean,
   autosave: boolean,
@@ -672,7 +670,11 @@ export function associatedRecordsToValidateOrSave(
   const raw = association?.target;
   if (raw == null) return null;
   const target: any[] = Array.isArray(raw) ? raw : [raw];
-  if (newRecord) return target;
+  // Rails autosave_association.rb:299 — `if new_record || custom_validation_context?`.
+  const customValidationContext =
+    typeof (this as any)?.customValidationContext === "function" &&
+    (this as any).customValidationContext();
+  if (newRecord || customValidationContext) return target;
   if (autosave) return target.filter((r: any) => r.changedForAutosave?.() ?? false);
   return target.filter((r: any) => r.isNewRecord?.() ?? false);
 }
@@ -766,23 +768,12 @@ export async function validateCollectionAssociation(
   // Pass the real Association instance so downstream readers can reach
   // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
   const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  // Mirrors Rails autosave_association.rb:298-305 — a custom validation context
-  // bypasses the changed/new filter so unchanged persisted children still run
-  // their context-specific validators (the `|| custom_validation_context?` arm).
-  const customCtx =
-    typeof (this as any).customValidationContext === "function" &&
-    (this as any).customValidationContext();
-  const records = customCtx
-    ? association?.target == null
-      ? null
-      : Array.isArray(association.target)
-        ? (association.target as any[])
-        : [association.target]
-    : associatedRecordsToValidateOrSave(
-        association,
-        typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
-        !!reflection.options?.autosave,
-      );
+  const records = associatedRecordsToValidateOrSave.call(
+    this,
+    association,
+    typeof this.isNewRecord === "function" ? this.isNewRecord() : false,
+    !!reflection.options?.autosave,
+  );
   if (!records) return;
   for (const record of records) {
     await isAssociationValid.call(this, association, record);
@@ -1026,14 +1017,17 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
         (a: any) => a.name === collectionName,
       );
       if (assocDef?.options?.autosave === false) return;
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      // Rails registers `save_collection_association` directly
+      // (autosave_association.rb:196-197); the RecordInvalid raise lives inside
+      // it, at `:460`, so there is nothing to translate here.
+      await record[saveMethod]();
     });
     afterUpdate(model, async (record: any) => {
       const assocDef = record.constructor._associations?.find(
         (a: any) => a.name === collectionName,
       );
       if (assocDef?.options?.autosave === false) return;
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      await record[saveMethod]();
     });
   } else if (isHasOne) {
     defineNonCyclicMethod(model, saveMethod, async function (this: any) {

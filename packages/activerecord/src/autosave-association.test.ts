@@ -3477,7 +3477,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  fixtures([]);
+  fixtures(["pirates", "ships"]);
   it("should automatically validate associations", async () => {
     class Item extends Base {
       declare name: string | null;
@@ -3492,17 +3492,16 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     expect(valid).toBe(false);
   });
   it("validations still fire on unchanged association with custom validation context", async () => {
-    class Post extends Base {
-      declare title: string | null;
+    const { FamousPirate } = await import("./test-helpers/models/pirate.js");
+    const { FamousShip } = await import("./test-helpers/models/ship.js");
+    registerModel("FamousPirate", FamousPirate as never);
+    registerModel("FamousShip", FamousShip as never);
 
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, on: "create" });
-      }
-    }
-    const p = new Post({});
-    expect(await p.isValid("create")).toBe(false);
-    expect(await p.isValid("update")).toBe(true);
+    const pirate = (await FamousPirate.createBang({ catchphrase: "Avast Ye!" })) as any;
+    await pirate.famousShips.createBang({});
+
+    expect(await pirate.isValid()).toBe(true);
+    expect(await pirate.isValid("conference")).toBe(false);
   });
 });
 
