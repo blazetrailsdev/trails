@@ -6,6 +6,7 @@
  */
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
+import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -435,15 +436,11 @@ export async function saveHasOneAssociation(
     // child was already validated in the owner's validation phase, so
     // validate: false; with autosave nil it is validated here at save time.
     const saved = await record.save({ validate: !autosave });
-    if (!saved) {
-      // Rails: `raise ActiveRecord::Rollback if !saved && autosave` — a failed
-      // save only rolls the owner back when the autosave option is enabled (and
-      // adds no owner error; child validation errors were already imported
-      // during the validation phase). trails surfaces that rollback by returning
-      // false, which makes the after_create/after_update callback throw
-      // RecordInvalid. With autosave nil there is no rollback, so return true.
-      return !autosave;
-    }
+    // autosave_association.rb:502 — a failed save only rolls the owner back
+    // when the autosave option is enabled (and adds no owner error; child
+    // validation errors were already imported during the validation phase).
+    if (!saved && autosave) throw new Rollback();
+    return saved !== false && saved != null;
   }
   return true;
 }
@@ -957,11 +954,14 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // unconditionally keeps a nil/true-autosave NEW/changed child's persistence
     // in-save (via the `_record_changed?` → `new_record?` leg) rather than
     // deferring it to the post-commit `flushPendingReplaces` net.
+    // The failure path is `save_has_one_association`'s own
+    // `raise ActiveRecord::Rollback` (autosave_association.rb:502), not a
+    // translation of the return value here.
     afterCreate(model, async (record: any) => {
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      await record[saveMethod]();
     });
     afterUpdate(model, async (record: any) => {
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      await record[saveMethod]();
     });
   } else {
     // belongs_to
