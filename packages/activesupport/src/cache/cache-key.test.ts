@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expandCacheKey } from "./expand-cache-key.js";
+import { expandCacheKey } from "../cache.js";
 import { Entry } from "./entry.js";
 import { setEnv, env } from "../process-adapter.js";
 

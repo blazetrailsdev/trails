@@ -1,6 +1,7 @@
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
+import { toParam } from "../hash-utils.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 
 /** Mirrors Ruby ArgumentError. @internal */
@@ -532,8 +533,36 @@ export abstract class Store {
     return String(key ?? "");
   }
 
-  protected normalizeVersion(_key: string, options?: StoreOptions): string | undefined {
-    return options?.version != null ? String(options.version) : undefined;
+  /** Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991). */
+  protected normalizeVersion(key: unknown, options?: StoreOptions): string | undefined {
+    const version = options?.version != null ? toParam(options.version) : null;
+    return (version != null ? String(version) : undefined) ?? this.expandedVersion(key);
+  }
+
+  /**
+   * Mirrors Rails `Cache::Store#expanded_version` (cache.rb:994-1000): the
+   * version an object carries with it, so a stale entry is detected without the
+   * caller passing `:version`. Ruby's `case` with no matching `when` returns
+   * nil, so a key that answers neither `cache_version` nor `to_a` is versionless.
+   */
+  protected expandedVersion(key: unknown): string | undefined {
+    if (key != null && typeof key === "object") {
+      if (typeof (key as { cacheVersion?: () => unknown }).cacheVersion === "function") {
+        const version = toParam((key as { cacheVersion(): unknown }).cacheVersion());
+        return version == null ? undefined : String(version);
+      }
+      if (Array.isArray(key)) {
+        const versions = key
+          .map((element) => this.expandedVersion(element))
+          .filter((version) => version != null);
+        const param = toParam(versions);
+        return param == null ? undefined : String(param);
+      }
+      if (Symbol.iterator in key) {
+        return this.expandedVersion([...(key as Iterable<unknown>)]);
+      }
+    }
+    return undefined;
   }
 
   /**

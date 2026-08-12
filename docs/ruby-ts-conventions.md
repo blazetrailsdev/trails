@@ -149,6 +149,10 @@ a genuine gap:
   - `test` (only in: `testing/declarative.rb`)
 - ActiveSupport::Concurrency::LoadInterlockAwareMonitor (concurrency/load_interlock_aware_monitor.rb) is a Ruby `Monitor` subclass whose only purpose is to release the Dependencies interlock while a thread blocks on the lock, so a competing thread can keep autoloading. Both halves are absent from the port: JS has no threads to serialize with a reentrant mutex and no `Thread.handle_interrupt`, and there is no interlock to permit loads through (see the dependencies.rb group). RFC 0073's permanent-connection-checkout work does not change that — it converges where a connection is held, not what guards constant loading — and trails' load-interlock suite is a permanent skip. Scoped to this file so `synchronize` and `initialize` stay expected elsewhere.
   - `mon_enter`, `synchronize`, `initialize`, `mon_try_enter`, `mon_exit` (only in: `concurrency/load_interlock_aware_monitor.rb`)
+- MemoryStore#synchronize (memory_store.rb:191-193) is `@monitor.synchronize(&block)` — the Monitor that makes MemoryStore thread-safe across Ruby threads. JavaScript has no threads and no preemption inside a synchronous body, so every read_entry/write_entry the Ruby method wraps is already atomic and a ported wrapper could only be an inert `block()` call. Scoped to memory_store.rb so it cannot silence a genuine `synchronize` elsewhere.
+  - `synchronize` (only in: `cache/memory_store.rb`)
+- FileStore#lock_file (file_store.rb:147-159) takes an advisory `File::LOCK_EX` flock around a read-modify-write so concurrent PROCESSES serialize on the entry file. There is no flock in the async fs surface trails is allowed to use (no node:\* imports), and no portable equivalent, so the increment/decrement path runs unguarded. Scoped to cache/file_store.rb.
+  - `lock_file` (only in: `cache/file_store.rb`)
 
 ## Ruby-only classes
 
