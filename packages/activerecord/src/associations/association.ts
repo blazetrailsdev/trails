@@ -814,12 +814,21 @@ export class Association {
   matchesForeignKey(record: Base): boolean {
     if (this.isForeignKeyFor(record)) {
       return (
-        this.keyValuesEqual(this.foreignKeyValues(record), this.idValues(this.owner)) ||
+        this.keyValuesEqual(
+          this.resolveForeignKey().map((key) => record.readAttribute(key)),
+          this.owner.id,
+        ) ||
         (this.isForeignKeyFor(this.owner) &&
-          this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record)))
+          this.keyValuesEqual(
+            this.resolveForeignKey().map((key) => this.owner.readAttribute(key)),
+            record.id,
+          ))
       );
     }
-    return this.keyValuesEqual(this.foreignKeyValues(this.owner), this.idValues(record));
+    return this.keyValuesEqual(
+      this.resolveForeignKey().map((key) => this.owner.readAttribute(key)),
+      record.id,
+    );
   }
 
   private resolveForeignKey(): string[] {
@@ -850,18 +859,17 @@ export class Association {
     return as ? `${underscore(as)}_type` : null;
   }
 
-  private foreignKeyValues(record: Base): unknown[] {
-    return this.resolveForeignKey().map((key) => (record as any)._readAttribute(key));
-  }
-
-  private idValues(record: Base): unknown[] {
-    const pk = (record.constructor as typeof Base).primaryKey;
-    return (Array.isArray(pk) ? pk : [pk]).map((key) => (record as any)._readAttribute(key));
-  }
-
-  private keyValuesEqual(a: unknown[], b: unknown[]): boolean {
-    if (a.length === 0 || a.length !== b.length) return false;
-    return a.every((value, i) => associationKeysEqual(value, b[i]));
+  /**
+   * Ruby compares `read_attribute(reflection.foreign_key) == owner.id` directly;
+   * with a composite key both sides are arrays, and `associationKeysEqual`
+   * bridges a child FK (int4 number) and an owner PK (int8 BigInt under PG
+   * bigserial) as Ruby's `Integer ==` does.
+   */
+  private keyValuesEqual(a: unknown, b: unknown): boolean {
+    const left = Array.isArray(a) ? a : [a];
+    const right = Array.isArray(b) ? b : [b];
+    if (left.length === 0 || left.length !== right.length) return false;
+    return left.every((value, i) => associationKeysEqual(value, right[i]));
   }
 
   private ensureKlassExistsBang(): typeof Base {
@@ -1034,19 +1042,6 @@ export class Association {
       ownerAny._afterCommitJobs ??= [];
       ownerAny._afterCommitJobs.push([jobClass, options]);
     }
-  }
-
-  private isMatchesForeignKey(record: Base): boolean {
-    const fk = (this.reflection.options as any).foreignKey;
-    const fkArr: string[] = Array.isArray(fk) ? fk : [String(fk)];
-    if (this.isForeignKeyFor(record)) {
-      return (
-        fkArr.every((key) => (record as any).readAttribute(key) === (this.owner as any).id) ||
-        (this.isForeignKeyFor(this.owner) &&
-          fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id))
-      );
-    }
-    return fkArr.every((key) => (this.owner as any).readAttribute(key) === (record as any).id);
   }
 }
 
