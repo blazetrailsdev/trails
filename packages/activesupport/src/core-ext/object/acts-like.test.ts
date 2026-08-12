@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { Object as ObjectExt } from "./acts-like.js";
 
 describe("ObjectTests", () => {
   it("duck typing", () => {
-    // acts_like? - checking if an object behaves like something
-    const actsLike = (obj: any, type: string) => typeof obj[`acts_like_${type}?`] === "function";
-    const datelike = { "acts_like_date?": () => true };
-    expect(actsLike(datelike, "date")).toBe(true);
-    expect(actsLike({}, "date")).toBe(false);
+    const datelike = { actsLikeDate: () => true };
+    expect(ObjectExt.actsLike(datelike, "date")).toBe(true);
+    expect(ObjectExt.actsLike({}, "date")).toBe(false);
+    expect(ObjectExt.actsLike({ actsLikeTime: () => true }, "time")).toBe(true);
+    expect(ObjectExt.actsLike({ actsLikeStringish: () => true }, "stringish")).toBe(true);
   });
 
   it("acts like string", () => {
-    const strlike = { "acts_like_string?": () => true };
-    expect(typeof strlike["acts_like_string?"] === "function").toBe(true);
+    const strlike = { actsLikeString: () => true };
+    expect(ObjectExt.actsLike(strlike, "string")).toBe(true);
+    expect(ObjectExt.actsLike("a real string", "string")).toBe(false);
   });
 });

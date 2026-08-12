@@ -81,7 +81,7 @@ describe("AssociationRelation", () => {
     const scope = proxy.where({ name: "Mast" }) as unknown as AssociationRelation<ShipPart>;
     expect(scope.proxyAssociation.owner).toBe(ship);
     expect(scope.proxyAssociation.reflection.name).toBe("parts");
-    expect(scope.proxyAssociation.reflection.type).toBe("hasMany");
+    expect(scope.proxyAssociation.reflection.macro).toBe("hasMany");
   });
 
   it("equals compares against a loaded array of records", async () => {

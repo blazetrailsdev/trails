@@ -24,17 +24,6 @@
     "package": "activerecord",
     "tsFile": "persistence.ts",
     "rubyName": "_delete_record",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:arelTable"
-    ],
-    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "_delete_record",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -57,7 +46,7 @@
     "tsFile": "persistence.ts",
     "rubyName": "_raise_record_not_destroyed",
     "call": "order:constructor,primaryKey",
-    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
+    "reason": "Extractor call-resolution artifact, not a body divergence: the TS body reads `this.constructor.primaryKey` then `this.constructor.name`, the same order as Rails' `self.class.primary_key` then `self.class` (persistence.rb:951-952), and the extracted `callSeq` is `constructor, primaryKey`. Ruby `class` resolves against the later `name` read rather than `constructor`, inverting the reported pair. The body itself was converged to Rails' `ensure`-clears shape in the same PR."
   },
   {
     "package": "activerecord",
@@ -76,22 +65,13 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "apply_scoping?",
-    "call": "global_current_scope",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "build_default_constraint",
     "call": "default_scoped",
     "kind": "args",
     "rubyArgs": [
       "kwargs{allQueries=bool:true}"
     ],
-    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
+    "reason": "TypeScript cannot omit a leading optional positional to pass only kwargs: Rails' `default_scoped(scope = relation, all_queries: nil)` (scoping/named.rb:45) is called here as `default_scoped(all_queries: true)`, so the port must spell the `scope` slot as `undefined` before the trailing kwargs object. The kwarg key and value match Rails exactly."
   },
   {
     "package": "activerecord",

@@ -348,8 +348,7 @@ export async function _deleteRecord(
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const table: ArelTable = (this as any).arelTable;
-  const dm = new DeleteManager();
-  dm.from(table);
+  const dm = new DeleteManager(table);
 
   for (const [col, val] of Object.entries(constraints)) {
     dm.where(table.get(col).eq(val));
@@ -1884,7 +1883,7 @@ export function isApplyScoping(
   // all_queries-flagged default scope (or a global current scope) opts a
   // mutation/reload into scoping; a plain default scope does not.
   const hasAllQueriesDefaultScope = !!ctor.defaultScopes?.some((s: any) => s.allQueries);
-  return !!(hasAllQueriesDefaultScope || ScopeRegistry.globalCurrentScope(ctor));
+  return !!(hasAllQueriesDefaultScope || ctor.globalCurrentScope());
 }
 
 /** @internal */
@@ -2162,18 +2161,20 @@ export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: stri
 
 /** @internal */
 export function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
+  (this as any)._associationDestroyException ??= null;
   const key = this.constructor.primaryKey;
   const keyStr = Array.isArray(key) ? key.join(", ") : key;
-  // If an association destroy raised an exception, propagate that instead.
-  const assocEx = (this as any)._associationDestroyException ?? null;
-  if (assocEx) (this as any)._associationDestroyException = null;
-  throw (
-    assocEx ??
-    new RecordNotDestroyed(
-      `Failed to destroy ${this.constructor.name} with ${keyStr}=${String(this.id)}`,
-      this as unknown as object,
-    )
-  );
+  try {
+    throw (
+      (this as any)._associationDestroyException ??
+      new RecordNotDestroyed(
+        `Failed to destroy ${this.constructor.name} with ${keyStr}=${String(this.id)}`,
+        this as unknown as object,
+      )
+    );
+  } finally {
+    (this as any)._associationDestroyException = null;
+  }
 }
 
 /** @internal */
