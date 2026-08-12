@@ -2001,9 +2001,12 @@ async function instanceUpdateRecord(
 ): Promise<boolean> {
   const ctor = this.constructor;
 
-  // Thread the `withQueryConnection` connection rather than the deprecated
-  // `.connection` getter (see `_createRecord` below); resolved after the
-  // suppression guard so a suppressed write never touches `.connection`.
+  // Rails resolves no connection here: `_update_record` delegates the write to
+  // `_update_row` → the class-level `_update_record`, which does the
+  // `with_connection` (persistence.rb:906, 944-946). While that delegation is
+  // deferred (see below), thread the connection the enclosing
+  // `withQueryConnection` already leased rather than the deprecated
+  // `.connection` getter, so the UPDATE does not flip the lease permanent.
   const adapter = threadedConnectionFor(ctor) ?? ctor.connection;
 
   const table = ctor.arelTable;
