@@ -25,7 +25,6 @@ import {
   routeThroughCheckValidity,
 } from "./validate-through-reflection.js";
 import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./errors.js";
-import { RecordInvalid } from "../validations.js";
 import { CollectionAssociation, includesRecord } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
@@ -50,7 +49,7 @@ export class HasManyAssociation extends CollectionAssociation {
    */
   declare updateCounterInMemory: (difference: number) => void;
   /** @internal */
-  declare updateCounterIfSuccess: (savedSuccessfully: boolean, difference: number) => boolean;
+  declare updateCounterIfSuccess: <T>(savedSuccessfully: T, difference: number) => T;
 
   /**
    * Set on an ad-hoc holder built by a CollectionProxy whose own Relation state
@@ -150,20 +149,14 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /**
-   * Insert a record into the collection. Sets the FK and type
-   * columns on the record to point to the owner, then saves.
-   * Rails: if raise is true, uses save! (raises on failure);
-   * otherwise uses save (returns boolean).
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#insert_record
+   * (has_many_association.rb:61-64) — point the record's FK/type columns at the
+   * owner, then delegate to `CollectionAssociation#insert_record`, which picks
+   * the `save!` / `save` arm from `raise`.
    */
-  async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
+  override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
     this.setOwnerAttributes(record);
-    let saved = false;
-    if (typeof (record as any).save === "function") {
-      saved = !!(await (record as any).save({ validate }));
-      if (!saved && raise) throw new RecordInvalid(record);
-    }
-    // Rails: update_counter_if_success(super, 1) — sync counter on successful insert
-    return this.updateCounterIfSuccess(saved, 1);
+    return super.insertRecord(record, validate, raise);
   }
 
   /**
@@ -270,6 +263,37 @@ export class HasManyAssociation extends CollectionAssociation {
     const count = await deleteCount(this, strategy, scope);
     if (count > 0) await updateCounter(this, -count);
     return count;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#concat_records
+   * (has_many_association.rb:139-141) — `update_counter_if_success(super,
+   * records.length)`.
+   * @internal
+   */
+  protected override async concatRecords(records: Base[], raise = false): Promise<Base[]> {
+    return this.updateCounterIfSuccess(await super.concatRecords(records, raise), records.length);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasManyAssociation#_create_record
+   * (has_many_association.rb:143-149) — the array arm creates each record
+   * through `super` (which bumps the counter per record), the scalar arm bumps
+   * by one.
+   * @internal
+   */
+  protected override async _createRecord(
+    attributes?: Record<string, unknown>,
+    shouldRaise = false,
+    block?: (record: Base) => void,
+  ): Promise<Base | null> {
+    if (Array.isArray(attributes)) {
+      return super._createRecord(attributes, shouldRaise, block);
+    }
+    return this.updateCounterIfSuccess(
+      await super._createRecord(attributes, shouldRaise, block),
+      1,
+    );
   }
 
   /**
@@ -429,11 +453,11 @@ function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]
 }
 
 /** @internal */
-function updateCounterIfSuccess(
+function updateCounterIfSuccess<T>(
   this: HasManyAssociation,
-  savedSuccessfully: boolean,
+  savedSuccessfully: T,
   difference: number,
-): boolean {
+): T {
   if (savedSuccessfully) this.updateCounterInMemory(difference);
   return savedSuccessfully;
 }

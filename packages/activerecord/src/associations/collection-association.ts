@@ -448,9 +448,13 @@ export class CollectionAssociation extends Association {
     throw new Error("intersection is implemented by CollectionAssociation subclasses");
   }
 
-  /** @internal */
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#insert_record
+   * (collection_association.rb:377-383) — `raise` picks `save!`, which raises
+   * from inside the save, over `save`, which returns false.
+   * @internal
+   */
   async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
-    this.setOwnerAttributes(record);
     if (raise && typeof (record as any).saveBang === "function") {
       await (record as any).saveBang({ validate });
       return true;
