@@ -607,7 +607,7 @@ export class AssociationScope {
         : aliased && typeof aliased === "object" && typeof aliased.name === "string"
           ? aliased.name
           : (nr.klass?.tableName ?? "");
-    // Build the ON condition as Arel constraints nodes —
+    // Build the ON condition as Arel constraint nodes —
     // `table[join_primary_key].eq(foreign_table[foreign_key])` folded with
     // `.and` — exactly as Rails' next_chain_scope (association_scope.rb:88-91).
     // Identifier quoting and value escaping flow through the Arel visitor,
