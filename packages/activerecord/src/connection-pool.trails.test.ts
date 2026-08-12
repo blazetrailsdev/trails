@@ -427,6 +427,57 @@ it("context pin takes priority over fixture pin in unpin", async () => {
   }
 });
 
+it("concurrent unpinConnectionBang calls do not interleave inside the pin tear-down", async () => {
+  // Rails runs the whole of `unpin_connection!` under
+  // `@pinned_connection.lock.synchronize` (connection_pool.rb:344-362). trails'
+  // `rollbackTransaction` is a real await, so without that lock a second unpin
+  // enters the critical section while the first is still mid-rollback and the
+  // pin bookkeeping is half torn down. Assert the *interleaving*, not just the
+  // end state: the two tear-downs must be strictly sequential.
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+
+    const tm = pinned.transactionManager as unknown as {
+      rollbackTransaction: (...args: unknown[]) => Promise<unknown>;
+    };
+    const original = tm.rollbackTransaction.bind(tm);
+    const events: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    tm.rollbackTransaction = async (...args: unknown[]) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      events.push("rollback:begin");
+      try {
+        // Yield the microtask queue so a second unpin gets a real chance to
+        // enter the tear-down while this one is suspended.
+        await Promise.resolve();
+        return await original(...args);
+      } finally {
+        events.push("rollback:end");
+        inFlight--;
+      }
+    };
+
+    const [first, second] = await Promise.all([
+      pool.unpinConnectionBang(),
+      pool.unpinConnectionBang(),
+    ]);
+
+    // Baseline (no lock) records ["rollback:begin", "rollback:begin", …] and a
+    // maxInFlight of 2, and both callers report a clean unpin because both see
+    // the transaction still open.
+    expect(maxInFlight).toBe(1);
+    expect(events).toEqual(["rollback:begin", "rollback:end"]);
+    expect([first, second]).toEqual([true, false]);
+    expect(pinned.transactionManager.openTransactions).toBe(0);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
 describe("ConnectionPool schema cache", () => {
   // Rails' ConnectionPoolTests declares `fixtures` and sets
   // `use_transactional_tests = false` (connection_pool_test.rb:11); its

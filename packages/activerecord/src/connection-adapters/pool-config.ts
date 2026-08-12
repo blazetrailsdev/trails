@@ -174,6 +174,14 @@ export class PoolConfig {
     return this._pool !== null;
   }
 
+  // Rails guards this body with `synchronize` (pool_config.rb:61-68) — the
+  // MonitorMixin on PoolConfig itself, re-checking `@pool` inside the lock —
+  // so a concurrent caller cannot overwrite `automatic_reconnect` between this
+  // caller's write and its `@pool.disconnect!`. That lock has no counterpart
+  // here: the only async mutex in trails is `TransactionManager#synchronize`,
+  // which is a *per-connection* lock and guards the wrong object, and adding a
+  // second lock shape is out of scope for this story. Tracked as
+  // `port-pool-config-monitor-critical-section`.
   async disconnectBang(options: { automaticReconnect?: boolean } = {}): Promise<void> {
     if (!this._pool) return;
     if (options.automaticReconnect !== undefined) {

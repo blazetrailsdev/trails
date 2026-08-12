@@ -821,26 +821,45 @@ export class ConnectionPool implements ReapablePool {
     const connection = pin.connection;
     let clean = true;
 
-    try {
-      if (isTransactionAware(connection)) {
-        if (connection.transactionManager.currentTransaction.open) {
-          await connection.transactionManager.rollbackTransaction();
-        } else {
-          clean = false;
-          connection.resetBang();
+    // The block Rails runs under `@pinned_connection.lock.synchronize`
+    // (connection_pool.rb:344-362). `rollbackTransaction` is a real await in
+    // trails, so without the lock a second `unpinConnectionBang` — or a
+    // concurrent `pinConnectionBang` — enters while the pin is half torn down:
+    // it sees the not-yet-decremented `pin.depth`, rolls the same transaction
+    // back a second time, or checks the connection in twice.
+    const block = async () => {
+      try {
+        if (isTransactionAware(connection)) {
+          if (connection.transactionManager.currentTransaction.open) {
+            await connection.transactionManager.rollbackTransaction();
+          } else {
+            clean = false;
+            connection.resetBang();
+          }
+        }
+      } finally {
+        pin.depth--;
+        if (pin.depth === 0) {
+          if (fromFixture) {
+            this._fixturePin = null;
+          } else {
+            this._pinnedConnections.delete(ctxId);
+          }
+          this._cacheConfig.decrementPinnedCount();
+          this.checkin(connection);
         }
       }
-    } finally {
-      pin.depth--;
-      if (pin.depth === 0) {
-        if (fromFixture) {
-          this._fixturePin = null;
-        } else {
-          this._pinnedConnections.delete(ctxId);
-        }
-        this._cacheConfig.decrementPinnedCount();
-        this.checkin(connection);
-      }
+    };
+
+    // `TransactionManager#synchronize` is the trails-native spelling of the
+    // per-connection lock, and it is re-entrant on the same async chain, so the
+    // nested `rollbackTransaction` (which takes the same lock) cannot
+    // self-deadlock. A connection with no transaction manager has no lock to
+    // take and no transaction to roll back.
+    if (isTransactionAware(connection)) {
+      await connection.transactionManager.synchronize(block);
+    } else {
+      await block();
     }
 
     return clean;
