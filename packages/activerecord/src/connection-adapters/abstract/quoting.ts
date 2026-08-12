@@ -526,7 +526,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
   if (value instanceof TimeValue) {
     value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
   }
-  const dt =
+  value =
     value instanceof Temporal.PlainTime
       ? new Temporal.PlainDateTime(
           2000,
@@ -540,7 +540,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
           value.nanosecond,
         )
       : value.with({ year: 2000, month: 1, day: 1 });
-  return this.quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "");
+  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
 /** @internal */

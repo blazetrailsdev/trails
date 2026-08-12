@@ -1252,11 +1252,11 @@ export class TableDefinition {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): CheckConstraintDefinition {
-    const resolved = this._adapter.checkConstraintOptions(this.name, expression, options) as {
+    options = this._adapter.checkConstraintOptions(this.name, expression, options) as {
       name?: string;
       validate?: boolean;
     };
-    return new CheckConstraintDefinition(this.name, expression, resolved);
+    return new CheckConstraintDefinition(this.name, expression, options);
   }
 
   /** @internal */
@@ -1584,17 +1584,17 @@ export class Table {
     const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     await this._schema.removeColumns(
-      this._tableName,
+      this.name,
       ...(rest as string[]),
       ...(Object.keys(options).length > 0 ? [options] : []),
     );
   }
-  async rename(oldName: string, newName: string): Promise<void> {
-    await this._schema.renameColumn(this._tableName, oldName, newName);
+  async rename(columnName: string, newColumnName: string): Promise<void> {
+    await this._schema.renameColumn(this.name, columnName, newColumnName);
   }
   async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addIndex(this._tableName, columns, options);
+    await this._schema.addIndex(this.name, columns, options);
   }
   // Rails: `Table#remove_index(column_name = nil, **options)` forwards to
   // `@base.remove_index(table_name, column_name, **options)`.
@@ -1608,9 +1608,9 @@ export class Table {
     const columnName = isColumn ? columnOrOptions : undefined;
     // Ruby's `**options` collects the hash from either position, so an explicit
     // nil column with the options behind it keeps them.
-    const optionHash = isColumn ? options : { ...columnOrOptions, ...options };
-    this.raiseOnIfExistOptions(optionHash as Record<string, unknown>);
-    await this._schema.removeIndex(this._tableName, columnName, optionHash);
+    options = isColumn ? options : { ...columnOrOptions, ...options };
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    await this._schema.removeIndex(this.name, columnName, options);
   }
   async references(...refNames: string[]): Promise<void>;
   async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
@@ -1618,7 +1618,7 @@ export class Table {
     const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     for (const refName of names) {
-      await this._schema.addReference(this._tableName, refName, options);
+      await this._schema.addReference(this.name, refName, options);
     }
   }
   async belongsTo(...refNames: string[]): Promise<void>;
@@ -1628,7 +1628,7 @@ export class Table {
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.addTimestamps(this._tableName, options);
+    await this._schema.addTimestamps(this.name, options);
   }
 
   get name(): string {
@@ -1645,18 +1645,18 @@ export class Table {
     // `@base.add_column(name, column_name, type, **options)` passes no fourth
     // argument when `options` is empty, and CommandRecorder records args verbatim.
     if (Object.keys(colOpts).length === 0) {
-      await this._schema.addColumn(this._tableName, columnName, type);
+      await this._schema.addColumn(this.name, columnName, type);
     } else {
-      await this._schema.addColumn(this._tableName, columnName, type, colOpts as ColumnOptions);
+      await this._schema.addColumn(this.name, columnName, type, colOpts as ColumnOptions);
     }
     if (indexOpt) {
       const opts: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
-      await this._schema.addIndex(this._tableName, columnName, opts);
+      await this._schema.addIndex(this.name, columnName, opts);
     }
   }
 
   async columnExists(columnName: string, type?: ColumnType): Promise<boolean> {
-    return this._require("columnExists").call(this._schema, this._tableName, columnName, type);
+    return this._require("columnExists").call(this._schema, this.name, columnName, type);
   }
 
   private _require<K extends keyof SchemaStatementsLike>(
@@ -1671,28 +1671,22 @@ export class Table {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    return this._require("indexExists").call(this._schema, this._tableName, columnName, options);
+    return this._require("indexExists").call(this._schema, this.name, columnName, options);
   }
 
   async renameIndex(oldName: string, newName: string): Promise<void> {
-    return this._require("renameIndex").call(this._schema, this._tableName, oldName, newName);
+    return this._require("renameIndex").call(this._schema, this.name, oldName, newName);
   }
 
   async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("changeColumn").call(
-      this._schema,
-      this._tableName,
-      columnName,
-      type,
-      options,
-    );
+    return this._require("changeColumn").call(this._schema, this.name, columnName, type, options);
   }
 
   async changeDefault(columnName: string, defaultOrChanges: unknown): Promise<void> {
     return this._require("changeColumnDefault").call(
       this._schema,
-      this._tableName,
+      this.name,
       columnName,
       defaultOrChanges,
     );
@@ -1701,7 +1695,7 @@ export class Table {
   async changeNull(columnName: string, isNull: boolean, defaultValue?: unknown): Promise<void> {
     return this._require("changeColumnNull").call(
       this._schema,
-      this._tableName,
+      this.name,
       columnName,
       isNull,
       defaultValue,
@@ -1709,7 +1703,7 @@ export class Table {
   }
 
   async removeTimestamps(options?: ColumnOptions): Promise<void> {
-    return this._require("removeTimestamps").call(this._schema, this._tableName, options);
+    return this._require("removeTimestamps").call(this._schema, this.name, options);
   }
 
   async removeReferences(...refNames: string[]): Promise<void>;
@@ -1720,7 +1714,7 @@ export class Table {
     const { names, options } = this._splitRefNames(args);
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     for (const refName of names) {
-      await this._require("removeReference").call(this._schema, this._tableName, refName, options);
+      await this._require("removeReference").call(this._schema, this.name, refName, options);
     }
   }
   async removeBelongsTo(...refNames: string[]): Promise<void>;
@@ -1742,7 +1736,7 @@ export class Table {
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._require("addForeignKey").call(this._schema, this._tableName, toTable, options);
+    return this._require("addForeignKey").call(this._schema, this.name, toTable, options);
   }
 
   async removeForeignKey(
@@ -1751,20 +1745,15 @@ export class Table {
     this.raiseOnIfExistOptions(
       (typeof toTableOrOptions === "object" ? toTableOrOptions : {}) as Record<string, unknown>,
     );
-    return this._require("removeForeignKey").call(this._schema, this._tableName, toTableOrOptions);
+    return this._require("removeForeignKey").call(this._schema, this.name, toTableOrOptions);
   }
 
   async foreignKeyExists(toTableOrOptions?: string | Record<string, unknown>): Promise<boolean> {
-    return this._require("foreignKeyExists").call(this._schema, this._tableName, toTableOrOptions);
+    return this._require("foreignKeyExists").call(this._schema, this.name, toTableOrOptions);
   }
 
   async checkConstraint(expression: string, options?: Record<string, unknown>): Promise<void> {
-    return this._require("addCheckConstraint").call(
-      this._schema,
-      this._tableName,
-      expression,
-      options,
-    );
+    return this._require("addCheckConstraint").call(this._schema, this.name, expression, options);
   }
 
   async removeCheckConstraint(
@@ -1774,13 +1763,13 @@ export class Table {
     if (typeof expressionOrOptions === "string") {
       return this._require("removeCheckConstraint").call(
         this._schema,
-        this._tableName,
+        this.name,
         options?.name ? options : expressionOrOptions,
       );
     }
     return this._require("removeCheckConstraint").call(
       this._schema,
-      this._tableName,
+      this.name,
       expressionOrOptions,
     );
   }
@@ -1788,7 +1777,7 @@ export class Table {
   async checkConstraintExists(
     options: { name?: string; expression?: string } = {},
   ): Promise<boolean> {
-    return this._require("checkConstraintExists").call(this._schema, this._tableName, options);
+    return this._require("checkConstraintExists").call(this._schema, this.name, options);
   }
 
   async primaryKey(
@@ -1800,7 +1789,7 @@ export class Table {
   }
 
   async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
-    return this._schema.addColumn(this._tableName, columnName, type, options);
+    return this._schema.addColumn(this.name, columnName, type, options);
   }
 
   /** @internal */

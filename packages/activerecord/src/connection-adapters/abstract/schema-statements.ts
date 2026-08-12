@@ -535,27 +535,25 @@ export class SchemaStatements {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — the column
     // can be passed positionally or via the options hash.
     let columnName: string | string[] | undefined;
-    let opts: { column?: string | string[]; name?: string; ifExists?: boolean };
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
-      opts = options;
     } else {
       columnName = undefined;
       // Ruby's `**options` collects the hash whether it arrived as the sole
       // argument or behind an explicit nil column.
-      opts = { ...columnOrOptions, ...options };
+      options = { ...columnOrOptions, ...options };
     }
 
     // Rails: `return if options[:if_exists] && !index_exists?(table_name,
     // column_name, **options)` (schema_statements.rb:967) — one probe, because
     // `Index#defined_for?` (schema_definitions.rb:54) reads `options[:column]`
     // when no columns are given and then matches on `name` alone.
-    if (opts.ifExists && !(await this.indexExists(tableName, columnName, opts))) return;
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
 
     // Rails resolves the concrete index name via `index_name_for_remove`, which
     // raises ArgumentError when the spec matches no index (or is ambiguous), and
     // then drops by that real name — never a silent DROP ... IF EXISTS.
-    const indexName = await this.indexNameForRemove(tableName, columnName, opts);
+    const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
     if (this.adapterName === "mysql") {
       await this.execute(
@@ -1830,21 +1828,21 @@ export class SchemaStatements {
     if (!algorithm) return undefined;
     const normalized = algorithm.toLowerCase();
 
-    const adapterAlgorithms =
+    const indexAlgorithms =
       typeof (this as any).indexAlgorithms === "function"
         ? ((this as any).indexAlgorithms() as Record<string, string>)
         : null;
 
-    if (adapterAlgorithms) {
-      if (normalized in adapterAlgorithms) {
-        const result = adapterAlgorithms[normalized];
+    if (indexAlgorithms) {
+      if (normalized in indexAlgorithms) {
+        const result = indexAlgorithms[normalized];
         return result || undefined;
       }
     } else if (normalized === "concurrently") {
       return "CONCURRENTLY";
     }
 
-    const valid = adapterAlgorithms ? Object.keys(adapterAlgorithms) : ["concurrently"];
+    const valid = indexAlgorithms ? Object.keys(indexAlgorithms) : ["concurrently"];
     throw new ArgumentError(
       `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
     );
