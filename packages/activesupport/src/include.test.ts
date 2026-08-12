@@ -1,5 +1,13 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { include, extend, included, extended, type Included, type Extended } from "./include.js";
+import {
+  include,
+  extend,
+  included,
+  extended,
+  Module,
+  type Included,
+  type Extended,
+} from "./include.js";
 
 describe("include", () => {
   it("copies instance methods onto the prototype", () => {
@@ -59,6 +67,45 @@ describe("include", () => {
     expect((new User() as any).shared()).toBe("B");
     // A method defined in the class body beats every included mixin.
     expect(new User().classBody()).toBe("class-body");
+  });
+
+  it("resolves methods a Module defines after it was included", () => {
+    class User {}
+    const mod = new Module();
+    include(User, mod);
+    mod.defineMethod("greet", () => "hello");
+    expect((new User() as unknown as { greet(): string }).greet()).toBe("hello");
+    mod.undefMethod(...mod.instanceMethods());
+    expect((new User() as unknown as { greet?: unknown }).greet).toBeUndefined();
+  });
+
+  it("keeps a class-body method ahead of an included Module", () => {
+    class User {
+      greet() {
+        return "original";
+      }
+    }
+    const mod = new Module();
+    include(User, mod);
+    mod.defineMethod("greet", () => "replaced");
+    expect(new User().greet()).toBe("original");
+    expect(mod.isMethodDefined("greet")).toBe(true);
+  });
+
+  it("keeps an included Module ahead of the superclass", () => {
+    class Parent {
+      greet() {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    const mod = new Module();
+    include(Child, mod);
+    mod.moduleEval((m) => {
+      Object.defineProperty(m, "greet", { value: () => "module", configurable: true });
+    });
+    expect(new Child().greet()).toBe("module");
+    expect(new Parent().greet()).toBe("parent");
   });
 
   it("fires the included callback after methods are copied", () => {

@@ -3,7 +3,7 @@
  *
  * Mirrors: ActiveRecord::AttributeMethods
  */
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, include, Module } from "@blazetrails/activesupport";
 import {
   MissingAttributeError,
   missingAttribute,
@@ -158,13 +158,16 @@ export function accessedFields(this: AttributeRecord): string[] {
 }
 
 /**
- * Generated attribute methods placeholder.
- * Model classes mix dynamically-generated accessors into this module.
+ * The module generated attribute methods are defined into and which each
+ * model class includes.
  *
  * Mirrors: ActiveRecord::AttributeMethods::GeneratedAttributeMethods
+ * (attribute_methods.rb:14, `class GeneratedAttributeMethods < Module`).
  */
-export class GeneratedAttributeMethods {
-  constructor(private readonly ownerName?: string) {}
+export class GeneratedAttributeMethods extends Module {
+  constructor(private readonly ownerName?: string) {
+    super();
+  }
 
   inspect(): string {
     return `${this.ownerName}::GeneratedAttributeMethods`;
@@ -255,28 +258,24 @@ export function dangerousAttributeMethods(): Set<string> {
  *   include @generated_attribute_methods
  *   super
  *
- * trails installs generated accessors directly onto the class prototype in
- * `defineAttributeMethods`/`generateAliasAttributes` (the lazy self-init path,
- * like `initializeFindByCache`) rather than into a separately-mixed module, so
- * the `GeneratedAttributeMethods` instance stands in for Rails' namespace
- * constant. Resetting both flags to `false` re-arms those lazy paths so the
- * next accessor read regenerates against this class's schema.
+ * trails has no `const_set`, so the module is held on the class under the
+ * Rails ivar name rather than as a namespaced constant; it is included the
+ * same way, which splices it below the class prototype so the class body still
+ * outranks a generated accessor. Resetting both flags to `false` re-arms the
+ * lazy generation paths so the next accessor read regenerates against this
+ * class's schema.
  *
  * Rails chains this to `Core`'s `initialize_generated_modules` via `super`;
  * this port mirrors that by delegating to the core version at the end. `Base`
  * wires this attribute-methods entry point as the single static (see base.ts),
  * so the super call reaches `generatedAssociationMethods` just as Rails' method
  * ancestry does.
- *
- * @missingRailsCall include — Per-entry verified (RFC 0032 wide-entry
- *   verification): Rails attribute_methods.rb:42-50 does `include @generated_attribute_methods`;
- *   trails attribute-methods.ts:257-259 assigns a GeneratedAttributeMethods
- *   holder instance — no Module#include in TS, the holder is consulted directly.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   this._generatedAttributeMethods = new GeneratedAttributeMethods(this.name);
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
+  include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
   _coreInitializeGeneratedModules.call(
     this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
   );
@@ -349,7 +348,16 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // `cachedFindByStatement` lazily calls `initializeFindByCache` — we run it
   // here the first time a class generates its methods, gated on an *own*
   // `_generatedAttributeMethods` so each subclass initializes exactly once.
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+  // Rails runs it from `included do` (attribute_methods.rb:10-11), before any
+  // class body can reach `generated_attribute_methods`; here a class-body
+  // `alias_attribute` gets there first and ActiveModel builds a bare `Module`
+  // under the same ivar name (attribute_methods.rb:400-402), so the gate also
+  // checks the class — Rails' AR override is what names the module
+  // (`const_set`), and it is the one this class must end up with.
+  if (
+    !Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods") ||
+    !(this._generatedAttributeMethods instanceof GeneratedAttributeMethods)
+  ) {
     initializeGeneratedModules.call(this);
   }
   // Rails' @attribute_methods_generated is a per-class ivar (nil for every

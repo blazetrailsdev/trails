@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
-import { missingAttribute } from "./attribute-methods.js";
+import {
+  defineAttributeMethod,
+  generatedAttributeMethods,
+  missingAttribute,
+} from "./attribute-methods.js";
 
 describe("AttributeMethodsTest", () => {
   it("#missing_attribute applies the supplied stack to the raised error", () => {
@@ -32,12 +36,23 @@ describe("AttributeMethodsTest", () => {
       static {
         this.attribute("name", "string");
       }
-      customName() {
-        return "custom";
-      }
     }
-    const p = new Person({ name: "Alice" });
-    expect(p.customName()).toBe("custom");
+    // Rails defines `foo` straight into the module and then generates the bare
+    // `foo` reader over it. trails skips the bare pattern (readers are real
+    // accessor properties), so a suffix pattern's method stands in for it.
+    Person.attributeMethodSuffix("Short");
+    generatedAttributeMethods.call(Person).moduleEval((mod) => {
+      Object.defineProperty(mod, "nameShort", {
+        value: () => "<3",
+        writable: true,
+        configurable: true,
+      });
+    });
+    defineAttributeMethod(Person, "name");
+
+    expect((new Person({ name: "Alice" }) as unknown as { nameShort(): string }).nameShort()).toBe(
+      "<3",
+    );
   });
 
   it("#define_attribute_method generates a method that is already defined on the host", () => {

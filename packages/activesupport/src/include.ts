@@ -20,7 +20,72 @@
  */
 
 type AnyClass = new (...args: any[]) => any;
-type Module = Record<string, any>;
+type ModuleObject = Record<string, any>;
+
+/**
+ * Ruby's `Module.new` — an anonymous module built at runtime and populated
+ * after the fact (`mod.module_eval { define_method … }`), then mixed into a
+ * class with `include`.
+ *
+ * Unlike a plain-object module, whose methods `include()` copies onto the
+ * class prototype once, a `Module` instance is *live*: `include()` splices a
+ * carrier object into the prototype chain directly below the including class's
+ * prototype, and every method the module defines afterwards is found by
+ * instances from then on. That is Ruby's actual include semantics — including
+ * that a method defined in the class body outranks the module's.
+ *
+ * The carrier is a separate object from the module because a JS object cannot
+ * be both: everything reachable from a link in an instance's prototype chain is
+ * an instance method, whereas Ruby's module object carries its own methods
+ * (`Module#inspect`, `#name`) outside the ancestry it contributes. So the
+ * module's methods are reached through the Ruby-named Module API below, which
+ * operates on the carrier.
+ *
+ * Mirrors: Ruby's Module.new (core language feature)
+ */
+export class Module {
+  /** Mirrors: Ruby's Module#module_eval — yields the module's method table. */
+  moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
+    return block(carrierOf(this));
+  }
+
+  /** Mirrors: Ruby's Module#define_method. */
+  defineMethod(name: string, body: (...args: any[]) => unknown): void {
+    Object.defineProperty(carrierOf(this), name, {
+      value: body,
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  /** Mirrors: Ruby's Module#instance_methods. */
+  instanceMethods(): string[] {
+    return Object.getOwnPropertyNames(carrierOf(this));
+  }
+
+  /** Mirrors: Ruby's Module#undef_method. */
+  undefMethod(...names: string[]): void {
+    const carrier = carrierOf(this);
+    for (const name of names) delete carrier[name];
+  }
+
+  /** Mirrors: Ruby's Module#method_defined?. */
+  isMethodDefined(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(carrierOf(this), name);
+  }
+}
+
+/** The prototype-chain link holding a module's instance methods. */
+const carriers = new WeakMap<Module, Record<string, unknown>>();
+
+function carrierOf(mod: Module): Record<string, unknown> {
+  let carrier = carriers.get(mod);
+  if (!carrier) {
+    carrier = Object.create(null) as Record<string, unknown>;
+    carriers.set(mod, carrier);
+  }
+  return carrier;
+}
 
 /**
  * Symbol keys for Ruby's Module#included and Module#extended callbacks.
@@ -93,7 +158,18 @@ type CallableMethods<M extends object> = {
  */
 export type Included<M extends object> = CallableMethods<M>;
 
-export function include(klass: AnyClass, mod: Module | AnyClass): void {
+export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  if (mod instanceof Module) {
+    const proto = klass.prototype as object;
+    const carrier = Object.create(Object.getPrototypeOf(proto)) as Record<string, unknown>;
+    Object.defineProperties(carrier, Object.getOwnPropertyDescriptors(carrierOf(mod)));
+    carriers.set(mod, carrier);
+    Object.setPrototypeOf(proto, carrier);
+    if (typeof (mod as any)[included] === "function") {
+      (mod as any)[included](klass);
+    }
+    return;
+  }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);
 
@@ -145,8 +221,8 @@ export function include(klass: AnyClass, mod: Module | AnyClass): void {
       // replaces it, so leave it untouched.
     }
   } else {
-    for (const key of Object.keys(mod as Module)) {
-      const value = (mod as Module)[key];
+    for (const key of Object.keys(mod as ModuleObject)) {
+      const value = (mod as ModuleObject)[key];
       // Ruby's include copies only instance methods — skip non-function values
       // and Ruby-style constants (uppercase first char mirrors Ruby constant naming).
       if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
@@ -199,7 +275,7 @@ export type Extended<M extends object> = CallableMethods<M>;
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend(klass: AnyClass | object, mod: Module | AnyClass): void {
+export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass): void {
   // A class module carries its members as non-enumerable own statics, so read
   // its property names directly; a plain-object module keeps the Object.keys
   // (enumerable-only) semantics.

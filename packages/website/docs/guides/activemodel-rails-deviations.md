@@ -27,8 +27,10 @@ specifically, the machinery is applied to wire up
 Rails' `ActiveModel::AttributeMethods` registers method _patterns_
 (`_changed?`, `_was`, `reset_`, etc.) and routes calls through
 `method_missing`. We can't do that in TypeScript without blinding the type
-checker, so Trails generates the methods at class-definition time and
-tracks them in a `_generatedMethods` Set.
+checker, so Trails generates the methods at class-definition time. They are
+defined into the module `generated_attribute_methods` builds and includes,
+exactly as in Rails — so `undefine_attribute_methods` still clears them and a
+class-body method still outranks a generated one.
 
 - `AttributeMethodPattern` (`packages/activemodel/src/attribute-methods.ts`)
   holds the same prefix/suffix/proxy-target concept as Rails.
@@ -126,7 +128,7 @@ The cross-package conventions — [method casing](./index.md#method-casing),
 
 | Area              | Rails                              | Trails                                                                                                                 |
 | ----------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Attribute methods | `method_missing` + `define_method` | Generated methods in `_generatedMethods`; index signature for reads                                                    |
+| Attribute methods | `method_missing` + `define_method` | Generated eagerly into `generated_attribute_methods`; index signature for reads                                        |
 | Dirty tracking    | Scattered ivars                    | `DirtyTracker` instance at `_dirtyTracker`                                                                             |
 | Callbacks         | Blocks (`before_save do ... end`)  | Async-capable functions; `runCallbacks` is async                                                                       |
 | Validations       | Synchronous                        | Async: `valid?`/`validate` return a `Promise`; the callback chain awaits DB-backed validators (e.g. uniqueness) inline |

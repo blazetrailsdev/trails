@@ -279,7 +279,6 @@ export class Model {
   static _attributeMethodPatterns: AttributeMethodPattern[] = [new AttributeMethodPattern()];
   static _attributeAliases: Record<string, string> = {};
   static _aliasesByAttributeName: Map<string, string[]> = new Map();
-  static _generatedMethods: Set<string> = new Set();
   // Rails: `class_attribute :_validators, … default: Hash.new { |h, k| h[k] = [] }`
   // (activemodel/lib/active_model/validations.rb:50). Map keyed by attribute
   // name (or `null` for validators registered without `attributes:`); O(1)

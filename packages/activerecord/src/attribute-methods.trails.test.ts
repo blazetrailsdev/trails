@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
+import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
 
@@ -26,6 +27,19 @@ const generatable = (cls: unknown): Generatable => cls as Generatable;
 
 describe("AttributeMethodsTest (trails)", () => {
   fixtures([]);
+
+  it("initializeGeneratedModules replaces a module ActiveModel built first", async () => {
+    class Legacy extends Base {
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    generatable(Legacy).defineAttributeMethods();
+
+    expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+    expect(new Legacy({ title: "t" }).heading).toBe("t");
+  });
 
   it("defineAttributeMethods cascades to the superclass", async () => {
     class Animal extends Base {
