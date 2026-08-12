@@ -374,10 +374,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         await (
           other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
         )._cancelAnyRunningQuery();
-        // The `block` half: the cancelled command has already settled by the
-        // time the cancel returns, so nothing of it is left in flight.
-        expect(sleepError).toBeInstanceOf(QueryCanceled);
+        // `block` puts the cancelled command back off the wire before the
+        // cancel returns; its error reaching this `catch` is a further
+        // microtask hop behind that, so await the query before reading it.
         await sleep;
+        expect(sleepError).toBeInstanceOf(QueryCanceled);
         // The cancel aborted the transaction, so end it before probing — a
         // leaked cancel shows up as QueryCanceled on one of these two, not as
         // the 25P02 an aborted transaction block answers with.
