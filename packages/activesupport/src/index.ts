@@ -495,6 +495,7 @@ export { hexdigest } from "./hexdigest.js";
 export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
+export { synchronize, type MonitorMixin } from "./concurrency/monitor.js";
 // Gzip requires node:zlib — import from "@blazetrails/activesupport/gzip"
 export { DescendantsTracker } from "./descendants-tracker.js";
 export { Configurable, Configuration } from "./configurable.js";
