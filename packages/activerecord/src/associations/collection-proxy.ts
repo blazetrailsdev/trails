@@ -35,7 +35,13 @@ import {
   findTakeWithLimit as baseFindTakeWithLimit,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
+import {
+  underscore,
+  singularize,
+  camelize,
+  constantize,
+  isAbortSignal,
+} from "@blazetrails/activesupport";
 import {
   RecordNotSaved,
   ConfigurationError,
@@ -2231,11 +2237,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Rails wraps the whole `before_remove` loop in one `catch(:abort) ... ||
       // return`: if any record's before_remove halts, the entire operation aborts
       // and nothing is deleted (the transaction commits with no work done).
-      for (const record of modelRecords) {
-        if (!this._callbackHost.callback("beforeRemove", record)) {
-          aborted = true;
-          return;
-        }
+      try {
+        for (const record of modelRecords) this._callbackHost.callback("beforeRemove", record);
+      } catch (e) {
+        if (!isAbortSignal(e)) throw e;
+        aborted = true;
+        return;
       }
       if (persistedRecords.length > 0) {
         // Mirror Rails HasManyAssociation#delete_records: `:destroy` destroys
@@ -3510,7 +3517,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isThrough) {
       const record = this._buildRecord(attrs as Record<string, unknown>) as T;
       if (block) block(record);
-      if (!this._callbackHost.callback("beforeAdd", record)) {
+      try {
+        this._callbackHost.callback("beforeAdd", record);
+      } catch (e) {
+        if (!isAbortSignal(e)) throw e;
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
       // Rails' `_create_record` runs the target save INSIDE the transaction —

@@ -2237,13 +2237,12 @@ export function applyDefaultAndGlobalConstraints(
 /** @internal */
 export function buildDefaultConstraint(this: {
   defaultScopes?: { allQueries: boolean; scope: (rel: any) => any }[];
-  defaultScoped(
-    scope?: any,
-    options?: { allQueries?: boolean | null },
-  ): { _whereClause: { isEmpty(): boolean; ast: unknown } };
+  defaultScoped(options: { allQueries?: boolean | null }): {
+    _whereClause: { isEmpty(): boolean; ast: unknown };
+  };
 }): unknown {
   if (!this.defaultScopes?.some((s) => s.allQueries)) return undefined;
-  const defaultWhereClause = this.defaultScoped(undefined, { allQueries: true })._whereClause;
+  const defaultWhereClause = this.defaultScoped({ allQueries: true })._whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 

@@ -37,17 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "build_default_constraint",
-    "call": "default_scoped",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{allQueries=bool:true}"
-    ],
-    "reason": "TypeScript cannot omit a leading optional positional to pass only kwargs: Rails' `default_scoped(scope = relation, all_queries: nil)` (scoping/named.rb:45) is called here as `default_scoped(all_queries: true)`, so the port must spell the `scope` slot as `undefined` before the trailing kwargs object. The kwarg key and value match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "destroy",
     "call": "readonly?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

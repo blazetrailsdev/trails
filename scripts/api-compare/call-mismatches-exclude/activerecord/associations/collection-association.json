@@ -11,13 +11,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
-    "rubyName": "remove_records",
-    "call": "catch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
     "rubyName": "replace",
     "call": "replace_records",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -48,13 +41,6 @@
       "kwargs{replace=bool:true}"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "replace_on_target",
-    "call": "catch",
-    "reason": "Ruby `catch(:abort) { callback(:before_add, record) }` (collection_association.rb:463-465): the abort catch lives inside trails' shared `callback` dispatcher, which converts the thrown abort sentinel into a `false` return — the same split already baselined for `remove_records`."
   },
   {
     "package": "activerecord",
