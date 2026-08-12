@@ -540,12 +540,12 @@ export class SchemaCache {
   }
 
   async addAll(pool: unknown): Promise<void> {
-    await withConnection(pool, async (connection) => {
-      const tables = await this.tablesToCache(connection);
+    await withConnection(pool, async () => {
+      const tables = await this.tablesToCache(pool);
       for (const table of tables) {
-        await this.add(connection, table);
+        await this.add(pool, table);
       }
-      await this.version(connection);
+      await this.version(pool);
     });
   }
 
@@ -651,7 +651,7 @@ export class SchemaCache {
     return withConnection(pool, async (connection) => {
       if (typeof connection.dataSources === "function") {
         const tables = (await connection.dataSources()) as string[];
-        return tables.filter((t) => !this.isIgnoredTable(t));
+        return tables.filter((table) => !this.isIgnoredTable(table));
       }
       return [];
     });
@@ -941,10 +941,10 @@ export class BoundSchemaReflection {
   private _pool: unknown;
 
   static forLoneConnection(
-    schemaReflection: SchemaReflection,
+    abstractSchemaReflection: SchemaReflection,
     connection: unknown,
   ): BoundSchemaReflection {
-    return new BoundSchemaReflection(schemaReflection, new FakePool(connection));
+    return new BoundSchemaReflection(abstractSchemaReflection, new FakePool(connection));
   }
 
   constructor(schemaReflection: SchemaReflection, pool: unknown) {
@@ -1053,7 +1053,7 @@ export class FakePool {
  * @internal
  */
 export function deepDeduplicate<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((v) => deepDeduplicate(v)) as unknown as T;
+  if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
   if (value !== null && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {

@@ -185,8 +185,7 @@ export class ConnectionHandler {
       adapterFactory: options.adapterFactory,
     });
 
-    const poolKey = poolConfig.connectionDescriptor.name;
-    const poolManager = this.setPoolManager(poolKey);
+    const poolManager = this.setPoolManager(poolConfig.connectionDescriptor);
 
     const existingPoolConfig = poolManager.getPoolConfig(role, shard);
 
@@ -210,7 +209,7 @@ export class ConnectionHandler {
     poolManager.setPoolConfig(role, shard, poolConfig);
 
     const payload = {
-      connection_name: poolKey,
+      connection_name: poolConfig.connectionDescriptor.name,
       role,
       shard,
       config: poolConfig.dbConfig.configuration,
@@ -363,11 +362,11 @@ export class ConnectionHandler {
   }
 
   /** @internal */
-  private setPoolManager(connectionName: string): PoolManager {
-    let manager = this._connectionNameToPoolManager.get(connectionName);
+  private setPoolManager(connectionDescriptor: ConnectionDescriptor): PoolManager {
+    let manager = this._connectionNameToPoolManager.get(connectionDescriptor.name);
     if (!manager) {
       manager = new PoolManager();
-      this._connectionNameToPoolManager.set(connectionName, manager);
+      this._connectionNameToPoolManager.set(connectionDescriptor.name, manager);
     }
     return manager;
   }

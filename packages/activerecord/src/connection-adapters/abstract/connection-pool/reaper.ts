@@ -36,8 +36,8 @@ export class Reaper {
   }
 
   run(): void {
-    if (!this._frequency || this._frequency <= 0) return;
-    Reaper.registerPool(this._pool, this._frequency);
+    if (!this.frequency || this.frequency <= 0) return;
+    Reaper.registerPool(this.pool, this.frequency);
   }
 
   // --- Class-level registry (mirrors Rails @mutex/@pools/@threads) ---

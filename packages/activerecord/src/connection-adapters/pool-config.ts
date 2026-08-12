@@ -60,8 +60,8 @@ export class PoolConfig {
       // missing config leaves the cache path null, which is what
       // SchemaReflection treats as "no persistent cache on disk"
       // (possibleCacheAvailable → false).
-      const cachePath = this._lazySchemaCachePath();
-      this._schemaReflection = new SchemaReflection(cachePath);
+      const lazySchemaCachePath = this._lazySchemaCachePath();
+      this._schemaReflection = new SchemaReflection(lazySchemaCachePath);
     }
     return this._schemaReflection;
   }

@@ -456,17 +456,21 @@ export class Transaction {
     const recs = this.records;
     if (recs) {
       const ite = this.uniqueRecords();
-      const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
+      const instancesToRunCallbacksOn = this.prepareInstancesToRunCallbacksOn(ite);
 
       try {
-        await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
-          if (typeof (record as any).rolledbackBang === "function") {
-            await (record as any).rolledbackBang({
-              forceRestoreState: this.isFullRollback(),
-              shouldRunCallbacks,
-            });
-          }
-        });
+        await this.runActionOnRecords(
+          ite,
+          instancesToRunCallbacksOn,
+          async (record, shouldRunCallbacks) => {
+            if (typeof (record as any).rolledbackBang === "function") {
+              await (record as any).rolledbackBang({
+                forceRestoreState: this.isFullRollback(),
+                shouldRunCallbacks,
+              });
+            }
+          },
+        );
       } finally {
         for (const i of ite) {
           if (typeof (i as any).rolledbackBang === "function") {
@@ -518,14 +522,18 @@ export class Transaction {
       const ite = this.uniqueRecords();
 
       if (this._runCommitCallbacks) {
-        const instanceMap = this.prepareInstancesToRunCallbacksOn(ite);
+        const instancesToRunCallbacksOn = this.prepareInstancesToRunCallbacksOn(ite);
 
         try {
-          await this.runActionOnRecords(ite, instanceMap, async (record, shouldRunCallbacks) => {
-            if (typeof (record as any).committedBang === "function") {
-              await (record as any).committedBang({ shouldRunCallbacks });
-            }
-          });
+          await this.runActionOnRecords(
+            ite,
+            instancesToRunCallbacksOn,
+            async (record, shouldRunCallbacks) => {
+              if (typeof (record as any).committedBang === "function") {
+                await (record as any).committedBang({ shouldRunCallbacks });
+              }
+            },
+          );
         } finally {
           for (const i of ite) {
             if (typeof (i as any).committedBang === "function") {
