@@ -7,6 +7,7 @@ import "./cache/null-store.js";
 import "./cache/file-store.js";
 import { lookupStoreClass } from "./cache/store-registry.js";
 import type { CacheStore } from "./cache/index.js";
+import { getFormatVersion } from "./cache/format-version-slot.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
@@ -23,18 +24,13 @@ class RuntimeError extends Error {
   }
 }
 
-/** Mirrors Rails `@format_version = 7.0` (cache.rb:55). */
-let _formatVersion = 7.0;
-
 /** Mirrors Rails `ActiveSupport::Cache.format_version` (cache.rb:58). */
 export function formatVersion(): number {
-  return _formatVersion;
+  return getFormatVersion();
 }
 
 /** Mirrors Rails `ActiveSupport::Cache.format_version=` (cache.rb:58). */
-export function setFormatVersion(value: number): void {
-  _formatVersion = value;
-}
+export { setFormatVersion } from "./cache/format-version-slot.js";
 
 /**
  * Creates a new Store object according to the given options. A Ruby Symbol is

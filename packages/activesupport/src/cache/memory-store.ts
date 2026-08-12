@@ -1,7 +1,7 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
-import { Store } from "./store.js";
+import { Store, type StoreOptions } from "./store.js";
 import { integer } from "./integer.js";
 import { registerStoreClass } from "./store-registry.js";
 
@@ -29,9 +29,10 @@ export class MemoryStore extends Store implements CacheStore {
   }
 
   // Rails stores the `serialize_entry` payload itself (`@data[key] = payload`,
-  // memory_store.rb:213-227), which for this store is a DupCoder-dumped `Entry`,
-  // and keeps the LRU order in the Hash — re-inserted on read (:204-208).
-  private data: Map<string, Entry> = new Map();
+  // memory_store.rb:213-227), which is a DupCoder-dumped `Entry` by default and
+  // a serializer's dumped string when the caller names one, and keeps the LRU
+  // order in the Hash — re-inserted on read (:204-208).
+  private data: Map<string, Entry | string> = new Map();
   private maxSize: number;
   private maxPruneTime: number;
   private cacheSize: number;
@@ -45,18 +46,29 @@ export class MemoryStore extends Store implements CacheStore {
     compress?: boolean;
     compressThreshold?: number;
     coder?: unknown;
+    serializer?: unknown;
   }) {
     // Rails installs DupCoder and disables compression by default
-    // (memory_store.rb:73-77).
-    super({ coder: DupCoder, compress: false, ...(options ?? {}) });
+    // (memory_store.rb:73-77); the coder is skipped when the caller named a
+    // `:coder` or a `:serializer` of their own.
+    const opts: StoreOptions = { ...(options ?? {}) };
+    if (!("coder" in opts) && !("serializer" in opts)) opts.coder = DupCoder;
+    if (!opts.compress) opts.compress = false;
+    super(opts);
     this.maxSize = options?.size ?? 32 * 1024 * 1024;
     this.maxPruneTime = options?.maxPruneTime ?? 2;
     this.cacheSize = 0;
   }
 
-  // Mirrors Rails MemoryStore#cached_size (memory_store.rb:198-200).
-  private cachedSize(key: string, payload: Entry): number {
-    return UTF8.encode(String(key)).length + payload.bytesize() + PER_ENTRY_OVERHEAD;
+  // Mirrors Rails MemoryStore#cached_size (memory_store.rb:198-200). Ruby's
+  // `payload.bytesize` reads the same on a Marshal/serializer String as on a
+  // DupCoder `Entry`; TS has to branch because JS strings have no such method.
+  private cachedSize(key: string, payload: Entry | string): number {
+    return (
+      UTF8.encode(String(key)).length +
+      (typeof payload === "string" ? UTF8.encode(payload).length : payload.bytesize()) +
+      PER_ENTRY_OVERHEAD
+    );
   }
 
   // Abstract entry hooks of the instrumented Store base, backed by the Map. The
@@ -73,12 +85,16 @@ export class MemoryStore extends Store implements CacheStore {
   }
 
   protected writeEntry(key: string, entry: Entry, options: Record<string, unknown>): boolean {
-    const payload = this.serializeEntry(entry, options) as Entry;
+    const payload = this.serializeEntry(entry, options) as Entry | string;
     if (options.unlessExist && this.exist(key, { namespace: null })) return false;
 
     const oldPayload = this.data.get(key);
     if (oldPayload !== undefined) {
-      this.cacheSize -= oldPayload.bytesize() - payload.bytesize();
+      // Ruby `old_payload.bytesize - payload.bytesize` (memory_store.rb:216)
+      // duck-types over String and Entry; JS strings have no `bytesize`.
+      this.cacheSize -=
+        (typeof oldPayload === "string" ? UTF8.encode(oldPayload).length : oldPayload.bytesize()) -
+        (typeof payload === "string" ? UTF8.encode(payload).length : payload.bytesize());
     } else {
       this.cacheSize += this.cachedSize(key, payload);
     }
