@@ -1543,17 +1543,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * record.new_record?` (:476) is what records a *persisted* record here, so a
    * later `<<`/`push` of the same record replaces in place rather than
    * appending a duplicate; and because `@_was_loaded` is forced true there we
-   * always append to `@target` — loaded or not. A subsequent real `load()` merges this in-memory record by primary key
-   * (the trails analog of `merge_target_lists`), so the early append is not
-   * double-counted.
+   * always append to `@target` — loaded or not. A subsequent real `load()`
+   * merges this in-memory record by primary key (the trails analog of
+   * `merge_target_lists`), so the early append is not double-counted.
    *
    * This is the single write entry point for inverse has_many targets. The C2
    * (#2591) seam, which used to reach into `proxy._replacedOrAddedTargets` from
    * `associations.ts`, is now internal here. `set_inverse_instance(record)` is
    * deliberately NOT re-invoked (see `_replaceOnTarget`'s `inversing` guard):
    * the reciprocal (record → owner) side is established by the caller in
-   * `associations.ts`, and re-wiring here would recurse. The seeded record lands in `_target`, which `Base#_associationCache`
-   * surfaces to readers (this proxy is the canonical has_many store).
+   * `associations.ts`, and re-wiring here would recurse. The seeded record
+   * lands in `_target`, which `Base#_associationCache` surfaces to readers
+   * (this proxy is the canonical has_many store).
    * @internal
    */
   _wireInverseTarget(record: T): void {
