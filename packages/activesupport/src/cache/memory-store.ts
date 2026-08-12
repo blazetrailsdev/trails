@@ -5,15 +5,10 @@ import { Store } from "./store.js";
 import { integer } from "./integer.js";
 import { registerStoreClass } from "./store-registry.js";
 
-// In-memory record backing a single key. Rails stores the `serialize_entry`
-// payload itself (`@data[key] = payload`, memory_store.rb:213-227), which for
-// this store is a DupCoder-dumped `Entry`; `expiresAt` mirrors it for the
-// `unless_exist` check and `accessedAt` drives LRU pruning.
-interface MemoryRecord {
-  payload: Entry;
-  expiresAt: number | null;
-  accessedAt: number;
-}
+const PER_ENTRY_OVERHEAD = 240;
+
+// Ruby `String#bytesize`; JS strings are UTF-16, so the UTF-8 length is encoded.
+const UTF8 = new TextEncoder();
 
 // Mirrors Ruby `#to_i`: Integer/Float truncate toward zero, a String yields its
 // leading integer (0 when none), and anything else is 0.
@@ -33,78 +28,75 @@ export class MemoryStore extends Store implements CacheStore {
     return true;
   }
 
-  private data: Map<string, MemoryRecord> = new Map();
-  private sizeLimit: number;
+  // Rails stores the `serialize_entry` payload itself (`@data[key] = payload`,
+  // memory_store.rb:213-227), which for this store is a DupCoder-dumped `Entry`,
+  // and keeps the LRU order in the Hash — re-inserted on read (:204-208).
+  private data: Map<string, Entry> = new Map();
+  private maxSize: number;
+  private maxPruneTime: number;
+  private cacheSize: number;
   private _pruning = false;
 
   constructor(options?: {
-    sizeLimit?: number;
+    size?: number;
+    maxPruneTime?: number;
     namespace?: string | (() => string);
     expiresIn?: number;
     compress?: boolean;
     compressThreshold?: number;
+    coder?: unknown;
   }) {
-    super(options ?? {});
-    this.sizeLimit = options?.sizeLimit ?? Infinity;
+    // Rails installs DupCoder and disables compression by default
+    // (memory_store.rb:73-77).
+    super({ coder: DupCoder, compress: false, ...(options ?? {}) });
+    this.maxSize = options?.size ?? 32 * 1024 * 1024;
+    this.maxPruneTime = options?.maxPruneTime ?? 2;
+    this.cacheSize = 0;
+  }
+
+  // Mirrors Rails MemoryStore#cached_size (memory_store.rb:198-200).
+  private cachedSize(key: string, payload: Entry): number {
+    return UTF8.encode(String(key)).length + payload.bytesize() + PER_ENTRY_OVERHEAD;
   }
 
   // Abstract entry hooks of the instrumented Store base, backed by the Map. The
   // public read/write/delete/exist?/fetch/*_multi methods are inherited.
+  // Mirrors Rails MemoryStore#read_entry (memory_store.rb:202-212): re-inserting
+  // the payload makes the Map's iteration order the LRU order Rails gets from
+  // Ruby's insertion-ordered Hash.
   protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
-    const rec = this.data.get(key);
-    if (!rec) return null;
-    rec.accessedAt = Date.now();
-    return this.deserializeEntry(rec.payload);
+    const payload = this.data.get(key);
+    if (payload === undefined) return null;
+    this.data.delete(key);
+    this.data.set(key, payload);
+    return this.deserializeEntry(payload);
   }
 
   protected writeEntry(key: string, entry: Entry, options: Record<string, unknown>): boolean {
-    const payload = this.serializeEntry(entry, options);
-    if (options.unlessExist) {
-      const existing = this.data.get(key);
-      if (existing && !this.recordExpired(existing)) return false;
+    const payload = this.serializeEntry(entry, options) as Entry;
+    if (options.unlessExist && this.exist(key, { namespace: null })) return false;
+
+    const oldPayload = this.data.get(key);
+    if (oldPayload !== undefined) {
+      this.cacheSize -= oldPayload.bytesize() - payload.bytesize();
+    } else {
+      this.cacheSize += this.cachedSize(key, payload);
     }
-    this.data.set(key, {
-      payload,
-      expiresAt: entry.expiresAt,
-      accessedAt: Date.now(),
-    });
-    if (this.data.size > this.sizeLimit) this.evictLRU();
+    this.data.set(key, payload);
+    if (this.cacheSize > this.maxSize) this.prune(this.maxSize * 0.75, this.maxPruneTime);
     return true;
   }
 
-  /**
-   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
-   * coder's `dump_compressed` under `compress`, else `dump`. Rails installs the
-   * coder in `MemoryStore#initialize` (`options[:coder] = DupCoder`,
-   * memory_store.rb:73-75) and holds it in `@coder` on the base; trails' `Store`
-   * has no `@coder` seam yet (RFC 0101 story
-   * `converge-store-serialized-entry-hooks-and-file-store-paths` ports it), so
-   * this store names the coder Rails installs for it directly until that lands.
-   */
-  private serializeEntry(entry: Entry, options: Record<string, unknown>): Entry {
-    options = this.mergedOptions(options as CacheOptions) as Record<string, unknown>;
-    if (options.compress) {
-      return DupCoder.dumpCompressed(entry, (options.compressThreshold as number) ?? 1024);
-    } else {
-      return DupCoder.dump(entry);
-    }
-  }
-
-  /** Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819). */
-  private deserializeEntry(payload: Entry | null): Entry | null {
-    return payload === null ? null : DupCoder.load(payload);
-  }
-
   protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {
-    return this.data.delete(key);
-  }
-
-  private recordExpired(rec: MemoryRecord): boolean {
-    return rec.expiresAt !== null && rec.expiresAt <= Date.now();
+    const payload = this.data.get(key);
+    this.data.delete(key);
+    if (payload !== undefined) this.cacheSize -= this.cachedSize(key, payload);
+    return payload !== undefined;
   }
 
   override clear(): void {
     this.data.clear();
+    this.cacheSize = 0;
   }
 
   // Mirrors Rails MemoryStore#cleanup (memory_store.rb): instrumented, deletes
@@ -112,8 +104,9 @@ export class MemoryStore extends Store implements CacheStore {
   override cleanup(options?: CacheOptions): void {
     options = this.mergedOptions(options);
     this.instrument("cleanup", null, { size: this.data.size }, () => {
-      for (const [key, rec] of this.data) {
-        if (this.recordExpired(rec)) this.deleteEntry(key, options);
+      for (const key of [...this.data.keys()]) {
+        const entry = this.deserializeEntry(this.data.get(key));
+        if (entry && entry.isExpired()) this.deleteEntry(key, options);
       }
     });
   }
@@ -188,14 +181,17 @@ export class MemoryStore extends Store implements CacheStore {
     try {
       const startTime = Date.now();
       this.cleanup();
-      const sorted = [...this.data.entries()].sort((a, b) => a[1].accessedAt - b[1].accessedAt);
-      let freed = 0;
-      for (const [key] of sorted) {
-        if (freed >= targetSize) break;
-        if (maxTime != null && Date.now() - startTime > maxTime * 1000) break;
-        this.data.delete(key);
-        freed++;
-      }
+      this.instrument("prune", targetSize, { from: this.cacheSize }, () => {
+        for (const key of [...this.data.keys()]) {
+          this.deleteEntry(key, {});
+          if (
+            this.cacheSize <= targetSize ||
+            (maxTime != null && (Date.now() - startTime) / 1000 > maxTime)
+          ) {
+            return;
+          }
+        }
+      });
     } finally {
       this._pruning = false;
     }
@@ -204,16 +200,6 @@ export class MemoryStore extends Store implements CacheStore {
   /** Returns true if the cache is currently being pruned (memory_store.rb:129-131). */
   isPruning(): boolean {
     return this._pruning;
-  }
-
-  private evictLRU(): void {
-    let oldest: [string, MemoryRecord] | null = null;
-    for (const entry of this.data.entries()) {
-      if (!oldest || entry[1].accessedAt < oldest[1].accessedAt) {
-        oldest = entry;
-      }
-    }
-    if (oldest) this.data.delete(oldest[0]);
   }
 }
 

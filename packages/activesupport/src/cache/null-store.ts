@@ -30,12 +30,24 @@ export class NullStore extends Store implements CacheStore {
 
   override deleteMatched(_pattern: string | RegExp): void {}
 
-  protected readEntry(_key: string, _options: Record<string, unknown>): Entry | null {
+  // Mirrors Rails NullStore#read_entry (null_store.rb:41-43): the serialized
+  // read always misses, so the deserialization always yields nil.
+  protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
+    return this.deserializeEntry(this.readSerializedEntry(key));
+  }
+
+  protected readSerializedEntry(_key: string): unknown {
     return null;
   }
-  protected writeEntry(_key: string, _entry: Entry, _options: Record<string, unknown>): boolean {
+
+  protected writeEntry(key: string, entry: Entry, _options: Record<string, unknown>): boolean {
+    return this.writeSerializedEntry(key, this.serializeEntry(entry));
+  }
+
+  protected writeSerializedEntry(_key: string, _payload: unknown): boolean {
     return true;
   }
+
   protected deleteEntry(_key: string, _options: Record<string, unknown>): boolean {
     return false;
   }

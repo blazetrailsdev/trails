@@ -67,15 +67,15 @@ describe("MemoryStore serialization", () => {
     const store = new MemoryStore({ compress: true, compressThreshold: 1 });
     const value = "a".repeat(2000);
     store.write("foo", value);
-    const data = (store as unknown as { data: Map<string, { payload: Entry }> }).data;
-    expect(data.get("foo")!.payload.isCompressed()).toBe(true);
+    const data = (store as unknown as { data: Map<string, Entry> }).data;
+    expect(data.get("foo")!.isCompressed()).toBe(true);
     expect(store.read("foo")).toBe(value);
   });
 
   it("stores uncompressed by default", () => {
     const store = new MemoryStore();
     store.write("foo", "a".repeat(2000));
-    const data = (store as unknown as { data: Map<string, { payload: Entry }> }).data;
-    expect(data.get("foo")!.payload.isCompressed()).toBe(false);
+    const data = (store as unknown as { data: Map<string, Entry> }).data;
+    expect(data.get("foo")!.isCompressed()).toBe(false);
   });
 });

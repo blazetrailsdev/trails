@@ -1,262 +1,107 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
-import { Coder, coder } from "./coder.js";
-import { deflate, inflate } from "../gzip.js";
-import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
 import { Store, type StoreOptions } from "./store.js";
 import { integer } from "./integer.js";
-import { type CacheEntry, isExpired } from "./entry-record.js";
+import { hexdigest } from "../hexdigest.js";
 import { registerStoreClass } from "./store-registry.js";
 
-const FILENAME_MAX_SIZE = 228;
+// max filename size on file system is 255, minus room for timestamp, pid, and
+// random characters appended by Tempfile (file_store.rb:16)
+const FILENAME_MAX_SIZE = 226;
+// max is 1024, plus some room (file_store.rb:17)
+const FILEPATH_MAX_SIZE = 900;
+const GITKEEP_FILES = [".gitkeep", ".keep"];
 
-// Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45).
-const DEFAULT_COMPRESS_LIMIT = 1024;
+// Ruby `DIR_FORMATTER = "%03X"` (file_store.rb:15).
+function dirFormatter(dir: number): string {
+  return dir.toString(16).toUpperCase().padStart(3, "0");
+}
 
-// The coder Rails' `Store#initialize` builds when none is given:
-// `Cache::Coder.new(serializer, compressor)` (cache.rb:301-309).
-const fileCoder = new Coder(coder, { deflate, inflate });
+const UTF8 = new TextEncoder();
+
+/**
+ * Ruby `Zlib.adler32`. Ruby's zlib is a stdlib C extension with no trails
+ * counterpart, and the digest picks the cache's shard directories, so it has to
+ * be the same function.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (Zlib), not Rails, so no Ruby file
+ * maps onto it; named for the method `normalize_key` calls at file_store.rb:167.
+ */
+function adler32(data: string): number {
+  let a = 1;
+  let b = 0;
+  for (const byte of UTF8.encode(data)) {
+    a = (a + byte) % 65521;
+    b = (b + a) % 65521;
+  }
+  return b * 0x10000 + a;
+}
+
+/**
+ * Ruby `URI.encode_www_form_component`: everything but `*-._` and alphanumerics
+ * is percent-encoded and a space becomes `+`. `encodeURIComponent` also leaves
+ * `!~'()` unescaped, so those are escaped here.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (URI), not Rails, so no Ruby file
+ * maps onto it; named for the method `normalize_key` calls at file_store.rb:160.
+ */
+function encodeWwwFormComponent(str: string): string {
+  return encodeURIComponent(str)
+    .replace(/[!'()~]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%20/g, "+");
+}
+
+/**
+ * Ruby `URI.decode_www_form_component`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (URI), not Rails, so no Ruby file
+ * maps onto it; named for the method `file_path_key` calls at file_store.rb:186.
+ */
+function decodeWwwFormComponent(str: string): string {
+  return decodeURIComponent(str.replace(/\+/g, " "));
+}
 
 export class FileStore extends Store implements CacheStore {
+  /** Mirrors Rails `attr_reader :cache_path` (file_store.rb:13). */
+  get cachePath(): string {
+    return this._cachePath;
+  }
+
   /** Advertise cache versioning support (file_store.rb:25-28). */
   static supportsCacheVersioning(): boolean {
     return true;
   }
 
-  private cacheDir: string;
+  private _cachePath: string;
 
-  constructor(cacheDir: string, options?: CacheOptions) {
+  constructor(cachePath: string, options?: CacheOptions) {
     super(options ?? {});
-    this.cacheDir = String(cacheDir);
+    this._cachePath = String(cachePath);
   }
 
-  // Abstract entry hooks of the instrumented Store base, backed by on-disk
-  // records. FileStore overrides only these hooks plus the file-layout helpers
-  // (clear/cleanup/deleteMatched/increment/decrement) and inherits the
-  // instrumented base read/write/delete/exist?/fetch/*Multi public methods,
-  // exactly like Rails FileStore (file_store.rb).
-  //
-  // readEntry round-trips the stored expiry and version so base methods (e.g.
-  // the inherited fetch/fetchMulti/readMultiEntries) can apply
-  // isExpired()/isMismatched() like Rails read_entry. A malformed payload
-  // degrades to a miss, mirroring Rails deserialize_entry's rescue (cache.rb).
-  protected readEntry(key: string, _options: StoreOptions): Entry | null {
-    const payload = this.readFile(this.keyToPath(key));
-    if (payload) {
-      const entry = this.deserializeEntry(payload);
-      return entry instanceof Entry ? entry : null;
-    }
-    return null;
-  }
-
-  // The `unless_exist` refusal is Rails' `write_serialized_entry`
-  // (file_store.rb:123-129), whose own port belongs with the FileStore path
-  // helpers; `write_entry` itself is Rails' `serialize_entry` call.
-  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
-    if (options.unlessExist && getFs().existsSync(this.keyToPath(key))) return false;
-    this.writeFile(this.keyToPath(key), this.serializeEntry(entry, options));
-    return true;
-  }
-
-  /**
-   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
-   * coder's `dump_compressed` under `:compress` — Rails' default
-   * (`@options[:compress] = true unless @options.key?(:compress)`, cache.rb:298)
-   * — and to `dump` otherwise. The coder is `Cache::Coder` over the default
-   * serializer and Zlib (cache.rb:301-309), which `Store#initialize` builds and
-   * holds in `@coder`; trails' `Store` has no such seam yet (RFC 0101 story
-   * `converge-store-serialized-entry-hooks-and-file-store-paths`), so this
-   * store builds the same coder meanwhile. The framed payload carries the
-   * value, the compression flag, `expires_at` and `version`; the surrounding
-   * record keeps `expiresAt` beside it for the directory scans `cleanup` and
-   * `deleteMatched` do without deserializing.
-   */
-  private serializeEntry(entry: Entry, options: StoreOptions): CacheEntry {
-    const compress = (options.compress as boolean | undefined) ?? true;
-    const compressThreshold =
-      (options.compressThreshold as number | undefined) ?? DEFAULT_COMPRESS_LIMIT;
-    return {
-      encodedValue: compress
-        ? fileCoder.dumpCompressed(entry, compressThreshold)
-        : fileCoder.dump(entry),
-      expiresAt: entry.expiresAt,
-      version: entry.version,
-      accessedAt: Date.now(),
-    };
-  }
-
-  /**
-   * Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819), including the
-   * `rescue DeserializationError` that degrades a malformed payload to a miss.
-   */
-  private deserializeEntry(payload: CacheEntry | null): Entry | null {
-    if (payload === null || payload.encodedValue === undefined) return null;
-    try {
-      return fileCoder.load(payload.encodedValue) as Entry;
-    } catch (e) {
-      if (e instanceof DeserializationError) return null;
-      throw e;
-    }
-  }
-
-  protected deleteEntry(key: string, _options: StoreOptions): boolean {
-    const filePath = this.keyToPath(key);
-    try {
-      if (getFs().existsSync(filePath)) {
-        getFs().unlinkSync(filePath);
-        this.deleteEmptyDirectories(getPath().dirname(filePath));
-        return true;
-      }
-    } catch {}
-    return false;
-  }
-
-  // Mirrors Rails delete_empty_directories (file_store.rb:194-201): after
-  // unlinking the entry, recursively remove now-empty intermediate directories
-  // up to — but never including — cacheDir.
-  private deleteEmptyDirectories(dir: string): void {
-    // Rails compares File.realpath(dir) == File.realpath(cache_path)
-    // (file_store.rb:195), which resolves symlinks; a lexical path.resolve
-    // would mis-compare when cacheDir or an intermediate dir is symlinked.
-    if (this.realPath(dir) === this.realPath(this.cacheDir)) return;
-    let children: string[];
-    try {
-      children = getFs().readdirSync(dir);
-    } catch {
-      return;
-    }
-    if (children.length > 0) return;
-    // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and we
-    // still recurse toward the parent (file_store.rb:197-199).
-    try {
-      getFs().rmdirSync(dir);
-    } catch {}
-    this.deleteEmptyDirectories(getPath().dirname(dir));
-  }
-
-  // Resolve symlinks like Ruby File.realpath. Adapters without symlink support
-  // (or paths that no longer exist) fall back to a lexical resolve, which keeps
-  // the guard sound for the common no-symlink case.
-  private realPath(dir: string): string {
-    const fs = getFs();
-    if (fs.realpathSync) {
-      try {
-        return fs.realpathSync(dir);
-      } catch {}
-    }
-    return getPath().resolve(dir);
-  }
-
-  private keyToPath(key: string): string {
-    const parts = key.split("/");
-    const safeParts: string[] = [];
-    for (const part of parts) {
-      if (part.length <= FILENAME_MAX_SIZE) {
-        safeParts.push(part);
-      } else {
-        let remaining = part;
-        while (remaining.length > FILENAME_MAX_SIZE) {
-          safeParts.push(remaining.slice(0, FILENAME_MAX_SIZE));
-          remaining = remaining.slice(FILENAME_MAX_SIZE);
-        }
-        safeParts.push(remaining);
-      }
-    }
-    return getPath().join(this.cacheDir, ...safeParts);
-  }
-
-  private readFile(filePath: string): CacheEntry | null {
-    try {
-      if (!getFs().existsSync(filePath)) return null;
-      const data = getFs().readFileSync(filePath, "utf-8");
-      return JSON.parse(data) as CacheEntry;
-    } catch {
-      return null;
-    }
-  }
-
-  private writeFile(filePath: string, entry: CacheEntry): void {
-    const dir = getPath().dirname(filePath);
-    getFs().mkdirSync(dir, { recursive: true });
-    getFs().writeFileSync(filePath, JSON.stringify(entry), "utf-8");
-  }
-
+  // Mirrors Rails FileStore#clear (file_store.rb:33-36): deletes everything in
+  // the cache directory except .keep / .gitkeep, swallowing ENOENT/ENOTEMPTY.
   override clear(): void {
-    if (!getFs().existsSync(this.cacheDir)) return;
-    this.clearDir(this.cacheDir, true);
-  }
-
-  private clearDir(dir: string, isRoot: boolean): void {
     try {
-      const entries = getFs().readdirSync(dir);
-      for (const entry of entries) {
-        if (isRoot && (entry === ".gitkeep" || entry === ".keep")) continue;
-        const fullPath = getPath().join(dir, entry);
-        const stat = getFs().statSync(fullPath);
-        if (stat.isDirectory()) {
-          this.clearDir(fullPath, false);
-          try {
-            getFs().rmdirSync(fullPath);
-          } catch {}
-        } else {
-          try {
-            getFs().unlinkSync(fullPath);
-          } catch {}
-        }
+      const rootDirs = getFs()
+        .readdirSync(this.cachePath)
+        .filter((f) => !GITKEEP_FILES.includes(f));
+      for (const f of rootDirs) {
+        getFs().rmSync(getPath().join(this.cachePath, f), { recursive: true, force: true });
       }
     } catch {}
   }
 
-  override cleanup(): void {
-    if (!getFs().existsSync(this.cacheDir)) return;
-    this.cleanupDir(this.cacheDir);
-  }
-
-  private cleanupDir(dir: string): void {
-    try {
-      const entries = getFs().readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = getPath().join(dir, entry);
-        try {
-          const stat = getFs().statSync(fullPath);
-          if (stat.isDirectory()) {
-            this.cleanupDir(fullPath);
-          } else {
-            const data = this.readFile(fullPath);
-            if (data && isExpired(data)) {
-              getFs().unlinkSync(fullPath);
-            }
-          }
-        } catch {}
-      }
-    } catch {}
-  }
-
-  override deleteMatched(pattern: string | RegExp): void {
-    if (!getFs().existsSync(this.cacheDir)) return;
-    const re = typeof pattern === "string" ? new RegExp(pattern) : pattern;
-    this.deleteMatchedInDir(this.cacheDir, re);
-  }
-
-  private deleteMatchedInDir(dir: string, re: RegExp): void {
-    try {
-      const entries = getFs().readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = getPath().join(dir, entry);
-        try {
-          const stat = getFs().statSync(fullPath);
-          if (stat.isDirectory()) {
-            this.deleteMatchedInDir(fullPath, re);
-          } else {
-            const relPath = fullPath.slice(this.cacheDir.length + 1);
-            if (re.test(relPath)) {
-              getFs().unlinkSync(fullPath);
-            }
-          }
-        } catch {}
-      }
-    } catch {}
+  // Mirrors Rails FileStore#cleanup (file_store.rb:39-45): walks every stored
+  // file and deletes the expired ones. `search_dir` yields file *paths*, which
+  // are exactly what normalizeKey produces, so they feed read/delete_entry.
+  override cleanup(options?: CacheOptions): void {
+    options = this.mergedOptions(options);
+    this.searchDir(this.cachePath, (fname) => {
+      const entry = this.readEntry(fname, options);
+      if (entry && entry.isExpired()) this.deleteEntry(fname, options);
+    });
   }
 
   // Rails FileStore instruments increment/decrement with the normalized key
@@ -277,7 +122,180 @@ export class FileStore extends Store implements CacheStore {
     );
   }
 
-  // Mirrors Rails FileStore#modify_value (file_store.rb:222-241): on a missing,
+  // Mirrors Rails FileStore#delete_matched (file_store.rb:86-95): the matcher is
+  // run through keyMatcher (so a namespaced store scopes the deletion to its own
+  // keys) and compared against the key recovered from each file path.
+  override deleteMatched(matcher: string | RegExp, options?: StoreOptions): void {
+    options = this.mergedOptions(options);
+    if (typeof matcher === "string") matcher = new RegExp(matcher);
+    matcher = this.keyMatcher(matcher, options);
+
+    this.instrument("delete_matched", String(matcher), undefined, () => {
+      this.searchDir(this.cachePath, (path) => {
+        const key = this.filePathKey(path);
+        if (key.match(matcher) !== null) this.deleteEntry(path, options);
+      });
+    });
+  }
+
+  // Mirrors Rails FileStore#read_entry (file_store.rb:114-119): the payload
+  // bytes come back from readSerializedEntry and only a real Entry is returned,
+  // so a stray file in the cache directory degrades to a miss.
+  protected readEntry(key: string, _options: StoreOptions): Entry | null {
+    const payload = this.readSerializedEntry(key);
+    if (payload != null) {
+      const entry = this.deserializeEntry(payload);
+      return entry instanceof Entry ? entry : null;
+    }
+    return null;
+  }
+
+  // Mirrors Rails FileStore#read_serialized_entry (file_store.rb:121-126): a
+  // read failure is logged and treated as a miss.
+  protected readSerializedEntry(key: string): string | null {
+    try {
+      return getFs().existsSync(key) ? getFs().readFileSync(key, "utf-8") : null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Store.logger?.error?.(`FileStoreError (${message}): ${message}`);
+      return null;
+    }
+  }
+
+  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
+    return this.writeSerializedEntry(key, this.serializeEntry(entry, options) as string, options);
+  }
+
+  // Mirrors Rails FileStore#write_serialized_entry (file_store.rb:132-137):
+  // unless_exist refuses the write when the file merely exists, regardless of
+  // expiry. Rails' File.atomic_write has no fs-adapter analogue.
+  protected writeSerializedEntry(key: string, payload: string, options: StoreOptions): boolean {
+    if (options.unlessExist && getFs().existsSync(key)) return false;
+    this.ensureCachePath(getPath().dirname(key));
+    getFs().writeFileSync(key, payload, "utf-8");
+    return true;
+  }
+
+  protected deleteEntry(key: string, _options: StoreOptions): boolean {
+    if (getFs().existsSync(key)) {
+      try {
+        getFs().unlinkSync(key);
+        this.deleteEmptyDirectories(getPath().dirname(key));
+        return true;
+      } catch (error) {
+        // Just in case the error was caused by another process deleting the
+        // file first (file_store.rb:145-147).
+        if (getFs().existsSync(key)) throw error;
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
+
+  // Translate a key into a file path (file_store.rb:158-181).
+  protected override normalizeKey(key: unknown, options?: StoreOptions): string {
+    const normalizedKey = super.normalizeKey(key, options);
+    let fname = encodeWwwFormComponent(normalizedKey);
+
+    if (fname.length > FILEPATH_MAX_SIZE) {
+      fname = hexdigest(normalizedKey);
+    }
+
+    let hash = adler32(fname);
+    const dir1 = hash % 0x1000;
+    hash = Math.floor(hash / 0x1000);
+    const dir2 = hash % 0x1000;
+
+    // Make sure file name doesn't exceed file system limits.
+    let fnamePaths: string[];
+    if (fname.length < FILENAME_MAX_SIZE) {
+      fnamePaths = [fname];
+    } else {
+      fnamePaths = [];
+      do {
+        fnamePaths.push(fname.slice(0, FILENAME_MAX_SIZE));
+        fname = fname.slice(FILENAME_MAX_SIZE);
+      } while (fname !== "");
+    }
+
+    return getPath().join(this.cachePath, dirFormatter(dir1), dirFormatter(dir2), ...fnamePaths);
+  }
+
+  // Translate a file path into a key (file_store.rb:184-187).
+  protected filePathKey(path: string): string {
+    const sep = getPath().sep;
+    // Ruby `split(File::SEPARATOR, 4).last.delete(File::SEPARATOR)`: the limit
+    // keeps the remainder joined, which the delete then concatenates — JS'
+    // split limit discards it instead, so slice off the first three fields.
+    const fname = path.slice(this.cachePath.length).split(sep).slice(3).join("");
+    return decodeWwwFormComponent(fname);
+  }
+
+  // Mirrors Rails delete_empty_directories (file_store.rb:190-197): after
+  // unlinking the entry, recursively remove now-empty intermediate directories
+  // up to — but never including — cachePath.
+  private deleteEmptyDirectories(dir: string): void {
+    // Rails compares File.realpath(dir) == File.realpath(cache_path)
+    // (file_store.rb:191), which resolves symlinks; a lexical path.resolve
+    // would mis-compare when cachePath or an intermediate dir is symlinked.
+    if (this.realPath(dir) === this.realPath(this.cachePath)) return;
+    let children: string[];
+    try {
+      children = getFs().readdirSync(dir);
+    } catch {
+      return;
+    }
+    if (children.length > 0) return;
+    // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and we
+    // still recurse toward the parent (file_store.rb:193-195).
+    try {
+      getFs().rmdirSync(dir);
+    } catch {}
+    this.deleteEmptyDirectories(getPath().dirname(dir));
+  }
+
+  // Resolve symlinks like Ruby File.realpath. Adapters without symlink support
+  // (or paths that no longer exist) fall back to a lexical resolve, which keeps
+  // the guard sound for the common no-symlink case.
+  private realPath(dir: string): string {
+    const fs = getFs();
+    if (fs.realpathSync) {
+      try {
+        return fs.realpathSync(dir);
+      } catch {}
+    }
+    return getPath().resolve(dir);
+  }
+
+  // Make sure a file path's directories exist (file_store.rb:200-202).
+  protected ensureCachePath(path: string): void {
+    if (!getFs().existsSync(path)) getFs().mkdirSync(path, { recursive: true });
+  }
+
+  // Mirrors Rails FileStore#search_dir (file_store.rb:204-214): depth-first walk
+  // of the cache directory, yielding every file path.
+  protected searchDir(dir: string, callback: (path: string) => void): void {
+    if (!getFs().existsSync(dir)) return;
+    let children: string[];
+    try {
+      children = getFs().readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const d of children) {
+      const name = getPath().join(dir, d);
+      try {
+        if (getFs().statSync(name).isDirectory()) {
+          this.searchDir(name, callback);
+        } else {
+          callback(name);
+        }
+      } catch {}
+    }
+  }
+
+  // Mirrors Rails FileStore#modify_value (file_store.rb:218-241): on a missing,
   // expired, or version-mismatched entry it *creates* the key set to amount
   // through the instrumented write path and returns amount (so
   // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving

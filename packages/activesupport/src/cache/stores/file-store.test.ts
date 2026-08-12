@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { FileStore } from "../file-store.js";
+// Rails reaches the private path helper with `@cache.send(:normalize_key, key, {})`
+// (file_store_test.rb:63).
+function pathFor(store: FileStore, key: string): string {
+  return (store as unknown as { normalizeKey(k: string, o: object): string }).normalizeKey(key, {});
+}
+
 describe("FileStoreTest", () => {
   let cacheDir: string;
   let store: FileStore;
@@ -68,10 +74,11 @@ describe("FileStoreTest", () => {
   });
 
   it("delete prunes empty parent directories", () => {
+    const entryDir = dirname(pathFor(store, "a/b"));
     store.write("a/b", "val");
-    expect(existsSync(join(cacheDir, "a"))).toBe(true);
+    expect(existsSync(entryDir)).toBe(true);
     store.delete("a/b");
-    expect(existsSync(join(cacheDir, "a"))).toBe(false);
+    expect(existsSync(entryDir)).toBe(false);
     expect(existsSync(cacheDir)).toBe(true);
   });
 
@@ -85,10 +92,11 @@ describe("FileStoreTest", () => {
     symlinkSync(realRoot, linkRoot, "dir");
     try {
       const linkStore = new FileStore(linkRoot, { expiresIn: 60 });
+      const entryDir = dirname(pathFor(linkStore, "a/b"));
       linkStore.write("a/b", "val");
-      expect(existsSync(join(linkRoot, "a"))).toBe(true);
+      expect(existsSync(entryDir)).toBe(true);
       linkStore.delete("a/b");
-      expect(existsSync(join(linkRoot, "a"))).toBe(false);
+      expect(existsSync(entryDir)).toBe(false);
       // The real cache dir (reached through the symlink) survives the recursion.
       expect(existsSync(realRoot)).toBe(true);
       expect(existsSync(linkRoot)).toBe(true);

@@ -5,10 +5,8 @@ import type { Entry } from "./entry.js";
 // Mirrors Rails' `cache.instance_variable_get(:@data)["tester:foo"].value`
 // peek at the raw namespaced key.
 function rawValue(cache: MemoryStore, key: string): unknown {
-  const data = (cache as unknown as { data: Map<string, { payload: Entry }> }).data;
-  const rec = data.get(key);
-  if (!rec) return undefined;
-  return rec.payload.value;
+  const data = (cache as unknown as { data: Map<string, Entry> }).data;
+  return data.get(key)?.value;
 }
 
 describe("CacheStoreNamespaceTest", () => {

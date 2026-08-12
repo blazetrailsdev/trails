@@ -5,26 +5,5 @@
     "rubyName": "initialize",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/memory-store.ts",
-    "rubyName": "read_entry",
-    "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/memory-store.ts",
-    "rubyName": "write_entry",
-    "call": "exist?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/memory-store.ts",
-    "rubyName": "write_entry",
-    "call": "prune",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

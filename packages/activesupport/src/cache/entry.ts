@@ -17,7 +17,7 @@ export class Entry {
     // A nil value is popped from #pack's trailing nils, so members[0] is absent
     // (undefined) here; normalize to null to mirror Ruby's `members[0]` nil and
     // stay consistent with the `?? null` already applied to the other members.
-    return new Entry(members[0] ?? null, {
+    return new Entry(members.length > 0 ? members[0] : null, {
       expiresAt: (members[1] as number | null) ?? null,
       version: (members[2] as string | null) ?? null,
     });
@@ -122,7 +122,9 @@ export class Entry {
   // with trailing nils popped.
   pack(): unknown[] {
     const members: unknown[] = [this.value, this.expiresAt, this.version];
-    while (members.length > 0 && members[members.length - 1] == null) {
+    // Ruby nil is `null` in trails; a stored `undefined` is a distinct JS value
+    // the coder round-trips, so `=== null` (not `== null`) keeps it packed.
+    while (members.length > 0 && members[members.length - 1] === null) {
       members.pop();
     }
     return members;
