@@ -2886,9 +2886,11 @@ function ensureAbstractAdapterMixinsApplied(): void {
   // `update`/`delete`/`insert`/`create`; trails wires one layer lower, on
   // `execUpdate`/`execDelete`/`execInsert`/`execInsertAll`, because that is the
   // single funnel every logical write shares. Two distinct update paths converge
-  // there: the model save path (`_performUpdate`/`_destroyRow` in base.ts) calls
+  // there: the model save path (`_updateRecord` in persistence.ts, `_destroyRow`
+  // in base.ts) calls
   // `execUpdate`/`execDelete` DIRECTLY, bypassing the public `update`/`delete`
-  // entirely, while `update_all`/`updateColumns` (persistence.ts `_updateRecord`)
+  // entirely, while `update_all`/`updateColumns` (the ClassMethods
+  // `_updateRecord` in persistence.ts)
   // go through the public `update`/`delete` — which themselves call
   // `execUpdate`/`execDelete`. Wiring the public methods would miss the direct
   // save path; wiring the low-level method catches both, exactly once each. The

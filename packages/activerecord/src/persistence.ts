@@ -40,7 +40,12 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 import { threadedConnectionFor, withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
-import { attributesForCreate, attributesForUpdate, attributesWithValues } from "./attribute-methods.js";
+import {
+  attributesForCreate,
+  attributesForUpdate,
+  attributesWithValues,
+} from "./attribute-methods.js";
+import { attributeNamesForPartialUpdates } from "./attribute-methods/dirty.js";
 import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isSuppressed } from "./suppressor.js";
@@ -2004,10 +2009,9 @@ async function instanceUpdateRecord(
 
   const table = ctor.arelTable;
 
-  // With partial_writes=false Rails includes all columns; with it on, only dirty ones.
-  let attributeNames = ctor.partialUpdates
-    ? Object.keys(this.changes).filter((key: string) => ctor._attributeDefinitions.has(key))
-    : ctor.attributeNames().filter((key: string) => ctor._attributeDefinitions.has(key));
+  // Rails AttributeMethods::Dirty#_update_record's default argument
+  // (dirty.rb:233) — with partial_updates off it is every attribute name.
+  let attributeNames = attributeNamesForPartialUpdates.call(this as any);
   attributeNames = attributesForUpdate.call(this as any, attributeNames);
 
   // Mirrors Rails _update_record's `if attribute_names.empty?` branch: no
@@ -2029,7 +2033,7 @@ async function instanceUpdateRecord(
     let lockWhereValue: unknown;
     if (ctor.lockingEnabled) {
       const rawVersion = this.readAttribute(lockCol);
-      const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
+      const currentVersion = rawVersion == null ? 0 : Number(rawVersion);
       // Mirrors Rails _lock_value_for_database:
       // - User explicitly changed lock_version (e.g. person.lock_version = 42):
       //   use valueForDatabase so WHERE = 42. DB has 0 → StaleObjectError.
@@ -2066,7 +2070,7 @@ async function instanceUpdateRecord(
       if (lockWhereValue == null) {
         um.where(table.get(lockCol).eq(null));
       } else {
-        um.where(table.get(lockCol).eq(Number(lockWhereValue) || 0));
+        um.where(table.get(lockCol).eq(lockWhereValue));
       }
     }
     applyDefaultAndGlobalConstraints(um as any, ctor);
