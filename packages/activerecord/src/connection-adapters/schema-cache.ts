@@ -947,8 +947,8 @@ export class BoundSchemaReflection {
     return new BoundSchemaReflection(abstractSchemaReflection, new FakePool(connection));
   }
 
-  constructor(schemaReflection: SchemaReflection, pool: unknown) {
-    this._schemaReflection = schemaReflection;
+  constructor(abstractSchemaReflection: SchemaReflection, pool: unknown) {
+    this._schemaReflection = abstractSchemaReflection;
     this._pool = pool;
   }
 
