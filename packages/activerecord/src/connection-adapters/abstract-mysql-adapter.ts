@@ -630,8 +630,24 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    *
    * @internal
    */
-  dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
-    return mysqlDataSourceSql.call(this, name, options);
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /**
+   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
+   * callable with the kwargs alone, and TypeScript cannot skip a leading
+   * positional, so the options object may arrive in its place.
+   *
+   * @internal
+   */
+  dataSourceSql(options: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(
+    nameOrOptions?: string | null | { type?: string },
+    options: { type?: string } = {},
+  ): string {
+    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
+    const name = kwargsOnly ? null : nameOrOptions;
+    const opts = kwargsOnly ? nameOrOptions : options;
+    return mysqlDataSourceSql.call(this, name, opts);
   }
 
   async tableComment(tableName: string): Promise<string | null> {

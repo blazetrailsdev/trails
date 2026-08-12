@@ -1288,15 +1288,13 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql(null, { type: "BASE TABLE" }), "SCHEMA")).map(
+    return (await this.queryValues(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")).map(
       String,
     );
   }
 
   async views(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql(null, { type: "VIEW" }), "SCHEMA")).map(
-      String,
-    );
+    return (await this.queryValues(this.dataSourceSql({ type: "VIEW" }), "SCHEMA")).map(String);
   }
 
   async viewExists(viewName: string): Promise<boolean> {
@@ -2499,7 +2497,20 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(_name?: string | null, _options?: { type?: string }): string {
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /**
+   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
+   * callable with the kwargs alone, and TypeScript cannot skip a leading
+   * positional, so the options object may arrive in its place.
+   *
+   * @internal
+   */
+  dataSourceSql(options: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(
+    _nameOrOptions?: string | null | { type?: string },
+    _options?: { type?: string },
+  ): string {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
     throw new NotImplementedError(
       "ActiveRecord::ConnectionAdapters::SchemaStatements#data_source_sql is not implemented",

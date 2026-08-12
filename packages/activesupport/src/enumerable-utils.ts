@@ -2,6 +2,7 @@
  * Enumerable utilities mirroring Rails ActiveSupport enumerable extensions.
  */
 
+import { valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
 /**
@@ -29,17 +30,16 @@ export function indexBy<T, K extends string | number>(
 }
 
 /**
- * Group a collection by a key function.
+ * Group a collection by a key function. The result is a `Map` because Ruby's
+ * `group_by` returns a Hash keyed by VALUE — the keys are arbitrary objects
+ * (Integer, String, nil), which a JS object would collapse by string coercion.
  */
-export function groupBy<T, K extends string | number>(
-  collection: T[],
-  fn: (item: T) => K,
-): Record<K, T[]> {
-  const result = {} as Record<K, T[]>;
+export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> {
+  const result = new Map<K, T[]>();
   for (const item of collection) {
     const key = fn(item);
-    if (!result[key]) result[key] = [];
-    result[key].push(item);
+    if (!result.has(key)) result.set(key, []);
+    result.get(key)!.push(item);
   }
   return result;
 }
@@ -182,7 +182,8 @@ export function eachSlice<T>(collection: T[], n: number): T[][] {
 /**
  * inOrderOf — reorder collection by a series of key values.
  * Elements not in the series are dropped by default (filter: true).
- * With filter: false, unmatched elements are appended at the end in original order.
+ * With filter: false, elements are sorted by their position in the series and
+ * unmatched elements sort last (enumerable.rb:197-203).
  */
 export function inOrderOf<T>(
   collection: T[],
@@ -191,31 +192,17 @@ export function inOrderOf<T>(
   options: { filter?: boolean } = {},
 ): T[] {
   const filter = options.filter !== false;
-  const seriesMap = new Map<unknown, T[]>();
-  for (const key of series) {
-    seriesMap.set(key, []);
+  if (filter) {
+    return valuesAt(groupBy(collection, fn), ...series)
+      .flat(1)
+      .filter((v): v is T => v != null);
+  } else {
+    const position = (v: T): number => {
+      const index = series.indexOf(fn(v));
+      return index === -1 ? series.length : index;
+    };
+    return [...collection].sort((a, b) => position(a) - position(b)).filter((v) => v != null);
   }
-
-  const unmatched: T[] = [];
-  for (const item of collection) {
-    const key = fn(item);
-    if (seriesMap.has(key)) {
-      seriesMap.get(key)!.push(item);
-    } else {
-      unmatched.push(item);
-    }
-  }
-
-  const ordered: T[] = [];
-  for (const key of series) {
-    ordered.push(...(seriesMap.get(key) ?? []));
-  }
-
-  if (!filter) {
-    ordered.push(...unmatched);
-  }
-
-  return ordered;
 }
 
 /**

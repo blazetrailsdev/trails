@@ -18,9 +18,19 @@ export class ArgumentError extends Error {
  * Mirrors Ruby's `Hash#values_at` — the values stored under each of the given
  * keys, in the order given, with `undefined` where a key is absent (Ruby's
  * `nil`, which the callers' `compact` drops).
+ *
+ * A Ruby Hash keys by value, so a `Map` receiver is the faithful shape wherever
+ * the keys are not strings — `group_by(&key).values_at(*series)` over arbitrary
+ * attribute values (core_ext/enumerable.rb:199).
  */
-export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[] {
-  return keys.map((key) => hash[key]);
+export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[];
+export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
+export function valuesAt(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  ...keys: unknown[]
+) {
+  if (hash instanceof Map) return keys.map((key) => hash.get(key));
+  return keys.map((key) => hash[key as string]);
 }
 
 /**

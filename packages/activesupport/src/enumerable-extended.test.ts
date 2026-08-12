@@ -142,8 +142,8 @@ describe("EnumerableTests", () => {
       { type: "a", v: 3 },
     ];
     const grouped = groupBy(items, (x) => x.type);
-    expect(grouped["a"]).toHaveLength(2);
-    expect(grouped["b"]).toHaveLength(1);
+    expect(grouped.get("a")).toHaveLength(2);
+    expect(grouped.get("b")).toHaveLength(1);
   });
 
   it("compact_blank — removes blank values", () => {
@@ -194,6 +194,12 @@ describe("EnumerableTests", () => {
     const values = [pay(5), pay(1), pay(3)];
     const result = inOrderOf(values, (p) => p.price, [1, 5]);
     expect(result.map((p) => p.price)).toEqual([1, 5]);
+  });
+
+  it("in_order_of — keys the series by value, not by string coercion", () => {
+    const items = [{ id: "1" }, { id: 1 }, { id: null }];
+    const result = inOrderOf(items, (x) => x.id, [null, 1, "1"]);
+    expect(result).toEqual([{ id: null }, { id: 1 }, { id: "1" }]);
   });
 
   it("in_order_of — with filter false keeps unmatched elements", () => {

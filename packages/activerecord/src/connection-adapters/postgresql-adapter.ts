@@ -3500,10 +3500,7 @@ export class PostgreSQLAdapter
   }
 
   async foreignTables(): Promise<string[]> {
-    const names = await this.queryValues(
-      this.dataSourceSql(null, { type: "FOREIGN TABLE" }),
-      "SCHEMA",
-    );
+    const names = await this.queryValues(this.dataSourceSql({ type: "FOREIGN TABLE" }), "SCHEMA");
     return names as string[];
   }
 
@@ -3521,8 +3518,24 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options: { type?: string } = {}): string {
-    const scope = this.quotedScope(name, { type: options.type });
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /**
+   * Ruby's `data_source_sql(name = nil, type:)` (schema_statements.rb:1890) is
+   * callable with the kwargs alone, and TypeScript cannot skip a leading
+   * positional, so the options object may arrive in its place.
+   *
+   * @internal
+   */
+  dataSourceSql(options: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(
+    nameOrOptions?: string | null | { type?: string },
+    options: { type?: string } = {},
+  ): string {
+    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
+    const name = kwargsOnly ? null : nameOrOptions;
+    const opts = kwargsOnly ? nameOrOptions : options;
+    const scope = this.quotedScope(name, { type: opts.type });
     const type = scope.type ?? "'r','v','m','p','f'";
     let sql = `SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace`;
     sql += ` WHERE n.nspname = ${scope.schema}`;
