@@ -38,7 +38,7 @@ import {
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import { setCurrentAdapterResolver } from "./type.js";
-import { Table, UpdateManager, DeleteManager, Nodes } from "@blazetrails/arel";
+import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
@@ -868,36 +868,6 @@ interface _ConstructorAssociationWriter {
   writer?: (v: unknown) => void;
   syncWrite?: (v: unknown) => void;
   syncIdsWrite?: (v: unknown[]) => void;
-}
-
-// Build the Arel value node for one write-path column (INSERT VALUES / UPDATE
-// SET). Mirrors Rails' `_insert_record`/`_update_record`, which hand every
-// column to the Arel visitor as an `ActiveModel::Attribute` so
-// `visit_ActiveModel_Attribute → collector.add_bind(o)` binds it as a typed
-// prepared-statement parameter (`type_casted_binds`) — null bytes round-trip
-// and intermediate database values (BinaryData, Temporal, BigDecimal) are
-// finished off by each adapter's bind normalization instead of being inlined
-// via `quote()`.
-//
-// Deviation: the bind carries the pre-extracted `valuesForDatabase()` primitive
-// where Rails' AST carries the Attribute object itself (attribute_methods.rb
-// `attributes_with_values` → persistence.rb `_insert_record`/`_update_record`),
-// keeping type metadata until the adapter's `type_casted_binds`. In trails the
-// Attribute would be resolved to the very same primitive one step later anyway:
-// `toSqlAndBinds` (abstract/database-statements.ts) unwraps every ModelAttribute
-// bind to `valueForDatabase` at compile time — a trails-wide seam shared with
-// the read path and relied on by query-cache keying
-// (`JSON.stringify([sql, binds])`), so threading the Attribute through here is
-// inert. The only driver dispatch keyed off attribute type (SQLite's
-// FloatType → SQLITE_FLOAT for whole-valued floats) is not observable for
-// table writes: a float column's REAL affinity converts an INTEGER-typed bind
-// on storage (verified: `typeof(col)` is 'real' either way).
-// Array columns bind like every other column: `value_for_database` yields the
-// PG `OID::Array::Data` wrapper, which `type_casted_binds` routes through
-// `encode_array` (postgresql/quoting.rb) so the driver receives the encoded
-// `{…}` literal as one bound parameter typed by the column.
-function writePathValueNode(raw: unknown): InstanceType<typeof Nodes.Node> {
-  return new Nodes.BindParam(raw);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -3416,7 +3386,7 @@ export class Base extends Model {
       if (saved) {
         this._transactionAction = wasNewRecord ? "create" : "update";
         (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-        // `@_trigger_update_callback` is set inside `_performUpdate` from the
+        // `@_trigger_update_callback` is set inside `_updateRecord` from the
         // UPDATE's affected-row count (Rails persistence.rb:900-909), so it is
         // NOT forced here: a real update whose WHERE matched zero rows (e.g. a
         // separate instance deleted the row earlier in the transaction) must
@@ -3440,7 +3410,6 @@ export class Base extends Model {
     return saved;
   }
 
-  private _pendingOperation: Promise<void> | null = null;
   // Mirrors ActiveRecord::Timestamp's @_touch_record ivar (timestamp.rb:104),
   // set by Timestamp#create_or_update and read by record_update_timestamps.
   private _touchRecord: boolean | null = null;
@@ -3453,130 +3422,6 @@ export class Base extends Model {
 
   set recordTimestamps(value: boolean) {
     this._instanceRecordTimestamps = value;
-  }
-
-  private _performUpdate(): void {
-    const ctor = this.constructor as typeof Base;
-
-    // Thread the `withQueryConnection` connection rather than the deprecated
-    // `.connection` getter (see `_createRecord` in persistence.ts); resolved after the suppression
-    // guard so a suppressed write never touches `.connection`.
-    const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
-
-    const table = ctor.arelTable;
-
-    const changedAttrs = { ...this.changes };
-
-    // With partial_writes=false Rails uses all columns and never short-circuits on clean attrs.
-    // Mirrors Rails _update_record's `if attribute_names.empty?` branch: no
-    // columns to write ⇒ affected_rows = 0 but @_trigger_update_callback = true.
-    if (ctor.partialUpdates && Object.keys(changedAttrs).length === 0) {
-      (this as any)._triggerUpdateCallback = true;
-      return;
-    }
-
-    const dbValues = this._attributes.valuesForDatabase();
-    // With partial_writes=false Rails includes all columns; with it on, only dirty ones.
-    const candidateNames = ctor.partialUpdates
-      ? Object.keys(changedAttrs).filter((key) => ctor._attributeDefinitions.has(key))
-      : ctor.attributeNames().filter((key) => ctor._attributeDefinitions.has(key));
-    const declaredChanges = _attributesForUpdate.call(this, candidateNames);
-
-    // Same empty-attribute_names branch as above (Rails persistence.rb:903-905).
-    if (declaredChanges.length === 0) {
-      (this as any)._triggerUpdateCallback = true;
-      return;
-    }
-
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
-      (key) => [table.get(key), writePathValueNode(dbValues[key])],
-    );
-
-    // Optimistic locking: include lock column in WHERE and increment it.
-    // Remove any user-supplied lock column entry from the SET list first —
-    // it will be replaced with the auto-incremented value to avoid a
-    // "multiple assignments to same column" error on PostgreSQL.
-    const lockCol = ctor.lockingColumn;
-    let lockAttributeWas: import("@blazetrails/activemodel").Attribute | null = null;
-    let lockWhereValue: unknown;
-    if (ctor.lockingEnabled) {
-      const rawVersion = this.readAttribute(lockCol);
-      const currentVersion = rawVersion == null ? 0 : Number(rawVersion) || 0;
-      // Mirrors Rails _lock_value_for_database:
-      // - User explicitly changed lock_version (e.g. person.lock_version = 42):
-      //   use valueForDatabase so WHERE = 42. DB has 0 → StaleObjectError.
-      // - Normal auto-increment path: use originalValueForDatabase() so
-      //   NULL-in-DB records generate IS NULL, freshly-created records generate = 0.
-      // Must be read BEFORE mutating _attributes below.
-      const lockAttr = this._attributes.getAttribute(lockCol);
-      lockAttributeWas = lockAttr; // snapshot for stale restore (mirrors Rails lock_attribute_was)
-      if (this.willSaveChangeToAttribute(lockCol)) {
-        lockWhereValue = lockAttr.valueForDatabase;
-      } else {
-        lockWhereValue = lockAttr.originalValueForDatabase();
-      }
-      const lockIdx = declaredChanges.indexOf(lockCol);
-      if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
-      this._writeAttribute(lockCol, currentVersion + 1);
-      // Rails increments `self[locking_column]` and lets `_update_record` pass
-      // the attribute to Arel like every other SET column (optimistic.rb:
-      // 101-108 → persistence.rb attributes_with_values), so the bumped lock
-      // value is bound, not inlined — route through the same write-path node.
-      updateValues.push([table.get(lockCol), writePathValueNode(currentVersion + 1)]);
-    }
-
-    const um = new UpdateManager()
-      .table(table)
-      .set(updateValues)
-      // Mirrors Rails _update_record(_query_constraints_hash): WHERE targets
-      // each query-constraint column's `*_in_database` value (just the primary
-      // key keyed to `id_in_database` when no query_constraints are declared),
-      // so a dirty primary key updates the original row (and can write a new PK
-      // value into it).
-      .where(
-        ctor._buildQueryConstraintsWhereNode(_Persistence._queryConstraintsHash.call(this as any)),
-      );
-    if (ctor.lockingEnabled) {
-      if (lockWhereValue == null) {
-        um.where(table.get(lockCol).eq(null));
-      } else {
-        um.where(table.get(lockCol).eq(Number(lockWhereValue) || 0));
-      }
-    }
-    _Persistence.applyDefaultAndGlobalConstraints(um as any, ctor);
-
-    const [updateSql, updateBinds] = adapter.toSqlAndBinds(um);
-    this._pendingOperation = adapter
-      .execUpdate(updateSql, `${ctor.name} Update`, updateBinds)
-      .then((affected) => {
-        // Mirrors Rails Locking::Optimistic#_update_row (optimistic.rb:110):
-        // `raise StaleObjectError if affected_rows != 1` — not just `=== 0`.
-        if (ctor.lockingEnabled && affected !== 1) {
-          // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
-          // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
-          // records don't lose their original null valueBeforeTypeCast.
-          if (lockAttributeWas !== null) {
-            this._attributes.set(lockCol, lockAttributeWas);
-            // Rails derives dirty state from @attributes, so restoring
-            // lock_attribute_was also reverts the auto-increment bump's dirty
-            // entry. Our DirtyTracker is a separate map, so recompute lockCol
-            // against the snapshot baseline: this drops the auto-bump (clean →
-            // clean) while preserving any user-set lock_version change.
-            (this as any)._dirty.attributeWritten(
-              lockCol,
-              lockAttributeWas.value,
-              lockAttributeWas.valueBeforeTypeCast,
-              lockAttributeWas.type,
-            );
-          }
-          throw new StaleObjectError(this, "update");
-        }
-        // Mirrors Rails _update_record: `@_trigger_update_callback = affected_rows == 1`.
-        // A stale update whose WHERE matched no row (row deleted by another
-        // instance earlier in the transaction) leaves the flag false, so
-        // after_update_commit / after_rollback(on: :update) don't fire.
-        (this as any)._triggerUpdateCallback = affected === 1;
-      });
   }
 
   // update / updateBang extracted to persistence.ts; wired via include() below.
