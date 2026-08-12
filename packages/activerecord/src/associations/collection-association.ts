@@ -1398,8 +1398,6 @@ export class CollectionAssociation extends Association {
 
     let yielded = false;
     try {
-      // Rails: `catch(:abort) { callback(:before_add, record) } || return unless
-      // skip_callbacks` (collection_association.rb:462-465).
       if (!skipCallbacks) {
         try {
           this.callback("beforeAdd", record);
