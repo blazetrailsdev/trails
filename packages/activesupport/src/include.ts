@@ -44,17 +44,14 @@ type ModuleObject = Record<string, any>;
  * Mirrors: Ruby's Module.new (core language feature)
  */
 export class Module {
-  /** The prototype-chain link holding this module's instance methods. */
-  private carrier: Record<string, unknown> = Object.create(null);
-
   /** Mirrors: Ruby's Module#module_eval — yields the module's method table. */
   moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
-    return block(this.carrier);
+    return block(carrierOf(this));
   }
 
   /** Mirrors: Ruby's Module#define_method. */
   defineMethod(name: string, body: (...args: any[]) => unknown): void {
-    Object.defineProperty(this.carrier, name, {
+    Object.defineProperty(carrierOf(this), name, {
       value: body,
       writable: true,
       configurable: true,
@@ -63,33 +60,31 @@ export class Module {
 
   /** Mirrors: Ruby's Module#instance_methods. */
   instanceMethods(): string[] {
-    return Object.getOwnPropertyNames(this.carrier);
+    return Object.getOwnPropertyNames(carrierOf(this));
   }
 
   /** Mirrors: Ruby's Module#undef_method. */
   undefMethod(...names: string[]): void {
-    for (const name of names) delete this.carrier[name];
+    const carrier = carrierOf(this);
+    for (const name of names) delete carrier[name];
   }
 
   /** Mirrors: Ruby's Module#method_defined?. */
   isMethodDefined(name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.carrier, name);
+    return Object.prototype.hasOwnProperty.call(carrierOf(this), name);
   }
+}
 
-  /**
-   * Splice this module's carrier into `klass`'s prototype chain. Called by
-   * `include()`; the carrier keeps the identity of the object it was created
-   * with, so a module may only be included once.
-   *
-   * @internal
-   */
-  _includeInto(klass: AnyClass): void {
-    const proto = klass.prototype as object;
-    const carrier = Object.create(Object.getPrototypeOf(proto));
-    Object.assign(carrier, this.carrier);
-    this.carrier = carrier;
-    Object.setPrototypeOf(proto, carrier);
+/** The prototype-chain link holding a module's instance methods. */
+const carriers = new WeakMap<Module, Record<string, unknown>>();
+
+function carrierOf(mod: Module): Record<string, unknown> {
+  let carrier = carriers.get(mod);
+  if (!carrier) {
+    carrier = Object.create(null) as Record<string, unknown>;
+    carriers.set(mod, carrier);
   }
+  return carrier;
 }
 
 /**
@@ -164,11 +159,12 @@ type CallableMethods<M extends object> = {
 export type Included<M extends object> = CallableMethods<M>;
 
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
-  // A `Module.new` instance is a live module: splice it into the prototype
-  // chain below the class's prototype rather than copying, so methods defined
-  // on it after the include are still resolved (Ruby's ancestry insertion).
   if (mod instanceof Module) {
-    mod._includeInto(klass);
+    const proto = klass.prototype as object;
+    const carrier = Object.create(Object.getPrototypeOf(proto)) as Record<string, unknown>;
+    Object.defineProperties(carrier, Object.getOwnPropertyDescriptors(carrierOf(mod)));
+    carriers.set(mod, carrier);
+    Object.setPrototypeOf(proto, carrier);
     if (typeof (mod as any)[included] === "function") {
       (mod as any)[included](klass);
     }
