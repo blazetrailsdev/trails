@@ -1940,6 +1940,23 @@ export function _touchRow(
   return _updateRow.call(this, attributeNames, "touch");
 }
 
+/** @internal */
+export function _updateRow(
+  this: PersistencePrivateHost,
+  attributeNames: string[],
+  _attemptedAction = "update",
+): Promise<number> {
+  const values: Record<string, unknown> = {};
+  for (const name of attributeNames) {
+    values[name] = this.readAttribute(name);
+  }
+  return ClassMethods._updateRecord.call(
+    this.constructor as any,
+    values,
+    _queryConstraintsHash.call(this),
+  );
+}
+
 /**
  * The bottom of the update super chain: the UPDATE, `@previously_new_record =
  * false`, then the `save(&block)` yield.
@@ -2008,23 +2025,6 @@ export async function _createRecord(
   // Rails returns `id`; the trails chain carries a truthy value that becomes
   // run_callbacks' value in Callbacks#_create_record.
   return true;
-}
-
-/** @internal */
-export function _updateRow(
-  this: PersistencePrivateHost,
-  attributeNames: string[],
-  _attemptedAction = "update",
-): Promise<number> {
-  const values: Record<string, unknown> = {};
-  for (const name of attributeNames) {
-    values[name] = this.readAttribute(name);
-  }
-  return ClassMethods._updateRecord.call(
-    this.constructor as any,
-    values,
-    _queryConstraintsHash.call(this),
-  );
 }
 
 /** @internal */
