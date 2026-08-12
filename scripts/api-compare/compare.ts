@@ -337,7 +337,7 @@ export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionN
  * then the plain call's port, and letting the predicate claim it makes the two
  * distinct Ruby calls resolve to one TS name. `CollectionAssociation#load_target`
  * is the worked case — Rails calls `find_target?` then `merge_target_lists` then
- * `find_target` (collection_association.rb:37-42), trails calls
+ * `find_target` (collection_association.rb:272-279), trails calls
  * `findTargetNeeded` then `mergeTargetLists` then `findTarget`
  * (collection-association.ts), and the predicate claiming `findTarget` reported
  * a call-ORDER inversion in a body whose order matches Rails exactly.
