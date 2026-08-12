@@ -24,8 +24,8 @@
     "package": "activemodel",
     "tsFile": "validations/numericality.ts",
     "rubyName": "validate_each",
-    "call": "order:add,isNumber",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "call": "order:filteredOptions,isNumber",
+    "reason": "Order artifact of a TS-only pre-guard: the port adds a nil/undefined arm that calls filteredOptions before is_number? is ever reached (numericality.ts:63); Rails calls is_number? first."
   },
   {
     "package": "activemodel",

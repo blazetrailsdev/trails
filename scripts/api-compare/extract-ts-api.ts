@@ -2910,6 +2910,11 @@ function describeObjectLiteral(node: ts.ObjectLiteralExpression, flags: string[]
   return `kwargs{${pairs.join(",")}}`;
 }
 
+/** The port's spelling of a Ruby block: an inline callback argument. */
+function isFunctionArgument(node: ts.Node): boolean {
+  return ts.isArrowFunction(node) || ts.isFunctionExpression(node);
+}
+
 function collectCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
@@ -2924,24 +2929,35 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
       // call as `new`, which conventions.ts maps to the TS `constructor`; record
       // `constructor` here so an instantiation counts toward the call set. Args
-      // are still walked below, so calls nested in constructor arguments
-      // (`new Foo(typeCast(x))`) are credited regardless of body shape.
+      // are walked FIRST (see the call branch below), so calls nested in
+      // constructor arguments (`new Foo(typeCast(x))`) are credited regardless
+      // of body shape.
+      ts.forEachChild(n, visit);
       names.add("constructor");
+      return;
     } else if (ts.isCallExpression(n)) {
+      // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
+      // order, matching extract-ruby-api.rb#walk_call_in_order; the two orders
+      // must agree. Recording evaluation rather than lexical order makes the
+      // sequence invariant to hoisting: `addToTarget(buildRecord(x))` and the
+      // `const r = await buildRecord(x); addToTarget(r)` an `await` forces
+      // record the same two names in the same order.
       const callee = n.expression;
+      const called: string[] = [];
+      // The names the `!x()` negation prefix applies to — the call's own, not
+      // the extra identifier a `X.call(...)` dispatch credits below.
+      const negated: string[] = [];
       if (ts.isIdentifier(callee)) {
-        names.add(callee.text);
+        called.push(callee.text);
         // Renamed-import call (`import { a as b }; b()`): also credit the
         // original imported name so it matches the ported call set.
-        names.add(resolve(callee.text));
-        addNegated(n, callee.text, resolve(callee.text));
+        called.push(resolve(callee.text));
+        negated.push(callee.text, resolve(callee.text));
       } else if (ts.isPropertyAccessExpression(callee)) {
-        // Receiver before the call it receives, matching
-        // extract-ruby-api.rb#walk_for_calls; the two orders must agree.
         visit(callee.expression);
         const prop = callee.name.text;
-        names.add(prop);
-        addNegated(n, prop);
+        called.push(prop);
+        negated.push(prop);
         // `X.call(...)` / `X.apply(...)` also dispatch the function bound to
         // `X` (the project's `this`-typed mixin convention, plus Ruby's
         // `meth.call`/`send` indirection). Additionally credit the dispatched
@@ -2949,14 +2965,27 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
         // invocation of a ported method counts toward its call set. Additive:
         // the literal `call`/`apply` name is retained, so no prior match is lost.
         if ((prop === "call" || prop === "apply") && ts.isIdentifier(callee.expression)) {
-          names.add(resolve(callee.expression.text));
+          called.push(resolve(callee.expression.text));
         }
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"
         // so calls-parity can flag a ported override that drops the super call.
-        names.add("super");
+        called.push("super");
+      } else {
+        visit(callee);
       }
+      // A function-expression argument is the port's spelling of a Ruby BLOCK,
+      // which extract-ruby-api.rb walks AFTER the call it hangs off (the block
+      // of `xs.each do … end` is normally a `for` body here, following the
+      // iterated expression). So it is deferred, and only the value arguments
+      // are evaluated before the call.
+      const blocks = n.arguments.filter(isFunctionArgument);
+      for (const arg of n.arguments) if (!isFunctionArgument(arg)) visit(arg);
+      for (const name of called) names.add(name);
+      for (const block of blocks) visit(block);
+      addNegated(n, ...negated);
+      return;
     } else if (ts.isPropertyAccessExpression(n)) {
       // A property READ (`this.joinsValues`, `obj.nested`) is the faithful TS
       // mirror of a Ruby method send: Ruby has no public field access on ANY

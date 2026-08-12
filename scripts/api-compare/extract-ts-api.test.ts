@@ -227,6 +227,51 @@ describe("body call capture", () => {
     expect(swapped.callSeq).toEqual(["save", "build"]);
   });
 
+  it("records a nested argument before the call it is passed to", () => {
+    // Ruby's EVALUATION order (collection_association.rb:121 records
+    // build_record before add_to_target), which extract-ruby-api.rb now
+    // mirrors: recording it makes the sequence invariant to the hoist an
+    // `await` forces, so both spellings below read the same.
+    const nested = extractFromSource(
+      `class Foo {
+        build(attributes) {
+          this.addToTarget(this.buildRecord(attributes), true);
+        }
+      }`,
+    );
+    expect(nested.instanceMethods.find((m) => m.name === "build")!.callSeq).toEqual([
+      "buildRecord",
+      "addToTarget",
+    ]);
+
+    const hoisted = extractFromSource(
+      `class Foo {
+        async build(attributes) {
+          const record = await this.buildRecord(attributes);
+          this.addToTarget(record, true);
+        }
+      }`,
+    );
+    expect(hoisted.instanceMethods.find((m) => m.name === "build")!.callSeq).toEqual([
+      "buildRecord",
+      "addToTarget",
+    ]);
+  });
+
+  it("records a callback argument after the call it is passed to, as Ruby records a block", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        blockBody(xs) {
+          xs.forEach((x) => this.save(x));
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "blockBody")!.callSeq).toEqual([
+      "forEach",
+      "save",
+    ]);
+  });
+
   it("also records callSeq for an object-literal member and an arrow-function export", () => {
     // The two populations RFC 0084's order-only check was silently skipping:
     // `export const X = { method() {...} }` (arel's visitor tables, the

@@ -124,6 +124,35 @@ describe("Ruby extractor body call capture", () => {
     ]);
   });
 
+  it("emits a nested argument before the call it is passed to", () => {
+    // Ruby EVALUATION order (collection_association.rb:121): the argument runs
+    // first, so the port's `await`-forced hoist into a local records the same
+    // sequence as the nested spelling. extract-ts-api.ts#collectCalls agrees.
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def build(attributes)
+            add_to_target(build_record(attributes), replace: true)
+          end
+
+          def block_body(xs)
+            xs.each { |x| save(x) }
+          end
+
+          def lambda_arg
+            scope :active, -> { where(status: 0) }
+          end
+        end
+      `,
+    });
+    expect(c["Foo#build"]).toEqual(["build_record", "add_to_target"]);
+    // A block, and the lambda literal that is a block in all but name, still
+    // follow the call they hang off — the port spells both as the callback
+    // argument the TS side defers, or as a `for` body.
+    expect(c["Foo#block_body"]).toEqual(["each", "save"]);
+    expect(c["Foo#lambda_arg"]).toEqual(["scope", "where"]);
+  });
+
   it('records super(args) and bare super as a "super" call', () => {
     const c = rubyCalls({
       "foo.rb": `

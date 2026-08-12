@@ -507,6 +507,13 @@ export const ORDER_PREFIX = "order:";
  * `tsCalls` sequences must both be deduplicated at first occurrence, since a
  * name's position is its first one.
  *
+ * Both sequences are recorded in EVALUATION order by the extractors
+ * (extract-ruby-api.rb#walk_call_in_order, extract-ts-api.ts#collectCalls):
+ * a call's arguments come before the call itself, so a body that hoists a
+ * nested argument into a local — which an `await` forces on the TS side —
+ * reads as the same sequence as the nested spelling, and only a real
+ * reordering flags here.
+ *
  * At most one flag per body, naming the first inversion — `order:b,a → a,b`
  * reads "TS calls b before a; Rails calls a before b" — so the row is a stable
  * baseline key rather than a whole-sequence string that churns on every edit.
