@@ -338,9 +338,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._record = record;
   }
 
-  /** @internal Association definition — used by AssociationRelation. */
+  /**
+   * Mirrors Rails' `Association#reflection` (association.rb:16), which is the
+   * rich `AssociationReflection` the constructor was handed off the owner's
+   * class (`associations.rb:290-296`). The proxy is built from the thin macro
+   * definition, so the reader resolves the reflection here — once — instead of
+   * every rich-predicate call site re-resolving `_reflectOnAssociation`. An
+   * anonymous inline association has no registered reflection; it falls back to
+   * the macro definition.
+   * @internal
+   */
   get reflection(): AssociationDefinition {
-    return this._assocDef;
+    const ctor = this._record.constructor as typeof Base;
+    return (
+      (ctor._reflectOnAssociation?.(this._assocName) as AssociationDefinition | null) ??
+      this._assocDef
+    );
   }
 
   /**
@@ -1287,10 +1300,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private _reflectionForeignKey(): string | string[] | undefined {
-    const ctor = this._record.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: string | string[] } | undefined;
-    };
-    return ctor._reflectOnAssociation?.(this._assocName)?.foreignKey ?? undefined;
+    return this.reflection.foreignKey ?? undefined;
   }
 
   /**
@@ -1598,10 +1608,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * guard the loader uses.
    */
   private async _djarForCount(): Promise<{ djar: unknown } | null> {
-    const ctor = this._record.constructor as typeof Base;
-    const reflection = ctor._reflectOnAssociation?.(this._assocName);
-    if (!reflection) return null;
-    if (ownerHasUnresolvedThroughKey(this._record, reflection)) return null;
+    const reflection = this.reflection;
+    // An anonymous inline association falls back to the macro definition,
+    // which carries no `klass` for the DJAR to scope against.
+    if (reflection.klass == null) return null;
+    if (ownerHasUnresolvedThroughKey(this._record, reflection as any)) return null;
     const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
     const klass = (reflection as { klass: typeof Base }).klass;
     // Box the DJAR so awaiting this helper doesn't unwrap it via
@@ -1642,8 +1653,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     //     doesn't have. Fall back to the loader for those (task #25
     //     covers the underlying scope-build issue).
     if (this._assocDef.options.through) {
-      const ctor = this._record.constructor as typeof Base;
-      const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
+      const refl = this.reflection as any;
       // Disable-joins through: fast path goes through DJAR's
       // deferred walker + final-step COUNT. The divergence-aware
       // Relation.prototype.count fallthrough below handles any
@@ -1816,15 +1826,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private _countRecords(): Promise<number> {
-    const ctor = this._record.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const refl = ctor._reflectOnAssociation?.(this._assocName) as
-      | { hasActiveCachedCounter?: () => boolean; counterCacheColumn?: () => string | null }
-      | undefined;
+    const reflection = this.reflection;
     return countRecords({
-      hasActiveCachedCounter: () => refl?.hasActiveCachedCounter?.() ?? false,
-      counterCacheColumn: () => refl?.counterCacheColumn?.() ?? null,
+      hasActiveCachedCounter: () => reflection.hasActiveCachedCounter?.() ?? false,
+      counterCacheColumn: () => reflection.counterCacheColumn?.() ?? null,
       readCounterAttribute: (col) => this._record.readAttribute(col),
       countViaScope: () => this.count(),
       // Rails clamps by `association_scope.limit_value` — the association's own
@@ -1864,9 +1869,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private _foreignKeyPresent(): boolean {
-    const ctor = this._record.constructor as typeof Base;
-    const reflection = ctor._reflectOnAssociation?.(this._assocName);
-    if (!reflection) return false;
+    const reflection = this.reflection;
+    // Same anonymous-inline fallback as `_djarForCount`: the macro definition
+    // carries none of the key readers the two branches below read.
+    if (reflection.klass == null) return false;
     if (this._assocDef.options.through) {
       return throughForeignKeyPresent({ owner: this._record, reflection });
     }
@@ -1905,15 +1911,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Using _countRecords unconditionally was a regression: when count=0 it calls
     // markLoaded(), so a later isEmpty() reads a stale empty cache instead of
     // querying the DB again after records were created.
-    const ctor = this._record.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const refl = ctor._reflectOnAssociation?.(this._assocName) as
-      | { hasActiveCachedCounter?: () => boolean }
-      | undefined;
     let activeCachedCounter = false;
     try {
-      activeCachedCounter = refl?.hasActiveCachedCounter?.() ?? false;
+      activeCachedCounter = this.reflection.hasActiveCachedCounter?.() ?? false;
     } catch {
       // hasActiveCachedCounter can throw when referenced models are not yet
       // registered (e.g. inverseWhichUpdatesCounterCache calls c.klass).
@@ -2211,9 +2211,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // association name, which for a collection source (e.g. `has_many :comments
     // through: :posts`, source `Post#comments`) is plural. `singularize` would
     // mis-guess `comment`, so prefer the resolved source reflection.
-    const sourceRefl = ctor._reflectOnAssociation?.(this._assocName)?.sourceReflection as
-      | { name?: string }
-      | undefined;
+    const sourceRefl = (this.reflection as { sourceReflection?: { name?: string } })
+      .sourceReflection;
     const sourceName =
       sourceRefl?.name ?? this._assocDef.options.source ?? singularize(this._assocName);
     const sources = (await (this._record as any)[throughName]) as Base[] | undefined;
@@ -2360,14 +2359,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // belongs_to inverse only when that inverse points at THIS reflection's
           // counter column; otherwise (e.g. a has_many `counter_cache:` distinct from
           // the inverse's) decrement here so we don't silently skip it.
-          const reflection = (
-            this._record.constructor as typeof Base & {
-              _reflectOnAssociation?: (
-                n: string,
-              ) => { inverseWhichUpdatesCounterCache?: () => unknown } | undefined;
-            }
-          )._reflectOnAssociation?.(this._assocName);
-          if (!reflection?.inverseWhichUpdatesCounterCache?.()) {
+          const reflection = this.reflection as {
+            inverseWhichUpdatesCounterCache?: () => unknown;
+          };
+          if (!reflection.inverseWhichUpdatesCounterCache?.()) {
             await this._decrementCounterCache(persistedRecords.length);
           }
         } else {
@@ -2479,15 +2474,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // bypasses the child callbacks, so resolve the reflection's cached-counter
     // column and decrement it here, matching Rails' `update_counter(-count)`.
     if (!column) {
-      const refl = (
-        this._record.constructor as typeof Base & {
-          _reflectOnAssociation?: (n: string) => {
-            hasCachedCounter?: () => boolean;
-            counterCacheColumn?: () => string | null;
-          };
-        }
-      )._reflectOnAssociation?.(this._assocName);
-      if (refl?.hasCachedCounter?.()) column = refl.counterCacheColumn?.() ?? null;
+      const refl = this.reflection;
+      if (refl.hasCachedCounter?.()) column = refl.counterCacheColumn?.() ?? null;
     }
     if (!column) return;
     const owner = this._record as any;
@@ -3358,8 +3346,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // throw. Only shapes `_routeThroughViaAssociationScope` still declines
     // (polymorphic-has_many sources, unsaved nested-through) fall through to
     // that fallback, where the composite guards remain as a loud backstop.
-    const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
-    if (refl && _routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
+    const refl = this.reflection as any;
+    if (_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
       const joinRel = hasManyScope(this._record, this._assocName, this._assocDef.options);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
     }
@@ -3388,11 +3376,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // This avoids the pluralize-fallback ambiguity and respects the source:
     // option exactly as Rails does (source_reflection_names returns [options[:source]]
     // only when source: is given — reflection.rb:1108).
-    const sourceRefl = (
-      ctor as unknown as {
-        _reflectOnAssociation?: (n: string) => { sourceReflection?: any } | null;
-      }
-    )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
+    const sourceRefl = (this.reflection as { sourceReflection?: any }).sourceReflection;
 
     const throughAs = throughAssoc.options.as;
     const throughTable = throughModel.arelTable;

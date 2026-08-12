@@ -253,8 +253,6 @@ export {
   inGroups,
   splitArray,
   extract,
-  arrayFrom,
-  arrayTo,
   toSentence,
 } from "./array-utils.js";
 
