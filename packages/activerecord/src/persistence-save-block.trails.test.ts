@@ -114,4 +114,26 @@ describe("save block threading (trails)", () => {
 
     expect(seen).toEqual(["block", "after_create"]);
   });
+
+  // AC3: Rails' `@_was_loaded` guard. `concat_records` captures `loaded?` in the
+  // block it hands to `insert_record` (collection_association.rb:445), which
+  // `save` yields before the after_create callbacks (persistence.rb:940). A
+  // callback that loads the association therefore cannot make the capture read
+  // `true`, and `replace_on_target`'s `elsif @_was_loaded || !loaded?`
+  // (collection_association.rb:480) skips the append the load already made.
+  it("an after_create callback that loads the collection leaves no duplicate target entry", async () => {
+    const author = await Author.find(authors("david").id);
+
+    await resetCallbacks(Post, "create", async () => {
+      afterCreate(Post, async () => {
+        await author.posts.load();
+      });
+
+      const post = Post.new({ title: "dup", body: "check" });
+      await author.posts.push(post);
+
+      const target = await author.posts;
+      expect(target.filter((p) => p.id === post.id)).toHaveLength(1);
+    });
+  });
 });
