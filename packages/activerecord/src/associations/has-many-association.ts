@@ -259,10 +259,19 @@ export class HasManyAssociation extends CollectionAssociation {
     // association-layer `delete` with a dependent strategy; non-through has_many
     // `delete` is intercepted by the CollectionProxy. Scope to the given records by
     // their query-constraint columns so we delete/nullify only those rows.
+    const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
+    const values = records.map((r) =>
+      queryConstraints.map((col) => (r as any)._readAttribute(col)),
+    );
     const baseScope = (this as any).scope?.();
     if (!baseScope) return 0;
-    const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
-    const scope = scopeForRecords(baseScope, queryConstraints, records);
+    // Rails: `scope = self.scope.where(query_constraints => values)`. A single-column
+    // key takes the `WHERE id IN (...)` form; a composite key takes the tuple form
+    // (OR-of-AND), since `AND col1 IN (...) AND col2 IN (...)` is a cartesian product.
+    const scope =
+      queryConstraints.length === 1
+        ? baseScope.where({ [queryConstraints[0]]: values.map((tuple) => tuple[0]) })
+        : baseScope.where(queryConstraints, values);
     // Canonical models map Rails' `dependent: :delete_all` to the `"delete"`
     // string (deleteAll is not yet in the AssociationOptions type), so normalize
     // it to the delete_all strategy here the same way `deleteAll()` does
@@ -436,28 +445,6 @@ function deleteCount(assoc: HasManyAssociation, method: string, scope: any): Pro
     }
   ).computeNullifiedOwnerAttributes();
   return scope.updateAll?.(nullAttrs) ?? Promise.resolve(0);
-}
-
-/**
- * Restrict an association scope to the given records via their query-constraint
- * columns. Mirrors Rails' `scope.where(query_constraints => values)` from
- * `HasManyAssociation#delete_records` (has_many_association.rb:132–135).
- * Single-column PKs use `WHERE id IN (...)`; composite keys use the tuple form
- * `where(cols, tuples)` (OR-of-AND) to avoid the cartesian product that
- * `AND col1 IN (...) AND col2 IN (...)` would produce.
- * @internal
- */
-function scopeForRecords(scope: any, queryConstraints: string[], records: Base[]): any {
-  const readCol = (r: Base, col: string): unknown =>
-    typeof (r as any)._readAttribute === "function"
-      ? (r as any)._readAttribute(col)
-      : (r as any)[col];
-  if (queryConstraints.length === 1) {
-    const col = queryConstraints[0];
-    return scope.where({ [col]: records.map((r) => readCol(r, col)) });
-  }
-  const tuples = records.map((r) => queryConstraints.map((col) => readCol(r, col)));
-  return scope.where(queryConstraints, tuples);
 }
 
 /** @internal */

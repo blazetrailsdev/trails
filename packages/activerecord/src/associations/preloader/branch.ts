@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { wrap } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -34,7 +35,7 @@ export class Branch {
     this.parent = options.parent;
     this.scope = options.scope;
     this.associateByDefault = options.associateByDefault;
-    this.children = this._buildChildren(options.children);
+    this.children = this.buildChildren(options.children);
     this._loaders = null;
   }
 
@@ -181,7 +182,15 @@ export class Branch {
     reflection: AbstractReflection,
     reflectionRecords: Base[],
   ): Association[] {
-    const groups = new Map<string, { klass: typeof Base; reflectionScope: any; records: Base[] }>();
+    // Rails groups on the `[klass, reflection_scope]` pair, whose Ruby Array
+    // equality is structural; JS has no such key, so the scope half is keyed on
+    // its SQL and the groups are kept as an ordered list of buckets.
+    const groups: {
+      key: string;
+      klass: typeof Base;
+      reflectionScope: any;
+      records: Base[];
+    }[] = [];
 
     for (const record of reflectionRecords) {
       const klass: typeof Base = (record as any).association(this.association!).klass;
@@ -209,29 +218,27 @@ export class Branch {
       const scopeKey =
         reflectionScope?.toSql?.() ?? (reflectionScope == null ? "" : String(reflectionScope));
       const key = `${klass.name}::${scopeKey}`;
-      const existing = groups.get(key);
+      const existing = groups.find((g) => g.key === key);
       if (existing) {
         existing.records.push(record);
       } else {
-        groups.set(key, { klass, reflectionScope, records: [record] });
+        groups.push({ key, klass, reflectionScope, records: [record] });
       }
     }
 
-    const PreloaderClass = this._preloaderFor(reflection);
-    const result: Association[] = [];
-    for (const { klass, reflectionScope, records } of groups.values()) {
-      result.push(
-        new PreloaderClass(
-          klass,
-          records,
-          reflection as any,
-          this.scope,
-          reflectionScope,
-          this.associateByDefault,
-        ),
+    return groups.map(({ klass: rhsKlass, reflectionScope, records: rs }) => {
+      // Rails' `preloader_for(reflection).new(...)`; the receiver is resolved
+      // into a local because a TS `new (expr)(...)` reads the constructor first.
+      const preloaderClass = this.preloaderFor(reflection);
+      return new preloaderClass(
+        rhsKlass,
+        rs,
+        reflection as any,
+        this.scope,
+        reflectionScope,
+        this.associateByDefault,
       );
-    }
-    return result;
+    });
   }
 
   isPolymorphic(): boolean {
@@ -256,18 +263,15 @@ export class Branch {
     return this._loaders;
   }
 
-  private _buildChildren(children: any): Branch[] {
-    if (children == null) return [];
-
-    const arr = Array.isArray(children) ? children : [children];
-    return arr.flatMap((assoc) => {
+  private buildChildren(children: any): Branch[] {
+    return wrap(children).flatMap((assoc: any) => {
       // `Array(nil)` is `[]` in Ruby, so nil entries inside an includes/preload
       // spec are silently dropped (e.g. `includes(nil)`, `includes([:posts, nil])`).
       if (assoc == null) return [];
 
       // Flatten nested arrays, mirroring Rails' `Array.wrap` + `Array(...)`.
       if (Array.isArray(assoc)) {
-        return this._buildChildren(assoc);
+        return this.buildChildren(assoc);
       }
 
       if (typeof assoc === "object" && assoc !== null) {
@@ -318,7 +322,7 @@ export class Branch {
     return association;
   }
 
-  private _preloaderFor(
+  private preloaderFor(
     reflection: AbstractReflection,
   ): typeof Association | typeof ThroughAssociation {
     if ((reflection as any).options?.through) {
@@ -335,14 +339,4 @@ export class Branch {
 function rubyClassName(value: unknown): string {
   if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
   return (value as any)?.constructor?.name ?? typeof value;
-}
-
-/** @internal */
-function buildChildren(branch: Branch, children: unknown): Branch[] {
-  return ((branch as any)._buildChildren?.(children) as Branch[] | undefined) ?? [];
-}
-
-/** @internal */
-function preloaderFor(branch: Branch, reflection: unknown): unknown {
-  return (branch as any)._preloaderFor?.(reflection) ?? null;
 }
