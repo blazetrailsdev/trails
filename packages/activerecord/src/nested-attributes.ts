@@ -8,7 +8,7 @@ import {
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import { markForDestruction, defineAutosaveValidationCallbacks } from "./autosave-association.js";
+import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 /**
@@ -482,7 +482,7 @@ export function assignToOrMarkForDestruction(
   const pending = childRecord.assignAttributes(assignable);
   const markIfRequested = (): void => {
     if (hasDestroyFlag(attributes) && allowDestroy) {
-      markForDestruction(childRecord);
+      childRecord.markForDestruction();
     }
   };
   return pending ? pending.then(markIfRequested) : markIfRequested();
@@ -957,7 +957,7 @@ export function assignNestedAttributesForCollectionAssociation(
           const id = a.id;
           if (id != null && id !== "" && hasDestroyFlag(a)) {
             const existing = findRecordById(targetModel, loaded, id);
-            if (existing) markForDestruction(existing);
+            if (existing) existing.markForDestruction();
           }
         }
       }

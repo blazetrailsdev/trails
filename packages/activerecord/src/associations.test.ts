@@ -40,7 +40,6 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { markForDestruction } from "./autosave-association.js";
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
 
@@ -1780,7 +1779,7 @@ describe("AssociationsTest", () => {
   it("loading the association target should keep child records marked for destruction", async () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
     const part = await (ship as any).parts.create({ name: "Mast" });
-    markForDestruction(part);
+    part.markForDestruction();
     // Rails `ship.parts[0]` routes through load_target → merge_target_lists,
     // preserving in-memory records (marked-for-destruction kept); trails'
     // `toArray()` merges in-memory over DB rows the same way.
@@ -1791,7 +1790,7 @@ describe("AssociationsTest", () => {
   it("loading the association target should load most recent attributes for child records marked for destruction", async () => {
     const ship = await Ship.create({ name: "The good ship Dollypop" });
     const part = await (ship as any).parts.create({ name: "Mast" });
-    markForDestruction(part);
+    part.markForDestruction();
     const reloaded = await ShipPart.find(part.id as number);
     await reloaded.updateColumn("name", "Deck");
     const parts = await (ship as any).parts.toArray();

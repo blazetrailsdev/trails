@@ -42,11 +42,7 @@ import { Customer as CanonicalCustomer } from "./test-helpers/models/customer.js
 import { Order as CanonicalOrder } from "./test-helpers/models/order.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
-import {
-  markForDestruction,
-  computePrimaryKey,
-  addAutosaveAssociationCallbacks,
-} from "./autosave-association.js";
+import { computePrimaryKey, addAutosaveAssociationCallbacks } from "./autosave-association.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { resetI18n } from "./test-helpers/i18n.js";
@@ -98,8 +94,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
     cacheAssoc(pirate, "ship", ship);
 
-    markForDestruction(pirate);
-    markForDestruction(ship);
+    pirate.markForDestruction();
+    ship.markForDestruction();
 
     expect((await pirate.reload()).markedForDestruction()).toBe(false);
     expect((await ship.reload()).markedForDestruction()).toBe(false);
@@ -109,7 +105,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Black Pearl", pirate_id: pirate.id });
-    markForDestruction(ship);
+    ship.markForDestruction();
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(ship.isDestroyed()).toBe(true);
@@ -120,7 +116,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const ship = await Ship.create({ name: "Titanic" });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
     part.name = "";
-    markForDestruction(part);
+    part.markForDestruction();
     cacheAssoc(ship, "parts", [part]);
     const saved = await ship.save();
     expect(saved).toBe(true);
@@ -131,7 +127,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    markForDestruction(ship);
+    ship.markForDestruction();
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(ship.isDestroyed()).toBe(true);
@@ -184,7 +180,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    markForDestruction(pirate);
+    pirate.markForDestruction();
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
     expect(pirate.isDestroyed()).toBe(true);
@@ -194,7 +190,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Ahoy" });
     const ship = await Ship.create({ name: "Queen Anne", pirate_id: pirate.id });
-    markForDestruction(pirate);
+    pirate.markForDestruction();
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
     expect(pirate.isDestroyed()).toBe(true);
@@ -204,7 +200,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    markForDestruction(pirate);
+    pirate.markForDestruction();
     cacheAssoc(ship, "pirate", pirate);
     const saved = await ship.save();
     expect(saved).toBe(true);
@@ -215,7 +211,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    markForDestruction(pirate);
+    pirate.markForDestruction();
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
     expect(pirate.isDestroyed()).toBe(true);
@@ -260,7 +256,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const b1 = await Bird.create({ name: "Polly", pirate_id: pirate.id });
     const b2 = await Bird.create({ name: "Crackers", pirate_id: pirate.id });
-    markForDestruction(b1);
+    b1.markForDestruction();
     cacheAssoc(pirate, "birds", [b1, b2]);
     await pirate.save();
     expect(b1.isDestroyed()).toBe(true);
@@ -282,7 +278,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
     bird.name = "";
-    markForDestruction(bird);
+    bird.markForDestruction();
     cacheAssoc(pirate, "birds", [bird]);
     const saved = await pirate.save();
     expect(saved).toBe(true);
@@ -303,7 +299,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Bird } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const bird = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    markForDestruction(bird);
+    bird.markForDestruction();
     cacheAssoc(pirate, "birds", [bird]);
     await pirate.save();
     expect(bird.isDestroyed()).toBe(true);
@@ -317,8 +313,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const b1 = await Bird.create({ name: "birds_0", pirate_id: pirate.id });
     const b2 = await Bird.create({ name: "birds_1", pirate_id: pirate.id });
-    markForDestruction(b1);
-    markForDestruction(b2);
+    b1.markForDestruction();
+    b2.markForDestruction();
     // Override the second bird's destroy to raise after super
     const origDestroy = b2.destroy.bind(b2);
     (b2 as any).destroy = async () => {
@@ -336,7 +332,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Bird } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const b1 = new Bird({ name: "Polly" });
-    markForDestruction(b1);
+    b1.markForDestruction();
     const b2 = new Bird({ name: "Crackers" });
     cacheAssoc(pirate, "birds", [b1, b2]);
     const saved = await pirate.save();
@@ -348,7 +344,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Bird } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const b1 = await Bird.create({ name: "Polly", pirate_id: pirate.id });
-    markForDestruction(b1);
+    b1.markForDestruction();
     const b2 = new Bird({ name: "Polly" });
     cacheAssoc(pirate, "birds", [b1, b2]);
     const saved = await pirate.save();
@@ -370,7 +366,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
     const parrots = await proxy;
     expect(parrots.some((p) => p.markedForDestruction())).toBe(false);
-    for (const p of parrots) markForDestruction(p);
+    for (const p of parrots) p.markForDestruction();
 
     // Rails `assert_no_difference "Parrot.count"`: HABTM mark_for_destruction
     // removes the join row, it does NOT destroy the associated record.
@@ -393,7 +389,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     for (const p of parrots) p.name = "";
     expect(await pirate.isValid()).toBe(false);
 
-    for (const p of parrots) markForDestruction(p);
+    for (const p of parrots) p.markForDestruction();
 
     // Rails `assert_not_called(parrot, :valid?)`: a marked-for-destruction child
     // is skipped by `association_valid?` before validation runs, so `valid?`
@@ -472,7 +468,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const proxy = association(pirate, "parrots");
     await proxy.create({ name: "parrots_1" });
 
-    for (const p of await proxy) markForDestruction(p);
+    for (const p of await proxy) p.markForDestruction();
     expect(await pirate.save()).toBe(true);
 
     // The join record is already gone — saving again issues no queries.
@@ -488,7 +484,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_1" });
 
     const before = (await proxy).map((p) => p.id).sort();
-    for (const p of await proxy) markForDestruction(p);
+    for (const p of await proxy) p.markForDestruction();
 
     // Mirror Rails: override the parrots association's `destroy` to raise after
     // running the real destroy, so the whole save transaction rolls back.
@@ -1645,7 +1641,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     // ship. Only an autosave association skips validating a marked child.
     const ship = new ShipWithoutNestedAttributes({ name: "The Black Flag" });
     const part = ship.parts.build();
-    markForDestruction(part);
+    part.markForDestruction();
 
     expect(await ship.isValid()).toBe(false);
   });
@@ -2956,7 +2952,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    markForDestruction(part);
+    part.markForDestruction();
     cacheAssoc(ship, "parts", [part]);
     ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ships", [ship]);
@@ -3289,7 +3285,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     const part = await Part.create({ name: "Mast", ship_id: ship.id });
-    markForDestruction(part);
+    part.markForDestruction();
     cacheAssoc(ship, "part", part);
     ship.name = "Pearl-touched";
     cacheAssoc(pirate, "ship", ship);
@@ -4830,7 +4826,7 @@ describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
       const assocName = `birdsWith${callbackType === "method" ? "Method" : "Proc"}Callbacks`;
       const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
       const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
-      markForDestruction(child);
+      child.markForDestruction();
       const childId = child.id;
 
       pirate.shipLog.splice(0);

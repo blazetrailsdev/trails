@@ -16,6 +16,7 @@ import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Ship } from "./test-helpers/models/ship.js";
+import { Developer } from "./test-helpers/models/developer.js";
 
 // Dynamic column reads/writes (FK/counter-cache columns and the generated
 // `*Attributes=` setters vary per model and are not statically declared), kept
@@ -143,6 +144,7 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   fixtures({
     pirates: [Pirate, {}],
     ships: [Ship, {}],
+    developers: [Developer, {}],
   });
 
   // `acceptsNestedAttributesFor` wraps `save` to flush pending nested
@@ -405,5 +407,41 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     });
 
     expect(events.slice(0, 3)).toEqual(["remove_target!:start", "remove_target!:end", "parrots"]);
+  });
+});
+
+describe("nested attributes destroy dispatch (trails-only)", () => {
+  fixtures({
+    pirates: [Pirate, {}],
+    ships: [Ship, {}],
+    developers: [Developer, {}],
+  });
+
+  // Rails' `assign_to_or_mark_for_destruction` calls `record.mark_for_destruction`
+  // (nested_attributes.rb:578), so an override on the record is honoured. A
+  // trails port that wrote the private flag directly instead would bypass it.
+  it("dispatches the _destroy flag through the record's markForDestruction", async () => {
+    Pirate.acceptsNestedAttributesFor("ship", { allowDestroy: true });
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    const ship = await (
+      pirate as unknown as { createShip(a: Record<string, unknown>): Promise<Ship> }
+    ).createShip({ name: "Nights Dirty Lightning" });
+
+    const original = Ship.prototype.markForDestruction;
+    let calls = 0;
+    Ship.prototype.markForDestruction = function (this: Ship): void {
+      calls += 1;
+      original.call(this);
+    };
+    try {
+      await (pirate as unknown as { update(a: Record<string, unknown>): Promise<unknown> }).update({
+        shipAttributes: { id: ship.id, _destroy: "1" },
+      });
+    } finally {
+      Ship.prototype.markForDestruction = original;
+    }
+
+    expect(calls).toBe(1);
+    expect(await Ship.findBy({ id: ship.id })).toBeNull();
   });
 });

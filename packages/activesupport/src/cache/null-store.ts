@@ -1,6 +1,7 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { Store } from "./store.js";
+import { registerStoreClass } from "./store-registry.js";
 
 // Mirrors Rails `Cache::NullStore` (null_store.rb): a store that persists
 // nothing. read/write/delete/exist?/fetch/read_multi/write_multi/delete_multi
@@ -39,3 +40,5 @@ export class NullStore extends Store implements CacheStore {
     return false;
   }
 }
+
+registerStoreClass(":null_store", NullStore);

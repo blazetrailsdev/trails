@@ -1,8 +1,11 @@
 import { extractOptions, toParam } from "./hash-utils.js";
 import { env } from "./process-adapter.js";
 import { MemoryStore } from "./cache/memory-store.js";
-import { NullStore } from "./cache/null-store.js";
-import { FileStore } from "./cache/file-store.js";
+// Imported for the registration side effect: each store module registers its
+// class under its symbol name, which is what requiring the file does in Ruby.
+import "./cache/null-store.js";
+import "./cache/file-store.js";
+import { lookupStoreClass } from "./cache/store-registry.js";
 import type { CacheStore } from "./cache/index.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
@@ -106,28 +109,24 @@ function retrieveCacheKey(key: unknown): string {
  * Ruby resolves the class by `require "active_support/cache/#{store}"` plus a
  * `const_get` on the camelized name, so a store shipped by another gem
  * resolves too. ESM has no such call-time autoload — an import is eager and
- * cannot be built from a runtime name — so the stores this package ships are
- * named directly, and any other name raises with the message Ruby's rescued
- * LoadError produces.
+ * cannot be built from a runtime name — so the store modules register
+ * themselves under their symbol name (the way requiring the file defines the
+ * constant) and the lookup reads that registry, which stands in for the
+ * `ActiveSupport::Cache` namespace `const_get` reads. A name nothing has
+ * registered raises with the message Ruby's rescued LoadError produces.
  *
  * Mirrors: ActiveSupport::Cache.retrieve_store_class (cache.rb:135-144)
  *
  * @internal
  */
 function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
-  switch (store) {
-    case ":memory_store":
-      return MemoryStore as unknown as new (...args: any[]) => CacheStore;
-    case ":null_store":
-      return NullStore as unknown as new (...args: any[]) => CacheStore;
-    case ":file_store":
-      return FileStore as unknown as new (...args: any[]) => CacheStore;
-    default: {
-      const name = store.slice(1);
-      throw new RuntimeError(
-        `Could not find cache store adapter for ${name} ` +
-          `(cannot load such file -- active_support/cache/${name})`,
-      );
-    }
+  const klass = lookupStoreClass(store);
+  if (klass === undefined) {
+    const name = store.slice(1);
+    throw new RuntimeError(
+      `Could not find cache store adapter for ${name} ` +
+        `(cannot load such file -- active_support/cache/${name})`,
+    );
   }
+  return klass;
 }

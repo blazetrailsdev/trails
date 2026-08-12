@@ -6,6 +6,7 @@ import { Entry } from "./entry.js";
 import { Store, type StoreOptions } from "./store.js";
 import { integer } from "./integer.js";
 import { type CacheEntry, isExpired } from "./entry-record.js";
+import { registerStoreClass } from "./store-registry.js";
 
 const FILENAME_MAX_SIZE = 228;
 
@@ -273,3 +274,5 @@ function toI(value: unknown): number {
   }
   return 0;
 }
+
+registerStoreClass(":file_store", FileStore);
