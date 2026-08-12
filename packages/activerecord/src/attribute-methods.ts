@@ -588,7 +588,13 @@ export function attributesWithValues(
   const attributes = this._attributes;
   if (attributes == null) return result;
   for (const name of attributeNames) {
-    if (attributes.has(name)) result[name] = attributes.fetchValue?.(name);
+    // Rails' `attribute_names.index_with { |name| @attributes[name] }` — the
+    // map carries the `ActiveModel::Attribute` objects themselves, not their
+    // values, so `_insert_record`/`_update_record` hand Arel a typed bind whose
+    // `value_for_database` the adapter's `type_casted_binds` reads. The `has`
+    // guard keeps a name with no attribute out of the write entirely rather
+    // than writing the uninitialized default's NULL.
+    if (attributes.has(name)) result[name] = attributes.getAttribute?.(name);
   }
   return result;
 }

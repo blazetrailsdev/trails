@@ -372,13 +372,27 @@ export function releaseConnection(this: typeof Base): boolean {
   return connectionPool.call(this).releaseConnection();
 }
 
+/**
+ * Mirrors: ActiveRecord::ConnectionHandling#with_connection
+ * (`connection_handling.rb`) — `connection_pool.with_connection`.
+ *
+ * The pool-less arm has no Rails counterpart because the models that take it
+ * have none either: a model backed by a directly-assigned adapter
+ * (`Model.adapter = x`) and an HABTM join model (whose `.connection` delegates
+ * to the owner) both have no pool to lease from, so there is no lease to manage
+ * and the block runs inline on the connection the getter resolves. Keeping that
+ * arm here, rather than at each internal call site, is what lets those sites
+ * spell Rails' `with_connection`.
+ */
 export function withConnection<T>(
   this: typeof Base,
   fn: (conn: DatabaseAdapter) => T | Promise<T>,
   options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
 ): Promise<T> {
   try {
-    return Promise.resolve(connectionPool.call(this).withConnection(fn, options)) as Promise<T>;
+    const pool = leasablePool(this);
+    if (!pool) return Promise.resolve(fn(connection.call(this))) as Promise<T>;
+    return Promise.resolve(pool.withConnection(fn, options)) as Promise<T>;
   } catch (err) {
     return Promise.reject(err);
   }
@@ -433,23 +447,6 @@ function leasablePool(modelClass: typeof Base): ConnectionPool | null {
   }
   if (!pool || typeof pool.withConnection !== "function") return null;
   return pool;
-}
-
-/**
- * `withConnection` for internal call sites that must also serve the models
- * {@link leasablePool} finds no pool for: those have no lease to manage, so the
- * block runs inline on the connection the (deprecated) getter resolves —
- * the directly-assigned adapter, or the owner's for an HABTM join model.
- *
- * @internal
- */
-export function withPooledOrDirectConnection<T>(
-  modelClass: typeof Base,
-  fn: (conn: DatabaseAdapter) => T | Promise<T>,
-): Promise<T> {
-  const pool = leasablePool(modelClass);
-  if (!pool) return Promise.resolve(fn(connection.call(modelClass)));
-  return Promise.resolve(pool.withConnection(fn)) as Promise<T>;
 }
 
 export function connectionDbConfig(this: typeof Base) {
