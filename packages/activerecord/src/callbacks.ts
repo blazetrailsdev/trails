@@ -20,7 +20,7 @@ import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
 import {
   _createRecord as persistenceCreateRecord,
-  _updateRecord as persistenceUpdateRecord,
+  InstanceMethods as PersistenceInstanceMethods,
 } from "./persistence.js";
 import {
   _createRecord as dirtyCreateRecord,
@@ -318,7 +318,9 @@ export async function _updateRecord(this: any, block?: (record: any) => void): P
   return (
     (await runAllCallbacks(ctor.prototype, "update", this, () =>
       recordUpdateTimestamps.call(this, () =>
-        dirtyUpdateRecord.call(this, () => persistenceUpdateRecord.call(this, block)),
+        dirtyUpdateRecord.call(this, () =>
+          PersistenceInstanceMethods._updateRecord.call(this, block),
+        ),
       ),
     )) !== false
   );

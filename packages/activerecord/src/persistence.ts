@@ -304,13 +304,14 @@ export async function _insertRecord(
  * A TS module cannot export two bindings called `_updateRecord`, and Rails has
  * both `Persistence::ClassMethods#_update_record` (this one) and the instance
  * `Persistence#_update_record` below in the same file. The class-level half
- * keeps the Rails name inside the `ClassMethods` grouping the port already uses
- * for Rails' `module ClassMethods` (counter-cache.ts, timestamp.ts), leaving the
- * free export to the instance method.
+ * keeps the free export — that is the name `parity:api` and `lint-deps` resolve
+ * against, and this is the half Rails builds the `Arel::UpdateManager` in — and
+ * the instance half rides the `InstanceMethods` grouping the port already uses
+ * for Rails' instance-side modules (timestamp.ts, touch-later.ts).
  *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_update_record
  */
-async function classMethodsUpdateRecord(
+export async function _updateRecord(
   this: PersistenceHost,
   values: Record<string, unknown>,
   constraints: Record<string, unknown>,
@@ -336,11 +337,6 @@ async function classMethodsUpdateRecord(
   const sql = adapter.toSql(um);
   return adapter.executeMutation(sql);
 }
-
-/** Rails' `Persistence::ClassMethods` — see {@link classMethodsUpdateRecord}. */
-export const ClassMethods = {
-  _updateRecord: classMethodsUpdateRecord,
-};
 
 /**
  * Builds and executes a DELETE with the given constraints.
@@ -1958,11 +1954,7 @@ export function _updateRow(
   for (const name of attributeNames) {
     values[name] = this.readAttribute(name);
   }
-  return ClassMethods._updateRecord.call(
-    this.constructor as any,
-    values,
-    _queryConstraintsHash.call(this),
-  );
+  return _updateRecord.call(this.constructor as any, values, _queryConstraintsHash.call(this));
 }
 
 /**
@@ -1975,7 +1967,7 @@ export function _updateRow(
  * Mirrors: ActiveRecord::Persistence#_update_record (persistence.rb:900-916)
  * @internal
  */
-export async function _updateRecord(
+async function instanceUpdateRecord(
   this: PersistenceInstanceChainHost,
   block?: (record: any) => void,
 ): Promise<boolean> {
@@ -2256,3 +2248,11 @@ export function buildDefaultConstraint(this: {
   const defaultWhereClause = this.defaultScoped(undefined, { allQueries: true })._whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
+
+/**
+ * Rails' instance-side `Persistence` members that collide by name with the
+ * `ClassMethods` half of the same file — see {@link instanceUpdateRecord}.
+ */
+export const InstanceMethods = {
+  _updateRecord: instanceUpdateRecord,
+};
