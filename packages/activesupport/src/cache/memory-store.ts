@@ -37,6 +37,7 @@ export class MemoryStore extends Store implements CacheStore {
 
   private data: Map<string, MemoryRecord> = new Map();
   private sizeLimit: number;
+  private _pruning = false;
 
   constructor(options?: {
     sizeLimit?: number;
@@ -156,17 +157,31 @@ export class MemoryStore extends Store implements CacheStore {
     return num;
   }
 
+  // Rails guards `prune` against re-entry with the `@pruning` flag
+  // (memory_store.rb:110-127): `cleanup` and the per-key `delete_entry` below can
+  // both re-enter through a write, and the inner call must not prune again.
   prune(targetSize: number, maxTime?: number): void {
-    const start = Date.now();
-    this.cleanup();
-    const sorted = [...this.data.entries()].sort((a, b) => a[1].accessedAt - b[1].accessedAt);
-    let freed = 0;
-    for (const [key] of sorted) {
-      if (freed >= targetSize) break;
-      if (maxTime != null && Date.now() - start > maxTime * 1000) break;
-      this.data.delete(key);
-      freed++;
+    if (this.isPruning()) return;
+    this._pruning = true;
+    try {
+      const startTime = Date.now();
+      this.cleanup();
+      const sorted = [...this.data.entries()].sort((a, b) => a[1].accessedAt - b[1].accessedAt);
+      let freed = 0;
+      for (const [key] of sorted) {
+        if (freed >= targetSize) break;
+        if (maxTime != null && Date.now() - startTime > maxTime * 1000) break;
+        this.data.delete(key);
+        freed++;
+      }
+    } finally {
+      this._pruning = false;
     }
+  }
+
+  /** Returns true if the cache is currently being pruned (memory_store.rb:129-131). */
+  isPruning(): boolean {
+    return this._pruning;
   }
 
   private evictLRU(): void {
@@ -181,18 +196,69 @@ export class MemoryStore extends Store implements CacheStore {
 }
 
 export namespace DupCoder {
-  export function dump(entry: unknown): unknown {
-    if (entry === null || entry === undefined) return entry;
-    if (typeof entry !== "object") return entry;
-    try {
-      return structuredClone(entry);
-    } catch {
+  // Mirrors Rails MemoryStore::DupCoder#dump (memory_store.rb:32-38): rebuild the
+  // Entry around a dumped value so the stored value can't alias the caller's,
+  // preserving expires_at/version. Ruby's `entry.value && … != true &&
+  // !Numeric` leaves nil/false/true/Numeric entries untouched.
+  export function dump(entry: Entry): Entry {
+    const value = entry.value;
+    if (
+      value != null &&
+      value !== false &&
+      value !== true &&
+      typeof value !== "number" &&
+      typeof value !== "bigint"
+    ) {
+      return new Entry(dumpValue(value), { expiresAt: entry.expiresAt, version: entry.version });
+    } else {
       return entry;
     }
   }
 
-  export function load(entry: unknown): unknown {
-    return dump(entry);
+  // Mirrors Rails MemoryStore::DupCoder#dump_compressed (memory_store.rb:40-43).
+  export function dumpCompressed(entry: Entry, threshold: number): Entry {
+    const compressedEntry = entry.compressed(threshold);
+    return compressedEntry.isCompressed() ? compressedEntry : dump(entry);
+  }
+
+  // Mirrors Rails MemoryStore::DupCoder#load (memory_store.rb:45-51).
+  export function load(entry: Entry): Entry {
+    if (!entry.isCompressed() && typeof entry.value === "string") {
+      return new Entry(loadValue(entry.value), {
+        expiresAt: entry.expiresAt,
+        version: entry.version,
+      });
+    } else {
+      return entry;
+    }
+  }
+
+  // Rails' `MARSHAL_SIGNATURE` (memory_store.rb:54) is the two leading bytes
+  // every `Marshal.dump` payload carries, which is how `load_value` tells a
+  // serialized value from a String stored verbatim. The trails Marshal
+  // equivalent is the fidelity Coder (coder.ts), whose JSON output carries no
+  // such self-identifying prefix, so dump_value prepends the same signature and
+  // load_value strips it — same discriminator, same two arms.
+  const MARSHAL_SIGNATURE = "\x04\x08";
+
+  // Mirrors Rails MemoryStore::DupCoder#dump_value (memory_store.rb:56-62).
+  // Ruby's `value.dup` guards against the caller mutating the stored String;
+  // JS strings are immutable, so the String arm returns it as-is.
+  function dumpValue(value: unknown): string {
+    if (typeof value === "string" && !value.startsWith(MARSHAL_SIGNATURE)) {
+      return value;
+    } else {
+      return MARSHAL_SIGNATURE + coder.dump(value);
+    }
+  }
+
+  // Mirrors Rails MemoryStore::DupCoder#load_value (memory_store.rb:64-70).
+  function loadValue(string: string): unknown {
+    if (string.startsWith(MARSHAL_SIGNATURE)) {
+      return coder.load(string.slice(MARSHAL_SIGNATURE.length));
+    } else {
+      return string;
+    }
   }
 }
 

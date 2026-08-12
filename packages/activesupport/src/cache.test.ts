@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore, DupCoder } from "./cache/memory-store.js";
+import { Entry } from "./cache/entry.js";
 import { NullStore } from "./cache/null-store.js";
 import { FileStore } from "./cache/file-store.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -375,7 +376,7 @@ describe("FileStoreTest", () => {
 describe("DupCoder", () => {
   it("deep-clones plain objects", () => {
     const obj = { a: { b: 1 }, c: [2, 3] };
-    const dup = DupCoder.dump(obj) as typeof obj;
+    const dup = DupCoder.load(DupCoder.dump(new Entry(obj))).value as typeof obj;
     expect(dup).toEqual(obj);
     expect(dup).not.toBe(obj);
     expect(dup.a).not.toBe(obj.a);
@@ -383,21 +384,40 @@ describe("DupCoder", () => {
 
   it("deep-clones arrays", () => {
     const arr = [{ x: 1 }, { y: 2 }];
-    const dup = DupCoder.dump(arr) as typeof arr;
+    const dup = DupCoder.load(DupCoder.dump(new Entry(arr))).value as typeof arr;
     expect(dup).toEqual(arr);
     expect(dup[0]).not.toBe(arr[0]);
   });
 
   it("returns primitives unchanged", () => {
-    expect(DupCoder.dump(42)).toBe(42);
-    expect(DupCoder.dump("hello")).toBe("hello");
-    expect(DupCoder.dump(true)).toBe(true);
-    expect(DupCoder.dump(null)).toBe(null);
-    expect(DupCoder.dump(undefined)).toBe(undefined);
+    for (const value of [42, true, null]) {
+      const entry = new Entry(value);
+      expect(DupCoder.dump(entry)).toBe(entry);
+    }
   });
 
-  it("load is symmetric with dump", () => {
-    const obj = { a: 1 };
-    expect(DupCoder.load(DupCoder.dump(obj))).toEqual(obj);
+  it("preserves expiresAt and version", () => {
+    const entry = new Entry({ a: 1 }, { expiresAt: 1234, version: "v1" });
+    const loaded = DupCoder.load(DupCoder.dump(entry));
+    expect(loaded.expiresAt).toBe(1234);
+    expect(loaded.version).toBe("v1");
+    expect(loaded.value).toEqual({ a: 1 });
+  });
+
+  it("round-trips a string without wrapping it", () => {
+    const entry = new Entry("hello");
+    expect(DupCoder.load(DupCoder.dump(entry)).value).toBe("hello");
+  });
+
+  it("dumpCompressed compresses past the threshold", () => {
+    const entry = new Entry("a".repeat(2000));
+    expect(DupCoder.dumpCompressed(entry, 1).isCompressed()).toBe(true);
+    expect(DupCoder.dumpCompressed(entry, 1).value).toBe("a".repeat(2000));
+    expect(DupCoder.dumpCompressed(entry, Infinity).isCompressed()).toBe(false);
+  });
+
+  it("load leaves a compressed entry alone", () => {
+    const compressed = DupCoder.dumpCompressed(new Entry("a".repeat(2000)), 1);
+    expect(DupCoder.load(compressed)).toBe(compressed);
   });
 });
