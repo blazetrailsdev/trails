@@ -6,6 +6,7 @@
  */
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
+import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -435,15 +436,11 @@ export async function saveHasOneAssociation(
     // child was already validated in the owner's validation phase, so
     // validate: false; with autosave nil it is validated here at save time.
     const saved = await record.save({ validate: !autosave });
-    if (!saved) {
-      // Rails: `raise ActiveRecord::Rollback if !saved && autosave` — a failed
-      // save only rolls the owner back when the autosave option is enabled (and
-      // adds no owner error; child validation errors were already imported
-      // during the validation phase). trails surfaces that rollback by returning
-      // false, which makes the after_create/after_update callback throw
-      // RecordInvalid. With autosave nil there is no rollback, so return true.
-      return !autosave;
-    }
+    // autosave_association.rb:502 — a failed save only rolls the owner back
+    // when the autosave option is enabled (and adds no owner error; child
+    // validation errors were already imported during the validation phase).
+    if (!saved && autosave) throw new Rollback();
+    return saved ?? false;
   }
   return true;
 }
@@ -894,7 +891,8 @@ export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) 
  *   `_newRecordBeforeSave` tracking, then `afterCreate` + `afterUpdate` to
  *   persist children. Raises `RecordInvalid` on failure so `save()` returns
  *   false and the enclosing DB transaction is rolled back.
- * - HasOne: same as collection minus the around_save.
+ * - HasOne: `afterCreate` + `afterUpdate` that call the save method, which
+ *   raises `Rollback` itself when an autosaved child fails to save.
  * - BelongsTo: `beforeSave` that halts the chain on failure.
  *
  * @internal
@@ -958,10 +956,10 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // in-save (via the `_record_changed?` → `new_record?` leg) rather than
     // deferring it to the post-commit `flushPendingReplaces` net.
     afterCreate(model, async (record: any) => {
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      await record[saveMethod]();
     });
     afterUpdate(model, async (record: any) => {
-      if ((await record[saveMethod]()) === false) throw new RecordInvalid(record);
+      await record[saveMethod]();
     });
   } else {
     // belongs_to
