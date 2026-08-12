@@ -24,8 +24,11 @@
 import { safeConstantize } from "../inflector.js";
 
 export namespace ConstantLookup {
-  // Rails nests this in `module ClassMethods` under `extend ActiveSupport::Concern`;
-  // the Concern flattens it onto the including class, so it sits on the module here.
+  /**
+   * Rails nests this in `module ClassMethods` under `extend
+   * ActiveSupport::Concern`, which flattens it onto the including class — so it
+   * sits on the module here.
+   */
   export function determineConstantFromTestName(
     testName: string,
     block: (constant: unknown) => boolean,
@@ -35,8 +38,6 @@ export namespace ConstantLookup {
       names[names.length - 1] = names[names.length - 1].replace(/Test$/, "");
       try {
         const constant = safeConstantize(names.join("::"));
-        // Ruby `break(constant) if yield(constant)` — the `ensure` below still
-        // pops before the value leaves the loop.
         if (block(constant)) return constant;
       } finally {
         names.pop();

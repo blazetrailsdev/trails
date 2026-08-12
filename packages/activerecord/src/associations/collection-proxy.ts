@@ -1609,8 +1609,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private async _djarForCount(): Promise<{ djar: unknown } | null> {
     const reflection = this.reflection;
-    // An anonymous inline association falls back to the macro definition,
-    // which carries no `klass` for the DJAR to scope against.
+    // No registered reflection: the macro-definition fallback carries no `klass`.
     if (reflection.klass == null) return null;
     if (ownerHasUnresolvedThroughKey(this._record, reflection as any)) return null;
     const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
@@ -1870,8 +1869,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _foreignKeyPresent(): boolean {
     const reflection = this.reflection;
-    // Same anonymous-inline fallback as `_djarForCount`: the macro definition
-    // carries none of the key readers the two branches below read.
+    // No registered reflection: the fallback carries none of the key readers below.
     if (reflection.klass == null) return false;
     if (this._assocDef.options.through) {
       return throughForeignKeyPresent({ owner: this._record, reflection });

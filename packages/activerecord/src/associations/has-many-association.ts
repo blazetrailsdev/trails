@@ -255,11 +255,8 @@ export class HasManyAssociation extends CollectionAssociation {
     // `delete` is intercepted by the CollectionProxy. Scope to the given records by
     // their query-constraint columns so we delete/nullify only those rows.
     // Rails: `reflection.klass.composite_query_constraints_list`
-    // (has_many_association.rb:132). `Association#klass` IS `reflection.klass`
-    // (association.rb:36-38), so this is the same expression — and it keeps the
-    // derivation for an ad-hoc holder built from a macro definition (which
-    // carries no `klass`) in the single reader that owns it, rather than a
-    // second fallback arm here.
+    // (has_many_association.rb:132); `Association#klass` IS `reflection.klass`
+    // (association.rb:36-38), and owns the unregistered-association derivation.
     const queryConstraints = compositeQueryConstraintsList.call(this.klass as any);
     const values = records.map((r) =>
       queryConstraints.map((col) => (r as any)._readAttribute(col)),

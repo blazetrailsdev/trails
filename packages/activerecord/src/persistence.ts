@@ -2165,8 +2165,6 @@ export function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
   const key = this.constructor.primaryKey;
   const keyStr = Array.isArray(key) ? key.join(", ") : key;
   try {
-    // Rails raises the association's exception when one was recorded, else
-    // builds the RecordNotDestroyed (persistence.rb:952).
     throw (
       (this as any)._associationDestroyException ??
       new RecordNotDestroyed(

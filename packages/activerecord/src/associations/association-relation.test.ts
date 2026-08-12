@@ -81,9 +81,6 @@ describe("AssociationRelation", () => {
     const scope = proxy.where({ name: "Mast" }) as unknown as AssociationRelation<ShipPart>;
     expect(scope.proxyAssociation.owner).toBe(ship);
     expect(scope.proxyAssociation.reflection.name).toBe("parts");
-    // `reflection` is now the rich AssociationReflection (Rails'
-    // `Association#reflection`), so the macro reads off `macro` — Rails'
-    // `reflection.type` is the polymorphic `*_type` column, nil here.
     expect(scope.proxyAssociation.reflection.macro).toBe("hasMany");
   });
 

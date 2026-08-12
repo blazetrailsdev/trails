@@ -16,10 +16,11 @@ export class Array {
    *   %w().from(0)           # => []
    *   %w( a b c d ).from(-2) # => ["c", "d"]
    *   %w( a b c ).from(-10)  # => []
+   *
+   * Ruby's `self[position, length] || []`: the two-arg slice is nil (→ `[]`)
+   * for a start past the end, or a negative start that underflows the array.
    */
   static from<T>(self: T[], position: number): T[] {
-    // Ruby: `self[position, length] || []` — the two-arg slice is nil (→ []) for
-    // a start past the end or a negative start that underflows the array.
     const start = position < 0 ? self.length + position : position;
     if (start < 0 || start > self.length) return [];
     return self.slice(start);
@@ -34,13 +35,14 @@ export class Array {
    *   %w().to(0)           # => []
    *   %w( a b c d ).to(-2) # => ["a", "b", "c"]
    *   %w( a b c ).to(-10)  # => []
+   *
+   * The negative arm is Ruby's `self[0..position]`: an inclusive range with a
+   * negative end, which is empty once that end underflows the array.
    */
   static to<T>(self: T[], position: number): T[] {
     if (position >= 0) {
       return self.slice(0, position + 1);
     } else {
-      // Ruby: `self[0..position]` — an inclusive range with a negative end,
-      // which is empty once the end underflows the array.
       const end = self.length + position;
       return end < 0 ? [] : self.slice(0, end + 1);
     }
