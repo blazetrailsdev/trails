@@ -689,12 +689,14 @@ function buildHabtmThroughRecord(assoc: HasManyThroughAssociation, record: Base)
     const joinRecord = throughProxy.build(joinAttrs);
     // Rails writes a join row's owner FK in `HasManyAssociation#insert_record`
     // (has_many_association.rb:61-64), at save time, never in
-    // `CollectionAssociation#build` (collection_association.rb:117-123).
-    // `saveThroughRecord` does rebuild the row once the owner is persisted, and
-    // `joinAttrs` then holds the real id — but `build` drops it: the owner FK is
-    // in `initialize_attributes`' skip-assign set (association.rb:224), so the
-    // rebuilt record still reads null and the INSERT violates NOT NULL. This is
-    // that write, at Rails' insert-time position.
+    // `CollectionAssociation#build` (collection_association.rb:117-123) — and
+    // `build` cannot carry it: `initialize_attributes` computes
+    // `assigned_keys - skip_assign` (association.rb:219-222), so the FK, being
+    // in `skip_assign`, is deliberately re-admitted and `scope_for_create`'s
+    // value wins over the one the caller passed. On the new-owner path that
+    // value is null, so every build of this row — including the rebuild
+    // `saveThroughRecord` makes after the owner is saved — reads null and the
+    // INSERT violates NOT NULL. This is Rails' insert-time write.
     throughProxy.setOwnerAttributes?.(joinRecord);
     return joinRecord;
   }
