@@ -216,9 +216,9 @@ describe("ToTagTest", () => {
 
 // Rails' `module REXML end` stand-ins: a backend is anything answering #parse,
 // and these are only ever compared by identity.
-const REXML: XmlMiniBackend = { parse: () => ({}) };
-const LibXML: XmlMiniBackend = { parse: () => ({}) };
-const Nokogiri: XmlMiniBackend = { parse: () => ({}) };
+const REXML: XmlMiniBackend = { parse: async () => ({}) };
+const LibXML: XmlMiniBackend = { parse: async () => ({}) };
+const Nokogiri: XmlMiniBackend = { parse: async () => ({}) };
 
 describe("WithBackendTest", () => {
   let defaultBackend: XmlMiniBackend | null | undefined;

@@ -41,9 +41,13 @@ export const FileLike = {
  * `require`s `active_support/xml_mini/<name>` and reads the constant out of
  * `ActiveSupport`; here the module namespace object of
  * `./xml-mini/<name>.js` *is* that module.
+ *
+ * Rails' backends return the parsed Hash synchronously; ours are async because
+ * each loads its optional parser package (`@blazetrails/nokogiri`) through a
+ * dynamic import — see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99`.
  */
 export interface XmlMiniBackend {
-  parse(data: string | null | undefined): unknown;
+  parse(data: string | null | undefined): Promise<Record<string, unknown>>;
 }
 
 /** The name of a backend, or the backend module itself. */
@@ -54,6 +58,143 @@ export interface RenameKeyOptions {
   dasherize?: boolean;
   /** Camelize the key first: `true`/`"upper"` for UpperCamel, `"lower"` for lowerCamel. */
   camelize?: boolean | "lower" | "upper";
+}
+
+/**
+ * The backend `parse` delegates to (Ruby's `@backend`). Rails'
+ * `XmlMini.backend = "REXML"` (xml_mini.rb:210) has no counterpart yet:
+ * `XmlMini_REXML` is unported, so there is no default and `parse` raises until
+ * a backend is set.
+ *
+ * @internal
+ */
+let _backend: XmlMiniBackend | null | undefined;
+
+/**
+ * Parse an XML document into a hash through the current backend.
+ *
+ * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99) — awaitable because
+ * every backend's `parse` is (see {@link XmlMiniBackend}); the delegation itself
+ * still forwards straight to the selected backend.
+ */
+export function parse(data: string | null | undefined): Promise<Record<string, unknown>> {
+  return backend()!.parse(data);
+}
+
+/**
+ * The backend in effect: the execution-state-scoped override set by
+ * {@link withBackend} if there is one, else the process-wide backend.
+ *
+ * Mirrors: ActiveSupport::XmlMini.backend (xml_mini.rb:101-103).
+ *
+ * @missingRailsCall cast_backend_name_to_module — belongs to `backend=`, which
+ * the call gate pairs with this reader (the bare-camel candidate wins over
+ * `setBackend`); {@link setBackend} makes the call.
+ */
+export function backend(): XmlMiniBackend | null | undefined {
+  return currentThreadBackend() ?? _backend;
+}
+
+/**
+ * Set the process-wide backend, by name or module.
+ *
+ * Mirrors: ActiveSupport::XmlMini#backend= (xml_mini.rb:105-109) — awaitable
+ * because resolving a name imports the backend module, which Ruby does
+ * synchronously via `require`.
+ */
+export async function setBackend(name: XmlMiniBackendName | null | undefined): Promise<void> {
+  const backend = name != null ? await castBackendNameToModule(name) : name;
+  if (currentThreadBackend() != null) await setCurrentThreadBackend(backend);
+  _backend = backend;
+}
+
+/**
+ * Run `fn` with `name` as the backend, restoring the previous
+ * execution-state-scoped backend afterwards.
+ *
+ * Mirrors: ActiveSupport::XmlMini#with_backend (xml_mini.rb:111-117).
+ */
+export async function withBackend<T>(
+  name: XmlMiniBackendName | null | undefined,
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  const oldBackend = currentThreadBackend();
+  try {
+    await setCurrentThreadBackend(name != null ? await castBackendNameToModule(name) : name);
+    return await fn();
+  } finally {
+    await setCurrentThreadBackend(oldBackend);
+  }
+}
+
+/**
+ * The execution-state-scoped backend override.
+ *
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
+ *
+ * @missingRailsCall cast_backend_name_to_module — belongs to
+ * `current_thread_backend=`, which the call gate pairs with this reader (the
+ * bare-camel candidate wins over `setCurrentThreadBackend`);
+ * {@link setCurrentThreadBackend} makes the call.
+ *
+ * @internal
+ */
+export function currentThreadBackend(): XmlMiniBackend | null | undefined {
+  return IsolatedExecutionState.get("xml_mini_backend");
+}
+
+/**
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend= (xml_mini.rb:196-198).
+ *
+ * @internal
+ */
+export async function setCurrentThreadBackend(
+  name: XmlMiniBackendName | null | undefined,
+): Promise<void> {
+  IsolatedExecutionState.set(
+    "xml_mini_backend",
+    name != null ? await castBackendNameToModule(name) : name,
+  );
+}
+
+/**
+ * Resolve a backend name to its module, loading the module the first time.
+ *
+ * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
+ * (xml_mini.rb:200-206) — Ruby's `require
+ * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
+ * is one dynamic import here, since the module namespace object of
+ * `xml-mini/<name>.js` is the backend module.
+ *
+ * @internal
+ */
+export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
+  if (typeof name !== "string") {
+    return name;
+  } else {
+    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
+  }
+}
+
+/**
+ * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
+ *
+ * Mirrors: ActiveSupport::XmlMini.rename_key (xml_mini.rb:154-161) — camelize (when requested) runs
+ * first, then dasherize (default `true`) runs on the result. Both transforms
+ * compose exactly as in Rails, so `camelize: true` still passes through
+ * `_dasherize` (a no-op on an already-camelized, underscore-free key).
+ */
+export function renameKey(key: string, options: RenameKeyOptions = {}): string {
+  const { camelize: camelizeOpt } = options;
+  const dasherize = options.dasherize === undefined || options.dasherize;
+  let result = key;
+  if (camelizeOpt) {
+    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
+  }
+  if (dasherize) {
+    result = _dasherize(result);
+  }
+  return result;
 }
 
 /**
@@ -126,27 +267,6 @@ export function _parseFile(
  */
 export function _parseHexBinary(bin: string): string {
   return Buffer.from(bin, "hex").toString("binary");
-}
-
-/**
- * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
- *
- * Mirrors: ActiveSupport::XmlMini.rename_key (xml_mini.rb:154-161) — camelize (when requested) runs
- * first, then dasherize (default `true`) runs on the result. Both transforms
- * compose exactly as in Rails, so `camelize: true` still passes through
- * `_dasherize` (a no-op on an already-camelized, underscore-free key).
- */
-export function renameKey(key: string, options: RenameKeyOptions = {}): string {
-  const { camelize: camelizeOpt } = options;
-  const dasherize = options.dasherize === undefined || options.dasherize;
-  let result = key;
-  if (camelizeOpt) {
-    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
-  }
-  if (dasherize) {
-    result = _dasherize(result);
-  }
-  return result;
 }
 
 /**
@@ -253,120 +373,6 @@ function encode64(value: unknown): string {
  */
 function decode64(value: string): string {
   return Buffer.from(value, "base64").toString("binary");
-}
-
-/**
- * The backend `parse` delegates to (Ruby's `@backend`). Rails'
- * `XmlMini.backend = "REXML"` (xml_mini.rb:210) has no counterpart yet:
- * `XmlMini_REXML` is unported, so there is no default and `parse` raises until
- * a backend is set.
- *
- * @internal
- */
-let _backend: XmlMiniBackend | null | undefined;
-
-/**
- * Parse an XML document into a hash through the current backend.
- *
- * Mirrors: `delegate :parse, to: :backend` (xml_mini.rb:99).
- */
-export function parse(data: string | null | undefined): unknown {
-  return backend()!.parse(data);
-}
-
-/**
- * The backend in effect: the execution-state-scoped override set by
- * {@link withBackend} if there is one, else the process-wide backend.
- *
- * Mirrors: ActiveSupport::XmlMini.backend (xml_mini.rb:101-103).
- *
- * @missingRailsCall cast_backend_name_to_module — belongs to `backend=`, which
- * the call gate pairs with this reader (the bare-camel candidate wins over
- * `setBackend`); {@link setBackend} makes the call.
- */
-export function backend(): XmlMiniBackend | null | undefined {
-  return currentThreadBackend() ?? _backend;
-}
-
-/**
- * Set the process-wide backend, by name or module.
- *
- * Mirrors: ActiveSupport::XmlMini#backend= (xml_mini.rb:105-109) — awaitable
- * because resolving a name imports the backend module, which Ruby does
- * synchronously via `require`.
- */
-export async function setBackend(name: XmlMiniBackendName | null | undefined): Promise<void> {
-  const backend = name != null ? await castBackendNameToModule(name) : name;
-  if (currentThreadBackend() != null) await setCurrentThreadBackend(backend);
-  _backend = backend;
-}
-
-/**
- * Run `fn` with `name` as the backend, restoring the previous
- * execution-state-scoped backend afterwards.
- *
- * Mirrors: ActiveSupport::XmlMini#with_backend (xml_mini.rb:111-117).
- */
-export async function withBackend<T>(
-  name: XmlMiniBackendName | null | undefined,
-  fn: () => T | Promise<T>,
-): Promise<T> {
-  const oldBackend = currentThreadBackend();
-  try {
-    await setCurrentThreadBackend(name != null ? await castBackendNameToModule(name) : name);
-    return await fn();
-  } finally {
-    await setCurrentThreadBackend(oldBackend);
-  }
-}
-
-/**
- * The execution-state-scoped backend override.
- *
- * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
- *
- * @missingRailsCall cast_backend_name_to_module — belongs to
- * `current_thread_backend=`, which the call gate pairs with this reader (the
- * bare-camel candidate wins over `setCurrentThreadBackend`);
- * {@link setCurrentThreadBackend} makes the call.
- *
- * @internal
- */
-export function currentThreadBackend(): XmlMiniBackend | null | undefined {
-  return IsolatedExecutionState.get("xml_mini_backend");
-}
-
-/**
- * Mirrors: ActiveSupport::XmlMini#current_thread_backend= (xml_mini.rb:196-198).
- *
- * @internal
- */
-export async function setCurrentThreadBackend(
-  name: XmlMiniBackendName | null | undefined,
-): Promise<void> {
-  IsolatedExecutionState.set(
-    "xml_mini_backend",
-    name != null ? await castBackendNameToModule(name) : name,
-  );
-}
-
-/**
- * Resolve a backend name to its module, loading the module the first time.
- *
- * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
- * (xml_mini.rb:200-206) — Ruby's `require
- * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
- * is one dynamic import here, since the module namespace object of
- * `xml-mini/<name>.js` is the backend module.
- *
- * @internal
- */
-export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
-  if (typeof name !== "string") {
-    return name;
-  } else {
-    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
-  }
 }
 
 function formatDateTime(value: unknown): string {
