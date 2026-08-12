@@ -19,17 +19,6 @@
     "package": "activerecord",
     "tsFile": "middleware/shard-selector.ts",
     "rubyName": "set_shard",
-    "call": "connected_to",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{shard=ref:toSym}"
-    ],
-    "reason": "shard_selector.rb:56 passes `shard.to_sym`; trails models the Ruby Symbol as a JS `Symbol`, which CLAUDE.md forbids — converging the value means making `shard` a plain string, tracked by story `converge-shard-selector-symbol-to-string`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "middleware/shard-selector.ts",
-    "rubyName": "set_shard",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

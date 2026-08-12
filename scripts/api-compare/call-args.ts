@@ -28,6 +28,11 @@ import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 // convention exactly as any other identifier-shaped value is.
 const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
 
+/** Ruby conversions the extractor records as the CALL with the receiver
+ *  dropped, leaving no rename signal on the Ruby side at all — see
+ *  {@link refKeysEqual}. */
+const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
+
 /** Descriptors that carry no comparable value (RFC 0095 §1). Their presence
  *  anywhere in an argument list — INCLUDING nested inside a `kwargs{}` — makes
  *  the whole site uncomparable. */
@@ -193,12 +198,18 @@ function normalizeRef(rawName: string): string {
  *
  * Two further families are TOOLING residue rather than port debt (RFC 0096):
  *
- * - `to_s`. The Ruby extractor describes `table_name.to_s`
+ * - `to_s` and `to_sym`. The Ruby extractor describes `table_name.to_s`
  *   (postgresql/schema_statements.rb:436-437, :439) as the CALL, dropping the
  *   receiver, so the key is `ref:toS` and the receiver's name is not on the
  *   Ruby side at all. The faithful port is either `toString()` or — because a
  *   TS string is already a string — the bare local, and no rename is
- *   detectable either way.
+ *   detectable either way — and `toString` is itself identifier-shaped, so the
+ *   one test covers both spellings. `shard.to_sym`
+ *   (connection_handling.rb:103, :254) records the same way as `ref:toSym`,
+ *   and a Ruby Symbol IS a JS string (CLAUDE.md, "Symbols vs strings"), so the
+ *   port is the bare local and the receiver is again unrecoverable. The list is
+ *   named rather than "any `ref:` matches any `ref:`": a genuine rename between
+ *   two ordinary identifiers still reports.
  * - A Ruby name that is a JS reserved word. `default` and `null`
  *   (postgresql/schema_statements.rb#extract_default_function,
  *   abstract/schema_statements.rb#change_column_null) cannot be TS
@@ -210,7 +221,7 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey === tsKey) return true;
   const rubyName = rubyKey.slice("ref:".length);
   const tsName = tsKey.slice("ref:".length);
-  if (rubyName === "toS") return tsName === "toString" || IDENTIFIER_STRING.test(tsName);
+  if (RECEIVER_DROPPING_CONVERSIONS.has(rubyName)) return IDENTIFIER_STRING.test(tsName);
   if (JS_RESERVED_WORDS.has(rubyName) && tsName === `${rubyName}_`) return true;
   if (!/[?!=]$/.test(rubyName)) return false;
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
@@ -579,7 +590,43 @@ function argKeysEqual(rubyKey: string, tsKey: string): boolean {
     return calleeKeys(rubyKey.slice(CALLEE_PREFIX.length)).includes(tsKey);
   }
   if (rubyKey.startsWith("ref:") && tsKey.startsWith("ref:")) return refKeysEqual(rubyKey, tsKey);
+  if (rubyKey.startsWith("kwargs{") && tsKey.startsWith("kwargs{")) {
+    return kwargsKeysEqual(rubyKey, tsKey);
+  }
   return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey);
+}
+
+/**
+ * Two `kwargs{…}` descriptors carrying the same keys with equal values.
+ *
+ * A kwargs value is an argument key like any other — `shard: shard.to_sym`
+ * (connection_handling.rb:103) is the same `ref:toSym` residue whether it sits
+ * at a positional slot or inside the hash — so the values compare through
+ * {@link argKeysEqual} rather than by the raw string equality that would class
+ * a nested-only difference as a `shape` row.
+ */
+function kwargsKeysEqual(rubyKey: string, tsKey: string): boolean {
+  const ruby = kwargPairs(rubyKey);
+  const ts = kwargPairs(tsKey);
+  if (ruby.size !== ts.size) return false;
+  for (const [key, rubyValue] of ruby) {
+    const tsValue = ts.get(key);
+    if (tsValue === undefined || !argKeysEqual(rubyValue, tsValue)) return false;
+  }
+  return true;
+}
+
+/** The key→value pairs of an already-normalized `kwargs{…}` descriptor. A
+ *  fragment carrying no `=` keys itself, so it can only ever match the
+ *  identical fragment. */
+function kwargPairs(descriptor: string): Map<string, string> {
+  const pairs = new Map<string, string>();
+  for (const pair of splitPairs(descriptor.slice("kwargs{".length, -1))) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) pairs.set(pair, pair);
+    else pairs.set(pair.slice(0, eq), pair.slice(eq + 1));
+  }
+  return pairs;
 }
 
 /**
