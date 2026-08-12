@@ -639,6 +639,164 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     rubyFiles: ["messages/rotator.rb"],
     tsMirrorName: "initialize",
   },
+  {
+    reason:
+      "ActiveSupport::Dependencies (dependencies.rb) and " +
+      "ActiveSupport::Autoload (dependencies/autoload.rb) are Zeitwerk " +
+      "autoload/reload machinery: an interlock guarding concurrent constant " +
+      "loads, the autoload/eager-load path registries it walks, and the " +
+      "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
+      "file. ESM has neither half — every `import` is eager and resolved before " +
+      "the importing module's body, and there is no reloading — so trails has " +
+      "no constant table to guard and nothing to reload. Where Ruby leans on " +
+      "call-time constant resolution to break a load-order cycle, the port uses " +
+      'the zero-import slot module instead (CLAUDE.md, "Call-time constant ' +
+      'resolution"); the two require_dependency suites in trails ' +
+      "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
+      "reason. Scoped to these two files so `clear`, `autoload`, `autoloader` " +
+      "and the `*_paths` readers stay expected everywhere else.",
+    names: [
+      "interlock",
+      "interlock=",
+      "run_interlock",
+      "load_interlock",
+      "unload_interlock",
+      "autoload_paths",
+      "autoload_paths=",
+      "autoload_once_paths",
+      "autoload_once_paths=",
+      "_eager_load_paths",
+      "_eager_load_paths=",
+      "_autoloaded_tracked_classes",
+      "_autoloaded_tracked_classes=",
+      "autoloader",
+      "autoloader=",
+      "clear",
+      "search_for_file",
+      "eager_load?",
+      "autoload",
+      "autoload_under",
+      "autoload_at",
+      "eager_autoload",
+      "eager_load!",
+    ],
+    rubyFiles: ["dependencies.rb", "dependencies/autoload.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Multibyte::Chars (multibyte/chars.rb) is a proxy that " +
+      "wraps a String, force-encodes it to UTF-8 and re-implements " +
+      "`split`/`slice!`/`reverse`/`limit`/`grapheme_length`/`tidy_bytes` so they " +
+      "count characters rather than bytes — the problem Ruby has because a " +
+      "String is a byte sequence with an encoding. A JS string is a UTF-16 code " +
+      "unit sequence and `[...str]` already iterates by code point, so every " +
+      "member of the proxy is either the identity or a plain string operation; " +
+      "there is no wrapper to hold. Nothing in the port reaches for it: " +
+      "`mb_chars` has no caller in Rails' own activesupport lib outside " +
+      "core_ext/string/multibyte.rb (Inflector never uses it), and trails' " +
+      "multibyte suites assert the code-point semantics directly against JS " +
+      "strings. Scoped to multibyte/chars.rb so `split`, `reverse`, `compose`, " +
+      "`as_json` and the rest stay expected in every other file.",
+    names: [
+      "wrapped_string",
+      "to_s",
+      "to_str",
+      "match?",
+      "acts_like_string?",
+      "initialize",
+      "split",
+      "slice!",
+      "reverse",
+      "limit",
+      "titleize",
+      "titlecase",
+      "decompose",
+      "compose",
+      "grapheme_length",
+      "tidy_bytes",
+      "as_json",
+      "reverse!",
+      "tidy_bytes!",
+      "chars",
+    ],
+    rubyFiles: ["multibyte/chars.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Testing::Parallelization (testing/parallelization.rb) " +
+      "forks OS processes, hands each one a DRb queue and re-runs the setup " +
+      "hooks in the child. vitest owns process/worker parallelism in trails — " +
+      "the pool, the work distribution and the per-worker setup are all its " +
+      "config, not something the port reimplements — so there is no trails " +
+      "object for `size` / `shutdown` / the fork hooks to hang off. Scoped to " +
+      "parallelization.rb so `size`, `shutdown` and `initialize` stay expected " +
+      "everywhere else.",
+    names: [
+      "after_fork_hooks",
+      "run_cleanup_hooks",
+      "initialize",
+      "size",
+      "shutdown",
+      "after_fork_hook",
+      "run_cleanup_hook",
+    ],
+    rubyFiles: ["testing/parallelization.rb"],
+  },
+  {
+    reason:
+      "The minitest runner plumbing on ActiveSupport::TestCase " +
+      "(test_case.rb): `test_order` selects minitest's shuffle seed policy, " +
+      "`parallelize` / `parallelize_setup` / `parallelize_teardown` configure " +
+      "the fork-based parallel runner (see the parallelization.rb group), " +
+      "and `method_name` is the `alias_method :method_name, :name` onto " +
+      "Minitest::Test#name. vitest is the runner in trails: it owns ordering " +
+      "and worker parallelism, so none of these has a port to point at. (The " +
+      '`test "..." do` macro test_case.rb:153 extends in is skipped against ' +
+      "its own file, testing/declarative.rb.) Scoped to test_case.rb — the assertion helpers this " +
+      "file picks up by `include` (assert_not*, assert_raises, " +
+      "assert_difference, assert_changes, assert_deprecated, stub_const, the " +
+      "TimeHelpers travel/freeze family) are NOT skipped: they are portable and " +
+      "still counted against testing/assertions.rb and its siblings.",
+    names: [
+      "method_name",
+      "test_order",
+      "test_order=",
+      "parallelize",
+      "parallelize_setup",
+      "parallelize_teardown",
+    ],
+    rubyFiles: ["test_case.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Testing::Declarative#test (testing/declarative.rb:13) is " +
+      'the `test "..." do` declaration macro: it defines a `test_<name>` ' +
+      "method on the class for minitest to discover by reflection. vitest " +
+      'discovers nothing by reflection — a test is the `it("...")` call ' +
+      "itself, which is also the spelling parity:test matches Rails test names " +
+      "through — so the macro has no port to point at. Scoped to " +
+      "declarative.rb, its only definition site (test_case.rb:153 merely " +
+      "`extend`s the module), so `test` stays expected anywhere it is a real " +
+      "method.",
+    names: ["test"],
+    rubyFiles: ["testing/declarative.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Concurrency::LoadInterlockAwareMonitor " +
+      "(concurrency/load_interlock_aware_monitor.rb) is a Ruby `Monitor` " +
+      "subclass whose only purpose is to release the Dependencies interlock " +
+      "while a thread blocks on the lock, so a competing thread can keep " +
+      "autoloading. Both halves are absent from the port: JS has no threads to " +
+      "serialize with a reentrant mutex and no `Thread.handle_interrupt`, and " +
+      "there is no interlock to permit loads through (see the dependencies.rb " +
+      "group). RFC 0073's permanent-connection-checkout work does not change " +
+      "that — it converges where a connection is held, not what guards constant " +
+      "loading — and trails' load-interlock suite is a permanent skip. Scoped to " +
+      "this file so `synchronize` and `initialize` stay expected elsewhere.",
+    names: ["mon_enter", "synchronize", "initialize", "mon_try_enter", "mon_exit"],
+    rubyFiles: ["concurrency/load_interlock_aware_monitor.rb"],
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */

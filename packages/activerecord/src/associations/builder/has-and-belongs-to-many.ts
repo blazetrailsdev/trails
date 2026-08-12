@@ -9,6 +9,7 @@ import {
 import * as Reflection from "../../reflection.js";
 import { habtmTargetFk, joinHabtmTableNames } from "../../associations.js";
 import { CollectionAssociation as CollectionAssociationBuilder } from "./collection-association.js";
+import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /**
  * Builder for has_and_belongs_to_many associations. Internally creates
@@ -224,6 +225,9 @@ export class HasAndBelongsToMany {
       options: middleOptions,
     });
     const middleReflection = Reflection.create("hasMany", middleName, null, middleOptions, model);
+    // Rails: `Builder::HasMany.define_callbacks self, middle_reflection`
+    // (associations.rb:1878); AutosaveAssociation is one of its extensions.
+    addAutosaveAssociationCallbacks(model, middleReflection);
     Reflection.addReflection(model, middleName, middleReflection as any);
 
     // Mirrors Rails associations.rb:1886-1894 — instead of registering a

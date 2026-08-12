@@ -1732,38 +1732,23 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Add belongsTo associations matching what `HasManyThroughAssociation#findTarget` expects
-  const joinAssocs: AssociationDefinition[] = [];
-  joinAssocs.push({
-    type: "belongsTo",
-    name: "leftSide",
-    options: { className: lhsModel.name, foreignKey: ownerFk },
+  // Mirrors `Builder::HasAndBelongsToMany#add_left_association` /
+  // `#add_right_association` (has_and_belongs_to_many.rb:53-63).
+  (JoinModel as any).belongsTo("leftSide", {
+    required: false,
+    className: lhsModel.name,
+    foreignKey: ownerFk,
   });
-  joinAssocs.push({
-    type: "belongsTo",
-    name: sourceName,
-    options: { className: targetClassName, foreignKey: targetFk },
+  (JoinModel as any).belongsTo(sourceName, {
+    required: false,
+    className: targetClassName,
+    foreignKey: targetFk,
   });
-  JoinModel._associations = joinAssocs;
 
-  for (const assocDef of joinAssocs) {
-    const ref = Reflection.create(
-      assocDef.type,
-      assocDef.name,
-      null,
-      assocDef.options as Record<string, unknown>,
-      JoinModel,
-    );
-    Reflection.addReflection(JoinModel, assocDef.name, ref);
-  }
-
-  // No presence validations on the join model's belongs_to sides: Rails builds
-  // both with `required: false` hardcoded (Builder::HasAndBelongsToMany
-  // add_left/right_association), so define_validations always resolves
-  // `optional`/`required` to opt out — `belongs_to_required_by_default` never
-  // applies to the implicit join model. This keeps habtm usable even when the
-  // owner declares it under a true global flag (see project.rb:21-26 and the
-  // "usable with belongs to required by default" test).
+  // `required: false` is hardcoded on both sides in Rails, so
+  // `belongs_to_required_by_default` never reaches the implicit join model
+  // (see project.rb:21-26 and the "usable with belongs to required by default"
+  // test).
 
   return JoinModel;
 }

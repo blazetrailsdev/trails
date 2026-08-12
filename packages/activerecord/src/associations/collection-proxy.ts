@@ -40,7 +40,6 @@ import {
   ConfigurationError,
   AssociationTypeMismatch,
   RecordNotFound,
-  Rollback,
 } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
@@ -1407,24 +1406,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
       )) as T;
     }
-    const record = this._buildRecord(attrs) as T;
-    if (block) block(record);
-    // Rails' `_create_record` wraps the insert in a transaction and re-raises
-    // `Rollback unless result` (collection_association.rb:363-371) so a
-    // non-raising `save` failure undoes any partial write. `add_to_target`
-    // buffers the record into the target and fires after_add regardless of the
-    // save result — the `yield(record)` return is ignored — so we accumulate it
-    // in `result` here rather than gating the in-memory push.
-    // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`,
-    // so a `distinct` association scope dedups in place rather than appending twice.
-    await this.transaction(async () => {
-      let result: boolean | undefined = undefined;
-      await this._addToTarget(record, { replace: this.distinctValue }, async () => {
-        result = await record.save();
-      });
-      if (!result) throw new Rollback();
-    });
-    return record;
+    // Rails: `@association.create(...)` (collection_proxy.rb:308-310).
+    return (await this._record
+      .association(this._assocName)
+      .create(attrs, block as ((record: Base) => void) | undefined)) as T;
   }
 
   /**
@@ -3667,17 +3652,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       assocCallback(this._callbackHost, "afterAdd", record);
       return record;
     }
-    const record = this._buildRecord(attrs) as T;
-    if (block) block(record);
-    // Mirror Rails' _create_record(raise: true): add_to_target(record) { save! }.
-    // The save (insert_record) runs inside the add_to_target funnel, between
-    // set_inverse_instance and the target mutation. A before_add abort leaves
-    // the record unsaved and out of the target without raising.
-    await this._addToTarget(record, { replace: this.distinctValue }, async () => {
-      if (!(await record.save())) throw new RecordInvalid(record);
-      return true;
-    });
-    return record;
+    // Rails: `@association.create!(...)` (collection_proxy.rb:319-321).
+    return (await this._record
+      .association(this._assocName)
+      .createBang(attrs, block as ((record: Base) => void) | undefined)) as T;
   }
 
   /**
