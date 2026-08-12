@@ -136,6 +136,44 @@ describe("compareCallArgs colon-kept Symbol spelling", () => {
   });
 });
 
+describe("compareCallArgs to_s and reserved-word locals", () => {
+  // postgresql/schema_statements.rb:436-437 `clear_data_source_cache!(table_name.to_s)`.
+  it("reads a Ruby to_s argument as the TS toString call", () => {
+    expect(
+      compareCallArgs(
+        site("clear_data_source_cache!", ["call:to_s"]),
+        site("clearDataSourceCache", ["call:toString"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("reads a Ruby to_s argument as a TS value already held as a string", () => {
+    expect(
+      compareCallArgs(site("remove_index", ["call:to_s"]), site("removeIndex", ["id:tableName"]))
+        .verdict,
+    ).toBe("match");
+  });
+
+  // abstract/schema_statements.rb#change_column_null(table_name, column_name, null, default).
+  it("reads a reserved Ruby name as the same name with a trailing underscore", () => {
+    expect(
+      compareCallArgs(
+        site("change_column_null", ["id:table_name", "id:null", "id:default"]),
+        site("changeColumnNull", ["id:tableName", "id:null_", "id:default_"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still reports a genuine rename of a non-reserved name", () => {
+    const result = compareCallArgs(
+      site("change_column_null", ["id:column_name"]),
+      site("changeColumnNull", ["id:columnName_"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("naming");
+  });
+});
+
 describe("compareCallArgs built-in receiver as argument 1", () => {
   it("reads the TS first argument as the Ruby receiver for a core-ext", () => {
     // reflection.rb:454 `name.to_s.camelize` → `camelize(name)`.

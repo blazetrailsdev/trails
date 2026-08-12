@@ -16,8 +16,15 @@ import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { fixtures } from "./test-fixtures.js";
 
+// Rails' assignment (`client.firm = apple`) routes through the association
+// WRITER, which for belongs_to is `replace` (belongs_to_association.rb:96) and
+// marks the association `updated?` — what the autosave FK propagation is gated
+// on (autosave_association.rb:560). `setTarget` is the LOADER path and leaves
+// `updated?` false, so a belongs_to assignment must not use it.
 function cacheAssoc(record: Base, name: string, value: unknown) {
-  record.association(name).setTarget(value as any);
+  const association = record.association(name) as any;
+  if (typeof association.isUpdated === "function") association.writer(value as any);
+  else association.setTarget(value as any);
 }
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
@@ -187,8 +194,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     });
 
     const parent = new Parent({ name: "P" });
-    const child = new Child({ title: "c", group: "us-west" });
+    const child = new Child({ title: "c" });
     cacheAssoc(child, "parent", parent);
+    // Set the trailing FK column AFTER the assignment: Rails' `replace_keys`
+    // (belongs_to_association.rb:138-140) writes every array FK position from
+    // the target's PK values, so the assignment itself nulls "group".
+    child.group = "us-west";
     await child.save();
     expect(parent.isNewRecord()).toBe(false);
     expect(child.parent_id).toBe(parent.id);

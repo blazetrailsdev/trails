@@ -33,6 +33,51 @@ const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
  *  the whole site uncomparable. */
 const OPAQUE_DESCRIPTORS = new Set(["?", "array", "hash", "str-interp", "ternary"]);
 
+/** The words TS cannot spell as an identifier, so a port of a Ruby local or
+ *  parameter with one of these names has to add a trailing underscore
+ *  (`default` → `default_`, `null` → `null_`). Deliberately the reserved list
+ *  only: a `foo_` local is a rename and must keep reporting. */
+const JS_RESERVED_WORDS = new Set([
+  "await",
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "else",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "import",
+  "in",
+  "instanceof",
+  "new",
+  "null",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+  "with",
+  "yield",
+]);
+
 /** Per-site flags that make the argument list's arity unknowable on that side. */
 const UNCOMPARABLE_FLAGS = new Set(["splat", "blockpass", "zsuper"]);
 
@@ -145,12 +190,30 @@ function normalizeRef(rawName: string): string {
  * both narrower and more accurate than folding the `is` prefix away on both
  * sides, which would read a plain `is_valid` local as `valid` and hide a
  * genuine rename to it.
+ *
+ * Two further families are TOOLING residue rather than port debt (RFC 0096):
+ *
+ * - `to_s`. The Ruby extractor describes `table_name.to_s`
+ *   (postgresql/schema_statements.rb:436-437, :439) as the CALL, dropping the
+ *   receiver, so the key is `ref:toS` and the receiver's name is not on the
+ *   Ruby side at all. The faithful port is either `toString()` or — because a
+ *   TS string is already a string — the bare local, and no rename is
+ *   detectable either way.
+ * - A Ruby name that is a JS reserved word. `default` and `null`
+ *   (postgresql/schema_statements.rb#extract_default_function,
+ *   abstract/schema_statements.rb#change_column_null) cannot be TS
+ *   identifiers, so the port spells them `default_` / `null_` and
+ *   {@link snakeToCamel} does not fold the trailing underscore back. Only the
+ *   reserved words qualify, so an unrelated `foo_` local still reports.
  */
 function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey === tsKey) return true;
   const rubyName = rubyKey.slice("ref:".length);
+  const tsName = tsKey.slice("ref:".length);
+  if (rubyName === "toS") return tsName === "toString" || IDENTIFIER_STRING.test(tsName);
+  if (JS_RESERVED_WORDS.has(rubyName) && tsName === `${rubyName}_`) return true;
   if (!/[?!=]$/.test(rubyName)) return false;
-  return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsKey.slice("ref:".length));
+  return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
 
 /**

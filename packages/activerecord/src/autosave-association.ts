@@ -6,8 +6,6 @@
  */
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
-import { CompositePrimaryKeyMismatchError } from "./associations/errors.js";
-import { routeThroughCheckValidity } from "./associations/validate-through-reflection.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
@@ -287,13 +285,7 @@ export async function saveHasOneAssociation(
   reflection: any,
 ): Promise<boolean> {
   const owner = this as unknown as Base;
-  const assoc: AssociationDefinition = {
-    name: reflection.name,
-    type: "hasOne",
-    options: reflection.options ?? {},
-  } as AssociationDefinition;
   const association = associationInstanceGet.call(owner, reflection.name) as any;
-  const ctor = owner.constructor as typeof Base;
   // Rails `save_has_one_association` reads `reflection.through_reflection`
   // (autosave_association.rb:489).
   const isThrough = !!reflection?.throughReflection;
@@ -332,7 +324,11 @@ export async function saveHasOneAssociation(
     return true;
   }
 
-  const target = association?.target;
+  // Rails save_has_one_association:475 — `return unless association && association.loaded?`.
+  if (!association || !association.isLoaded()) return true;
+
+  // Rails save_has_one_association:477 — `record = association.load_target`.
+  const target = await association.loadTarget();
   if (!target || Array.isArray(target) || !(target instanceof Object)) return true;
   const record = target as Base;
 
@@ -351,7 +347,7 @@ export async function saveHasOneAssociation(
   // (autosave_association.rb:200) and `define_non_cyclic_method` guards
   // re-registration (:160 `return if method_defined?`), so a later
   // re-declaration is NOT picked up — Rails keeps the original reflection.
-  const autosave = assoc.options.autosave;
+  const autosave = reflection.options?.autosave;
 
   // NOTE: the join side of a has_one *through* was already persisted above by
   // `persistReplace` (which consumes the association's `_pendingReplace`),
@@ -387,16 +383,14 @@ export async function saveHasOneAssociation(
   // returned above), so a NEW child persists whether or not autosave is set.
   // Rails:485-486 — `primary_key = Array(compute_primary_key(reflection, self))`
   // then `primary_key_value = primary_key.map { _read_attribute(_1) }`.
-  const pkSpec = reflection ? computePrimaryKey(reflection, owner) : (ctor.primaryKey ?? "id");
-  const pkArr: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
-  const pkForChangeCheck = pkArr.map((k) => owner._readAttribute(k));
+  const pkSpec = computePrimaryKey(reflection, owner);
+  const primaryKey: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
+  const primaryKeyValue = primaryKey.map((key) => owner._readAttribute(key));
   const changedForSave =
     typeof (record as any).changedForAutosave === "function"
       ? (record as any).changedForAutosave()
       : !!(record as any).changed;
-  const recordChanged = reflection
-    ? is_recordChanged(reflection, record, pkForChangeCheck)
-    : record.isNewRecord();
+  const recordChanged = is_recordChanged(reflection, record, primaryKeyValue);
   if ((autosave && changedForSave) || recordChanged) {
     // Rails save_has_one_association:489 — `unless reflection.through_reflection`.
     // A has_one *through* never writes a foreign key onto the end record (its
@@ -406,74 +400,24 @@ export async function saveHasOneAssociation(
     // (gated by the same `(autosave && changed) || _record_changed?` condition),
     // so an `autosave: true` through re-saves a mutated end record.
     if (!reflection?.throughReflection) {
-      // reflection.foreignKey resolves queryConstraints-derived FK columns;
-      // fall back to the raw option or the default scalar FK.
-      const foreignKey: string | string[] =
-        (reflection && reflection.foreignKey != null ? reflection.foreignKey : null) ??
-        assoc.options.foreignKey ??
-        `${underscore(ctor.name)}_id`;
-      // Mirrors Rails compute_primary_key (autosave_association.rb:576-587).
-      // Use the reflection (when available) so the normalized queryConstraints option
-      // (array FKs are moved there by the reflection constructor) is visible to branch 2.
-      const explicitPk = assoc.options.primaryKey;
-      let primaryKey: string | string[];
-      if (explicitPk) {
-        primaryKey = explicitPk;
-      } else {
-        const candidatePk = computePrimaryKey(reflection ?? assoc, owner);
-        // computePrimaryKey may collapse a CPK to "id" when queryConstraintsList is null
-        // (our queryConstraintsList doesn't auto-return composite PK, unlike Rails).
-        // When that produces a scalar against a composite FK, fall back to ctor.primaryKey
-        // so CPK models with explicit composite FKs still pair correctly.
-        primaryKey =
-          !Array.isArray(candidatePk) && Array.isArray(foreignKey) ? ctor.primaryKey : candidatePk;
-      }
-      // Mirrors Rails composite_primary_key? collapse (autosave_association.rb:582-585):
-      // collapse only when the PK array IS the class composite primary key (not a QC-derived
-      // list). QC branch returns early before reaching composite_primary_key? in Rails,
-      // so we gate on Array.isArray(ctor.primaryKey) — QC models typically keep scalar PK.
-      if (
-        !explicitPk &&
-        Array.isArray(ctor.primaryKey) &&
-        Array.isArray(primaryKey) &&
-        !Array.isArray(foreignKey)
-      ) {
-        if (primaryKey.includes("id")) primaryKey = "id";
-      }
-      if (Array.isArray(primaryKey) && Array.isArray(foreignKey)) {
-        if (primaryKey.length !== foreignKey.length) {
-          // Route through the reflection's canonical checkValidityBang (Rails'
-          // single raise site) so the error carries the Rails-faithful message.
-          routeThroughCheckValidity(owner.constructor as typeof Base, assoc.name);
-          // No reflection resolvable — minimal trails-only fallback guard.
-          throw new CompositePrimaryKeyMismatchError({
-            activeRecord: (owner.constructor as typeof Base).name,
-            name: assoc.name,
-            primaryKey,
-            foreignKey,
-          });
+      // Rails save_has_one_association:490 — `foreign_key = Array(reflection.foreign_key)`.
+      const foreignKey: string[] = Array.isArray(reflection.foreignKey)
+        ? reflection.foreignKey
+        : [reflection.foreignKey];
+      // Rails save_has_one_association:491-495 — `primary_key.zip(foreign_key)`.
+      // Ruby's Array#zip pads with nil when the argument is shorter and drops
+      // the surplus when it is longer, so a shape mismatch writes fewer columns
+      // rather than raising.
+      for (let i = 0; i < primaryKey.length; i++) {
+        const fkCol = foreignKey[i];
+        if (fkCol == null) continue;
+        const associationId = owner._readAttribute(primaryKey[i]);
+        // Rails: `record[foreign_key] = association_id unless record[foreign_key] == association_id`.
+        if (record._readAttribute(fkCol) !== associationId) {
+          record._writeAttribute(fkCol, associationId);
         }
-        primaryKey.forEach((pk: string, i: number) => {
-          const pkValue = owner._readAttribute(pk);
-          if (pkValue != null) record._writeAttribute(foreignKey[i], pkValue);
-        });
-      } else if (!Array.isArray(primaryKey) && !Array.isArray(foreignKey)) {
-        const pkValue = owner._readAttribute(primaryKey);
-        if (pkValue != null) record._writeAttribute(foreignKey, pkValue);
-      } else {
-        // Route through the reflection's canonical checkValidityBang (Rails'
-        // single raise site) so the error carries the Rails-faithful message.
-        routeThroughCheckValidity(owner.constructor as typeof Base, assoc.name);
-        // No reflection resolvable — minimal trails-only fallback guard.
-        throw new CompositePrimaryKeyMismatchError({
-          activeRecord: (owner.constructor as typeof Base).name,
-          name: assoc.name,
-          primaryKey,
-          foreignKey,
-        });
       }
-      // Mirrors Rails save_has_one_association:496: set_inverse_instance fires
-      // after FK assignment, before save (autosave_association.rb:497).
+      // Rails save_has_one_association:496 — `association.set_inverse_instance(record)`.
       association?.setInverseInstance?.(record);
     }
 
@@ -519,10 +463,14 @@ export async function saveBelongsToAssociation(
     options: reflection.options ?? {},
   } as AssociationDefinition;
   const association = associationInstanceGet.call(owner, reflection.name) as any;
-  // Rails save_belongs_to_association:538 — skip when the loaded target is
-  // stale (FK changed since the target was cached).
-  if (association?.isStaleTarget?.()) return true;
-  const associated = association?.target;
+  // Rails save_belongs_to_association:533 — `return unless association &&
+  // association.loaded? && !association.stale_target?`: an unloaded association
+  // has nothing to save, and a loaded target is skipped once it is stale (the
+  // FK changed since the target was cached).
+  if (!association || !association.isLoaded() || association.isStaleTarget()) return true;
+
+  // Rails save_belongs_to_association:535 — `record = association.load_target`.
+  const associated = await association.loadTarget();
   if (!associated || Array.isArray(associated) || !(associated instanceof Object)) return true;
   const record = associated as Base;
   // Rails save_belongs_to_association:541 — `if record && !record.destroyed?`.
@@ -579,50 +527,22 @@ export async function saveBelongsToAssociation(
     }
   }
 
-  // Rails save_belongs_to_association:560 — the FK write is gated on
-  // `association.updated?`, independent of whether the target itself needed
-  // saving. This matters when two relations share one target (e.g. an order's
-  // billing and shipping pointing at the same customer): the second relation
-  // re-assigns an already-persisted, unchanged record, so the save above is
-  // skipped, but its FK must still be propagated. We keep `isNewOrChanged` in
-  // the guard so the `setTarget` test shortcut — which bypasses the writer and
-  // leaves `updated?` false — still propagates the FK as before.
-  if (isNewOrChanged || association?.isUpdated?.()) {
+  // Rails save_belongs_to_association:560 — `if association.updated?`. The FK
+  // write is gated on the association alone, independent of whether the target
+  // itself needed saving: when two relations share one target (an order's
+  // billing and shipping pointing at the same customer) the second re-assigns
+  // an already-persisted, unchanged record, so the save above is skipped but
+  // its FK must still be propagated.
+  if (association.isUpdated()) {
+    // Rails save_belongs_to_association:561 —
+    // `primary_key = Array(compute_primary_key(reflection, record)).map(&:to_s)`.
+    const pkSpec = computePrimaryKey(reflection, record);
+    const primaryKey: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
     // Rails save_belongs_to_association:562 — `foreign_key = Array(reflection.foreign_key)`.
     const foreignKey: string[] = Array.isArray(reflection.foreignKey)
       ? reflection.foreignKey
       : [reflection.foreignKey];
-    // Pair against the target's PK columns in the same shape the writer
-    // (BelongsToAssociation#replaceKeys) used, so autosave FK
-    // propagation lands on the same columns the writer populated.
-    // Rails save_belongs_to_association:561 —
-    // `primary_key = Array(compute_primary_key(reflection, record)).map(&:to_s)`.
-    let primaryKey: string[] | null = null;
-    if (assoc.options.primaryKey == null) {
-      // Defer to computePrimaryKey when the target has *explicit* class-level
-      // query_constraints and Rails' compute_primary_key (steps 2/3 at
-      // autosave_association.rb:577-582) would pick that list.
-      const targetHasQc = hasQueryConstraints.call(record.constructor as any);
-      const targetQcWouldApply =
-        targetHasQc && (assoc.options.queryConstraints != null || assoc.options.foreignKey == null);
-      if (!targetQcWouldApply) {
-        // When the FK is explicitly composite, pair the full composite PK
-        // against the composite FK columns so the zip hits every column.
-        const explicitFk = assoc.options.foreignKey ?? assoc.options.queryConstraints;
-        const fkIsComposite = Array.isArray(explicitFk) && explicitFk.length > 1;
-        const reflFk = reflection?.foreignKey;
-        const reflFkIsComposite = Array.isArray(reflFk) && reflFk.length > 1;
-        if (fkIsComposite || reflFkIsComposite) {
-          const pk = (record.constructor as typeof Base).primaryKey;
-          if (Array.isArray(pk) && pk.length > 1) primaryKey = pk;
-        }
-      }
-    }
-    if (primaryKey === null) {
-      const rawPk = computePrimaryKey(reflection, record);
-      primaryKey = Array.isArray(rawPk) ? rawPk : [rawPk];
-    }
-    // Rails save_belongs_to_association:563: `primary_key.zip(foreign_key)`.
+    // Rails save_belongs_to_association:564: `primary_key.zip(foreign_key)`.
     // Ruby's Array#zip drops trailing args when the argument is longer than
     // the receiver, and pads with nil when the argument is shorter. Mirror
     // that here so shape mismatches don't raise — they just don't write FK
@@ -636,9 +556,8 @@ export async function saveBelongsToAssociation(
         owner._writeAttribute(fkCol, associationId);
       }
     }
-    // Rails save_belongs_to_association:568 — `association.loaded!` fires
-    // inside the `if association.updated?` branch after the FK write.
-    if (association?.isUpdated?.()) association.loadedBang?.();
+    // Rails save_belongs_to_association:568 — `association.loaded!`.
+    association.loadedBang?.();
   }
   return true;
 }
