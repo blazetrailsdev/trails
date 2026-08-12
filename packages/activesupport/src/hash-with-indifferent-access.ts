@@ -14,17 +14,17 @@ type AnyObject = Record<string, unknown>;
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
 
-  constructor(obj?: AnyObject | Map<string, V>) {
+  constructor(constructor?: AnyObject | Map<string, V>) {
     this.data = new Map();
-    if (obj) {
-      if (obj instanceof Map) {
-        for (const [key, value] of obj) {
+    if (constructor) {
+      if (constructor instanceof Map) {
+        for (const [key, value] of constructor) {
           this.data.set(String(key), value);
         }
       } else {
         // Mirrors Rails HashWithIndifferentAccess#initialize, which populates
         // via `update(constructor)` rather than inlining the copy.
-        this.update(obj);
+        this.update(constructor);
       }
     }
   }

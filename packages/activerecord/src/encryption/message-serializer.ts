@@ -10,7 +10,7 @@ import { Decryption, ForbiddenClass } from "./errors.js";
 
 export interface MessageSerializerLike {
   dump(message: Message): string;
-  load(serialized: string): Message;
+  load(serializedContent: string): Message;
   isBinary(): boolean;
 }
 
@@ -22,13 +22,13 @@ export class MessageSerializer implements MessageSerializerLike {
     return JSON.stringify(this.messageToJson(message));
   }
 
-  load(serialized: string): Message {
-    if (typeof serialized !== "string") {
-      throw new TypeError(`Expected string, got ${typeof serialized}`);
+  load(serializedContent: string): Message {
+    if (typeof serializedContent !== "string") {
+      throw new TypeError(`Expected string, got ${typeof serializedContent}`);
     }
     let data: unknown;
     try {
-      data = JSON.parse(serialized);
+      data = JSON.parse(serializedContent);
     } catch {
       throw new Decryption("Failed to deserialize encrypted message");
     }

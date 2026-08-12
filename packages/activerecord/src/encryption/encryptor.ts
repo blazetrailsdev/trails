@@ -246,10 +246,10 @@ export class Encryptor {
   }
 
   /** @internal */
-  private deserializeMessage(encryptedText: string): Message {
+  private deserializeMessage(message: string): Message {
     // Mirrors Rails: rescue ArgumentError, TypeError, Errors::ForbiddenClass => Errors::Encoding
     try {
-      return this.serializer().load(encryptedText);
+      return this.serializer().load(message);
     } catch (e) {
       if (e instanceof ForbiddenClass || e instanceof TypeError) throw new Encoding();
       throw e;

@@ -25,13 +25,13 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     return MessagePack.dump(this.messageToHash(message)).toString("latin1");
   }
 
-  load(serialized: string): Message {
-    if (typeof serialized !== "string") {
-      throw new TypeError(`Expected string, got ${typeof serialized}`);
+  load(serializedContent: string): Message {
+    if (typeof serializedContent !== "string") {
+      throw new TypeError(`Expected string, got ${typeof serializedContent}`);
     }
     let data: unknown;
     try {
-      data = MessagePack.load(Buffer.from(serialized, "latin1"));
+      data = MessagePack.load(Buffer.from(serializedContent, "latin1"));
     } catch (e) {
       // ActiveSupport::MessagePack raises MessagePackError on a missing/wrong
       // signature or malformed bytes — both mean an undecodable message.

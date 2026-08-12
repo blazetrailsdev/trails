@@ -102,14 +102,7 @@ export abstract class Store {
     }
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#fetch` (cache.rb:443). Rails reassigns
-   * `options = merged_options(options)`; TypeScript cannot, because the
-   * pre-merge value here is a `let` local (the overload split), and TS drops
-   * narrowing for a `let` assigned on more than one branch — so the merged
-   * value is a block-scoped `options` and the pre-merge one keeps Rails' other
-   * name for it, `call_options` (cache.rb:861, 948).
-   */
+  /** Mirrors Rails `Cache::Store#fetch` (cache.rb:443). */
   fetch(
     name: string,
     options?: StoreOptions,
@@ -121,23 +114,25 @@ export abstract class Store {
     optionsOrBlock?: StoreOptions | ((key: string, opts: WriteOptions) => unknown),
     maybeBlock?: (key: string, opts: WriteOptions) => unknown,
   ): unknown {
-    let callOptions: StoreOptions | undefined;
+    let options: StoreOptions | undefined;
     let block: ((key: string, opts: WriteOptions) => unknown) | undefined;
     if (typeof optionsOrBlock === "function") {
       block = optionsOrBlock;
     } else {
-      callOptions = optionsOrBlock;
+      options = optionsOrBlock;
       block = maybeBlock;
     }
 
     if (block) {
-      const options = this.mergedOptions(callOptions);
+      options = this.mergedOptions(options);
       const key = this.normalizeKey(name, options);
       let entry: Entry | null = null;
       if (!options.force) {
         this.instrument("read", key, options, (payload) => {
-          const cachedEntry = this.readEntry(key, options);
-          entry = this.handleExpiredEntry(cachedEntry, key, options);
+          // `options` is the merged value assigned just above; TS drops the
+          // narrowing across the closure boundary because it is a `let`.
+          const cachedEntry = this.readEntry(key, options!);
+          entry = this.handleExpiredEntry(cachedEntry, key, options!);
           if (entry) {
             if (entry.isMismatched(this.normalizeVersion(name, options) ?? null)) {
               entry = null;
@@ -156,12 +151,12 @@ export abstract class Store {
       }
       if (entry) return this.getEntryValue(entry, name, options);
       return this.saveBlockResultToCache(name, key, options, block);
-    } else if (callOptions?.force) {
+    } else if (options?.force) {
       throw new ArgumentError(
         "Missing block: Calling `Cache#fetch` with `force: true` requires a block.",
       );
     } else {
-      return this.read(name, callOptions);
+      return this.read(name, options);
     }
   }
 

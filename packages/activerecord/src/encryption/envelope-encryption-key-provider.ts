@@ -34,8 +34,8 @@ export class EnvelopeEncryptionKeyProvider {
     return key;
   }
 
-  decryptionKeys(message: Message): Key[] {
-    const secret = this.decryptDataKey(message);
+  decryptionKeys(encryptedMessage: Message): Key[] {
+    const secret = this.decryptDataKey(encryptedMessage);
     return secret ? [new Key(secret)] : [];
   }
 

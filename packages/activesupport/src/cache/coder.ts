@@ -308,10 +308,10 @@ export class Coder {
     return dumpedVersion;
   }
 
-  private tryCompress(payload: string, threshold: number): string | undefined {
-    if (this.compressor && Buffer.byteLength(payload) >= threshold) {
-      const compressed = this.compressor.deflate(payload);
-      if (compressed.length < Buffer.byteLength(payload)) return compressed;
+  private tryCompress(string: string, threshold: number): string | undefined {
+    if (this.compressor && Buffer.byteLength(string) >= threshold) {
+      const compressed = this.compressor.deflate(string);
+      if (compressed.length < Buffer.byteLength(string)) return compressed;
     }
     return undefined;
   }
