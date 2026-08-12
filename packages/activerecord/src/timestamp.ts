@@ -280,7 +280,7 @@ interface TimestampHost {
 /** Minimal instance-side surface used by Timestamp private/internal helpers. */
 interface TimestampInstanceHost {
   _touchRecord: boolean | null;
-  _createOrUpdate: () => Promise<boolean>;
+  _createOrUpdate: (block?: (record: unknown) => void) => Promise<boolean>;
   readAttribute?(name: string): unknown;
   _readAttribute?(name: string): unknown;
   _writeAttribute?(name: string, val: unknown): void;
@@ -466,9 +466,13 @@ export async function _updateRecord(this: TimestampInstanceHost): Promise<boolea
 }
 
 /** @internal */
-export function createOrUpdate(this: TimestampInstanceHost, touch = true): Promise<boolean> {
+export function createOrUpdate(
+  this: TimestampInstanceHost,
+  touch = true,
+  block?: (record: unknown) => void,
+): Promise<boolean> {
   this._touchRecord = touch;
-  return this._createOrUpdate.call(this);
+  return this._createOrUpdate.call(this, block);
 }
 
 /** @internal */

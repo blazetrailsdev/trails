@@ -191,7 +191,12 @@ function assertValidLimit(n: number): void {
 interface ThroughAssociationHandle {
   _throughScope?: unknown;
   concat(...records: Base[]): Promise<Base[] | undefined>;
-  insertRecord(record: Base, validate?: boolean, raise?: boolean): Promise<boolean>;
+  insertRecord(
+    record: Base,
+    validate?: boolean,
+    raise?: boolean,
+    block?: (record: Base) => void,
+  ): Promise<boolean>;
   transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
 }
 

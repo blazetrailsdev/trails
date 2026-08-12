@@ -456,24 +456,13 @@ export class CollectionAssociation extends Association {
     record: Base,
     validate = true,
     raise = false,
-    block?: () => void,
+    block?: (record: Base) => void,
   ): Promise<boolean> {
-    // Rails passes `&block` into `save`/`save!`, which yields it from
-    // `_create_record` after the INSERT but before the after_create callbacks
-    // (persistence.rb:940). trails' save stack takes no block yet — threading
-    // one through `save` → `createOrUpdate` → each `_createRecord` layer is
-    // filed as `plumb-save-block-through-create-record` — so the block runs
-    // here, right after the save, which is the same moment for every path that
-    // does not load the association from an after_create callback.
-    // @missingRailsCall save(&block)
-    if (raise && typeof (record as any).saveBang === "function") {
-      await (record as any).saveBang({ validate });
-      block?.();
-      return true;
+    if (raise) {
+      return !!(await (record as any).saveBang({ validate }, block));
+    } else {
+      return !!(await (record as any).save({ validate }, block));
     }
-    const result = !!(await (record as any).save?.({ validate }));
-    block?.();
-    return result;
   }
 
   /**

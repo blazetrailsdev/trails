@@ -300,16 +300,19 @@ export function registerBaseTimestampCallbacks(baseProto: object): void {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export function createOrUpdate(this: any): Promise<boolean> {
+export function createOrUpdate(this: any, block?: (record: any) => void): Promise<boolean> {
   // Rails: Callbacks#create_or_update wraps super in _run_save_callbacks.
   // In trails, save's before/after callback chain runs inside _createOrUpdate
   // (base.ts: runBefore("save") → dispatch create/update → runAfter("save")),
   // so this wrapper just delegates and the callback ordering still matches.
-  return (this._createOrUpdate as () => Promise<boolean>).call(this);
+  return (this._createOrUpdate as (block?: (record: any) => void) => Promise<boolean>).call(
+    this,
+    block,
+  );
 }
 
 /** @internal */
-export async function _createRecord(this: any): Promise<boolean> {
+export async function _createRecord(this: any, block?: (record: any) => void): Promise<boolean> {
   // Rails: _run_create_callbacks { super }, whose value is the block's return
   // (run_callbacks returns env.value). Rails coerces one level up, in
   // create_or_update: `result != false` (persistence.rb:895) — so a nil/absent
@@ -349,6 +352,12 @@ export async function _createRecord(this: any): Promise<boolean> {
         }
         this._previouslyNewRecord = true;
         this._newRecord = false;
+        // Rails Persistence#_create_record yields here — after the INSERT and
+        // `@new_record = false`, before the after_create callbacks
+        // (persistence.rb:936-940). `changes_applied` runs above it, in
+        // AttributeMethods::Dirty#_create_record's `super` (dirty.rb:239-243),
+        // so the yield precedes it.
+        block?.(this);
         this.changesApplied();
         // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
         return true;
@@ -358,7 +367,7 @@ export async function _createRecord(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export async function _updateRecord(this: any): Promise<boolean> {
+export async function _updateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
   // Rails: _run_update_callbacks { record_update_timestamps { super } }, whose
   // value is the block's return. As in _createRecord, Rails' `result != false`
   // (create_or_update, persistence.rb:895) is applied here to keep the
@@ -410,6 +419,10 @@ export async function _updateRecord(this: any): Promise<boolean> {
         this._pendingOperation = null;
       }
       this._previouslyNewRecord = false;
+      // Rails Persistence#_update_record yields here, after
+      // `@previously_new_record = false` and before the after_update callbacks
+      // (persistence.rb:912-916).
+      block?.(this);
       this.changesApplied();
       // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
       return true;
