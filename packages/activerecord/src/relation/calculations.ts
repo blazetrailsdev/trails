@@ -10,7 +10,7 @@
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
-import { any, many } from "@blazetrails/activesupport";
+import { any, many, tryCall } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
@@ -1149,9 +1149,10 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<unknown> {
-  // trails compiles each arm to SQL + binds instead of handing a `query_builder`
-  // to `select_all`, because the count-subquery arm's inner manager is compiled
-  // here (see buildCountSubquery) and the CTE prefix is applied to the SQL.
+  // DIVERGENCE (calculations.rb:469-511): each arm compiles to SQL + binds
+  // instead of handing Rails' `query_builder` to `select_all` — the
+  // count-subquery arm compiles its inner manager here (buildCountSubquery) and
+  // the CTE prefix is applied to the compiled SQL.
   let sql: string;
   let binds: unknown[];
   let column: unknown = null;
@@ -1169,9 +1170,9 @@ export async function executeSimpleCalculation(
     [sql, binds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
   } else {
     // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
-    // (calculations.rb:477-478). trails projects the aggregate onto a manager
-    // of its own rather than reading `relation.arel`, so no ORDER BY and no
-    // DISTINCT reach the emitted SQL and the `unscope(:order).distinct!(false)`
+    // (calculations.rb:477-478). DIVERGENCE: the manager below is projected
+    // explicitly rather than read off `relation.arel`, so neither ORDER BY nor
+    // DISTINCT reaches the emitted SQL and the `unscope(:order).distinct!(false)`
     // rebase has nothing left to strip.
     const relation = rel;
     // Rails routes aggregates through apply_join_dependency when eager loading,
@@ -1186,10 +1187,11 @@ export async function executeSimpleCalculation(
     ) as Nodes.Node & { distinct: boolean; as(alias: string): Nodes.Node };
     if (operation === "sum" && distinct) selectValue.distinct = true;
 
-    // Rails assigns `relation.select_values = [select_value]` and compiles
-    // `relation.arel`; our manager is projected explicitly, so the joins, wheres,
-    // from and having `build_arel` would have applied are applied here. The
-    // "val" alias is what the SQLite bigint CAST wrapper reads back.
+    // DIVERGENCE (calculations.rb:485-487): Rails assigns
+    // `relation.select_values` and compiles `relation.arel`; the manager here is
+    // projected directly, so everything `build_arel` would have applied — joins,
+    // wheres, from, having — is applied by hand below. The "val" alias is what
+    // the SQLite bigint CAST wrapper reads back.
     const manager = projectOnRelationTable(relation, selectValue.as("val"));
     // Rails routes sum/average/maximum/minimum through apply_join_dependency when
     // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
@@ -1199,8 +1201,8 @@ export async function executeSimpleCalculation(
     relation._applyWheresToManager(manager, relationTable(relation));
     applyFromToManager(relation, manager);
     // `build_arel` applies the having clause with no GROUP BY guard — an
-    // ungrouped `having("sum(x) > n").sum(:x)` is unusual but valid, and Rails
-    // emits it.
+    // ungrouped `having("sum(x) > n").sum(:x)` is unusual but valid (see
+    // query_methods.rb:1756).
     applyHavingToManager(relation, manager);
 
     const [rawSql, managerBinds] = compileManagerWithBinds(relation, manager);
@@ -1224,14 +1226,20 @@ export async function executeSimpleCalculation(
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
-        rel._conn().selectAll(sql, `${rel.model.name} ${capitalizeOperation(operation)}`, binds),
+        rel
+          ._conn()
+          .selectAll(
+            sql,
+            `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
+            binds,
+          ),
       );
 
   let type: unknown;
   if (operation !== "count") {
     type =
       typeCasterFor(column) ??
-      lookupCastTypeFromJoinDependencies(rel, String(aggregateTarget(columnName))) ??
+      lookupCastTypeFromJoinDependencies(rel, String(columnName ?? "")) ??
       defaultValue();
     if (type instanceof EnumType) type = type.subtypeType();
   }
@@ -1239,19 +1247,17 @@ export async function executeSimpleCalculation(
   return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
 }
 
-/** Ruby `operation.capitalize` (calculations.rb:499). */
-function capitalizeOperation(operation: string): string {
-  return operation.charAt(0).toUpperCase() + operation.slice(1).toLowerCase();
-}
-
 /**
- * Ruby `column.try(:type_caster)` (calculations.rb:505): an Arel attribute
- * carries its relation's type caster, a SqlLiteral or star does not.
+ * Ruby `column.try(:type_caster)` (calculations.rb:505). An Arel attribute
+ * carries its relation's caster and a SqlLiteral does not, so `tryCall` covers
+ * Rails' `try` — except that a join-built `Table` is constructed with no caster
+ * (relation.ts:731) and `Table#typeForAttribute` would raise rather than answer
+ * nil, so the caster is asked for only when the relation can type-cast.
  */
 function typeCasterFor(column: unknown): unknown {
-  const attr = column as { typeCaster?: unknown; relation?: { isAbleToTypeCast?(): boolean } };
-  if (!(column instanceof Nodes.Node) || attr.relation?.isAbleToTypeCast?.() !== true) return null;
-  return attr.typeCaster ?? null;
+  const relation = (column as { relation?: { isAbleToTypeCast?(): boolean } } | null)?.relation;
+  if (relation?.isAbleToTypeCast?.() !== true) return null;
+  return tryCall(column as object, "typeCaster") ?? null;
 }
 
 /** @internal */
