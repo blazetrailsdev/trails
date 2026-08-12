@@ -303,7 +303,9 @@ export function buildTruncateStatements(
   this: BuildTruncateStatementsHost,
   tableNames: string[],
 ): string[] {
-  return [`TRUNCATE TABLE ${tableNames.map((t) => this.quoteTableName(t)).join(", ")}`];
+  return [
+    `TRUNCATE TABLE ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}`,
+  ];
 }
 
 /** @internal */
