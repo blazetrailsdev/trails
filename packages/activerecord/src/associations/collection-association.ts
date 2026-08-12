@@ -71,6 +71,20 @@ export class CollectionAssociation extends Association {
 
   private _sharedTargetEnabled = false;
 
+  /**
+   * Mirrors: `CollectionAssociation#callback` / `#callbacks_for`
+   * (collection_association.rb:492-505) — instance methods on the association,
+   * assigned as `this`-typed functions (CLAUDE.md's spelling for a body that
+   * lives at its Rails file position) so every call site is Rails'
+   * `callback(:before_add, record)` rather than a free function taking the
+   * receiver as its first argument.
+   *
+   * @internal
+   */
+  callback = callback;
+  /** @internal */
+  callbacksFor = callbacksFor;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
     this.target = [];
@@ -704,7 +718,7 @@ export class CollectionAssociation extends Association {
       const toRemove = this.difference(this.target, otherArray);
       let removable = true;
       for (const r of toRemove) {
-        if (!callback(this, "beforeRemove", r)) {
+        if (!this.callback("beforeRemove", r)) {
           removable = false;
           break;
         }
@@ -715,7 +729,7 @@ export class CollectionAssociation extends Association {
           if (idx !== -1) this.target.splice(idx, 1);
           this.removeInverseInstance(r);
         }
-        for (const r of toRemove) callback(this, "afterRemove", r);
+        for (const r of toRemove) this.callback("afterRemove", r);
       }
       // concat(difference(new_target, target)): add_to_target per record.
       // `added` is that difference — Rails' concat_records returns the full
@@ -1135,7 +1149,7 @@ export class CollectionAssociation extends Association {
     // Rails remove_records: catch(:abort) { each before_remove } || return —
     // an aborted before_remove halts removal (target untouched); returns false.
     for (const record of records) {
-      if (!callback(this, "beforeRemove", record)) {
+      if (!this.callback("beforeRemove", record)) {
         this._lastRemoveAborted = true;
         return false;
       }
@@ -1156,7 +1170,7 @@ export class CollectionAssociation extends Association {
       this.removeInverseInstance(record);
     }
     this._associationIds = null;
-    for (const record of records) callback(this, "afterRemove", record);
+    for (const record of records) this.callback("afterRemove", record);
     return true;
   }
 
@@ -1480,13 +1494,13 @@ function replaceOnTarget(
       (assoc as any)._associationIds = null;
       target.push(record);
     }
-    if (!skipCallbacks) callback(assoc, "afterAdd", record);
+    if (!skipCallbacks) assoc.callback("afterAdd", record);
     return record;
   };
 
   let yielded = false;
   try {
-    if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
+    if (!skipCallbacks && !assoc.callback("beforeAdd", record)) return null;
     assoc.setInverseInstance(record);
     assoc._wasLoaded = true;
     if (block) {
@@ -1505,27 +1519,34 @@ function replaceOnTarget(
 }
 
 /**
- * The owner + reflection pair {@link callback} needs. Both the
- * `CollectionAssociation` and the `CollectionProxy` (which holds the same two
- * pieces under different field names) satisfy it.
+ * The receiver {@link callback} and {@link callbacksFor} run against — Rails'
+ * own `owner` / `reflection` readers plus the two methods themselves, so each
+ * calls the other as Rails does (`callbacks_for(method)`,
+ * collection_association.rb:493). Both the `CollectionAssociation` and the
+ * `CollectionProxy` (which holds the same two pieces under different field
+ * names) satisfy it.
  * @internal
  */
 export interface CallbackHost {
   owner: Base;
   reflection: { name: string; options: object };
+  /** @internal */
+  callback(method: string, record: Base): boolean;
+  /** @internal */
+  callbacksFor(callbackName: string): unknown[];
 }
 
 /**
  * Unified association-callback dispatch. Mirrors Rails'
  * `CollectionAssociation#callback` (collection_association.rb:492), whose
  * lookup half is `callbacks_for` (:498): looks up the registered callbacks for
- * `kind` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
+ * `method` (`beforeAdd`/`afterAdd`/`beforeRemove`/`afterRemove`) and invokes
  * each. Returns `false` if any callback aborts (Rails `throw :abort`,
  * modelled here as a callback returning `false`), so callers can halt the
  * add/remove like Rails' `catch(:abort) ... || return`.
  *
  * Arity note: like Rails, the stored procs take `(method, owner, record)` and
- * this dispatcher passes `kind` through as `method`. The symbol and proc arms
+ * this dispatcher passes the callback name straight through as `method`. The symbol and proc arms
  * ignore it, but the object arm needs it — Rails' `callback.send(method, owner,
  * record)` (builder/collection_association.rb:51) dispatches the callback kind
  * as a method ON the callback object, so binding it at registration time would
@@ -1534,43 +1555,47 @@ export interface CallbackHost {
  * `callback` is private in Rails, hence `@internal`.
  * @internal
  */
-export function callback(assoc: CallbackHost, kind: string, record: Base): boolean {
+export function callback(this: CallbackHost, method: string, record: Base): boolean {
   // Rails wraps only `before_add`/`before_remove` in `catch(:abort)`
   // (collection_association.rb:400-402, 462-464); after callbacks run outside
   // the catch (:408, :485), so a `throw :abort` from after_add/after_remove
   // propagates rather than being silently swallowed.
-  const catchAbort = kind.startsWith("before");
-  for (const cb of callbacksFor(assoc, kind)) {
+  const catchAbort = method.startsWith("before");
+  for (const cb of this.callbacksFor(method)) {
     if (typeof cb !== "function") continue;
     // A before callback halts the add/remove ONLY by throwing the abort sentinel
     // (faithful `throw :abort`); a `false` return no longer halts (Rails 5+).
     if (catchAbort) {
       try {
-        (cb as any)(kind, assoc.owner, record);
+        (cb as any)(method, this.owner, record);
       } catch (e) {
         if (!isAbortSignal(e)) throw e;
         return false;
       }
     } else {
       // after callbacks run outside the catch; their return value is ignored.
-      (cb as any)(kind, assoc.owner, record);
+      (cb as any)(method, this.owner, record);
     }
   }
   return true;
 }
 
-/** @internal */
-function callbacksFor(assoc: CallbackHost, callbackName: string): unknown[] {
+/**
+ * Mirrors: `CollectionAssociation#callbacks_for`
+ * (collection_association.rb:498-505), the lookup half of {@link callback}.
+ * @internal
+ */
+export function callbacksFor(this: CallbackHost, callbackName: string): unknown[] {
   // The builder stores normalized callbacks both as the
   // `<kind>For<Name>` class attribute (Rails parity) and on the reflection
   // options; either is the same array. Prefer the class attribute, matching
   // Rails' `owner.class.send("#{callback_name}_for_#{reflection.name}")`.
-  const fullName = `${callbackName}For${assoc.reflection.name.charAt(0).toUpperCase()}${assoc.reflection.name.slice(1)}`;
-  const owner = assoc.owner.constructor as any;
+  const fullName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
+  const owner = this.owner.constructor as any;
   const stored = owner[fullName];
   if (typeof stored === "function") return stored();
   if (Array.isArray(stored)) return stored;
-  const fromOptions = (assoc.reflection.options as Record<string, unknown>)[callbackName];
+  const fromOptions = (this.reflection.options as Record<string, unknown>)[callbackName];
   return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
 }
 

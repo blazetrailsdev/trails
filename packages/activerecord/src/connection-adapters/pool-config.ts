@@ -147,28 +147,26 @@ export class PoolConfig {
    * adapter's `get_database_version` is fetched through; the adapters
    * themselves stay pure.
    *
-   * Reviewed against the monitor: Rails' `synchronize` here only prevents two
-   * threads both running `get_database_version`; it is a memoization guard,
-   * not a correctness one — either fetch yields the same version, and Ruby's
-   * monitor is reentrant precisely because `configure_connection` re-enters
-   * this method (see below). Locking it would mean the sync arm — which every
-   * caller of a version-gated adapter branch depends on — could no longer
-   * return a value. Left unlocked deliberately.
+   * The ported `synchronize` is async, so the reader is too — every consumer
+   * already awaits `AbstractAdapter#databaseVersion`, which is where the
+   * version-gated adapter branches read it.
+   *
+   * The reentry Ruby's Monitor tolerates is load-bearing here: the fetch opens
+   * the connection, whose `configureConnection` (`abstract_adapter.rb:1212`)
+   * reads the version back through this method from inside the fetch. Our
+   * monitor is reentrant too, so that nested call runs straight through and
+   * recomputes against a still-null `_serverVersion` exactly as Ruby's does.
    */
-  serverVersion(connection: DatabaseAdapter): unknown {
-    // trails-only: `getDatabaseVersion` is a real await on every adapter
-    // whose version comes off the wire, where Rails' is sync.
-    if (this._serverVersion != null) return this._serverVersion;
-    const version = connection.getDatabaseVersion?.();
-    // Only the resolved value is memoized, never the in-flight promise: the
-    // fetch opens the connection, whose `configureConnection`
-    // (`abstract_adapter.rb:1212`) reads back through here, and handing that
-    // nested call the promise it is itself inside would deadlock. Ruby's
-    // `synchronize` is a re-entrant Monitor, so it recomputes there too.
-    if (version instanceof Promise) {
-      return version.then((v) => (this._serverVersion = v));
-    }
-    return (this._serverVersion = version);
+  async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
+    return (
+      this._serverVersion ??
+      (await this.synchronize(async () => {
+        // trails-only: `getDatabaseVersion` is a real await on every adapter
+        // whose version comes off the wire, where Rails' is sync.
+        this._serverVersion ??= await connection.getDatabaseVersion?.();
+        return this._serverVersion;
+      }))
+    );
   }
 
   /**

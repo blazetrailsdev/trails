@@ -3,6 +3,7 @@ import { Relation } from "../relation.js";
 import {
   CollectionAssociation,
   callback as assocCallback,
+  callbacksFor as assocCallbacksFor,
   type CallbackHost,
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
@@ -348,7 +349,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   private get _callbackHost(): CallbackHost {
-    return { owner: this._record, reflection: this._assocDef };
+    return {
+      owner: this._record,
+      reflection: this._assocDef,
+      callback: assocCallback,
+      callbacksFor: assocCallbacksFor,
+    };
   }
 
   /** @internal Association name — used by AssociationRelation. */
@@ -1440,13 +1446,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): Promise<T | null> {
     const { skipCallbacks = false, replace = false } = options;
     const index = this._targetReplaceIndex(record, replace);
-    if (!skipCallbacks && !assocCallback(this._callbackHost, "beforeAdd", record)) {
+    if (!skipCallbacks && !this._callbackHost.callback("beforeAdd", record)) {
       return null;
     }
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     if (save) await save();
     this._commitToTarget(record, index);
-    if (!skipCallbacks) assocCallback(this._callbackHost, "afterAdd", record);
+    if (!skipCallbacks) this._callbackHost.callback("afterAdd", record);
     return record;
   }
 
@@ -1464,7 +1470,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): T | null {
     const { skipCallbacks = false, replace = false, inversing = false } = options;
     const index = this._targetReplaceIndex(record, replace);
-    if (!skipCallbacks && !assocCallback(this._callbackHost, "beforeAdd", record)) {
+    if (!skipCallbacks && !this._callbackHost.callback("beforeAdd", record)) {
       return null;
     }
     if (!inversing) {
@@ -1475,7 +1481,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
     }
     this._commitToTarget(record, index, inversing);
-    if (!skipCallbacks) assocCallback(this._callbackHost, "afterAdd", record);
+    if (!skipCallbacks) this._callbackHost.callback("afterAdd", record);
     return record;
   }
 
@@ -2332,7 +2338,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // return`: if any record's before_remove halts, the entire operation aborts
       // and nothing is deleted (the transaction commits with no work done).
       for (const record of modelRecords) {
-        if (!assocCallback(this._callbackHost, "beforeRemove", record)) {
+        if (!this._callbackHost.callback("beforeRemove", record)) {
           aborted = true;
           return;
         }
@@ -2401,7 +2407,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Remove from target first, then fire after_remove for all records.
       this._removeFromTarget(modelRecords as Base[]);
       for (const record of modelRecords) {
-        assocCallback(this._callbackHost, "afterRemove", record);
+        this._callbackHost.callback("afterRemove", record);
       }
     };
 
@@ -3625,7 +3631,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isThrough) {
       const record = this._buildRecord(attrs) as T;
       if (block) block(record);
-      if (!assocCallback(this._callbackHost, "beforeAdd", record)) {
+      if (!this._callbackHost.callback("beforeAdd", record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
       }
       // Rails' `_create_record` runs the target save INSIDE the transaction —
@@ -3640,7 +3646,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (this._target.length === targetBefore) {
         throw new RecordNotSaved("Failed to create join record for through association", record);
       }
-      assocCallback(this._callbackHost, "afterAdd", record);
+      this._callbackHost.callback("afterAdd", record);
       return record;
     }
     // Rails: `@association.create!(...)` (collection_proxy.rb:319-321).

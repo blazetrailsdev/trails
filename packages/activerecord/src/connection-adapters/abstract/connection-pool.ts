@@ -499,7 +499,7 @@ export class ConnectionPool implements ReapablePool {
     return this._boundSchemaCache;
   }
 
-  serverVersion(connection: DatabaseAdapter): unknown {
+  serverVersion(connection: DatabaseAdapter): Promise<unknown> {
     return this.poolConfig.serverVersion(connection);
   }
 

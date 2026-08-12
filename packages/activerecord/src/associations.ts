@@ -187,6 +187,13 @@ export interface AssociationDefinition {
   isCounterMustBeUpdatedByHasMany?: () => boolean;
   /** Rails' `AbstractReflection#inverse_of` → `inverse_name`. See {@link macro}. */
   inverseName?: () => string | null;
+  /**
+   * Rails' `AbstractReflection#inverse_updates_counter_cache?` (reflection.rb:297,
+   * an alias of `inverse_which_updates_counter_cache`). See {@link macro}.
+   */
+  isInverseUpdatesCounterCache?: () => unknown;
+  /** Rails' `AbstractReflection#klass`. See {@link macro}. */
+  klass?: typeof Base;
 }
 
 /**

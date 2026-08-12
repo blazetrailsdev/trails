@@ -389,6 +389,58 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    // Regression for RFC 0061 pg-cancel-block-half-has-no-regression: nothing
+    // covered the `block` half of `cancel_any_running_query`
+    // (postgresql/database_statements.rb:131) — deleting the
+    // `await this._blockUntilCommandSettles(txClient)` line left the suite
+    // green. Its postcondition is libpq's own: once `block` returns, the
+    // cancelled command is off the wire, so `PQtransactionStatus` is no longer
+    // PQTRANS_ACTIVE. On an unloaded host the backend's ErrorResponse happens to
+    // land before the CancelRequest socket closes, so that byte alone does not
+    // discriminate; the deferred stand-in below reproduces the "command has not
+    // come back yet" state CI's loaded runner produces, and pins that the cancel
+    // does not resolve ahead of it.
+    it("cancelAnyRunningQuery waits for the cancelled command to come back", async () => {
+      const PQTRANS_ACTIVE = 1;
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.beginDbTransaction();
+        const sleep = other.execute("SELECT pg_sleep(2)").catch(() => {});
+        await new Promise<void>((r) => setTimeout(r, 200));
+        expect(other.transactionStatus).toBe(PQTRANS_ACTIVE);
+
+        const internals = other as unknown as {
+          _cancelAnyRunningQuery(): Promise<void>;
+          _blockUntilCommandSettles(client: unknown): Promise<void>;
+        };
+        // Spy the INSTANCE, not the prototype: the adapter reads the method off
+        // `this`, and a prototype spy would be shadowed by nothing here but is
+        // shared with every other adapter in the worker.
+        const blockUntilCommandSettles = internals._blockUntilCommandSettles.bind(other);
+        let releaseBlock!: () => void;
+        const blocked = new Promise<void>((r) => (releaseBlock = r));
+        internals._blockUntilCommandSettles = async (client: unknown): Promise<void> => {
+          await blocked;
+          await blockUntilCommandSettles(client);
+        };
+
+        let cancelReturned = false;
+        const cancel = internals._cancelAnyRunningQuery().then(() => {
+          cancelReturned = true;
+        });
+        await new Promise<void>((r) => setTimeout(r, 50));
+        expect(cancelReturned).toBe(false);
+        releaseBlock();
+        await cancel;
+        expect(other.transactionStatus).not.toBe(PQTRANS_ACTIVE);
+
+        await sleep;
+        await other.rollbackDbTransaction();
+      } finally {
+        await other.close();
+      }
+    });
+
     // Rails' `cancel_any_running_query` has nothing to cancel once the lock
     // covers each query's whole life — `rollback_transaction` takes the same
     // lock (abstract/transaction.rb:611) and finds an idle transaction status.
