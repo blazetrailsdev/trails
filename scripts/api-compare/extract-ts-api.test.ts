@@ -728,6 +728,25 @@ describe("body call capture", () => {
     expect(unpin.calls).toEqual(["checkin", "connection", "lock", "synchronize"]);
   });
 
+  it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
+    // Deliberate over-drop: the enclosing occurrence is no less ambiguous than
+    // the closure's. Ruby's counterpart may be either the lambda-at-definition
+    // position or the block-at-call one, so neither TS occurrence can be
+    // matched against it. The call SET still records the name.
+    const cls = extractFromSource(
+      `class Foo {
+        touchCallbacks() {
+          const cb = () => { this.touchRecord(); };
+          this.afterCreate(cb);
+          this.afterUpdate(() => { this.touchRecord(); });
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "touchCallbacks")!;
+    expect(m.callSeq).toEqual(["afterCreate", "afterUpdate"]);
+    expect(m.calls).toEqual(["afterCreate", "afterUpdate", "touchRecord"]);
+  });
+
   it("keeps an INLINE function argument in the order stream", () => {
     // Only a local binding is ambiguous; a function passed as an argument is
     // the port's spelling of a Ruby block and stays deferred-but-recorded.

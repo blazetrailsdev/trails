@@ -2933,7 +2933,10 @@ function collectCalls(
   // names outright — position unknown is not position wrong — rather than
   // picking a side and flagging every body that matches the other. The call SET
   // is unaffected: it is collected with `skipHoistedClosures` off, so every
-  // name inside a hoisted closure still counts toward it.
+  // name inside a hoisted closure still counts toward it. A name the enclosing
+  // body ALSO calls is dropped with it, deliberately: the enclosing occurrence
+  // is no less ambiguous, since Ruby's single counterpart may correspond to
+  // either position.
   const hoisted = skipHoistedClosures ? hoistedClosureCalls(node) : undefined;
   const addNegated = (expr: ts.Node, ...called: string[]): void => {
     if (!isNegatedOperand(expr)) return;

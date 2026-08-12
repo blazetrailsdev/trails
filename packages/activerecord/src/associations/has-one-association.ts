@@ -341,8 +341,30 @@ export class HasOneAssociation extends SingularAssociation {
     }
     {
       if (record) (this as any).raiseOnTypeMismatchBang(record);
-      const assigningAnotherRecord = !sameRecord(this.target, record);
+      const displaced = this.target;
+      const assigningAnotherRecord = !sameRecord(displaced, record);
       if (assigningAnotherRecord || record?.hasChangesToSave === true) {
+        // Rails' `remove_target!(options[:dependent])` (:69) runs on this arm
+        // too — `save = false` gates only `transaction_if` (:68) and
+        // `record.save` (:75). Its default arm is `nullify_owner_attributes` +
+        // `remove_inverse_instance` (:104-106), both in memory, so they run
+        // here. Only `target.save` (:108) and the `:delete` / `:destroy` arms
+        // (:97-101) need an `await` this synchronous arm cannot issue, so the
+        // awaitable callers run those — `detachDisplacedTarget` from the
+        // `build#{name}` / `create#{name}` accessors (builder/has-one.ts,
+        // `_createRecord`) and from the nested-attributes writer
+        // (nested-attributes.ts, `detachDisplacedThenSetNewRecord`).
+        if (
+          displaced &&
+          assigningAnotherRecord &&
+          (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true
+        ) {
+          const dependent = (this.reflection.options.dependent as string) ?? "";
+          if (dependent !== "delete" && dependent !== "destroy") {
+            this.nullifyOwnerAttributes(displaced);
+            this.removeInverseInstance(displaced);
+          }
+        }
         if (record) {
           // Set the foreign key (from the owner's — possibly still-nil — primary
           // key) and inverse in memory. Persistence is Rails'
@@ -573,19 +595,7 @@ export class HasOneAssociation extends SingularAssociation {
    * already detached.
    */
   protected override setNewRecord(record: Base): void {
-    const displaced = this.target;
-    const assigningAnother = !sameRecord(displaced, record);
     this.replace(record, false);
-    if (!displaced || !assigningAnother) return;
-    if ((displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true) return;
-    if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
-    const dependent = (this.reflection.options.dependent as string) ?? "";
-    if (dependent !== "delete" && dependent !== "destroy") {
-      // `remove_target!`'s else branch (:104-106) is synchronous in Rails; only
-      // its `target.save` (:108) needs an await, so do the memory half now.
-      this.nullifyOwnerAttributes(displaced);
-      this.removeInverseInstance(displaced);
-    }
   }
 
   private async removeTargetBang(method: string): Promise<void> {
