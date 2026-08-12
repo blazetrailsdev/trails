@@ -348,10 +348,12 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   // `cachedFindByStatement` lazily calls `initializeFindByCache` — we run it
   // here the first time a class generates its methods, gated on an *own*
   // `_generatedAttributeMethods` so each subclass initializes exactly once.
-  // ActiveModel's `generated_attribute_methods` builds a bare `Module` under
-  // that same name if it generates first, so the gate also checks the class:
-  // Rails' AR override is what names the module (`const_set`), and it is the
-  // one this class must end up with.
+  // Rails runs it from `included do` (attribute_methods.rb:10-11), before any
+  // class body can reach `generated_attribute_methods`; here a class-body
+  // `alias_attribute` gets there first and ActiveModel builds a bare `Module`
+  // under the same ivar name (attribute_methods.rb:400-402), so the gate also
+  // checks the class — Rails' AR override is what names the module
+  // (`const_set`), and it is the one this class must end up with.
   if (
     !Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods") ||
     !(this._generatedAttributeMethods instanceof GeneratedAttributeMethods)
