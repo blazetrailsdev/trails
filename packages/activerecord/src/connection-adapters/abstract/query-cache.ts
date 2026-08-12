@@ -652,7 +652,7 @@ function cacheSql(
   const qc = this._queryCache;
   if (!qc) return block();
   const key = sqlCacheKey(sql, binds);
-  return qc.computeIfAbsent(key, block);
+  return qc.computeIfAbsent(key, () => block());
 }
 
 /**

@@ -14,7 +14,7 @@ import { Message } from "./message.js";
 
 export class Cipher {
   encrypt(clearText: string | Buffer, options: { key: string; deterministic?: boolean }): Message {
-    return this.cipherFor(options.key, options.deterministic ?? false).encrypt(clearText, options);
+    return this.cipherFor(options.key, options.deterministic ?? false).encrypt(clearText);
   }
 
   decrypt(

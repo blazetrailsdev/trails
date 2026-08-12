@@ -69,7 +69,7 @@ export async function updateCounters(
   options?: { touch?: CounterCacheTouchOption },
 ): Promise<number> {
   const relation = this.unscoped().where(buildPkPredicate(this, id));
-  return relation.updateCounters(counters, options);
+  return relation.updateCounters({ ...counters, touch: options?.touch });
 }
 
 /**

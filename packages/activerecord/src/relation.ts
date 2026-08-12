@@ -5871,8 +5871,10 @@ export class Relation<T extends Base> {
    * wrapper keeps NULL counters from propagating through the arithmetic.
    */
   async updateCounters(
-    counters: Record<string, number | { time?: Temporal.Instant }>,
-    options?: { touch?: CounterCacheTouchOption },
+    counters: Record<
+      string,
+      number | { time?: Temporal.Instant } | CounterCacheTouchOption | undefined
+    >,
   ): Promise<number> {
     // No `none?` guard here: Rails' update_counters (relation.rb:926-944) ends
     // in `update_all updates` and inherits the `return 0 if @none` from there
@@ -5896,9 +5898,7 @@ export class Relation<T extends Base> {
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
-    const touchOption = (touchFromCounters ?? options?.touch) as
-      | CounterCacheTouchOption
-      | undefined;
+    const touchOption = touchFromCounters as CounterCacheTouchOption | undefined;
     if (touchOption) {
       // Mirror Rails relation.rb: parse touch into names + time (`{ time: }`
       // hash form; `touch: []` → no names), then touch the update-timestamp

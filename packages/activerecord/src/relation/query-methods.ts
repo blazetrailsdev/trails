@@ -916,8 +916,9 @@ export function buildWhereClause(
       const resolved = aliases[key] ?? key;
       normalized[resolved] = value;
     }
-    const block = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
-    const parts = this.predicateBuilder.buildFromHash(normalized, block);
+    const parts = this.predicateBuilder.buildFromHash(normalized, (tableName: string) =>
+      lookupTableKlassFromJoinDependencies.call(this, tableName),
+    );
     return new WhereClause(parts);
   }
 
@@ -2141,10 +2142,10 @@ export function arelColumnWithTable(
     // Rails passes `lookup_table_klass_from_join_dependencies` as the block
     // (query_methods.rb:1982-1984), so a table name that only resolves through a
     // join dependency still finds its model — and its type caster.
-    const block = (name: string) => lookupTableKlassFromJoinDependencies.call(this, name);
     return (
-      builder?.resolveArelAttribute?.(tableName, colStr, block) ??
-      new ArelTable(tableName).get(colStr)
+      builder?.resolveArelAttribute?.(tableName, colStr, (name: string) =>
+        lookupTableKlassFromJoinDependencies.call(this, name),
+      ) ?? new ArelTable(tableName).get(colStr)
     );
   }
   const quotedTable = safeQuoteTableName(modelClass, tableName);

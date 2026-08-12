@@ -159,7 +159,7 @@ describe("touch_all / update_counters with empty updates", () => {
     // `touch: []` is truthy in Ruby too, so Rails calls
     // touch_attributes_with_time with no names; on a model without
     // updated_at/updated_on that yields {} and update_all raises.
-    await expect(Post.all().updateCounters({}, { touch: [] })).rejects.toThrow(
+    await expect(Post.all().updateCounters({ touch: [] })).rejects.toThrow(
       new ArgumentError("Empty list of attributes to change"),
     );
   });
@@ -167,7 +167,7 @@ describe("touch_all / update_counters with empty updates", () => {
   it("update_counters still updates when only the touch option contributes columns", async () => {
     const first = topics("first");
     const before = await Topic.find(first.id);
-    const count = await Topic.where({ id: first.id }).updateCounters({}, { touch: true });
+    const count = await Topic.where({ id: first.id }).updateCounters({ touch: true });
 
     expect(count).toBe(1);
     const after = await Topic.find(first.id);

@@ -167,7 +167,7 @@ export class UniquenessValidator extends EachValidator {
     if (value == null && o.allowNil === true) return;
     if (isBlank(value) && o.allowBlank === true) return;
 
-    const finderClass = findFinderClassFor(record, this._klass) ?? record.constructor;
+    const finderClass = this.findFinderClassFor(record) ?? record.constructor;
     if (!finderClass.where) return;
 
     const mapped = mapEnumAttribute(finderClass, attribute, value);
@@ -189,7 +189,7 @@ export class UniquenessValidator extends EachValidator {
     // that constructs the validator directly with a strict option.
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
-    let [relation] = await buildRelation(finderClass, attribute, mapped, this.options);
+    let [relation] = await this.buildRelation(finderClass, attribute, mapped);
 
     if (record.isPersisted?.()) {
       const pk = finderClass.primaryKey;
@@ -217,7 +217,7 @@ export class UniquenessValidator extends EachValidator {
       }
     }
 
-    relation = scopeRelation(record, relation, this.options);
+    relation = this.scopeRelation(record, relation);
 
     if (opts?.conditions && typeof opts.conditions === "function") {
       const conditioned =
@@ -232,37 +232,185 @@ export class UniquenessValidator extends EachValidator {
       record.errors.add(attribute, ":taken", errorOpts);
     }
   }
-}
 
-/**
- * Walks up the inheritance chain from `record.class` to the validator's
- * configured `:class` option, returning the first non-abstract class —
- * mirrors Rails' rule that the existence check must run from a concrete
- * (non-abstract) class.
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#find_finder_class_for
- *
- * @internal
- */
-function findFinderClassFor(record: any, klassOption: any): any {
-  // Rails walks from record.class up to @klass, tracking the most-recent
-  // non-abstract class; STI uses this so the existence query targets the
-  // class where the validation was declared (and its scope/table). When
-  // @klass is unset in Trails, bound the walk at the AR/AM boundary
-  // (parent class without `.where`) so we don't leak into ActiveModel.
-  let current = record.constructor;
-  let lastConcrete: any = null;
-  while (current) {
-    if (!current.abstractClass && typeof current.where === "function") {
-      lastConcrete = current;
+  /**
+   * Walks up the inheritance chain from `record.class` to the validator's
+   * configured `:class` option, returning the first non-abstract class —
+   * mirrors Rails' rule that the existence check must run from a concrete
+   * (non-abstract) class.
+   *
+   * Mirrors: ActiveRecord::Validations::UniquenessValidator#find_finder_class_for
+   *
+   * @internal
+   */
+  private findFinderClassFor(record: any): any {
+    // Rails walks from record.class up to @klass, tracking the most-recent
+    // non-abstract class; STI uses this so the existence query targets the
+    // class where the validation was declared (and its scope/table). When
+    // @klass is unset in Trails, bound the walk at the AR/AM boundary
+    // (parent class without `.where`) so we don't leak into ActiveModel.
+    let current = record.constructor;
+    let lastConcrete: any = null;
+    while (current) {
+      if (!current.abstractClass && typeof current.where === "function") {
+        lastConcrete = current;
+      }
+      if (current === this._klass) break;
+      const parent = Object.getPrototypeOf(current);
+      if (!parent || parent === Function.prototype || parent === Object) break;
+      if (typeof parent.where !== "function") break;
+      current = parent;
     }
-    if (current === klassOption) break;
-    const parent = Object.getPrototypeOf(current);
-    if (!parent || parent === Function.prototype || parent === Object) break;
-    if (typeof parent.where !== "function") break;
-    current = parent;
+    return lastConcrete ?? record.constructor;
   }
-  return lastConcrete ?? record.constructor;
+
+  /**
+   * Builds the base existence-check relation: `klass.unscoped.where(attr = value)`,
+   * with case-sensitivity honoring the `:case_sensitive` option (and the
+   * adapter's default collation when unspecified).
+   *
+   * Mirrors: ActiveRecord::Validations::UniquenessValidator#build_relation
+   *
+   * @internal
+   */
+  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<[any]> {
+    // Wrapped in a tuple because Relation is thenable — a bare `await` would
+    // execute the query and resolve to the row array.
+    const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
+
+    // Resolve an attribute alias (`alias_attribute :new_content, :content`) to its
+    // underlying column before building the comparison — Rails routes the bind
+    // through the predicate builder, which resolves aliases.
+    attribute = (klass._attributeAliases?.[attribute] as string) ?? attribute;
+
+    // Resolve an association attribute (`validates :event`) to its foreign-key
+    // column for the comparison. `value` already arrives as the FK scalar; if a
+    // record is passed (Rails routes the association object through), read its
+    // primary key. Mirrors build_relation's reflection branch.
+    const refl = klass._reflectOnAssociation?.(attribute);
+    if (refl) {
+      const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
+      if (
+        value != null &&
+        typeof value === "object" &&
+        typeof (value as any).readAttribute === "function"
+      ) {
+        const pk = refl.klass?.primaryKey ?? "id";
+        value = (value as any).readAttribute(Array.isArray(pk) ? pk[0] : pk);
+      }
+      attribute = fk;
+    }
+
+    // A nil value must compare as `IS NULL`, not `= NULL` (which never matches).
+    // `where({ col: null })` emits the IS NULL form; Rails routes nil through the
+    // predicate builder for the same effect.
+    if (value == null) {
+      return [base.where({ [attribute]: null })];
+    }
+
+    const arel = klass.arelTable as { get?: (n: string) => any } | null;
+    const pb = (
+      base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
+    ).predicateBuilder;
+    const adapter = klass.connection ?? null;
+    const hasCsKey = Object.prototype.hasOwnProperty.call(this.options, "caseSensitive");
+    const typeObj =
+      typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
+
+    // Serialized columns (`serialize :content`) store the coder-dumped form, but
+    // the value is NOT serialized here: the bind path below runs it through the
+    // attribute's (decorated, coder-wrapping) type, which the arel table resolves
+    // via `typeForAttribute` — so `buildBindAttribute` / `where` already emit the
+    // coder-dumped form. Serializing here too would double-dump (`"x\n"` →
+    // `"x\n\n"`) and never match the stored row. Mirrors Rails' `build_relation`,
+    // which hands the raw value to `bind_attribute` and lets the type serialize.
+
+    // When the attribute supports unencrypted data alongside encrypted values, the
+    // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
+    // arg so processArguments can expand the IN list to include the plain-text variant.
+    // The Arel node path below bypasses processArguments entirely and would miss rows
+    // stored without encryption.
+    if (typeObj?.supportUnencryptedData) {
+      return [base.where({ [attribute]: value })];
+    }
+
+    // Rails routes the comparison through the adapter (defaultUniquenessComparison
+    // / caseSensitiveComparison / caseInsensitiveComparison) so adapters with
+    // CI collations / native ILIKE / case-insensitive types can pick the right
+    // SQL form without wrapping the column in LOWER() and defeating indexes.
+    if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
+      const attr = arel.get(attribute);
+      const bind = pb.buildBindAttribute(attribute, value);
+      let comparison: any = null;
+      if (!hasCsKey || value == null) {
+        comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
+      } else if (this.options.caseSensitive) {
+        comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
+      } else {
+        // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
+        // which returns false from can_perform_case_insensitive_comparison_for? for uuid
+        // (PG has no lower(uuid) function). Use plain equality instead.
+        const colType =
+          typeObj == null
+            ? null
+            : typeof typeObj.type === "function"
+              ? typeObj.type()
+              : typeObj.type;
+        if (colType !== "uuid") {
+          comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
+          if (comparison == null && typeof value === "string") {
+            // No native CI form — fall back to LOWER() with a lowercased bind.
+            // Keeps the bind parameterized so the prepared-statement cache
+            // stays effective.
+            const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
+            comparison = attr.lower().eq(lowerBind);
+          }
+        }
+      }
+      if (comparison != null && typeof base.where === "function") {
+        return [base.where(comparison)];
+      }
+    }
+    return [base.where({ [attribute]: value })];
+  }
+
+  /**
+   * Adds `WHERE scope = record.scope` clauses for each `:scope` option,
+   * resolving association-name scopes to their underlying FK value.
+   *
+   * Mirrors: ActiveRecord::Validations::UniquenessValidator#scope_relation
+   *
+   * @internal
+   */
+  private scopeRelation(record: any, relation: any): any {
+    const scope = this.options.scope;
+    if (scope == null) return relation;
+    const scopes = Array.isArray(scope) ? (scope as string[]) : [scope as string];
+    let r = relation;
+    for (const rawItem of scopes) {
+      const ctor = record.constructor;
+      // Resolve an alias scope (`scope: :new_parent_id`) to the real column.
+      const item = (ctor._attributeAliases?.[rawItem] as string) ?? rawItem;
+      const refl = ctor._reflectOnAssociation?.(item);
+      if (refl) {
+        // Read FK (and foreignType for polymorphic) directly off the record —
+        // do NOT load the association (Rails routes through the proxy reader,
+        // but in TS this can trigger lazy-load and strict-loading violations).
+        const isPoly =
+          typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
+        const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
+        for (const fk of fks) {
+          r = r.where({ [fk]: record.readAttribute?.(fk) });
+        }
+        if (isPoly && refl.foreignType) {
+          r = r.where({ [refl.foreignType]: record.readAttribute?.(refl.foreignType) });
+        }
+      } else {
+        r = r.where({ [item]: record.readAttribute?.(item) });
+      }
+    }
+    return r;
+  }
 }
 
 /**
@@ -386,154 +534,6 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
     if (isPoly && refl.foreignType) out.push(refl.foreignType);
   }
   return out.filter((x) => x != null);
-}
-
-/**
- * Builds the base existence-check relation: `klass.unscoped.where(attr = value)`,
- * with case-sensitivity honoring the `:case_sensitive` option (and the
- * adapter's default collation when unspecified).
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#build_relation
- *
- * @internal
- */
-async function buildRelation(
-  klass: any,
-  attribute: string,
-  value: unknown,
-  options: Record<string, unknown>,
-): Promise<[any]> {
-  // Wrapped in a tuple because Relation is thenable — a bare `await` would
-  // execute the query and resolve to the row array.
-  const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
-
-  // Resolve an attribute alias (`alias_attribute :new_content, :content`) to its
-  // underlying column before building the comparison — Rails routes the bind
-  // through the predicate builder, which resolves aliases.
-  attribute = (klass._attributeAliases?.[attribute] as string) ?? attribute;
-
-  // Resolve an association attribute (`validates :event`) to its foreign-key
-  // column for the comparison. `value` already arrives as the FK scalar; if a
-  // record is passed (Rails routes the association object through), read its
-  // primary key. Mirrors build_relation's reflection branch.
-  const refl = klass._reflectOnAssociation?.(attribute);
-  if (refl) {
-    const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
-    if (
-      value != null &&
-      typeof value === "object" &&
-      typeof (value as any).readAttribute === "function"
-    ) {
-      const pk = refl.klass?.primaryKey ?? "id";
-      value = (value as any).readAttribute(Array.isArray(pk) ? pk[0] : pk);
-    }
-    attribute = fk;
-  }
-
-  // A nil value must compare as `IS NULL`, not `= NULL` (which never matches).
-  // `where({ col: null })` emits the IS NULL form; Rails routes nil through the
-  // predicate builder for the same effect.
-  if (value == null) {
-    return [base.where({ [attribute]: null })];
-  }
-
-  const arel = klass.arelTable as { get?: (n: string) => any } | null;
-  const pb = (base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } })
-    .predicateBuilder;
-  const adapter = klass.connection ?? null;
-  const hasCsKey = Object.prototype.hasOwnProperty.call(options, "caseSensitive");
-  const typeObj =
-    typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
-
-  // Serialized columns (`serialize :content`) store the coder-dumped form, but
-  // the value is NOT serialized here: the bind path below runs it through the
-  // attribute's (decorated, coder-wrapping) type, which the arel table resolves
-  // via `typeForAttribute` — so `buildBindAttribute` / `where` already emit the
-  // coder-dumped form. Serializing here too would double-dump (`"x\n"` →
-  // `"x\n\n"`) and never match the stored row. Mirrors Rails' `build_relation`,
-  // which hands the raw value to `bind_attribute` and lets the type serialize.
-
-  // When the attribute supports unencrypted data alongside encrypted values, the
-  // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
-  // arg so processArguments can expand the IN list to include the plain-text variant.
-  // The Arel node path below bypasses processArguments entirely and would miss rows
-  // stored without encryption.
-  if (typeObj?.supportUnencryptedData) {
-    return [base.where({ [attribute]: value })];
-  }
-
-  // Rails routes the comparison through the adapter (defaultUniquenessComparison
-  // / caseSensitiveComparison / caseInsensitiveComparison) so adapters with
-  // CI collations / native ILIKE / case-insensitive types can pick the right
-  // SQL form without wrapping the column in LOWER() and defeating indexes.
-  if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
-    const attr = arel.get(attribute);
-    const bind = pb.buildBindAttribute(attribute, value);
-    let comparison: any = null;
-    if (!hasCsKey || value == null) {
-      comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
-    } else if (options.caseSensitive) {
-      comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
-    } else {
-      // UUID columns are already canonical lowercase — skip LOWER() to match Rails,
-      // which returns false from can_perform_case_insensitive_comparison_for? for uuid
-      // (PG has no lower(uuid) function). Use plain equality instead.
-      const colType =
-        typeObj == null ? null : typeof typeObj.type === "function" ? typeObj.type() : typeObj.type;
-      if (colType !== "uuid") {
-        comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
-        if (comparison == null && typeof value === "string") {
-          // No native CI form — fall back to LOWER() with a lowercased bind.
-          // Keeps the bind parameterized so the prepared-statement cache
-          // stays effective.
-          const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
-          comparison = attr.lower().eq(lowerBind);
-        }
-      }
-    }
-    if (comparison != null && typeof base.where === "function") {
-      return [base.where(comparison)];
-    }
-  }
-  return [base.where({ [attribute]: value })];
-}
-
-/**
- * Adds `WHERE scope = record.scope` clauses for each `:scope` option,
- * resolving association-name scopes to their underlying FK value.
- *
- * Mirrors: ActiveRecord::Validations::UniquenessValidator#scope_relation
- *
- * @internal
- */
-function scopeRelation(record: any, relation: any, options: Record<string, unknown>): any {
-  const scope = options.scope;
-  if (scope == null) return relation;
-  const scopes = Array.isArray(scope) ? (scope as string[]) : [scope as string];
-  let r = relation;
-  for (const rawItem of scopes) {
-    const ctor = record.constructor;
-    // Resolve an alias scope (`scope: :new_parent_id`) to the real column.
-    const item = (ctor._attributeAliases?.[rawItem] as string) ?? rawItem;
-    const refl = ctor._reflectOnAssociation?.(item);
-    if (refl) {
-      // Read FK (and foreignType for polymorphic) directly off the record —
-      // do NOT load the association (Rails routes through the proxy reader,
-      // but in TS this can trigger lazy-load and strict-loading violations).
-      const isPoly =
-        typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
-      const fks = Array.isArray(refl.foreignKey) ? refl.foreignKey : [refl.foreignKey];
-      for (const fk of fks) {
-        r = r.where({ [fk]: record.readAttribute?.(fk) });
-      }
-      if (isPoly && refl.foreignType) {
-        r = r.where({ [refl.foreignType]: record.readAttribute?.(refl.foreignType) });
-      }
-    } else {
-      r = r.where({ [item]: record.readAttribute?.(item) });
-    }
-  }
-  return r;
 }
 
 /**

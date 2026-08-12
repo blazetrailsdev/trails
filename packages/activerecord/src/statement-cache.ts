@@ -26,12 +26,10 @@ export class Substitute {}
  * Mirrors: ActiveRecord::StatementCache::Query
  */
 export class Query {
-  readonly retryable: boolean;
   private _sql: string;
 
-  constructor(sql: string, options: { retryable?: boolean } = {}) {
+  constructor(sql: string) {
     this._sql = sql;
-    this.retryable = options.retryable ?? false;
   }
 
   sqlFor(_binds: unknown[], _connection: unknown): string {
@@ -47,8 +45,8 @@ export class PartialQuery extends Query {
   private _values: unknown[];
   private _indexes: number[];
 
-  constructor(values: unknown[], options: { retryable?: boolean } = {}) {
-    super("", options);
+  constructor(values: unknown[]) {
+    super("");
     this._values = values;
     this._indexes = [];
     for (let i = 0; i < values.length; i++) {
@@ -177,12 +175,12 @@ export class StatementCache {
     this._model = model;
   }
 
-  static query(sql: string, options: { retryable?: boolean } = {}): Query {
-    return new Query(sql, options);
+  static query(sql: string): Query {
+    return new Query(sql);
   }
 
-  static partialQuery(values: unknown[], options: { retryable?: boolean } = {}): PartialQuery {
-    return new PartialQuery(values, options);
+  static partialQuery(values: unknown[]): PartialQuery {
+    return new PartialQuery(values);
   }
 
   static partialQueryCollector(): PartialQueryCollector {
@@ -244,7 +242,7 @@ export class StatementCache {
     try {
       const bindValues = this._bindMap.bind(params);
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
-      const allowRetry = opts.allowRetry ?? this._queryBuilder.retryable;
+      const allowRetry = opts.allowRetry ?? false;
       // PartialQuery inlines values into the SQL string — pass empty binds
       // to avoid findBySql trying to re-substitute them. This matches Rails:
       // PartialQuery#sql_for drains the bind_values array in place via

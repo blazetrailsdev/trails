@@ -10,32 +10,8 @@
     "package": "activerecord",
     "tsFile": "validations/uniqueness.ts",
     "rubyName": "validate_each",
-    "call": "build_relation",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:finderClass",
-      "ref:attribute",
-      "ref:value"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "validations/uniqueness.ts",
-    "rubyName": "validate_each",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "validations/uniqueness.ts",
-    "rubyName": "validate_each",
-    "call": "find_finder_class_for",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:record"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -50,18 +26,6 @@
     "rubyName": "validate_each",
     "call": "order:constructor,mapEnumAttribute",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "validations/uniqueness.ts",
-    "rubyName": "validate_each",
-    "call": "scope_relation",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:record",
-      "ref:relation"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
