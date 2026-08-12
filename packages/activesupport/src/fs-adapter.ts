@@ -33,6 +33,14 @@ export interface FsAdapter {
   readdirSync(path: string, options: { withFileTypes: true }): FsDirent[];
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
   rmdirSync(path: string): void;
+  /** Sync rename — used for the temp-file swap in `File.atomic_write`. */
+  renameSync(src: string, dest: string): void;
+  /**
+   * Advisory file lock on an open descriptor, mirroring Ruby `File#flock` with
+   * `File::LOCK_EX` / `File::LOCK_UN`. Optional: Node's `fs` exposes no flock,
+   * so callers (FileStore#lockFile) degrade to running the block unlocked.
+   */
+  flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
   /**
    * Sync realpath — resolves symlinks, mirroring Ruby File.realpath. Optional;

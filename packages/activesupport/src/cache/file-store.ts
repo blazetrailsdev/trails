@@ -1,7 +1,8 @@
 import { getFs, getPath } from "../fs-adapter.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
-import { Store, type StoreOptions } from "./store.js";
+import { Store, inspectOptions, type StoreOptions } from "./store.js";
+import { atomicWrite } from "../core-ext/file/atomic.js";
 import { integer } from "./integer.js";
 import { hexdigest } from "../hexdigest.js";
 import { registerStoreClass } from "./store-registry.js";
@@ -138,6 +139,15 @@ export class FileStore extends Store implements CacheStore {
     });
   }
 
+  // Mirrors Rails FileStore#inspect (file_store.rb:97-99). Ruby's
+  // `self.class.name` is the fully-qualified constant; TS has only the class
+  // name, which is the same last segment.
+  inspect(): string {
+    return `#<${this.constructor.name} cache_path=${this._cachePath}, options=${inspectOptions(
+      this.options as Record<string, unknown>,
+    )}>`;
+  }
+
   // Mirrors Rails FileStore#read_entry (file_store.rb:114-119): the payload
   // bytes come back from readSerializedEntry and only a real Entry is returned,
   // so a stray file in the cache directory degrades to a miss.
@@ -168,11 +178,12 @@ export class FileStore extends Store implements CacheStore {
 
   // Mirrors Rails FileStore#write_serialized_entry (file_store.rb:132-137):
   // unless_exist refuses the write when the file merely exists, regardless of
-  // expiry. Rails' File.atomic_write has no fs-adapter analogue.
+  // expiry. The payload lands through File.atomic_write, so a crash mid-write
+  // leaves the previous file rather than a truncated one.
   protected writeSerializedEntry(key: string, payload: string, options: StoreOptions): boolean {
     if (options.unlessExist && getFs().existsSync(key)) return false;
     this.ensureCachePath(getPath().dirname(key));
-    getFs().writeFileSync(key, payload, "utf-8");
+    atomicWrite(key, this.cachePath, (f) => f.write(payload));
     return true;
   }
 
@@ -190,6 +201,28 @@ export class FileStore extends Store implements CacheStore {
       }
     } else {
       return false;
+    }
+  }
+
+  // Lock a file for a block so only one process can modify it at a time
+  // (file_store.rb:140-153). An adapter without `flockSync` — Node's `fs`
+  // exposes no flock — still opens and closes the file, and the block runs
+  // unlocked, which is the missing-file arm's behaviour anyway.
+  protected lockFile<T>(fileName: string, block: () => T): T {
+    if (getFs().existsSync(fileName)) {
+      const f = getFs().openSync(fileName, "r+");
+      try {
+        getFs().flockSync?.(f, "ex");
+        return block();
+      } finally {
+        try {
+          getFs().flockSync?.(f, "un");
+        } finally {
+          getFs().closeSync(f);
+        }
+      }
+    } else {
+      return block();
     }
   }
 
@@ -307,18 +340,23 @@ export class FileStore extends Store implements CacheStore {
     // it uniformly for the seed write, the return, and the hit-path addition;
     // `Integer()` raises on NaN/Infinity rather than silently truncating.
     amount = integer(amount);
-    const entry = this.readEntry(key, options);
-    if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-      this.write(name, amount, options);
-      return amount;
-    }
-    const num = toI(entry.value) + amount;
-    this.writeEntry(
-      key,
-      new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
-      options,
-    );
-    return num;
+
+    return this.lockFile(key, () => {
+      const entry = this.readEntry(key, options);
+
+      if (!entry || entry.isExpired() || entry.isMismatched(version)) {
+        this.write(name, amount, options);
+        return amount;
+      } else {
+        const num = toI(entry.value) + amount;
+        this.writeEntry(
+          key,
+          new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
+          options,
+        );
+        return num;
+      }
+    });
   }
 }
 

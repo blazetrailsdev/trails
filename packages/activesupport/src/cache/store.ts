@@ -729,3 +729,30 @@ export abstract class Store {
     return result;
   }
 }
+
+/**
+ * Ruby `Hash#inspect` over a store's `@options`, for the `inspect` strings the
+ * cache stores build (cache.rb / file_store.rb:97-99, memory_store.rb:186-188).
+ * The keys stand in for Ruby Symbols, so they render with a leading colon.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (Hash#inspect), not Rails, so no
+ * Ruby file maps onto it.
+ */
+export function inspectOptions(options: Record<string, unknown>): string {
+  const pairs = Object.entries(options).map(([k, v]) => `:${k}=>${inspectValue(v)}`);
+  return `{${pairs.join(", ")}}`;
+}
+
+function inspectValue(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(inspectValue).join(", ")}]`;
+  if (typeof value === "object") {
+    const proto = Object.getPrototypeOf(value) as object | null;
+    if (proto !== Object.prototype && proto !== null) {
+      return `#<${(value.constructor as { name?: string } | undefined)?.name ?? "Object"}>`;
+    }
+    return inspectOptions(value as Record<string, unknown>);
+  }
+  return String(value);
+}

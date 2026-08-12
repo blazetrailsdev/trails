@@ -18,6 +18,7 @@ import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
+import { defaultValue } from "../type.js";
 import { arelColumn, arelColumns, buildCteSql, buildJoinDependencies } from "./query-methods.js";
 
 /**
@@ -469,51 +470,6 @@ function projectOnRelationTable(
  */
 function eagerJoinedRelation(rel: CalculationRelation, eagerLoading: boolean): CalculationRelation {
   return rel.applyJoinDependency({ eagerLoading });
-}
-
-async function singleAggregate(
-  rel: CalculationRelation,
-  fn: AggFn,
-  column: string | Nodes.Node,
-  coerceNumeric: boolean = true,
-  distinct: boolean | null = rel._isDistinct,
-): Promise<unknown | null> {
-  // Rails routes aggregates through apply_join_dependency when eager loading,
-  // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
-  rel._checkEagerLoadable();
-  const table = relationTable(rel);
-  const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
-  const projection = aggNode.as("val");
-  const manager = projectOnRelationTable(rel, projection);
-  // Rails routes sum/average/maximum/minimum through apply_join_dependency when
-  // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
-  eagerJoinedRelation(rel, rel._groupColumns.length === 0)._applyJoinsToManager(manager);
-  rel._applyWheresToManager(manager, table);
-  applyFromToManager(rel, manager);
-  // `execute_simple_calculation` runs the relation's own arel too, and
-  // `build_arel` applies the having clause with no GROUP BY guard — an ungrouped
-  // `having("sum(x) > n").sum(:x)` is unusual but valid, and Rails emits it.
-  applyHavingToManager(rel, manager);
-
-  const colType = resolveColType(rel, column);
-  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
-  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
-  const sql =
-    isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
-  const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = rel._whereClause.isContradiction()
-    ? Result.empty()
-    : await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
-  const rows = queryResult.toArray();
-  const val = rows[0]?.val;
-  if (val === undefined || val === null) {
-    // calculations.rb:627-630 `type_cast_calculated_value`: an empty result set
-    // is `nil.to_i` for count and `type.deserialize(0)` for sum; the remaining
-    // operations keep nil.
-    if (fn === "count") return 0;
-    return fn === "sum" ? castAggValue(null, fn, colType, coerceNumeric) : null;
-  }
-  return castAggValue(val, fn, colType, coerceNumeric);
 }
 
 /**
@@ -999,8 +955,10 @@ export function aggregateColumn(
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._model.arelTable;
-  if (columnName === "*" || columnName === "1") {
-    return table.sql ? table.sql(columnName) : columnName;
+  // Ruby `when :all then Arel.star` (calculations.rb:418-419) — ":all" is
+  // spelled "*"/"all" here. "1" is the count-subquery's literal projection.
+  if (columnName === "*" || columnName === "all" || columnName === "1") {
+    return new Nodes.SqlLiteral(columnName === "1" ? "1" : "*");
   }
   // Mirrors buildAggNode / Rails' aggregate_column → arel_column: a known column
   // qualifies onto the model's own table, a "table.column" string resolves
@@ -1191,34 +1149,109 @@ export async function executeSimpleCalculation(
   columnName: string | string[] | Nodes.Node | null,
   distinct: boolean | null,
 ): Promise<unknown> {
-  // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,
-  // which compiles to an empty `IN`) yields `ActiveRecord::Result.empty` with no
-  // query at all, and `type_cast_calculated_value` folds that empty result to
-  // the operation's identity. Checked after the query builder is chosen, as
-  // Rails does.
+  // trails compiles each arm to SQL + binds instead of handing a `query_builder`
+  // to `select_all`, because the count-subquery arm's inner manager is compiled
+  // here (see buildCountSubquery) and the CTE prefix is applied to the SQL.
+  let sql: string;
+  let binds: unknown[];
+  let column: unknown = null;
+
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
+    // Shortcut when limit is zero (calculations.rb:471-472).
     if (rel._limitValue === 0) return 0;
+
     const [queryBuilder, innerBinds] = buildCountSubquery(
       rel,
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
     const [outerSql, outerBinds] = compileManagerWithBinds(rel, queryBuilder);
-    const [withCtes, ctedBinds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
-    const queryResult = rel._whereClause.isContradiction()
-      ? Result.empty()
-      : await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
-    const type = null;
-    return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
+    [sql, binds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
+  } else {
+    // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
+    // (calculations.rb:477-478). trails projects the aggregate onto a manager
+    // of its own rather than reading `relation.arel`, so no ORDER BY and no
+    // DISTINCT reach the emitted SQL and the `unscope(:order).distinct!(false)`
+    // rebase has nothing left to strip.
+    const relation = rel;
+    // Rails routes aggregates through apply_join_dependency when eager loading,
+    // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
+    relation._checkEagerLoadable();
+
+    column = aggregateColumn(relation, aggregateTarget(columnName));
+    const selectValue = operationOverAggregateColumn(
+      column,
+      operation,
+      distinct === true,
+    ) as Nodes.Node & { distinct: boolean; as(alias: string): Nodes.Node };
+    if (operation === "sum" && distinct) selectValue.distinct = true;
+
+    // Rails assigns `relation.select_values = [select_value]` and compiles
+    // `relation.arel`; our manager is projected explicitly, so the joins, wheres,
+    // from and having `build_arel` would have applied are applied here. The
+    // "val" alias is what the SQLite bigint CAST wrapper reads back.
+    const manager = projectOnRelationTable(relation, selectValue.as("val"));
+    // Rails routes sum/average/maximum/minimum through apply_join_dependency when
+    // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
+    eagerJoinedRelation(relation, relation._groupColumns.length === 0)._applyJoinsToManager(
+      manager,
+    );
+    relation._applyWheresToManager(manager, relationTable(relation));
+    applyFromToManager(relation, manager);
+    // `build_arel` applies the having clause with no GROUP BY guard — an
+    // ungrouped `having("sum(x) > n").sum(:x)` is unusual but valid, and Rails
+    // emits it.
+    applyHavingToManager(relation, manager);
+
+    const [rawSql, managerBinds] = compileManagerWithBinds(relation, manager);
+    const [withCtes, ctedBinds] = prependCtes(relation, rawSql, managerBinds);
+    const target = aggregateTarget(columnName);
+    sql =
+      isBigintColumn(relation, operation.toLowerCase() as AggFn, target) &&
+      needsBigintCast(relation)
+        ? wrapBigintAgg(withCtes)
+        : withCtes;
+    binds = ctedBinds;
   }
-  const fn = operation.toLowerCase() as AggFn;
-  // DIVERGENCE (Rails calculations.rb:468-511): the ungrouped aggregate body —
-  // the count-subquery shortcut, the `unscope(:order).distinct!(false)` rebase,
-  // the select_all call and the type_cast_calculated_value fold — lives in the
-  // shared `singleAggregate` helper. The resolved `distinct` is threaded into
-  // it so it reaches `operation_over_aggregate_column` (calculations.rb:481)
-  // rather than being re-read off the relation.
-  return singleAggregate(rel, fn, aggregateTarget(columnName), coercesNumeric(fn), distinct);
+
+  // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,
+  // which compiles to an empty `IN`) yields `ActiveRecord::Result.empty` with no
+  // query at all, and `type_cast_calculated_value` folds that empty result to
+  // the operation's identity. Checked after the query builder is chosen, as
+  // Rails does.
+  const queryResult = rel._whereClause.isContradiction()
+    ? Result.empty()
+    : await (
+        rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
+      ).skipQueryCacheIfNecessary(() =>
+        rel._conn().selectAll(sql, `${rel.model.name} ${capitalizeOperation(operation)}`, binds),
+      );
+
+  let type: unknown;
+  if (operation !== "count") {
+    type =
+      typeCasterFor(column) ??
+      lookupCastTypeFromJoinDependencies(rel, String(aggregateTarget(columnName))) ??
+      defaultValue();
+    if (type instanceof EnumType) type = type.subtypeType();
+  }
+
+  return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
+}
+
+/** Ruby `operation.capitalize` (calculations.rb:499). */
+function capitalizeOperation(operation: string): string {
+  return operation.charAt(0).toUpperCase() + operation.slice(1).toLowerCase();
+}
+
+/**
+ * Ruby `column.try(:type_caster)` (calculations.rb:505): an Arel attribute
+ * carries its relation's type caster, a SqlLiteral or star does not.
+ */
+function typeCasterFor(column: unknown): unknown {
+  const attr = column as { typeCaster?: unknown; relation?: { isAbleToTypeCast?(): boolean } };
+  if (!(column instanceof Nodes.Node) || attr.relation?.isAbleToTypeCast?.() !== true) return null;
+  return attr.typeCaster ?? null;
 }
 
 /** @internal */
@@ -1334,12 +1367,47 @@ function pluckCastTypeForKnownColumn(
   return model.typeForAttribute?.(name) ?? null;
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::Calculations#type_cast_calculated_value
+ * (calculations.rb:627-643).
+ *
+ *   - count   → `value.to_i`, a JS number. A SQL COUNT() above 2^53-1 loses
+ *               precision (Rails returns an arbitrary-precision Integer).
+ *   - sum     → `type.deserialize(value || 0)`; a big_integer column yields a
+ *               bigint, every other type coerces to a JS number (a documented
+ *               Rails-→JS limitation, since Rails returns BigDecimal here).
+ *   - average → Rails maps :integer/:decimal to `value&.to_d` (BigDecimal);
+ *               trails coerces those to a JS number and routes every other
+ *               type — interval, time, money — through `type.deserialize` so
+ *               callers get the domain object rather than the driver string.
+ *   - else    → `type.deserialize(value)` for minimum/maximum: big_integer
+ *               returns bigint, datetime a Temporal instant, and so on.
+ *
+ * @internal
+ */
 export function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
-  if (operation === "count") return Number(value ?? 0);
-  if (operation === "sum") return Number(value ?? 0);
-  if (operation === "average") return value === null ? null : Number(value);
-  return value;
+  switch (operation) {
+    case "count":
+      return Number(value ?? 0);
+    case "sum":
+      if (type instanceof BigIntegerType) return type.deserialize(value ?? 0) ?? 0n;
+      return Number(value ?? 0);
+    case "average": {
+      if (value === null || value === undefined) return null;
+      const typeName = (type as { type?(): string } | null)?.type?.();
+      if (type != null && !isCoerceNumericTypeName(typeName)) {
+        const ct = type as { deserialize?(v: unknown): unknown };
+        if (typeof ct.deserialize === "function") return ct.deserialize(value);
+      }
+      return Number(value);
+    }
+    default: {
+      if (value === null || value === undefined) return null;
+      const ct = type as { deserialize?(v: unknown): unknown } | null;
+      if (typeof ct?.deserialize === "function") return ct.deserialize(value);
+      return value;
+    }
+  }
 }
 
 /** @internal */

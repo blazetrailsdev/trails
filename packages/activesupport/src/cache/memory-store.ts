@@ -1,7 +1,7 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
-import { Store, type StoreOptions } from "./store.js";
+import { Store, inspectOptions, type StoreOptions } from "./store.js";
 import { integer } from "./integer.js";
 import { registerStoreClass } from "./store-registry.js";
 
@@ -139,6 +139,15 @@ export class MemoryStore extends Store implements CacheStore {
         if (key.match(matcher) !== null) this.deleteEntry(key, options);
       }
     });
+  }
+
+  // Mirrors Rails MemoryStore#inspect (memory_store.rb:186-188). Ruby's
+  // `self.class.name` is the fully-qualified constant; TS has only the class
+  // name, which is the same last segment.
+  inspect(): string {
+    return `#<${this.constructor.name} entries=${this.data.size}, size=${this.cacheSize}, options=${inspectOptions(
+      this.options as Record<string, unknown>,
+    )}>`;
   }
 
   // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
