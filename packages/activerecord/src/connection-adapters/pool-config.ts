@@ -27,10 +27,6 @@ export class PoolConfig {
    * `this`-typed function, the settled trails spelling for a Ruby `include`.
    * Ruby's monitor is owned by a Thread and ours by an async chain; see
    * `activesupport/src/concurrency/monitor.ts`.
-   *
-   * @noRailsEquivalent `include MonitorMixin` (`pool_config.rb:6`) — the method
-   * is Rails', but it arrives from a Ruby stdlib module with no Rails source
-   * file, so the extractor has nothing to match it against.
    */
   synchronize = synchronize;
 
@@ -251,12 +247,12 @@ export class PoolConfig {
    * sweep has been discarded (the drain is a trails-only step for async-only
    * drivers, with no Rails equivalent). No-ops when the pool is uninitialized.
    *
-   * Reviewed against `#discard_pool!`'s monitor (`pool_config.rb:74-82`):
-   * everything inside Rails' `synchronize` — `@pool.discard!` and `@pool = nil`
-   * — is synchronous on this side too, so the guard, the discard and the write
-   * are already atomic and the inner `@pool` re-check has nothing to catch. The
-   * lock would also have to be taken from `discardPoolsBang`'s synchronous
-   * sweep, which cannot await. Left unlocked deliberately.
+   * Runs under the caller's monitor, never on its own: `#disconnect!` and
+   * `#discard_pool!` (`pool_config.rb:61-68, 74-82`) share one monitor, so on
+   * Rails a thread suspended inside `disconnect!`'s `@pool.disconnect!` still
+   * holds the lock and a concurrent `discard_pool!` blocks on `synchronize`
+   * rather than nulling `@pool` underneath it. Every caller here therefore
+   * takes `synchronize` first.
    */
   private _discardPoolBangSync(): Array<Promise<void>> {
     const pool = this._pool;
@@ -272,14 +268,21 @@ export class PoolConfig {
    * before the caller re-opens the DB. No-ops when the pool is uninitialized.
    */
   async discardPoolBang(): Promise<void> {
-    await Promise.all(this._discardPoolBangSync());
+    if (!this._pool) return;
+
+    const drains = await this.synchronize(() => {
+      if (!this._pool) return [];
+
+      return this._discardPoolBangSync();
+    });
+    await Promise.all(drains);
   }
 
   static async discardPoolsBang(): Promise<void> {
-    // Match Rails' `INSTANCES.each_key(&:discard_pool!)`: discard (and null)
-    // every registered pool synchronously up front, with no inter-pool waiting,
-    // so a slow trails-only drain on one pool can't delay discarding the rest.
-    // The async drains are awaited only after the whole sweep has run.
+    // Match Rails' `INSTANCES.each_key(&:discard_pool!)`: take each config's
+    // monitor and discard (and null) its pool, with no inter-pool waiting, so a
+    // slow trails-only drain on one pool can't delay discarding the rest. The
+    // async drains are awaited only after the whole sweep has run.
     const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {
       const config = ref.deref();
@@ -287,7 +290,9 @@ export class PoolConfig {
         INSTANCES.delete(ref);
         continue;
       }
-      drains.push(...config._discardPoolBangSync());
+      await config.synchronize(() => {
+        drains.push(...config._discardPoolBangSync());
+      });
     }
     await Promise.all(drains);
   }

@@ -28,7 +28,6 @@ import {
 
 interface MonData {
   owner: symbol | null;
-  count: number;
   chain: Promise<void> | null;
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
@@ -44,7 +43,7 @@ const MON_DATA = new WeakMap<object, MonData>();
 function monData(self: object): MonData {
   let data = MON_DATA.get(self);
   if (!data) {
-    data = { owner: null, count: 0, chain: null, storage: null, adapter: null };
+    data = { owner: null, chain: null, storage: null, adapter: null };
     MON_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -66,6 +65,11 @@ function monData(self: object): MonData {
  * the lock synchronously — installing a new chain — before any other resumes,
  * so the rest re-test and park again.
  *
+ * No `@mon_count`: Ruby needs one because `mon_exit` can be called explicitly,
+ * so the release has to be gated on the nesting depth reaching zero. Here the
+ * only exit is the outer call's `finally`, and a reentrant call cannot reach
+ * it, so the count would have nothing to gate.
+ *
  * Assign it onto a class to spell Ruby's `include MonitorMixin`:
  *
  * ```ts
@@ -79,12 +83,7 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
   const storage = data.storage!;
 
   if (data.owner !== null && storage.getStore() === data.owner) {
-    data.count += 1;
-    try {
-      return await block();
-    } finally {
-      data.count -= 1;
-    }
+    return await block();
   }
 
   while (data.chain) {
@@ -97,12 +96,10 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
     monExit = () => {
       data.chain = null;
       data.owner = null;
-      data.count = 0;
       resolve();
     };
   });
   data.owner = owner;
-  data.count = 1;
 
   try {
     return await storage.run(owner, () => block());

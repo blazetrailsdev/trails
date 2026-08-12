@@ -112,6 +112,22 @@ describe("PoolConfig", () => {
       expect(seen).toEqual([true, true, false, false]);
     });
 
+    it("excludes a concurrent discardPoolBang while the disconnect is in flight", async () => {
+      const pool = config.pool;
+      let discardedDuringDisconnect = false;
+      const discardSpy = vi.spyOn(pool, "discardBangDraining").mockReturnValue([]);
+      vi.spyOn(pool, "disconnectBang").mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        discardedDuringDisconnect = discardSpy.mock.calls.length > 0;
+      });
+
+      await Promise.all([config.disconnectBang(), config.discardPoolBang()]);
+
+      expect(discardedDuringDisconnect).toBe(false);
+      expect(discardSpy).toHaveBeenCalledTimes(1);
+      expect(config.poolInitialized).toBe(false);
+    });
+
     it("defaults automaticReconnect to false", async () => {
       const pool = config.pool;
       pool.automaticReconnect = true;
