@@ -1,5 +1,6 @@
 import { Entry } from "./entry.js";
 import { Coder, coder as fidelityCoder } from "./coder.js";
+import { SerializerWithFallback } from "./serializer-with-fallback.js";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
@@ -113,11 +114,23 @@ export abstract class Store {
     this.options = Store.normalizeOptions({ ...options });
 
     if (!("compress" in this.options)) this.options.compress = true;
-    this.options.compressThreshold ||= DEFAULT_COMPRESS_LIMIT;
+    // Ruby `||=` replaces only nil/false, so an explicit `compress_threshold: 0`
+    // — compress everything — survives where JS `||=` would take the default.
+    if (this.options.compressThreshold == null || this.options.compressThreshold === false) {
+      this.options.compressThreshold = DEFAULT_COMPRESS_LIMIT;
+    }
 
-    const optionCoder = this.options.coder as CacheCoder | undefined;
+    // Ruby `@options.delete(:coder) { ... }` runs the block only when the key is
+    // absent, so an explicit `coder: nil` stays nil and falls through the `||=`
+    // below to the passthrough serializer — Rails' direct-entry path.
+    const hadCoder = "coder" in this.options;
+    let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
-    this.coder = optionCoder ?? new Coder(fidelityCoder, { deflate, inflate });
+    if (!hadCoder) coder = new Coder(fidelityCoder, { deflate, inflate });
+    this.coder =
+      coder == null || (coder as unknown) === false
+        ? (SerializerWithFallback.get("passthrough") as CacheCoder)
+        : coder;
     this.coderSupportsCompression = typeof this.coder.dumpCompressed === "function";
   }
 

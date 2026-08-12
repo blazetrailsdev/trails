@@ -44,6 +44,7 @@ export class MemoryStore extends Store implements CacheStore {
     expiresIn?: number;
     compress?: boolean;
     compressThreshold?: number;
+    coder?: unknown;
   }) {
     // Rails installs DupCoder and disables compression by default
     // (memory_store.rb:73-77).
