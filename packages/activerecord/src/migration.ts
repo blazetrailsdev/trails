@@ -200,8 +200,12 @@ export class PendingMigrationError extends MigrationError {
    * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
    *
    * Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
-   * pass the kwarg on its own; TypeScript has no kwargs, so an options-only
-   * first argument stands in for that call shape.
+   * pass the kwarg on its own; TypeScript has no kwargs, so the options hash is
+   * accepted in the first parameter's place — the union-typed first parameter
+   * with runtime dispatch that `ConnectionNotEstablished` (`errors.ts`) already
+   * uses for Ruby's `Exception.new(any_object)`. Passing `undefined` positionally
+   * instead would put an argument in the call that Rails' call sites
+   * (`migration.rb:722,743`) do not pass.
    *
    * The one arm that cannot converge is Rails' nil default (`migration.rb:161`),
    * which reads `connection_pool.migration_context.open.pending_migrations` —
@@ -214,12 +218,9 @@ export class PendingMigrationError extends MigrationError {
     message?: string | { pendingMigrations?: MigrationProxy[] },
     options: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
+    const { pendingMigrations } =
+      message != null && typeof message === "object" ? message : options;
     if (typeof message !== "string") {
-      options = message ?? options;
-      message = undefined;
-    }
-    const { pendingMigrations } = options;
-    if (message == null) {
       if (pendingMigrations == null) {
         throw new ArgumentError(
           "PendingMigrationError needs a message or `pendingMigrations:`; Rails reads the list " +
