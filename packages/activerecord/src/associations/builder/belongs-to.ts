@@ -180,7 +180,7 @@ export class BelongsTo extends SingularAssociation {
             reflection?.foreignType ??
             reflection?.options?.foreignType ??
             `${underscore(name)}_type`;
-          const typeName =
+          klass =
             (changes[foreignType] as [unknown, unknown] | undefined)?.[0] ??
             (typeof record._readAttribute === "function"
               ? record._readAttribute(foreignType)
@@ -189,10 +189,10 @@ export class BelongsTo extends SingularAssociation {
             // Rails: `o.class.polymorphic_class_for(klass)` — a model may
             // override the hook to map a custom polymorphic_name back to its
             // class (builder/belongs_to.rb:53).
-            klass = typeName
+            klass = klass
               ? (
                   record.constructor as { polymorphicClassFor(name: string): any }
-                ).polymorphicClassFor(typeName)
+                ).polymorphicClassFor(klass)
               : null;
           } catch {
             klass = null;

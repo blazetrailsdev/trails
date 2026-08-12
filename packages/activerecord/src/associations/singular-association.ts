@@ -409,7 +409,7 @@ export class SingularAssociation extends Association {
 
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     // Rails yields the record in `build_record` before the save (block can
@@ -432,7 +432,7 @@ export class SingularAssociation extends Association {
     const removal = this.detachDisplacedOnBuild(record);
     if (removal) await removal;
     this.setNewRecord(record);
-    if (!saved && shouldRaise) {
+    if (!saved && raise) {
       throw new RecordInvalid(record);
     }
     return record;

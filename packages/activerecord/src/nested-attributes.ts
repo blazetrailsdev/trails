@@ -820,18 +820,22 @@ export function assignNestedAttributesForOneToOneAssociation(
       );
     }
   }
-  const existing = assoc.target ?? null;
+  const existingRecord = assoc.target ?? null;
 
   // Rails nested_attributes.rb:436 — update (or mark for destruction) the
   // existing record in place when `update_only` is set, or when a matching
   // `id` was supplied and the in-memory target carries that id.
   if (
     (updateOnly || hasId) &&
-    existing &&
-    (updateOnly || String(existing.id) === String((attributes as any).id))
+    existingRecord &&
+    (updateOnly || String(existingRecord.id) === String((attributes as any).id))
   ) {
     if (!callRejectIf.call(record, associationName, attributes)) {
-      return assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
+      return assignToOrMarkForDestruction(
+        existingRecord,
+        attributes,
+        options.allowDestroy ?? false,
+      );
     }
     return;
   }
@@ -846,15 +850,15 @@ export function assignNestedAttributesForOneToOneAssociation(
     const assignable = assignableNestedAttributes(attributes);
     const targetModel = resolveCollectionTargetModel(record, associationName);
     if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
-    if (existing && existing.isNewRecord()) {
+    if (existingRecord && existingRecord.isNewRecord()) {
       // Rails reuses an already-built unsaved target (e.g. after `buildShip`)
       // rather than replacing it: assign into it, then re-anchor FK/scope/
       // inverse via `initialize_attributes`.
-      const pending = existing.assignAttributes(assignable);
+      const pending = existingRecord.assignAttributes(assignable);
       if (pending) {
-        return pending.then(() => assoc.initializeAttributes(existing));
+        return pending.then(() => assoc.initializeAttributes(existingRecord));
       }
-      assoc.initializeAttributes(existing);
+      assoc.initializeAttributes(existingRecord);
     } else {
       // Rails nested_attributes.rb:451 — `method = :"build_#{association_name}";
       // respond_to?(method) ? public_send(method, ...) : raise`. A plain

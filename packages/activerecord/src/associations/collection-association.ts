@@ -501,7 +501,7 @@ export class CollectionAssociation extends Association {
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     if (!this.owner.isPersisted()) {
@@ -513,7 +513,7 @@ export class CollectionAssociation extends Association {
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
       await this.addToTarget(record, {}, async () => {
-        result = await this.insertRecord(record, true, shouldRaise, () => {
+        result = await this.insertRecord(record, true, raise, () => {
           this._wasLoaded = this.isLoaded();
         });
       });

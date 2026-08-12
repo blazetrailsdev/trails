@@ -380,7 +380,7 @@ export class HasOneAssociation extends SingularAssociation {
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
@@ -401,7 +401,7 @@ export class HasOneAssociation extends SingularAssociation {
     // `loadDisplacedTargetForCreate`, which caches the row as `this.target`;
     // `super._createRecord` removes it via `detachDisplacedOnBuild`.
     const loadError = await this.loadDisplacedTargetForCreate();
-    const record = await super._createRecord(attributes, shouldRaise, block);
+    const record = await super._createRecord(attributes, raise, block);
     // Every exception but `RecordNotFound` propagates out of `load_target`
     // (association.rb:189-195). Re-raise at the point Rails raises: after
     // `build_record` and `record.save`. A failed load cached nothing, so the

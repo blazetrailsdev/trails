@@ -174,12 +174,12 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     let record: Base | null;
     try {
-      record = await super._createRecord(attributes, shouldRaise, block);
+      record = await super._createRecord(attributes, raise, block);
     } catch (error) {
       if (error instanceof RecordInvalid && this._pendingReplace) {
         await this.persistReplace(false);

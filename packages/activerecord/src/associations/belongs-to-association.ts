@@ -130,9 +130,9 @@ export class BelongsToAssociation extends SingularAssociation {
     }
 
     const fkNames = this.foreignKeyNames();
-    const foreignKeyWas = fkNames.map((fk) =>
+    const foreignKeyWas = fkNames.map((foreignKey) =>
       typeof this.owner.attributeBeforeLastSave === "function"
-        ? this.owner.attributeBeforeLastSave(fk)
+        ? this.owner.attributeBeforeLastSave(foreignKey)
         : undefined,
     );
 

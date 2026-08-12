@@ -702,7 +702,7 @@ export class Association {
 
   protected async _createRecord(
     attributes?: Record<string, unknown>,
-    shouldRaise = false,
+    raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
     // Rails yields the record inside `build_record` (association.rb:383-388),
@@ -711,7 +711,7 @@ export class Association {
     if (!record) return null;
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();
-      if (!saved && shouldRaise) {
+      if (!saved && raise) {
         throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
       }
     }

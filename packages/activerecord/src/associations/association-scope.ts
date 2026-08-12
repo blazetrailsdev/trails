@@ -410,18 +410,18 @@ export class AssociationScope {
       | { name?: string }
       | null
       | undefined;
-    let table: string | null;
+    let tableName: string | null;
     if (typeof aliased === "string") {
-      table = aliased;
+      tableName = aliased;
     } else if (aliased && typeof aliased === "object" && typeof aliased.name === "string") {
-      table = aliased.name;
+      tableName = aliased.name;
     } else if (klass && typeof klass.tableName === "string") {
-      table = klass.tableName;
+      tableName = klass.tableName;
     } else {
       try {
-        table = (reflection as { klass?: { tableName?: string } }).klass?.tableName ?? null;
+        tableName = (reflection as { klass?: { tableName?: string } }).klass?.tableName ?? null;
       } catch {
-        table = null;
+        tableName = null;
       }
     }
     // For polymorphic belongsTo, `joinPrimaryKey` is hard-coded to "id"
@@ -459,17 +459,18 @@ export class AssociationScope {
     // Rails passes `reflection.aliased_table` (an Arel node) to apply_scope;
     // resolve it the same way `nextChainScope` does so the identity check
     // sees the alias node, not a bare name.
-    const tableNode = table ? this._arelTableFor(reflection, table) : null;
+    const table = tableName ? this._arelTableFor(reflection, tableName) : null;
     for (let i = 0; i < joinPks.length; i++) {
-      const rawValue = owner._readAttribute(joinFks[i]);
-      const value = this.transformValue(rawValue);
-      scope = this.applyScope(scope, tableNode, joinPks[i], value);
+      const value = this.transformValue(owner._readAttribute(joinFks[i]));
+      scope = this.applyScope(scope, table, joinPks[i], value);
     }
     if (r.type) {
       // Rails: `owner.class.polymorphic_name` (returns base_class.name
       // for STI subclasses) routed through `transform_value`.
-      const polyName = this.transformValue((owner.constructor as typeof Base).polymorphicName());
-      scope = this.applyScope(scope, tableNode, r.type, polyName);
+      const polymorphicType = this.transformValue(
+        (owner.constructor as typeof Base).polymorphicName(),
+      );
+      scope = this.applyScope(scope, table, r.type, polymorphicType);
     }
     return scope;
   }
@@ -503,23 +504,23 @@ export class AssociationScope {
     const name = reflection.name;
     for (const refl of tail) {
       const klass = (refl as unknown as { klass?: typeof Base }).klass;
-      let aliased: unknown;
+      let aliasedTable: unknown;
       if (tracker && klass) {
         // Rails: `tracker.aliased_table_for(refl.klass.arel_table) {
         // refl.alias_candidate(name) }`. Pass a thunk so
         // `aliasCandidate` is only invoked on repeat visits — first
         // visits return the base arel table without ever building
         // the candidate string.
-        aliased = tracker.aliasedTableFor(klass.arelTable, () => {
+        aliasedTable = tracker.aliasedTableFor(klass.arelTable, () => {
           const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
           return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
         });
       } else {
         // Fallback for the legacy single-call path where no tracker
         // is provided — bare table name, same behavior as before.
-        aliased = klass?.tableName ?? "";
+        aliasedTable = klass?.tableName ?? "";
       }
-      chain.push(new ReflectionProxy(refl, aliased));
+      chain.push(new ReflectionProxy(refl, aliasedTable));
     }
     return chain;
   }
@@ -606,16 +607,16 @@ export class AssociationScope {
         : aliased && typeof aliased === "object" && typeof aliased.name === "string"
           ? aliased.name
           : (nr.klass?.tableName ?? "");
-    // Build the ON condition as Arel constraint nodes —
+    // Build the ON condition as Arel constraints nodes —
     // `table[join_primary_key].eq(foreign_table[foreign_key])` folded with
     // `.and` — exactly as Rails' next_chain_scope (association_scope.rb:88-91).
     // Identifier quoting and value escaping flow through the Arel visitor,
     // so no manual interpolation or quoter is needed.
-    const tableNode = this._arelTableFor(reflection, tableName);
-    const foreignTableNode = this._arelTableFor(nextReflection, foreignTableName);
-    let constraint: Nodes.Node = tableNode.get(joinPks[0]).eq(foreignTableNode.get(joinFks[0]));
+    const table = this._arelTableFor(reflection, tableName);
+    const foreignTable = this._arelTableFor(nextReflection, foreignTableName);
+    let constraints: Nodes.Node = table.get(joinPks[0]).eq(foreignTable.get(joinFks[0]));
     for (let i = 1; i < joinPks.length; i++) {
-      constraint = constraint.and(tableNode.get(joinPks[i]).eq(foreignTableNode.get(joinFks[i])));
+      constraints = constraints.and(table.get(joinPks[i]).eq(foreignTable.get(joinFks[i])));
     }
     if (r.type) {
       // Polymorphic through: filter by the next reflection's klass
@@ -630,13 +631,13 @@ export class AssociationScope {
       // table, ...)` where `table` is `reflection.aliased_table` (so
       // `table.name` is the alias). Keeps the `_type` WHERE on the same
       // identifier the JOIN uses.
-      scope = this.applyScope(scope, tableNode, r.type, value);
+      scope = this.applyScope(scope, table, r.type, value);
     }
-    // Wrap the join target + constraint in Arel's LeadingJoin/On nodes via
+    // Wrap the join target + constraints in Arel's LeadingJoin/On nodes via
     // `join()` and push it through Relation#joins, which stores Arel join
     // nodes in joins_values (mirrors Rails' `scope.joins!(join(...))`).
     return (scope as { joins: (node: Nodes.Join) => unknown }).joins(
-      this.join(foreignTableNode, constraint) as Nodes.Join,
+      this.join(foreignTable, constraints) as Nodes.Join,
     );
   }
 

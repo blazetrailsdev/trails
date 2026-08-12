@@ -330,9 +330,9 @@ export class Association {
    * reproduces. ActiveRecord does not override `type_for_attribute`.
    */
   private associationKeyType(): string | undefined {
-    const key = this.associationKeyName;
-    if (Array.isArray(key)) return undefined;
-    return this.klass.typeForAttribute(key).type();
+    const associationKeyName = this.associationKeyName;
+    if (Array.isArray(associationKeyName)) return undefined;
+    return this.klass.typeForAttribute(associationKeyName).type();
   }
 
   /** Mirrors: Preloader::Association#owner_key_type
@@ -341,9 +341,9 @@ export class Association {
    *  loader, where Rails' `@model` would be nil and `type_for_attribute`
    *  unreachable. */
   private ownerKeyType(): string | undefined {
-    const key = this.ownerKeyName;
-    if (this.model == null || Array.isArray(key)) return undefined;
-    return this.model.typeForAttribute(key).type();
+    const ownerKeyName = this.ownerKeyName;
+    if (this.model == null || Array.isArray(ownerKeyName)) return undefined;
+    return this.model.typeForAttribute(ownerKeyName).type();
   }
 
   /**
