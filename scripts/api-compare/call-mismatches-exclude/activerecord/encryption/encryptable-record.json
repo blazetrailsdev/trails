@@ -9,17 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "add_length_validation_for_encrypted_columns",
-    "call": "validate_column_size",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:attributeName"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "ciphertext_for",
     "call": "read_attribute_for_database",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

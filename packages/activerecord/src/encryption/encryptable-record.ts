@@ -73,23 +73,6 @@ const NOT_CACHED = Symbol("encryption.columnDefault.notCached");
  *   EncryptableRecord.encrypts(User, "email", { deterministic: true })
  */
 export class EncryptableRecord {
-  /** @internal */
-  static validateColumnSize(modelClass: any, attribute: string): void {
-    if (typeof modelClass.validatesLengthOf !== "function") return;
-    const limit = modelClass._attributeDefinitions?.get(attribute)?.limit;
-    if (limit == null) return;
-    // Guard against double registration (called at encrypts() time and again
-    // after schema reflection). Check whether a LengthValidator with this
-    // exact maximum already exists for the attribute.
-    const existing: unknown[] = modelClass._validators?.get(attribute) ?? [];
-    const alreadyRegistered = existing.some(
-      (v: unknown) => v instanceof LengthValidator && (v as any).options?.maximum === limit,
-    );
-    if (!alreadyRegistered) {
-      modelClass.validatesLengthOf(attribute, { maximum: limit });
-    }
-  }
-
   /**
    * `class_attribute :encrypted_attributes` (encryptable_record.rb:11) also
    * generates the predicate, whose body is `!!encrypted_attributes` — true once
@@ -348,7 +331,7 @@ export class EncryptableRecord {
   static addLengthValidationForEncryptedColumns(modelClass: any): void {
     const attrs: Set<string> = modelClass._encryptedAttributes ?? new Set<string>();
     for (const name of attrs) {
-      this.validateColumnSize(modelClass, name);
+      validateColumnSize.call(modelClass, name);
     }
   }
 
@@ -379,6 +362,28 @@ export class EncryptableRecord {
         record.errors?.add?.(attr, "can't be modified because it is encrypted");
       }
     }
+  }
+}
+
+/**
+ * Mirrors: ...EncryptableRecord::ClassMethods#validate_column_size
+ * (encryptable_record.rb:138-142). `this` is the model class.
+ *
+ * @internal
+ */
+export function validateColumnSize(this: any, attributeName: string): void {
+  if (typeof this.validatesLengthOf !== "function") return;
+  const limit = this._attributeDefinitions?.get(attributeName)?.limit;
+  if (limit == null) return;
+  // Guard against double registration (called at encrypts() time and again
+  // after schema reflection). Check whether a LengthValidator with this
+  // exact maximum already exists for the attribute.
+  const existing: unknown[] = this._validators?.get(attributeName) ?? [];
+  const alreadyRegistered = existing.some(
+    (v: unknown) => v instanceof LengthValidator && (v as any).options?.maximum === limit,
+  );
+  if (!alreadyRegistered) {
+    this.validatesLengthOf(attributeName, { maximum: limit });
   }
 }
 
@@ -617,7 +622,7 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   }
 
   if (Configurable.config.validateColumnSize) {
-    EncryptableRecord.validateColumnSize(this, name);
+    validateColumnSize.call(this, name);
   }
 
   // Mirrors Rails encryptable_record.rb:94 —
