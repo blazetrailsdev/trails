@@ -255,9 +255,14 @@ function decode64(value: string): string {
   return Buffer.from(value, "base64").toString("binary");
 }
 
-// The backend `parse` delegates to. Rails' `XmlMini.backend = "REXML"`
-// (xml_mini.rb:210) has no counterpart yet: `XmlMini_REXML` is unported, so
-// there is no default and `parse` raises until a backend is set.
+/**
+ * The backend `parse` delegates to (Ruby's `@backend`). Rails'
+ * `XmlMini.backend = "REXML"` (xml_mini.rb:210) has no counterpart yet:
+ * `XmlMini_REXML` is unported, so there is no default and `parse` raises until
+ * a backend is set.
+ *
+ * @internal
+ */
 let _backend: XmlMiniBackend | null | undefined;
 
 /**
