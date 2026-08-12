@@ -748,12 +748,11 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "(test_case.rb): `test_order` selects minitest's shuffle seed policy, " +
       "`parallelize` / `parallelize_setup` / `parallelize_teardown` configure " +
       "the fork-based parallel runner (see the parallelization.rb group), " +
-      "`method_name` is the `alias_method :method_name, :name` onto " +
-      'Minitest::Test#name, and `test` is the `test "..." do` declaration ' +
-      "macro. vitest is the runner in trails: it owns ordering, worker " +
-      'parallelism and the declaration form (`it("...")`, which is what ' +
-      "parity:test matches Rails test names through), so none of these has a " +
-      "port to point at. Scoped to test_case.rb — the assertion helpers this " +
+      "and `method_name` is the `alias_method :method_name, :name` onto " +
+      "Minitest::Test#name. vitest is the runner in trails: it owns ordering " +
+      "and worker parallelism, so none of these has a port to point at. (The " +
+      '`test "..." do` macro test_case.rb:153 extends in is skipped against ' +
+      "its own file, testing/declarative.rb.) Scoped to test_case.rb — the assertion helpers this " +
       "file picks up by `include` (assert_not*, assert_raises, " +
       "assert_difference, assert_changes, assert_deprecated, stub_const, the " +
       "TimeHelpers travel/freeze family) are NOT skipped: they are portable and " +
@@ -765,9 +764,22 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "parallelize",
       "parallelize_setup",
       "parallelize_teardown",
-      "test",
     ],
     rubyFiles: ["test_case.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Testing::Declarative#test (testing/declarative.rb:13) is " +
+      'the `test "..." do` declaration macro: it defines a `test_<name>` ' +
+      "method on the class for minitest to discover by reflection. vitest " +
+      'discovers nothing by reflection — a test is the `it("...")` call ' +
+      "itself, which is also the spelling parity:test matches Rails test names " +
+      "through — so the macro has no port to point at. Scoped to " +
+      "declarative.rb, its only definition site (test_case.rb:153 merely " +
+      "`extend`s the module), so `test` stays expected anywhere it is a real " +
+      "method.",
+    names: ["test"],
+    rubyFiles: ["testing/declarative.rb"],
   },
   {
     reason:

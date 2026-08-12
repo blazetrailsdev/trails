@@ -1407,32 +1407,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       )) as T;
     }
     // Rails: `@association.create(...)` (collection_proxy.rb:308-310).
-    return (await this._collectionAssociation()._createRecord(
-      attrs,
-      false,
-      block as ((record: Base) => void) | undefined,
-    )) as T;
-  }
-
-  /**
-   * The OO `CollectionAssociation` behind this proxy — Rails' `@association`,
-   * which `CollectionProxy` delegates every mutation to.
-   * @internal
-   */
-  private _collectionAssociation(): {
-    _createRecord(
-      attributes?: Record<string, unknown>,
-      shouldRaise?: boolean,
-      block?: (record: Base) => void,
-    ): Promise<Base | null>;
-  } {
-    return this._record.association(this._assocName) as unknown as {
-      _createRecord(
-        attributes?: Record<string, unknown>,
-        shouldRaise?: boolean,
-        block?: (record: Base) => void,
-      ): Promise<Base | null>;
-    };
+    return (await this._record
+      .association(this._assocName)
+      .create(attrs, block as ((record: Base) => void) | undefined)) as T;
   }
 
   /**
@@ -3676,11 +3653,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return record;
     }
     // Rails: `@association.create!(...)` (collection_proxy.rb:319-321).
-    return (await this._collectionAssociation()._createRecord(
-      attrs,
-      true,
-      block as ((record: Base) => void) | undefined,
-    )) as T;
+    return (await this._record
+      .association(this._assocName)
+      .createBang(attrs, block as ((record: Base) => void) | undefined)) as T;
   }
 
   /**
