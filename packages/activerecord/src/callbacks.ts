@@ -352,11 +352,8 @@ export async function _createRecord(this: any, block?: (record: any) => void): P
         }
         this._previouslyNewRecord = true;
         this._newRecord = false;
-        // Rails Persistence#_create_record yields here — after the INSERT and
-        // `@new_record = false`, before the after_create callbacks
-        // (persistence.rb:936-940). `changes_applied` runs above it, in
-        // AttributeMethods::Dirty#_create_record's `super` (dirty.rb:239-243),
-        // so the yield precedes it.
+        // Rails yields here (persistence.rb:936-940); `changes_applied` runs
+        // above it in Dirty#_create_record's `super` (dirty.rb:239-243).
         block?.(this);
         this.changesApplied();
         // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
@@ -419,9 +416,7 @@ export async function _updateRecord(this: any, block?: (record: any) => void): P
         this._pendingOperation = null;
       }
       this._previouslyNewRecord = false;
-      // Rails Persistence#_update_record yields here, after
-      // `@previously_new_record = false` and before the after_update callbacks
-      // (persistence.rb:912-916).
+      // Rails yields here (persistence.rb:912-916).
       block?.(this);
       this.changesApplied();
       // Rails' block is `super`, whose truthy return becomes run_callbacks' value.

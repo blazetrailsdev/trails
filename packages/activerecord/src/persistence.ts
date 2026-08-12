@@ -780,9 +780,7 @@ export async function save<T extends SaveRecord>(
         }
       }
 
-      // Rails: `create_or_update(**options, &block)` — the block reaches
-      // `_create_record`/`_update_record`, which yield it after the write and
-      // before the after_create/after_update callbacks (persistence.rb:891-940).
+      // Rails: `create_or_update(**options, &block)` (persistence.rb:390-408).
       return self.createOrUpdate(block);
     })) as boolean | undefined;
   } catch (e) {
