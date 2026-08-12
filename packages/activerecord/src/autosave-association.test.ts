@@ -52,8 +52,20 @@ import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
+// Rails' assignment (`client.firm = apple`) routes through the association
+// WRITER, which for belongs_to is `replace` (belongs_to_association.rb:96) and
+// marks the association `updated?` — what the autosave FK propagation is gated
+// on (autosave_association.rb:560). `setTarget` is the LOADER path and leaves
+// `updated?` false, so a belongs_to assignment must not use it. The belongs_to
+// writer is synchronous, so it needs no await here.
+function setAssociationTarget(record: Base, name: string, value: unknown) {
+  const association = record.association(name) as any;
+  if (typeof association.isUpdated === "function") association.writer(value as any);
+  else association.setTarget(value as any);
+}
+
 function cacheAssoc(record: Base, name: string, value: unknown) {
-  record.association(name).setTarget(value as any);
+  setAssociationTarget(record, name, value);
 }
 
 fixtures([], { useTransactionalTests: false });
@@ -74,7 +86,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   });
 
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
 
   function makePirateShip() {
@@ -497,7 +509,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   const { companies, developers } = fixtures(["companies", "developers"]);
   beforeAll(() => {
@@ -988,7 +1000,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
   beforeAll(() => {
@@ -1369,7 +1381,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   fixtures([]);
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
 
   beforeAll(() => {
@@ -1713,7 +1725,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
 
@@ -2019,7 +2031,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
 
@@ -2186,7 +2198,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
 
@@ -2886,7 +2898,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
 describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
 
@@ -3229,7 +3241,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 
 describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
-    record.association(name).setTarget(value as any);
+    setAssociationTarget(record, name, value);
   }
   fixtures([]);
 
