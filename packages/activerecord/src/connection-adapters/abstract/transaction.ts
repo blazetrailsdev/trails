@@ -300,8 +300,10 @@ export type TransactionConnection = DatabaseAdapter & {
   supportsLazyTransactions?(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
   addTransactionRecord?(record: unknown): void;
-  /** Rails' `@lock` (abstract_adapter.rb:181-192) — the monitor
-   *  `TransactionManager#synchronize` runs its critical sections under. */
+  /** Rails' `@lock` (abstract_adapter.rb:181-192) — the monitor each of the
+   *  manager's critical sections takes inline, as Rails writes
+   *  `@connection.lock.synchronize` at abstract/transaction.rb:507, 581, 594,
+   *  611 and 623. */
   lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
   currentTransaction?(): Transaction | NullTransaction;
@@ -929,7 +931,7 @@ export class TransactionManager {
    * re-entrant `materializeTransactions` passes (queries the materialize loop
    * issues re-enter the method on the same chain). Safe as a plain instance
    * flag — not an AsyncContext token — because it is only ever read and written
-   * while holding the per-connection lock ({@link synchronize}); a foreign
+   * while holding the per-connection lock (`@connection.lock`); a foreign
    * chain blocks on the lock and never observes it true.
    */
   private _materializingTransactions = false;
@@ -953,7 +955,7 @@ export class TransactionManager {
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
-    return await this.synchronize(() => this._beginTransactionInner(options));
+    return await this._connection.lock.synchronize(() => this._beginTransactionInner(options));
   }
 
   /**
@@ -1059,7 +1061,7 @@ export class TransactionManager {
     // (mirroring Rails line 507) so `_hasUnmaterializedTransactions` cannot
     // flip back to true mid-pass — making the unconditional clear at the
     // end of the loop safe by exclusion.
-    await this.synchronize(async () => {
+    await this._connection.lock.synchronize(async () => {
       // `return if @materializing_transactions` (`transaction.rb:578`). A
       // re-entrant call — a query the materialize loop issues (e.g. a
       // cross-record autosave cascade) re-enters here on the same chain and
@@ -1095,7 +1097,7 @@ export class TransactionManager {
    * common case where this is called from inside `_withinNewTransactionBody`.
    */
   async commitTransaction(): Promise<void> {
-    await this.synchronize(() => this._commitTransactionInner());
+    await this._connection.lock.synchronize(() => this._commitTransactionInner());
   }
 
   /** @internal */
@@ -1123,7 +1125,7 @@ export class TransactionManager {
    * reason as {@link commitTransaction}.
    */
   async rollbackTransaction(transaction?: Transaction): Promise<void> {
-    await this.synchronize(() => this._rollbackTransactionInner(transaction));
+    await this._connection.lock.synchronize(() => this._rollbackTransactionInner(transaction));
   }
 
   /** @internal */
@@ -1166,27 +1168,13 @@ export class TransactionManager {
     return this._connection.clearCacheBang?.();
   }
 
-  /**
-   * Run `fn` under the per-connection lock that serializes
-   * {@link withinNewTransaction} — Rails' `@connection.lock.synchronize do … end`
-   * (`abstract/transaction.rb:622`), so callers can extend the lock scope
-   * across pre-/post-transaction work (e.g. DDL setup) without starting a
-   * transaction.
-   *
-   * The lock lives on the CONNECTION, not on the manager: it is the monitor
-   * `AbstractAdapter` installs as `@lock` (abstract_adapter.rb:181-192), the
-   * same one `with_raw_connection` takes, so a write nested inside a
-   * transaction re-enters one lock rather than crossing two.
-   */
-  async synchronize<T>(fn: () => Promise<T> | T): Promise<T> {
-    return await this._connection.lock.synchronize(fn);
-  }
-
   async withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
     fn: (tx: UserTransaction) => Promise<T> | T,
   ): Promise<T> {
-    return await this.synchronize(() => this._withinNewTransactionBody(options, fn));
+    return await this._connection.lock.synchronize(() =>
+      this._withinNewTransactionBody(options, fn),
+    );
   }
 
   /** @internal */

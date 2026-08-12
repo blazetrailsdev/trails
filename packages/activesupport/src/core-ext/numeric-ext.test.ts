@@ -91,31 +91,6 @@ describe("NumericExtDateTest", () => {
   });
 });
 
-describe("NumericExtSizeTest", () => {
-  it("unit in terms of another", () => {
-    // 1 kilobyte = 1024 bytes, etc.
-    expect(1024).toBe(1024);
-    expect(1024 * 1024).toBe(1048576);
-  });
-
-  it("units as bytes independently", () => {
-    // basic byte unit sanity checks
-    const KB = 1024;
-    const MB = 1024 * KB;
-    const GB = 1024 * MB;
-    const TB = 1024 * GB;
-    const PB = 1024 * TB;
-    const EB = 1024 * PB;
-
-    expect(KB).toBe(1024);
-    expect(MB).toBe(1048576);
-    expect(GB).toBe(1073741824);
-    expect(TB).toBe(1099511627776);
-    expect(PB).toBe(1125899906842624);
-    expect(EB).toBe(1152921504606846976);
-  });
-});
-
 describe("NumericExtFormattingTest", () => {
   it("number to human", () => {
     expect(numberToHuman(0)).toBe("0");

@@ -3000,10 +3000,20 @@ function collectCalls(node: ts.Node | undefined): string[] | undefined {
       //     `[this.foo] = arr` / `({ a: this.foo } = obj)`): that mirrors Ruby's
       //     writer send `foo=`, not the reader `foo` — crediting the reader name
       //     would be unfaithful (and makes the call set body-shape dependent).
+      //   - a read of `constructor` itself (`this.constructor.primaryKey`):
+      //     that is the port of Ruby's `self.class`, a SKIP name compare never
+      //     demands — but `constructor` is ALSO the name a `new Foo(...)` site
+      //     records, so crediting the read lets a class reference stand in for
+      //     an instantiation Rails makes. In an order row that mis-credit is
+      //     visible: `_raise_record_not_destroyed` reads `this.constructor`
+      //     first and constructs `RecordNotDestroyed` last, exactly as
+      //     persistence.rb:949-955 does, yet the Ruby `new` resolved against
+      //     the leading class reference and the pair read as inverted.
       const parent = n.parent;
       const isCallCallee =
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
       visit(n.expression);
+      if (n.name.text === "constructor") return;
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         addNegated(n, n.name.text);

@@ -849,12 +849,13 @@ export class ConnectionPool implements ReapablePool {
       }
     };
 
-    // `TransactionManager#synchronize` is the trails spelling of Rails'
-    // per-connection lock; it is re-entrant on the async chain, so the nested
-    // `rollbackTransaction` (same lock) cannot self-deadlock. A connection with
-    // no transaction manager has neither a lock to take nor a transaction.
+    // Rails: `@pinned_connection.lock.synchronize do … end`
+    // (connection_pool.rb:344-362). The monitor is re-entrant on the async
+    // chain, so the nested `rollbackTransaction` (same lock) cannot
+    // self-deadlock. A connection with no transaction manager has neither a
+    // lock to take nor a transaction.
     if (isTransactionAware(connection)) {
-      await connection.transactionManager.synchronize(block);
+      await connection.lock.synchronize(block);
     } else {
       await block();
     }

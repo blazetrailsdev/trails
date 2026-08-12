@@ -40,12 +40,5 @@
     "rubyName": "raise_nested_attributes_record_not_found!",
     "call": "klass",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "nested-attributes.ts",
-    "rubyName": "raise_nested_attributes_record_not_found!",
-    "call": "order:constructor,id",
-    "reason": "Order artifact of a TS-only class reach: `record.constructor` (nested-attributes.ts:515) is credited as `constructor` before `record.id`, where Rails evaluates the id interpolation before RecordNotFound.new."
   }
 ]

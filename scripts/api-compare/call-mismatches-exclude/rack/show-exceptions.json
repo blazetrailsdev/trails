@@ -17,6 +17,13 @@
     "package": "rack",
     "tsFile": "show-exceptions.ts",
     "rubyName": "pretty",
+    "call": "new",
+    "reason": "Rails' pretty builds `Rack::Request.new(env)` and a `Frame.new` per backtrace line (show_exceptions.rb:76-91); neither is ported, so pretty delegates to `template`, which renders straight from `env` and the Error."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
     "call": "template",
     "kind": "args",
     "rubyArgs": [],

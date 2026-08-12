@@ -9,10 +9,8 @@
  * calls `synchronize` and includes `MonitorMixin` — so they score as moved,
  * not as invented surface, and the file carries no `@noRailsEquivalent`.
  *
- * Ruby's monitor is owned by a Thread; ours is owned by an async chain, reusing
- * the AsyncContext-token scheme `TransactionManager#synchronize`
- * (`activerecord/src/connection-adapters/abstract/transaction.ts`) already
- * implements: each acquisition mints a fresh symbol stored both in the
+ * Ruby's monitor is owned by a Thread; ours is owned by an async chain, via an
+ * AsyncContext-token scheme: each acquisition mints a fresh symbol stored both in the
  * AsyncContext and on the monitor, and reentry requires both to match — so a
  * detached task that inherits the AsyncContext but outlives the holder's
  * release correctly queues for the lock instead of walking into it.

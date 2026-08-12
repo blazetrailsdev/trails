@@ -24,7 +24,7 @@ interface PrivatePgAdapter {
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
-  transactionManager: { synchronize: <T>(fn: () => Promise<T> | T) => Promise<T> };
+  lock: { synchronize: <T>(fn: () => Promise<T> | T) => Promise<T> };
   close: () => Promise<void>;
   isConnected: () => boolean;
 }
@@ -137,7 +137,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
 
     // A foreign chain taking the same lock — Rails' `@lock.synchronize`
     // (postgresql_adapter.rb:372) is what keeps it out of the reset body.
-    const foreign = adapter.transactionManager.synchronize(() => {
+    const foreign = adapter.lock.synchronize(() => {
       order.push("foreign");
     });
 

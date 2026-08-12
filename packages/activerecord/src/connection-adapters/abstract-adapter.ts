@@ -1334,7 +1334,7 @@ export class AbstractAdapter implements Quoting {
     // scheduling point at which a second `reconnectBang`/`verifyBang` could
     // enter and race `_connection` / `_verified`, so the lock is a real
     // guarantee to port, not a no-op for a single-threaded runtime.
-    return this._transactionManager.synchronize(async () => {
+    return this.lock.synchronize(async () => {
       for (;;) {
         try {
           await this.reconnect();
@@ -1436,7 +1436,7 @@ export class AbstractAdapter implements Quoting {
       // `@verified = true`. Without it two concurrent verifies both observe
       // `!active()`, both claim `_unconfiguredConnection`, and one handle is
       // dropped — or both take the reconnect path and reconnect twice.
-      const promoted = await this._transactionManager.synchronize(async () => {
+      const promoted = await this.lock.synchronize(async () => {
         // Mirrors Rails' `verify!` (abstract_adapter.rb): an unconfigured raw
         // connection (opened by the pool but never run through
         // configure_connection) is promoted here rather than reconnected. If
@@ -2508,7 +2508,7 @@ export class AbstractAdapter implements Quoting {
     // one lock, so materialize_transactions and a write nested inside a
     // transaction both re-enter directly (Rails' Monitor reentrancy,
     // abstract_adapter.rb:972-981).
-    return this._transactionManager.synchronize(run);
+    return this.lock.synchronize(run);
   }
 
   /**

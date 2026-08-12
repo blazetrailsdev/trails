@@ -701,15 +701,16 @@ export function strictLoadingViolationBang(
   // Rails passes `owner.class` (Notifications payload + message subject); the
   // message builder stringifies it to the class name, matching Ruby's `#{owner}`.
   const ownerClass = typeof owner === "function" ? owner : owner?.constructor;
-  if (ActiveRecord.actionOnStrictLoadingViolation === "log") {
-    Notifications.instrument("strict_loading_violation.active_record", {
-      owner: ownerClass,
-      reflection: reflectionLike,
-    });
-    return;
+  switch (ActiveRecord.actionOnStrictLoadingViolation) {
+    case "raise": {
+      const message = reflectionLike.strictLoadingViolationMessage(ownerClass);
+      throw new StrictLoadingViolationError(message);
+    }
+    case "log": {
+      const name = "strict_loading_violation.active_record";
+      Notifications.instrument(name, { owner: ownerClass, reflection: reflectionLike });
+    }
   }
-  const message = reflectionLike.strictLoadingViolationMessage(ownerClass);
-  throw new StrictLoadingViolationError(message);
 }
 
 export function initializeFindByCache(this: CoreHost): void {

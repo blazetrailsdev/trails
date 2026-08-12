@@ -80,6 +80,13 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
+    "call": "new",
+    "reason": "Rails raises `RecordNotSaved.new` inside `replace`'s own transaction block (has_one_association.rb:76); the port extracts that block into `persistImmediate` because the save must be awaited, so the construction lives one method away. Converging it means inlining the async transaction body back into `replace`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-association.ts",
+    "rubyName": "replace",
     "call": "nullify_owner_attributes",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

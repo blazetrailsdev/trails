@@ -26,5 +26,12 @@
     "rubyName": "parse_content_type",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/response.ts",
+    "rubyName": "send_file",
+    "call": "new",
+    "reason": "Rails assigns `FileBody.new(path)` (response.rb:374-377); trails has no ported FileBody class, so sendFile builds the equivalent `toPath`/`each` object literal inline. Converging it means porting FileBody."
   }
 ]
