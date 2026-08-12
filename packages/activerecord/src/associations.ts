@@ -1732,30 +1732,24 @@ function createHabtmJoinModel(
     configurable: true,
   });
 
-  // Add belongsTo associations matching what `HasManyThroughAssociation#findTarget` expects
-  const joinAssocs: AssociationDefinition[] = [];
-  joinAssocs.push({
-    type: "belongsTo",
-    name: "leftSide",
-    options: { className: lhsModel.name, foreignKey: ownerFk },
+  // Mirrors `Builder::HasAndBelongsToMany#add_left_association` /
+  // `#add_right_association` (has_and_belongs_to_many.rb:53-63), which declare
+  // both sides with the real `belongs_to` macro (`required: false`) rather than
+  // hand-registering reflections. Going through the macro is what gives the
+  // join model its association accessors and belongs_to autosave callback —
+  // `build_through_record` assigns the target under `source_reflection.name`
+  // (has_many_through_association.rb:55-66), an association write, never a
+  // foreign-key column write.
+  (JoinModel as any).belongsTo("leftSide", {
+    className: lhsModel.name,
+    foreignKey: ownerFk,
+    optional: true,
   });
-  joinAssocs.push({
-    type: "belongsTo",
-    name: sourceName,
-    options: { className: targetClassName, foreignKey: targetFk },
+  (JoinModel as any).belongsTo(sourceName, {
+    className: targetClassName,
+    foreignKey: targetFk,
+    optional: true,
   });
-  JoinModel._associations = joinAssocs;
-
-  for (const assocDef of joinAssocs) {
-    const ref = Reflection.create(
-      assocDef.type,
-      assocDef.name,
-      null,
-      assocDef.options as Record<string, unknown>,
-      JoinModel,
-    );
-    Reflection.addReflection(JoinModel, assocDef.name, ref);
-  }
 
   // No presence validations on the join model's belongs_to sides: Rails builds
   // both with `required: false` hardcoded (Builder::HasAndBelongsToMany

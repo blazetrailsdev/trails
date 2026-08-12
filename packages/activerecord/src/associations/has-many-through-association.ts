@@ -602,13 +602,6 @@ export function buildThroughInverseFor(
  * @internal
  */
 function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base | null {
-  // HABTM associations don't expose a sourceReflection chain, so
-  // constructJoinAttributes (which keys off source_reflection) can't run.
-  // Build the join row from the habtm options instead — matches Rails'
-  // build_through_record path for habtm under the hood.
-  if (this.reflection.macro === "hasAndBelongsToMany") {
-    return buildHabtmThroughRecord(this, record);
-  }
   const cache = throughRecordsCache(this);
   const cached = cache.get(record);
   if (cached) return cached;
@@ -639,73 +632,6 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
   }
   cache.set(record, newRecord);
   return newRecord;
-}
-
-/** @internal */
-function buildHabtmThroughRecord(assoc: HasManyThroughAssociation, record: Base): Base {
-  const ctor = assoc.owner.constructor as any;
-  const assocDef = assoc.reflection as any;
-  const throughName = assocDef.options?.through as string | undefined;
-  // The HABTM builder (associations/builder/has-and-belongs-to-many.ts) always
-  // sets options.through to the generated middle reflection, so a missing
-  // through-name or missing through definition signals genuine misconfiguration —
-  // surface it loudly rather than silently dropping the join write.
-  if (!throughName)
-    throw new Error(`HABTM association '${assocDef.name}' on ${ctor.name} has no through name`);
-  const associations: AssociationDefinition[] = ctor._associations ?? [];
-  const throughAssocDef = associations.find((a: any) => a.name === throughName);
-  if (!throughAssocDef)
-    throw new Error(
-      `HABTM association '${assocDef.name}' on ${ctor.name}: through association '${throughName}' not found`,
-    );
-  const throughClassName =
-    throughAssocDef.options.className ?? `${ctor.name}::HABTM_${camelize(assocDef.name)}`;
-  const throughModel = resolveAssocClass(assoc.owner, throughName, throughClassName);
-  const ownerPk = throughAssocDef.options.primaryKey ?? ctor.primaryKey ?? "id";
-  const ownerFk =
-    throughAssocDef.options.foreignKey ??
-    ctor._reflectOnAssociation?.(throughName)?.foreignKey ??
-    `${underscore(ctor.name)}_id`;
-  const pkValue = (assoc.owner as any)._readAttribute?.(ownerPk) ?? (assoc.owner as any)[ownerPk];
-  // The HABTM JoinModel (createHabtmJoinModel in associations.ts) declares
-  // two belongsTo entries on `_associations`: "leftSide" (owner-side) and a
-  // right-side entry whose `foreignKey` is the builder-computed targetFk
-  // (className-derived, honoring `associationForeignKey`). Read it from
-  // there so we write to the column the JoinModel actually declared, rather
-  // than re-deriving via `singularize(assocName)` and silently dropping the
-  // value when the conventions diverge.
-  const joinAssocs = (throughModel as { _associations?: AssociationDefinition[] })._associations;
-  const rightSide = joinAssocs?.find(
-    (a) => a.type === "belongsTo" && a.name !== "leftSide" && a.options?.foreignKey,
-  );
-  const sourceFk =
-    (rightSide?.options?.foreignKey as string | undefined) ??
-    `${underscore(assocDef.options?.source ?? singularize(assocDef.name))}_id`;
-  const targetPk = (record.constructor as any).primaryKey ?? "id";
-  const joinAttrs: Record<string, unknown> = {
-    [ownerFk as string]: pkValue,
-    [sourceFk]: (record as any)._readAttribute?.(targetPk) ?? (record as any)[targetPk],
-  };
-  const throughProxy = (assoc.owner as any).association?.(throughName) as {
-    build?: (a: Record<string, unknown>) => Base;
-    setOwnerAttributes?: (record: Base) => void;
-  } | null;
-  if (throughProxy && typeof throughProxy.build === "function") {
-    const joinRecord = throughProxy.build(joinAttrs);
-    // Rails writes a join row's owner FK in `HasManyAssociation#insert_record`
-    // (has_many_association.rb:61-64), at save time, never in
-    // `CollectionAssociation#build` (collection_association.rb:117-123) — and
-    // `build` cannot carry it: `initialize_attributes` computes
-    // `assigned_keys - skip_assign` (association.rb:219-222), so the FK, being
-    // in `skip_assign`, is deliberately re-admitted and `scope_for_create`'s
-    // value wins over the one the caller passed. On the new-owner path that
-    // value is null, so every build of this row — including the rebuild
-    // `saveThroughRecord` makes after the owner is saved — reads null and the
-    // INSERT violates NOT NULL. This is Rails' insert-time write.
-    throughProxy.setOwnerAttributes?.(joinRecord);
-    return joinRecord;
-  }
-  return new (throughModel as any)(joinAttrs);
 }
 
 /** @internal */

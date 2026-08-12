@@ -475,6 +475,43 @@ export class CollectionAssociation extends Association {
   }
 
   /**
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#_create_record
+   * (collection_association.rb:354-372).
+   *
+   * Rails' Array arm — `_create_record` recursing over an Array of attribute
+   * hashes — has no counterpart here for the same reason it has none in
+   * `HasManyAssociation#_createRecord`: the multi-record form is the loop in
+   * `CollectionProxy#create`, which reaches this method once per element.
+   *
+   * @missingRailsCall loaded? — the `{ @_was_loaded = loaded? }` block Rails
+   * hands to `insert_record` (collection_association.rb:365-367) feeds
+   * `replace_on_target`'s `@_was_loaded || !loaded?` append gate
+   * (collection_association.rb:481). trails' `replaceOnTarget` port appends
+   * unconditionally, so the flag has no reader to set.
+   * @internal
+   */
+  protected override async _createRecord(
+    attributes?: Record<string, unknown>,
+    shouldRaise = false,
+    block?: (record: Base) => void,
+  ): Promise<Base | null> {
+    if (!this.owner.isPersisted()) {
+      throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
+    }
+
+    const record = this.buildRecord(attributes, block);
+    if (!record) return null;
+    await this.transaction(async () => {
+      let result: boolean | undefined = undefined;
+      await this.addToTarget(record, {}, async () => {
+        result = await this.insertRecord(record, true, shouldRaise);
+      });
+      if (!result) throw new Rollback();
+    });
+    return record;
+  }
+
+  /**
    * Mirrors Rails' `CollectionAssociation#concat_records`
    * (collection_association.rb): add each record to the target, inserting it
    * when the owner is persisted. Returns `records` so subclasses (HMT) can

@@ -7,7 +7,7 @@ import {
   findCollectionTarget as findHasManyThroughTarget,
 } from "../test-helpers/find-collection-target.js";
 import type { AssociationProxy } from "./collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Notifications, throwAbort } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -279,9 +279,17 @@ describe("HasManyAssociationsTest", () => {
     const firstFirm = companies("first_firm") as any;
     await firstFirm.clientsOfFirm.load();
 
-    const bad = await firstFirm.clientsOfFirm.create({ name: "Bad" }, (r: any) => {
-      r.throwOnSave = true;
-    });
+    // The `create` block is yielded inside `build_record`, i.e. from the
+    // constructor (association.rb:383-388) — before JS class-field initializers
+    // run — so a flag set there would be reset by `throwOnSave = false`. Fail
+    // the insert at `insert_record`'s `record.save` instead.
+    const saveSpy = vi.spyOn(Client.prototype as any, "save").mockResolvedValue(false);
+    let bad: any;
+    try {
+      bad = await firstFirm.clientsOfFirm.create({ name: "Bad" });
+    } finally {
+      saveSpy.mockRestore();
+    }
 
     expect(bad.isNewRecord()).toBe(true);
     expect(await firstFirm.clientsOfFirm.toArray()).toContain(bad);

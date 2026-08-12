@@ -40,7 +40,6 @@ import {
   ConfigurationError,
   AssociationTypeMismatch,
   RecordNotFound,
-  Rollback,
 } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
@@ -1407,24 +1406,41 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
       )) as T;
     }
-    const record = this._buildRecord(attrs) as T;
-    if (block) block(record);
-    // Rails' `_create_record` wraps the insert in a transaction and re-raises
-    // `Rollback unless result` (collection_association.rb:363-371) so a
-    // non-raising `save` failure undoes any partial write. `add_to_target`
-    // buffers the record into the target and fires after_add regardless of the
-    // save result — the `yield(record)` return is ignored — so we accumulate it
-    // in `result` here rather than gating the in-memory push.
-    // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`,
-    // so a `distinct` association scope dedups in place rather than appending twice.
-    await this.transaction(async () => {
-      let result: boolean | undefined = undefined;
-      await this._addToTarget(record, { replace: this.distinctValue }, async () => {
-        result = await record.save();
-      });
-      if (!result) throw new Rollback();
-    });
-    return record;
+    // Rails' `CollectionProxy#create` is `@association.create(...)`
+    // (collection_proxy.rb:308-310), which lands in
+    // `CollectionAssociation#_create_record` — build_record, then
+    // `transaction { add_to_target(record) { insert_record(record, true, raise) } }`.
+    // Routing through the association is what puts the owner FK on the row via
+    // `HasManyAssociation#insert_record`'s `set_owner_attributes`
+    // (has_many_association.rb:61-64) and what reaches
+    // `HasManyAssociation#_create_record`'s in-memory counter bump
+    // (has_many_association.rb:143-149).
+    return (await this._collectionAssociation()._createRecord(
+      attrs,
+      false,
+      block as ((record: Base) => void) | undefined,
+    )) as T;
+  }
+
+  /**
+   * The OO `CollectionAssociation` behind this proxy — Rails' `@association`,
+   * which `CollectionProxy` delegates every mutation to.
+   * @internal
+   */
+  private _collectionAssociation(): {
+    _createRecord(
+      attributes?: Record<string, unknown>,
+      shouldRaise?: boolean,
+      block?: (record: Base) => void,
+    ): Promise<Base | null>;
+  } {
+    return this._record.association(this._assocName) as unknown as {
+      _createRecord(
+        attributes?: Record<string, unknown>,
+        shouldRaise?: boolean,
+        block?: (record: Base) => void,
+      ): Promise<Base | null>;
+    };
   }
 
   /**
@@ -3667,17 +3683,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       assocCallback(this._callbackHost, "afterAdd", record);
       return record;
     }
-    const record = this._buildRecord(attrs) as T;
-    if (block) block(record);
-    // Mirror Rails' _create_record(raise: true): add_to_target(record) { save! }.
-    // The save (insert_record) runs inside the add_to_target funnel, between
-    // set_inverse_instance and the target mutation. A before_add abort leaves
-    // the record unsaved and out of the target without raising.
-    await this._addToTarget(record, { replace: this.distinctValue }, async () => {
-      if (!(await record.save())) throw new RecordInvalid(record);
-      return true;
-    });
-    return record;
+    // `create!` is `@association.create!` (collection_proxy.rb:319-321) — the
+    // same `_create_record` with `raise = true`, so the validation failure
+    // surfaces from `insert_record`'s `save!` inside the transaction.
+    return (await this._collectionAssociation()._createRecord(
+      attrs,
+      true,
+      block as ((record: Base) => void) | undefined,
+    )) as T;
   }
 
   /**
