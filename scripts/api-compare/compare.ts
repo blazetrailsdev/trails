@@ -326,6 +326,43 @@ export function dropWeakCalls(
 export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionNegatedCalls };
 
 /**
+ * Narrow a Ruby PREDICATE's candidate list against the rest of the body it was
+ * read from (RFC 0084 `extractor-predicate-and-closure-order-artifacts`).
+ *
+ * `rubyMethodToTs` maps `find_target?` to BOTH spellings a port may use —
+ * `["isFindTarget", "findTarget"]` — because trails prefixes some ported
+ * predicates with `is` and leaves others bare, and the conventions table cannot
+ * know which. That either-spelling candidate is safe on its own and wrong the
+ * moment the SAME body also calls the plain `find_target`: the bare spelling is
+ * then the plain call's port, and letting the predicate claim it makes the two
+ * distinct Ruby calls resolve to one TS name. `CollectionAssociation#load_target`
+ * is the worked case — Rails calls `find_target?` then `merge_target_lists` then
+ * `find_target` (collection_association.rb:37-42), trails calls
+ * `findTargetNeeded` then `mergeTargetLists` then `findTarget`
+ * (collection-association.ts), and the predicate claiming `findTarget` reported
+ * a call-ORDER inversion in a body whose order matches Rails exactly.
+ *
+ * So: when the body makes the plain call too, drop from the predicate's
+ * candidates every name the plain call also maps to. The `is`-prefixed spelling
+ * always survives (the plain call never produces it), so a genuinely dropped
+ * predicate is still flagged — this only stops one Ruby call from being
+ * credited to another's port.
+ */
+export function narrowPredicateCandidates(
+  rubyCall: string,
+  mapped: readonly string[],
+  rubyCalls: readonly string[],
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+): string[] {
+  if (!rubyCall.endsWith("?")) return [...mapped];
+  const plain = rubyCall.slice(0, -1);
+  if (!rubyCalls.includes(plain)) return [...mapped];
+  const claimed = new Set(mapCall(plain) ?? []);
+  const narrowed = mapped.filter((c) => !claimed.has(c));
+  return narrowed.length === 0 ? [...mapped] : narrowed;
+}
+
+/**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
  * name-matched pair, returns the fidelity-critical Ruby body calls that are
  * absent from the TS body's call-set, formatted as `ruby_call → tsCand|tsCand`.
@@ -340,6 +377,11 @@ export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionN
  *   3. flagged only when the TS body makes NONE of the mapped candidates, nor
  *      any JS-native analogue of the Ruby call (`aliasCall`, e.g. `some` for
  *      `any?`).
+ *
+ * `bodyRubyCalls` is the body's call list BEFORE `dropWeakCalls` — the
+ * disambiguation above is about what the Ruby body NAMES, and a call the weak
+ * filter drops (an inert receiver, `reflection.validate?`) still names a TS
+ * spelling that another call would otherwise be credited with.
  */
 export function significantMissingCalls(
   rubyName: string,
@@ -350,6 +392,7 @@ export function significantMissingCalls(
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
   negatedTsCalls: Set<string> = new Set(),
+  bodyRubyCalls: readonly string[] = rubyCalls,
 ): string[] {
   const missing: string[] = [];
   for (const rc of rubyCalls) {
@@ -369,8 +412,9 @@ export function significantMissingCalls(
       if (!chained) missing.push(`super → super|${[...selfTs].join("|")}`);
       continue;
     }
-    const mapped = mapCall(rc);
-    if (!mapped || mapped.length === 0) continue;
+    const raw = mapCall(rc);
+    if (!raw || raw.length === 0) continue;
+    const mapped = narrowPredicateCandidates(rc, raw, bodyRubyCalls, mapCall);
     if (!mapped.some(isPortedWithArgs)) continue;
     if (mapped.some((c) => tsCalls.has(c))) continue;
     // A NEGATED alias (`exclude? → includes`) is matched against the negated
@@ -385,6 +429,38 @@ export function significantMissingCalls(
     missing.push(`${rc} → ${mapped.join("|")}`);
   }
   return missing;
+}
+
+/**
+ * The TS names that TWO OR MORE of a body's Ruby calls could be ported as, so
+ * no position in the TS sequence can be attributed to either of them (RFC 0084
+ * `extractor-predicate-and-closure-order-artifacts`).
+ *
+ * The class is a predicate and its plain sibling in one body:
+ * `define_autosave_validation_callbacks` calls `reflection.validate?`
+ * (autosave_association.rb:221) and then `validate validation_method` (:231),
+ * and trails spells the first `reflection.validate` — so the TS name `validate`
+ * occurs twice with two different meanings, and `callSeq` (deduplicated at
+ * first occurrence, like Ruby's `calls.uniq`) keeps only the predicate's
+ * position. Charging the plain call with that position reported an inversion
+ * against a body whose order matches Rails.
+ *
+ * Order needs identity, so an ambiguous name is dropped from the ORDER
+ * comparison only. Membership does not: {@link significantMissingCalls} still
+ * sees the name in the TS call-set, so a genuinely dropped call is still
+ * flagged either way.
+ */
+export function ambiguousTsNames(
+  rubyCalls: readonly string[],
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+): Set<string> {
+  const owners = new Map<string, Set<string>>();
+  for (const rc of new Set(rubyCalls)) {
+    for (const c of mapCall(rc) ?? []) {
+      (owners.get(c) ?? owners.set(c, new Set()).get(c)!).add(rc);
+    }
+  }
+  return new Set([...owners].filter(([, rcs]) => rcs.size > 1).map(([c]) => c));
 }
 
 /**
@@ -422,6 +498,30 @@ export const ORDER_PREFIX = "order:";
  * At most one flag per body, naming the first inversion — `order:b,a → a,b`
  * reads "TS calls b before a; Rails calls a before b" — so the row is a stable
  * baseline key rather than a whole-sequence string that churns on every edit.
+ *
+ * A TS name two of the body's Ruby calls could both be ported as carries no
+ * position for either ({@link ambiguousTsNames}), so it is skipped here; the
+ * membership check still sees it.
+ *
+ * ONE class of order flag is a known extractor artifact and is NOT handled
+ * here, recorded once rather than re-derived per file (RFC 0084
+ * `extractor-predicate-and-closure-order-artifacts`): a call nested in ANOTHER
+ * call's ARGUMENTS. Both extractors emit lexical order — receiver, then the
+ * call, then its arguments (extract-ruby-api.rb#walk_for_calls,
+ * extract-ts-api.ts#collectCalls, whose comments pin the two to each other) —
+ * so Rails' `add_to_target(build_record(attributes, &block), replace: true)`
+ * (collection_association.rb:121) records `add_to_target` BEFORE `build_record`
+ * even though `build_record` is what runs first. A port that hoists the nested
+ * call into a local — which an `await` forces — then reads as an inversion.
+ * Ruby EVALUATION order (arguments before the enclosing call) is the sequence
+ * both sides should record; changing it is a matched change to two extractors
+ * with its own whole-artifact re-measure, so it is its own story rather than a
+ * special case here.
+ *
+ * `bodyRubyCalls` is the body's call list BEFORE `dropWeakCalls` — the
+ * disambiguation above is about what the Ruby body NAMES, and a call the weak
+ * filter drops (an inert receiver, `reflection.validate?`) still names a TS
+ * spelling that another call would otherwise be credited with.
  */
 export function reorderedCalls(
   rubyName: string,
@@ -430,16 +530,19 @@ export function reorderedCalls(
   isPortedWithArgs: (tsName: string) => boolean,
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+  bodyRubyCalls: readonly string[] = rubyCalls,
 ): string[] {
+  const ambiguous = ambiguousTsNames(bodyRubyCalls, mapCall);
   const rubySeq: string[] = [];
   for (const rc of rubyCalls) {
     if (rc === rubyName) continue;
     if (rc === "super") continue;
     if (!significant.has(rc)) continue;
-    const mapped = mapCall(rc);
-    if (!mapped || mapped.length === 0) continue;
+    const raw = mapCall(rc);
+    if (!raw || raw.length === 0) continue;
+    const mapped = narrowPredicateCandidates(rc, raw, bodyRubyCalls, mapCall);
     if (!mapped.some(isPortedWithArgs)) continue;
-    const hit = mapped.find((c) => tsCalls.includes(c));
+    const hit = mapped.find((c) => tsCalls.includes(c) && !ambiguous.has(c));
     if (hit === undefined) continue;
     if (rubySeq.includes(hit)) continue;
     rubySeq.push(hit);
@@ -2589,6 +2692,7 @@ export function main() {
           callsSignificant,
           jsEnumerableAliases,
           negatedTsCalls,
+          rubyOwned?.calls ?? rubyCalls,
         );
         const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
         let kept = missing;
@@ -2624,6 +2728,7 @@ export function main() {
               (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
               rubyMethodToTs,
               callsSignificant,
+              rubyOwned?.calls ?? rubyCalls,
             ),
           );
         }

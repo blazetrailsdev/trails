@@ -19,6 +19,8 @@ import {
   buildEntitiesByName,
   resolveEntityByDeclaringFile,
   significantMissingCalls,
+  narrowPredicateCandidates,
+  ambiguousTsNames,
   reorderedCalls,
   ORDER_PREFIX,
   resolvePortedWithArgsSigs,
@@ -1965,6 +1967,58 @@ describe("reopeningMethodCreditedToOwnFile", () => {
   });
 });
 
+describe("narrowPredicateCandidates", () => {
+  const map = (c: string) => rubyMethodToTs(c);
+
+  it("drops the bare spelling when the body also makes the plain call", () => {
+    expect(
+      narrowPredicateCandidates(
+        "find_target?",
+        ["isFindTarget", "findTarget"],
+        ["find_target?", "find_target"],
+        map,
+      ),
+    ).toEqual(["isFindTarget"]);
+  });
+
+  it("keeps both spellings when the plain call is absent", () => {
+    expect(
+      narrowPredicateCandidates(
+        "find_target?",
+        ["isFindTarget", "findTarget"],
+        ["find_target?"],
+        map,
+      ),
+    ).toEqual(["isFindTarget", "findTarget"]);
+  });
+
+  it("leaves a non-predicate call alone", () => {
+    expect(narrowPredicateCandidates("find_target", ["findTarget"], ["find_target"], map)).toEqual([
+      "findTarget",
+    ]);
+  });
+
+  it("keeps the whole list rather than narrowing to nothing", () => {
+    // A predicate whose ONLY candidate is the plain call's must still be
+    // checkable — narrowing to [] would silence a genuinely dropped call.
+    expect(narrowPredicateCandidates("save?", ["save"], ["save?", "save"], () => ["save"])).toEqual(
+      ["save"],
+    );
+  });
+});
+
+describe("ambiguousTsNames", () => {
+  const map = (c: string) => rubyMethodToTs(c);
+
+  it("names the TS spelling a predicate and its plain sibling share", () => {
+    expect([...ambiguousTsNames(["validate?", "validate", "name"], map)]).toEqual(["validate"]);
+  });
+
+  it("is empty when every Ruby call maps to its own TS names", () => {
+    expect([...ambiguousTsNames(["build_record", "add_to_target"], map)]).toEqual([]);
+  });
+});
+
 describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
   const map = (c: string) => rubyMethodToTs(c);
   const wide = { has: (k: string) => k !== "super" };
@@ -2018,6 +2072,54 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
     expect(
       reorderedCalls("save", ["super", "touch", "build"], ["touch", "build"], ported, map, wide),
     ).toEqual([]);
+  });
+
+  it("does not credit a predicate with the plain call's TS position", () => {
+    // CollectionAssociation#load_target (collection_association.rb:37-42) calls
+    // `find_target?`, `merge_target_lists`, then `find_target`; trails calls
+    // `findTargetNeeded`, `mergeTargetLists`, then `findTarget`. `find_target?`
+    // maps to ["isFindTarget", "findTarget"], and letting it claim `findTarget`
+    // reported an inversion against a body whose order matches Rails.
+    expect(
+      reorderedCalls(
+        "load_target",
+        ["find_target?", "merge_target_lists", "find_target"],
+        ["findTargetNeeded", "mergeTargetLists", "findTarget"],
+        ported,
+        map,
+        wide,
+      ),
+    ).toEqual([]);
+  });
+
+  it("drops a TS name two of the body's Ruby calls could both be ported as", () => {
+    // define_autosave_validation_callbacks (autosave_association.rb:219-234)
+    // calls `reflection.validate?` and then `validate validation_method`; trails
+    // spells the first `reflection.validate`, so the TS name `validate` carries
+    // no position for either. The weak call (`reflection.validate?` sits on an
+    // inert receiver) still disambiguates, so it is passed as bodyRubyCalls.
+    expect(
+      reorderedCalls(
+        "define_autosave_validation_callbacks",
+        ["define_non_cyclic_method", "validate"],
+        ["validate", "defineNonCyclicMethod"],
+        ported,
+        map,
+        wide,
+        ["validate?", "define_non_cyclic_method", "validate"],
+      ),
+    ).toEqual([]);
+    // Without the ambiguity, the same sequences ARE an inversion.
+    expect(
+      reorderedCalls(
+        "define_autosave_validation_callbacks",
+        ["define_non_cyclic_method", "validate"],
+        ["validate", "defineNonCyclicMethod"],
+        ported,
+        map,
+        wide,
+      ),
+    ).toEqual([`${ORDER_PREFIX}validate,defineNonCyclicMethod → defineNonCyclicMethod,validate`]);
   });
 
   it("respects the ported-with-args gate the missing-call check uses", () => {
