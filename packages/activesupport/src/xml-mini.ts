@@ -53,11 +53,72 @@ export interface XmlMiniBackend {
 /** The name of a backend, or the backend module itself. */
 export type XmlMiniBackendName = XmlMiniBackend | string;
 
-export interface RenameKeyOptions {
-  /** Convert `snake_case` keys to `dashed-keys`. Defaults to `true`. */
-  dasherize?: boolean;
-  /** Camelize the key first: `true`/`"upper"` for UpperCamel, `"lower"` for lowerCamel. */
-  camelize?: boolean | "lower" | "upper";
+/** Mirrors: ActiveSupport::XmlMini::DEFAULT_ENCODINGS. */
+const DEFAULT_ENCODINGS: Record<string, string> = {
+  binary: "base64",
+};
+
+/**
+ * Per-type value formatters. Mirrors: ActiveSupport::XmlMini::FORMATTING —
+ * the JS type each entry receives is the trails analog of the Ruby class that
+ * `TYPE_NAMES` maps to the same tag name (e.g. `Temporal.Duration` ↔
+ * `ActiveSupport::Duration`).
+ */
+const FORMATTING: Record<string, (value: unknown) => string> = {
+  symbol: (value) => (typeof value === "symbol" ? (value.description ?? "") : String(value)),
+  date: (value) => (value instanceof Temporal.PlainDate ? value.toString() : String(value)),
+  time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
+  dateTime: formatDateTime,
+  duration: (value) => (value instanceof Temporal.Duration ? value.toString() : String(value)),
+  binary: encode64,
+};
+
+/**
+ * Base64-encode binary content, mirroring Ruby's `Base64.encode64`: MIME line
+ * wrapping at 60 characters, each line (including the last) terminated by `\n`.
+ * Accepts a byte array or a binary (Latin-1) string, matching how Rails' binary
+ * columns arrive.
+ */
+function encode64(value: unknown): string {
+  const bytes =
+    typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value as Uint8Array);
+  const b64 = bytes.toString("base64");
+  // Empty input encodes to "" (no trailing newline); otherwise chunk into
+  // 60-char lines joined by "\n" with a single trailing "\n" — matching
+  // Base64.encode64 exactly, including when the length is a multiple of 60.
+  if (b64 === "") return "";
+  return (b64.match(/.{1,60}/g) ?? []).join("\n") + "\n";
+}
+
+/**
+ * Decode Base64 content, mirroring Ruby's `Base64.decode64`: any character
+ * outside the Base64 alphabet (the line breaks `encode64` inserts included) is
+ * ignored. The decoded bytes come back as a binary (Latin-1) string, the same
+ * shape {@link encode64} accepts.
+ */
+function decode64(value: string): string {
+  return Buffer.from(value, "base64").toString("binary");
+}
+
+function formatDateTime(value: unknown): string {
+  // boundary: legacy JS Date values serialize as ISO 8601 dateTime.
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
+  }
+  // ActiveSupport::TimeWithZone (and any zoned wall-clock) exposes #xmlschema,
+  // which keeps the local offset — Rails' `time.xmlschema`.
+  if (typeof (value as { xmlschema?: unknown })?.xmlschema === "function") {
+    return (value as { xmlschema(): string }).xmlschema();
+  }
+  if (value instanceof Temporal.ZonedDateTime) {
+    // Drop the IANA `[Zone]` annotation so the lexical form is a valid XML
+    // Schema dateTime while keeping the numeric offset (unlike a UTC recast).
+    return value.toString({ timeZoneName: "never" });
+  }
+  if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
+    return value.toString();
+  }
+  return String(value);
 }
 
 /**
@@ -128,148 +189,6 @@ export async function withBackend<T>(
 }
 
 /**
- * The execution-state-scoped backend override.
- *
- * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
- *
- * @missingRailsCall cast_backend_name_to_module — belongs to
- * `current_thread_backend=`, which the call gate pairs with this reader (the
- * bare-camel candidate wins over `setCurrentThreadBackend`);
- * {@link setCurrentThreadBackend} makes the call.
- *
- * @internal
- */
-export function currentThreadBackend(): XmlMiniBackend | null | undefined {
-  return IsolatedExecutionState.get("xml_mini_backend");
-}
-
-/**
- * Mirrors: ActiveSupport::XmlMini#current_thread_backend= (xml_mini.rb:196-198).
- *
- * @internal
- */
-export async function setCurrentThreadBackend(
-  name: XmlMiniBackendName | null | undefined,
-): Promise<void> {
-  IsolatedExecutionState.set(
-    "xml_mini_backend",
-    name != null ? await castBackendNameToModule(name) : name,
-  );
-}
-
-/**
- * Resolve a backend name to its module, loading the module the first time.
- *
- * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
- * (xml_mini.rb:200-206) — Ruby's `require
- * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
- * is one dynamic import here, since the module namespace object of
- * `xml-mini/<name>.js` is the backend module.
- *
- * @internal
- */
-export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
-  if (typeof name !== "string") {
-    return name;
-  } else {
-    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
-  }
-}
-
-/**
- * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
- *
- * Mirrors: ActiveSupport::XmlMini.rename_key (xml_mini.rb:154-161) — camelize (when requested) runs
- * first, then dasherize (default `true`) runs on the result. Both transforms
- * compose exactly as in Rails, so `camelize: true` still passes through
- * `_dasherize` (a no-op on an already-camelized, underscore-free key).
- */
-export function renameKey(key: string, options: RenameKeyOptions = {}): string {
-  const { camelize: camelizeOpt } = options;
-  const dasherize = options.dasherize === undefined || options.dasherize;
-  let result = key;
-  if (camelizeOpt) {
-    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
-  }
-  if (dasherize) {
-    result = _dasherize(result);
-  }
-  return result;
-}
-
-/**
- * Dasherize an `underscore_key`, preserving any leading/trailing underscores.
- *
- * Mirrors: ActiveSupport::XmlMini._dasherize (xml_mini.rb:163-167) — the `$2` (interior) capture is
- * non-greedy so surrounding runs of underscores are left untouched and only the
- * interior `_`/space characters become `-`.
- *
- * @internal
- */
-export function _dasherize(key: string): string {
-  const match = key.trim().match(/^(_*)([\s\S]*?)(_*)$/);
-  if (!match) return key;
-  const [, left, middle, right] = match;
-  return `${left}${middle.replace(/[_ ]/g, "-")}${right}`;
-}
-
-/**
- * Decode a `type="binary"` value according to its element's `encoding`
- * attribute, leaving an unrecognized encoding untouched.
- *
- * Mirrors: ActiveSupport::XmlMini._parse_binary (xml_mini.rb:169-178).
- *
- * @internal
- */
-export function _parseBinary(bin: string, entity: Record<string, string | undefined>): string {
-  switch (entity["encoding"]) {
-    case "base64":
-      return decode64(bin);
-    case "hex":
-    case "hexBinary":
-      return _parseHexBinary(bin);
-    default:
-      return bin;
-  }
-}
-
-/**
- * Decode a `type="file"` value into an IO decorated with the element's `name`
- * and `content_type` attributes.
- *
- * Mirrors: ActiveSupport::XmlMini._parse_file (xml_mini.rb:180-186) — `Blob` is
- * the platform's in-memory, readable byte container, so it stands in for
- * `StringIO.new`; the Latin-1 round-trip hands it {@link decode64}'s bytes
- * unchanged rather than re-encoding them as UTF-8. Copying {@link FileLike}'s
- * descriptors onto it is `f.extend(FileLike)`.
- *
- * @internal
- */
-export function _parseFile(
-  file: string,
-  entity: Record<string, string | undefined>,
-): Blob & typeof FileLike {
-  const f = new Blob([Uint8Array.from(decode64(file), (c) => c.charCodeAt(0))]);
-  Object.defineProperties(f, Object.getOwnPropertyDescriptors(FileLike));
-  const fileLike = f as Blob & typeof FileLike;
-  fileLike.originalFilename = entity["name"];
-  fileLike.contentType = entity["content_type"];
-  return fileLike;
-}
-
-/**
- * Decode a hex-encoded value to its bytes.
- *
- * Mirrors: ActiveSupport::XmlMini._parse_hex_binary (xml_mini.rb:188-190) —
- * Ruby's `[bin].pack("H*")`.
- *
- * @internal
- */
-export function _parseHexBinary(bin: string): string {
-  return Buffer.from(bin, "hex").toString("binary");
-}
-
-/**
  * A sink for XML fragments. `toTag` writes one value's tag(s) into it, so the
  * same per-value logic can target either a compact string (the parity default,
  * {@link XmlStringBuilder}) or an indentation-aware sink (ActiveModel's
@@ -300,6 +219,13 @@ export interface XmlTypeInfo {
   nested: Record<string, XmlTypeInfo>;
 }
 
+export interface RenameKeyOptions {
+  /** Convert `snake_case` keys to `dashed-keys`. Defaults to `true`. */
+  dasherize?: boolean;
+  /** Camelize the key first: `true`/`"upper"` for UpperCamel, `"lower"` for lowerCamel. */
+  camelize?: boolean | "lower" | "upper";
+}
+
 export interface ToTagOptions extends RenameKeyOptions {
   /** The sink the emitted tag(s) are written to. */
   builder: XmlBuilder;
@@ -326,74 +252,6 @@ export interface ToTagOptions extends RenameKeyOptions {
   root?: unknown;
   /** Always true once inside `to_tag` (no XML instruction on nested docs). */
   skipInstruct?: boolean;
-}
-
-/** Mirrors: ActiveSupport::XmlMini::DEFAULT_ENCODINGS. */
-const DEFAULT_ENCODINGS: Record<string, string> = {
-  binary: "base64",
-};
-
-/**
- * Per-type value formatters. Mirrors: ActiveSupport::XmlMini::FORMATTING —
- * the JS type each entry receives is the trails analog of the Ruby class that
- * `TYPE_NAMES` maps to the same tag name (e.g. `Temporal.Duration` ↔
- * `ActiveSupport::Duration`).
- */
-const FORMATTING: Record<string, (value: unknown) => string> = {
-  symbol: (value) => (typeof value === "symbol" ? (value.description ?? "") : String(value)),
-  date: (value) => (value instanceof Temporal.PlainDate ? value.toString() : String(value)),
-  time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
-  dateTime: formatDateTime,
-  duration: (value) => (value instanceof Temporal.Duration ? value.toString() : String(value)),
-  binary: encode64,
-};
-
-/**
- * Base64-encode binary content, mirroring Ruby's `Base64.encode64`: MIME line
- * wrapping at 60 characters, each line (including the last) terminated by `\n`.
- * Accepts a byte array or a binary (Latin-1) string, matching how Rails' binary
- * columns arrive.
- */
-function encode64(value: unknown): string {
-  const bytes =
-    typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value as Uint8Array);
-  const b64 = bytes.toString("base64");
-  // Empty input encodes to "" (no trailing newline); otherwise chunk into
-  // 60-char lines joined by "\n" with a single trailing "\n" — matching
-  // Base64.encode64 exactly, including when the length is a multiple of 60.
-  if (b64 === "") return "";
-  return (b64.match(/.{1,60}/g) ?? []).join("\n") + "\n";
-}
-
-/**
- * Decode Base64 content, mirroring Ruby's `Base64.decode64`: any character
- * outside the Base64 alphabet (the line breaks `encode64` inserts included) is
- * ignored. The decoded bytes come back as a binary (Latin-1) string, the same
- * shape {@link encode64} accepts.
- */
-function decode64(value: string): string {
-  return Buffer.from(value, "base64").toString("binary");
-}
-
-function formatDateTime(value: unknown): string {
-  // boundary: legacy JS Date values serialize as ISO 8601 dateTime.
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? "" : value.toISOString();
-  }
-  // ActiveSupport::TimeWithZone (and any zoned wall-clock) exposes #xmlschema,
-  // which keeps the local offset — Rails' `time.xmlschema`.
-  if (typeof (value as { xmlschema?: unknown })?.xmlschema === "function") {
-    return (value as { xmlschema(): string }).xmlschema();
-  }
-  if (value instanceof Temporal.ZonedDateTime) {
-    // Drop the IANA `[Zone]` annotation so the lexical form is a valid XML
-    // Schema dateTime while keeping the numeric offset (unlike a UTC recast).
-    return value.toString({ timeZoneName: "never" });
-  }
-  if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
-    return value.toString();
-  }
-  return String(value);
 }
 
 /**
@@ -559,6 +417,148 @@ function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOpt
     toTag(k, v, { ...options, type: info?.types[k], typeInfo: info?.nested[k], root: k });
   }
   options.builder.closeTag(root);
+}
+
+/**
+ * Apply the `camelize`/`dasherize` key transforms to a single XML tag name.
+ *
+ * Mirrors: ActiveSupport::XmlMini.rename_key (xml_mini.rb:154-161) — camelize (when requested) runs
+ * first, then dasherize (default `true`) runs on the result. Both transforms
+ * compose exactly as in Rails, so `camelize: true` still passes through
+ * `_dasherize` (a no-op on an already-camelized, underscore-free key).
+ */
+export function renameKey(key: string, options: RenameKeyOptions = {}): string {
+  const { camelize: camelizeOpt } = options;
+  const dasherize = options.dasherize === undefined || options.dasherize;
+  let result = key;
+  if (camelizeOpt) {
+    result = camelizeOpt === true ? camelize(result) : camelize(result, camelizeOpt);
+  }
+  if (dasherize) {
+    result = _dasherize(result);
+  }
+  return result;
+}
+
+/**
+ * Dasherize an `underscore_key`, preserving any leading/trailing underscores.
+ *
+ * Mirrors: ActiveSupport::XmlMini._dasherize (xml_mini.rb:163-167) — the `$2` (interior) capture is
+ * non-greedy so surrounding runs of underscores are left untouched and only the
+ * interior `_`/space characters become `-`.
+ *
+ * @internal
+ */
+export function _dasherize(key: string): string {
+  const match = key.trim().match(/^(_*)([\s\S]*?)(_*)$/);
+  if (!match) return key;
+  const [, left, middle, right] = match;
+  return `${left}${middle.replace(/[_ ]/g, "-")}${right}`;
+}
+
+/**
+ * Decode a `type="binary"` value according to its element's `encoding`
+ * attribute, leaving an unrecognized encoding untouched.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_binary (xml_mini.rb:169-178).
+ *
+ * @internal
+ */
+export function _parseBinary(bin: string, entity: Record<string, string | undefined>): string {
+  switch (entity["encoding"]) {
+    case "base64":
+      return decode64(bin);
+    case "hex":
+    case "hexBinary":
+      return _parseHexBinary(bin);
+    default:
+      return bin;
+  }
+}
+
+/**
+ * Decode a `type="file"` value into an IO decorated with the element's `name`
+ * and `content_type` attributes.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_file (xml_mini.rb:180-186) — `Blob` is
+ * the platform's in-memory, readable byte container, so it stands in for
+ * `StringIO.new`; the Latin-1 round-trip hands it {@link decode64}'s bytes
+ * unchanged rather than re-encoding them as UTF-8. Copying {@link FileLike}'s
+ * descriptors onto it is `f.extend(FileLike)`.
+ *
+ * @internal
+ */
+export function _parseFile(
+  file: string,
+  entity: Record<string, string | undefined>,
+): Blob & typeof FileLike {
+  const f = new Blob([Uint8Array.from(decode64(file), (c) => c.charCodeAt(0))]);
+  Object.defineProperties(f, Object.getOwnPropertyDescriptors(FileLike));
+  const fileLike = f as Blob & typeof FileLike;
+  fileLike.originalFilename = entity["name"];
+  fileLike.contentType = entity["content_type"];
+  return fileLike;
+}
+
+/**
+ * Decode a hex-encoded value to its bytes.
+ *
+ * Mirrors: ActiveSupport::XmlMini._parse_hex_binary (xml_mini.rb:188-190) —
+ * Ruby's `[bin].pack("H*")`.
+ *
+ * @internal
+ */
+export function _parseHexBinary(bin: string): string {
+  return Buffer.from(bin, "hex").toString("binary");
+}
+
+/**
+ * The execution-state-scoped backend override.
+ *
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend (xml_mini.rb:192-194).
+ *
+ * @missingRailsCall cast_backend_name_to_module — belongs to
+ * `current_thread_backend=`, which the call gate pairs with this reader (the
+ * bare-camel candidate wins over `setCurrentThreadBackend`);
+ * {@link setCurrentThreadBackend} makes the call.
+ *
+ * @internal
+ */
+export function currentThreadBackend(): XmlMiniBackend | null | undefined {
+  return IsolatedExecutionState.get("xml_mini_backend");
+}
+
+/**
+ * Mirrors: ActiveSupport::XmlMini#current_thread_backend= (xml_mini.rb:196-198).
+ *
+ * @internal
+ */
+export async function setCurrentThreadBackend(
+  name: XmlMiniBackendName | null | undefined,
+): Promise<void> {
+  IsolatedExecutionState.set(
+    "xml_mini_backend",
+    name != null ? await castBackendNameToModule(name) : name,
+  );
+}
+
+/**
+ * Resolve a backend name to its module, loading the module the first time.
+ *
+ * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
+ * (xml_mini.rb:200-206) — Ruby's `require
+ * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
+ * is one dynamic import here, since the module namespace object of
+ * `xml-mini/<name>.js` is the backend module.
+ *
+ * @internal
+ */
+export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
+  if (typeof name !== "string") {
+    return name;
+  } else {
+    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
+  }
 }
 
 /** Render `attrs` as ` k="v"` pairs with escaped values, in insertion order. */
