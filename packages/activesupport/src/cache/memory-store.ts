@@ -3,6 +3,7 @@ import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
 import { Store } from "./store.js";
 import { integer } from "./integer.js";
+import { registerStoreClass } from "./store-registry.js";
 
 // In-memory record backing a single key. We store the coder-serialized value
 // (so Date/undefined/bigint/non-finite numbers and deep-clone isolation survive
@@ -194,3 +195,5 @@ export namespace DupCoder {
     return dump(entry);
   }
 }
+
+registerStoreClass(":memory_store", MemoryStore);

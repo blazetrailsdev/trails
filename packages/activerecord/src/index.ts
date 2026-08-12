@@ -332,7 +332,7 @@ export { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 export type { MigrationProxy } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 
-export { markForDestruction, isDestroyable } from "./autosave-association.js";
+export { isDestroyable } from "./autosave-association.js";
 export { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 export { Map as TypeCasterMap } from "./type-caster/map.js";
 

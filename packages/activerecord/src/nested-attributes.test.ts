@@ -18,7 +18,6 @@ import {
   REJECT_ALL_BLANK_PROC,
   TooManyRecords,
 } from "./index.js";
-import { markForDestruction } from "./autosave-association.js";
 import { fixtures } from "./test-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
@@ -171,7 +170,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
     const ship = await Ship.createBang({ name: "Nights Dirty Lightning" });
     expect(ship.markedForDestruction()).toBe(false);
-    markForDestruction(ship);
+    ship.markForDestruction();
     expect(ship.markedForDestruction()).toBe(true);
   });
 

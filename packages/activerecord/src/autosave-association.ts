@@ -158,10 +158,6 @@ function _setAutosavingBelongsToFor(record: any, association: unknown, value: bo
 // Standalone exports (used by other modules, called via dynamic import)
 // ---------------------------------------------------------------------------
 
-export function markForDestruction(record: Base): void {
-  (record as any)[MARKED_FOR_DESTRUCTION] = true;
-}
-
 export function isDestroyable(record: Base): boolean {
   return !record.isNewRecord() && record.markedForDestruction();
 }

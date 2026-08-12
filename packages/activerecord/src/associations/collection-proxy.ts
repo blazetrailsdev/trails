@@ -1159,8 +1159,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     for (const r of records) assoc.setStrictLoading(r);
   }
 
-  // Rails' `_create_record` raises before building the record or opening a
-  // transaction when the owner is unsaved (collection_association.rb:354-357).
+  // Rails raises this once, in `CollectionAssociation#_create_record`
+  // (collection_association.rb:355-357). The non-through arm reaches that
+  // ported guard through `association.create`; the through arm does not route
+  // through `_createRecord` yet, so it keeps the check here until it does.
   private _ensurePersistedOwnerForCreate(): void {
     if (this._record.isNewRecord()) {
       throw new RecordNotSaved(`You cannot call create unless the parent is saved`, this._record);
@@ -1397,7 +1399,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isSingular) {
       return this._createSingular(attrs, block, false);
     }
-    this._ensurePersistedOwnerForCreate();
+    if (this._isThrough) this._ensurePersistedOwnerForCreate();
     this._ensureThroughWritable();
     if (this._isThrough) {
       return (await this._createThrough(
@@ -3629,7 +3631,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isSingular) {
       return this._createSingular(attrs, block, true);
     }
-    this._ensurePersistedOwnerForCreate();
+    if (this._isThrough) this._ensurePersistedOwnerForCreate();
     this._ensureThroughWritable();
     if (this._isThrough) {
       const record = this._buildRecord(attrs) as T;

@@ -123,6 +123,23 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
  */
 export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
+  // Real ports that live under a different file name than the Ruby one, found
+  // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
+  // read as missing while the TS file next door defines them.
+  //
+  // `Rescuable`'s class methods are mixed onto a class by `rescueFrom` and
+  // friends in `module-ext.ts`, alongside the other `include`-shaped helpers.
+  "activesupport:rescuable.rb": "module-ext.ts",
+  // `LoggerSilence` and `LoggerThreadSafeLevel` are both mixed into
+  // `ActiveSupport::Logger`; trails carries `silence` and `localLevel` on the
+  // Logger class itself rather than in two mixin files.
+  "activesupport:logger_silence.rb": "logger.ts",
+  "activesupport:logger_thread_safe_level.rb": "logger.ts",
+  // `Deprecation::Disallowed` is one of the modules `Deprecation` includes;
+  // trails carries `disallowedWarnings` / `disallowedBehavior` on Deprecation.
+  "activesupport:deprecation/disallowed.rb": "deprecation.ts",
+  // `Array#extract_options!` is ported next to the other options-hash helpers.
+  "activesupport:core_ext/array/extract_options.rb": "hash-utils.ts",
   "activesupport:core_ext/string/inflections.rb": "inflector.ts",
   // Same reopening shape: this file reopens `class Integer` first, so its
   // bucket owns all of Integer's core_ext surface — `ordinalize`/`ordinal` here
