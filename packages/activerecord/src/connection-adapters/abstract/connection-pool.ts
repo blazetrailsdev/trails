@@ -5,6 +5,7 @@
  */
 
 import { NoMethodError } from "@blazetrails/activemodel";
+import { synchronize, type MonitorMixin } from "@blazetrails/activesupport";
 import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
@@ -77,6 +78,22 @@ const NULL_CONFIG = new NullConfig();
 export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
   static readonly NULL_CONFIG = NULL_CONFIG;
+
+  /**
+   * Mirrors: `@mutex = Mutex.new` (`abstract/connection_pool.rb:26`) — the lock
+   * `server_version` memoizes under, so two concurrent first callers issue one
+   * version query rather than two.
+   *
+   * Ruby's is a plain `Mutex`, which is not re-entrant; the port holds the
+   * re-entrant `MonitorMixin#synchronize` `PoolConfig` also carries, because
+   * trails' `getDatabaseVersion` is async where Ruby's is sync: the fetch opens
+   * the connection, whose `configureConnection` (`abstract_adapter.rb:1212`)
+   * reads the version back through this same method from inside the fetch.
+   * Ruby never reaches that re-entry — its adapter is already connected by the
+   * time `get_database_version` runs — so a literal `Mutex` would deadlock on a
+   * path Rails does not have.
+   */
+  private readonly _mutex: MonitorMixin = { synchronize };
 
   private _serverVersion: unknown = null;
   private _schemaReflection: SchemaReflection | null = null;
@@ -179,18 +196,20 @@ export class NullPool implements AbstractPool {
    * memo the real pool keeps on its PoolConfig. The promise arm is the trails
    * async shape documented on `PoolConfig#serverVersion`.
    */
-  serverVersion(connection: DatabaseAdapter): unknown {
-    if (this._serverVersion != null) return this._serverVersion;
-    const version = connection.getDatabaseVersion?.();
-    // Only the resolved value is memoized, never the in-flight promise: the
-    // fetch opens the connection, whose `configureConnection`
-    // (`abstract_adapter.rb:1212`) reads back through here, and handing that
-    // nested call the promise it is itself inside would deadlock. Ruby's
-    // `synchronize` is a re-entrant Monitor, so it recomputes there too.
-    if (version instanceof Promise) {
-      return version.then((v) => (this._serverVersion = v));
-    }
-    return (this._serverVersion = version);
+  async serverVersion(connection: DatabaseAdapter): Promise<unknown> {
+    return (
+      this._serverVersion ??
+      (await this._mutex.synchronize(async () => {
+        // Only the resolved value is memoized, never the in-flight promise: the
+        // fetch opens the connection, whose `configureConnection`
+        // (`abstract_adapter.rb:1212`) reads back through here, and handing that
+        // nested call the promise it is itself inside would deadlock. The
+        // re-entrant lock lets that nested call recompute against a still-null
+        // memo exactly as Ruby's `@server_version ||=` would.
+        this._serverVersion ??= await connection.getDatabaseVersion?.();
+        return this._serverVersion;
+      }))
+    );
   }
 
   get schemaReflection(): SchemaReflection {

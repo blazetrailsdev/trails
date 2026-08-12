@@ -2,27 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "_create_record",
-    "call": "attributes_with_values",
-    "reason": "`_create_record` builds the column→value map from `_attributes.valuesForDatabase()` rather than `attributes_with_values` (attribute-methods.ts), which returns the cast values `fetchValue` yields: the write path binds DB-serialized values, so routing through it would change what reaches `_insert_record`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "_create_record",
-    "call": "id",
-    "reason": "Rails' `_create_record` returns `id` (persistence.rb:941); the trails chain is typed `Promise<boolean>` and carries the truthy value that becomes run_callbacks' value in Callbacks#_create_record, so the reader is never called."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "_create_record",
-    "call": "with_connection",
-    "reason": "Rails wraps the INSERT in `self.class.with_connection` (persistence.rb:923); the port uses the connection already threaded by the enclosing `withQueryConnection` wrap, so the INSERT does not flip the lease permanent — a second `with_connection` here would nest a checkout inside that lease."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "_delete_record",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -53,13 +32,6 @@
     "tsFile": "persistence.ts",
     "rubyName": "_update_record",
     "call": "attributes_for_update",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "_update_row",
-    "call": "attributes_with_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
