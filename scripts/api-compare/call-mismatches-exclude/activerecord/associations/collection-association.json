@@ -35,59 +35,8 @@
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "ids_writer",
-    "call": "all",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at associations/collection_association.rb:81 `klass.all.raise_record_not_found_exception!(...)`: Rails' `all` is the AR scoping method, while the TS occurrence the comparator matched is JS `Promise.all(...)` — a name collision, not the same call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "compact_blank",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "index_by",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "order:all,where",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "raise_record_not_found_exception!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "type_for_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
     "call": "values_at",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "load_target",
-    "call": "order:mergeTargetLists,findTarget",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   },
   {
     "package": "activerecord",
@@ -136,5 +85,14 @@
     "rubyName": "reset",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_writer",
+    "call": "index_by",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby calling convention, not a divergence: `records.index_by { … }` is a receiver call with a block (collection_association.rb:68-75), and ActiveSupport's TS `indexBy` is a free function, so the receiver and the block become its two arguments — same call, same key function, arity shifted by the language."
   }
 ]
