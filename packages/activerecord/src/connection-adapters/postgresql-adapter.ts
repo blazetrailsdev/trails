@@ -41,7 +41,6 @@ import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
   ActiveRecordError,
-  AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -3807,30 +3806,31 @@ export class PostgreSQLAdapter
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
     if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
-      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds });
+      if (!(e instanceof Error))
+        return new StatementInvalid(String(e), { sql, binds, connectionPool: this.pool });
       const code = (e as { code?: string }).code;
       const msg = e.message;
       switch (code) {
         case "23505": // unique_violation
-          return new RecordNotUnique(msg, { sql, binds });
+          return new RecordNotUnique(msg, { sql, binds, connectionPool: this.pool });
         case "23503": // foreign_key_violation
-          return new InvalidForeignKey(msg, { sql, binds });
+          return new InvalidForeignKey(msg, { sql, binds, connectionPool: this.pool });
         case "23502": // not_null_violation
-          return new NotNullViolation(msg, { sql, binds });
+          return new NotNullViolation(msg, { sql, binds, connectionPool: this.pool });
         case "22001": // string_data_right_truncation
-          return new ValueTooLong(msg, { sql, binds });
+          return new ValueTooLong(msg, { sql, binds, connectionPool: this.pool });
         case "22003": // numeric_value_out_of_range
-          return new ActiveRecordRangeError(msg, { sql, binds });
+          return new ActiveRecordRangeError(msg, { sql, binds, connectionPool: this.pool });
         case "40001": // serialization_failure
-          return new SerializationFailure(msg, { sql, binds });
+          return new SerializationFailure(msg, { sql, binds, connectionPool: this.pool });
         case "40P01": // deadlock_detected
-          return new Deadlocked(msg, { sql, binds });
+          return new Deadlocked(msg, { sql, binds, connectionPool: this.pool });
         case "42P04": // duplicate_database
-          return new DatabaseAlreadyExists(msg, { sql, binds });
+          return new DatabaseAlreadyExists(msg, { sql, binds, connectionPool: this.pool });
         case "55P03": // lock_not_available
-          return new LockWaitTimeout(msg, { sql, binds });
+          return new LockWaitTimeout(msg, { sql, binds, connectionPool: this.pool });
         case "57014": // query_canceled
-          return new QueryCanceled(msg, { sql, binds });
+          return new QueryCanceled(msg, { sql, binds, connectionPool: this.pool });
         default:
           // A severed connection (08xxx, "Connection terminated", pg's
           // "Client has encountered a connection error", …) surfaces here as a
@@ -3873,7 +3873,7 @@ export class PostgreSQLAdapter
           // network failures as StatementInvalid with misleading
           // sql/binds attached.
           if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
-            return new StatementInvalid(msg, { sql, binds });
+            return new StatementInvalid(msg, { sql, binds, connectionPool: this.pool });
           }
           return e;
       }
@@ -3887,15 +3887,6 @@ export class PostgreSQLAdapter
     // is for everything routed through the public translator.
     if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = e;
-    }
-    // Mirrors Rails' PostgreSQLAdapter#translate_exception, which builds every
-    // translated error with `connection_pool: @pool`. For a standalone adapter
-    // that pool is a NullPool. Use setPool/setConnectionPool (both guarded) so
-    // a pool attached at raise-time isn't overwritten.
-    if (translated instanceof ConnectionNotEstablished) {
-      translated.setPool(this.pool);
-    } else if (translated instanceof AdapterError) {
-      translated.setConnectionPool(this.pool);
     }
     return translated;
   }
