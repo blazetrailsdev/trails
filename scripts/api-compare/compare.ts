@@ -1817,6 +1817,34 @@ function isPackageBarrel(file: string): boolean {
  */
 export const NAME_COLLISION_CLUSTERS: ReadonlySet<string> = new Set([]);
 
+/**
+ * Whether a Ruby file has SOME real TS counterpart the compare can point at:
+ * either its mirrored `expectedTsFile` exists, or the misplaced-cluster vote
+ * found the sibling file its port actually landed in.
+ *
+ * Cross-file credit — the include chain, the mixin/reopening arms, the umbrella
+ * config arm — is gated on this. Those arms all say "the member is ported, just
+ * in another file", which is only meaningful when this Ruby file is ported at
+ * all. Without the gate a Ruby file with a 0-line port accumulates `matched`
+ * from unrelated files that happen to define a TS name equal to one of its Ruby
+ * member names — `active_support/execution_wrapper.rb` read as `matched: 2`
+ * with no `ExecutionWrapper` anywhere in the tree, and every `helpers/tags/*.rb`
+ * bucket read as ~36 matched off the ActionView helper modules. `matched` must
+ * mean "a TS member the compare can point at in a file that maps to this Ruby
+ * file"; an unmapped file's members are missing, and read as missing.
+ *
+ * Every credit arm after the same-file direct match is cross-file — the include
+ * chain, the mixin/reopening arms, the misplaced-cluster fallback and the
+ * umbrella-config arm — so `main` short-circuits all of them to `missing` when
+ * this returns false.
+ */
+export function rubyFileHasTsCounterpart(
+  tsFileExists: boolean,
+  misplacedActualFile: string | null,
+): boolean {
+  return tsFileExists || misplacedActualFile !== null;
+}
+
 export function selectMisplacedFile(
   fileHits: Map<string, number>,
   rubyMethodCount: number,
@@ -2903,6 +2931,7 @@ export function main() {
       const actualMethods = misplacedActualFile
         ? tsMethodsByFile.get(misplacedActualFile) || new Set<string>()
         : null;
+      const hasTsCounterpart = rubyFileHasTsCounterpart(tsFileExists, misplacedActualFile);
 
       for (const [
         _dedupeKey,
@@ -2915,6 +2944,12 @@ export function main() {
         if (directMatch) {
           fileMatched++;
           checkArity(rubyName, directMatch, expectedTs, rubyModule);
+          continue;
+        }
+
+        if (!hasTsCounterpart) {
+          fileMissing++;
+          missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });
           continue;
         }
 

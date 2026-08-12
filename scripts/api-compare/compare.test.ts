@@ -14,6 +14,7 @@ import {
   dedupeRubyMethodInto,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
+  rubyFileHasTsCounterpart,
   MISPLACED_MIN_HITS,
   blazetrailsDepKeys,
   buildEntitiesByName,
@@ -1471,6 +1472,20 @@ describe("dedupeRubyMethodInto", () => {
       rubyModule: "Foo::A",
       definedInFile: "x.rb",
     });
+  });
+});
+
+describe("rubyFileHasTsCounterpart", () => {
+  it("is true when the mirrored TS file exists", () => {
+    expect(rubyFileHasTsCounterpart(true, null)).toBe(true);
+  });
+
+  it("is true when the port landed in the sibling file the misplaced vote found", () => {
+    expect(rubyFileHasTsCounterpart(false, "core-ext/object/blank.ts")).toBe(true);
+  });
+
+  it("is false for a Ruby file with no port anywhere, so its members cannot be credited cross-file", () => {
+    expect(rubyFileHasTsCounterpart(false, null)).toBe(false);
   });
 });
 
