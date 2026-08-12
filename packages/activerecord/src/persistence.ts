@@ -1797,7 +1797,6 @@ type PersistenceInstanceChainHost = {
   _previouslyNewRecord: boolean;
   _attributes: any;
   _dirty: { reinstateNewRecordChanges(attributes: unknown, skip: Set<string>): void };
-  changes: Record<string, [unknown, unknown]>;
   readAttribute(name: string): unknown;
   willSaveChangeToAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
@@ -2019,6 +2018,17 @@ async function instanceUpdateRecord(
   if (attributeNames.length === 0) {
     (this as any)._triggerUpdateCallback = true;
   } else {
+    // Deviation: Rails delegates the row write to `_update_row(attribute_names)`
+    // (persistence.rb:906), which `Locking::Optimistic#_update_row`
+    // (optimistic.rb:92-118) overrides for the lock bump and the
+    // `affected_rows != 1` raise. trails has both halves — `_updateRow` below
+    // and `LockingOptimistic._updateRow` — but they build their values from
+    // `attributes_with_values` (cast values) where this path binds
+    // `valuesForDatabase()` write-path primitives, so routing through them
+    // changes what reaches the adapter for every column type. Converged by
+    // story `route-update-record-through-update-row` (RFC 0084), which owns
+    // that bind-path change and the missing `LockingOptimistic._updateRow`
+    // install.
     const dbValues = this._attributes.valuesForDatabase();
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = attributeNames.map(
       (key: string) => [table.get(key), writePathValueNode(dbValues[key])],
