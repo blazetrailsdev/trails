@@ -23,8 +23,7 @@ export class Association {
   readonly reflection: AssociationLikeReflection;
   /** @internal */
   protected preloadScope: any;
-  /** @internal */
-  protected reflectionScope: any;
+  private _reflectionScope: any;
   private _associate: boolean;
   private _model: typeof Base | null;
   private _run: boolean;
@@ -47,7 +46,7 @@ export class Association {
     this.owners = this._uniqueOwners(owners);
     this.reflection = reflection;
     this.preloadScope = preloadScope ?? null;
-    this.reflectionScope = reflectionScope ?? null;
+    this._reflectionScope = reflectionScope ?? null;
     this._associate = associateByDefault || preloadScope == null;
     this._model = owners.length > 0 ? (owners[0].constructor as typeof Base) : null;
     this._run = false;
@@ -203,8 +202,8 @@ export class Association {
 
   associateRecordsFromUnscoped(unscopedRecords: Base[] | undefined): void {
     if (!unscopedRecords || unscopedRecords.length === 0) return;
-    if (this.reflectionScope != null) return;
-    if (this.preloadScope != null) return;
+    if (!this.reflectionScope.isEmptyScope) return;
+    if (this.preloadScope && !this.preloadScope.isEmptyScope) return;
     if ((this.reflection as any).isCollection?.()) return;
 
     for (const record of unscopedRecords) {
@@ -347,6 +346,20 @@ export class Association {
     return this.model.typeForAttribute(key).type();
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::Preloader::Association#reflection_scope
+   * (`preloader/association.rb:290-292`). Branch only passes a scope down for an
+   * instance-dependent reflection scope; every other reflection recomputes it
+   * lazily here, off the record.
+   * @internal
+   */
+  protected get reflectionScope(): any {
+    this._reflectionScope ??= (this.reflection as any)
+      .joinScopes((this.klass as any).arelTable, (this.klass as any).predicateBuilder, this.klass)
+      .reduce((acc: any, s: any) => acc.merge(s), (this.klass as any).unscoped());
+    return this._reflectionScope;
+  }
+
   private buildScope(): any {
     // Mirror Rails' build_scope `scope = klass.scope_for_association`. It bases
     // on the pristine relation (ignoring any enclosing current_scope) and
@@ -361,13 +374,8 @@ export class Association {
       });
     }
 
-    // Merge reflection scope: use the pre-computed scope from Branch if available,
-    // otherwise apply the raw scope function directly
-    if (this.reflectionScope != null) {
+    if (!this.reflectionScope.isEmptyScope) {
       scope = scope.merge(this.reflectionScope);
-    } else if (this.reflection.scope) {
-      const scopeResult = this.reflection.scope(scope);
-      if (scopeResult) scope = scopeResult;
     }
 
     if (this.preloadScope && !this.preloadScope.isEmptyScope) {

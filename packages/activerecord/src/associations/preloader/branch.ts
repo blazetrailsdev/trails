@@ -187,7 +187,14 @@ export class Branch {
       const klass: typeof Base = (record as any).association(this.association!).klass;
 
       let reflectionScope: any = undefined;
-      if (reflection.scope) {
+      // Rails: `if reflection.scope && reflection.scope.arity != 0`
+      // (`preloader/branch.rb:95`). A trails scope lambda takes the relation as
+      // its first parameter where Ruby's takes none (`invokeScopeLambda`,
+      // `associations/association-scope.ts:20-49`), so Ruby's `arity != 0` is
+      // `length > 1` here. Only an instance-dependent scope is grouped per
+      // record; every other one is recomputed lazily by
+      // `Preloader::Association#reflectionScope`.
+      if (reflection.scope && reflection.scope.length > 1) {
         const scopes = (reflection as any).joinScopes(
           klass.arelTable,
           (klass as any).predicateBuilder,
