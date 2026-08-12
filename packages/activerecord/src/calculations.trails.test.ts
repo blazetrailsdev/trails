@@ -340,3 +340,41 @@ describe("typeFor", () => {
     );
   });
 });
+
+// ==========================================================================
+// Empty-scope aggregate identities
+//
+// trails-specific guard. Rails' `sum`/`average`/`minimum`/`maximum`
+// (calculations.rb:118-208) are bare `calculate(...)` calls, so the empty-scope
+// answer has to come out of `calculate`'s `@none` arm (calculations.rb:220-230)
+// and `execute_simple_calculation`'s `where_clause.contradiction?` arm
+// (calculations.rb:487-497) — not from a guard bolted on top of each aggregate.
+// The empty sum is the piece that arm has to keep: Rails reaches it via
+// `type_cast_calculated_value`'s `type.deserialize(value || 0)`
+// (calculations.rb:629), so the zero comes out of the SAME column type the
+// executed query's value would have been cast through — a big_integer column's
+// empty sum has the shape a populated one has, not a hard-coded literal.
+// ==========================================================================
+
+describe("empty-scope aggregate identities", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("sums a bigint column through the column type on a contradictory scope", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const populated = await Account.sum("firm_id");
+    const empty = await Account.where({ id: [] }).sum("firm_id");
+    expect(empty).toBe(0);
+    expect(typeof empty).toBe(typeof populated);
+    expect(await Account.none().sum("firm_id")).toBe(0);
+  });
+
+  it("keeps the empty identity for every aggregate on a contradictory scope", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const empty = Account.where({ id: [] });
+    expect(await empty.count()).toBe(0);
+    expect(await empty.sum("credit_limit")).toBe(0);
+    expect(await empty.average("credit_limit")).toBeNull();
+    expect(await empty.minimum("credit_limit")).toBeNull();
+    expect(await empty.maximum("credit_limit")).toBeNull();
+  });
+});

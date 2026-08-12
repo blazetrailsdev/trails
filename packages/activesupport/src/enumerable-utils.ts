@@ -86,6 +86,18 @@ export function compactBlank<T>(collection: T[]): T[] {
 }
 
 /**
+ * any? — true if any element is truthy (Ruby truthiness: neither nil nor
+ * false), or, with a block, if the block returns truthy for some element.
+ */
+export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boolean {
+  for (const item of collection) {
+    const value = fn ? fn(item) : item;
+    if (value != null && value !== false) return true;
+  }
+  return false;
+}
+
+/**
  * many? — true if more than one element (optionally matching a predicate).
  */
 export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
