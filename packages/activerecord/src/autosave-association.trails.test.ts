@@ -326,3 +326,28 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     expect(birds.length).toBe(1);
   });
 });
+
+describe("TestAutosaveAssociationsInGeneral changed_for_autosave?", () => {
+  fixtures([]);
+
+  it("changed_for_autosave? dispatches through marked_for_destruction?", async () => {
+    // autosave_association.rb:275-277 calls `marked_for_destruction?`, which
+    // subclasses (and nested-attributes hosts) may override. Reading the
+    // in-memory flag directly instead would bypass the override.
+    class Gadget extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("name", "string");
+      }
+
+      override markedForDestruction = (): boolean => true;
+    }
+    registerModel("ChangedForAutosaveGadget", Gadget);
+
+    const gadget = await Gadget.create({ name: "widget" });
+
+    expect(gadget.changedForAutosave()).toBe(true);
+  });
+});
