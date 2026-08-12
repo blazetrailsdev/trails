@@ -275,6 +275,16 @@ export class Queue {
     return undefined;
   }
 
+  /**
+   * @missingRailsCall permit_concurrent_loads — `queue.rb:117` wraps the
+   * `@cond.wait` in `ActiveSupport::Dependencies.interlock
+   * .permit_concurrent_loads`, which releases the autoload interlock so
+   * another thread can autoload while this one blocks. Neither the interlock
+   * nor Zeitwerk-style autoloading is ported (see the BLOCKED note in
+   * actionpack's `action-dispatch/dispatch/debug-locks.test.ts`), so there is
+   * nothing to permit; tracked by RFC 0023 story
+   * `port-dependencies-interlock-permit-concurrent-loads`.
+   */
   private async waitPoll(timeout: number): Promise<DatabaseAdapter> {
     this._numWaiting += 1;
 
