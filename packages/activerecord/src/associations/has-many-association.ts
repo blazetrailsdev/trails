@@ -244,11 +244,7 @@ export class HasManyAssociation extends CollectionAssociation {
       // Rails: records.each(&:destroy!).
       for (const record of records) await (record as any).destroyBang();
       // Rails: update_counter(-records.length) unless reflection.inverse_updates_counter_cache?
-      // (has_many_association.rb:130). The destroy callbacks decrement the owner's
-      // counter through the child's belongs_to inverse (CounterCache#destroy_row)
-      // only when that inverse points at THIS reflection's counter column;
-      // otherwise (e.g. a has_many `counter_cache:` distinct from the inverse's)
-      // decrement here so we don't silently skip it.
+      // (has_many_association.rb:130).
       if (!this.reflection.isInverseUpdatesCounterCache?.()) {
         await this.updateCounter(-records.length);
       }
@@ -259,10 +255,9 @@ export class HasManyAssociation extends CollectionAssociation {
     // `delete` is intercepted by the CollectionProxy. Scope to the given records by
     // their query-constraint columns so we delete/nullify only those rows.
     // Rails: `reflection.klass.composite_query_constraints_list`
-    // (has_many_association.rb:132). An ad-hoc holder built from a macro
-    // definition (a through step's synthesised def) carries no `klass`, so fall
-    // back to the association's own resolved class — the same class the rich
-    // reflection resolves to.
+    // (has_many_association.rb:132). The `?? this.klass` arm covers an ad-hoc
+    // holder built from a macro definition, which carries no `klass`; it
+    // resolves to the same class.
     const queryConstraints = compositeQueryConstraintsList.call(
       (this.reflection.klass ?? this.klass) as any,
     );
@@ -327,10 +322,6 @@ export class HasManyAssociation extends CollectionAssociation {
    * @internal
    */
   async countRecords(): Promise<number> {
-    // Rails reads `reflection.has_active_cached_counter?` /
-    // `reflection.counter_cache_column` off its own reflection
-    // (has_many_association.rb:83-88); `association(name)` hands us the rich one
-    // (`associations.rb:290-296`), so there is nothing to re-resolve.
     const refl = this.reflection;
     return countRecords({
       hasActiveCachedCounter: () => refl.hasActiveCachedCounter?.() ?? false,
