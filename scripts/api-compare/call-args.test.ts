@@ -164,6 +164,34 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     ).toBe("match");
   });
 
+  // connection_handling.rb:254 `current_role == role.to_sym`.
+  it("reads a Ruby to_sym argument as a TS value already held as a string", () => {
+    expect(
+      compareCallArgs(
+        site("establish_connection", ["call:to_sym"]),
+        site("establishConnection", ["id:environment"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  // connection_handling.rb:103 `establish_connection(db_config, …, shard: shard.to_sym)`.
+  it("reads a Ruby to_sym nested inside kwargs the same way", () => {
+    expect(
+      compareCallArgs(
+        site("connected_to", ["kwargs{shard=call:to_sym}"]),
+        site("connectedTo", ["kwargs{shard=id:shardKey}"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still reports a genuine rename of a kwargs value", () => {
+    const result = compareCallArgs(
+      site("connected_to", ["kwargs{shard=id:shard}"]),
+      site("connectedTo", ["kwargs{shard=id:shardKey}"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+  });
+
   it("still reports a genuine rename of a non-reserved name", () => {
     const result = compareCallArgs(
       site("change_column_null", ["id:column_name"]),
