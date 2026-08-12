@@ -1874,7 +1874,7 @@ export class Base extends Model {
    *
    * Mirrors: ActiveRecord::Base.token_definitions
    */
-  static get tokenDefinitions(): Readonly<Record<string, unknown>> {
+  static get tokenDefinitions(): ReturnType<typeof _tokenDefinitions> {
     return _tokenDefinitions(this);
   }
 
@@ -1883,11 +1883,11 @@ export class Base extends Model {
   }
 
   /**
-   * MessageVerifier backing token-for (null until the first token op builds it).
+   * MessageVerifier backing token-for (null until a verifier is configured).
    *
    * Mirrors: ActiveRecord::Base.generated_token_verifier
    */
-  static get generatedTokenVerifier(): unknown {
+  static get generatedTokenVerifier(): _MessageVerifier | null {
     return _generatedTokenVerifier(this);
   }
 

@@ -8,11 +8,7 @@ import {
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
 import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import {
-  isMarkedForDestruction,
-  markForDestruction,
-  defineAutosaveValidationCallbacks,
-} from "./autosave-association.js";
+import { markForDestruction, defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
 
 /**
@@ -36,7 +32,7 @@ export class TooManyRecords extends ActiveRecordError {
  * Mirrors: ActiveRecord::NestedAttributes#_destroy
  */
 export function _destroy(this: Base): boolean {
-  return isMarkedForDestruction(this);
+  return this.markedForDestruction();
 }
 
 /**

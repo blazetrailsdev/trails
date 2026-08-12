@@ -18,7 +18,7 @@ import {
   REJECT_ALL_BLANK_PROC,
   TooManyRecords,
 } from "./index.js";
-import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
+import { markForDestruction } from "./autosave-association.js";
 import { fixtures } from "./test-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
@@ -170,9 +170,9 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("a model should respond to underscore destroy and return if it is marked for destruction", async () => {
     const ship = await Ship.createBang({ name: "Nights Dirty Lightning" });
-    expect(isMarkedForDestruction(ship)).toBe(false);
+    expect(ship.markedForDestruction()).toBe(false);
     markForDestruction(ship);
-    expect(isMarkedForDestruction(ship)).toBe(true);
+    expect(ship.markedForDestruction()).toBe(true);
   });
 
   it("reject if method without arguments", async () => {
@@ -563,7 +563,7 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     (pirate as any).attributes = { shipAttributes: { id: ship.id, _destroy: "1" } };
     const target = (pirate.association("ship") as any).target as Ship;
     expect(target.isDestroyed?.() ?? false).toBe(false);
-    expect(isMarkedForDestruction(target)).toBe(true);
+    expect(target.markedForDestruction()).toBe(true);
     await pirate.save();
     expect(target.isDestroyed?.() ?? true).toBe(true);
     expect(await shipOf(await Pirate.find(pirate.id))).toBeFalsy();
@@ -974,9 +974,9 @@ function collectionAssociationTests(
     await pirate.reload();
     write(pirate, [{ id: child1.id, _destroy: "1" }]);
     const target = await proxy(pirate).loadTarget();
-    expect(
-      isMarkedForDestruction(target.find((r: any) => String(r.id) === String(child1.id))),
-    ).toBe(true);
+    expect(target.find((r: any) => String(r.id) === String(child1.id)).markedForDestruction()).toBe(
+      true,
+    );
   });
 
   it("should take a hash with composite id keys and assign the attributes to the associated models", async () => {
