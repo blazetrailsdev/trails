@@ -129,8 +129,6 @@ export abstract class Store {
       let entry: Entry | null = null;
       if (!options.force) {
         this.instrument("read", key, options, (payload) => {
-          // `options` is the merged value assigned just above; TS drops the
-          // narrowing across the closure boundary because it is a `let`.
           const cachedEntry = this.readEntry(key, options!);
           entry = this.handleExpiredEntry(cachedEntry, key, options!);
           if (entry) {
