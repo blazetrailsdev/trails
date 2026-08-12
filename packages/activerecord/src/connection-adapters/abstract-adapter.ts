@@ -517,6 +517,7 @@ export interface AbstractAdapter {
     tableName: string,
     fnOrOptions?: ((t: Table) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: Table) => void | Promise<void>,
+    base?: unknown,
   ): Promise<void>;
   /** @internal */
   renameTableIndexes(
