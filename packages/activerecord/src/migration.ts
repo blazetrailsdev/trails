@@ -199,6 +199,10 @@ export class PendingMigrationError extends MigrationError {
   /**
    * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
    *
+   * Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
+   * pass the kwarg on its own; TypeScript has no kwargs, so an options-only
+   * first argument stands in for that call shape.
+   *
    * The one arm that cannot converge is Rails' nil default (`migration.rb:161`),
    * which reads `connection_pool.migration_context.open.pending_migrations` —
    * asynchronous in trails, and a JS constructor cannot await. Raise sites
@@ -210,9 +214,6 @@ export class PendingMigrationError extends MigrationError {
     message?: string | { pendingMigrations?: MigrationProxy[] },
     options: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
-    // Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
-    // pass the kwarg on its own; TS has no kwargs, so an options-only first
-    // argument stands in for that call shape (`migration.rb:159`).
     if (typeof message !== "string") {
       options = message ?? options;
       message = undefined;

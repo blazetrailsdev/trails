@@ -372,10 +372,10 @@ export function storeAccessor(
     const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
     Object.defineProperty(storeModuleProto, accessorName, {
       get: function (this: Base) {
-        return readStoreAttribute.call(this, attribute, accessor);
+        return this.readStoreAttribute(attribute, accessor);
       },
       set: function (this: Base, value: unknown) {
-        writeStoreAttribute.call(this, attribute, accessor, value);
+        this.writeStoreAttribute(attribute, accessor, value);
       },
       configurable: true,
     });
