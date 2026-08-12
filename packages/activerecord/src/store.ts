@@ -1,6 +1,6 @@
 import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import type { YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
@@ -176,12 +176,11 @@ export function localStoredAttributesMethod(this: typeof Base): Record<string, s
  *
  * Mirrors: ActiveRecord::Store::ClassMethods#stored_attributes
  */
-export function storedAttributes(modelClass: typeof Base): Record<string, string[]> {
+export function storedAttributes(this: typeof Base): Record<string, string[]> {
+  const modelClass = this;
   const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
   const parentAttrs =
-    parent && typeof parent === "function" && parent !== Function.prototype
-      ? storedAttributes(parent)
-      : {};
+    typeof parent?.storedAttributes === "function" ? parent.storedAttributes() : {};
   const local = _storedAttributes.get(modelClass);
   if (!local) return parentAttrs;
   const merged: Record<string, string[]> = { ...parentAttrs };
@@ -370,14 +369,13 @@ export function storeAccessor(
     // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
     storeAccessorsModule(modelClass).add(accessorName);
 
-    const declaringClass = modelClass;
     const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
     Object.defineProperty(storeModuleProto, accessorName, {
       get: function (this: Base) {
-        return readStoreAttribute(this, attribute, accessor, declaringClass);
+        return this.readStoreAttribute(attribute, accessor);
       },
       set: function (this: Base, value: unknown) {
-        writeStoreAttribute(this, attribute, accessor, value, declaringClass);
+        this.writeStoreAttribute(attribute, accessor, value);
       },
       configurable: true,
     });
@@ -524,10 +522,8 @@ export function store(
  *
  * @internal
  */
-export function storeAccessorFor(
-  modelClass: typeof Base,
-  storeAttribute: string,
-): typeof HashAccessor {
+export function storeAccessorFor(this: Base, storeAttribute: string): typeof HashAccessor {
+  const modelClass = this.constructor as typeof Base;
   // Rails dispatches via type_for_attribute(attr).accessor — check the type first.
   const type = (modelClass as any).typeForAttribute?.(storeAttribute);
   if (type && typeof type.accessor === "function") {
@@ -551,17 +547,9 @@ export function storeAccessorFor(
  *
  * Mirrors: ActiveRecord::Store#read_store_attribute (private)
  */
-export function readStoreAttribute(
-  record: Base,
-  storeAttribute: string,
-  key: string,
-  declaringClass?: typeof Base,
-): unknown {
-  // Use the declaring class (where store() was called) so subclass instances
-  // resolve the correct accessor even when record.constructor differs from the parent.
-  const modelClass = declaringClass ?? (record.constructor as typeof Base);
-  const accessor = storeAccessorFor(modelClass, storeAttribute);
-  return accessor.read(record, storeAttribute, key);
+export function readStoreAttribute(this: Base, storeAttribute: string, key: string): unknown {
+  const accessor = this.storeAccessorFor(storeAttribute);
+  return accessor.read(this, storeAttribute, key);
 }
 
 /**
@@ -570,53 +558,13 @@ export function readStoreAttribute(
  * Mirrors: ActiveRecord::Store#write_store_attribute (private)
  */
 export function writeStoreAttribute(
-  record: Base,
-  storeAttribute: string,
-  key: string,
-  value: unknown,
-  declaringClass?: typeof Base,
-): void {
-  const modelClass = declaringClass ?? (record.constructor as typeof Base);
-  const accessor = storeAccessorFor(modelClass, storeAttribute);
-  accessor.write(record, storeAttribute, key, value);
-}
-
-/**
- * This-typed wrapper for wiring readStoreAttribute as instance method via include(Base).
- *
- * Mirrors: ActiveRecord::Store#read_store_attribute (private)
- *
- * @internal
- */
-export function readStoreAttributeMethod(this: Base, storeAttribute: string, key: string): unknown {
-  return readStoreAttribute(this, storeAttribute, key);
-}
-
-/**
- * This-typed wrapper for wiring writeStoreAttribute as instance method via include(Base).
- *
- * Mirrors: ActiveRecord::Store#write_store_attribute (private)
- *
- * @internal
- */
-export function writeStoreAttributeMethod(
   this: Base,
   storeAttribute: string,
   key: string,
   value: unknown,
 ): void {
-  writeStoreAttribute(this, storeAttribute, key, value);
-}
-
-/**
- * This-typed wrapper for wiring storeAccessorFor as instance method via include(Base).
- *
- * Mirrors: ActiveRecord::Store#store_accessor_for (private)
- *
- * @internal
- */
-export function storeAccessorForMethod(this: Base, storeAttribute: string): typeof HashAccessor {
-  return storeAccessorFor(this.constructor as typeof Base, storeAttribute);
+  const accessor = this.storeAccessorFor(storeAttribute);
+  accessor.write(this, storeAttribute, key, value);
 }
 
 /**
@@ -650,9 +598,9 @@ function asRegularHash(obj: unknown): Record<string, unknown> {
 export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unknown> {
   if (obj instanceof HashWithIndifferentAccess) return obj;
   if (obj !== null && obj !== undefined && typeof obj === "object" && !Array.isArray(obj)) {
-    return new HashWithIndifferentAccess(obj as Record<string, unknown>);
+    return withIndifferentAccess(obj as Record<string, unknown>);
   }
-  return new HashWithIndifferentAccess({});
+  return new HashWithIndifferentAccess();
 }
 
 /**

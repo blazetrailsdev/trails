@@ -4,13 +4,7 @@ import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
 import { fixtures } from "./test-fixtures.js";
-import {
-  stiName,
-  isDescendsFromActiveRecord,
-  isBaseClass,
-  baseClass,
-  registerSubclass,
-} from "./inheritance.js";
+import { stiName, isBaseClass, baseClass, registerSubclass } from "./inheritance.js";
 import { registerModel } from "./associations.js";
 import { SubclassNotFound, RecordNotFound, NotImplementedError, NameError } from "./errors.js";
 import {
@@ -134,31 +128,31 @@ describe("InheritanceTest", () => {
   });
 
   it("descends from active record", async () => {
-    // TRACKED-PENDING-CONVERGENCE: isDescendsFromActiveRecord(Base) returns true in trails
+    // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
     // (no type attr → !classHasAttribute). AbstractStiPost/SubAbstractStiPost assertions also
     // require schema loaded. Story: descends-from-active-record-base (RFC 0019).
-    expect(isDescendsFromActiveRecord(LoosePerson)).toBe(true);
-    expect(isDescendsFromActiveRecord(LooseDescendant)).toBe(true);
-    expect(isDescendsFromActiveRecord(TightPerson)).toBe(true);
-    expect(isDescendsFromActiveRecord(TightDescendant)).toBe(true);
-    expect(isDescendsFromActiveRecord(Post)).toBe(true);
+    expect(LoosePerson.isDescendsFromActiveRecord()).toBe(true);
+    expect(LooseDescendant.isDescendsFromActiveRecord()).toBe(true);
+    expect(TightPerson.isDescendsFromActiveRecord()).toBe(true);
+    expect(TightDescendant.isDescendsFromActiveRecord()).toBe(true);
+    expect(Post.isDescendsFromActiveRecord()).toBe(true);
     await Post.loadSchema();
-    expect(isDescendsFromActiveRecord(StiPost)).toBe(false);
-    expect(isDescendsFromActiveRecord(SubStiPost)).toBe(false);
-    expect(isDescendsFromActiveRecord(AbstractStiPost)).toBe(false);
-    expect(isDescendsFromActiveRecord(SubAbstractStiPost)).toBe(false);
+    expect(StiPost.isDescendsFromActiveRecord()).toBe(false);
+    expect(SubStiPost.isDescendsFromActiveRecord()).toBe(false);
+    expect(AbstractStiPost.isDescendsFromActiveRecord()).toBe(false);
+    expect(SubAbstractStiPost.isDescendsFromActiveRecord()).toBe(false);
   });
 
   it("company descends from active record", async () => {
-    // TRACKED-PENDING-CONVERGENCE: isDescendsFromActiveRecord(Base) returns true in trails
+    // TRACKED-PENDING-CONVERGENCE: Base.isDescendsFromActiveRecord() returns true in trails
     // (no type attr → !classHasAttribute); Story: descends-from-active-record-base (RFC 0019).
-    expect(isDescendsFromActiveRecord(AbstractCompany)).toBe(true);
-    expect(isDescendsFromActiveRecord(Company)).toBe(true);
+    expect(AbstractCompany.isDescendsFromActiveRecord()).toBe(true);
+    expect(Company.isDescendsFromActiveRecord()).toBe(true);
     // Rails: assert_not Class.new(Company).descends_from_active_record? — an anonymous
     // subclass of Company is NOT a direct AR descendant once Company has the type col.
     await Company.loadSchema();
     class LocalCompanySubclass extends Company {}
-    expect(isDescendsFromActiveRecord(LocalCompanySubclass)).toBe(false);
+    expect(LocalCompanySubclass.isDescendsFromActiveRecord()).toBe(false);
   });
 
   it("abstract class", () => {

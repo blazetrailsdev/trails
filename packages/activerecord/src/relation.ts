@@ -19,7 +19,6 @@ import {
   RecordNotUnique,
   UnknownPrimaryKey,
 } from "./errors.js";
-import { tokenDefinitions } from "./token-for.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
@@ -6402,20 +6401,18 @@ export class Relation<T extends Base> {
   async findByTokenFor(purpose: string, token: string): Promise<T | null> {
     const primaryKey = this.model.primaryKey as string | string[] | null;
     if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this.model);
-    const record = await tokenDefinitions(this.model)
-      .fetch(purpose)
-      .resolveToken(token, (id) => {
-        // Rails passes `model.primary_key => [id]`; with a composite key that
-        // hash key is the key array, which trails' findBy spells one column at
-        // a time.
-        if (Array.isArray(primaryKey)) {
-          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
-          return this.findBy(
-            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
-          ) as Promise<Base | null>;
-        }
-        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
-      });
+    const record = await this.model.tokenDefinitions.fetch(purpose).resolveToken(token, (id) => {
+      // Rails passes `model.primary_key => [id]`; with a composite key that
+      // hash key is the key array, which trails' findBy spells one column at
+      // a time.
+      if (Array.isArray(primaryKey)) {
+        if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
+        return this.findBy(
+          Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
+        ) as Promise<Base | null>;
+      }
+      return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
+    });
     return record as T | null;
   }
 
@@ -6423,7 +6420,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::TokenFor::RelationMethods#find_by_token_for!
    */
   async findByTokenForBang(purpose: string, token: string): Promise<T> {
-    const record = await tokenDefinitions(this.model)
+    const record = await this.model.tokenDefinitions
       .fetch(purpose)
       .resolveToken(token, (id) => this.find(id) as Promise<Base>);
     if (!record) throw new InvalidSignature();
@@ -6662,10 +6659,12 @@ export class Relation<T extends Base> {
     return `${size}`;
   }
 
-  async cacheKeyWithVersion(timestampColumn = "updated_at"): Promise<string> {
-    const key = await this.cacheKey(timestampColumn);
-    const version = await this.cacheVersion(timestampColumn);
-    return version ? `${key}-${version}` : key;
+  async cacheKeyWithVersion(): Promise<string> {
+    const version = await this.cacheVersion();
+    if (version) {
+      return `${await this.cacheKey()}-${version}`;
+    }
+    return this.cacheKey();
   }
 
   /**

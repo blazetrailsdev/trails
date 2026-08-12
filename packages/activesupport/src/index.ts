@@ -230,6 +230,7 @@ export {
   deepSymbolizeKeys,
   reverseMerge,
   assertValidKeys,
+  withIndifferentAccess,
   deepTransformValues,
   extractKeys,
   toParam,

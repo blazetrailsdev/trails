@@ -45,6 +45,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "dasherize",
   "deconstantize",
   "demodulize",
+  "foreign_key",
   "humanize",
   "ordinalize",
   "parameterize",
@@ -71,4 +72,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "assert_valid_keys",
   "to_param",
   "as_json",
+  // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
+  // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
+  "with_indifferent_access",
 ]);

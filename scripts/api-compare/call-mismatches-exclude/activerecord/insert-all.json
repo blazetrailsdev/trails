@@ -66,13 +66,6 @@
     "package": "activerecord",
     "tsFile": "insert-all.ts",
     "rubyName": "resolve_sti",
-    "call": "descends_from_active_record?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "insert-all.ts",
-    "rubyName": "resolve_sti",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

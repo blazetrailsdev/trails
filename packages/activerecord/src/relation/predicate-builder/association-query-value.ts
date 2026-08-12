@@ -98,14 +98,14 @@ export class AssociationQueryValue {
     if (this.isRelation(value)) {
       const pk = this.primaryKey();
       let relation = value as any;
-      if (!Array.isArray(pk) && this.isSelectClause(relation)) {
+      if (!Array.isArray(pk) && this.isSelectClause()) {
         // Select the table-qualified primary key so the subquery's projection
         // stays unambiguous once its arel carries joins (build_arel
         // convergence) — matching RelationHandler's `arel_table[primary_key]`.
         const arelTable = relation._model?.arelTable;
         relation = relation.select(arelTable ? arelTable.get(pk) : pk);
       }
-      if (this.isPolymorphicClause(relation)) {
+      if (this.isPolymorphicClause()) {
         relation = relation.where({ [this.primaryType()!]: this.polymorphicName() });
       }
       return relation;
@@ -132,23 +132,21 @@ export class AssociationQueryValue {
   }
 
   /** @internal */
-  private isPolymorphicClause(relation: {
-    whereValuesHash?: () => Record<string, unknown>;
-  }): boolean {
+  private isPolymorphicClause(): boolean {
+    const value = this.value as { whereValuesHash?: () => Record<string, unknown> };
     const type = this.primaryType();
     if (!type) return false;
     // Rails: polymorphic? && !where_values_hash.key?(primary_type). If the relation
     // doesn't implement where_values_hash (non-Relation duck), treat as needing the
     // polymorphic constraint — that's the safer default than skipping the type guard.
-    const hash =
-      typeof relation.whereValuesHash === "function" ? relation.whereValuesHash() : undefined;
+    const hash = typeof value.whereValuesHash === "function" ? value.whereValuesHash() : undefined;
     if (!hash) return true;
     return !(type in hash);
   }
 
-  private isSelectClause(relation: unknown): boolean {
-    const sv = (relation as any).selectValues;
-    if (typeof sv === "function") return sv.call(relation).length === 0;
+  private isSelectClause(): boolean {
+    const sv = (this.value as any).selectValues;
+    if (typeof sv === "function") return sv.call(this.value).length === 0;
     if (Array.isArray(sv)) return sv.length === 0;
     return false;
   }

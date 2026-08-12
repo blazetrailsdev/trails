@@ -145,7 +145,8 @@ function descendsFromActiveRecordByHierarchy(modelClass: typeof Base): boolean {
  *
  * Mirrors: ActiveRecord::Inheritance::ClassMethods#descends_from_active_record?
  */
-export function isDescendsFromActiveRecord(modelClass: typeof Base): boolean {
+export function isDescendsFromActiveRecord(this: typeof Base): boolean {
+  const modelClass = this;
   if (descendsFromActiveRecordByHierarchy(modelClass)) return true;
   const inheritCol = modelClass.inheritanceColumn;
   return inheritCol === null || !classHasAttribute(modelClass, inheritCol);
@@ -693,7 +694,7 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
     return (modelClass as any)._finderNeedsTypeCondition === true;
   }
   // Rails: `descends_from_active_record? ? :false : :true`, memoized.
-  if (!isDescendsFromActiveRecord(modelClass)) {
+  if (!modelClass.isDescendsFromActiveRecord()) {
     (modelClass as any)._finderNeedsTypeCondition = true;
     return true;
   }
@@ -855,7 +856,7 @@ export function discriminateClassForRecord(
   modelClass: typeof Base,
   record: Record<string, unknown>,
 ): typeof Base {
-  if (usingSingleTableInheritance(modelClass, record)) {
+  if (modelClass.usingSingleTableInheritance(record)) {
     const inheritCol = modelClass.inheritanceColumn;
     if (inheritCol === null) return modelClass;
     // Rails casts through `base_class`, not the receiver (find_sti_class,
@@ -884,10 +885,11 @@ export function discriminateClassForRecord(
  *
  * @internal
  */
-function usingSingleTableInheritance(
-  modelClass: typeof Base,
+export function usingSingleTableInheritance(
+  this: typeof Base,
   record: Record<string, unknown>,
 ): boolean {
+  const modelClass = this;
   // Mirrors Rails exactly: `record[inheritance_column].present? &&
   // _has_attribute?(inheritance_column)` — no `stiEnabled` short-circuit. A plain
   // model with a reflected `type` column still passes this gate, but resolves to

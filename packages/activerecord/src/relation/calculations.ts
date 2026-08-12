@@ -1342,34 +1342,34 @@ export function performCalculation(
   operation: string,
   columnName: string | string[] | Nodes.Node | null,
 ): Promise<unknown> {
-  const op = operation.toLowerCase();
+  operation = operation.toLowerCase();
 
   // Mirrors Rails `perform_calculation` (calculations.rb:434-458): resolve the
   // effective `distinct` flag and count column before dispatching. `:all` is
   // spelled "*"/"all" here (the JS analogue Rails' aggregate_column maps to
   // Arel.star — calculations.rb:414-423).
   let distinct: boolean | null = rel._isDistinct;
-  let column = columnName;
-  if (op === "count") {
-    column ??= selectForCount(rel);
-    if (column === "*" || column === "all") {
+  if (operation === "count") {
+    columnName ??= (rel as any).selectForCount();
+    if (columnName === "*" || columnName === "all") {
       if (!distinct) {
-        if (rel._groupColumns.length === 0) distinct = isDistinctSelect(rel, selectForCount(rel));
+        if (rel._groupColumns.length === 0)
+          distinct = (rel as any).isDistinctSelect((rel as any).selectForCount());
       } else if (
         rel._groupColumns.length > 0 ||
         (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
       ) {
-        column = rel.primaryKey;
+        columnName = rel.primaryKey;
       }
-    } else if (isDistinctSelect(rel, column)) {
+    } else if ((rel as any).isDistinctSelect(columnName)) {
       distinct = null;
     }
   }
 
   if (rel._groupColumns.length > 0) {
-    return executeGroupedCalculation(rel, op, column, distinct);
+    return (rel as any).executeGroupedCalculation(operation, columnName, distinct);
   }
-  return executeSimpleCalculation(rel, op, column, distinct);
+  return (rel as any).executeSimpleCalculation(operation, columnName, distinct);
 }
 
 /** @internal */

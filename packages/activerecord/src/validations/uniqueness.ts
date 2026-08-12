@@ -113,6 +113,14 @@ export class UniquenessValidator extends EachValidator {
   _covered: string[] | null = null;
 
   /**
+   * Mirrors: ActiveRecord::Validations::UniquenessValidator#covered_by_unique_index?
+   * Assigned from the module function below (the trails mixin idiom for a Ruby
+   * instance method whose body lives at file scope).
+   * @internal
+   */
+  declare isCoveredByUniqueIndex: typeof isCoveredByUniqueIndex;
+
+  /**
    * Mirrors: ActiveRecord::Validations::UniquenessValidator#initialize
    *
    * Validates options: :conditions must be callable, :scope must be
@@ -443,7 +451,7 @@ async function isValidationNeeded(
     (a) => dirty?.attributeChanged?.(a) || record.readAttribute?.(a) == null,
   );
   if (anyChangedOrNull) return true;
-  return !(await isCoveredByUniqueIndex(validator, klass, record, attribute, scope));
+  return !(await validator.isCoveredByUniqueIndex(klass, record, attribute, scope));
 }
 
 /**
@@ -456,12 +464,13 @@ async function isValidationNeeded(
  * @internal
  */
 async function isCoveredByUniqueIndex(
-  validator: UniquenessValidator,
+  this: UniquenessValidator,
   klass: any,
   record: any,
   attribute: string,
   scope: string[],
 ): Promise<boolean> {
+  const validator = this;
   if (validator._covered == null) {
     const indexes = await tableIndexes(klass);
     const covered: string[] = [];
@@ -552,3 +561,5 @@ function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknow
   }
   return value;
 }
+
+UniquenessValidator.prototype.isCoveredByUniqueIndex = isCoveredByUniqueIndex;

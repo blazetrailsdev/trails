@@ -199,6 +199,14 @@ export class PendingMigrationError extends MigrationError {
   /**
    * Mirrors: `PendingMigrationError#initialize` (`migration.rb:159-165`).
    *
+   * Ruby's `initialize(message = nil, pending_migrations: nil)` lets a caller
+   * pass the kwarg on its own; TypeScript has no kwargs, so the options hash is
+   * accepted in the first parameter's place — the union-typed first parameter
+   * with runtime dispatch that `ConnectionNotEstablished` (`errors.ts`) already
+   * uses for Ruby's `Exception.new(any_object)`. Passing `undefined` positionally
+   * instead would put an argument in the call that Rails' call sites
+   * (`migration.rb:722,743`) do not pass.
+   *
    * The one arm that cannot converge is Rails' nil default (`migration.rb:161`),
    * which reads `connection_pool.migration_context.open.pending_migrations` —
    * asynchronous in trails, and a JS constructor cannot await. Raise sites
@@ -207,10 +215,12 @@ export class PendingMigrationError extends MigrationError {
    * anyway raises rather than inventing a message Rails never produces.
    */
   constructor(
-    message?: string,
-    { pendingMigrations }: { pendingMigrations?: MigrationProxy[] } = {},
+    message?: string | { pendingMigrations?: MigrationProxy[] },
+    options: { pendingMigrations?: MigrationProxy[] } = {},
   ) {
-    if (message == null) {
+    const { pendingMigrations } =
+      message != null && typeof message === "object" ? message : options;
+    if (typeof message !== "string") {
       if (pendingMigrations == null) {
         throw new ArgumentError(
           "PendingMigrationError needs a message or `pendingMigrations:`; Rails reads the list " +
@@ -1598,7 +1608,7 @@ export class Migration {
     const migrations = await this.pendingMigrations();
 
     if (migrations.length > 0) {
-      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+      throw new PendingMigrationError({ pendingMigrations: migrations });
     }
   }
 
@@ -1621,7 +1631,7 @@ export class Migration {
     const migrations = pendingMigrations.flat();
 
     if (migrations.length > 0) {
-      throw new PendingMigrationError(undefined, { pendingMigrations: migrations });
+      throw new PendingMigrationError({ pendingMigrations: migrations });
     }
   }
 

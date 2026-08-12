@@ -2,6 +2,8 @@
  * Hash/object utilities mirroring Rails ActiveSupport hash extensions.
  */
 
+import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+
 type AnyObject = Record<string, unknown>;
 
 /**
@@ -201,6 +203,16 @@ export function reverseMerge<T extends AnyObject>(obj: T, defaults: AnyObject): 
     }
   }
   return result as T;
+}
+
+/**
+ * Returns a HashWithIndifferentAccess out of its receiver — Ruby's
+ * `Hash#with_indifferent_access` (core_ext/hash/indifferent_access.rb:9). The
+ * receiver is the first argument here because TypeScript has no way to define
+ * the method on `Object.prototype`.
+ */
+export function withIndifferentAccess(obj: AnyObject): HashWithIndifferentAccess<unknown> {
+  return new HashWithIndifferentAccess(obj);
 }
 
 /**

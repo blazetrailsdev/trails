@@ -53,7 +53,7 @@ export class Default {
     // proc/method form, `def self.default_scope`) rather than registering via
     // the `default_scope { }` macro, call that method with the base relation
     // installed as the current scope (`relation.scoping { default_scope }`).
-    const override = modelClass.defaultScopeOverride ? defaultScopeOverride(modelClass) : undefined;
+    const override = modelClass.defaultScopeOverride ? defaultScopeMethod(modelClass) : undefined;
     if (override) {
       return evaluateDefaultScope.call(modelClass, () => {
         const base = buildRelation();
@@ -101,7 +101,7 @@ export class Default {
  * (i.e. the inherited macro), there is no override.
  * @internal
  */
-function defaultScopeOverride(modelClass: any): ((this: any) => any) | undefined {
+function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
   let klass = modelClass;
   while (typeof klass === "function") {
     if (Object.prototype.hasOwnProperty.call(klass, "defaultScope")) {
@@ -120,7 +120,7 @@ function defaultScopeOverride(modelClass: any): ((this: any) => any) | undefined
  * @internal
  */
 export function hasDefaultScopeOverride(modelClass: any): boolean {
-  return defaultScopeOverride(modelClass) !== undefined;
+  return defaultScopeMethod(modelClass) !== undefined;
 }
 
 /**

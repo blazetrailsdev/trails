@@ -2,29 +2,9 @@
   {
     "package": "activerecord",
     "tsFile": "store.ts",
-    "rubyName": "as_indifferent_hash",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
     "rubyName": "read",
     "call": "prepare",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
-    "rubyName": "read_store_attribute",
-    "call": "store_accessor_for",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:storeAttribute"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activerecord",
@@ -65,18 +45,6 @@
     "package": "activerecord",
     "tsFile": "store.ts",
     "rubyName": "store_accessor",
-    "call": "read_store_attribute",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:storeAttribute",
-      "ref:key"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
-    "rubyName": "store_accessor",
     "call": "saved_change_to_attribute?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -90,41 +58,8 @@
   {
     "package": "activerecord",
     "tsFile": "store.ts",
-    "rubyName": "store_accessor",
-    "call": "write_store_attribute",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:storeAttribute",
-      "ref:key",
-      "ref:value"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
     "rubyName": "stored_attributes",
     "call": "local_stored_attributes",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
-    "rubyName": "stored_attributes",
-    "call": "stored_attributes",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "store.ts",
-    "rubyName": "write_store_attribute",
-    "call": "store_accessor_for",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:storeAttribute"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

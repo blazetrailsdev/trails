@@ -362,6 +362,9 @@ function makeFindSomeRel(
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
     _whereClause: { isEmpty: () => true },
+    findSomeOrdered(ids: unknown[]) {
+      return findSomeOrdered(this, ids);
+    },
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
