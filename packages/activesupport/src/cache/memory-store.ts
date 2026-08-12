@@ -5,15 +5,13 @@ import { Store } from "./store.js";
 import { integer } from "./integer.js";
 import { registerStoreClass } from "./store-registry.js";
 
-// In-memory record backing a single key. We store the coder-serialized value
-// (so Date/undefined/bigint/non-finite numbers and deep-clone isolation survive
-// the round-trip) alongside the Rails Entry metadata (absolute `expiresAt` in ms,
-// `version`). `accessedAt` drives LRU pruning. readEntry/writeEntry rebuild the
-// Rails second-unit `Entry` so the instrumented Store base owns read/write/fetch.
+// In-memory record backing a single key. Rails stores the `serialize_entry`
+// payload itself (`@data[key] = payload`, memory_store.rb:213-227), which for
+// this store is a DupCoder-dumped `Entry`; `expiresAt` mirrors it for the
+// `unless_exist` check and `accessedAt` drives LRU pruning.
 interface MemoryRecord {
-  encodedValue: string;
+  payload: Entry;
   expiresAt: number | null;
-  version: string | null;
   accessedAt: number;
 }
 
@@ -43,6 +41,8 @@ export class MemoryStore extends Store implements CacheStore {
     sizeLimit?: number;
     namespace?: string | (() => string);
     expiresIn?: number;
+    compress?: boolean;
+    compressThreshold?: number;
   }) {
     super(options ?? {});
     this.sizeLimit = options?.sizeLimit ?? Infinity;
@@ -54,25 +54,45 @@ export class MemoryStore extends Store implements CacheStore {
     const rec = this.data.get(key);
     if (!rec) return null;
     rec.accessedAt = Date.now();
-    return new Entry(coder.load(rec.encodedValue), {
-      expiresAt: rec.expiresAt,
-      version: rec.version,
-    });
+    return this.deserializeEntry(rec.payload);
   }
 
   protected writeEntry(key: string, entry: Entry, options: Record<string, unknown>): boolean {
+    const payload = this.serializeEntry(entry, options);
     if (options.unlessExist) {
       const existing = this.data.get(key);
       if (existing && !this.recordExpired(existing)) return false;
     }
     this.data.set(key, {
-      encodedValue: coder.dump(entry.value),
+      payload,
       expiresAt: entry.expiresAt,
-      version: entry.version,
       accessedAt: Date.now(),
     });
     if (this.data.size > this.sizeLimit) this.evictLRU();
     return true;
+  }
+
+  /**
+   * Mirrors Rails `Store#serialize_entry` (cache.rb:806-813): dispatch to the
+   * coder's `dump_compressed` under `compress`, else `dump`. Rails installs the
+   * coder in `MemoryStore#initialize` (`options[:coder] = DupCoder`,
+   * memory_store.rb:73-75) and holds it in `@coder` on the base; trails' `Store`
+   * has no `@coder` seam yet (RFC 0101 story
+   * `converge-store-serialized-entry-hooks-and-file-store-paths` ports it), so
+   * this store names the coder Rails installs for it directly until that lands.
+   */
+  private serializeEntry(entry: Entry, options: Record<string, unknown>): Entry {
+    options = this.mergedOptions(options as CacheOptions) as Record<string, unknown>;
+    if (options.compress) {
+      return DupCoder.dumpCompressed(entry, (options.compressThreshold as number) ?? 1024);
+    } else {
+      return DupCoder.dump(entry);
+    }
+  }
+
+  /** Mirrors Rails `Store#deserialize_entry` (cache.rb:815-819). */
+  private deserializeEntry(payload: Entry | null): Entry | null {
+    return payload === null ? null : DupCoder.load(payload);
   }
 
   protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {

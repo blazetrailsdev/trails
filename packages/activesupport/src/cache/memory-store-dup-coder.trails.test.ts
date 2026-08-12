@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DupCoder } from "./memory-store.js";
+import { DupCoder, MemoryStore } from "./memory-store.js";
 import { Entry } from "./entry.js";
 
 // trails-only coverage for `ActiveSupport::Cache::MemoryStore::DupCoder`
@@ -51,5 +51,31 @@ describe("DupCoder", () => {
   it("load leaves a compressed entry alone", () => {
     const compressed = DupCoder.dumpCompressed(new Entry("a".repeat(2000)), 1);
     expect(DupCoder.load(compressed)).toBe(compressed);
+  });
+});
+
+describe("MemoryStore serialization", () => {
+  it("routes writes through DupCoder so a stored value cannot alias the caller's", () => {
+    const store = new MemoryStore();
+    const value = { a: { b: 1 } };
+    store.write("foo", value);
+    value.a.b = 2;
+    expect(store.read("foo")).toEqual({ a: { b: 1 } });
+  });
+
+  it("compresses past the threshold when compress is set", () => {
+    const store = new MemoryStore({ compress: true, compressThreshold: 1 });
+    const value = "a".repeat(2000);
+    store.write("foo", value);
+    const data = (store as unknown as { data: Map<string, { payload: Entry }> }).data;
+    expect(data.get("foo")!.payload.isCompressed()).toBe(true);
+    expect(store.read("foo")).toBe(value);
+  });
+
+  it("stores uncompressed by default", () => {
+    const store = new MemoryStore();
+    store.write("foo", "a".repeat(2000));
+    const data = (store as unknown as { data: Map<string, { payload: Entry }> }).data;
+    expect(data.get("foo")!.payload.isCompressed()).toBe(false);
   });
 });
