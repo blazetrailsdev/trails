@@ -21,6 +21,17 @@ interface Waiter {
 }
 
 /**
+ * The condition-variable surface `@cond` is duck-typed against in Rails:
+ * `@lock.new_cond` returns one, and BiasedConditionVariable stands in for one.
+ */
+interface Cond {
+  wait(timeout: number): Promise<void>;
+  signal(): void;
+  broadcast(): void;
+  rejectAll(error: Error): void;
+}
+
+/**
  * Ruby's `Monitor#new_cond` condition variable, which `Queue` and
  * `BiasedConditionVariable` both build on. Node has no threads to block, so a
  * waiter is a pending promise: `signal` resolves the first one, `broadcast`
@@ -30,7 +41,7 @@ interface Waiter {
  * @noRailsEquivalent Port of the Ruby stdlib primitive `@lock.new_cond`
  * returns; there is no Rails-side class to mirror.
  */
-class ConditionVariable {
+class ConditionVariable implements Cond {
   private _waiters: Waiter[] = [];
 
   wait(timeout: number): Promise<void> {
@@ -73,24 +84,19 @@ class ConditionVariable {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue::BiasedConditionVariable
- *
- * Extends the plain condition variable only so it can stand in for one where
- * `@cond` is duck-typed in Rails; every method is overridden and the inherited
- * waiter list is unused.
  */
-export class BiasedConditionVariable extends ConditionVariable {
+export class BiasedConditionVariable implements Cond {
   private _realCond = new ConditionVariable();
-  private _otherCond: ConditionVariable;
+  private _otherCond: Cond;
   private _preferredThread: unknown;
   private _numWaitingOnRealCond = 0;
 
-  constructor(_lock: unknown, otherCond: ConditionVariable, preferredThread: unknown) {
-    super();
+  constructor(_lock: unknown, otherCond: Cond, preferredThread: unknown) {
     this._otherCond = otherCond;
     this._preferredThread = preferredThread;
   }
 
-  override broadcast(): void {
+  broadcast(): void {
     this.broadcastOnBiased();
     this._otherCond.broadcast();
   }
@@ -100,8 +106,8 @@ export class BiasedConditionVariable extends ConditionVariable {
     this._realCond.broadcast();
   }
 
-  override signal(): void {
-    let cond: ConditionVariable;
+  signal(): void {
+    let cond: Cond;
     if (this._numWaitingOnRealCond > 0) {
       this._numWaitingOnRealCond -= 1;
       cond = this._realCond;
@@ -111,10 +117,10 @@ export class BiasedConditionVariable extends ConditionVariable {
     cond.signal();
   }
 
-  override wait(timeout: number): Promise<void> {
+  wait(timeout: number): Promise<void> {
     // Node is single-threaded, so a waiter reaching here always belongs to the
     // context that entered `withABiasFor` — `Thread.current == @preferred_thread`.
-    let cond: ConditionVariable;
+    let cond: Cond;
     if (this._preferredThread != null) {
       this._numWaitingOnRealCond += 1;
       cond = this._realCond;
@@ -124,7 +130,7 @@ export class BiasedConditionVariable extends ConditionVariable {
     return cond.wait(timeout);
   }
 
-  override rejectAll(error: Error): void {
+  rejectAll(error: Error): void {
     this._realCond.rejectAll(error);
     this._otherCond.rejectAll(error);
   }
@@ -136,7 +142,7 @@ export class BiasedConditionVariable extends ConditionVariable {
  */
 interface BiasableQueueHost {
   _lock?: unknown;
-  _cond: ConditionVariable;
+  _cond: Cond;
 }
 
 /**
@@ -147,7 +153,7 @@ interface BiasableQueueHost {
  * toward a specific thread.
  */
 export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: () => T): T {
-  let previousCond: ConditionVariable | null = null;
+  let previousCond: Cond | null = null;
   let newCond: BiasedConditionVariable | null = null;
   synchronize(this, () => {
     previousCond = this._cond;
@@ -178,7 +184,7 @@ export const BiasableQueue = {
 export class Queue {
   private _queue: DatabaseAdapter[] = [];
   protected _lock?: unknown;
-  protected _cond: ConditionVariable;
+  protected _cond: Cond;
   private _numWaiting = 0;
 
   constructor(lock?: unknown) {
