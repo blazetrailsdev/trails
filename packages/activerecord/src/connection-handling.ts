@@ -792,7 +792,7 @@ export async function establishConnection(
     // resolved object then goes to the handler verbatim, so the pool stores it
     // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
     // and buildAdapterArg live inside establishWithDbConfig.
-    const dbConfig = resolveConfigForConnection.call(modelClass, config);
+    const dbConfig = modelClass.resolveConfigForConnection(config);
     await establishWithDbConfig(modelClass, dbConfig);
   }
 }

@@ -158,12 +158,9 @@ it("withConnection waits for a released connection when pool is saturated", asyn
   const held = await pool.checkout();
 
   let connSeen: DatabaseAdapter | undefined;
-  const waiter = pool.withConnection(
-    (conn) => {
-      connSeen = conn;
-    },
-    { checkoutTimeout: 5 },
-  );
+  const waiter = pool.withConnection((conn) => {
+    connSeen = conn;
+  });
   pool.checkin(held);
   await waiter;
   expect(connSeen).toBe(held);
@@ -176,10 +173,10 @@ it("withConnection rejects with ConnectionTimeoutError when pool stays saturated
   const { ConnectionTimeoutError } = await import("./errors.js");
   vi.useFakeTimers();
   try {
-    const pool = makePool(1);
+    const pool = makeAmbientPool({ pool: 1, checkoutTimeout: 0.05 });
     await pool.checkout();
 
-    const waiter = pool.withConnection(() => {}, { checkoutTimeout: 0.05 });
+    const waiter = pool.withConnection(() => {});
     // Attach the rejection handler before advancing timers to avoid an
     // unhandled-rejection window during IPC serialization.
     const assertion = expect(waiter).rejects.toThrow(ConnectionTimeoutError);

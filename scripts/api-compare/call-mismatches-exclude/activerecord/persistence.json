@@ -110,5 +110,85 @@
     "rubyName": "verify_readonly_attribute",
     "call": "readonly_attribute?",
     "reason": "Unmasked by alias-arity resolution (story arity-resolve-ts-alias-bindings-to-target-params): the TS body reads `_readonlyAttributes` directly instead of delegating to `readonlyAttributeQ`. Real gap, tracked as story converge-readonly-attribute-predicate-callers."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "attributes_for_create",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "attributes_with_values",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "deserialize",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "id",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "type_for_attribute",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_create_record",
+    "call": "with_connection",
+    "reason": "The INSERT itself still lives in base.ts' trails-only `_performInsert` decomposition, which `_create_record` calls: moving the Persistence layer of the chain into persistence.ts (RFC 0084) is what first paired this body with persistence.rb:918-942 and surfaced the pre-existing split. Retires with the `_performInsert`/`_performUpdate` fold story."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_raise_record_not_destroyed",
+    "call": "order:constructor,primaryKey",
+    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "_delete_record",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:arelTable"
+    ],
+    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "apply_scoping?",
+    "call": "global_current_scope",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "persistence.ts",
+    "rubyName": "build_default_constraint",
+    "call": "default_scoped",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{allQueries=bool:true}"
+    ],
+    "reason": "Pre-existing divergence in an untouched body, surfaced when the instance-side `_create_record`/`_update_record` landed in persistence.ts and the file's ClassMethods/instance pairing was recomputed."
   }
 ]

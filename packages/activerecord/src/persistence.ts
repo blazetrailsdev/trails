@@ -293,9 +293,16 @@ export async function _insertRecord(
 /**
  * Builds and executes an UPDATE with the given values and constraints.
  *
+ * A TS module cannot export two bindings called `_updateRecord`, and Rails has
+ * both `Persistence::ClassMethods#_update_record` (this one) and the instance
+ * `Persistence#_update_record` below in the same file. The class-level half
+ * keeps the Rails name inside the `ClassMethods` grouping the port already uses
+ * for Rails' `module ClassMethods` (counter-cache.ts, timestamp.ts), leaving the
+ * free export to the instance method.
+ *
  * Mirrors: ActiveRecord::Persistence::ClassMethods#_update_record
  */
-export async function _updateRecord(
+async function classMethodsUpdateRecord(
   this: PersistenceHost,
   values: Record<string, unknown>,
   constraints: Record<string, unknown>,
@@ -321,6 +328,11 @@ export async function _updateRecord(
   const sql = adapter.toSql(um);
   return adapter.executeMutation(sql);
 }
+
+/** Rails' `Persistence::ClassMethods` — see {@link classMethodsUpdateRecord}. */
+export const ClassMethods = {
+  _updateRecord: classMethodsUpdateRecord,
+};
 
 /**
  * Builds and executes a DELETE with the given constraints.
@@ -1768,6 +1780,24 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   };
 };
 
+/**
+ * Host surface for the Persistence layer of the create/update super chain.
+ * `_performInsert` / `_performUpdate` are trails-only decompositions living on
+ * base.ts (they reach private record state); `_pendingOperation` is the promise
+ * slot they park the statement in.
+ */
+type PersistenceInstanceChainHost = {
+  constructor: unknown;
+  _newRecord: boolean;
+  _previouslyNewRecord: boolean;
+  _pendingOperation?: Promise<unknown> | null;
+  _attributes: unknown;
+  _dirty: { reinstateNewRecordChanges(attributes: unknown, skip: Set<string>): void };
+  _readAttribute?(name: string): unknown;
+  _performInsert?(): Promise<unknown> | void;
+  _performUpdate?(): Promise<unknown> | void;
+};
+
 /** @internal */
 function initInternals(this: PersistencePrivateHost): void {
   this._newRecord = true;
@@ -1910,6 +1940,76 @@ export function _touchRow(
   return _updateRow.call(this, attributeNames, "touch");
 }
 
+/**
+ * The bottom of the update super chain: the UPDATE, `@previously_new_record =
+ * false`, then the `save(&block)` yield.
+ *
+ * The `_pendingOperation` await has no Rails counterpart — trails' `_performUpdate`
+ * parks the statement promise there so the sync half of the chain can start it.
+ *
+ * Mirrors: ActiveRecord::Persistence#_update_record (persistence.rb:900-916)
+ * @internal
+ */
+export async function _updateRecord(
+  this: PersistenceInstanceChainHost,
+  block?: (record: any) => void,
+): Promise<boolean> {
+  if (!this._performUpdate) throw new Error("_performUpdate not implemented");
+  await this._performUpdate();
+  if (this._pendingOperation) {
+    await this._pendingOperation;
+    this._pendingOperation = null;
+  }
+  this._previouslyNewRecord = false;
+  // Rails yields here (persistence.rb:912-916).
+  block?.(this);
+  return true;
+}
+
+/**
+ * The bottom of the create super chain: the INSERT, `@new_record = false` /
+ * `@previously_new_record = true`, then the `save(&block)` yield.
+ *
+ * Mirrors: ActiveRecord::Persistence#_create_record (persistence.rb:918-942)
+ * @internal
+ */
+export async function _createRecord(
+  this: PersistenceInstanceChainHost,
+  block?: (record: any) => void,
+): Promise<boolean> {
+  const ctor = this.constructor as any;
+  if (!this._performInsert) throw new Error("_performInsert not implemented");
+  // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
+  // insert. Rails new records are dirty from construction, so partial_inserts'
+  // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
+  // correctly includes attrs the user set to a non-default value — e.g. an
+  // hstore column with a DB default of "" that was assigned {key: null}.
+  // Running this after the insert would leave the dirty set empty at column-
+  // selection time and wrongly drop such columns. Only a *null* PK column is
+  // skipped: that's the auto-populated key, tracked via
+  // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
+  // (non-null) PK column — e.g. a composite key — must stay dirty so it's
+  // inserted; otherwise the row is written with a missing key and
+  // find/destroy by that key raises RecordNotFound.
+  const _pk = ctor.primaryKey;
+  const _pkSet = new Set(
+    (Array.isArray(_pk) ? _pk : [_pk]).filter((n: string) => this._readAttribute?.(n) == null),
+  );
+  this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
+  await this._performInsert();
+  if (this._pendingOperation) {
+    await this._pendingOperation;
+    this._pendingOperation = null;
+  }
+  this._previouslyNewRecord = true;
+  this._newRecord = false;
+  // Rails yields here (persistence.rb:936-940).
+  block?.(this);
+  // Rails returns `id`; the trails chain carries a truthy value that becomes
+  // run_callbacks' value in Callbacks#_create_record.
+  return true;
+}
+
 /** @internal */
 export function _updateRow(
   this: PersistencePrivateHost,
@@ -1920,7 +2020,11 @@ export function _updateRow(
   for (const name of attributeNames) {
     values[name] = this.readAttribute(name);
   }
-  return _updateRecord.call(this.constructor as any, values, _queryConstraintsHash.call(this));
+  return ClassMethods._updateRecord.call(
+    this.constructor as any,
+    values,
+    _queryConstraintsHash.call(this),
+  );
 }
 
 /** @internal */

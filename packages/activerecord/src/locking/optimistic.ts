@@ -2,7 +2,7 @@ import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
-import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
+import { queryConstraintsList, ClassMethods as PersistenceClassMethods } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import { reloadSchemaFromCache } from "../model-schema.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
@@ -231,7 +231,7 @@ export async function _updateRow(
   this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
 
   try {
-    const affectedRows = await persistenceUpdateRecord.call(
+    const affectedRows = await PersistenceClassMethods._updateRecord.call(
       ctor as any,
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
