@@ -25,8 +25,8 @@ const UTF8 = new TextEncoder();
  * counterpart, and the digest picks the cache's shard directories, so it has to
  * be the same function.
  *
- * @noRailsEquivalent Ruby stdlib (Zlib) rather than Rails; named for the Ruby
- * method `normalize_key` calls at file_store.rb:167.
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (Zlib), not Rails, so no Ruby file
+ * maps onto it; named for the method `normalize_key` calls at file_store.rb:167.
  */
 function adler32(data: string): number {
   let a = 1;
@@ -43,8 +43,8 @@ function adler32(data: string): number {
  * is percent-encoded and a space becomes `+`. `encodeURIComponent` also leaves
  * `!~'()` unescaped, so those are escaped here.
  *
- * @noRailsEquivalent Ruby stdlib (URI) rather than Rails; named for the Ruby
- * method `normalize_key` calls at file_store.rb:160.
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (URI), not Rails, so no Ruby file
+ * maps onto it; named for the method `normalize_key` calls at file_store.rb:160.
  */
 function encodeWwwFormComponent(str: string): string {
   return encodeURIComponent(str)
@@ -55,8 +55,8 @@ function encodeWwwFormComponent(str: string): string {
 /**
  * Ruby `URI.decode_www_form_component`.
  *
- * @noRailsEquivalent Ruby stdlib (URI) rather than Rails; named for the Ruby
- * method `file_path_key` calls at file_store.rb:186.
+ * @noRailsEquivalent PERMANENT — Ruby stdlib (URI), not Rails, so no Ruby file
+ * maps onto it; named for the method `file_path_key` calls at file_store.rb:186.
  */
 function decodeWwwFormComponent(str: string): string {
   return decodeURIComponent(str.replace(/\+/g, " "));

@@ -33,7 +33,8 @@ export type StoreOptions = Record<string, unknown>;
  * The coder surface `Store` holds in `@coder` (cache.rb:301-312): `dump`/`load`,
  * plus `dump_compressed` when the coder answers it.
  *
- * @noRailsEquivalent Ruby duck-types `@coder`; TS needs the shape named.
+ * @noRailsEquivalent PERMANENT — Ruby duck-types `@coder` (cache.rb:301-312);
+ * TS has to name the shape a structural type checks against.
  */
 export interface CacheCoder {
   dump(entry: Entry): unknown;
