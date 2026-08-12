@@ -64,14 +64,15 @@ describe("ConnectionPool::Queue", () => {
     const promise = q.poll(1) as Promise<DatabaseAdapter>;
     expect(q.numWaiting()).toBe(1);
 
-    // Add a connection — it goes to the waiter, not the queue
+    // Add a connection — it is pushed and the waiter is signalled
     q.add(c);
-    expect(q.length).toBe(0);
+    expect(q.length).toBe(1);
 
-    // A no-wait poll should get nothing
+    // A no-wait poll should get nothing — the waiter is ahead in line
     expect(q.poll()).toBeUndefined();
 
     await promise;
+    expect(q.length).toBe(0);
   });
 
   it("delete removes and returns element", () => {
@@ -85,6 +86,20 @@ describe("ConnectionPool::Queue", () => {
     expect(q.delete(c1)).toBe(c1);
     expect(q.length).toBe(1);
     expect(q.delete(fakeConn(99))).toBeUndefined();
+  });
+
+  it("delete removes every equal element", () => {
+    const q = new Queue();
+    const c1 = fakeConn(1);
+    const c2 = fakeConn(2);
+
+    q.add(c1);
+    q.add(c2);
+    q.add(c1);
+
+    expect(q.delete(c1)).toBe(c1);
+    expect(q.length).toBe(1);
+    expect(q.poll()).toBe(c2);
   });
 
   it("clear empties queue and returns elements", () => {
@@ -122,95 +137,69 @@ describe("ConnectionPool::Queue", () => {
 });
 
 describe("ConnectionPool::BiasedConditionVariable", () => {
-  it("constructor accepts lock, otherCond, preferredThread", () => {
-    const cv = new BiasedConditionVariable({}, null, "thread-1");
-    expect(cv.waitingCount).toBe(0);
-  });
+  // The plain `@lock.new_cond` a Queue starts with — the leaf `@other_cond`.
+  function newCond(): any {
+    return (new Queue() as any)._cond;
+  }
 
-  it("signal resolves a waiter", async () => {
-    const cv = new BiasedConditionVariable();
+  function settled(promise: Promise<void>): Promise<boolean> {
+    return Promise.race([promise.then(() => true), Promise.resolve().then(() => false)]);
+  }
+
+  it("signal wakes a waiter on the biased cond", async () => {
+    const other = new BiasedConditionVariable(undefined, newCond(), "other");
+    const cv = new BiasedConditionVariable({}, other, "thread-1");
+
     const p = cv.wait(1);
-    expect(cv.waitingCount).toBe(1);
+    cv.signal();
 
-    const c = fakeConn();
-    expect(cv.signal(c)).toBe(true);
-    expect(cv.waitingCount).toBe(0);
-
-    const result = await p;
-    expect(result).toBe(c);
+    expect(await settled(p)).toBe(true);
   });
 
-  it("signal returns false when no waiters", () => {
-    const cv = new BiasedConditionVariable();
-    expect(cv.signal(fakeConn())).toBe(false);
+  it("signal delegates to otherCond when no waiters are on the biased cond", async () => {
+    const base = new BiasedConditionVariable(undefined, newCond(), "base");
+    const cv = new BiasedConditionVariable(undefined, base, "thread-1");
+
+    const p = base.wait(1);
+    cv.signal();
+
+    expect(await settled(p)).toBe(true);
   });
 
-  it("broadcastOnBiased resolves local waiters and returns remainder", async () => {
-    const cv = new BiasedConditionVariable();
+  it("broadcastOnBiased wakes every waiter on the biased cond", async () => {
+    const other = new BiasedConditionVariable(undefined, newCond(), "other");
+    const cv = new BiasedConditionVariable(undefined, other, "thread-1");
+
     const p1 = cv.wait(1);
     const p2 = cv.wait(1);
+    cv.broadcastOnBiased();
 
-    const c1 = fakeConn(1);
-    const c2 = fakeConn(2);
-    const c3 = fakeConn(3);
-    const remaining = cv.broadcastOnBiased([c1, c2, c3]);
-
-    expect(await p1).toBe(c1);
-    expect(await p2).toBe(c2);
-    expect(remaining).toEqual([c3]);
-  });
-
-  it("broadcast does not double-deliver connections", async () => {
-    const other = new BiasedConditionVariable();
-    const biased = new BiasedConditionVariable(undefined, other);
-
-    const pBiased = biased.wait(1);
-    const pOther = other.wait(1);
-
-    const c1 = fakeConn(1);
-    const c2 = fakeConn(2);
-    biased.broadcast([c1, c2]);
-
-    // c1 goes to biased, c2 goes to other — no double-delivery
-    expect(await pBiased).toBe(c1);
-    expect(await pOther).toBe(c2);
-  });
-
-  it("signal delegates to otherCond when no local waiters", async () => {
-    const other = new BiasedConditionVariable();
-    const biased = new BiasedConditionVariable(undefined, other);
-
-    const p = other.wait(1);
-    const c = fakeConn();
-    expect(biased.signal(c)).toBe(true);
-    expect(await p).toBe(c);
-  });
-
-  it("signal prefers local waiters over otherCond", async () => {
-    const other = new BiasedConditionVariable();
-    const biased = new BiasedConditionVariable(undefined, other);
-
-    const pBiased = biased.wait(1);
-    const pOther = other.wait(1);
-
-    const c1 = fakeConn(1);
-    const c2 = fakeConn(2);
-    expect(biased.signal(c1)).toBe(true);
-    expect(biased.signal(c2)).toBe(true);
-
-    expect(await pBiased).toBe(c1);
-    expect(await pOther).toBe(c2);
+    expect(await settled(p1)).toBe(true);
+    expect(await settled(p2)).toBe(true);
   });
 
   it("broadcast propagates to otherCond", async () => {
-    const other = new BiasedConditionVariable();
-    const biased = new BiasedConditionVariable(undefined, other);
+    const base = new BiasedConditionVariable(undefined, newCond(), "base");
+    const cv = new BiasedConditionVariable(undefined, base, "thread-1");
 
-    const pOther = other.wait(1);
-    const c = fakeConn();
-    biased.broadcast([c]);
+    const pBiased = cv.wait(1);
+    const pOther = base.wait(1);
+    cv.broadcast();
 
-    expect(await pOther).toBe(c);
+    expect(await settled(pBiased)).toBe(true);
+    expect(await settled(pOther)).toBe(true);
+  });
+
+  it("broadcastOnBiased leaves otherCond waiters asleep", async () => {
+    const base = new BiasedConditionVariable(undefined, newCond(), "base");
+    const cv = new BiasedConditionVariable(undefined, base, "thread-1");
+
+    const pOther = base.wait(1);
+    cv.broadcastOnBiased();
+
+    expect(await settled(pOther)).toBe(false);
+    base.broadcast();
+    await pOther;
   });
 });
 

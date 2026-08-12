@@ -2,79 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "add",
-    "call": "order:signal,push",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "add",
-    "call": "signal",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "broadcast",
-    "call": "broadcast",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "broadcast",
-    "call": "broadcast_on_biased",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "broadcast_on_biased",
-    "call": "broadcast",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "can_remove_no_wait?",
     "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "no_wait_poll",
-    "call": "remove",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "signal",
-    "call": "signal",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "wait_poll",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
-    "rubyName": "wait_poll",
-    "call": "remove",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

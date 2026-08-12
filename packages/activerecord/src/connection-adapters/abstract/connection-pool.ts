@@ -1652,7 +1652,7 @@ function attemptToCheckoutAllExistingConnections(
     for (const conn of conns) {
       if (this._checkedOut.has(conn)) continue;
       try {
-        if (this._available?.remove?.(conn) === false) {
+        if (this._available && this._available.delete(conn) === undefined) {
           // Not idle — fall back to a generic checkout to surface a timeout.
           const acquired = checkoutForExclusiveAccess(this, this.checkoutTimeout);
           if (acquired) newlyCheckedOut.push(acquired);
