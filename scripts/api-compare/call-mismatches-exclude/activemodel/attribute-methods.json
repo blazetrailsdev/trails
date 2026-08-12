@@ -130,20 +130,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "generated_attribute_methods",
-    "call": "include",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:400-402 lazily builds `Module.new.tap { include mod }`; trails attribute-methods.ts:466-468 returns the `_generatedMethods` Set — there is no module system to include into, the Set is the holder."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "generated_attribute_methods",
-    "call": "new",
-    "reason": "Missing construction, not a constructor idiom: Rails builds and includes the module lazily — `@generated_attribute_methods ||= Module.new.tap { |mod| include mod }` (activemodel/lib/active_model/attribute_methods.rb:400-402). The port (attribute-methods.ts:467-469) is `return this._generatedMethods`, so neither the construction nor the include happens here. Tracked by story `0084-wide-call-set-burndown/converge-generated-attribute-methods-module`."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "match",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

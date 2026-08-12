@@ -517,7 +517,7 @@ export {
 } from "./callbacks.js";
 export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
-export { include, extend, included, extended } from "./include.js";
+export { include, extend, included, extended, Module } from "./include.js";
 export type { Included, Extended } from "./include.js";
 export { methodMissingProxy } from "./method-missing-proxy.js";
 export { prepend } from "./prepend.js";
