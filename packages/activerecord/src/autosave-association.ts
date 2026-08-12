@@ -980,12 +980,11 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
 
 /** @internal */
 export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
-  const klass = this;
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
-  if (!klass.prototype) return;
+  if (!this.prototype) return;
   // Mirrors method_defined?(name, false) — only skip if defined on this exact class.
-  if (Object.prototype.hasOwnProperty.call(klass.prototype, validationName)) return;
+  if (Object.prototype.hasOwnProperty.call(this.prototype, validationName)) return;
   const isCol =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -993,15 +992,15 @@ export function defineAutosaveValidationCallbacks(this: any, reflection: any): v
   const isHasOne =
     typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
   if (isCol) {
-    defineNonCyclicMethod.call(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateCollectionAssociation.call(this, reflection);
     });
   } else if (isHasOne) {
-    defineNonCyclicMethod.call(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateHasOneAssociation.call(this, reflection);
     });
   } else {
-    defineNonCyclicMethod.call(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateBelongsToAssociation.call(this, reflection);
     });
   }
@@ -1010,8 +1009,8 @@ export function defineAutosaveValidationCallbacks(this: any, reflection: any): v
   // Cycle-breaking is handled per-record by `defineNonCyclicMethod`'s
   // `_alreadyCalled` guard, so co-recursive owner/child chains terminate
   // even though each validator runs independently.
-  if (typeof klass.validate === "function") {
-    klass.validate(validationName);
+  if (typeof this.validate === "function") {
+    this.validate(validationName);
   }
-  klass.afterValidation(":_ensureNoDuplicateErrors");
+  this.afterValidation(":_ensureNoDuplicateErrors");
 }
