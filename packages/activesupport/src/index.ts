@@ -266,6 +266,7 @@ export {
   minimum,
   inBatchesOf,
   compactBlank,
+  any,
   many,
   tally,
   filterMap,

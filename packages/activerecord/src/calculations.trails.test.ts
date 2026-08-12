@@ -340,3 +340,46 @@ describe("typeFor", () => {
     );
   });
 });
+
+// ==========================================================================
+// Empty-scope aggregate identities
+//
+// trails-specific guard. Rails' `sum`/`average`/`minimum`/`maximum`
+// (calculations.rb:118-208) are bare `calculate(...)` calls, so the empty-scope
+// answer has to come out of `calculate`'s `@none` arm (calculations.rb:220-230)
+// and `execute_simple_calculation`'s `where_clause.contradiction?` arm
+// (calculations.rb:487-497) — not from a guard bolted on top of each aggregate.
+// The two arms answer an empty bigint sum differently in Rails, and both land
+// on a plain zero. `@none` hard-codes the literal `0` (calculations.rb:222),
+// ignoring the column type entirely. The contradiction arm goes through
+// `type_cast_calculated_value`'s `type.deserialize(value || 0)`
+// (calculations.rb:629) — and `ActiveModel::Type::BigInteger < Integer`
+// (big_integer.rb:25) casts `0` to Ruby's one Integer, so Rails cannot produce a
+// distinct bignum zero there either. trails' `BigIntegerType` narrows
+// safe-range values to a JS `number` by the same documented contract, which is
+// what a POPULATED bigint sum already returns through `castAggValue`. Both
+// assertions below pin that equivalence.
+// ==========================================================================
+
+describe("empty-scope aggregate identities", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("sums a bigint column through the column type on a contradictory scope", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const populated = await Account.sum("firm_id");
+    const empty = await Account.where({ id: [] }).sum("firm_id");
+    expect(empty).toBe(0);
+    expect(typeof empty).toBe(typeof populated);
+    expect(await Account.none().sum("firm_id")).toBe(0);
+  });
+
+  it("keeps the empty identity for every aggregate on a contradictory scope", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const empty = Account.where({ id: [] });
+    expect(await empty.count()).toBe(0);
+    expect(await empty.sum("credit_limit")).toBe(0);
+    expect(await empty.average("credit_limit")).toBeNull();
+    expect(await empty.minimum("credit_limit")).toBeNull();
+    expect(await empty.maximum("credit_limit")).toBeNull();
+  });
+});

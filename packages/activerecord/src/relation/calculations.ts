@@ -10,13 +10,13 @@
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { BigIntegerType } from "@blazetrails/activemodel";
-import { many } from "@blazetrails/activesupport";
+import { any, many } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { withQueryConnection } from "../connection-handling.js";
 import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import { columnType, type ColumnType, type Result } from "../result.js";
+import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
 import { arelColumn, arelColumns, buildCteSql, buildJoinDependencies } from "./query-methods.js";
 
@@ -501,8 +501,10 @@ async function singleAggregate(
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel) ? wrapBigintAgg(withCtes) : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const result = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
-  const rows = result.toArray();
+  const queryResult = rel._whereClause.isContradiction()
+    ? Result.empty()
+    : await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
+  const rows = queryResult.toArray();
   const val = rows[0]?.val;
   if (val === undefined || val === null) {
     // calculations.rb:627-630 `type_cast_calculated_value`: an empty result set
@@ -779,27 +781,6 @@ async function groupedCompositeAssoc(
 }
 
 /**
- * True when a calculation yields its empty value without issuing a query.
- *
- * `none()` (`_isNone`) always short-circuits — Rails' `NullRelation#calculate`
- * returns `0`/`nil` (or `{}` when grouped) for every operation. A contradictory
- * where-clause (`where(col: [])`, which compiles to an empty `IN`) only
- * short-circuits the SIMPLE calculation: Rails checks `where_clause.contradiction?`
- * in `execute_simple_calculation` and returns `ActiveRecord::Result.empty`, but
- * `execute_grouped_calculation` has no such guard — a grouped contradiction still
- * runs the query (zero rows → `{}`). So the contradiction branch is gated on the
- * relation being ungrouped.
- */
-function isEmptyCalculationScope(rel: CalculationRelation): boolean {
-  // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
-  // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
-  // live association scope, so count/sum/average/minimum/maximum on a relation
-  // spawned off a new owner pick up the persisted FK after `save`.
-  if (rel._isEmptyRelation()) return true;
-  return rel._groupColumns.length === 0 && rel._whereClause.isContradiction();
-}
-
-/**
  * Mirrors: ActiveRecord::Calculations#count (calculations.rb:94-104). Rails'
  * block form (`count { |r| ... }`) is `Enumerable#count` on the loaded
  * records; every other arm is `calculate(:count, column_name)`.
@@ -829,11 +810,11 @@ export async function calculate(
     switch (operation) {
       case "count":
       case "sum":
-        return this.groupValues.length > 0 ? new Map() : 0;
+        return any(this.groupValues) ? new Map() : 0;
       case "average":
       case "minimum":
       case "maximum":
-        return this.groupValues.length > 0 ? new Map() : null;
+        return any(this.groupValues) ? new Map() : null;
     }
   }
 
@@ -868,10 +849,6 @@ export async function performSum(
   this: CalculationRelation,
   column?: string | Nodes.Node,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
-  if (isEmptyCalculationScope(this)) {
-    if (this._groupColumns.length > 0) return new Map();
-    return column && resolveColType(this, column) instanceof BigIntegerType ? 0n : 0;
-  }
   if (!column) return 0;
   const sum = await calculate.call(this, "sum", column);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
@@ -888,7 +865,6 @@ export async function performAverage(
   // similarly polymorphic (BigDecimal for integer/decimal, Duration for
   // interval, etc.). Numeric averages still narrow to JS number at the
   // call site.
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   return calculate.call(this, "average", column);
 }
 
@@ -896,7 +872,6 @@ export async function performMinimum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   return calculate.call(this, "minimum", column);
 }
 
@@ -904,7 +879,6 @@ export async function performMaximum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   return calculate.call(this, "maximum", column);
 }
 
@@ -1107,7 +1081,7 @@ export function performCalculation(
         if (rel._groupColumns.length === 0)
           distinct = (rel as any).isDistinctSelect((rel as any).selectForCount());
       } else if (
-        rel._groupColumns.length > 0 ||
+        any(rel.groupValues) ||
         (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
       ) {
         columnName = rel.primaryKey;
@@ -1117,7 +1091,7 @@ export function performCalculation(
     }
   }
 
-  if (rel._groupColumns.length > 0) {
+  if (any(rel.groupValues)) {
     return (rel as any).executeGroupedCalculation(operation, columnName, distinct);
   }
   return (rel as any).executeSimpleCalculation(operation, columnName, distinct);
@@ -1229,16 +1203,13 @@ export async function executeSimpleCalculation(
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
-    if (rel._whereClause.isContradiction()) {
-      return typeCastCalculatedValue(null, operation, null);
-    }
     const [outerSql, outerBinds] = compileManagerWithBinds(rel, queryBuilder);
     const [withCtes, ctedBinds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
-    const result = await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
-    return Number(result.toArray()[0]?.count ?? 0);
-  }
-  if (rel._whereClause.isContradiction()) {
-    return typeCastCalculatedValue(null, operation, null);
+    const queryResult = rel._whereClause.isContradiction()
+      ? Result.empty()
+      : await rel._conn().selectAll(withCtes, `${rel.model.name} Count`, ctedBinds);
+    const type = null;
+    return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
   }
   const fn = operation.toLowerCase() as AggFn;
   // DIVERGENCE (Rails calculations.rb:468-511): the ungrouped aggregate body —

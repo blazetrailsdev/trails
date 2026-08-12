@@ -6,6 +6,7 @@ import {
   minimum,
   maximum,
   compactBlank,
+  any,
   many,
   tally,
   filterMap,
@@ -58,6 +59,26 @@ describe("EnumerableTests", () => {
     expect(indexed[5]).toEqual(pay(5));
     expect(indexed[15]).toEqual(pay(15));
     expect(indexed[10]).toEqual(pay(10));
+  });
+
+  it("any — false when empty", () => {
+    expect(any([])).toBe(false);
+  });
+
+  it("any — false when the only element is nil", () => {
+    expect(any([null])).toBe(false);
+  });
+
+  it("any — true when an element is truthy", () => {
+    expect(any([null, 0])).toBe(true);
+  });
+
+  it("any with predicate — false when the block returns nil", () => {
+    expect(any([null], () => null)).toBe(false);
+  });
+
+  it("any with predicate — true when the block matches", () => {
+    expect(any([1, 2], (x) => x > 1)).toBe(true);
   });
 
   it("many — false when empty", () => {
