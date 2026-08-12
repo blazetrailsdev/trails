@@ -701,25 +701,25 @@ export async function isAssociationValid(
   // neither rides in as an extra param.
   const owner = this as any;
   const reflection = association.reflection;
-  if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
-  if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
+  if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
+    return true;
   const context =
     typeof owner?.customValidationContext === "function" && owner.customValidationContext()
       ? owner._validationContext
       : undefined;
-  const isChildValid = typeof record.isValid === "function" ? await record.isValid(context) : true;
+  const isChildValid = await record.isValid(context);
   if (isChildValid) return true;
 
   const childErrors: any[] = record.errors?.objects ?? [];
   const associatedErrors =
-    record.isNewRecord?.() || record.changed || context
+    record.changed || record.isNewRecord() || context
       ? childErrors
       : childErrors.filter((e: any) => e instanceof AssociationsNestedError);
 
   const parentErrors = owner?.errors;
   if (!parentErrors) return isChildValid;
 
-  if (reflection.options?.autosave) {
+  if (association.options.autosave) {
     if (owner === record) return isChildValid; // Rails: `return if equal?(record)`
     for (const error of associatedErrors) {
       parentErrors.objects.push(new AssociationsNestedError(association, error));

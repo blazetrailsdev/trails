@@ -83,4 +83,136 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     package: "activesupport",
     reason: "Pre-1.0: one arm of `acts_like?`; trails ports the Time/Date arms only.",
   },
+  // Out-of-closure activesupport families (RFC 0072). trails' scope for the
+  // support gems is the `require "active_support/…"` closure of
+  // activerecord/lib + activemodel/lib — the set `scripts/api-compare/ar-closure.ts`
+  // walks out of vendor/rails and prints as the "AR closure" rollup. Every file
+  // below sits OUTSIDE that closure and has no trails counterpart, so it is
+  // denominator-only. Files that are out of closure but partially ported
+  // (`cache.rb`, `cache/file_store.rb`, `cache/memory_store.rb`,
+  // `cache/null_store.rb`, `xml_mini.rb`, `xml_mini/nokogiri*.rb`) stay counted,
+  // as do in-closure files the walk reaches (`concurrency/share_lock.rb`,
+  // `dependencies/interlock.rb`, `testing/parallelization*.rb`) and
+  // `log_subscriber/test_helper.rb`, which AR's own log_subscriber and enum
+  // tests include.
+  {
+    pattern: "cache/redis_cache_store.rb",
+    testFile: "redis_cache_store_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "cache/mem_cache_store.rb",
+    testFile: "mem_cache_store_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "cache/strategy/local_cache.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "cache/strategy/local_cache_middleware.rb",
+    testFile: "local_cache_middleware_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "reloader.rb",
+    testFile: "reloader_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "execution_wrapper.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "/file_update_checker.rb",
+    testFile: "/file_update_checker_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "evented_file_update_checker.rb",
+    testFile: "evented_file_update_checker_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "xml_mini/jdom.rb",
+    testFile: "jdom_engine_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "xml_mini/libxml.rb",
+    testFile: "libxml_engine_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "xml_mini/libxmlsax.rb",
+    testFile: "libxmlsax_engine_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "xml_mini/rexml.rb",
+    testFile: "rexml_engine_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "testing/parallelize_executor.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "encrypted_configuration.rb",
+    testFile: "encrypted_configuration_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "code_generator.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "fork_tracker.rb",
+    testFile: "fork_tracker_test.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "/railtie.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
+  {
+    pattern: "syntax_error_proxy.rb",
+    package: "activesupport",
+    reason:
+      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+  },
 ];

@@ -1206,10 +1206,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Build a new associated record (unsaved).
-   * For direct has_many, sets the FK on the target.
-   * For through associations, builds the target without FK — the join
-   * record is created later via create() or push().
+   * Mirrors `CollectionProxy#build` (collection_proxy.rb:315-317): a plain
+   * delegation to `@association.build(attributes, &block)`. The Array arm and
+   * the `add_to_target(build_record(...), replace: true)` shape live on
+   * `CollectionAssociation#build` (collection_association.rb:117-123), which
+   * writes the same in-memory target this proxy reads.
    */
   build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
   build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
@@ -1217,14 +1218,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    if (Array.isArray(attrs)) {
-      return attrs.map((a) => this.build(a, block));
-    }
-    // Rails' build calls add_to_target(build_record(...), replace: true).
-    const record = (this._isThrough ? this._buildThrough(attrs) : this._buildRaw(attrs)) as T;
-    if (block) block(record);
-    this._replaceOnTarget(record, { replace: true });
-    return record;
+    const association = this._record.association(
+      this._assocName,
+    ) as unknown as CollectionAssociation;
+    return (
+      Array.isArray(attrs)
+        ? association.build(attrs, block as (record: Base) => void)
+        : association.build(attrs, block as (record: Base) => void)
+    ) as T | T[];
   }
 
   /** Rails `CollectionProxy#new` — `alias_method :new, :build`. */
@@ -1234,12 +1235,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    // The two branches read identically but are NOT redundant: each narrows
-    // `attrs` (array vs single record) so overload resolution selects the
-    // matching `build` overload. A bare `this.build(attrs, block)` on the union
-    // type fails (TS2769 — no overload accepts `T | T[]`), and casting would
-    // mis-type the return. This is the cast-free delegation Rails expresses as
-    // `alias_method :new, :build` (collection_proxy.rb:321).
+    // Each branch narrows `attrs` (array vs single) so overload resolution
+    // selects the matching `build` overload: a bare `this.build(attrs, block)`
+    // on the union fails (TS2769 — no overload accepts `T | T[]`). This is the
+    // cast-free delegation Rails expresses as `alias_method :new, :build`
+    // (collection_proxy.rb:321).
     return Array.isArray(attrs) ? this.build(attrs, block) : this.build(attrs, block);
   }
 
@@ -1287,26 +1287,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * (reflection.rb:182) and `Base.new`'s inheritance-column handling
    * (inheritance.rb `new` / `subclass_from_attributes`); the foreign key and
    * the polymorphic type come off `scope_for_create` inside
-   * `initialize_attributes` (association.rb:224). So the proxy hands the whole
-   * job to the association holder rather than assembling them itself.
+   * `initialize_attributes` (association.rb:224). The through arm
+   * (`HasManyThroughAssociation#build_record`,
+   * has_many_through_association.rb:88-114) is an override on the same holder,
+   * so there is one call here and no through/non-through split on the proxy.
    */
-  private _buildRaw(attrs: Record<string, unknown> = {}): Base {
-    return (
-      this._record.association(this._assocName) as unknown as {
-        buildRecord(attributes?: Record<string, unknown>): Base;
-      }
-    ).buildRecord(attrs);
-  }
-
-  /**
-   * Mirrors Rails' `HasManyThroughAssociation#build_record`
-   * (has_many_through_association.rb:88-100), which calls `super` —
-   * `Association#build_record` (association.rb:383-388) — for the
-   * construction and then wires the pre-built join row onto the target's
-   * inverse. Both halves live on the association holder, so the proxy hands
-   * the whole job to it.
-   */
-  private _buildThrough(attrs: Record<string, unknown> = {}): Base {
+  private _buildRecord(attrs: Record<string, unknown> = {}): Base {
     return (
       this._record.association(this._assocName) as unknown as {
         buildRecord(attributes?: Record<string, unknown>): Base;
@@ -1410,7 +1396,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
       )) as T;
     }
-    const record = this._buildRaw(attrs) as T;
+    const record = this._buildRecord(attrs) as T;
     if (block) block(record);
     // Rails' `_create_record` wraps the insert in a transaction and re-raises
     // `Rollback unless result` (collection_association.rb:363-371) so a
@@ -1600,7 +1586,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._record.isNewRecord()) {
       throw new Error(`You cannot call create unless the parent is saved`);
     }
-    const record = this._buildThrough(attrs) as T;
+    const record = this._buildRecord(attrs) as T;
     if (block) block(record);
     const saved = await record.save();
     if (!saved) return record;
@@ -3650,7 +3636,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._ensurePersistedOwnerForCreate();
     this._ensureThroughWritable();
     if (this._isThrough) {
-      const record = this._buildThrough(attrs) as T;
+      const record = this._buildRecord(attrs) as T;
       if (block) block(record);
       if (!assocCallback(this._callbackHost, "beforeAdd", record)) {
         throw new RecordNotSaved("Callback prevented record creation", record);
@@ -3670,7 +3656,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       assocCallback(this._callbackHost, "afterAdd", record);
       return record;
     }
-    const record = this._buildRaw(attrs) as T;
+    const record = this._buildRecord(attrs) as T;
     if (block) block(record);
     // Mirror Rails' _create_record(raise: true): add_to_target(record) { save! }.
     // The save (insert_record) runs inside the add_to_target funnel, between
