@@ -4,6 +4,7 @@ import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
+import { StatementInvalid } from "./errors.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
@@ -364,10 +365,16 @@ describe("CalculationsTest", () => {
   });
 
   it("count on invalid columns raises", async () => {
-    // Rails: count on a select with non-aggregate columns raises StatementInvalid on PG/MySQL.
-    // In trails, count() ignores the select clause and returns the row count (implementation gap).
-    // Only assert a number is returned; the raise behavior is tracked separately.
-    expect(await Account.select("credit_limit, firm_name").count()).toBeTypeOf("number");
+    let error: StatementInvalid | undefined;
+    try {
+      await Account.select("credit_limit, firm_name").count();
+    } catch (e) {
+      error = e as StatementInvalid;
+    }
+    expect(error).toBeInstanceOf(StatementInvalid);
+
+    expect(error!.sql).toMatch(/accounts/i);
+    expect(error!.sql).toContain("credit_limit, firm_name");
   });
 
   it("apply distinct in count", async () => {
@@ -747,7 +754,7 @@ describe("CalculationsTest", () => {
     ]);
     const actual = await Account.select("DISTINCT accounts.firm_id")
       .group("accounts.firm_id")
-      .count();
+      .count("all");
     expect(actual).toEqual(expected);
   });
 

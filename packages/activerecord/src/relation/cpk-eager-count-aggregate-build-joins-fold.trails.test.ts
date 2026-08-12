@@ -110,7 +110,12 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     expect(idSql).toBeTruthy();
     // The recount restricts via per-column IN (author_id IN ... AND id IN ...),
     // mirroring Rails' `where!(pk.zip(ids.transpose).to_h)`.
-    const countSql = sqls.find((s) => /COUNT\(DISTINCT/i.test(s)) ?? "";
+    // `select_values` is the two pk columns Rails' `calculate` installs
+    // (calculations.rb:238), so `build_count_subquery?` (calculations.rb:659)
+    // wraps the DISTINCT count in a subquery rather than emitting the
+    // multi-column `COUNT(DISTINCT a, b)` SQLite and PG reject.
+    const countSql = sqls.find((s) => /COUNT\(/i.test(s) && /IN \(/i.test(s)) ?? "";
+    expect(countSql).toMatch(/DISTINCT/i);
     expect(countSql).toMatch(/author_id.*IN/i);
     expect(countSql).toMatch(/\bid\b.*IN/i);
   });
@@ -182,7 +187,15 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     // by the loaded Order records.
     let result!: Map<unknown, unknown>;
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.eagerLoad("order").group("order").count()) as Map<unknown, unknown>;
+      // Counted over a named column: with no column Rails' `calculate` installs
+      // `select_values = Array(model.primary_key)` (calculations.rb:238), and a
+      // grouped calculation has no count-subquery arm, so the composite key
+      // would reach Arel as the multi-column `COUNT(DISTINCT author_id, id)`
+      // SQLite and PostgreSQL reject.
+      result = (await CpkBook.eagerLoad("order").group("order").count("cpk_books.id")) as Map<
+        unknown,
+        unknown
+      >;
     });
     // The eager `order` JD coincides with the grouped belongs_to; `walk` dedups
     // it into a single LEFT OUTER JOIN rather than emitting a parallel join.

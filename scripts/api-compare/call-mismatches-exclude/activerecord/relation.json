@@ -128,48 +128,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "apply_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "distinct_select?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "has_include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "perform_calculation",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "calculate",
-    "call": "primary_key",
-    "reason": "Per-entry verified (RFC 0072 calculation cluster): Rails calculations.rb:238 sets `relation.select_values = Array(model.primary_key || table[Arel.star])` inside `calculate`'s has_include? arm. trails' `calculate` (relation.ts) is a dispatcher over count/sum/average/minimum/maximum, and the has_include? eager-join arm - including the DISTINCT primary-key projection - lives in relation/calculations.ts `count`, which reads `this.primaryKey` for exactly that projection. Relocating it would duplicate the eager-count body across five operations."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "compute_cache_key",
     "call": "cache_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -486,13 +444,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "execute_simple_calculation",
-    "call": "type_cast_calculated_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "execute_simple_calculation",
     "call": "unscope",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -730,13 +681,6 @@
     "rubyName": "references_eager_loaded_tables?",
     "call": "order:map,flatMap",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "select_for_count",
-    "call": "arel_columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

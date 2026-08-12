@@ -330,8 +330,10 @@ export class HasManyAssociation extends CollectionAssociation {
       readCounterAttribute: (col) => (this.owner as any).readAttribute(col),
       countViaScope: async () => {
         const rel = (this as any).scope?.();
+        // has_many_association.rb:84 `scope.count(:all)`: `:all` keeps a
+        // `select` declared on the association off the COUNT.
         return rel && typeof rel.count === "function"
-          ? await rel.count()
+          ? await rel.count("all")
           : (this as CollectionAssociation).target.length;
       },
       limitValue: () =>
