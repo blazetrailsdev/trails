@@ -840,7 +840,8 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 }
 
 /** @internal */
-export function defineNonCyclicMethod(klass: any, name: string, fn: (this: any) => any): void {
+export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) => any): void {
+  const klass = this;
   if (!klass.prototype) return;
   // Mirrors Ruby method_defined?(name, false) — check only the immediate class prototype.
   if (Object.prototype.hasOwnProperty.call(klass.prototype, name)) return;
@@ -913,7 +914,7 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
 
   if (isCollection) {
     model.aroundSave(":aroundSaveCollectionAssociation");
-    defineNonCyclicMethod(model, saveMethod, async function (this: any) {
+    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
     // Mirrors Rails: save_collection_association runs for every collection
@@ -938,7 +939,7 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       await record[saveMethod]();
     });
   } else if (isHasOne) {
-    defineNonCyclicMethod(model, saveMethod, async function (this: any) {
+    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
       return saveHasOneAssociation.call(this, reflection);
     });
     // Mirrors Rails: `save_has_one_association` is registered for after_create
@@ -957,7 +958,7 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     });
   } else {
     // belongs_to
-    defineNonCyclicMethod(model, saveMethod, function (this: any) {
+    defineNonCyclicMethod.call(model, saveMethod, function (this: any) {
       return saveBelongsToAssociation.call(this, reflection);
     });
     beforeSave(
@@ -974,16 +975,16 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     );
   }
 
-  defineAutosaveValidationCallbacks(model, reflection);
+  defineAutosaveValidationCallbacks.call(model, reflection);
 }
 
 /** @internal */
-export function defineAutosaveValidationCallbacks(klass: any, reflection: any): void {
+export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
   if (!reflection.validate) return;
   const validationName = `validateAssociatedRecordsFor_${reflection.name}`;
-  if (!klass.prototype) return;
+  if (!this.prototype) return;
   // Mirrors method_defined?(name, false) — only skip if defined on this exact class.
-  if (Object.prototype.hasOwnProperty.call(klass.prototype, validationName)) return;
+  if (Object.prototype.hasOwnProperty.call(this.prototype, validationName)) return;
   const isCol =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -991,15 +992,15 @@ export function defineAutosaveValidationCallbacks(klass: any, reflection: any): 
   const isHasOne =
     typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
   if (isCol) {
-    defineNonCyclicMethod(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateCollectionAssociation.call(this, reflection);
     });
   } else if (isHasOne) {
-    defineNonCyclicMethod(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateHasOneAssociation.call(this, reflection);
     });
   } else {
-    defineNonCyclicMethod(klass, validationName, function (this: any) {
+    defineNonCyclicMethod.call(this, validationName, function (this: any) {
       return validateBelongsToAssociation.call(this, reflection);
     });
   }
@@ -1008,8 +1009,8 @@ export function defineAutosaveValidationCallbacks(klass: any, reflection: any): 
   // Cycle-breaking is handled per-record by `defineNonCyclicMethod`'s
   // `_alreadyCalled` guard, so co-recursive owner/child chains terminate
   // even though each validator runs independently.
-  if (typeof klass.validate === "function") {
-    klass.validate(validationName);
+  if (typeof this.validate === "function") {
+    this.validate(validationName);
   }
-  klass.afterValidation(":_ensureNoDuplicateErrors");
+  this.afterValidation(":_ensureNoDuplicateErrors");
 }

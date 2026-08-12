@@ -137,7 +137,7 @@ export function acceptsNestedAttributesFor(
     // (not just the `_associations` entry the save path reads) so
     // `reflection.validate?` sees it and the validation callback is wired.
     reflection.autosave = true;
-    defineAutosaveValidationCallbacks(modelClass, reflection);
+    defineAutosaveValidationCallbacks.call(modelClass, reflection);
   }
 
   // Rails does NOT reject polymorphic belongs_to at declaration time — the
@@ -433,45 +433,43 @@ export function hasDestroyFlag(hash: Record<string, unknown>): boolean {
 }
 
 /** @internal */
-export function isAllowDestroy(record: Base, associationName: string): boolean {
-  const configs: NestedAttributeConfig[] =
-    (record.constructor as any)._nestedAttributeConfigs ?? [];
+export function isAllowDestroy(this: Base, associationName: string): boolean {
+  const configs: NestedAttributeConfig[] = (this.constructor as any)._nestedAttributeConfigs ?? [];
   return configs.find((c) => c.associationName === associationName)?.options.allowDestroy ?? false;
 }
 
 /** @internal */
 export function isWillBeDestroyed(
-  record: Base,
+  this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
 ): boolean {
-  return isAllowDestroy(record, associationName) && hasDestroyFlag(attributes);
+  return isAllowDestroy.call(this, associationName) && hasDestroyFlag(attributes);
 }
 
 /** @internal */
 export function callRejectIf(
-  record: Base,
+  this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
 ): boolean {
-  if (isWillBeDestroyed(record, associationName, attributes)) return false;
-  const configs: NestedAttributeConfig[] =
-    (record.constructor as any)._nestedAttributeConfigs ?? [];
+  if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
+  const configs: NestedAttributeConfig[] = (this.constructor as any)._nestedAttributeConfigs ?? [];
   const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
   // `"all_blank"` is resolved to a proc in acceptsNestedAttributesFor, so a
   // stored rejectIf is always a function here.
-  return typeof rejectIf === "function" ? rejectIf(attributes, record) : false;
+  return typeof rejectIf === "function" ? rejectIf(attributes, this) : false;
 }
 
 /** @internal */
 export function isRejectNewRecord(
-  record: Base,
+  this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
 ): boolean {
   return (
-    isWillBeDestroyed(record, associationName, attributes) ||
-    callRejectIf(record, associationName, attributes)
+    isWillBeDestroyed.call(this, associationName, attributes) ||
+    callRejectIf.call(this, associationName, attributes)
   );
 }
 
@@ -836,7 +834,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     existing &&
     (updateOnly || String(existing.id) === String((attributes as any).id))
   ) {
-    if (!callRejectIf(record, associationName, attributes)) {
+    if (!callRejectIf.call(record, associationName, attributes)) {
       return assignToOrMarkForDestruction(existing, attributes, options.allowDestroy ?? false);
     }
     return;
@@ -848,7 +846,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
-  if (!isRejectNewRecord(record, associationName, attributes)) {
+  if (!isRejectNewRecord.call(record, associationName, attributes)) {
     const assignable = assignableNestedAttributes(attributes);
     const targetModel = resolveCollectionTargetModel(record, associationName);
     if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
@@ -1017,7 +1015,7 @@ export function assignNestedAttributesForCollectionAssociation(
   let pending: Promise<void> | undefined;
   for (const a of attrs) {
     if (!hasNestedId(a)) {
-      if (!isRejectNewRecord(record, associationName, a)) {
+      if (!isRejectNewRecord.call(record, associationName, a)) {
         const assignable = assignableNestedAttributes(a);
         if (collectionTargetModel)
           assertNestedAttributesAreKnown(collectionTargetModel, assignable);
@@ -1029,7 +1027,7 @@ export function assignNestedAttributesForCollectionAssociation(
       const existing = populateInMemoryExistingRecord(record, associationName, a);
       nestedTarget.push(existing);
       if (existing) {
-        const allowDestroy = isAllowDestroy(record, associationName);
+        const allowDestroy = isAllowDestroy.call(record, associationName);
         pending = (
           pending
             ? pending.then(() => assignToOrMarkForDestruction(existing, a, allowDestroy))
@@ -1119,7 +1117,7 @@ function populateInMemoryExistingRecord(
   // rejected existing record never enters `@target`. Defer the stub's
   // `add_to_target` until after the reject check to avoid leaving a partial
   // (PK-only) stub in the in-memory collection.
-  if (callRejectIf(record, associationName, attrs)) return null;
+  if (callRejectIf.call(record, associationName, attrs)) return null;
   if (isNewStub) (proxy as any).addExistingRecord(existing);
   return existing ?? null;
 }

@@ -55,7 +55,7 @@ export class Default {
     // installed as the current scope (`relation.scoping { default_scope }`).
     const override = modelClass.defaultScopeOverride ? defaultScopeOverride(modelClass) : undefined;
     if (override) {
-      return evaluateDefaultScope(modelClass, () => {
+      return evaluateDefaultScope.call(modelClass, () => {
         const base = buildRelation();
         const prev = ScopeRegistry.currentScope(modelClass);
         modelClass.setCurrentScope(base);
@@ -73,7 +73,7 @@ export class Default {
     const scopes: DefaultScope[] = modelClass.defaultScopes ?? [];
     if (scopes.length === 0) return undefined;
 
-    return evaluateDefaultScope(modelClass, () => {
+    return evaluateDefaultScope.call(modelClass, () => {
       let rel = buildRelation();
       for (const scopeObj of scopes) {
         if (isExecuteScope(allQueries, scopeObj)) {
@@ -238,32 +238,39 @@ function isExecuteScope(
   return allQueries == null || (!!allQueries && defaultScopeObj.allQueries);
 }
 
-/** @internal */
-function isIgnoreDefaultScope(modelClass: any): boolean {
-  return !!ScopeRegistry.ignoreDefaultScope(modelClass, true);
+/**
+ * Mirrors: Scoping::Default::ClassMethods#ignore_default_scope?
+ * (default.rb:181-183) — keyed off `base_class`, so an STI subtree shares the
+ * one recursion guard, and WITHOUT `skip_inherited_scope`.
+ * @internal
+ */
+function isIgnoreDefaultScope(this: any): boolean {
+  return !!ScopeRegistry.ignoreDefaultScope(this.baseClass);
 }
 
-/** @internal */
-function setIgnoreDefaultScope(baseClass: any, ignore: boolean | null): void {
-  ScopeRegistry.setIgnoreDefaultScope(baseClass, ignore);
+/**
+ * Mirrors: Scoping::Default::ClassMethods#ignore_default_scope=
+ * (default.rb:185-187).
+ * @internal
+ */
+function setIgnoreDefaultScope(this: any, ignore: boolean | null): void {
+  ScopeRegistry.setIgnoreDefaultScope(this.baseClass, ignore);
 }
 
 /**
  * Mirrors: Scoping::Default#evaluate_default_scope. Temporarily sets
  * ignore_default_scope to true while yielding so nested calls don't re-apply
  * the default scope recursively. Returns undefined when already ignoring
- * (matches Rails' nil return from evaluate_default_scope). Saves and restores
- * the prior ScopeRegistry value so nested calls from different classes compose
- * correctly.
+ * (matches Rails' nil return from evaluate_default_scope, default.rb:192-201).
  * @internal
  */
-function evaluateDefaultScope(modelClass: any, fn: () => unknown): unknown {
-  if (isIgnoreDefaultScope(modelClass)) return undefined;
-  const prior = ScopeRegistry.ignoreDefaultScope(modelClass, true);
+function evaluateDefaultScope(this: any, fn: () => unknown): unknown {
+  if (isIgnoreDefaultScope.call(this)) return undefined;
+
   try {
-    setIgnoreDefaultScope(modelClass, true);
+    setIgnoreDefaultScope.call(this, true);
     return fn();
   } finally {
-    setIgnoreDefaultScope(modelClass, prior);
+    setIgnoreDefaultScope.call(this, false);
   }
 }

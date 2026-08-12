@@ -32,6 +32,7 @@ import {
   encryptAttribute,
   encryptedAttribute,
   encryptedTypeOf,
+  validateColumnSize,
 } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
@@ -117,7 +118,7 @@ export function applyPendingEncryptions(klass: any): void {
   // registering the same LengthValidator twice.
   if (Configurable.config.validateColumnSize) {
     for (const { name } of pending) {
-      EncryptableRecord.validateColumnSize(klass, name);
+      validateColumnSize.call(klass, name);
     }
   }
 
