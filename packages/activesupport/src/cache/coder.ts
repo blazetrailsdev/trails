@@ -17,8 +17,8 @@
 // It is deliberately NOT Ruby-wire-compatible. The rest of the cache
 // serialization surface has since converged: the MessagePack serializer
 // (`message-pack/cache-serializer.ts`), `SerializerWithFallback`
-// (`cache/serializer-with-fallback.ts`), and MemoryStore/FileStore/entry-record
-// all route their values through this Coder rather than their own ad-hoc JSON.
+// (`cache/serializer-with-fallback.ts`), and MemoryStore/FileStore all route
+// their values through this Coder rather than their own ad-hoc JSON.
 
 // Special values are encoded as a compact 1- or 2-element array whose head is a
 // short sentinel code: `["~#d", 1750000000000]` for a Date, `["~#u"]` for

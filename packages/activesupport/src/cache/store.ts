@@ -1,8 +1,13 @@
 import { Entry } from "./entry.js";
+import { Coder, coder as fidelityCoder } from "./coder.js";
+import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
+
+/** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
+const DEFAULT_COMPRESS_LIMIT = 1024;
 
 /** Mirrors Ruby ArgumentError. @internal */
 export class ArgumentError extends Error {
@@ -22,6 +27,18 @@ export interface CacheLogger {
 }
 
 export type StoreOptions = Record<string, unknown>;
+
+/**
+ * The coder surface `Store` holds in `@coder` (cache.rb:301-312): `dump`/`load`,
+ * plus `dump_compressed` when the coder answers it.
+ *
+ * @noRailsEquivalent Ruby duck-types `@coder`; TS needs the shape named.
+ */
+export interface CacheCoder {
+  dump(entry: Entry): unknown;
+  load(payload: unknown): unknown;
+  dumpCompressed?(entry: Entry, threshold: number): unknown;
+}
 
 /** Mirrors Ruby `Regexp.escape`: escapes regex metacharacters in a literal. */
 function escapeRegExp(str: string): string {
@@ -83,8 +100,25 @@ export abstract class Store {
   silence = false;
   options: StoreOptions;
 
+  /**
+   * The coder `Store#initialize` installs (cache.rb:301-312): `options[:coder]`
+   * when the store names one — MemoryStore names `DupCoder`
+   * (memory_store.rb:73-75) — else `Cache::Coder` over the default serializer
+   * and Zlib. Rails also remembers whether it answers `dump_compressed`.
+   */
+  protected coder: CacheCoder;
+  protected coderSupportsCompression: boolean;
+
   constructor(options: StoreOptions = {}) {
-    this.options = { ...options };
+    this.options = Store.normalizeOptions({ ...options });
+
+    if (!("compress" in this.options)) this.options.compress = true;
+    this.options.compressThreshold ||= DEFAULT_COMPRESS_LIMIT;
+
+    const optionCoder = this.options.coder as CacheCoder | undefined;
+    delete this.options.coder;
+    this.coder = optionCoder ?? new Coder(fidelityCoder, { deflate, inflate });
+    this.coderSupportsCompression = typeof this.coder.dumpCompressed === "function";
   }
 
   silenceBang(): this {
@@ -383,6 +417,27 @@ export abstract class Store {
   protected abstract readEntry(key: string, options: StoreOptions): Entry | null;
   protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): boolean;
   protected abstract deleteEntry(key: string, options: StoreOptions): boolean;
+
+  /** Mirrors Rails `Cache::Store#serialize_entry` (cache.rb:806-813). */
+  protected serializeEntry(entry: Entry, options?: StoreOptions): unknown {
+    options = this.mergedOptions(options);
+    if (this.coderSupportsCompression && options.compress) {
+      return this.coder.dumpCompressed!(entry, options.compressThreshold as number);
+    } else {
+      return this.coder.dump(entry);
+    }
+  }
+
+  /** Mirrors Rails `Cache::Store#deserialize_entry` (cache.rb:815-819). */
+  protected deserializeEntry(payload: unknown): Entry | null {
+    if (payload == null) return null;
+    try {
+      return this.coder.load(payload) as Entry;
+    } catch (error) {
+      if (error instanceof DeserializationError) return null;
+      throw error;
+    }
+  }
 
   protected readMultiEntries(names: string[], options: StoreOptions): Record<string, unknown> {
     const results: Record<string, unknown> = {};

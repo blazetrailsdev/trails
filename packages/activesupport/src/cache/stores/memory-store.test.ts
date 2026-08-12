@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
+import { Entry } from "../entry.js";
 import { Notifications } from "../../notifications.js";
+
+// Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
+// (memory_store_test.rb:101-104), the record size the pruning budget is sized in.
+// The Entry carries the store's expiry because a trails payload is the coder's
+// dump of `Entry#pack`, which includes expires_at — Rails' DupCoder payload is
+// the Entry itself and `bytesize` counts only its value.
+function cachedSizeOf(key: string, value: string): number {
+  const probe = new MemoryStore() as unknown as {
+    cachedSize(key: string, payload: string): number;
+    serializeEntry(entry: Entry): string;
+  };
+  return probe.cachedSize(key, probe.serializeEntry(new Entry(value, { expiresIn: 60 })));
+}
 
 describe("MemoryStoreTest", () => {
   let store: MemoryStore;
@@ -163,46 +177,87 @@ describe("MemoryStore increment instrumentation", () => {
 });
 
 describe("MemoryStorePruningTest", () => {
+  let recordSize: number;
   let store: MemoryStore;
 
   beforeEach(() => {
-    store = new MemoryStore({ sizeLimit: 10 });
+    recordSize = cachedSizeOf("1", "aaaaaaaaaa");
+    store = new MemoryStore({ expiresIn: 60, size: recordSize * 10 + 1 });
   });
 
   it("prune size", () => {
-    const store = new MemoryStore({ sizeLimit: 5 });
-    for (let i = 0; i < 10; i++) store.write(`k${i}`, `v${i}`);
-    store.prune(5);
-    // Pruning removes some entries
-    let count = 0;
-    for (let i = 0; i < 10; i++) if (store.exist(`k${i}`)) count++;
-    expect(count).toBeLessThanOrEqual(10);
+    store.write("1", "aaaaaaaaaa");
+    store.write("2", "bbbbbbbbbb");
+    store.write("3", "cccccccccc");
+    store.write("4", "dddddddddd");
+    store.write("5", "eeeeeeeeee");
+    store.read("2");
+    store.read("4");
+    store.prune(recordSize * 3);
+    expect(store.exist("5")).toBe(true);
+    expect(store.exist("4")).toBe(true);
+    expect(store.exist("3")).toBe(false);
+    expect(store.exist("2")).toBe(true);
+    expect(store.exist("1")).toBe(false);
   });
 
   it("prune size on write", () => {
-    const store = new MemoryStore({ sizeLimit: 2 });
-    store.write("a", "1");
-    store.write("b", "2");
-    store.write("c", "3"); // may trigger pruning
-    // At least some entries exist
-    const count = ["a", "b", "c"].filter((k) => store.exist(k)).length;
-    expect(count).toBeGreaterThan(0);
+    const values = "abcdefghij";
+    for (let i = 1; i <= 10; i++) store.write(String(i), values[i - 1].repeat(10));
+    store.read("2");
+    store.read("4");
+    store.write("11", "llllllllll");
+    expect(store.exist("11")).toBe(true);
+    expect(store.exist("10")).toBe(true);
+    expect(store.exist("9")).toBe(true);
+    expect(store.exist("8")).toBe(true);
+    expect(store.exist("7")).toBe(true);
+    expect(store.exist("6")).toBe(false);
+    expect(store.exist("5")).toBe(false);
+    expect(store.exist("4")).toBe(true);
+    expect(store.exist("3")).toBe(false);
+    expect(store.exist("2")).toBe(true);
+    expect(store.exist("1")).toBe(false);
   });
 
   it("prune size on write based on key length", () => {
-    const store = new MemoryStore({ sizeLimit: 10 });
-    store.write("short", "v");
-    store.write("a_very_long_key_that_takes_space", "v");
-    const count = ["short", "a_very_long_key_that_takes_space"].filter((k) =>
-      store.exist(k),
-    ).length;
-    expect(count).toBeGreaterThan(0);
+    const values = "abcdefghi";
+    for (let i = 1; i <= 9; i++) store.write(String(i), values[i - 1].repeat(10));
+    const longKey = "*".repeat(2 * recordSize);
+    store.write(longKey, "llllllllll");
+    expect(store.exist(longKey)).toBe(true);
+    expect(store.exist("9")).toBe(true);
+    expect(store.exist("8")).toBe(true);
+    expect(store.exist("7")).toBe(true);
+    expect(store.exist("6")).toBe(true);
+    expect(store.exist("5")).toBe(false);
+    expect(store.exist("4")).toBe(false);
+    expect(store.exist("3")).toBe(false);
+    expect(store.exist("2")).toBe(false);
+    expect(store.exist("1")).toBe(false);
   });
 
   it("pruning is capped at a max time", () => {
-    const store = new MemoryStore({ sizeLimit: 10 });
-    for (let i = 0; i < 5; i++) store.write(`k${i}`, `v${i}`);
-    expect(() => store.prune(3)).not.toThrow();
+    const slow = store as unknown as { deleteEntry(key: string, options: object): boolean };
+    const deleteEntry = slow.deleteEntry.bind(store);
+    slow.deleteEntry = (key: string, options: object) => {
+      const until = Date.now() + 10;
+      while (Date.now() < until) {
+        /* Rails sleeps 0.01s inside delete_entry (memory_store_test.rb:172-175) */
+      }
+      return deleteEntry(key, options);
+    };
+    store.write("1", "aaaaaaaaaa");
+    store.write("2", "bbbbbbbbbb");
+    store.write("3", "cccccccccc");
+    store.write("4", "dddddddddd");
+    store.write("5", "eeeeeeeeee");
+    store.prune(30, 0.001);
+    expect(store.exist("5")).toBe(true);
+    expect(store.exist("4")).toBe(true);
+    expect(store.exist("3")).toBe(true);
+    expect(store.exist("2")).toBe(true);
+    expect(store.exist("1")).toBe(false);
   });
 
   it("cache not mutated", () => {

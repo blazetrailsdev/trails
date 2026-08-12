@@ -2,27 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "cleanup",
-    "call": "delete_entry",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "cleanup",
-    "call": "merged_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "cleanup",
-    "call": "read_entry",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
     "rubyName": "delete_empty_directories",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -51,30 +30,47 @@
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_matched",
-    "call": "delete_entry",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "ensure_cache_path",
+    "call": "exist?",
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
   },
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_matched",
-    "call": "instrument",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "file_path_key",
+    "call": "decode_www_form_component",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:fname",
+      "const:UTF_8"
+    ],
+    "reason": "JS strings are already Unicode, so the decoder takes no Encoding argument — Ruby's Encoding::UTF_8 (file_store.rb:186) has no operand in TS."
   },
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_matched",
-    "call": "key_matcher",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "file_path_key",
+    "call": "delete",
+    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
   },
   {
     "package": "activesupport",
     "tsFile": "cache/file-store.ts",
-    "rubyName": "delete_matched",
-    "call": "merged_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "file_path_key",
+    "call": "last",
+    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache/file-store.ts",
+    "rubyName": "file_path_key",
+    "call": "split",
+    "kind": "args",
+    "rubyArgs": [
+      "const:SEPARATOR",
+      "num:4"
+    ],
+    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
   },
   {
     "package": "activesupport",
@@ -94,5 +90,37 @@
       "ref:entry"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache/file-store.ts",
+    "rubyName": "read_serialized_entry",
+    "call": "exist?",
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache/file-store.ts",
+    "rubyName": "search_dir",
+    "call": "directory?",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:name"
+    ],
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache/file-store.ts",
+    "rubyName": "search_dir",
+    "call": "exist?",
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache/file-store.ts",
+    "rubyName": "write_serialized_entry",
+    "call": "exist?",
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
   }
 ]

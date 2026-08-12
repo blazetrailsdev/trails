@@ -50,7 +50,7 @@ describe("CacheStoreSettingTest", () => {
   });
 
   it("mem cache fragment cache store with options", () => {
-    const store = new MemoryStore({ sizeLimit: 100 });
+    const store = new MemoryStore({ namespace: "foo" });
     store.write("x", 1);
     expect(store.read("x")).toBe(1);
   });

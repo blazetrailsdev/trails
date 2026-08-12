@@ -16,6 +16,26 @@
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
+    "rubyName": "initialize",
+    "call": "delete",
+    "reason": "`@options.delete(:coder)` (cache.rb:301) is the JS `delete` operator here, a statement rather than a call the extractor can see."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:serializer",
+      "ref:compressor",
+      "kwargs{legacySerializer=ref:legacySerializer}"
+    ],
+    "reason": "`legacy_serializer` rides Cache.format_version and the :serializer option (cache.rb:302-307), neither of which the Store options seam carries yet; the compressor is the trails deflate/inflate pair standing in for Zlib."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "cache.ts",
     "rubyName": "key_matcher",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

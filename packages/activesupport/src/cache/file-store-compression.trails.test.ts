@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore } from "./file-store.js";
-import type { CacheEntry } from "./entry-record.js";
 
 // trails-only coverage for FileStore's `serialize_entry` compression branch
 // (cache.rb:806-813). Rails covers it through the shared
@@ -19,9 +18,11 @@ describe("FileStore compression", () => {
   }
 
   function storedPayload(store: FileStore, key: string): string {
-    const path = (store as unknown as { keyToPath(k: string): string }).keyToPath(key);
-    const record = (store as unknown as { readFile(p: string): CacheEntry }).readFile(path);
-    return record.encodedValue;
+    const internals = store as unknown as {
+      normalizeKey(k: string, o: object): string;
+      readSerializedEntry(k: string): string;
+    };
+    return internals.readSerializedEntry(internals.normalizeKey(key, {}));
   }
 
   it("compresses a large value by default and reads it back intact", () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "./cache/memory-store.js";
+import { Entry } from "./cache/entry.js";
 import { NullStore } from "./cache/null-store.js";
 import { FileStore } from "./cache/file-store.js";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -176,35 +177,35 @@ describe("MemoryStoreTest", () => {
 // =============================================================================
 
 describe("MemoryStorePruningTest", () => {
+  let recordSize: number;
   let store: MemoryStore;
 
   beforeEach(() => {
-    store = new MemoryStore({ sizeLimit: 10 });
+    const probe = new MemoryStore() as unknown as {
+      cachedSize(key: string, payload: Entry): number;
+      serializeEntry(entry: Entry): Entry;
+    };
+    recordSize = probe.cachedSize(
+      "1",
+      probe.serializeEntry(new Entry("aaaaaaaaaa", { expiresIn: 60 })),
+    );
+    store = new MemoryStore({ expiresIn: 60, size: recordSize * 10 + 1 });
   });
 
-  it("prune size evicts least recently used", async () => {
+  it("prune size evicts least recently used", () => {
     store.write("1", "aaaaaaaaaa");
-    await new Promise((r) => setTimeout(r, 2));
     store.write("2", "bbbbbbbbbb");
-    await new Promise((r) => setTimeout(r, 2));
     store.write("3", "cccccccccc");
-    await new Promise((r) => setTimeout(r, 2));
     store.write("4", "dddddddddd");
-    await new Promise((r) => setTimeout(r, 2));
     store.write("5", "eeeeeeeeee");
-    await new Promise((r) => setTimeout(r, 2));
-    // Read 2 and 4 to make them more recently used
     store.read("2");
-    await new Promise((r) => setTimeout(r, 2));
     store.read("4");
-    // Prune 2 entries (LRU: 1 and 3 should be removed)
-    store.prune(2);
+    store.prune(recordSize * 3);
     expect(store.exist("5")).toBe(true);
     expect(store.exist("4")).toBe(true);
+    expect(store.exist("3")).toBe(false);
     expect(store.exist("2")).toBe(true);
-    // Note: exact pruning depends on LRU tracking; verify at least some eviction occurred
-    const remaining = ["1", "2", "3", "4", "5"].filter((k) => store.exist(k));
-    expect(remaining.length).toBeLessThan(5);
+    expect(store.exist("1")).toBe(false);
   });
 });
 
