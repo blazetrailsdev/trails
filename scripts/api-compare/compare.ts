@@ -344,9 +344,16 @@ export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases, NEGATED_ALIASES, partitionN
  *
  * So: when the body makes the plain call too, drop from the predicate's
  * candidates every name the plain call also maps to. The `is`-prefixed spelling
- * always survives (the plain call never produces it), so a genuinely dropped
- * predicate is still flagged — this only stops one Ruby call from being
- * credited to another's port.
+ * always survives — conventions.ts emits one only for a `?`-suffixed name, and
+ * `plain` never ends in `?` — so a genuinely dropped predicate is still
+ * flagged; this only stops one Ruby call from being credited to another's port.
+ *
+ * Deliberately narrow: the pairing is a predicate against its OWN bare sibling,
+ * exact-string. Two DIFFERENT Ruby predicates whose candidate lists overlap are
+ * not disambiguated here, because nothing says which of them owns the shared
+ * spelling — there is no `plain` to reserve it for. That case is handled where
+ * it actually costs something, the order check, by dropping the shared name
+ * from both ({@link ambiguousTsNames}).
  */
 export function narrowPredicateCandidates(
   rubyCall: string,
@@ -445,10 +452,15 @@ export function significantMissingCalls(
  * position. Charging the plain call with that position reported an inversion
  * against a body whose order matches Rails.
  *
- * Order needs identity, so an ambiguous name is dropped from the ORDER
- * comparison only. Membership does not: {@link significantMissingCalls} still
- * sees the name in the TS call-set, so a genuinely dropped call is still
- * flagged either way.
+ * Wired into the ORDER comparison ONLY, and the asymmetry with the membership
+ * check is the semantics of the two, not an oversight. A position is one
+ * indivisible fact that has to be attributed to exactly one call, so an
+ * ambiguous name carries no usable position. Membership is a SET comparison on
+ * both sides — Ruby's `calls.uniq` against the TS `Set` — and neither side
+ * records multiplicity, so it cannot demand that two Ruby calls be satisfied by
+ * two distinct TS names even in principle: a body calling one method twice is
+ * already indistinguishable from one calling it once. Narrowing there would
+ * only manufacture rows for a demand the artifact cannot express.
  */
 export function ambiguousTsNames(
   rubyCalls: readonly string[],
