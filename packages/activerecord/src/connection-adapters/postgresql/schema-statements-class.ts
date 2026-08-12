@@ -269,7 +269,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // Mirrors Rails #tables (data_source_sql type: "BASE TABLE" → relkind
   // IN ('r','p')). pg_tables would omit partitioned tables (relkind 'p').
   async tables(): Promise<string[]> {
-    const rows = await this.schemaQuery(this.dataSourceSql(null, { type: "BASE TABLE" }));
+    const rows = await this.schemaQuery(this.dataSourceSql({ type: "BASE TABLE" }));
     return rows.map((r) => r.relname as string);
   }
 
