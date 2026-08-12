@@ -610,7 +610,7 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   // drop virtual columns (persistence.rb / attribute_methods.rb:519-524). The
   // partial-inserts selection (attribute_names_for_partial_inserts) and the
   // Locking::Optimistic locking-column union happen UPSTREAM in the create
-  // path (base.ts._performInsert), mirroring the Rails super chain
+  // path (persistence.ts._createRecord), mirroring the Rails super chain
   // Dirty#_create_record → Locking::Optimistic#_create_record → Persistence —
   // so this function stays the generic, locking-agnostic filter Rails ships.
   return attributeNames.filter((name) => {
@@ -843,7 +843,6 @@ import {
   changesToSave as _changesToSave,
   changedAttributeNamesToSave as _changedAttributeNamesToSave,
   attributesInDatabase as _attributesInDatabase,
-  _touchRow as __touchRow,
   attributeNamesForPartialUpdates as _attributeNamesForPartialUpdates,
   attributeNamesForPartialInserts as _attributeNamesForPartialInserts,
 } from "./attribute-methods/dirty.js";
@@ -991,14 +990,6 @@ export function changedAttributeNamesToSave(this: InstanceMethodHost): string[] 
 /** @internal */
 export function attributesInDatabase(this: InstanceMethodHost): Record<string, unknown> {
   return _attributesInDatabase(this as any);
-}
-/** @internal */
-export function _touchRow(
-  this: InstanceMethodHost,
-  attributeNames: string[],
-  time?: any,
-): Promise<number> {
-  return __touchRow.call(this as any, attributeNames, time);
 }
 /** @internal */
 export function attributeNamesForPartialUpdates(this: InstanceMethodHost): string[] {

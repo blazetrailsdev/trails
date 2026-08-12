@@ -979,7 +979,7 @@ export class ConnectionPool implements ReapablePool {
 
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
-    options: { preventPermanentCheckout?: boolean; checkoutTimeout?: number } = {},
+    options: { preventPermanentCheckout?: boolean } = {},
   ): Promise<T> {
     const preventPermanent = options.preventPermanentCheckout ?? false;
     const lease = this.connectionLease();
@@ -993,7 +993,7 @@ export class ConnectionPool implements ReapablePool {
     const needsCheckout = !lease.connection;
     if (needsCheckout) {
       try {
-        lease.connection = await this.checkout(options.checkoutTimeout);
+        lease.connection = await this.checkout();
       } catch (err) {
         restoreSticky();
         throw err;

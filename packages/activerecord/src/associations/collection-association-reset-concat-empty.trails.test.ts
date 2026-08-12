@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
+import { afterCreate, resetCallbacks } from "../callbacks.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";
@@ -30,6 +31,7 @@ interface CollectionAssociationLike {
     block?: () => void,
   ): Promise<boolean>;
   isEmpty(): Promise<boolean>;
+  loadTarget(): Promise<Post[]>;
 }
 
 const assocOf = (author: Author): CollectionAssociationLike =>
@@ -74,6 +76,23 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     });
 
     expect(seen).toEqual([assoc.isLoaded()]);
+  });
+
+  it("_create_record captures _was_loaded before after_create can load the collection", async () => {
+    const author = await Author.find(authors("david").id);
+    const assoc = assocOf(author);
+
+    await resetCallbacks(Post, "create", async () => {
+      afterCreate(Post, async () => {
+        await assoc.loadTarget();
+      });
+
+      const created = await (
+        author as unknown as { posts: { create(a: Record<string, unknown>): Promise<Post> } }
+      ).posts.create({ title: "created", body: "by callback" });
+
+      expect(assoc.target.filter((post) => post.equals(created)).length).toBe(1);
+    });
   });
 
   it("empty? consults reflection.has_active_cached_counter? on the rich reflection", async () => {

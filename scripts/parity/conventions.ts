@@ -641,8 +641,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveSupport::Dependencies (dependencies.rb) and " +
-      "ActiveSupport::Autoload (dependencies/autoload.rb) are Zeitwerk " +
+      "ActiveSupport::Dependencies (dependencies.rb), " +
+      "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
+      "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
       "autoload/reload machinery: an interlock guarding concurrent constant " +
       "loads, the autoload/eager-load path registries it walks, and the " +
       "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
@@ -653,8 +654,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       'the zero-import slot module instead (CLAUDE.md, "Call-time constant ' +
       'resolution"); the two require_dependency suites in trails ' +
       "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
-      "reason. Scoped to these two files so `clear`, `autoload`, `autoloader` " +
-      "and the `*_paths` readers stay expected everywhere else.",
+      "reason. Scoped to these three files so `clear`, `autoload`, `autoloader`, " +
+      "`initialize`, `running` and the `*_paths` readers stay expected everywhere " +
+      "else.",
     names: [
       "interlock",
       "interlock=",
@@ -679,8 +681,18 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "autoload_at",
       "eager_autoload",
       "eager_load!",
+      "initialize",
+      "loading",
+      "unloading",
+      "start_unloading",
+      "done_unloading",
+      "start_running",
+      "done_running",
+      "running",
+      "permit_concurrent_loads",
+      "raw_state",
     ],
-    rubyFiles: ["dependencies.rb", "dependencies/autoload.rb"],
+    rubyFiles: ["dependencies.rb", "dependencies/autoload.rb", "dependencies/interlock.rb"],
   },
   {
     reason:

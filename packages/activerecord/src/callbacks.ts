@@ -19,6 +19,10 @@ import { subclasses as _subclasses } from "./inheritance.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
 import {
+  _createRecord as persistenceCreateRecord,
+  InstanceMethods as PersistenceInstanceMethods,
+} from "./persistence.js";
+import {
   _createRecord as dirtyCreateRecord,
   _updateRecord as dirtyUpdateRecord,
 } from "./attribute-methods/dirty.js";
@@ -282,61 +286,6 @@ export function createOrUpdate(this: any, block?: (record: any) => void): Promis
   );
 }
 
-/**
- * The Persistence#_create_record body (persistence.rb:920-940) — the bottom of
- * the create super chain: the INSERT, `@new_record = false`, then the yield.
- */
-async function persistenceCreateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
-  const ctor = this.constructor;
-  if (!this._performInsert) throw new Error("_performInsert not implemented");
-  // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
-  // insert. Rails new records are dirty from construction, so partial_inserts'
-  // `attribute_names & changed_attribute_names_to_save` (attributesForCreate)
-  // correctly includes attrs the user set to a non-default value — e.g. an
-  // hstore column with a DB default of "" that was assigned {key: null}.
-  // Running this after the insert would leave the dirty set empty at column-
-  // selection time and wrongly drop such columns. Only a *null* PK column is
-  // skipped: that's the auto-populated key, tracked via
-  // _writeAttribute(pk, insertedId) in _performInsert. A user-assigned
-  // (non-null) PK column — e.g. a composite key — must stay dirty so it's
-  // inserted; otherwise the row is written with a missing key and
-  // find/destroy by that key raises RecordNotFound.
-  const _pk = ctor.primaryKey;
-  const _pkSet = new Set(
-    (Array.isArray(_pk) ? _pk : [_pk]).filter((n: string) => this._readAttribute?.(n) == null),
-  );
-  this._dirty.reinstateNewRecordChanges(this._attributes, _pkSet);
-  await this._performInsert();
-  if (this._pendingOperation) {
-    await this._pendingOperation;
-    this._pendingOperation = null;
-  }
-  this._previouslyNewRecord = true;
-  this._newRecord = false;
-  // Rails yields here (persistence.rb:936-940).
-  block?.(this);
-  // Rails returns `id`; the trails chain carries a truthy value that becomes
-  // run_callbacks' value in Callbacks#_create_record.
-  return true;
-}
-
-/**
- * The Persistence#_update_record body (persistence.rb:900-916) — the bottom of
- * the update super chain: the UPDATE, then the yield.
- */
-async function persistenceUpdateRecord(this: any, block?: (record: any) => void): Promise<boolean> {
-  if (!this._performUpdate) throw new Error("_performUpdate not implemented");
-  await this._performUpdate();
-  if (this._pendingOperation) {
-    await this._pendingOperation;
-    this._pendingOperation = null;
-  }
-  this._previouslyNewRecord = false;
-  // Rails yields here (persistence.rb:912-916).
-  block?.(this);
-  return true;
-}
-
 /** @internal */
 export async function _createRecord(this: any, block?: (record: any) => void): Promise<boolean> {
   // Rails: _run_create_callbacks { super }, whose value is the block's return
@@ -369,7 +318,9 @@ export async function _updateRecord(this: any, block?: (record: any) => void): P
   return (
     (await runAllCallbacks(ctor.prototype, "update", this, () =>
       recordUpdateTimestamps.call(this, () =>
-        dirtyUpdateRecord.call(this, () => persistenceUpdateRecord.call(this, block)),
+        dirtyUpdateRecord.call(this, () =>
+          PersistenceInstanceMethods._updateRecord.call(this, block),
+        ),
       ),
     )) !== false
   );

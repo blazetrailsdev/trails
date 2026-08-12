@@ -396,8 +396,10 @@ export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
     if (action === "report") ActiveSupport.errorReporter.report(warning, { handled: true });
     // Rails' `ActiveRecord.db_warnings_action.call(warning)` — the symbol arms
     // above are the behaviors its setter bakes into that Proc, and a
-    // user-supplied callable is invoked here exactly as Rails invokes it.
-    if (typeof action === "function") action.call(undefined, warning);
+    // user-supplied callable is invoked here exactly as Rails invokes it. JS
+    // `Function#call` takes the receiver first, so the adapter fills the slot
+    // Ruby's `Proc#call` has no argument for.
+    if (typeof action === "function") action.call(this, warning);
   }
 }
 
