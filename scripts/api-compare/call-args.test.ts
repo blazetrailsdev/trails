@@ -164,7 +164,7 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     ).toBe("match");
   });
 
-  // connection_handling.rb:254 `current_role == role.to_sym`.
+  // connection_handling.rb:51 `config_or_env ||= DEFAULT_ENV.call.to_sym`.
   it("reads a Ruby to_sym argument as a TS value already held as a string", () => {
     expect(
       compareCallArgs(
