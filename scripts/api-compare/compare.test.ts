@@ -14,6 +14,7 @@ import {
   dedupeRubyMethodInto,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
+  rubyFileHasTsCounterpart,
   MISPLACED_MIN_HITS,
   blazetrailsDepKeys,
   buildEntitiesByName,
@@ -1471,6 +1472,23 @@ describe("dedupeRubyMethodInto", () => {
       rubyModule: "Foo::A",
       definedInFile: "x.rb",
     });
+  });
+});
+
+describe("rubyFileHasTsCounterpart", () => {
+  it("is true when the mirrored TS file exists", () => {
+    expect(rubyFileHasTsCounterpart(true, null)).toBe(true);
+  });
+
+  it("is true when the port landed in the sibling file the misplaced vote found", () => {
+    expect(rubyFileHasTsCounterpart(false, "core-ext/object/blank.ts")).toBe(true);
+  });
+
+  it("is false for a Ruby file with no port anywhere", () => {
+    // `active_support/execution_wrapper.rb`: `execution-wrapper.ts` does not
+    // exist and no TS file maps to it, yet it read as `matched: 2` off the
+    // cross-file credit for TS names that merely equal `run` / `complete`.
+    expect(rubyFileHasTsCounterpart(false, null)).toBe(false);
   });
 });
 
