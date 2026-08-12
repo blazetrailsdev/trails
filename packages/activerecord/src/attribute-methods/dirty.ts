@@ -151,7 +151,6 @@ interface DirtyPrivateHost {
   /** @internal */
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
-  _performUpdate(): Promise<number>;
   changedAttributeNamesToSave: string[];
   constructor: {
     attributeNames(): string[];
