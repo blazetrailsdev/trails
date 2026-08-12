@@ -126,7 +126,22 @@ export class CollectionAssociation extends Association {
     return this._sharedStore()?._sharedReplacedOrAddedTargets ?? this._replacedOrAddedTargetsStore;
   }
 
+  set _replacedOrAddedTargets(value: Set<Base>) {
+    const store = this._sharedStore();
+    if (store) store._sharedReplacedOrAddedTargets = value;
+    else this._replacedOrAddedTargetsStore = value;
+  }
+
   private _replacedOrAddedTargetsStore = new Set<Base>();
+
+  /**
+   * Rails' `@_was_loaded` (collection_association.rb:468-489): `loaded?` as of
+   * the `insert_record` yield, so `replace_on_target` can tell an append it
+   * still owes from one the save's own callbacks already made by loading the
+   * association.
+   * @internal
+   */
+  _wasLoaded: boolean | null = null;
 
   /**
    * Implements the writer method, e.g. foo.items= for Foo.has_many :items.
@@ -320,6 +335,9 @@ export class CollectionAssociation extends Association {
   override reset(): void {
     super.reset();
     this.target = [];
+    // Rails' `Set.new.compare_by_identity`: a JS Set already compares object
+    // members by identity.
+    this._replacedOrAddedTargets = new Set<Base>();
     this._associationIds = null;
     // Drop the trails-specific named-scope memo (see `_namedScopeRelations`) so
     // the next `things.someScope()` rebuilds against the reset collection. (This
@@ -434,12 +452,28 @@ export class CollectionAssociation extends Association {
    * from inside the save, over `save`, which returns false.
    * @internal
    */
-  async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
+  async insertRecord(
+    record: Base,
+    validate = true,
+    raise = false,
+    block?: () => void,
+  ): Promise<boolean> {
+    // Rails passes `&block` into `save`/`save!`, which yields it from
+    // `_create_record` after the INSERT but before the after_create callbacks
+    // (persistence.rb:940). trails' save stack takes no block yet — threading
+    // one through `save` → `createOrUpdate` → each `_createRecord` layer is
+    // filed as `plumb-save-block-through-create-record` — so the block runs
+    // here, right after the save, which is the same moment for every path that
+    // does not load the association from an after_create callback.
+    // @missingRailsCall save(&block)
     if (raise && typeof (record as any).saveBang === "function") {
       await (record as any).saveBang({ validate });
+      block?.();
       return true;
     }
-    return !!(await (record as any).save?.({ validate }));
+    const result = !!(await (record as any).save?.({ validate }));
+    block?.();
+    return result;
   }
 
   /**
@@ -468,7 +502,9 @@ export class CollectionAssociation extends Association {
         // `resultStillTrue === false` → a prior record failed, so Rails'
         // `result &&= insert_record` short-circuits the save.
         if (this.owner.isNewRecord() || !resultStillTrue) return;
-        inserted = await this.insertRecord(record, true, raise);
+        inserted = await this.insertRecord(record, true, raise, () => {
+          this._wasLoaded = this.isLoaded();
+        });
       });
       return inserted;
     });
@@ -584,23 +620,11 @@ export class CollectionAssociation extends Association {
     return this.target.length;
   }
 
-  isEmpty(): boolean {
-    if (this.isLoaded() || this._associationIds) {
+  async isEmpty(): Promise<boolean> {
+    if (this.isLoaded() || this._associationIds || this.reflection.hasActiveCachedCounter?.()) {
       return this.size === 0;
     }
-    return this.target.length === 0;
-  }
-
-  async isEmptyAsync(): Promise<boolean> {
-    if (this.isLoaded() || this._associationIds) {
-      return this.size === 0;
-    }
-    if (this.target.length > 0) return false;
-    const rel = this.scope();
-    if (rel && typeof rel.exists === "function") {
-      return !(await rel.exists());
-    }
-    return true;
+    return this.target.length === 0 && !(await this.scope().exists());
   }
 
   /**
@@ -1389,7 +1413,7 @@ function beginReplaceOnTarget(
       : -1;
   if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
   assoc.setInverseInstance(record);
-  (assoc as any)._associationIds = null;
+  assoc._wasLoaded = true;
   return index;
 }
 
@@ -1412,7 +1436,8 @@ function finishReplaceOnTarget(
   if (at !== -1 || record.isNewRecord()) assoc._replacedOrAddedTargets.add(record);
   if (at !== -1) {
     target[at] = record;
-  } else {
+  } else if (assoc._wasLoaded || !assoc.isLoaded()) {
+    (assoc as any)._associationIds = null;
     target.push(record);
   }
   if (!skipCallbacks) callback(assoc, "afterAdd", record);
@@ -1436,9 +1461,14 @@ function replaceOnTarget(
   skipCallbacks: boolean,
   replace: boolean,
 ): Base | null {
-  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
-  if (index === null) return null;
-  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+  try {
+    const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+    if (index === null) return null;
+    return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+  } finally {
+    // Rails' `ensure @_was_loaded = nil` (collection_association.rb:488).
+    assoc._wasLoaded = null;
+  }
 }
 
 /**
@@ -1455,10 +1485,15 @@ async function replaceOnTargetAsync(
   replace: boolean,
   save?: () => Promise<void>,
 ): Promise<Base | null> {
-  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
-  if (index === null) return null;
-  if (save) await save();
-  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+  try {
+    const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+    if (index === null) return null;
+    if (save) await save();
+    return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+  } finally {
+    // Rails' `ensure @_was_loaded = nil` (collection_association.rb:488).
+    assoc._wasLoaded = null;
+  }
 }
 
 /**

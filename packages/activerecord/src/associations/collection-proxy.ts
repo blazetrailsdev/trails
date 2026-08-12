@@ -270,6 +270,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._replacedOrAddedTargets;
   }
 
+  set _sharedReplacedOrAddedTargets(value: Set<T>) {
+    this._replacedOrAddedTargets = value;
+  }
+
   /** @internal */
   get _sharedLoaded(): boolean {
     return this._targetLoaded;

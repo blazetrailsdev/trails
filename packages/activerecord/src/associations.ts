@@ -181,6 +181,8 @@ export interface AssociationDefinition {
   counterCacheColumn?: () => string | null;
   /** Rails' `AssociationReflection#has_cached_counter?`. See {@link macro}. */
   hasCachedCounter?: () => boolean;
+  /** Rails' `AssociationReflection#has_active_cached_counter?`. See {@link macro}. */
+  hasActiveCachedCounter?: () => boolean;
   /** Rails' `AssociationReflection#counter_must_be_updated_by_has_many?`. See {@link macro}. */
   isCounterMustBeUpdatedByHasMany?: () => boolean;
   /** Rails' `AbstractReflection#inverse_of` → `inverse_name`. See {@link macro}. */
