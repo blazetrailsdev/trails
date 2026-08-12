@@ -69,8 +69,6 @@ export async function updateCounters(
   options?: { touch?: CounterCacheTouchOption },
 ): Promise<number> {
   const relation = this.unscoped().where(buildPkPredicate(this, id));
-  // Rails threads `:touch` through the counters hash itself, which
-  // `Relation#update_counters` shifts back off (`relation.rb:927`).
   return relation.updateCounters({ ...counters, touch: options?.touch });
 }
 
