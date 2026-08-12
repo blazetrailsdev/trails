@@ -374,12 +374,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await (
           other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
         )._cancelAnyRunningQuery();
-        // The `block` half: the cancelled command has already come back by the
-        // time the cancel returns, so nothing of it is left in flight. Its
-        // error reaching this `catch` is a further microtask hop behind the
-        // wire, so `await` the query before reading what it rejected with —
-        // whether that hop has run yet is a scheduling detail, not the
-        // invariant under test.
+        // `block` puts the cancelled command back off the wire before the
+        // cancel returns; its error reaching this `catch` is a further
+        // microtask hop behind that, so await the query before reading it.
         await sleep;
         expect(sleepError).toBeInstanceOf(QueryCanceled);
         // The cancel aborted the transaction, so end it before probing — a
