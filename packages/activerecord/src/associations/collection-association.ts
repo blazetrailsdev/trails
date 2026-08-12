@@ -388,13 +388,17 @@ export class CollectionAssociation extends Association {
     return null;
   }
 
-  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base {
-    const record = this.buildRecord(attributes, block);
-    if (record) {
-      this.setOwnerAttributes(record);
-      this.addToTarget(record, { replace: true });
+  build(attributes: Record<string, unknown>[], block?: (record: Base) => void): Base[];
+  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base;
+  build(
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    block?: (record: Base) => void,
+  ): Base | Base[] {
+    if (Array.isArray(attributes)) {
+      return attributes.map((attr) => this.build(attr, block));
+    } else {
+      return this.addToTarget(this.buildRecord(attributes, block)!, { replace: true })!;
     }
-    return record!;
   }
 
   /**

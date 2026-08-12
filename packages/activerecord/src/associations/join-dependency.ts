@@ -1194,42 +1194,32 @@ export class JoinDependency {
    * @internal
    */
   private aliases(): Aliases {
-    if (this._aliasesCache) return this._aliasesCache;
-    const columnsFor = (
-      node: JoinPart,
-      columns: string[],
-      tableIndex: number,
-    ): { node: JoinPart; table: TableRef; columns: AliasMap[] } => ({
-      node,
-      table: node.arelTable!,
-      columns: columns.map((column, columnIndex) => ({
-        column,
-        alias: `t${tableIndex}_r${columnIndex}`,
-      })),
-    });
-
-    // Rails: when the relation carries an explicit select (`!join_root_alias`),
-    // the base table contributes only its primary key (or nothing for a no-PK
-    // model); otherwise it contributes every column.
-    let rootColumns: string[];
-    if (this._joinRootAlias) {
-      rootColumns = getModelColumns(this._baseModel);
-    } else {
-      const pk = (this._baseModel as any).primaryKey;
-      rootColumns = pk ? (Array.isArray(pk) ? pk : [pk]) : [];
-    }
-    const tables = [columnsFor(this._joinRoot, rootColumns, 0)];
-    for (const node of this.nodes) {
-      // Rails' join_root tree holds only the reflected association nodes — the
-      // through/HABTM join-table links are joined by JoinAssociation#join_constraints
-      // but never become JoinParts, so their columns are not projected into the
-      // eager SELECT (and thus never need a GROUP BY entry). trails models those
-      // links as `isThroughNode` leaves for constraint building; skip their
-      // columns here to match Rails' projection.
-      if (node.isThroughNode) continue;
-      tables.push(columnsFor(node, node.columns, node.tableIndex));
-    }
-    return (this._aliasesCache = new Aliases(tables));
+    // Rails' join_root tree holds only the reflected association nodes — the
+    // through/HABTM join-table links are joined by JoinAssociation#join_constraints
+    // but never become JoinParts, so their columns are not projected into the
+    // eager SELECT (and thus never need a GROUP BY entry). trails models those
+    // links as `isThroughNode` leaves for constraint building; skip their
+    // columns here to match Rails' projection. The table index is the node's
+    // own `tableIndex` rather than Ruby's `each_with_index` position, since the
+    // skipped through-links would shift every later index.
+    return (this._aliasesCache ??= new Aliases(
+      [this._joinRoot, ...this.nodes.filter((node) => !node.isThroughNode)].map((joinPart) => {
+        const isJoinRoot = joinPart === this._joinRoot;
+        let columnNames: string[];
+        if (isJoinRoot && !this._joinRootAlias) {
+          const primaryKey = (this._baseModel as any).primaryKey;
+          columnNames = primaryKey ? (Array.isArray(primaryKey) ? primaryKey : [primaryKey]) : [];
+        } else {
+          columnNames = isJoinRoot ? getModelColumns(this._baseModel) : joinPart.columns;
+        }
+        const i = isJoinRoot ? 0 : joinPart.tableIndex;
+        const columns: AliasMap[] = columnNames.map((columnName, j) => ({
+          column: columnName,
+          alias: `t${i}_r${j}`,
+        }));
+        return { node: joinPart, table: joinPart.arelTable as TableRef, columns };
+      }),
+    ));
   }
 
   /**
