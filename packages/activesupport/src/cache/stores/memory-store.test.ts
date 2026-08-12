@@ -1,9 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
+import { coder } from "../coder.js";
+import { setFormatVersion } from "../format-version-slot.js";
 import { Notifications } from "../../notifications.js";
+
+// Rails calls the private `serialize_entry` through `send` (cache_store_coder_behavior.rb:90).
+function serializeEntry(store: MemoryStore, entry: Entry): unknown {
+  return (store as unknown as { serializeEntry(entry: Entry): unknown }).serializeEntry(entry);
+}
 
 // Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
 // (memory_store_test.rb:101-104), the record size the pruning budget is sized in.
@@ -416,5 +423,117 @@ describe("MemoryStore coder fidelity", () => {
     expect(r1).not.toBe(r2);
     r1.nested.count = 42;
     expect(r2.nested.count).toBe(1);
+  });
+});
+
+// Port of Rails' CacheStoreCoderBehavior (test/cache/behaviors/cache_store_coder_behavior.rb).
+// SpyCoder mirrors the Rails double; the fidelity `coder` (cache/coder.ts) stands
+// in for Marshal, so a dumped entry is its packed members.
+class SpyCoder {
+  dumpedEntries: Entry[] = [];
+  loadedEntries: Entry[] = [];
+  dumpCompressedEntries: Entry[] = [];
+
+  dump(entry: Entry): string {
+    this.dumpedEntries.push(entry);
+    return coder.dump(entry.pack());
+  }
+
+  load(payload: string): Entry {
+    const entry = Entry.unpack(coder.load(payload) as unknown[]);
+    this.loadedEntries.push(entry);
+    return entry;
+  }
+
+  dumpCompressed(entry: Entry, threshold: number): string {
+    if (threshold === 0) {
+      this.dumpCompressedEntries.push(entry);
+      return coder.dump(entry.pack());
+    } else {
+      return this.dump(entry);
+    }
+  }
+}
+
+describe("CacheStoreCoderBehavior", () => {
+  it("test_coder_receive_the_entry_on_write", () => {
+    const spy = new SpyCoder();
+    const store = new MemoryStore({ coder: spy });
+    store.write("foo", "bar");
+    expect(spy.dumpedEntries.length).toBe(1);
+    const entry = spy.dumpedEntries[0];
+    expect(entry).toBeInstanceOf(Entry);
+    expect(entry.value).toBe("bar");
+  });
+
+  it("test_coder_receive_the_entry_on_read", () => {
+    const spy = new SpyCoder();
+    const store = new MemoryStore({ coder: spy });
+    store.write("foo", "bar");
+    store.read("foo");
+    expect(spy.loadedEntries.length).toBe(1);
+    const entry = spy.loadedEntries[0];
+    expect(entry).toBeInstanceOf(Entry);
+    expect(entry.value).toBe("bar");
+  });
+
+  it("test_coder_receive_the_entry_on_write_multi", () => {
+    const spy = new SpyCoder();
+    const store = new MemoryStore({ coder: spy });
+    store.writeMulti({ foo: "bar", egg: "spam" });
+    expect(spy.dumpedEntries.length).toBe(2);
+    expect(spy.dumpedEntries[0].value).toBe("bar");
+    expect(spy.dumpedEntries[1].value).toBe("spam");
+  });
+
+  it("test_coder_does_not_receive_the_entry_on_read_miss", () => {
+    const spy = new SpyCoder();
+    const store = new MemoryStore({ coder: spy });
+    store.read("foo");
+    expect(spy.loadedEntries.length).toBe(0);
+  });
+
+  it("test_nil_coder_bypasses_serialization", () => {
+    const store = new MemoryStore({ coder: null });
+    const entry = new Entry("value");
+    expect(serializeEntry(store, entry)).toBe(entry);
+  });
+});
+
+// Port of Rails' CacheStoreSerializerBehavior
+// (test/cache/behaviors/cache_store_serializer_behavior.rb).
+describe("CacheStoreSerializerBehavior", () => {
+  afterEach(() => {
+    setFormatVersion(7.0);
+  });
+
+  it("serializer can be specified", () => {
+    const serializer = {
+      dump(value: unknown): string {
+        return (value as object).constructor.name;
+      },
+      load(dumped: string): unknown {
+        return dumped;
+      },
+    };
+
+    setFormatVersion(7.1);
+    const cache = new MemoryStore({ serializer });
+    cache.write("key", 123);
+    expect(cache.read("key")).toBe("Number");
+  });
+
+  it("serializer can be :message_pack", () => {
+    setFormatVersion(7.1);
+    const cache = new MemoryStore({ serializer: ":message_pack" });
+    cache.write("key", 123);
+    expect(cache.read("key")).toBe(123);
+  });
+
+  it("specifying a serializer raises when also specifying a coder", () => {
+    setFormatVersion(7.1);
+    expect(() => new MemoryStore({ serializer: ":marshal_7_1", coder: null })).toThrow(
+      /serializer/i,
+    );
   });
 });

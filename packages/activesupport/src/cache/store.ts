@@ -1,6 +1,7 @@
 import { Entry } from "./entry.js";
-import { Coder, coder as fidelityCoder } from "./coder.js";
-import { SerializerWithFallback } from "./serializer-with-fallback.js";
+import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
+import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
+import { getFormatVersion } from "./format-version-slot.js";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
@@ -9,6 +10,9 @@ import type { EventPayload } from "../notifications/instrumenter.js";
 
 /** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
+
+/** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
+const Zlib: CoderCompressor = { deflate, inflate };
 
 /** Mirrors Ruby ArgumentError. @internal */
 export class ArgumentError extends Error {
@@ -111,8 +115,8 @@ export abstract class Store {
   protected coder: CacheCoder;
   protected coderSupportsCompression: boolean;
 
-  constructor(options: StoreOptions = {}) {
-    this.options = Store.normalizeOptions({ ...options });
+  constructor(options?: StoreOptions) {
+    this.options = options ? this.validateOptions(Store.normalizeOptions({ ...options })) : {};
 
     if (!("compress" in this.options)) this.options.compress = true;
     // Ruby `||=` replaces only nil/false, so an explicit `compress_threshold: 0`
@@ -127,7 +131,24 @@ export abstract class Store {
     const hadCoder = "coder" in this.options;
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
-    if (!hadCoder) coder = new Coder(fidelityCoder, { deflate, inflate });
+    if (!hadCoder) {
+      const legacySerializer = getFormatVersion() < 7.1 && !this.options.serializer;
+      let serializer = this.options.serializer as Serializer | string | undefined;
+      delete this.options.serializer;
+      serializer ||= this.defaultSerializer();
+      // A Ruby Symbol is a colon-prefixed string in trails, which is what
+      // `serializer.is_a?(Symbol)` discriminates on (cache.rb:303).
+      if (typeof serializer === "string") {
+        serializer = SerializerWithFallback.get(serializer.slice(1));
+      }
+      const compressor =
+        "compressor" in this.options ? (this.options.compressor as CoderCompressor) : Zlib;
+      delete this.options.compressor;
+
+      coder = new Coder(serializer as unknown as CoderSerializer, compressor, {
+        legacySerializer,
+      });
+    }
     this.coder =
       coder == null || (coder as unknown) === false
         ? (SerializerWithFallback.get("passthrough") as CacheCoder)
@@ -428,6 +449,20 @@ export abstract class Store {
     ) as T;
   }
 
+  /** Mirrors Rails `Cache::Store#default_serializer` (cache.rb:764-773). */
+  private defaultSerializer(): Serializer {
+    switch (getFormatVersion()) {
+      case 7.0:
+        return SerializerWithFallback.get("marshal_7_0");
+      case 7.1:
+        return SerializerWithFallback.get("marshal_7_1");
+      default:
+        throw new ArgumentError(
+          `Unrecognized ActiveSupport::Cache.format_version: ${getFormatVersion()}`,
+        );
+    }
+  }
+
   protected abstract readEntry(key: string, options: StoreOptions): Entry | null;
   protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): boolean;
   protected abstract deleteEntry(key: string, options: StoreOptions): boolean;
@@ -531,6 +566,26 @@ export abstract class Store {
       delete opts.expired_in;
     }
     return opts;
+  }
+
+  /** Mirrors Rails `Cache::Store#validate_options` (cache.rb:912-925). */
+  private validateOptions(options: StoreOptions): StoreOptions {
+    if ("coder" in options && options.serializer) {
+      throw new ArgumentError("Cannot specify :serializer and :coder options together");
+    }
+
+    if ("coder" in options && options.compressor) {
+      throw new ArgumentError("Cannot specify :compressor and :coder options together");
+    }
+
+    if (getFormatVersion() < 7.1 && !options.serializer && options.compressor) {
+      throw new ArgumentError(
+        "Cannot specify :compressor option when using" +
+          " default serializer and cache format version is < 7.1",
+      );
+    }
+
+    return options;
   }
 
   /** Mirrors Rails `Cache::Store#handle_invalid_expires_in` (cache.rb:892–898). */
