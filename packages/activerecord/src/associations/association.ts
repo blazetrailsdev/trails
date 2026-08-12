@@ -815,24 +815,18 @@ export class Association {
     if (this.isForeignKeyFor(record)) {
       return (
         associationKeysEqual(
-          record.readAttribute(
-            String(this.reflection.foreignKey ?? (this.reflection.options as any).foreignKey),
-          ),
+          record.readAttribute(this.reflection.foreignKey as string),
           this.owner.id,
         ) ||
         (this.isForeignKeyFor(this.owner) &&
           associationKeysEqual(
-            this.owner.readAttribute(
-              String(this.reflection.foreignKey ?? (this.reflection.options as any).foreignKey),
-            ),
+            this.owner.readAttribute(this.reflection.foreignKey as string),
             record.id,
           ))
       );
     }
     return associationKeysEqual(
-      this.owner.readAttribute(
-        String(this.reflection.foreignKey ?? (this.reflection.options as any).foreignKey),
-      ),
+      this.owner.readAttribute(this.reflection.foreignKey as string),
       record.id,
     );
   }
