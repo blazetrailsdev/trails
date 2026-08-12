@@ -7,10 +7,13 @@
  * covers these through the user-facing surfaces; these tests reach the OO
  * association directly because that is where the port had drifted.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Car } from "../test-helpers/models/car.js";
+import { Tyre } from "../test-helpers/models/tyre.js";
+import { Person } from "../test-helpers/models/person.js";
 import { fixtures } from "../test-fixtures.js";
 
 interface CollectionAssociationLike {
@@ -35,11 +38,14 @@ const assocOf = (author: Author): CollectionAssociationLike =>
   );
 
 describe("CollectionAssociation reset / insert_record block / empty?", () => {
-  const { authors } = fixtures(["authors", "posts"]);
+  const { authors } = fixtures(["authors", "posts", "cars"]);
 
   beforeAll(() => {
     registerModel(Author);
     registerModel(Post);
+    registerModel(Car);
+    registerModel(Tyre);
+    registerModel(Person);
   });
 
   it("reset clears replaced_or_added_targets", async () => {
@@ -68,6 +74,22 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     });
 
     expect(seen).toEqual([assoc.isLoaded()]);
+  });
+
+  it("empty? consults reflection.has_active_cached_counter? on the rich reflection", async () => {
+    const car = await Car.create({ name: "honda" });
+    const assoc = (
+      car as unknown as { association(name: string): CollectionAssociationLike }
+    ).association("tyres");
+    const reflection = (
+      Car as unknown as { _reflectOnAssociation(n: string): unknown }
+    )._reflectOnAssociation("tyres") as { hasActiveCachedCounter(): boolean };
+    const spy = vi.spyOn(reflection, "hasActiveCachedCounter");
+
+    await assoc.isEmpty();
+
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it("empty? on an unloaded collection queries scope.exists?", async () => {
