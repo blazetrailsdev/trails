@@ -1155,9 +1155,9 @@ export class Relation<T extends Base> {
     // through to ValueType (no-op cast).
     const typeCaster = new TypeCasterMap(this.model);
     // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
-    const normalized = values.map((v) => {
-      if (v === undefined || v === null) return null;
-      return typeCaster.typeCastForDatabase(column, v);
+    const normalized = values.map((value) => {
+      if (value === undefined || value === null) return null;
+      return typeCaster.typeCastForDatabase(column, value);
     });
 
     // Mirrors Rails: `column.is_a?(Arel::Nodes::SqlLiteral) ? column : order_column(column.to_s)`.

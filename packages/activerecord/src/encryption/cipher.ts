@@ -13,8 +13,8 @@ import { Decryption } from "./errors.js";
 import { Message } from "./message.js";
 
 export class Cipher {
-  encrypt(clearText: string | Buffer, options: { key: string; deterministic?: boolean }): Message {
-    return this.cipherFor(options.key, options.deterministic ?? false).encrypt(clearText);
+  encrypt(cleanText: string | Buffer, options: { key: string; deterministic?: boolean }): Message {
+    return this.cipherFor(options.key, options.deterministic ?? false).encrypt(cleanText);
   }
 
   decrypt(
@@ -33,12 +33,12 @@ export class Cipher {
   }
 
   /** @internal */
-  private tryToDecryptWithEach(encryptedMessage: Message, { keys }: { keys: string[] }): Buffer {
+  private tryToDecryptWithEach(encryptedText: Message, { keys }: { keys: string[] }): Buffer {
     if (keys.length === 0) throw new Decryption("No decryption keys provided");
     let lastError: unknown;
     for (let i = 0; i < keys.length; i++) {
       try {
-        return this.cipherFor(keys[i]).decrypt(encryptedMessage);
+        return this.cipherFor(keys[i]).decrypt(encryptedText);
       } catch (e) {
         if (!(e instanceof Decryption)) throw e; // integrity/config errors propagate immediately
         lastError = e;

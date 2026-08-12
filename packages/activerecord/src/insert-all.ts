@@ -54,7 +54,7 @@ export class InsertAll {
   updateOnly: string | string[] | undefined;
   updateSql: Nodes.SqlLiteral | undefined;
 
-  private _scopeAttributes: Record<string, unknown>;
+  private scopeAttributes: Record<string, unknown>;
   private _recordTimestamps: boolean;
   private _updatableColumns: string[] | undefined;
   private _uniqueByResolved = false;
@@ -117,8 +117,8 @@ export class InsertAll {
     // handled by resolveSti (reverse_merge) so it must not be re-injected here.
     const rawScopeAttrs: Record<string, unknown> = (relation as any).scopeForCreate();
     delete rawScopeAttrs[this.model.inheritanceColumn as string];
-    this._scopeAttributes = rawScopeAttrs;
-    for (const key of Object.keys(this._scopeAttributes)) {
+    this.scopeAttributes = rawScopeAttrs;
+    for (const key of Object.keys(this.scopeAttributes)) {
       this.keys.add(key);
     }
 
@@ -242,10 +242,10 @@ export class InsertAll {
     const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
     const keysList = [...this.keysIncludingTimestamps()];
     return this.inserts.map((row) => {
-      const merged = { ...row, ...this._scopeAttributes };
+      const attributes = { ...row, ...this.scopeAttributes };
       if (timestamps) {
         for (const [col, val] of Object.entries(timestamps)) {
-          if (!(col in merged)) merged[col] = val;
+          if (!(col in attributes)) attributes[col] = val;
         }
       }
       // Rails calls verify_attributes here (insert_all.rb:79), after the
@@ -253,8 +253,8 @@ export class InsertAll {
       // not in the constructor: `keysIncludingTimestamps` reads the model's
       // timestamp attributes off the reflected schema, which is not loaded yet
       // at construction time.
-      this.verifyAttributes(merged);
-      return keysList.map((key) => fn(key, merged[key]));
+      this.verifyAttributes(attributes);
+      return keysList.map((key) => fn(key, attributes[key]));
     });
   }
 
@@ -398,8 +398,8 @@ export class InsertAll {
     if (!this.inserts[0] || !this.hasAttributeAliases(this.inserts[0])) return;
     for (let i = 0; i < this.inserts.length; i++) {
       const resolved: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(this.inserts[i])) {
-        resolved[this.resolveAttributeAlias(key)] = val;
+      for (const [attribute, val] of Object.entries(this.inserts[i])) {
+        resolved[this.resolveAttributeAlias(attribute)] = val;
       }
       this.inserts[i] = resolved;
     }
@@ -408,12 +408,12 @@ export class InsertAll {
     // target reference physical column names.
     if (this.updateOnly !== undefined) {
       const cols = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
-      this.updateOnly = cols.map((c) => this.resolveAttributeAlias(c));
+      this.updateOnly = cols.map((attribute) => this.resolveAttributeAlias(attribute));
     }
     if (typeof this.uniqueBy === "string") {
       this.uniqueBy = this.resolveAttributeAlias(this.uniqueBy);
     } else if (Array.isArray(this.uniqueBy)) {
-      this.uniqueBy = this.uniqueBy.map((c) => this.resolveAttributeAlias(c));
+      this.uniqueBy = this.uniqueBy.map((attribute) => this.resolveAttributeAlias(attribute));
     }
   }
 

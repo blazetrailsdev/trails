@@ -633,7 +633,7 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
     preserveOriginalEncrypted.call(this, name);
   }
 
-  Configurable.encryptedAttributeWasDeclared(modelClass, name);
+  Configurable.encryptedAttributeWasDeclared(this, name);
 }
 
 /**
@@ -644,7 +644,7 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
  */
 export function preserveOriginalEncrypted(this: any, name: string): void {
   const modelClass = this;
-  const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
+  const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
   // Record the source attribute so the post-reflection hook
   // (`requireOriginalColumnsAfterReflection`, driven from schema reflection)
   // can re-run the missing-column check against the authoritative DB column
@@ -669,8 +669,8 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   // `encrypts original_attribute_name` (encryptable_record.rb:105 — no kwargs).
   // encryptAttribute's durable branch buffers this in _pendingEncryptions so
   // the original column rides the same replay-safe machinery as its source.
-  encryptAttribute.call(this, originalName, {});
-  EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalName);
+  encryptAttribute.call(this, originalAttributeName, {});
+  EncryptableRecord.overrideAccessorsToPreserveOriginal(this, name, originalAttributeName);
 }
 
 /**

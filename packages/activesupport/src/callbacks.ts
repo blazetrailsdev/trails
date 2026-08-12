@@ -657,10 +657,10 @@ export class Callback {
     // Mirrors ActiveSupport::Callbacks::CallTemplate.build: a Proc/block filter
     // compiles to InstanceExec{0,1,2} (run via instance_exec, so `self` is the
     // record) selected by arity; a method-name filter compiles to MethodCall.
-    let callTemplate: CallTemplate;
+    let userCallback: CallTemplate;
     if (typeof this.filter === "function") {
       const arity = this.filter.length;
-      callTemplate =
+      userCallback =
         arity > 1
           ? new InstanceExec2(
               this.filter as (target: object, block: (() => unknown) | null) => unknown,
@@ -680,27 +680,27 @@ export class Callback {
       // ObjectCall.new(filter, current_scopes.join("_").to_sym) — the dispatched
       // method is the callback's scope-join, so the default `[:kind]` scope calls
       // `around`/`before`/`after` and `scope: [:kind, :name]` calls `aroundSave`.
-      callTemplate = new ObjectCall(this.filter, this.objectCallMethodName());
+      userCallback = new ObjectCall(this.filter, this.objectCallMethodName());
     } else {
-      callTemplate = new MethodCall(
+      userCallback = new MethodCall(
         typeof this.filter === "string" ? this.filter.slice(1) : (this.filter as PropertyKey),
       );
     }
 
     if (this.kind === "before") {
       this._compiled = new Before(
-        callTemplate.makeLambda(),
+        userCallback.makeLambda(),
         userConditions,
         this.chainConfig,
         this.filter,
         this.name,
       );
     } else if (this.kind === "after") {
-      this._compiled = new After(callTemplate.makeLambda(), userConditions, {
+      this._compiled = new After(userCallback.makeLambda(), userConditions, {
         skipAfterCallbacksIfTerminated: this.chainConfig.skipAfterCallbacksIfTerminated,
       });
     } else {
-      this._compiled = new Around(callTemplate, userConditions);
+      this._compiled = new Around(userCallback, userConditions);
     }
     return this._compiled;
   }

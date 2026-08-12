@@ -140,7 +140,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
           // The separate lengths/orders Records are consumed here and dropped.
           if (Object.keys(expressions).length > 0) {
             const quotedColumns = new Map<string, string>(
-              columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
+              columns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
             );
             await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
             return new IndexDefinition(
@@ -496,11 +496,12 @@ export function quotedScope(
   name?: string | null,
   options: { type?: string } = {},
 ): { schema: string; name?: string; type?: string } {
-  const [schema, tableName] = extractSchemaQualifiedName(name);
+  let schema: string | null;
+  [schema, name] = extractSchemaQualifiedName(name);
   const scope: { schema: string; name?: string; type?: string } = {
     schema: schema ? this.quote(schema) : "database()",
   };
-  if (tableName) scope.name = this.quote(tableName);
+  if (name) scope.name = this.quote(name);
   if (options.type) scope.type = this.quote(options.type);
   return scope;
 }

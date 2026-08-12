@@ -202,8 +202,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
-    const sql = `CHANGE ${this.adapter.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
-    return this.addColumnPositionBang(sql, this.columnOptions(o.column) as MysqlColumnOptions);
+    const changeColumnSql = `CHANGE ${this.adapter.quoteColumnName(o.name)} ${await this.accept(o.column)}`;
+    return this.addColumnPositionBang(
+      changeColumnSql,
+      this.columnOptions(o.column) as MysqlColumnOptions,
+    );
   }
 
   /** @internal */

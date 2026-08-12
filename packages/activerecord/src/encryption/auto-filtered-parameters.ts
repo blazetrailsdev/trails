@@ -73,8 +73,8 @@ export class AutoFilteredParameters {
 
   private applyCollectedAttributes(): void {
     for (const [klass, attributes] of this._attributesByClass) {
-      for (const attr of attributes) {
-        this.applyFilter(klass, attr);
+      for (const attribute of attributes) {
+        this.applyFilter(klass, attribute);
       }
     }
   }
