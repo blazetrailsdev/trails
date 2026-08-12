@@ -1211,6 +1211,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * the `add_to_target(build_record(...), replace: true)` shape live on
    * `CollectionAssociation#build` (collection_association.rb:117-123), which
    * writes the same in-memory target this proxy reads.
+   *
+   * The two textually identical ternary arms are not dead code: each narrows
+   * `attrs` (array vs single) so overload resolution picks the matching
+   * `CollectionAssociation#build` overload. A bare
+   * `association.build(attrs, block)` on the union fails with TS2769 — the same
+   * language necessity `new()` carries below.
    */
   build(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
   build(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
