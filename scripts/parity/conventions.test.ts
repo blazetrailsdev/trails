@@ -165,7 +165,7 @@ describe("rubyMethodToTsIgnoringSkip", () => {
 describe("SKIP_TS_MIRROR_IS_DRIFT", () => {
   it("covers the Ruby hook groups only", () => {
     expect([...SKIP_TS_MIRROR_IS_DRIFT].sort()).toEqual(
-      ["extended", "inherited", "included", "singleton_method_added"].sort(),
+      ["const_missing", "extended", "inherited", "included", "singleton_method_added"].sort(),
     );
   });
 });

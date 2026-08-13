@@ -158,7 +158,21 @@ type CallableMethods<M extends object> = {
  */
 export type Included<M extends object> = CallableMethods<M>;
 
+/**
+ * Ruby's `include`/`prepend`/`extend` are defined in terms of the module's own
+ * `append_features`/`prepend_features`/`extended` hooks, which a module may
+ * override — `Deprecation::DeprecatedConstantProxy` overrides all three to warn
+ * first (proxy_wrappers.rb:156-169). Only a `Module` instance can carry them.
+ */
+function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
+  if (!(mod instanceof Module)) return undefined;
+  const hook = (mod as unknown as Record<string, unknown>)[name];
+  return typeof hook === "function" ? (hook as (base: unknown) => void).bind(mod) : undefined;
+}
+
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  const appendFeatures = featureHook(mod, "appendFeatures");
+  if (appendFeatures) return appendFeatures(klass);
   if (mod instanceof Module) {
     const proto = klass.prototype as object;
     const carrier = Object.create(Object.getPrototypeOf(proto)) as Record<string, unknown>;
@@ -263,6 +277,38 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
 export type Extended<M extends object> = CallableMethods<M>;
 
 /**
+ * Ruby-style `prepend` for mixing module methods into a class *above* it.
+ *
+ * Ruby's `prepend` inserts the module ahead of the class in the ancestry, so a
+ * method the module defines wins over the same method in the class body — the
+ * one behavioural difference from `include`, which loses to it. Here that is a
+ * plain assignment onto the class prototype.
+ *
+ * Distinct from `prepend.ts`'s same-named helper, which wraps existing methods
+ * so the module's version receives the original as an explicit `super_`. This
+ * one is the ancestry splice that pairs with `include()` and is what a module's
+ * `prepend_features` hook installs; it is not re-exported from the package
+ * index, where `prepend.ts`'s helper owns the name.
+ *
+ * Mirrors: Ruby's Module#prepend (core language feature)
+ */
+export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  const prependFeatures = featureHook(mod, "prependFeatures");
+  if (prependFeatures) return prependFeatures(klass);
+  const source =
+    mod instanceof Module
+      ? carrierOf(mod)
+      : typeof mod === "function"
+        ? (mod as AnyClass).prototype
+        : mod;
+  for (const key of Object.getOwnPropertyNames(source)) {
+    if (key === "constructor") continue;
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (descriptor) Object.defineProperty(klass.prototype, key, descriptor);
+  }
+}
+
+/**
  * Ruby-style `extend` for mixing module methods onto a class as static methods.
  *
  * In Ruby, `extend SomeModule` copies the module's methods onto the
@@ -275,7 +321,9 @@ export type Extended<M extends object> = CallableMethods<M>;
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass): void {
+export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
+  const extendedHook = featureHook(mod, "extended");
+  if (extendedHook) return extendedHook(klass);
   // A class module carries its members as non-enumerable own statics, so read
   // its property names directly; a plain-object module keeps the Object.keys
   // (enumerable-only) semantics.
