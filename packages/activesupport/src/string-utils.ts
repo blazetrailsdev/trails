@@ -8,6 +8,10 @@ export function isBlank(value: unknown): boolean {
   if (typeof value === "boolean") return !value;
   if (typeof value === "number") return false;
   if (Array.isArray(value)) return value.length === 0;
+  // Ruby's Object#blank? is `respond_to?(:empty?) ? !!empty? : !self`, so a Set
+  // or Hash answers by emptiness. `Object.keys` reports none for either, which
+  // would make every Set/Map blank.
+  if (value instanceof Set || value instanceof Map) return value.size === 0;
   if (typeof value === "object") return Object.keys(value).length === 0;
   return false;
 }

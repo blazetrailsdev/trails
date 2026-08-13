@@ -5566,6 +5566,17 @@ function deconstructKeys(
 
 export class Date {
   /**
+   * The class name `rb_obj_class(self)` supplies to `mk_inspect`
+   * (`date_core.c:7032-7041`) and to the `rb_obj_classname` in
+   * `d_lite_initialize_copy`'s frozen check. Read through `this` so a subclass
+   * answers its own name, and spelled as a literal rather than
+   * `constructor.name` because `inspect`'s output is asserted byte-for-byte
+   * against MRI and quoted inside `FrozenError` messages, which a bundler that
+   * renames classes would corrupt.
+   */
+  static _railsClassName = "Date";
+
+  /**
    * Ruby `Date::Error` (ruby/date, `date_core.c` `Init_date_core`), raised by
    * `Date.parse` and a subclass of `ArgumentError`.
    */
@@ -6632,7 +6643,7 @@ export class Date {
   initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
       throw new FrozenError(
-        `can't modify frozen ${(this as object).constructor.name}: ${this.inspect()}`,
+        `can't modify frozen ${(this.constructor as typeof Date)._railsClassName}: ${this.inspect()}`,
       );
     }
     if ((this as Date) === date) return this;
@@ -7471,7 +7482,7 @@ export class Date {
     const of = this.mOf();
     const sf = this.mSf();
     return (
-      `#<${this.constructor.name}: ${this.toS()} ` +
+      `#<${(this.constructor as typeof Date)._railsClassName}: ${this.toS()} ` +
       `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf.inspect()}n),` +
       `${of < 0 ? "" : "+"}${of}s,${
         Number.isFinite(this.start) ? this.start.toFixed(0) : this.start > 0 ? "Inf" : "-Inf"
@@ -7596,6 +7607,9 @@ const DateWithoutParseStatics: (new (
  * `::Date`'s offset spelling rather than `::Time`'s `"UTC"`.
  */
 export class DateTime extends DateWithoutParseStatics {
+  /** `rb_obj_class(self)` for a `::DateTime`; see `Date._railsClassName`. */
+  static override _railsClassName = "DateTime";
+
   /**
    * @internal `ComplexDateData`'s fields (`date_core.c:215-231`): the day and
    * the day-fraction, both **in UTC**, and `of`, the offset in seconds east of
@@ -8581,7 +8595,7 @@ export class DateTime extends DateWithoutParseStatics {
   override initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
       throw new FrozenError(
-        `can't modify frozen ${(this as object).constructor.name}: ${this.inspect()}`,
+        `can't modify frozen ${(this.constructor as typeof Date)._railsClassName}: ${this.inspect()}`,
       );
     }
     if ((this as Date) === date) return this;

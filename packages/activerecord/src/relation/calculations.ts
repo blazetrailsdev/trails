@@ -450,12 +450,12 @@ async function groupedAggregate(
     const keyIds = rows
       .map((row) => aliases.map((a) => row[a]))
       .filter((vals) => vals.every((v) => v != null));
-    const keyRecords: any[] =
-      keyIds.length === 0
-        ? []
-        : primaryKey.length === 1
-          ? await klass.where({ [primaryKey[0]]: keyIds.map((vals) => vals[0]) }).toArray()
-          : await klass.where(primaryKey, keyIds).toArray();
+    // calculations.rb:562-563: one `where(primary_key => key_ids)` covers both
+    // arities in Ruby, whose Hash key can be an Array. `where(cols, tuples)` is
+    // the trails spelling of that Array-key form and collapses a one-column key
+    // to the same `IN (...)` Rails' one-element-key branch emits
+    // (predicate_builder.rb:87-90).
+    const keyRecords: any[] = await klass.where(primaryKey, keyIds).toArray();
     // The composite-PK `id` accessor returns an array, so key the lookup map by
     // the raw per-column attribute values to match the SQL group-key tuple.
     const byKey = new Map(

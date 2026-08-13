@@ -2333,4 +2333,27 @@ describe("Date#inspect", () => {
       "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
     );
   });
+
+  it("names the class from a literal a class-renaming bundler cannot rewrite", () => {
+    // ruby 3.3.11 -rdate:
+    //   DateTime.new(2001,2,3).inspect
+    //     #=> "#<DateTime: 2001-02-03T00:00:00+00:00 ((2451944j,0s,0n),+0s,2299161j)>"
+    expect(new RubyDateTime(2001, 2, 3).inspect()).toBe(
+      "#<DateTime: 2001-02-03T00:00:00+00:00 ((2451944j,0s,0n),+0s,2299161j)>",
+    );
+
+    // esbuild renames a class binding when it collides, which rewrites
+    // `constructor.name` but not a static string field.
+    const renamed = Object.defineProperty(RubyDate, "name", {
+      value: "Date2",
+      configurable: true,
+    });
+    try {
+      expect(new renamed(2001, 2, 3).inspect()).toBe(
+        "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
+      );
+    } finally {
+      Object.defineProperty(RubyDate, "name", { value: "Date", configurable: true });
+    }
+  });
 });

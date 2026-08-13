@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { cwd } from "../process-adapter.js";
-import { UnexpectedError } from "./assertions.js";
+import { BacktraceFilter, Minitest, UnexpectedError } from "./assertions.js";
 
 describe("UnexpectedErrorTest", () => {
   it("message reads the wrapped error when called", () => {
@@ -40,5 +40,24 @@ describe("UnexpectedErrorTest", () => {
     expect(new UnexpectedError(raised).message).toBe(
       "Error: boom\n    at doThing (packages/activesupport/src/thing.ts:1:1)",
     );
+  });
+
+  it("the rendered backtrace follows a swapped Minitest.backtraceFilter", () => {
+    const raised = new Error("boom");
+    raised.stack = [
+      "Error: boom",
+      `    at doThing (${cwd()}/packages/activesupport/src/thing.ts:1:1)`,
+      `    at inThePlugin (${cwd()}/packages/activesupport/src/plugin.ts:2:2)`,
+    ].join("\n");
+
+    const original = Minitest.backtraceFilter;
+    Minitest.backtraceFilter = new BacktraceFilter(/plugin\.ts/);
+    try {
+      expect(new UnexpectedError(raised).message).toBe(
+        "Error: boom\n    at doThing (packages/activesupport/src/thing.ts:1:1)",
+      );
+    } finally {
+      Minitest.backtraceFilter = original;
+    }
   });
 });
