@@ -19,6 +19,7 @@ import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
 import { Range } from "../../range-ext.js";
 import { KeyError } from "../key-error.js";
+import { Object } from "../object/acts-like.js";
 
 /** A receiver of the mixin: the `Date` arm or the `Time` arm. */
 export type DateOrTime = Temporal.PlainDate | Date;
@@ -132,12 +133,12 @@ function year(dateOrTime: DateOrTime): number {
 }
 
 function month(dateOrTime: DateOrTime): number {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getMonth() + 1 : dateOrTime.month;
 }
 
 function day(dateOrTime: DateOrTime): number {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getDate() : dateOrTime.day;
 }
 
@@ -148,22 +149,22 @@ function day(dateOrTime: DateOrTime): number {
  * `nsec` at all, which is why Rails guards that one with `try`.
  */
 function hour(dateOrTime: DateOrTime): number {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getHours() : 0;
 }
 
 function min(dateOrTime: DateOrTime): number {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getMinutes() : 0;
 }
 
 function sec(dateOrTime: DateOrTime): number {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getSeconds() : 0;
 }
 
 function nsec(dateOrTime: DateOrTime): number | undefined {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? dateOrTime.getMilliseconds() * 1_000_000 : undefined;
 }
 
@@ -178,14 +179,14 @@ function prevDay(dateOrTime: DateOrTime): DateOrInstant {
 
 /** `self.beginning_of_day` / `self.end_of_day` — a moment on either arm. */
 function beginningOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
     ? time.beginningOfDay(dateOrTime)
     : date.beginningOfDay(dateOrTime);
 }
 
 function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
-  // boundary: as `year` above.
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? time.endOfDay(dateOrTime) : date.endOfDay(dateOrTime);
 }
 
@@ -197,14 +198,15 @@ function fetch(hash: Record<string, number>, key: string): number {
 }
 
 /**
- * `self.acts_like?(:time)`. Rails asks the receiver for the marker method;
- * neither of trails' two receivers carries one, so the arm itself is the
- * answer — a JS `Date` is a moment, a `Temporal.PlainDate` a calendar day.
+ * `self.acts_like?(:time)`. `Object.actsLike` asks the receiver for the marker
+ * method, and neither of trails' two receivers carries one, so for `:time` the
+ * arm itself is the answer — a JS `Date` and the `Temporal.Instant` its members
+ * answer are moments, a `Temporal.PlainDate` is a calendar day.
  */
 function actsLike(dateOrTime: DateOrTime | DateOrInstant, duck: string): boolean {
-  // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  const isTime = dateOrTime instanceof Date || dateOrTime instanceof Temporal.Instant;
-  return duck === "time" ? isTime : !isTime;
+  if (duck !== "time") return Object.actsLike(dateOrTime, duck);
+  // boundary: a JS `Date` is the `Time` arm's receiver, and this arm is keyed on being one.
+  return dateOrTime instanceof Date || dateOrTime instanceof Temporal.Instant;
 }
 
 /**
@@ -615,7 +617,7 @@ export function endOfYear(dateOrTime: DateOrTime): DateOrInstant {
 export const atEndOfYear = endOfYear;
 
 /** Mirrors: `DateAndTime::Calculations#all_day` (`:310-312`) */
-export function allDay(dateOrTime: DateOrTime): Range<unknown> {
+export function allDay(dateOrTime: DateOrTime): Range<TimeWithZone | Temporal.Instant> {
   return new Range(beginningOfDay(dateOrTime), endOfDay(dateOrTime));
 }
 
