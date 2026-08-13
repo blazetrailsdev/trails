@@ -677,3 +677,101 @@ describe("ActionController render edge cases", () => {
     );
   });
 });
+
+// ==========================================================================
+// action_controller/metal/implicit_render.rb
+// ==========================================================================
+describe("ActionController::ImplicitRender", () => {
+  /** A LookupContext stand-in: templates keyed by `prefix/action.format`. */
+  function lookupContextWith(templates: Record<string, string>) {
+    return {
+      formats: ["html", "text", "js"],
+      findTemplate(name: string, prefix: string, format: string) {
+        return templates[`${prefix}/${name}.${format}`] ?? null;
+      },
+      async render(prefix: string, action: string, format: string) {
+        return templates[`${prefix}/${action}.${format}`] ?? "";
+      },
+    };
+  }
+
+  function controllerClass(templates: Record<string, string>) {
+    class ImplicitController extends Base {
+      static override controllerPath(): string {
+        return "implicit";
+      }
+    }
+    ImplicitController.lookupContext = lookupContextWith(templates) as never;
+    ImplicitController.layout = false;
+    return ImplicitController;
+  }
+
+  it("renders the action's template when the action method is empty", async () => {
+    const C = controllerClass({ "implicit/show.html": "<h1>shown</h1>" });
+    class WithAction extends C {
+      show(): void {}
+    }
+    const c = new WithAction();
+    await c.dispatch("show", makeRequest(), makeResponse());
+    expect(c.body).toBe("<h1>shown</h1>");
+  });
+
+  it("dispatches an action that exists only as a template", async () => {
+    const C = controllerClass({ "implicit/orphan.html": "<h1>no method</h1>" });
+    const c = new C();
+    await c.dispatch("orphan", makeRequest(), makeResponse());
+    expect(c.body).toBe("<h1>no method</h1>");
+  });
+
+  it("method_for_action returns defaultRender for a template-only action", () => {
+    const C = controllerClass({ "implicit/orphan.html": "x" });
+    expect(new C().methodForAction("orphan")).toBe("defaultRender");
+    expect(new C().methodForAction("nothing")).toBeUndefined();
+  });
+
+  it("raises UnknownFormat when the action has templates for other formats", async () => {
+    const C = controllerClass({ "implicit/other.text": "plain only" });
+    class WithAction extends C {
+      other(): void {}
+    }
+    const c = new WithAction();
+    await expect(c.dispatch("other", makeRequest(), makeResponse())).rejects.toThrow(
+      /missing a template for this request format and variant/,
+    );
+  });
+
+  it("reports request.formats and request.variant in the UnknownFormat message", async () => {
+    const C = controllerClass({ "implicit/other.text": "plain only" });
+    class WithAction extends C {
+      other(): void {}
+    }
+    const c = new WithAction();
+    const error = await c.dispatch("other", makeRequest(), makeResponse()).catch((e) => e);
+    expect(error.message).toContain("request.formats: [");
+    expect(error.message).toContain("request.variant: ");
+  });
+
+  it("raises MissingExactTemplate for a template-less interactive browser request", async () => {
+    const C = controllerClass({});
+    class WithAction extends C {
+      gone(): void {}
+    }
+    const c = new WithAction();
+    const error = await c.dispatch("gone", makeRequest(), makeResponse()).catch((e) => e);
+    expect(error.message).toMatch(/missing a template for request formats: /);
+  });
+
+  it("heads :no_content when the request is not an interactive browser request", async () => {
+    const C = controllerClass({});
+    class WithAction extends C {
+      gone(): void {}
+    }
+    const c = new WithAction();
+    await c.dispatch(
+      "gone",
+      makeRequest({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }),
+      makeResponse(),
+    );
+    expect(c.status).toBe(204);
+  });
+});

@@ -34,11 +34,16 @@ export interface ImplicitRenderHost {
     /** Rails compares `request.format == Mime[:html]`; `symbol` is the
      *  trails spelling, and both `MimeType` and `NullType` answer it. */
     format?: { symbol: string | null };
+    /** Rails `request.formats`, reported in both exception messages. */
+    formats?: ReadonlyArray<{ toString(): string }>;
+    /** Rails `request.variant`, reported in the UnknownFormat message. */
+    variant?: unknown;
     /** Rails `request.xhr?`. */
     xhr?: boolean;
   };
-  templateExists?(action: string, prefixes?: unknown, opts?: unknown): boolean;
-  anyTemplates?(action: string, prefixes?: unknown): boolean;
+  _prefixes?(): string[];
+  templateExists?(action: string, prefixes?: string[], opts?: unknown): boolean;
+  anyTemplates?(action: string, prefixes?: string[]): boolean;
   head(status: number): void;
   render(): void;
   logger?: { info(msg: string): void };
@@ -52,24 +57,42 @@ export interface ImplicitRenderHost {
  */
 export function defaultRender(this: ImplicitRenderHost): void {
   const name = this.constructor.name;
-  if (this.templateExists?.(this.actionName)) {
+  const prefixes = this._prefixes?.();
+  if (this.templateExists?.(this.actionName, prefixes)) {
     this.render();
     return;
   }
-  if (this.anyTemplates?.(this.actionName)) {
+  if (this.anyTemplates?.(this.actionName, prefixes)) {
     throw new UnknownFormat(
-      `${name}#${this.actionName} is missing a template for this request format and variant.`,
+      `${name}#${this.actionName} is missing a template ` +
+        "for this request format and variant.\n" +
+        `\nrequest.formats: ${inspectFormats(this)}` +
+        `\nrequest.variant: ${inspectVariant(this)}`,
     );
   }
   if (isInteractiveBrowserRequest.call(this)) {
     throw new MissingExactTemplate(
-      `${name}#${this.actionName} is missing a template for request formats.`,
+      `${name}#${this.actionName} is missing a template for request formats: ` +
+        `${(this.request?.formats ?? []).map((f) => String(f)).join(",")}`,
       name,
       this.actionName,
     );
   }
   this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
   this.head(204);
+}
+
+/** Rails `request.formats.map(&:to_s).inspect`. @internal */
+function inspectFormats(host: ImplicitRenderHost): string {
+  return `[${(host.request?.formats ?? []).map((f) => `"${String(f)}"`).join(", ")}]`;
+}
+
+/** Rails `request.variant.inspect`. @internal */
+function inspectVariant(host: ImplicitRenderHost): string {
+  const variant = host.request?.variant;
+  if (variant == null) return "nil";
+  const list = Array.isArray(variant) ? variant : Array.from(variant as Iterable<unknown>);
+  return `[${list.map((v) => `:${String(v)}`).join(", ")}]`;
 }
 
 /**
@@ -86,7 +109,7 @@ export function methodForAction(
 ): string | undefined {
   const sup = this._superMethodForAction?.(actionName);
   if (sup) return sup;
-  if (this.templateExists?.(actionName)) return "defaultRender";
+  if (this.templateExists?.(actionName, this._prefixes?.())) return "defaultRender";
   return undefined;
 }
 

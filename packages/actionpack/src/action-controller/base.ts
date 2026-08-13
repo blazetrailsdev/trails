@@ -18,7 +18,7 @@ import type {
   AroundCallback,
   CallbackOptions,
 } from "../abstract-controller/callbacks.js";
-import { LookupContext } from "@blazetrails/actionview";
+import { LookupContext, ViewPathsClassMethods } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
@@ -285,11 +285,11 @@ export class Base extends Metal {
    * a variant; trails' LookupContext resolves against a single controller
    * prefix and format, so those arguments have no counterpart yet.
    */
-  templateExists(action: string): boolean {
+  templateExists(action: string, prefixes: string[] = this._prefixes()): boolean {
     const ctx = (this.constructor as typeof Base).lookupContext;
     if (!ctx) return false;
     const format = this._lookupFormat();
-    return ctx.findTemplate(action, this.controllerPath(), format) !== null;
+    return prefixes.some((prefix) => ctx.findTemplate(action, prefix, format) !== null);
   }
 
   /**
@@ -311,10 +311,51 @@ export class Base extends Metal {
   }
 
   /**
+   * `ActionView::ViewPaths::ClassMethods#_prefixes` and `#local_prefixes`,
+   * mixed in per the module-mixin convention. Rails reaches these through
+   * `AbstractController::Rendering`, which includes `ActionView::ViewPaths`.
+   */
+  static _prefixes = ViewPathsClassMethods._prefixes;
+  static localPrefixes = ViewPathsClassMethods.localPrefixes;
+
+  /** Mirrors `ActionView::ViewPaths#_prefixes` — `self.class._prefixes`. */
+  _prefixes(): string[] {
+    return (this.constructor as unknown as { _prefixes(): string[] })._prefixes();
+  }
+
+  /**
+   * Mirrors `ActionView::ViewPaths#any_templates?` — is there a template for
+   * this action under *any* format? Rails delegates to `LookupContext#any?`,
+   * which reuses `detail_args_for_any` to drop the format/locale/variant
+   * constraints; the controller's LookupContext resolves through the
+   * single-format `TemplateResolver` protocol, so the widening is a sweep of
+   * the registered formats.
+   */
+  anyTemplates(action: string, prefixes: string[] = this._prefixes()): boolean {
+    const ctx = (this.constructor as typeof Base).lookupContext;
+    if (!ctx) return false;
+    return prefixes.some((prefix) =>
+      ctx.formats.some((format) => ctx.findTemplate(action, prefix, String(format)) !== null),
+    );
+  }
+
+  /**
    * Mirrors `ImplicitRender#default_render`. Mixed in from
    * `metal/implicit-render.ts` per the module-mixin convention.
    */
   defaultRender = implicitDefaultRender;
+
+  /**
+   * Mirrors `ImplicitRender#method_for_action` — `super || "default_render"
+   * if template_exists?`. Without it an action that exists only as a template
+   * is rejected by `AbstractController#_findActionName` before it can render.
+   */
+  override methodForAction(actionName: string): string | undefined {
+    return (
+      super.methodForAction(actionName) ??
+      (this.templateExists(actionName, this._prefixes()) ? "defaultRender" : undefined)
+    );
+  }
 
   /**
    * Mirrors `BasicImplicitRender#send_action` — `ret = super;
@@ -323,6 +364,14 @@ export class Base extends Metal {
    * {@link processAction}.
    */
   override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
+    // Rails resolves the method name in `process` and hands it to
+    // `send_action`, so a template-only action arrives as "default_render".
+    // Trails' `process` passes the action name through instead, so the
+    // template-only case resolves here.
+    if (!this.isActionMethod(action) && this.methodForAction(action) === "defaultRender") {
+      this.defaultRender();
+      return;
+    }
     await super._dispatchAction(action, ...args);
     if (!this.performed && !this._pendingRender) this.defaultRender();
   }

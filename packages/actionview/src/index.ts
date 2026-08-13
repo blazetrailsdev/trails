@@ -35,6 +35,7 @@ export type {
 } from "./rendering.js";
 
 export { ClassMethods as ViewPathsClassMethods } from "./view-paths.js";
+export { _prefixes as viewPathsPrefixes } from "./view-paths.js";
 export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 
 export { Renderer, RenderedTemplate } from "./renderer.js";
