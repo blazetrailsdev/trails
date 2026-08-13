@@ -59,5 +59,12 @@
     "rubyName": "unescape_path",
     "call": "unescape",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "utils.ts",
+    "rubyName": "param_depth_limit=",
+    "call": "default_query_parser",
+    "reason": "The reader Rack calls is spelled `getDefaultQueryParser` in this module (get*/set* accessor pair), which the call gate cannot map from `default_query_parser`."
   }
 ]

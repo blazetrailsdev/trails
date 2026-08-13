@@ -46,14 +46,7 @@ export function setBeginningOfWeekDefault(weekStart: string | null): void {
   _beginningOfWeekDefault = weekStart;
 }
 
-/**
- * Mirrors: `Date.beginning_of_week` (`date/calculations.rb:19-21`)
- *
- * @missingRailsCall find_beginning_of_week! — the writer `beginning_of_week=`
- * (`:27-29`) is what calls it, and it is ported as {@link setBeginningOfWeek};
- * the comparator offers the bare accessor before `set*` for a Ruby writer, so
- * both Ruby names resolve to this reader.
- */
+/** Mirrors: `Date.beginning_of_week` (`date/calculations.rb:19-21`) */
 export function beginningOfWeek(): string {
   return (
     IsolatedExecutionState.get<string>(BEGINNING_OF_WEEK) ?? beginningOfWeekDefault() ?? "monday"

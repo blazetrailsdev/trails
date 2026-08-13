@@ -1142,9 +1142,12 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *     the native JS spelling as a final candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
  */
-export function rubyMethodToTs(name: string): string[] | null {
+export function rubyMethodToTs(
+  name: string,
+  siblingRubyNames?: ReadonlySet<string>,
+): string[] | null {
   if (SKIP.has(name)) return null;
-  return rubyMethodToTsIgnoringSkip(name);
+  return rubyMethodToTsIgnoringSkip(name, siblingRubyNames);
 }
 
 /**
@@ -1157,7 +1160,10 @@ export function rubyMethodToTs(name: string): string[] | null {
  * entry point answers it; the SKIP gate stays in place for compare.ts, so a
  * skipped method still never counts as a missing port.
  */
-export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
+export function rubyMethodToTsIgnoringSkip(
+  name: string,
+  siblingRubyNames?: ReadonlySet<string>,
+): string[] | null {
   if (OPERATORS.has(name)) return null;
   if (name === "initialize" || name === "new") return ["constructor"];
   if (name === "to_s" || name === "to_str") return ["toString"];
@@ -1220,7 +1226,18 @@ export function rubyMethodToTsIgnoringSkip(name: string): string[] | null {
     // persists the displacement inline (has_one_association.rb:59-84) — which a
     // synchronous JS property setter cannot express; the awaitable `set#{Name}`
     // is the faithful rendering there (RFC 0068).
-    return [camel, "set" + camel.charAt(0).toUpperCase() + camel.slice(1)];
+    const setter = "set" + camel.charAt(0).toUpperCase() + camel.slice(1);
+    // …unless the Ruby surface also defines the *reader* `#{base}`: that reader
+    // has already claimed the bare camel name, so leaving it first here
+    // resolves the writer to the reader's body and reports every call the
+    // writer's Ruby body makes as missing (`Date.beginning_of_week=` →
+    // `beginningOfWeek`, losing `find_beginning_of_week!`). With the pair
+    // present, `set#{Name}` is the only spelling that can be the writer.
+    // …and only when Ruby has no `set_#{base}` of its own: `content_type=`
+    // sits next to a private `set_content_type` (actionpack
+    // `http/response.rb:75-81`), whose port already owns `setContentType`.
+    if (siblingRubyNames?.has(base) && !siblingRubyNames.has(`set_${base}`)) return [setter, camel];
+    return [camel, setter];
   }
 
   return [snakeToCamel(name)];
@@ -1335,7 +1352,10 @@ supported and both score as the port — the candidate list is a fallback chain,
 a migration: a sync accessor alone still matches, as it always did.
 Underscore-prefixed
 writers (\`_reflections=\`) are \`class_attribute\` storage slots, never blocking
-writers, so they get no \`set*\` candidate.
+writers, so they get no \`set*\` candidate. The ordering flips when the Ruby
+surface defines the matching *reader* too (\`beginning_of_week\` alongside
+\`beginning_of_week=\`): the reader has claimed the bare camel name, so the writer
+is offered \`set#{Name}\` first.
 
 ## Operators
 

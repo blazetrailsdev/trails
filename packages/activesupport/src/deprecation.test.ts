@@ -17,6 +17,19 @@ function withTrailsLogger<T>(logger: Logger | null, fn: () => T): T {
   }
 }
 
+/** Ruby reaches the private helper with `send`; TS needs the cast. */
+function callDeprecatedMethodWarning(
+  deprecator: Deprecation,
+  methodName: string,
+  message?: string,
+): string {
+  return (
+    deprecator as unknown as {
+      deprecatedMethodWarning(methodName: string, message?: string): string;
+    }
+  ).deprecatedMethodWarning(methodName, message);
+}
+
 describe("DeprecationTest", () => {
   let dep: Deprecation;
 
@@ -270,13 +283,25 @@ describe("DeprecationTest", () => {
   });
 
   it("custom gem_name", () => {
-    const d = new Deprecation("2.0", "MyLib");
-    expect(d.gemName).toBe("MyLib");
+    const deprecator = new Deprecation("2.0", "Custom");
+
+    const message = callDeprecatedMethodWarning(
+      deprecator,
+      "deprecated_method",
+      "You are calling deprecated method",
+    );
+    expect(message).toMatch(/is deprecated and will be removed from Custom/);
   });
 
   it("default gem_name is Rails", () => {
-    const d = new Deprecation();
-    expect(d.gemName).toBe("Rails");
+    const deprecator = new Deprecation();
+
+    const message = callDeprecatedMethodWarning(
+      deprecator,
+      "deprecated_method",
+      "You are calling deprecated method",
+    );
+    expect(message).toMatch(/is deprecated and will be removed from Rails/);
   });
 
   it("default deprecation_horizon is greater than the current Rails version", () => {

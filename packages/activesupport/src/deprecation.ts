@@ -296,12 +296,50 @@ export class Deprecation {
     }
   }
 
-  deprecateMethod(target: object, methodName: string, message: string): void {
+  /**
+   * Rails: `deprecation_warning` (deprecation/reporting.rb:99-104). Rails
+   * defaults the backtrace to `caller_locations(2)`; JS exposes no equivalent
+   * frame list, so an absent `callerBacktrace` reaches `warn` as-is and falls
+   * through to its own default.
+   */
+  deprecationWarning(
+    deprecatedMethodName: string,
+    message?: string,
+    callerBacktrace?: unknown[],
+  ): string {
+    const msg = this.deprecatedMethodWarning(deprecatedMethodName, message);
+    this.warn(msg, callerBacktrace);
+    return msg;
+  }
+
+  /**
+   * Outputs a deprecation warning message
+   *
+   *   deprecatedMethodWarning("methodName")
+   *   // => "methodName is deprecated and will be removed from Rails #{deprecationHorizon}"
+   *   deprecatedMethodWarning("methodName", ":anotherMethod")
+   *   // => "methodName is deprecated and will be removed from Rails #{deprecationHorizon} (use anotherMethod instead)"
+   *   deprecatedMethodWarning("methodName", "Optional message")
+   *   // => "methodName is deprecated and will be removed from Rails #{deprecationHorizon} (Optional message)"
+   *
+   * Rails: `deprecated_method_warning` (deprecation/reporting.rb:115-122).
+   */
+  private deprecatedMethodWarning(methodName: string, message?: string): string {
+    const warning = `${methodName} is deprecated and will be removed from ${this.gemName} ${this.deprecationHorizon}`;
+    // A Ruby Symbol argument names the replacement method; in trails it is a
+    // `":name"` string (CLAUDE.md), a String is free-form text.
+    if (message !== undefined && message.startsWith(":"))
+      return `${warning} (use ${message.slice(1)} instead)`;
+    if (message !== undefined) return `${warning} (${message})`;
+    return warning;
+  }
+
+  deprecateMethod(target: object, methodName: string, message?: string): void {
     const self = this;
     const original = (target as Record<string, unknown>)[methodName];
     if (typeof original !== "function") return;
     (target as Record<string, unknown>)[methodName] = function (...args: unknown[]) {
-      self.warn(message);
+      self.deprecationWarning(methodName, message);
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
   }

@@ -47,7 +47,10 @@ supported and both score as the port — the candidate list is a fallback chain,
 a migration: a sync accessor alone still matches, as it always did.
 Underscore-prefixed
 writers (`_reflections=`) are `class_attribute` storage slots, never blocking
-writers, so they get no `set*` candidate.
+writers, so they get no `set*` candidate. The ordering flips when the Ruby
+surface defines the matching _reader_ too (`beginning_of_week` alongside
+`beginning_of_week=`): the reader has claimed the bare camel name, so the writer
+is offered `set#{Name}` first.
 
 ## Operators
 
