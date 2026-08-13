@@ -116,7 +116,8 @@ export interface PerformQueryHost extends HandleWarningsHost {
   isCachedPlanFailure(pgerror: unknown): boolean;
   openTransactions: number;
   sqlKey(sql: string): string;
-  _poolFor(rawConnection: pg.Client): { delete(key: string): unknown };
+  /** Rails' `@statements` (abstract_adapter.rb:156). */
+  _statements: { delete(key: string): unknown };
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;
@@ -188,7 +189,7 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
             );
           } else {
             // outside of transactions we can simply flush this query and retry
-            await this._poolFor(rawConnection).delete(this.sqlKey(sql));
+            await this._statements.delete(this.sqlKey(sql));
             continue;
           }
         }
@@ -233,7 +234,7 @@ export async function castResult(this: CastResultHost, result: pg.QueryResult): 
   const columnTypes: Record<string | number, Type> = {};
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i];
-    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name, "");
+    const type = await this.getOidType(f.dataTypeID, f.dataTypeModifier ?? -1, f.name);
     columnTypes[i] = type;
     // Rails sets types[fname] = types[i] unconditionally; we guard against a column
     // named "1" colliding with integer index 1 in a plain JS object key space.

@@ -178,34 +178,21 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   async columns(tableName: string): Promise<Column[]> {
     const fields = await this.columnDefinitions(tableName);
-    // newColumnFromField's broader function-default detection calls SHOW CREATE TABLE via the
-    // sync createTableInfoFn callback. Pre-fetch once iff any field default falls through the
-    // earlier branches (non-digit literal, non-quoted string, non-CURRENT_TIMESTAMP datetime,
-    // non-DEFAULT_GENERATED) so the sync callback has data when needed and we keep a single
-    // round-trip per columns() call.
-    const needsCreateInfo = fields.some((f) => {
-      const def = (f["Default"] as string | null) ?? null;
-      const extra = ((f["Extra"] as string | null) ?? "").trim();
-      const sqlType = ((f["Type"] as string | null) ?? "").toLowerCase();
-      if (def == null || /^\d/.test(def) || def.startsWith("'")) return false;
-      if (extra === "DEFAULT_GENERATED") return false;
-      // newColumnFromField's datetime+CURRENT_TIMESTAMP short-circuit only fires when the
-      // semantic type is "datetime" (sqlType startsWith "datetime"/"timestamp"); for
-      // non-datetime columns with a CURRENT_TIMESTAMP default we still need SHOW CREATE TABLE
-      // for the broader function-default detection.
-      const isDatetimeLike = /^(datetime|timestamp)/.test(sqlType);
-      if (isDatetimeLike && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def)) return false;
-      return true;
-    });
-    const createInfo = needsCreateInfo ? await this.createTableInfo(tableName) : null;
-    return fields.map((field) =>
-      newColumnFromField(
-        tableName,
-        field as Record<string, string | null>,
-        () => createInfo,
-        (sqlType) => this.lookupCastType(sqlType) as never,
-      ),
-    );
+    // Rails' `.map`, run sequentially: `new_column_from_field` may issue its own
+    // SHOW CREATE TABLE (the `default_type` branch), and Rails emits those one
+    // after the other on the single connection.
+    const columns: Column[] = [];
+    for (const field of fields) {
+      columns.push(
+        await newColumnFromField.call(
+          this,
+          tableName,
+          field as Record<string, string | null>,
+          fields,
+        ),
+      );
+    }
+    return columns;
   }
 
   /**

@@ -240,8 +240,8 @@ describe("PostgreSQLAdapter#sqlKey", () => {
   const setMemo = (path: string | null): void => {
     (adapter as unknown as { _schemaSearchPathMemo: string | null })._schemaSearchPathMemo = path;
   };
-  const poolFor = (client: unknown): StatementPool =>
-    (adapter as unknown as { _poolFor: (c: unknown) => StatementPool })._poolFor(client);
+  const poolFor = (_client: unknown): StatementPool =>
+    (adapter as unknown as { _statements: StatementPool })._statements;
   const preparedNameFor = (client: unknown, sql: string): Promise<string> =>
     (
       adapter as unknown as {

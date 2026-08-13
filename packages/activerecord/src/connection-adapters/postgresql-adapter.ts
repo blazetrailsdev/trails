@@ -354,10 +354,18 @@ export class PostgreSQLAdapter
   // a thin typed accessor so the PG lifecycle code (which needs the concrete
   // `pg.Client`) reads naturally; the base field is typed `AbstractAdapter |
   // null`, so the accessor narrows it.
-  private get _rawConnection(): pg.Client | null {
+  //
+  // Not `private`: `StatementPool#dealloc` re-reads it at eviction time, which
+  // is exactly Rails' `@connection.instance_variable_get(:@raw_connection)`
+  // (postgresql_adapter.rb:310) — a deliberate reach into the adapter's
+  // connection slot from its own statement pool. TS `private` is per-class, so
+  // a sibling class in this file cannot do what Ruby's reflection does.
+  /** @internal */
+  get _rawConnection(): pg.Client | null {
     return this._connection as unknown as pg.Client | null;
   }
-  private set _rawConnection(value: pg.Client | null) {
+  /** @internal */
+  set _rawConnection(value: pg.Client | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
   /**
@@ -505,9 +513,16 @@ export class PostgreSQLAdapter
   // routing the pg_type queries back through withRawConnection would re-enter
   // it needlessly.
   private _typeMapEagerLoaded = false;
-  // The single StatementPool attached to _rawConnection. PG prepared
-  // statements are session-scoped; lifetime tracks _rawConnection.
-  private _statementPool: StatementPool | null = null;
+  // Rails' `@statements = build_statement_pool` (abstract_adapter.rb:156): one
+  // pool per adapter, built in the constructor and never replaced. PG prepared
+  // statements are session-scoped, and the pool re-reads `_rawConnection` at
+  // dealloc time, so a teardown just resets the map.
+  //
+  // Non-private so the extracted `performQuery` in
+  // `postgresql/database-statements.ts` can reach the statement cache Rails
+  // names `@statements`.
+  /** @internal */
+  _statements!: StatementPool;
   // True when the next checkout should run DEALLOCATE ALL to drain
   // orphaned server-side prepared statements (set by clearCacheBang's
   // reset branch after a rollback).
@@ -575,6 +590,7 @@ export class PostgreSQLAdapter
     if (PostgreSQLAdapter._isDeprecatedRawConnectionArg(config)) {
       deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
       this._acceptDeprecatedRawConnection(config, deprecatedConfig);
+      this._statements = this.buildStatementPool();
       return;
     }
     // Mirrors abstract_adapter.rb:135 — a config hash must be the only argument.
@@ -650,6 +666,7 @@ export class PostgreSQLAdapter
       // pg.Client connects lazily on the first acquisition path
       // (_acquireFreshClient); the constructor only stores config so
       // that adapter construction stays synchronous to match Rails.
+      this._statements = this.buildStatementPool();
       return;
     }
     // Rails' database.yml merges driver connection params + adapter
@@ -783,6 +800,12 @@ export class PostgreSQLAdapter
     // _acquireFreshClient). The error listener is attached after
     // connect() so a server-side FATAL on the live connection doesn't
     // surface as an uncaughtException.
+    //
+    // Mirrors AbstractAdapter#initialize's `@statements = build_statement_pool`
+    // (abstract_adapter.rb:156). It runs here rather than as a field
+    // initializer because `statement_limit` is only known once the config hash
+    // above has been destructured.
+    this._statements = this.buildStatementPool();
   }
 
   /**
@@ -1276,7 +1299,7 @@ export class PostgreSQLAdapter
       // interleaves with the in-flight statement and desyncs the pg protocol.
       // The orphaned server statements keep their old names — never reused — and
       // are reclaimed on session reset/close.
-      this._statementPool?.reset();
+      this._statements.reset();
     });
   }
 
@@ -1427,8 +1450,7 @@ export class PostgreSQLAdapter
         this._rawConnection = null;
         this._connectionConfigured = false;
         this._typeMapEagerLoaded = false;
-        this._statementPool?._detach();
-        this._statementPool = null;
+        this._statements.reset();
       }
       this._teardownRacedClient(client, acquireGen);
       throw error;
@@ -1492,33 +1514,6 @@ export class PostgreSQLAdapter
     // live socket survives so the loop never yields it un-drained.
     const client = this._rawConnection;
     if (client && !this._closed) await this._maybeDrainOrphanedPreparedStatements(client);
-  }
-
-  /**
-   * Return the single StatementPool for the persistent connection,
-   * lazily creating it. PG prepared statements are session-scoped;
-   * with one persistent client there is exactly one pool per adapter.
-   */
-  // Non-private (underscore-public) so the extracted `performQuery` in
-  // `postgresql/database-statements.ts` can reach the statement cache Rails
-  // names `@statements`.
-  _poolFor(client: pg.Client): StatementPool {
-    if (!this._statementPool) {
-      this._statementPool = this.buildStatementPool(client);
-    }
-    return this._statementPool;
-  }
-
-  /**
-   * Tear down the single StatementPool. Called from `close()` /
-   * `reconnect()` only — commit/rollback keep the pool attached
-   * because PG prepared statements are session-scoped, not
-   * transaction-scoped (mirrors Rails' PG::StatementPool, which only
-   * clears on disconnect).
-   */
-  private _releaseStatementPool(): void {
-    this._statementPool?._detach();
-    this._statementPool = null;
   }
 
   /**
@@ -2635,7 +2630,10 @@ export class PostgreSQLAdapter
    * and `_acquireFreshClient` throws.
    */
   async close(): Promise<void> {
-    this._releaseStatementPool();
+    // Rails' disconnect! → clear_cache!(new_connection: true) → @statements.reset
+    // (abstract_adapter.rb:700-706, 739-747): the map is dropped without
+    // DEALLOCATE, since the session that owned those names is gone.
+    this._statements.reset();
     this._client = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
@@ -2681,8 +2679,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements.reset();
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = false;
@@ -2823,8 +2820,7 @@ export class PostgreSQLAdapter
               this._rawConnection = null;
               this._connectionConfigured = false;
               this._typeMapEagerLoaded = false;
-              this._statementPool?._detach();
-              this._statementPool = null;
+              this._statements.reset();
             }
             live.end().catch(() => {});
             throw error;
@@ -2832,7 +2828,7 @@ export class PostgreSQLAdapter
         }
         // DISCARD ALL drops server-side prepared statements — reset the
         // local pool so a later PREPARE name (a1, a2, ...) doesn't collide.
-        this._statementPool?.reset();
+        this._statements.reset();
         // Rails' `super` — clear_cache!(new_connection: true) + reset_transaction
         // (abstract_adapter.rb:728-731) — runs inside the same lock, last
         // (postgresql_adapter.rb:380).
@@ -2880,8 +2876,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements.reset();
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     // Rails' disconnect! is NOT terminal: with_raw_connection's
@@ -2933,8 +2928,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statementPool?._detach();
-    this._statementPool = null;
+    this._statements.reset();
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
@@ -2952,19 +2946,17 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Test-only accessor for the single session-scoped StatementPool
-   * attached to `_rawConnection`. After the Phase D-X collapse there
-   * is one pool per adapter for the connection's full lifetime — it
-   * survives commit/rollback and is only torn down on disconnect /
-   * close / reconnect. Returns undefined before the first acquire (no
-   * pool built yet) or after teardown. Mirrors Rails'
+   * Test-only accessor for the adapter's `@statements` pool. Built in the
+   * constructor and never replaced: it survives commit/rollback, disconnect,
+   * and reconnect, because Rails' pool holds the ADAPTER and re-reads the raw
+   * connection at dealloc time. Mirrors Rails'
    * `raw_connection.instance_variable_get(:@statement_pool)` escape
    * hatch used by `PostgreSQL::StatementPoolTest`.
    *
    * @internal
    */
   _statementPoolForTest(): StatementPool | undefined {
-    return this._statementPool ?? undefined;
+    return this._statements;
   }
 
   /** @internal — the currently-held txn client (always _rawConnection while in TX). */
@@ -2993,16 +2985,15 @@ export class PostgreSQLAdapter
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
     void super.clearCacheBang({ newConnection });
-    if (!this._statementPool) return;
     if (newConnection) {
       // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
       // map without DEALLOCATE: the session that owned those statement names is
       // gone, so naming them again is an error, not a cleanup.
-      this._statementPool.reset();
+      this._statements.reset();
     } else if (this._rawConnection) {
-      return this._statementPool.clear();
+      return this._statements.clear();
     } else {
-      this._statementPool.reset();
+      this._statements.reset();
       this._needsDeallocateAll = true;
     }
   }
@@ -4278,8 +4269,12 @@ export class PostgreSQLAdapter
    * Bind+Execute, so it lands on an idle client (statement_pool.rb:31).
    * @internal
    */
-  async prepareStatement(sql: string, _binds: unknown[], client: pg.Client): Promise<string> {
-    const pool = this._poolFor(client);
+  // `conn` is unused: Rails calls `conn.prepare nextkey, sql` on it (see below),
+  // while node-pg Parses under the name on first Execute. It stays in the
+  // signature because Rails' `prepare_statement(sql, binds, conn)` has it.
+  /** @internal */
+  async prepareStatement(sql: string, _binds: unknown[], _conn: pg.Client): Promise<string> {
+    const pool = this._statements;
     const key = this.sqlKey(sql);
     const existing = pool.get(key);
     if (existing) return existing.name;
@@ -4330,23 +4325,13 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Build the per-adapter StatementPool (used on initialization).
-   *
-   * `onIssue` keeps `_commandSettled`'s invariant across the eviction
-   * DEALLOCATE, guarded on the client still being the pinned one: a DEALLOCATE
-   * outliving a reconnect would strand the flag false, since the
-   * ReadyForQuery listener that re-arms it is attached per `pg.Client`.
-   *
-   * Mirrors: PostgreSQLAdapter#build_statement_pool
+   * Mirrors: PostgreSQLAdapter#build_statement_pool (postgresql_adapter.rb:1055)
    * @internal
    */
-  buildStatementPool(client: pg.Client): StatementPool {
+  buildStatementPool(): StatementPool {
     return new StatementPool(
-      client,
+      this,
       PostgreSQLAdapter.typeCastConfigToInteger(this._statementLimit) as number,
-      () => {
-        if (this._rawConnection === client) this._commandSettled = false;
-      },
     );
   }
 
@@ -4778,24 +4763,18 @@ export interface PreparedStatement {
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::StatementPool
  */
 export class StatementPool extends GenericStatementPool<PreparedStatement> {
-  private _client: pg.Client | null;
+  private _connection: PostgreSQLAdapter;
   // Per-pool counter. Rails' PG StatementPool uses `@counter` on the
   // pool instance so names are scoped to the session — matches the
   // session-scoped nature of PG prepared statements and lets the
   // adapter own zero state about naming.
   private _counter = 0;
   private _deallocating: Promise<void> = Promise.resolve();
-  private _onIssue: () => void;
 
-  /**
-   * Rails' pool takes the connection (`postgresql_adapter.rb:296`) and reaches
-   * `@connection.@raw_connection` at dealloc time; trails' holds the client, so
-   * `onIssue` is the one piece of connection state it still needs.
-   */
-  constructor(client: pg.Client, maxSize = 1000, onIssue: () => void = () => {}) {
+  /** Mirrors: PostgreSQL::StatementPool#initialize (postgresql_adapter.rb:296) */
+  constructor(connection: PostgreSQLAdapter, maxSize = 1000) {
     super(maxSize);
-    this._client = client;
-    this._onIssue = onIssue;
+    this._connection = connection;
   }
 
   /**
@@ -4818,8 +4797,13 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
    * it (`_deallocating`), and that chain is what `[]=` / `clear` hand back.
    */
   protected override dealloc(stmt: PreparedStatement): void | Promise<void> {
-    const client = this._client;
-    if (!client) return;
+    // Rails re-reads `@connection.@raw_connection` here and only sends the
+    // DEALLOCATE `if conn.status == PG::CONNECTION_OK` (postgresql_adapter.rb:
+    // 308-314) — a reconnect invalidates the whole pool, so a stale handle is
+    // simply skipped. `_ending`/`_ended` is node-pg's analogue of a handle that
+    // is no longer CONNECTION_OK (see `_rawConnectionFinished`).
+    const client = this._connection._rawConnection as (pg.Client & PgClientLiveness) | null;
+    if (!client || client._ending === true || client._ended === true) return;
     // Best-effort async cleanup. The server drops prepared statements on
     // session close, so a swallowed failure here is safe — Rails' PG::
     // StatementPool#dealloc likewise rescues PG::InvalidSqlStatementName /
@@ -4829,7 +4813,11 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(stmt.name)}`;
     this._deallocating = this._deallocating
       .then(() => {
-        this._onIssue();
+        // Keeps `_commandSettled`'s invariant across the eviction DEALLOCATE,
+        // guarded on the client still being the pinned one: a DEALLOCATE
+        // outliving a reconnect would strand the flag false, since the
+        // ReadyForQuery listener that re-arms it is attached per `pg.Client`.
+        if (this._connection._rawConnection === client) this._connection._commandSettled = false;
         return client.query(deallocSql);
       })
       .then(
@@ -4837,18 +4825,6 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
         () => {},
       );
     return this._deallocating;
-  }
-
-  /**
-   * Mark the pool detached from its client (e.g. on connection release
-   * or close). Prevents late DEALLOCATE calls from racing with a
-   * client that's already back in the pg.Pool — the server will
-   * discard statements on session end anyway. Rails' StatementPool holds the
-   * raw connection for its whole lifetime and has no counterpart, so this stays
-   * Rails-private.
-   */
-  _detach(): void {
-    this._client = null;
   }
 }
 

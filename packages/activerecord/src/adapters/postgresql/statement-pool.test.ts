@@ -236,12 +236,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Simulate the failed-session window by detaching the live
       // connection before clearCacheBang.
       const conn = adapter._rawConnectionForTest();
-      // @ts-expect-error — driving the reset path by force-clearing _rawConnection.
+      // Driving the reset path by force-clearing _rawConnection.
       adapter._rawConnection = null;
       await adapter.clearCacheBang();
       expect(adapter._needsDeallocateAllForTest()).toBe(true);
       // Restore so the afterEach close() doesn't double-end.
-      // @ts-expect-error — restoring _rawConnection for cleanup.
+      // Restoring _rawConnection for cleanup.
       adapter._rawConnection = conn;
       // The next acquire runs DEALLOCATE ALL before any user query.
       expect(conn).not.toBeNull();

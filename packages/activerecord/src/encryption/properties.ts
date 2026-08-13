@@ -112,8 +112,16 @@ export class Properties {
     return this.get("iv") as string | undefined;
   }
 
+  set iv(value: string | Buffer | undefined) {
+    this.set("iv", value);
+  }
+
   get authTag(): string | undefined {
     return this.get("at") as string | undefined;
+  }
+
+  set authTag(value: string | Buffer | undefined) {
+    this.set("at", value);
   }
 
   validateValueType(value: unknown): void {
