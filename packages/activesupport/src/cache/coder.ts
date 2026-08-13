@@ -116,6 +116,31 @@ function decode(node: unknown): unknown {
   return decoded;
 }
 
+// `Marshal.dump` writes a String's bytes verbatim, so a binary-ish value keeps
+// its byte size in the payload and deflating it is a loss — which is what
+// `compression ignores incompressible data`
+// (cache_store_compression_behavior.rb:71-74) asserts. `JSON.stringify` instead
+// emits every control character as a six-byte `\uXXXX` escape, more than
+// doubling such a payload and making it deflate well. So the escapes are undone
+// on the way out and redone on the way in; the two passes are exact inverses,
+// since a dump carries no raw control character it did not itself unescape.
+const CONTROL_CHAR_ESCAPE = /\\u00[01][0-9a-f]/g;
+
+function unescapeControlChars(json: string): string {
+  return json.replace(CONTROL_CHAR_ESCAPE, (escape) =>
+    String.fromCharCode(parseInt(escape.slice(2), 16)),
+  );
+}
+
+function escapeControlChars(dumped: string): string {
+  let escaped = "";
+  for (const char of dumped) {
+    const code = char.charCodeAt(0);
+    escaped += code < 0x20 ? `\\u${code.toString(16).padStart(4, "0")}` : char;
+  }
+  return escaped;
+}
+
 /**
  * The trails Marshal-equivalent cache serializer. Mirrors the `dump`/`load`
  * surface of Rails' `Cache::Coder` while preserving JS type fidelity (Date,
@@ -125,10 +150,10 @@ function decode(node: unknown): unknown {
  */
 export const coder = {
   dump(value: unknown): string {
-    return JSON.stringify(encode(value));
+    return unescapeControlChars(JSON.stringify(encode(value)));
   },
   load(dumped: string): unknown {
-    return decode(JSON.parse(dumped));
+    return decode(JSON.parse(escapeControlChars(dumped)));
   },
 };
 

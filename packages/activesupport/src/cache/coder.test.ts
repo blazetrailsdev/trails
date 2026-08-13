@@ -75,4 +75,17 @@ describe("cache coder fidelity", () => {
     const value = { name: "test", count: 42, on: true, tags: ["a", "b"] };
     expect(roundtrip(value)).toEqual(value);
   });
+
+  it("dumps control characters raw so a binary-ish payload keeps its byte size", () => {
+    // Ruby's `[*0..127].pack("C*")`, whose Marshal payload tracks its 128 bytes.
+    const value = Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join("");
+    expect(coder.dump(value).length).toBeLessThan(value.length + 16);
+    expect(roundtrip(value)).toBe(value);
+  });
+
+  it("round-trips strings that spell a control-character escape", () => {
+    for (const value of ["\\u0001", "\\" + String.fromCharCode(1), String.fromCharCode(1) + "\\"]) {
+      expect(roundtrip(value)).toBe(value);
+    }
+  });
 });
