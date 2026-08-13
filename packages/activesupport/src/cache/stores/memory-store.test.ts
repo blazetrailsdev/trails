@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
+import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
@@ -80,6 +81,12 @@ describe("MemoryStoreTest", () => {
   // Mirrors `include CacheStoreSerializerBehavior` (memory_store_test.rb:20).
   cacheStoreSerializerBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
+  });
+
+  // Mirrors `include CacheInstrumentationBehavior` (memory_store_test.rb:23).
+  cacheInstrumentationBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
+    storeName: "MemoryStore",
   });
 
   // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);

@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
+import { UnserializableObjectError } from "../../message-pack/extensions.js";
 import type { Store, StoreOptions } from "../store.js";
 
 // Mirrors Rails `CacheStoreSerializerBehavior`
@@ -7,6 +8,9 @@ import type { Store, StoreOptions } from "../store.js";
 // Ruby's `include CacheStoreSerializerBehavior` is spelled here as a function
 // the store test file calls inside its own describe, the trails spelling of a
 // test-behavior mixin (see cache-store-compression-behavior.ts).
+
+// Ruby writes `Object.new`, which MessagePack has no extension for.
+class UnserializableObject {}
 
 /** @internal */
 export interface CacheStoreSerializerBehaviorHost {
@@ -54,6 +58,8 @@ export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorH
 
     cache.write(key, 123);
     expect(cache.read(key)).toBe(123);
+
+    expect(() => cache.write(key, new UnserializableObject())).toThrow(UnserializableObjectError);
   });
 
   it("specifying a serializer raises when also specifying a coder", () => {

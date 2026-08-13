@@ -3,8 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { FileStore } from "../file-store.js";
+import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
+import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
 // Rails reaches the private path helper with `@cache.send(:normalize_key, key, {})`
 // (file_store_test.rb:63).
@@ -168,6 +170,17 @@ describe("FileStoreTest", () => {
 
   // Mirrors `include CacheStoreBehavior` (file_store_test.rb:32).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
+
+  // Mirrors `include CacheInstrumentationBehavior` (file_store_test.rb:40).
+  cacheInstrumentationBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+    storeName: "FileStore",
+  });
+
+  // Mirrors `include CacheStoreSerializerBehavior` (file_store_test.rb:36).
+  cacheStoreSerializerBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
 
   // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
   cacheStoreCompressionBehavior({

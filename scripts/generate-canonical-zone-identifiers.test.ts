@@ -45,8 +45,8 @@ describe("generate-canonical-zone-identifiers", () => {
   // starts canonicalizing on its own — silently changes what `countryZones`
   // answers. Regenerating the table here turns that into a red test and a
   // reviewable diff.
-  it("reproduces the committed CANONICAL_ZONE_IDENTIFIERS table", async () => {
-    if (!(await hasTzinfo())) return;
+  it("reproduces the committed CANONICAL_ZONE_IDENTIFIERS table", async (ctx) => {
+    if (!(await hasTzinfo())) ctx.skip();
 
     const { stdout } = await execFileAsync("pnpm", ["tsx", GENERATOR], {
       cwd: REPO_ROOT,
