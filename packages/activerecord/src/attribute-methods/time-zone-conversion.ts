@@ -178,6 +178,14 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return extractUtc(value);
   }
 
+  override equals(other: Type): boolean {
+    if (!(other instanceof TimeZoneConverter)) return false;
+    const sub = this._subtype as ValueTypeInstance;
+    return typeof sub.equals === "function"
+      ? sub.equals(other._subtype)
+      : this._subtype === other._subtype;
+  }
+
   /**
    * Rails' `DelegateClass(Type::Value)` forwards `map` to the wrapped subtype,
    * so `map` is the SUBTYPE's hook: `Type::Value#map` returns the value
@@ -202,14 +210,6 @@ export class TimeZoneConverter extends ValueType<unknown> {
     if (typeof value === "number" && !Number.isFinite(value)) return value;
 
     return this.map(value, (v) => this.convertTimeToTimeZone(v));
-  }
-
-  override equals(other: Type): boolean {
-    if (!(other instanceof TimeZoneConverter)) return false;
-    const sub = this._subtype as ValueTypeInstance;
-    return typeof sub.equals === "function"
-      ? sub.equals(other._subtype)
-      : this._subtype === other._subtype;
   }
 }
 
