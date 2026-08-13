@@ -14,13 +14,9 @@ import * as XmlMini_REXML from "./rexml.js";
 
 /**
  * `REXMLEngineTest#engine` (`rexml_engine_test.rb:20-22`), which Ruby uses
- * both as the `XmlMini.backend=` argument and to name the constant. The
- * backend module namespace object is what `cast_backend_name_to_module`
- * (`xml_mini.rb:200-206`) resolves the name to, and the value passed here:
- * under vitest the name arm's `import("./xml-mini/rexml.js")` has no `.js`
- * file to glob, so the name is only spelled where it is compared.
+ * both as the `XmlMini.backend=` argument and to name the constant.
  */
-const engine = XmlMini_REXML;
+const engine = "REXML";
 
 /** `REXMLEngineTest#expansion_attack_error` (`rexml_engine_test.rb:24-26`). */
 const expansionAttackError = RuntimeError;

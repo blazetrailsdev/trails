@@ -37,6 +37,11 @@ export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant;
  * parameter takes both arms Rails accepts — a `TimeZone` object and a String
  * identifying one — because `Time.find_zone!` dispatches on both.
  */
+export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
+export function inTimeZone(
+  dateOrTime: Date | Temporal.Instant,
+  zone?: unknown,
+): TimeWithZone | Temporal.Instant;
 export function inTimeZone(
   dateOrTime: DateOrTime,
   zone: unknown = getZone(),
