@@ -645,7 +645,7 @@ export class LookupContext {
     };
 
     // Render the template
-    let output = await this.renderTemplate(template, locals, context);
+    let output = await this.renderTemplate(template, locals, context, variants);
 
     // Apply layout
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
@@ -656,7 +656,7 @@ export class LookupContext {
           ...context,
           yield: output,
         };
-        output = await this.renderTemplate(layoutTemplate, locals, layoutContext);
+        output = await this.renderTemplate(layoutTemplate, locals, layoutContext, variants);
       }
     }
 
@@ -696,7 +696,7 @@ export class LookupContext {
       format,
     };
 
-    return this.renderTemplate(template, locals, context);
+    return this.renderTemplate(template, locals, context, variants);
   }
 
   /**
@@ -715,6 +715,7 @@ export class LookupContext {
     format: string,
     collection: unknown[],
     as?: string,
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
   ): Promise<string> {
     const varName = as ?? partial;
     const parts: string[] = [];
@@ -725,7 +726,7 @@ export class LookupContext {
         [`${varName}_counter`]: i,
         [`${varName}_iteration`]: { index: i, first: i === 0, last: i === collection.length - 1 },
       };
-      parts.push(await this.renderPartial(partial, prefix, format, locals));
+      parts.push(await this.renderPartial(partial, prefix, format, locals, variants));
     }
 
     return parts.join("");
@@ -738,6 +739,7 @@ export class LookupContext {
     template: Template,
     locals: Record<string, unknown>,
     context: RenderContext,
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
   ): Promise<string> {
     const handler = TemplateHandlers.handlerForExtension(template.extension);
     if (!handler) {
@@ -751,7 +753,7 @@ export class LookupContext {
       ...context,
       templatePath: template.fullPath ?? template.identifier,
       renderPartial: (name, partialLocals) =>
-        this.renderPartialSync(name, context.controller, context.format, partialLocals),
+        this.renderPartialSync(name, context.controller, context.format, partialLocals, variants),
     });
   }
 
@@ -779,12 +781,13 @@ export class LookupContext {
     prefix: string,
     format: string,
     locals: Record<string, unknown> = {},
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
   ): string {
     const slash = name.lastIndexOf("/");
     const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
     const partialName = slash === -1 ? name : name.slice(slash + 1);
 
-    const template = this.findPartial(partialName, partialPrefix, format);
+    const template = this.findPartial(partialName, partialPrefix, format, variants);
     if (!template) {
       throw new MissingTemplate(
         partialPrefix,
@@ -809,7 +812,7 @@ export class LookupContext {
       format,
       templatePath: template.fullPath ?? template.identifier,
       renderPartial: (nested, nestedLocals) =>
-        this.renderPartialSync(nested, partialPrefix, format, nestedLocals),
+        this.renderPartialSync(nested, partialPrefix, format, nestedLocals, variants),
     });
 
     if (typeof output !== "string") {

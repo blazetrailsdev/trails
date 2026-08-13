@@ -439,6 +439,7 @@ export class Base extends Metal {
           format,
           options.collection,
           options.as,
+          options.variant,
         );
       } else {
         this.body = await ctx.renderPartial(

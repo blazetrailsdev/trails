@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { MissingTemplate, LookupContext } from "./lookup-context.js";
+import { TemplateHandlers } from "./template/handlers.js";
+import { Tse } from "./template/handlers/tse.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 
 describe("MissingTemplate#corrections", () => {
@@ -101,5 +103,60 @@ describe("LookupContext allCandidatePaths wiring", () => {
     expect(caught).toBeInstanceOf(MissingTemplate);
     expect(caught!.candidatePaths).toContain("posts/_form");
     expect(caught!.corrections).toContain("posts/form");
+  });
+});
+
+describe("LookupContext variant propagation", () => {
+  const tse = new Tse();
+  TemplateHandlers.registerTemplateHandler(...tse.extensions, tse);
+  afterEach(() => {
+    TemplateHandlers.clear();
+    TemplateHandlers.registerTemplateHandler(...tse.extensions, tse);
+  });
+
+  /**
+   * Resolver whose templates are keyed `prefix/name` with an optional
+   * `+variant` suffix, mirroring `FileSystemResolver`'s precedence.
+   */
+  function variantResolver(templates: Record<string, string>): TemplateResolver {
+    return {
+      find: (name, prefix, _format, _extensions, variants = []) => {
+        for (const variant of variants) {
+          const hit = templates[`${prefix}/${name}+${variant}`];
+          if (hit !== undefined) return { source: hit, extension: "tse" } as never;
+        }
+        const plain = templates[`${prefix}/${name}`];
+        return plain === undefined ? null : ({ source: plain, extension: "tse" } as never);
+      },
+      allTemplatePaths: () => Object.keys(templates),
+    };
+  }
+
+  function contextWith(templates: Record<string, string>): LookupContext {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(variantResolver(templates));
+    return ctx;
+  }
+
+  it("resolves a nested partial against the variant the outer render used", async () => {
+    const ctx = contextWith({
+      "posts/index": '<%= render({ partial: "row" }) %>',
+      "posts/_row": "plain-row",
+      "posts/_row+phone": "phone-row",
+    });
+
+    const output = await ctx.render("posts", "index", "html", {}, { variants: ["phone"] });
+    expect(output).toBe("phone-row");
+  });
+
+  it("falls back to the plain partial when no variant is active", async () => {
+    const ctx = contextWith({
+      "posts/index": '<%= render({ partial: "row" }) %>',
+      "posts/_row": "plain-row",
+      "posts/_row+phone": "phone-row",
+    });
+
+    const output = await ctx.render("posts", "index", "html", {}, {});
+    expect(output).toBe("plain-row");
   });
 });
