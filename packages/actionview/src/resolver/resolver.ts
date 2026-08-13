@@ -12,7 +12,18 @@ import type { TemplatePath } from "../template-path.js";
 import type { Template } from "../template.js";
 
 export interface TemplateResolver {
-  find(name: string, prefix: string, format: string, extensions: string[]): Template | null;
+  /**
+   * `variants` mirrors Rails' `variants:` detail: a template named
+   * `show.html+phone.tse` wins over `show.html.tse` when `:phone` is active.
+   * Optional so resolvers that predate variant support stay compatible.
+   */
+  find(
+    name: string,
+    prefix: string,
+    format: string,
+    extensions: string[],
+    variants?: ReadonlyArray<string>,
+  ): Template | null;
 
   /** @internal */
   findLayout?(name: string, format: string, extensions: string[]): Template | null;

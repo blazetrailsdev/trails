@@ -20,10 +20,24 @@ export class FileSystemResolver extends Resolver implements TemplateResolver {
     return this.basePath;
   }
 
-  find(name: string, prefix: string, format: string, extensions: string[]): Template | null {
+  find(
+    name: string,
+    prefix: string,
+    format: string,
+    extensions: string[],
+    variants: ReadonlyArray<string> = [],
+  ): Template | null {
     const dir = getPath().join(this.basePath, prefix);
 
     for (const ext of extensions) {
+      // Rails orders a variant match ahead of the plain format match:
+      // `show.html+phone.erb` beats `show.html.erb` when `:phone` is active.
+      for (const variant of variants) {
+        const variantPath = getPath().join(dir, `${name}.${format}+${variant}.${ext}`);
+        if (getFs().existsSync(variantPath)) {
+          return this.buildTemplate(variantPath, name, prefix, format, ext);
+        }
+      }
       const formatPath = getPath().join(dir, `${name}.${format}.${ext}`);
       if (getFs().existsSync(formatPath)) {
         return this.buildTemplate(formatPath, name, prefix, format, ext);

@@ -285,11 +285,17 @@ export class Base extends Metal {
    * a variant; trails' LookupContext resolves against a single controller
    * prefix and format, so those arguments have no counterpart yet.
    */
-  templateExists(action: string, prefixes: string[] = this._prefixes()): boolean {
+  templateExists(
+    action: string,
+    prefixes: string[] = this._prefixes(),
+    options: { variants?: ReadonlyArray<string> } = { variants: this.request?.variant },
+  ): boolean {
     const ctx = (this.constructor as typeof Base).lookupContext;
     if (!ctx) return false;
     const format = this._lookupFormat();
-    return prefixes.some((prefix) => ctx.findTemplate(action, prefix, format) !== null);
+    return prefixes.some(
+      (prefix) => ctx.findTemplate(action, prefix, format, options.variants) !== null,
+    );
   }
 
   /**

@@ -36,13 +36,17 @@ export interface ImplicitRenderHost {
     format?: { symbol: string | null };
     /** Rails `request.formats`, reported in both exception messages. */
     formats?: ReadonlyArray<{ toString(): string }>;
-    /** Rails `request.variant`, reported in the UnknownFormat message. */
-    variant?: unknown;
+    /** Rails `request.variant` — an `ArrayInquirer`, which is an Array. */
+    variant?: ReadonlyArray<string>;
     /** Rails `request.xhr?`. */
     xhr?: boolean;
   };
   _prefixes?(): string[];
-  templateExists?(action: string, prefixes?: string[], opts?: unknown): boolean;
+  templateExists?(
+    action: string,
+    prefixes?: string[],
+    options?: { variants?: ReadonlyArray<string> },
+  ): boolean;
   anyTemplates?(action: string, prefixes?: string[]): boolean;
   head(status: number): void;
   render(): void;
@@ -58,7 +62,7 @@ export interface ImplicitRenderHost {
 export function defaultRender(this: ImplicitRenderHost): void {
   const name = this.constructor.name;
   const prefixes = this._prefixes?.();
-  if (this.templateExists?.(this.actionName, prefixes)) {
+  if (this.templateExists?.(this.actionName, prefixes, { variants: this.request?.variant })) {
     this.render();
     return;
   }

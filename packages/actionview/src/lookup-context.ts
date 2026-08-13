@@ -549,12 +549,17 @@ export class LookupContext {
    *
    * @internal
    */
-  findTemplate(name: string, prefix: string, format: string): Template | null {
+  findTemplate(
+    name: string,
+    prefix: string,
+    format: string,
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
+  ): Template | null {
     const extensions = TemplateHandlers.extensions();
     if (extensions.length === 0) return null;
 
     for (const resolver of this.resolvers) {
-      const template = resolver.find(name, prefix, format, extensions);
+      const template = resolver.find(name, prefix, format, extensions, variants);
       if (template) return template;
     }
     return null;
@@ -735,23 +740,25 @@ export class LookupContext {
   }
 
   /**
-   * Render a partial synchronously, for a nested `render partial:` inside a
-   * compiled template. Rails' partial rendering is synchronous end to end;
-   * trails' handler protocol permits an async `render`, so a handler that
-   * returns a promise cannot be nested and says so rather than emitting
-   * `[object Promise]`.
+   * Plumbing behind the view's `render` helper, not a public lookup API.
+   *
+   * Rails exposes nested partial rendering on the view — `render "form"` /
+   * `render partial:` from `RenderingHelper`
+   * (`actionview/lib/action_view/helpers/rendering_helper.rb:13-61`) — and
+   * trails keeps that shape: templates call `render(...)` on the render
+   * context, which reaches this through `RenderContext.renderPartial`.
+   * Private so the view stays the only public entry point.
+   *
+   * Rails' partial rendering is synchronous end to end; trails' handler
+   * protocol permits an async `render`, so a handler returning a promise
+   * cannot be nested and says so rather than emitting `[object Promise]`.
    *
    * `name` may be qualified (`"users/user"`), in which case the leading
    * segments replace `prefix` — mirroring `PartialRenderer#partial_path`.
    *
-   * @noRailsEquivalent CONVERGEABLE (story:
-   * 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope).
-   * Rails has no sync/async split: a template is compiled into a method on
-   * `ActionView::Base`, so nested `render` is just a call on the view. This
-   * exists only because a trails handler receives source + locals rather than
-   * a view object, and is deleted when that lands.
+   * @internal
    */
-  renderPartialSync(
+  private renderPartialSync(
     name: string,
     prefix: string,
     format: string,

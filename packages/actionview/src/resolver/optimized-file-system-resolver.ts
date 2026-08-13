@@ -19,11 +19,12 @@ export class OptimizedFileSystemResolver extends FileSystemResolver {
     prefix: string,
     format: string,
     extensions: string[],
+    variants: ReadonlyArray<string> = [],
   ): Template | null {
-    const key = `${prefix}\0${name}\0${format}\0${extensions.join(",")}`;
+    const key = `${prefix}\0${name}\0${format}\0${extensions.join(",")}\0${variants.join(",")}`;
     const cached = this.cache.get(key);
     if (cached !== undefined) return cached;
-    const result = super.find(name, prefix, format, extensions);
+    const result = super.find(name, prefix, format, extensions, variants);
     this.cache.set(key, result);
     return result;
   }
