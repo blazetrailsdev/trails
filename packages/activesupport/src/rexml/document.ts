@@ -29,7 +29,24 @@ export class ParseException extends Error {
  * not Rails; `XmlMini_REXML` `require`s it.
  */
 export class Text {
-  constructor(public readonly value: string) {}
+  constructor(
+    private readonly raw: string,
+    private readonly entities: Record<string, string> = {},
+  ) {}
+
+  /**
+   * Mirrors: REXML::Text#value — the unescaped text, with the DOCTYPE's
+   * internal-subset entities expanded. REXML expands lazily, here as there:
+   * `Document.new` on a billion-laughs payload succeeds and the
+   * `entity expansion has grown too large` RuntimeError is raised at the first
+   * `#value`, which is where `XmlMini_REXML#merge_texts!` reads it.
+   *
+   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
+   * not Rails.
+   */
+  get value(): string {
+    return unescapeXml(this.raw, this.entities);
+  }
 }
 
 /**
@@ -135,18 +152,66 @@ function escapeXml(text: string): string {
 }
 
 /**
- * Resolve the standard entities and numeric character references. Entities
- * declared in an internal DTD subset are deliberately NOT expanded: that is the
- * billion-laughs vector, and REXML caps expansion for the same reason.
+ * Mirrors: RuntimeError — what REXML raises when an entity expands past
+ * `REXML::Security.entity_expansion_text_limit` / `entity_expansion_limit`, and
+ * what `XMLMiniEngineTest#test_exception_thrown_on_expansion_attack` asserts
+ * through `REXMLEngineTest#expansion_attack_error`
+ * (activesupport/test/xml_mini/rexml_engine_test.rb:24-25).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `RuntimeError`, not Rails.
  */
-function unescapeXml(text: string): string {
-  return text.replace(/&(#x?[0-9a-fA-F]+|[^;\s&]+);/g, (match, ref: string) => {
-    if (ref.startsWith("#")) {
-      const code = ref.startsWith("#x") ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
-    }
-    return ENTITIES[ref] ?? match;
-  });
+export class RuntimeError extends Error {
+  override name = "RuntimeError";
+}
+
+/** REXML::Security.entity_expansion_limit. */
+const ENTITY_EXPANSION_LIMIT = 10000;
+
+/** REXML::Security.entity_expansion_text_limit. */
+const ENTITY_EXPANSION_TEXT_LIMIT = 10240;
+
+/**
+ * Resolve the standard entities, numeric character references and the
+ * DOCTYPE's internal-subset entities, under REXML's expansion caps: a
+ * billion-laughs payload raises `RuntimeError: entity expansion has grown too
+ * large` rather than expanding, which is verified against MRI REXML 3.4.
+ */
+function unescapeXml(text: string, entities: Record<string, string> = {}): string {
+  let expansions = 0;
+
+  const expand = (source: string): string =>
+    source.replace(/&(#x?[0-9a-fA-F]+|[^;\s&]+);/g, (match, ref: string) => {
+      if (ref.startsWith("#")) {
+        const code = ref.startsWith("#x") ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10);
+        return Number.isNaN(code) ? match : String.fromCodePoint(code);
+      }
+      if (ENTITIES[ref] !== undefined) return ENTITIES[ref];
+      const value = entities[ref];
+      if (value === undefined) return match;
+      expansions += 1;
+      if (expansions > ENTITY_EXPANSION_LIMIT) {
+        throw new RuntimeError("number of entity expansions exceeded, processing aborted");
+      }
+      const expanded = expand(value);
+      if (expanded.length > ENTITY_EXPANSION_TEXT_LIMIT) {
+        throw new RuntimeError("entity expansion has grown too large");
+      }
+      return expanded;
+    });
+
+  const result = expand(text);
+  if (result.length > ENTITY_EXPANSION_TEXT_LIMIT) {
+    throw new RuntimeError("entity expansion has grown too large");
+  }
+  return result;
+}
+
+/** Read the `<!ENTITY name "value">` declarations out of an internal DTD subset. */
+function parseEntityDeclarations(subset: string): Record<string, string> {
+  const entities: Record<string, string> = {};
+  const declaration = /<!ENTITY\s+([^\s%]+)\s+("([^"]*)"|'([^']*)')\s*>/g;
+  for (const m of subset.matchAll(declaration)) entities[m[1]] = m[3] ?? m[4];
+  return entities;
 }
 
 const NAME = /[^\s/>]+/y;
@@ -165,6 +230,9 @@ export class Document {
    * not Rails.
    */
   root: Element | undefined;
+
+  /** The DOCTYPE internal-subset entities, expanded lazily by {@link Text#value}. */
+  private entities: Record<string, string> = {};
 
   constructor(source: string) {
     this.parse(source);
@@ -201,7 +269,7 @@ export class Document {
       if (next > pos) {
         const text = source.slice(pos, next);
         const parent = stack[stack.length - 1];
-        if (parent) parent.children.push(new Text(unescapeXml(text)));
+        if (parent) parent.children.push(new Text(text, this.entities));
         pos = next;
       }
 
@@ -213,7 +281,7 @@ export class Document {
         const end = source.indexOf("]]>", pos);
         if (end === -1) fail(`Missing end of CDATA at ${pos}`);
         const parent = stack[stack.length - 1];
-        if (parent) parent.children.push(new Text(source.slice(pos + 9, end)));
+        if (parent) parent.children.push(new Text(escapeXml(source.slice(pos + 9, end))));
         pos = end + 3;
       } else if (source.startsWith("<!", pos)) {
         // A DOCTYPE, with or without an internal subset.
@@ -221,6 +289,9 @@ export class Document {
         const close = source.indexOf(">", pos);
         if (close === -1) fail(`Missing end of declaration at ${pos}`);
         if (subset !== -1 && subset < close) {
+          const subsetEnd = source.indexOf("]", subset);
+          if (subsetEnd === -1) fail(`Missing end of declaration at ${pos}`);
+          this.entities = parseEntityDeclarations(source.slice(subset + 1, subsetEnd));
           skipTo("]");
           skipTo(">");
         } else {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Document, Element, ParseException, Text } from "./document.js";
+import { Document, Element, ParseException, RuntimeError, Text } from "./document.js";
 
 // REXML is Ruby stdlib, so there is no Rails test file to mirror: these cover
 // the slice of the parser `XmlMini_REXML` drives.
@@ -41,9 +41,25 @@ describe("REXML::Document", () => {
     expect(doc.root!.texts.map((t) => t.value)).toEqual(["<b>hi</b>"]);
   });
 
-  it("skips a DOCTYPE with an internal subset without expanding its entities", () => {
+  it("expands the internal DTD subset entities", () => {
     const doc = new Document(`<!DOCTYPE root [<!ENTITY a "aaa">]><root>&a;</root>`);
-    expect(doc.root!.texts.map((t) => t.value)).toEqual(["&a;"]);
+    expect(doc.root!.texts.map((t) => t.value)).toEqual(["aaa"]);
+  });
+
+  it("raises RuntimeError when an entity expands past REXML's text limit", () => {
+    const doc = new Document(`<?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE member [
+        <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+        <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+        <!ENTITY c "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+        <!ENTITY d "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+        <!ENTITY e "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+        <!ENTITY f "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+        <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      ]>
+      <member>&a;</member>`);
+    // REXML expands lazily: the document parses, #value raises.
+    expect(() => doc.root!.texts.map((t) => t.value)).toThrow(RuntimeError);
   });
 
   it("raises ParseException on an unclosed tag", () => {
