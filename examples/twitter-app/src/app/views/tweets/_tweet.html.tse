@@ -1,0 +1,23 @@
+<article class="tweet">
+  <p class="byline">
+    <a href="/@<%= tweet.user.handle %>"><%= tweet.user.display_name %></a>
+    <span class="handle">@<%= tweet.user.handle %></span>
+  </p>
+  <p class="body"><%= tweet.body %></p>
+  <p class="actions">
+    <a href="/tweets/<%= tweet.id %>">permalink</a>
+    <% if (isLoggedIn) { %>
+      <form method="post" action="/tweets/<%= tweet.id %>/like" class="inline">
+        <button type="submit">Like</button>
+      </form>
+      <form method="post" action="/tweets/<%= tweet.id %>/unlike" class="inline">
+        <button type="submit">Unlike</button>
+      </form>
+    <% } %>
+    <% if (isLoggedIn && currentUser.id === tweet.user.id) { %>
+      <form method="post" action="/tweets/<%= tweet.id %>?_method=delete" class="inline">
+        <button type="submit">Delete</button>
+      </form>
+    <% } %>
+  </p>
+</article>

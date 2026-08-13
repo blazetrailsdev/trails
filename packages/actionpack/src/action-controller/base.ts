@@ -290,8 +290,26 @@ export class Base extends Metal {
   templateExists(action: string): boolean {
     const ctx = (this.constructor as typeof Base).lookupContext;
     if (!ctx) return false;
-    const format = this.request?.format?.symbol ?? "html";
+    const format = this._lookupFormat();
     return ctx.findTemplate(action, this.controllerPath(), format) !== null;
+  }
+
+  /**
+   * The format templates are looked up under.
+   *
+   * Rails assigns `lookup_context.formats = request.formats.map(&:ref)` and
+   * `LookupContext#formats=` expands the catch-all into the default formats
+   * (`lookup_context.rb:263-266`, `values.concat(default_formats) if
+   * values.delete` the catch-all), so a browser sending an `Accept` of
+   * `star/star` resolves to HTML. Trails' LookupContext takes a single
+   * format, so the expansion happens here; `html` heads Rails' default list.
+   *
+   * @internal
+   */
+  private _lookupFormat(): string {
+    const symbol = this.request?.format?.symbol;
+    if (symbol == null || symbol === "*/*" || symbol === "all") return "html";
+    return symbol;
   }
 
   /**
@@ -332,7 +350,7 @@ export class Base extends Metal {
     }
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format?.symbol ?? "html";
+    const format = this._lookupFormat();
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
     const layout =
@@ -912,7 +930,7 @@ export class Base extends Metal {
     if (!resolver) return;
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format?.symbol ?? "html";
+    const format = this._lookupFormat();
     const template = resolver(controllerPrefix, action, format);
     if (template) {
       this.contentType = "text/html; charset=utf-8";

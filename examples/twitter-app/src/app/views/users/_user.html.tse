@@ -1,0 +1,4 @@
+<li class="user">
+  <a href="/@<%= user.handle %>"><%= user.display_name %></a>
+  <span class="handle">@<%= user.handle %></span>
+</li>

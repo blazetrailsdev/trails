@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowArbitraryExtensions": true,
+    "plugins": [
+      {
+        "name": "@blazetrails/trails-tsc/ts-plugin",
+        "viewsDir": "src/app/views"
+      }
+    ],
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "db/**/*.ts",
+    "test/**/*.ts",
+    "config.ts",
+    "vite.config.ts",
+    ".trails/template-registry-augmentation.d.ts"
+  ]
+}

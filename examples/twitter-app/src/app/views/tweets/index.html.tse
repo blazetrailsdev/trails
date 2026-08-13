@@ -1,0 +1,9 @@
+<h1>Timeline</h1>
+
+<% if (tweets.length === 0) { %>
+  <p class="empty">Nothing here yet. Follow someone, or post the first tweet.</p>
+<% } %>
+
+<% for (const tweet of tweets) { %>
+  <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+<% } %>

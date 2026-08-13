@@ -1,0 +1,44 @@
+{
+  "name": "@blazetrails/example-twitter-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.tse": {
+      "types": "./.trails/views/*.tse.d.ts",
+      "default": "./.trails/views/*.tse.js"
+    }
+  },
+  "scripts": {
+    "dev": "TRAILS_ENV=development tsx watch src/server.ts",
+    "db:create": "trails db create",
+    "db:migrate": "trails db migrate",
+    "db:seed": "tsx db/seed.ts",
+    "db:setup": "trails db create && trails db migrate && pnpm db:seed && TRAILS_ENV=test trails db create && TRAILS_ENV=test trails db test:prepare",
+    "db:reset": "trails db drop && trails db create && trails db migrate && pnpm db:seed",
+    "smoke": "TRAILS_ENV=test tsx test/integration/smoke.ts",
+    "start": "TRAILS_ENV=${TRAILS_ENV:-development} tsx src/server.ts",
+    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
+    "routes": "trails routes"
+  },
+  "dependencies": {
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "better-sqlite3": "^12.6.2",
+    "@blazetrails/date": "workspace:*"
+  },
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
+    "typescript": "^5.7.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0",
+    "tsx": "^4.21.0",
+    "@blazetrails/activerecord-cli": "workspace:*"
+  },
+  "description": "A server-rendered Twitter clone — the first full-stack trails application"
+}

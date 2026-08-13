@@ -1,0 +1,26 @@
+<h1><%= user.display_name %></h1>
+<p class="handle">@<%= user.handle %></p>
+<% if (user.bio) { %><p class="bio"><%= user.bio %></p><% } %>
+
+<p class="counts">
+  <a href="/@<%= user.handle %>/following"><%= followingCount %> following</a>
+  &middot;
+  <a href="/@<%= user.handle %>/followers"><%= followerCount %> followers</a>
+</p>
+
+<% if (isLoggedIn && currentUser.id !== user.id) { %>
+  <% if (isFollowing) { %>
+    <form method="post" action="/@<%= user.handle %>/unfollow">
+      <button type="submit">Unfollow</button>
+    </form>
+  <% } else { %>
+    <form method="post" action="/@<%= user.handle %>/follow">
+      <button type="submit">Follow</button>
+    </form>
+  <% } %>
+<% } %>
+
+<h2>Tweets</h2>
+<% for (const tweet of tweets) { %>
+  <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+<% } %>

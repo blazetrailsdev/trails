@@ -173,6 +173,7 @@ export class AppGenerator extends AppBase {
             "db:seed": "trails db seed",
             "db:setup": "trails db create && trails db migrate && trails db seed",
             "db:reset": "trails db drop && trails db setup",
+            typecheck: "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
             prepare: "trails-tsc-views build --views src/app/views",
           },
           dependencies: {
@@ -187,6 +188,8 @@ export class AppGenerator extends AppBase {
           },
           devDependencies: {
             "@blazetrails/trails-tsc": "*",
+            // Ships the `trails-tsc` bin the `typecheck` script above calls.
+            "@blazetrails/activerecord-cli": "*",
             typescript: "^5.7.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
@@ -606,12 +609,21 @@ export const filterParameters = [
 
     this.createFile(
       "src/app/models/application-record.ts",
-      tsModule({
-        imports: [{ from: "@blazetrails/activerecord", named: { ActiveRecord: "named" } }],
-        declarations: [
-          tsClass({ name: "ApplicationRecord", extends: ref("ActiveRecord.Base"), body: [] }),
-        ],
-      }),
+      // Mirrors railties' `application_record.rb.tt`, which is
+      // `class ApplicationRecord < ActiveRecord::Base; primary_abstract_class; end`.
+      // Written literally rather than through `tsModule` because the template
+      // builder cannot emit a `static {}` initializer block.
+      //
+      // `ActiveRecord` is the module-level config object (ar-config.ts), not a
+      // namespace holding `Base` — Rails' `ActiveRecord::Base` is `Base` here.
+      `import { Base } from "@blazetrails/activerecord";
+
+export class ApplicationRecord extends Base {
+  static {
+    this.primaryAbstractClass();
+  }
+}
+`,
     );
 
     this.createFile("src/app/models/concerns/.gitkeep", "");

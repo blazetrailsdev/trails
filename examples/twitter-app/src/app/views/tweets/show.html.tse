@@ -1,0 +1,5 @@
+<h1>Tweet</h1>
+
+<%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+
+<p><a href="/">&larr; Back to the timeline</a></p>

@@ -1,0 +1,11 @@
+<h1>Sign up</h1>
+
+<form method="post" action="/users">
+  <label>Handle <input type="text" name="user[handle]"></label>
+  <label>Display name <input type="text" name="user[display_name]"></label>
+  <label>Bio <input type="text" name="user[bio]"></label>
+  <label>Password <input type="password" name="user[password]"></label>
+  <button type="submit">Create account</button>
+</form>
+
+<p>Already have an account? <a href="/login">Log in</a>.</p>

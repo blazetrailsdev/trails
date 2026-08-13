@@ -1,0 +1,7 @@
+<h1>Followers of @<%= user.handle %></h1>
+
+<ul class="users">
+  <% for (const u of users) { %>
+    <%= render({ partial: "users/user", locals: { user: u } }) %>
+  <% } %>
+</ul>

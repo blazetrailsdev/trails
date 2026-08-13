@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>twitter-app</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/assets/stylesheets/application.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">twitter-app</a>
+    <nav>
+      <% if (isLoggedIn) { %>
+        <a href="/@<%= currentUser.handle %>">@<%= currentUser.handle %></a>
+        <a href="/tweets/new">Tweet</a>
+        <form method="post" action="/logout" class="inline">
+          <button type="submit">Log out</button>
+        </form>
+      <% } else { %>
+        <a href="/login">Log in</a>
+        <a href="/signup">Sign up</a>
+      <% } %>
+    </nav>
+  </header>
+
+  <% if (notice) { %><p class="flash notice"><%= notice %></p><% } %>
+  <% if (alert) { %><p class="flash alert"><%= alert %></p><% } %>
+
+  <main>
+    <%= yield %>
+  </main>
+</body>
+</html>

@@ -5,5 +5,42 @@
     "rubyName": "default_render",
     "call": "variant",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "any_templates?",
+    "rubyArgs": [
+      "ref:toS",
+      "ref:_prefixes"
+    ],
+    "kind": "args",
+    "reason": "Trails' LookupContext resolves a template from a single controller prefix and format; it has no `_prefixes` list and no variant support, so `templateExists` / `anyTemplates` take only the action name. Converges with 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope, which rebuilds template lookup around an ActionView::Base-like view object."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "template_exists?",
+    "rubyArgs": [
+      "ref:toS",
+      "ref:_prefixes",
+      "kwargs{variants=ref:variant}"
+    ],
+    "kind": "args",
+    "reason": "Trails' LookupContext resolves a template from a single controller prefix and format; it has no `_prefixes` list and no variant support, so `templateExists` / `anyTemplates` take only the action name. Converges with 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope, which rebuilds template lookup around an ActionView::Base-like view object."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "method_for_action",
+    "call": "template_exists?",
+    "rubyArgs": [
+      "ref:toS",
+      "ref:_prefixes"
+    ],
+    "kind": "args",
+    "reason": "Trails' LookupContext resolves a template from a single controller prefix and format; it has no `_prefixes` list and no variant support, so `templateExists` / `anyTemplates` take only the action name. Converges with 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope, which rebuilds template lookup around an ActionView::Base-like view object."
   }
 ]

@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 import { argv } from "@blazetrails/activesupport/process-adapter";
 import { getChildProcessAsync } from "@blazetrails/activesupport/child-process-adapter";
+import { getCryptoAsync } from "@blazetrails/activesupport/crypto-adapter";
 import { createProgram } from "./cli.js";
 
-// The sync auto-register in activesupport's child-process adapter only works
-// under CommonJS. This bin runs as pure ESM, so prime the registry through the
-// async path before any command can reach for `spawnSync` (`trails new`
-// shelling out to the package manager, `trails db:*` to the database CLIs).
-await getChildProcessAsync();
+// activesupport's adapters only self-register synchronously under CommonJS.
+// This bin runs as pure ESM, so prime them through the async path before any
+// command can reach for the sync getters:
+//
+//   child process — `trails new` shelling out to the package manager,
+//                   `trails db:*` to the database CLIs.
+//   crypto        — index and foreign-key name digests, so a migration using
+//                   `t.references(..., { foreignKey: true })` can run.
+await Promise.all([getChildProcessAsync(), getCryptoAsync()]);
 
 const program = createProgram();
 // `argv` is the process adapter's snapshot of the host argv, populated

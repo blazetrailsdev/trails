@@ -1,0 +1,140 @@
+:root {
+  --ink: #0f1419;
+  --muted: #536471;
+  --line: #eff3f4;
+  --accent: #1d9bf0;
+}
+
+body {
+  margin: 0;
+  font:
+    15px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--ink);
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar .brand {
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.topbar nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.inline {
+  display: inline;
+}
+
+button {
+  font: inherit;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.flash {
+  max-width: 40rem;
+  margin: 0.75rem auto 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.flash.notice {
+  background: #e8f5fd;
+  color: #0b5c8f;
+}
+
+.flash.alert {
+  background: #fdecea;
+  color: #8f1d15;
+}
+
+.tweet {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tweet .byline {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.tweet .body {
+  margin: 0 0 0.5rem;
+  white-space: pre-wrap;
+}
+
+.tweet .actions {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.handle,
+.muted,
+.empty {
+  color: var(--muted);
+}
+
+.handle {
+  font-weight: 400;
+}
+
+.users {
+  list-style: none;
+  padding: 0;
+}
+
+.user {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+form label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+textarea,
+input {
+  font: inherit;
+  padding: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+}
