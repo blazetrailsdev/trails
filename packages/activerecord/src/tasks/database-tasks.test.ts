@@ -51,7 +51,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
         [env]: { primary: { adapter: "sqlite3", database: dbFile } },
       });
-      DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+      DatabaseTasks.registerTask(
+        "sqlite",
+        class {
+          async create(): Promise<void> {}
+        },
+      );
 
       const { BetterSQLite3Adapter } =
         await import("../connection-adapters/better-sqlite3-adapter.js");
@@ -110,7 +115,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       arunit: { adapter: "sqlite3", database: dbFile },
     });
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.registerTask(
+      "sqlite",
+      class {
+        async create(): Promise<void> {}
+      },
+    );
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const adapter = new BetterSQLite3Adapter(dbFile);
@@ -159,7 +169,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
         secondary: { adapter: "sqlite3", database: secondaryDb },
       },
     });
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.registerTask(
+      "sqlite",
+      class {
+        async create(): Promise<void> {}
+      },
+    );
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
     const protectedEnvironments = Base.protectedEnvironments;
@@ -215,15 +230,30 @@ describe("DatabaseTasksRegisterTask", () => {
     DatabaseTasks.clearRegisteredTasks();
   });
 
-  it("register task", () => {
-    const handler = { create: async () => {} };
-    DatabaseTasks.registerTask("sqlite", handler);
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBe(handler);
+  it("register task", async () => {
+    const constructed: unknown[][] = [];
+    const dumped: unknown[][] = [];
+    const klazz = class {
+      constructor(...args: unknown[]) {
+        constructed.push(args);
+      }
+      async structureDump(filename: string, flags?: string | string[] | null): Promise<void> {
+        dumped.push([filename, flags]);
+      }
+    };
+    DatabaseTasks.registerTask(/abstract/, klazz);
+    await DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
+    expect(dumped).toEqual([["awesome-file.sql", null]]);
+    expect(constructed).toEqual([[{ adapter: "abstract" }]]);
   });
 
   it("register task precedence", () => {
-    const first = { create: async () => {} };
-    const second = { create: async () => {} };
+    const first = class {
+      async create(): Promise<void> {}
+    };
+    const second = class {
+      async create(): Promise<void> {}
+    };
     DatabaseTasks.registerTask("sqlite", first);
     DatabaseTasks.registerTask("sqlite", second);
     expect(DatabaseTasks.resolveTask("sqlite3")).toBe(second);
@@ -400,11 +430,18 @@ describe("DatabaseTasksCreateAllTest", () => {
     created = [];
     await Base.establishConnection(ambientPoolConfiguration());
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("abstract", {
-      create: async (config) => {
-        created.push(config.database ?? "unknown");
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async create(): Promise<void> {
+          created.push(this.dbConfig.database ?? "unknown");
+        }
       },
-    });
+    );
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
@@ -477,11 +514,18 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   beforeEach(() => {
     created = [];
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("abstract", {
-      create: async (config) => {
-        created.push(`${config.envName}:${config.database}`);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async create(): Promise<void> {
+          created.push(`${this.dbConfig.envName}:${this.dbConfig.database}`);
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
@@ -551,11 +595,18 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   beforeEach(() => {
     created = [];
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("abstract", {
-      create: async (config) => {
-        created.push(`${config.envName}:${config.name}:${config.database}`);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async create(): Promise<void> {
+          created.push(`${this.dbConfig.envName}:${this.dbConfig.name}:${this.dbConfig.database}`);
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
@@ -621,11 +672,18 @@ describe("DatabaseTasksDropAllTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("abstract", {
-      drop: async (config) => {
-        dropped.push(config.database ?? "unknown");
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async drop(): Promise<void> {
+          dropped.push(this.dbConfig.database ?? "unknown");
+        }
       },
-    });
+    );
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
@@ -695,11 +753,18 @@ describe("DatabaseTasksDropCurrentTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("abstract", {
-      drop: async (config) => {
-        dropped.push(`${config.envName}:${config.database}`);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async drop(): Promise<void> {
+          dropped.push(`${this.dbConfig.envName}:${this.dbConfig.database}`);
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
@@ -751,11 +816,18 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   let dropped: string[];
   beforeEach(() => {
     dropped = [];
-    DatabaseTasks.registerTask("abstract", {
-      drop: async (config) => {
-        dropped.push(`${config.envName}:${config.name}`);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async drop(): Promise<void> {
+          dropped.push(`${this.dbConfig.envName}:${this.dbConfig.name}`);
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
@@ -945,7 +1017,12 @@ describe("DatabaseTasksMigrateTest", () => {
   it.skipIf(skipMigrationTestCase)(
     "migrate set and unset empty values for verbose and version env vars",
     async () => {
-      DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+      DatabaseTasks.registerTask(
+        "sqlite",
+        class {
+          async create(): Promise<void> {}
+        },
+      );
       let migrated = false;
       DatabaseTasks.registerMigrations([
         {
@@ -1114,7 +1191,12 @@ describe("DatabaseTasksMigrateErrorTest", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-migrate-cache-"));
     const dbFile = path.join(tmp, "arunit.sqlite3");
     await Base.establishConnection({ adapter: "sqlite3", database: dbFile, pool: 1 });
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.registerTask(
+      "sqlite",
+      class {
+        async create(): Promise<void> {}
+      },
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
     });
@@ -1151,11 +1233,18 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
   it("purges current environment database", async () => {
     const purged: DatabaseConfig[] = [];
     const establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
-    DatabaseTasks.registerTask("abstract", {
-      purge: async (config) => {
-        purged.push(config);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async purge(): Promise<void> {
+          purged.push(this.dbConfig);
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
@@ -1178,11 +1267,18 @@ describe("DatabaseTasksPurgeAllTest", () => {
 
   it("purge all local configurations", async () => {
     const purged: string[] = [];
-    DatabaseTasks.registerTask("abstract", {
-      purge: async (config) => {
-        purged.push(config.database ?? "");
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async purge(): Promise<void> {
+          purged.push(this.dbConfig.database ?? "");
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db", host: "localhost" },
       test: { adapter: "abstract", database: "test-db", host: "localhost" },
@@ -1201,11 +1297,14 @@ describe("DatabaseTasksTruncateAllTest", () => {
 
   it("truncate tables", async () => {
     let truncated = false;
-    DatabaseTasks.registerTask("abstract", {
-      truncateAll: async () => {
-        truncated = true;
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        async truncateAll(): Promise<void> {
+          truncated = true;
+        }
       },
-    });
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       test: { adapter: "abstract", database: "test-db" },
     });
@@ -1219,11 +1318,18 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   let truncated: string[];
   beforeEach(() => {
     truncated = [];
-    DatabaseTasks.registerTask("abstract", {
-      truncateAll: async (config) => {
-        truncated.push(`${config.envName}:${config.database}`);
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        static usingDatabaseConfigurations(): boolean {
+          return true;
+        }
+        constructor(private readonly dbConfig: DatabaseConfig) {}
+        async truncateAll(): Promise<void> {
+          truncated.push(`${this.dbConfig.envName}:${this.dbConfig.database}`);
+        }
       },
-    });
+    );
   });
   afterEach(() => {
     DatabaseTasks.clearRegisteredTasks();
@@ -1288,9 +1394,14 @@ describe("DatabaseTasksCharsetTest", () => {
   });
 
   it("charset current", async () => {
-    DatabaseTasks.registerTask("abstract", {
-      charset: async () => "utf8",
-    });
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        async charset(): Promise<string> {
+          return "utf8";
+        }
+      },
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       test: { adapter: "abstract", database: "test-db" },
     });
@@ -1308,9 +1419,14 @@ describe("DatabaseTasksCollationTest", () => {
   });
 
   it("collation current", async () => {
-    DatabaseTasks.registerTask("abstract", {
-      collation: async () => "utf8_general_ci",
-    });
+    DatabaseTasks.registerTask(
+      "abstract",
+      class {
+        async collation(): Promise<string> {
+          return "utf8_general_ci";
+        }
+      },
+    );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       test: { adapter: "abstract", database: "test-db" },
     });

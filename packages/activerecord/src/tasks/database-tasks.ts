@@ -5,6 +5,7 @@
  */
 
 import { DatabaseConfig } from "../database-configurations/database-config.js";
+import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
 import {
   DatabaseConfigurations,
   configurationsStore,
@@ -210,12 +211,22 @@ export class DatabaseTasks {
 
   /**
    * @internal Mirrors: `database_adapter_for` (`tasks/database_tasks.rb:566-572`).
-   * Rails instantiates the resolved task class per call; trails registers task
-   * singletons through `registerTask`, so the handler itself is the instance
-   * and there are no `*arguments` to forward to a constructor.
    */
-  private static databaseAdapterFor(dbConfig: DatabaseConfig): DatabaseTaskHandler {
-    return this.classForAdapter(dbConfig.adapter);
+  private static databaseAdapterFor(
+    dbConfig: DatabaseConfig,
+    ...args: unknown[]
+  ): DatabaseTaskInstance {
+    const klass = this.classForAdapter(dbConfig.adapter);
+    const converted =
+      typeof klass.usingDatabaseConfigurations === "function" &&
+      klass.usingDatabaseConfigurations();
+
+    const config = converted ? dbConfig : dbConfig.configurationHash;
+    const ctor = klass as unknown as new (
+      config: DatabaseConfig | DatabaseConfigOptions,
+      ...args: unknown[]
+    ) => DatabaseTaskInstance;
+    return new ctor(config, ...args);
   }
 
   static clearRegisteredTasks(): void {
@@ -230,7 +241,7 @@ export class DatabaseTasks {
     try {
       const handler = this.databaseAdapterFor(dbConfig);
       if (handler.create) {
-        await handler.create(dbConfig);
+        await handler.create();
       }
       if (isVerbose()) stdout.write(`Created database '${dbConfig.database}'\n`);
     } catch (error) {
@@ -277,7 +288,7 @@ export class DatabaseTasks {
     try {
       const handler = this.databaseAdapterFor(dbConfig);
       if (handler.drop) {
-        await handler.drop(dbConfig);
+        await handler.drop();
       }
       if (isVerbose()) stdout.write(`Dropped database '${dbConfig.database}'\n`);
     } catch (error) {
@@ -520,7 +531,7 @@ export class DatabaseTasks {
     const dbConfig = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(dbConfig);
     if (handler.purge) {
-      await handler.purge(dbConfig);
+      await handler.purge();
     }
   }
 
@@ -545,7 +556,7 @@ export class DatabaseTasks {
     for (const dbConfig of configs) {
       const handler = this.databaseAdapterFor(dbConfig);
       if (handler.truncateAll) {
-        await handler.truncateAll(dbConfig);
+        await handler.truncateAll();
       } else {
         await this.truncateTables(dbConfig);
       }
@@ -557,10 +568,9 @@ export class DatabaseTasks {
    * send to the resolved task instance.
    *
    * Ruby gets the raise for free: a task class defining no `charset` answers
-   * NoMethodError. A trails handler is a plain object whose members are all
-   * optional (`registerTask` takes the object, not a class), so the absent
-   * send is raised explicitly; `constructor.name` stands in for Ruby's
-   * `.class.name` and reads `Object` for a handler registered as a literal.
+   * NoMethodError. TS has to model the absence, so every member of
+   * `DatabaseTaskInstance` is optional and the absent send is raised
+   * explicitly; `constructor.name` stands in for Ruby's `.class.name`.
    */
   static async charset(
     configuration: DatabaseConfig | string | Record<string, unknown>,
@@ -572,7 +582,7 @@ export class DatabaseTasks {
         `undefined method 'charset' for an instance of ${handler.constructor.name}`,
       );
     }
-    return handler.charset(dbConfig);
+    return handler.charset();
   }
 
   static async charsetCurrent(
@@ -600,7 +610,7 @@ export class DatabaseTasks {
         `undefined method 'collation' for an instance of ${handler.constructor.name}`,
       );
     }
-    return handler.collation(dbConfig);
+    return handler.collation();
   }
 
   static async collationCurrent(
@@ -861,11 +871,11 @@ export class DatabaseTasks {
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const flags = this.structureDumpFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig);
+    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
     if (!handler.structureDump) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureDump`);
     }
-    await handler.structureDump(dbConfig, filename, flags, root);
+    await handler.structureDump(filename, flags);
   }
 
   /** Mirrors: `structure_load` (`tasks/database_tasks.rb:369-374`). See {@link structureDump}. */
@@ -876,11 +886,11 @@ export class DatabaseTasks {
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const flags = this.structureLoadFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig);
+    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
     if (!handler.structureLoad) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureLoad`);
     }
-    await handler.structureLoad(dbConfig, filename, flags, root);
+    await handler.structureLoad(filename, flags);
   }
 
   /**
@@ -1137,14 +1147,14 @@ export class DatabaseTasks {
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
-    const puts = (s: string) => stdout.write(s + "\n");
+    const puts = (s = "") => stdout.write(s + "\n");
     puts(`\ndatabase: ${dbName}\n`);
     puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
     puts("-".repeat(50));
     for (const row of rows) {
       puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
     }
-    puts("");
+    puts();
   }
 
   /**
@@ -1525,7 +1535,7 @@ export class DatabaseTasks {
   static async truncateTables(dbConfig: DatabaseConfig): Promise<void> {
     const handler = this.databaseAdapterFor(dbConfig);
     if (handler.truncateAll) {
-      await handler.truncateAll(dbConfig);
+      await handler.truncateAll();
       return;
     }
     await this.withTemporaryConnection(dbConfig, async (conn) => {
@@ -1570,31 +1580,40 @@ export class DatabaseTasks {
   }
 }
 
+/**
+ * The instance a registered task class produces — the receiver of the bare
+ * sends `DatabaseTasks` makes at `database_tasks.rb:117,212,332-373`. Every
+ * member is optional because Ruby gets the "task class doesn't define this"
+ * arm for free as a NoMethodError; TS has to model the absence.
+ */
+export interface DatabaseTaskInstance {
+  create?(): Promise<void>;
+  drop?(): Promise<void>;
+  purge?(): Promise<void>;
+  truncateAll?(): Promise<void>;
+  charset?(): Promise<string | null>;
+  collation?(): Promise<string | null>;
+  /** `flags` is what `structure_dump_flags_for` computed (`database_tasks.rb:365-366`). */
+  structureDump?(filename: string, flags?: string | string[] | null): Promise<void>;
+  structureLoad?(filename: string, flags?: string | string[] | null): Promise<void>;
+}
+
+/**
+ * The task class `register_task` records (`database_tasks.rb:73-81`) and
+ * `database_adapter_for` instantiates as
+ * `klass.new(converted ? db_config : db_config.configuration_hash, *arguments)`
+ * (`database_tasks.rb:566-572`).
+ *
+ * The construct signature is bottom-typed because that call is untyped on both
+ * counts, and both are Rails-reachable: a class that answers
+ * `using_database_configurations?` takes a `DatabaseConfig`, one that does not
+ * takes the configuration hash, and `*arguments` is whatever the `structure_dump`
+ * / `structure_load` caller threaded past the filename (`:362-374`). A named
+ * parameter type here would admit one of those arms and reject the others.
+ */
 export interface DatabaseTaskHandler {
-  create?(config: DatabaseConfig): Promise<void>;
-  drop?(config: DatabaseConfig): Promise<void>;
-  purge?(config: DatabaseConfig): Promise<void>;
-  truncateAll?(config: DatabaseConfig): Promise<void>;
-  charset?(config: DatabaseConfig): Promise<string | null>;
-  collation?(config: DatabaseConfig): Promise<string | null>;
-  /**
-   * `flags` is what `structure_dump_flags_for` computed and `root` is Ruby's
-   * leftover `*arguments`, which `database_adapter_for` forwards to the task
-   * constructor (`database_tasks.rb:566-572`). trails registers task
-   * singletons, so both reach the handler on the one call it gets.
-   */
-  structureDump?(
-    config: DatabaseConfig,
-    filename: string,
-    flags?: string | string[] | null,
-    root?: string,
-  ): Promise<void>;
-  structureLoad?(
-    config: DatabaseConfig,
-    filename: string,
-    flags?: string | string[] | null,
-    root?: string,
-  ): Promise<void>;
+  new (...args: never[]): DatabaseTaskInstance;
+  usingDatabaseConfigurations?(): boolean;
 }
 
 function _errorToS(error: unknown): string {
