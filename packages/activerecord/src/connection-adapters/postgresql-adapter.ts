@@ -2546,9 +2546,8 @@ export class PostgreSQLAdapter
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        const pkStr = typeof pk === "string" ? pk : null;
-        const resolvedPk = suppressCompositePrimaryKey(pkStr ?? undefined);
-        sequenceName = resolvedPk ? await this.defaultSequenceName(tableRef, resolvedPk) : null;
+        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
+        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
       }
     }
     sql = this.preprocessQuery(sql);
@@ -3667,20 +3666,17 @@ export class PostgreSQLAdapter
     // Rails: `remove_index(table_name, column_name = nil, **options)` — column
     // may be positional or in the options hash.
     let columnName: string | string[] | undefined;
-    let opts: { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean };
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
-      opts = options;
     } else {
       columnName = undefined;
-      opts = columnOrOptions ?? {};
+      options = columnOrOptions ?? {};
     }
 
     let table = Utils.extractSchemaQualifiedName(tableName);
-    let resolveOpts = opts;
-    if (opts.name != null) {
-      const providedIndex = Utils.extractSchemaQualifiedName(opts.name);
-      resolveOpts = { ...opts, name: providedIndex.identifier };
+    if (options.name != null) {
+      const providedIndex = Utils.extractSchemaQualifiedName(options.name);
+      options = { ...options, name: providedIndex.identifier };
       const tableSchema = table.schema;
       if (!tableSchema) table = new Name(providedIndex.schema, table.identifier);
       if (providedIndex.schema && tableSchema && tableSchema !== providedIndex.schema) {
@@ -3690,7 +3686,7 @@ export class PostgreSQLAdapter
       }
     }
 
-    if (opts.ifExists && !(await this.indexExists(tableName, columnName, resolveOpts))) {
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) {
       return;
     }
 
@@ -3699,13 +3695,13 @@ export class PostgreSQLAdapter
     // argument. Passing the bare identifier here silently misses those.
     const indexToRemove = new Name(
       table.schema,
-      await this.indexNameForRemove(table.toString(), columnName, resolveOpts),
+      await this.indexNameForRemove(table.toString(), columnName, options),
     );
 
     await this.execute(
       // `?? ""` is Ruby's `#{nil}` — `index_algorithm` returns nil with no
       // `:algorithm`, so the statement carries the empty slot Rails emits.
-      `DROP INDEX ${this.indexAlgorithm(opts.algorithm) ?? ""} ${this.quoteTableName(indexToRemove.toString())}`,
+      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove.toString())}`,
     );
   }
 

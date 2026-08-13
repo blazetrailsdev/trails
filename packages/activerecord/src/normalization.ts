@@ -48,8 +48,7 @@ export class NormalizedValueType {
   }
 
   serialize(value: unknown): unknown {
-    const castValue = this.cast(value);
-    return this.serializeCastValue(castValue);
+    return this.serializeCastValue(this.cast(value));
   }
 
   serializeCastValue(value: unknown): unknown {

@@ -464,12 +464,12 @@ export function encryptedAttribute(this: any, attributeName: string): boolean {
  * @internal
  */
 export function ciphertextFor(this: any, attributeName: string): unknown {
-  const resolvedName = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
+  attributeName = this.constructor._attributeAliases?.[attributeName] ?? attributeName;
   if (encryptedAttribute.call(this, attributeName)) {
-    return this.readAttributeBeforeTypeCast?.(resolvedName);
+    return this.readAttributeBeforeTypeCast?.(attributeName);
   }
   // Unencrypted — return the DB-serialized value (mirrors read_attribute_for_database).
-  return this._attributes?.valuesForDatabase?.()?.[resolvedName];
+  return this._attributes?.valuesForDatabase?.()?.[attributeName];
 }
 
 /**

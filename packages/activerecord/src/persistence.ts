@@ -256,8 +256,8 @@ export async function _insertRecord(
     }
   }
 
-  const table: ArelTable = ctor.arelTable;
-  const im = new InsertManager(table);
+  const arelTable: ArelTable = ctor.arelTable;
+  const im = new InsertManager(arelTable);
 
   const entries = Object.entries(values);
   if (entries.length > 0) {
@@ -266,7 +266,7 @@ export async function _insertRecord(
     // via `visit_ActiveModel_Attribute`. trails' visitor binds through
     // `BindParam`, which unwraps `valueForDatabase` on the same seam, so the
     // wrap is where the transform is and nothing else changes.
-    im.insert(entries.map(([col, val]) => [table.get(col), new Nodes.BindParam(val)]));
+    im.insert(entries.map(([col, val]) => [arelTable.get(col), new Nodes.BindParam(val)]));
   }
 
   if (typeof connection.insert === "function") {
@@ -324,16 +324,16 @@ export async function _updateRecord(
   const setEntries = Object.entries(values);
   if (setEntries.length === 0) return 0;
 
-  const table: ArelTable = (this as any).arelTable;
+  const arelTable: ArelTable = (this as any).arelTable;
   const um = new UpdateManager();
-  um.table(table);
+  um.table(arelTable);
   // Rails: `um.set(values.transform_keys { |name| arel_table[name] })` — the
   // values are `ActiveModel::Attribute`s bound through Arel, as in
   // `_insertRecord` above.
-  um.set(setEntries.map(([col, val]) => [table.get(col), new Nodes.BindParam(val)]));
+  um.set(setEntries.map(([col, val]) => [arelTable.get(col), new Nodes.BindParam(val)]));
 
   for (const [col, val] of Object.entries(constraints)) {
-    um.where(table.get(col).eq(val));
+    um.where(arelTable.get(col).eq(val));
   }
 
   applyDefaultAndGlobalConstraints(um as any, this as any);
@@ -355,11 +355,11 @@ export async function _deleteRecord(
   this: PersistenceHost,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const table: ArelTable = (this as any).arelTable;
-  const dm = new DeleteManager(table);
+  const arelTable: ArelTable = (this as any).arelTable;
+  const dm = new DeleteManager(arelTable);
 
   for (const [col, val] of Object.entries(constraints)) {
-    dm.where(table.get(col).eq(val));
+    dm.where(arelTable.get(col).eq(val));
   }
 
   applyDefaultAndGlobalConstraints(dm as any, this as any);
@@ -603,13 +603,13 @@ interface UpdateRecord extends AttributeIO {
  */
 export async function update<T extends UpdateRecord>(
   this: T,
-  attrs: Record<string, unknown>,
+  attributes: Record<string, unknown>,
 ): Promise<boolean | undefined> {
-  assertHashAttributes(attrs);
+  assertHashAttributes(attributes);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // `assign_attributes(attributes); save` (persistence.rb:563-570).
-    await self.assignAttributes(attrs);
+    await self.assignAttributes(attributes);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
 }
@@ -620,13 +620,13 @@ export async function update<T extends UpdateRecord>(
  */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
-  attrs: Record<string, unknown>,
+  attributes: Record<string, unknown>,
 ): Promise<true | undefined> {
-  assertHashAttributes(attrs);
+  assertHashAttributes(attributes);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // `assign_attributes(attributes); save!` (persistence.rb:576-579).
-    await self.assignAttributes(attrs);
+    await self.assignAttributes(attributes);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
 }
@@ -1372,7 +1372,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   // `changes_applied`.
   const clearer = this as unknown as { clearAttributeChange?(name: string): void };
   if (typeof clearer.clearAttributeChange === "function") {
-    for (const key of updatedKeys) clearer.clearAttributeChange(key);
+    for (const k of updatedKeys) clearer.clearAttributeChange(k);
   } else {
     this.changesApplied();
   }
@@ -1856,10 +1856,9 @@ export function _findRecord(
   // all_queries flag controls whether `all_queries: true` default scopes apply.
   let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
-  const constraints = _inMemoryQueryConstraintsHash.call(this);
   if (options?.lock) scope = scope.lock(options.lock);
   // Rails uses find_by! — raises RecordNotFound when not found.
-  return scope.findByBang(constraints);
+  return scope.findByBang(_inMemoryQueryConstraintsHash.call(this));
 }
 
 /** @internal */
@@ -1904,9 +1903,11 @@ export function _queryConstraintsHash(this: PersistencePrivateHost): Record<stri
   // already in the DB. `??` would fall through a legitimately-null persisted
   // value to the new, unsaved one and target a non-existent row.
   return Object.fromEntries(
-    constraintsList.map((col: string) => [
-      col,
-      this.attributeInDatabase ? this.attributeInDatabase(col) : this.readAttribute(col),
+    constraintsList.map((columnName: string) => [
+      columnName,
+      this.attributeInDatabase
+        ? this.attributeInDatabase(columnName)
+        : this.readAttribute(columnName),
     ]),
   );
 }
