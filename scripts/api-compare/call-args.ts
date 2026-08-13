@@ -856,8 +856,9 @@ export function pairCallSites(
  *
  * So a weak site is RESTORED when both hold (RFC 0099):
  *
- * - `declaredNearby(name)` — the file being compared declares a method of that
- *   name, so the receiver is a ported collaborator sitting right there
+ * - `declaredInComparedFile(name)` — the Ruby file being compared (with its
+ *   included modules flattened in) declares a method of that name, so the
+ *   receiver is a ported collaborator sitting right there
  *   (`foreign_key`, `grouped_records`, `transform_value`, `selected_shard`)
  *   rather than an Enumerable/String builtin, which no ported file declares.
  * - the TS body still has an unconsumed same-named site once every non-weak
@@ -868,10 +869,18 @@ export function pairCallSites(
  * order, so the pairing {@link pairCallSites} then performs is unchanged for any
  * body that had no spare TS site.
  */
+/** Names whose Ruby meaning and TS spelling are homonyms, so a restored weak
+ *  site would pair against language punctuation rather than a ported call:
+ *  Ruby's `strategy.call(raw_post)` (parameters.rb:95) invokes a proc, while
+ *  every TS `fn.call(host, …)` is `Function.prototype.call` — the mixin
+ *  idiom's this-binding. Strong sites are unaffected; only the restoration
+ *  above skips these. */
+const WEAK_RESTORE_HOMONYMS = new Set(["call"]);
+
 export function comparableRubySites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
-  declaredNearby: (rubyName: string) => boolean,
+  declaredInComparedFile: (rubyName: string) => boolean,
 ): CallSite[] {
   const budget = new Map<string, number>();
   for (const ts of tsSites) budget.set(ts.name, (budget.get(ts.name) ?? 0) + 1);
@@ -889,7 +898,11 @@ export function comparableRubySites(
     if (!ruby.flags.includes("weak")) consume(ruby.name);
   }
   return rubySites.filter(
-    (ruby) => !ruby.flags.includes("weak") || (declaredNearby(ruby.name) && consume(ruby.name)),
+    (ruby) =>
+      !ruby.flags.includes("weak") ||
+      (!WEAK_RESTORE_HOMONYMS.has(ruby.name) &&
+        declaredInComparedFile(ruby.name) &&
+        consume(ruby.name)),
   );
 }
 

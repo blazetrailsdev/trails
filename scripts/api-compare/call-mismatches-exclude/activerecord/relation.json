@@ -783,7 +783,7 @@
       "ref:id",
       "ref:attributes"
     ],
-    "reason": "Baseline (RFC 0099): pre-existing call-ARGUMENT divergence, newly COMPARED now that a weak Ruby site with a ported receiver is kept in the population — the port's body predates the gate seeing it. Convergence tracked separately, not ratified here."
+    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:621 is `update(id = :all, attributes)` and dispatches on the `:all` sentinel, while relation.ts:5791 branches on an omitted/object `id` and forwards a single `updates` hash. Converging the signature is tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
   },
   {
     "package": "activerecord",
@@ -795,6 +795,6 @@
       "ref:id",
       "ref:attributes"
     ],
-    "reason": "Baseline (RFC 0099): pre-existing call-ARGUMENT divergence, newly COMPARED now that a weak Ruby site with a ported receiver is kept in the population — the port's body predates the gate seeing it. Convergence tracked separately, not ratified here."
+    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:629's `:all` sentinel, as for `update` above. Tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
   }
 ]

@@ -855,4 +855,13 @@ describe("comparableRubySites", () => {
     );
     expect(kept).toEqual([]);
   });
+
+  it("drops a restored weak `call` site, which TS spells as Function.prototype.call", () => {
+    const kept = comparableRubySites(
+      [site("call", ["id:raw_post"], ["weak"])],
+      [site("call", ["ref:host", "ref:parsers", "ref:fallback"])],
+      () => true,
+    );
+    expect(kept).toEqual([]);
+  });
 });

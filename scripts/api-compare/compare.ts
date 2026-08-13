@@ -2846,6 +2846,8 @@ export function main() {
         }
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
+        // `rubyOwnersByName` is built per Ruby FILE, a few lines up: its keys are
+        // the names THIS file (with its included modules flattened in) declares.
         const rubySites = comparableRubySites(rubyReadableSites, tsSites[0], (name) =>
           rubyOwnersByName.has(name),
         );
