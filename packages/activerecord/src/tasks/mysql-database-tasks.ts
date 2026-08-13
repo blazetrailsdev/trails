@@ -197,10 +197,6 @@ export class MySQLDatabaseTasks {
    *
    * Ruby's `filter_map` guard is `if configuration_hash[opt]`, so only nil/false
    * are dropped — an empty string still emits its flag.
-   *
-   * The one deviation is `password: "--password"`, deliberately NOT placed in
-   * argv (it would otherwise be visible in `ps` to other local users); it is
-   * passed via MYSQL_PWD in {@link commandEnv} instead.
    */
   private prepareCommandOptions(): string[] {
     const args = Object.entries({
@@ -208,6 +204,7 @@ export class MySQLDatabaseTasks {
       port: "--port",
       socket: "--socket",
       username: "--user",
+      password: "--password",
       encoding: "--default-character-set",
       sslca: "--ssl-ca",
       sslcert: "--ssl-cert",
@@ -223,15 +220,6 @@ export class MySQLDatabaseTasks {
     return args;
   }
 
-  private commandEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = {
-      ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
-    };
-    const password = this.configurationHash.password;
-    if (password != null && password !== false) env.MYSQL_PWD = String(password);
-    return env;
-  }
-
   private async connection(): Promise<Mysql2Adapter> {
     return (await Base.connectionPool().leaseConnection()) as Mysql2Adapter;
   }
@@ -241,7 +229,6 @@ export class MySQLDatabaseTasks {
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       encoding: "utf8",
       input: stdin,
-      env: this.commandEnv(),
     });
     if (result.error || result.status !== 0 || result.signal) {
       const details: string[] = [];
