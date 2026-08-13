@@ -1942,8 +1942,6 @@ export function _touchRow(
   for (const attr of attributeNames) {
     this._writeAttribute(attr, t);
   }
-  // Rails calls the METHOD (persistence.rb:874-882), so a locking-enabled
-  // model reaches `Locking::Optimistic#_update_row` here too.
   return (this as any)._updateRow(attributeNames, "touch");
 }
 
@@ -1979,9 +1977,6 @@ async function instanceUpdateRecord(
   if (attributeNames.length === 0) {
     (this as any)._triggerUpdateCallback = true;
   } else {
-    // Rails calls the METHOD (persistence.rb:906), so
-    // `Locking::Optimistic#_update_row` (optimistic.rb:92-118) — wired over
-    // `_Persistence._updateRow` in base.ts — takes it when locking is enabled.
     const affectedRows: number = await (this as any)._updateRow(attributeNames);
     // A stale update whose WHERE matched no row (row deleted by another
     // instance earlier in the transaction) leaves the flag false, so

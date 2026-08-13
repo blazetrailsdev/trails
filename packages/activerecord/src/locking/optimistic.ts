@@ -171,9 +171,16 @@ type InstanceLockingHost = {
   constructor: typeof Base & LockingHost;
   _attributes: {
     getAttribute(name: string): {
+      value: unknown;
+      valueBeforeTypeCast: unknown;
+      type: unknown;
       valueForDatabase: unknown;
       originalValueForDatabase(): unknown;
     };
+    set(name: string, attribute: unknown): void;
+  };
+  _dirty: {
+    attributeWritten(name: string, value: unknown, before: unknown, type: unknown): void;
   };
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
@@ -229,11 +236,12 @@ export async function _updateRow(
   if (!ctor.lockingEnabled) return superFn(attributeNames, attemptedAction);
 
   const col = ctor.lockingColumn;
-  const lockVersionWas = this.readAttribute(col);
-  const baseConstraints = buildBaseConstraints(this, ctor);
-  const updateConstraints = { ...baseConstraints, [col]: _lockValueForDatabase.call(this, col) };
+  const lockAttributeWas = this._attributes.getAttribute(col);
 
-  attributeNames = [...attributeNames.filter((n) => n !== col), col];
+  const updateConstraints = _queryConstraintsHash.call(this, buildBaseConstraints(this, ctor));
+
+  attributeNames = [...attributeNames, col];
+
   this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
 
   try {
@@ -242,10 +250,18 @@ export async function _updateRow(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
     );
+
     if (affectedRows !== 1) throw new StaleObjectError(this, attemptedAction);
+
     return affectedRows;
   } catch (e) {
-    this.writeAttribute(col, lockVersionWas);
+    this._attributes.set(col, lockAttributeWas);
+    this._dirty.attributeWritten(
+      col,
+      lockAttributeWas.value,
+      lockAttributeWas.valueBeforeTypeCast,
+      lockAttributeWas.type,
+    );
     throw e;
   }
 }
@@ -269,15 +285,15 @@ export function destroyRow(
 /**
  * @internal
  * Mirrors: ActiveRecord::Locking::Optimistic#_lock_value_for_database
+ *
+ * `Attribute::FromDatabase#_original_value_for_database` is the raw
+ * `value_before_type_cast`, so a lock column that is NULL in the row constrains
+ * on NULL: `LockingType#deserialize`'s `nil.to_i` 0 never reaches the WHERE.
  */
 export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: string): unknown {
   if (isWillSaveChangeToAttribute(this as any, lockingColumn)) {
     return this._attributes.getAttribute(lockingColumn).valueForDatabase;
   }
-  // `Attribute::FromDatabase#_original_value_for_database` is the raw
-  // `value_before_type_cast`, so a lock column that is NULL in the row
-  // constrains on NULL — `LockingType#deserialize`'s `nil.to_i` 0 never reaches
-  // the WHERE (locking/optimistic.rb:134-139, activemodel attribute.rb).
   return this._attributes.getAttribute(lockingColumn).originalValueForDatabase();
 }
 

@@ -1055,11 +1055,6 @@ describe("Date", () => {
   });
 
   it("reads strftime's week numbers off the residue day, as the C's int readers do", () => {
-    // ruby 3.3.11 -rdate:
-    //   Date.jd(2**70).strftime("%G|%V|%U") #=> "3232350070754114273|02|01"
-    // `%G` is `m_real_cwyear` (date_core.c:1858-1873) — `m_cwyear`'s `int` over
-    // the residue day with `nth` encoded back in — while `%V`/`%U`/`%W` read
-    // `m_cweek`/`m_wnum0`/`m_wnum1`, which stay `int`s and never see `nth`.
     const d = dNewByFrags({ jd: 2n ** 70n });
     expect(d.strftime("%G|%V|%U")).toBe("3232350070754114273|02|01");
     expect(d.strftime("%W|%g")).toBe("01|73");
