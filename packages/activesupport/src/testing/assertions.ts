@@ -79,8 +79,69 @@ function classNameOf(e: Error): string {
   return e.name || ctor || "Error";
 }
 
-/** Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1176). */
-const MT_RE = /node_modules[/\\]@?vitest|node:internal/;
+/**
+ * Mirrors `Minitest::BacktraceFilter` (minitest.rb:1173-1199).
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails reassigns
+ * `Minitest.backtrace_filter` but the class lives in the minitest gem, which
+ * has no vendored Rails file for the comparator to map onto. Ported here for
+ * the same reason {@link UnexpectedError} is.
+ */
+export class BacktraceFilter {
+  /**
+   * Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1176),
+   * `%r%lib/minitest|internal:warning%`. The frames trails filters are
+   * vitest's and node's, not minitest's, so the pattern names those instead —
+   * the only part of this class that cannot be transcribed literally.
+   *
+   * @noRailsEquivalent PERMANENT — minitest's constant, not Rails'; see
+   * {@link BacktraceFilter}.
+   */
+  static MT_RE = /node_modules[/\\]@?vitest|node:internal/;
+
+  regexp: RegExp;
+
+  constructor(regexp: RegExp = BacktraceFilter.MT_RE) {
+    this.regexp = regexp;
+  }
+
+  /**
+   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1190-1198): the
+   * frames before the first framework frame, else every non-framework frame,
+   * else the whole trace. Ruby's `$DEBUG`/`MT_DEBUG` escape hatch reads the
+   * process, which this repo's rules keep out of runtime code.
+   */
+  filter(bt: string[] | null): string[] {
+    if (!bt) return ["No backtrace"];
+
+    const framework = bt.findIndex((line) => this.regexp.test(line));
+    let newBt = framework === -1 ? [...bt] : bt.slice(0, framework);
+    if (newBt.length === 0) newBt = bt.filter((line) => !this.regexp.test(line));
+    if (newBt.length === 0) newBt = [...bt];
+
+    return newBt;
+  }
+}
+
+/**
+ * Mirrors the `Minitest` module's `backtrace_filter` accessor (minitest.rb:43,
+ * assigned at :1204) and `Minitest.filter_backtrace` (minitest.rb:365-369).
+ * Held on an object so the accessor is reassignable at the Ruby spelling
+ * (`Minitest.backtraceFilter = ...`), which `filterBacktrace` reads on every
+ * call the way the `cattr_accessor` does.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's module surface; see
+ * {@link BacktraceFilter}.
+ */
+export const Minitest = {
+  backtraceFilter: new BacktraceFilter(),
+
+  filterBacktrace(bt: string[] | null): string[] {
+    let result = Minitest.backtraceFilter.filter(bt);
+    if (result.length === 0 && bt) result = [...bt];
+    return result;
+  },
+};
 
 /** Mirrors `Minitest::UnexpectedError::BASE_RE` (minitest.rb:1101). */
 function baseRe(): RegExp {
@@ -93,30 +154,6 @@ function baseRe(): RegExp {
   return new RegExp(`${pwd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`, "g");
 }
 
-/**
- * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1190-1198): the
- * frames before the first framework frame, else every non-framework frame,
- * else the whole trace. Ruby's `$DEBUG`/`MT_DEBUG` escape hatch reads the
- * process, which this repo's rules keep out of runtime code.
- */
-function filter(bt: string[] | null): string[] {
-  if (!bt) return ["No backtrace"];
-
-  const framework = bt.findIndex((line) => MT_RE.test(line));
-  let newBt = framework === -1 ? [...bt] : bt.slice(0, framework);
-  if (newBt.length === 0) newBt = bt.filter((line) => !MT_RE.test(line));
-  if (newBt.length === 0) newBt = [...bt];
-
-  return newBt;
-}
-
-/** Mirrors `Minitest.filter_backtrace` (minitest.rb:365-369). */
-function filterBacktrace(bt: string[] | null): string[] {
-  let result = filter(bt);
-  if (result.length === 0 && bt) result = [...bt];
-  return result;
-}
-
 Object.defineProperties(UnexpectedError.prototype, {
   stack: {
     configurable: true,
@@ -127,7 +164,9 @@ Object.defineProperties(UnexpectedError.prototype, {
   message: {
     configurable: true,
     get(this: UnexpectedError): string {
-      const bt = filterBacktrace(backtrace(this.error)).join("\n    ").replace(baseRe(), "");
+      const bt = Minitest.filterBacktrace(backtrace(this.error))
+        .join("\n    ")
+        .replace(baseRe(), "");
       return `${classNameOf(this.error)}: ${this.error.message}\n    ${bt}`;
     },
   },

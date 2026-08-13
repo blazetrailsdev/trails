@@ -704,6 +704,32 @@ export async function setCurrentThreadBackend(
 }
 
 /**
+ * Every file Ruby's `require "active_support/xml_mini/#{name.downcase}"`
+ * (xml_mini.rb:202) can reach, listed here because ESM has no directory
+ * `require`: `activesupport/lib/active_support/xml_mini/` holds jdom.rb,
+ * libxml.rb, libxmlsax.rb, nokogiri.rb, nokogirisax.rb and rexml.rb. A name
+ * maps either to its trails module's loader or — for the three backends trails
+ * does not carry, which wrap a JRuby-only DOM (jdom.rb:3) and the libxml-ruby
+ * gem (libxml.rb:3, libxmlsax.rb:3) — to the message that Ruby file itself
+ * raises, so an unported backend is named in one place instead of being implied
+ * by an absent branch. A name with no entry at all raises what Ruby's `require`
+ * raises for a missing file.
+ *
+ * The specifiers are spelled out rather than interpolated: a bundler resolves
+ * `import(`./xml-mini/${x}.js`)` by globbing `./xml-mini/*.js`, which matches
+ * nothing when the sources on disk are `.ts`, so the name arm threw
+ * `Unknown variable dynamic import` under vitest.
+ */
+const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
+  jdom: "JRuby is required to use the JDOM backend for XmlMini",
+  libxml: "cannot load such file -- libxml",
+  libxmlsax: "cannot load such file -- libxml",
+  nokogiri: () => import("./xml-mini/nokogiri.js"),
+  nokogirisax: () => import("./xml-mini/nokogirisax.js"),
+  rexml: () => import("./xml-mini/rexml.js"),
+};
+
+/**
  * Resolve a backend name to its module, loading the module the first time.
  *
  * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
@@ -712,33 +738,21 @@ export async function setCurrentThreadBackend(
  * is a dynamic import here, since the module namespace object of
  * `xml-mini/<name>.js` is the backend module.
  *
- * The import specifiers are spelled out rather than interpolated: a bundler
- * resolves `import(\`./xml-mini/${x}.js\`)` by globbing `./xml-mini/*.js`, which
- * matches nothing when the sources on disk are `.ts`, so the name arm threw
- * `Unknown variable dynamic import` under vitest. One literal specifier per
- * file `require` can reach keeps the arm lazy and resolvable in both.
- *
  * @internal
  */
 export async function castBackendNameToModule(name: XmlMiniBackendName): Promise<XmlMiniBackend> {
   if (typeof name !== "string") {
     return name;
   } else {
-    switch (name.toLowerCase()) {
-      case "rexml":
-        return (await import("./xml-mini/rexml.js")) as XmlMiniBackend;
-      case "nokogiri":
-        return (await import("./xml-mini/nokogiri.js")) as XmlMiniBackend;
-      case "nokogirisax":
-        return (await import("./xml-mini/nokogirisax.js")) as XmlMiniBackend;
-      default:
-        // Ruby's counterpart is the core `LoadError` that
-        // `require "active_support/xml_mini/#{name.downcase}"` raises for a
-        // name with no file; there is no Rails error class to port here, the
-        // same reason `yaml.ts:16` gives for its own LoadError stand-in.
-        // eslint-disable-next-line blazetrails/rails-error-parity
-        throw new Error(`cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`);
-    }
+    const backend = XML_MINI_BACKENDS[name.toLowerCase()];
+    if (typeof backend === "function") return (await backend()) as XmlMiniBackend;
+    // Ruby's counterpart is the core `LoadError` / `RuntimeError` the file's own
+    // `require` or guard raises; there is no Rails error class to port here, the
+    // same reason `yaml.ts:16` gives for its own LoadError stand-in.
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(
+      backend ?? `cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`,
+    );
   }
 }
 

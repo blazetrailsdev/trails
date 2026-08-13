@@ -19,7 +19,7 @@ import { StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
-import { singularize, underscore } from "@blazetrails/activesupport";
+import { isPresent, singularize, underscore } from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { EncryptableRecord, encryptedAttributes } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
@@ -1257,7 +1257,7 @@ export async function prepareModelFixtures(
   // serialize each encrypted column value to ciphertext before insert so the DB stores
   // encrypted data (not cleartext), and populate original_* preserve-columns for ignoreCase.
   // Mirrors: ActiveRecord::Railtie `Fixture.prepend EncryptedFixtures if config.encrypt_fixtures`
-  if (Configurable.config.encryptFixtures && encryptedAttributes.call(ModelClass).size > 0) {
+  if (Configurable.config.encryptFixtures && isPresent(encryptedAttributes.call(ModelClass))) {
     encryptFixtureRows(ModelClass, rows);
   }
 
