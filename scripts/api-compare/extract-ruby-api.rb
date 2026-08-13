@@ -2040,12 +2040,26 @@ class ApiExtractor
     { deps: deps, depRefs: dep_refs }
   end
 
+  # `raise Foo.new(msg)` and `raise Foo, msg` are the same raise written two
+  # ways, and the port spells BOTH `throw new Foo(msg)` — so the `new` is a
+  # position the two spellings disagree on. Evaluation order puts the
+  # argument's `new` immediately before the `raise` that consumes it, which is
+  # exactly this occurrence; drop it, as extract-ts-api.ts#isThrownConstruction
+  # drops the TS half. Any OTHER `new` in the body still counts, and the two
+  # extractors have to agree here or a raise pins `new` at the front of one
+  # sequence and nowhere in the other.
+  def drop_raised_new(calls)
+    calls.each_with_index.reject { |name, i| name == "new" && calls[i + 1] == "raise" }
+         .map(&:first)
+  end
+
   # Returns [calls, weak_calls]: the de-duplicated call names, and the subset
   # whose EVERY occurrence had an inert receiver (see walk_for_calls).
   def collect_method_calls(body_node)
     calls = []
     weak = []
     walk_for_calls(body_node, calls, weak)
+    calls = drop_raised_new(calls)
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
     [calls.uniq, weak_calls]

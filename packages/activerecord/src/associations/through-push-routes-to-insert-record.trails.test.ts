@@ -93,6 +93,22 @@ describe("through-collection writes route onto the association's insertRecord", 
     expect(await Category.count()).toBe(before);
   });
 
+  it("createBang rolls the target row back when the join insert returns false", async () => {
+    // `_create_record`'s `raise ActiveRecord::Rollback unless result`
+    // (collection_association.rb:368) — the NON-raising failure arm, whose
+    // return value the proxy's own `insert_record` call used to discard.
+    // `Rollback` is swallowed by the transaction, so `create!` still returns
+    // the (now unpersisted) record.
+    const author = (await Author.find(authors("david").id)) as unknown as AuthorWithCategories;
+    const assoc = author.association("categories");
+    assoc.insertRecord = () => Promise.resolve(false);
+    const before = await Category.count();
+
+    await author.categories.createBang({ name: "Rolled back" });
+
+    expect(await Category.count()).toBe(before);
+  });
+
   it("the pushed record lands in the one shared target", async () => {
     const author = (await Author.find(authors("david").id)) as unknown as AuthorWithCategories;
     const category = (await Category.find(categories("technology").id)) as unknown as Base;

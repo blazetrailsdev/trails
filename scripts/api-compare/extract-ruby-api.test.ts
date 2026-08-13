@@ -320,6 +320,24 @@ describe("Ruby extractor inert-receiver call suppression", () => {
     expect(c["Qux#d"].calls).toContain("run");
   });
 
+  it("drops the new a raise builds its error with, keeping any other new", () => {
+    const c = rubyWeakCalls({
+      "raiser.rb": `
+        class Raiser
+          def f
+            raise ArgumentError.new("bad") unless ok?
+            Wrapper.new(build)
+          end
+        end
+      `,
+    });
+    // `raise Foo.new(msg)` and `raise Foo, msg` are one raise written two ways,
+    // and the port spells both `throw new Foo(msg)` — so the raise's own `new`
+    // carries no position (extract-ts-api.ts#isThrownConstruction drops the TS
+    // half). `Wrapper.new` still does, and lands after `ok?`.
+    expect(c["Raiser#f"].calls).toEqual(["ok?", "raise", "build", "new"]);
+  });
+
   it("drops new entirely when Proc is the only receiver", () => {
     const c = rubyWeakCalls({
       "quux.rb": `

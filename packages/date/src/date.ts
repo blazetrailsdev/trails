@@ -7461,6 +7461,11 @@ export class Date {
    * constructor `sf` is built through, folds a denominator of one where
    * `Rational()` and Rational arithmetic do not — so `denominator === 1n` is
    * that Integer arm — `0n`, not `(0/1)n`.
+   *
+   * The reform start goes through `%.0f`, which C spells `inf` / `-inf` for a
+   * non-finite double and MRI capitalises — `Date::JULIAN` inspects as `Infj`
+   * and `Date::GREGORIAN` as `-Infj`, where `toFixed` would answer
+   * `"Infinity"`.
    */
   inspect(): string {
     const of = this.mOf();
@@ -7468,7 +7473,9 @@ export class Date {
     return (
       `#<${this.constructor.name}: ${this.toS()} ` +
       `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf.inspect()}n),` +
-      `${of < 0 ? "" : "+"}${of}s,${this.start.toFixed(0)}j)>`
+      `${of < 0 ? "" : "+"}${of}s,${
+        Number.isFinite(this.start) ? this.start.toFixed(0) : this.start > 0 ? "Inf" : "-Inf"
+      }j)>`
     );
   }
 

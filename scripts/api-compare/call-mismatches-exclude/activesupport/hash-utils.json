@@ -9,13 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "hash-utils.ts",
-    "rubyName": "assert_valid_keys",
-    "call": "order:constructor,join",
-    "reason": "Order artifact of a TS-only `new Set(validKeys)` (hash-utils.ts:192), credited as `constructor` before the join Rails evaluates inside the ArgumentError.new message."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
     "rubyName": "deep_stringify_keys",
     "call": "deep_transform_keys",
     "kind": "args",
