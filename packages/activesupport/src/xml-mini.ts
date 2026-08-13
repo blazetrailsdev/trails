@@ -149,7 +149,6 @@ export const PARSING: Record<
     const s = String(symbol);
     return s.startsWith(":") ? s : `:${s}`;
   },
-  // `::Date.parse(date)` (xml_mini.rb:69).
   date: (date) => RubyDate.parse(date as string),
   // `Time.xmlschema(time).utc rescue ::DateTime.parse(time).utc`
   // (xml_mini.rb:70). @blazetrails/date carries `Time#xmlschema` for
@@ -179,13 +178,9 @@ export const PARSING: Record<
         : parsed.toZonedDateTime("UTC").toInstant();
     }
   },
-  // `Duration.parse(duration)` (xml_mini.rb:71).
   duration: (duration) => Duration.parse(String(duration)),
-  // `integer.to_i` (xml_mini.rb:72).
   integer: (integer) => toI(integer),
-  // `float.to_f` (xml_mini.rb:73).
   float: (float) => toF(float),
-  // `String === number ? number.to_d : BigDecimal(number)` (xml_mini.rb:74-80).
   decimal: (number) => {
     if (typeof number === "string") {
       return toD(number);
@@ -197,9 +192,7 @@ export const PARSING: Record<
     }
     return new BigDecimal(number as string | number | bigint);
   },
-  // `%w(1 true).include?(boolean.to_s.strip)` (xml_mini.rb:81).
   boolean: (boolean) => ["1", "true"].includes(String(boolean).trim()),
-  // `string.to_s` (xml_mini.rb:82).
   string: (string) => toS(string),
   // `YAML.load(yaml) rescue yaml` (xml_mini.rb:83). `yaml` is an
   // optionalDependency and this module sits in the package's root graph, so
@@ -223,13 +216,9 @@ export const PARSING: Record<
       return yaml;
     }
   },
-  // `::Base64.decode64(bin)` (xml_mini.rb:84).
   base64Binary: (bin) => decode64(String(bin)),
-  // `_parse_hex_binary(bin)` (xml_mini.rb:85).
   hexBinary: (bin) => _parseHexBinary(String(bin)),
-  // `_parse_binary(bin, entity)` (xml_mini.rb:86).
   binary: (bin, entity) => _parseBinary(String(bin), entity ?? {}),
-  // `_parse_file(file, entity)` (xml_mini.rb:87).
   file: (file, entity) => _parseFile(String(file), entity ?? {}),
 };
 
