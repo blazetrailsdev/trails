@@ -68,7 +68,11 @@ type EventObjectCallback = (event: Event) => void;
 /**
  * Any object responding to `call` — Rails' `Subscribers.new` reaches for
  * `listener.method(:call)` whenever the listener is not itself procish
- * (fanout.rb:328), so a plain object with a `call` method subscribes.
+ * (fanout.rb:328), so a plain object with a `call` method subscribes. Ruby then
+ * invokes `@delegate.call` uniformly for procs and callable objects
+ * (fanout.rb:437, 452); JS has no such uniform invocation, so `createSubscriber`
+ * binds the object's `call` to its receiver and the groups keep calling a
+ * function.
  */
 export type CallableListener = { call(...args: never[]): void };
 
@@ -135,9 +139,6 @@ function createSubscriber(
 ): Subscriber {
   const matcher = wrapMatcher(pattern);
   let kind: SubscriberKind;
-  // Rails calls `@delegate.call` uniformly for procs and callable objects
-  // (fanout.rb:437, 452); JS has no such uniform invocation, so bind the
-  // object's `call` to its receiver here.
   let delegate = listener as EventedListener | TimedCallback | EventObjectCallback;
 
   if (
@@ -149,7 +150,6 @@ function createSubscriber(
     kind = "evented";
   } else {
     kind = monotonic ? "monotonic" : "timed";
-    // Doing this to detect a single argument block or callable (fanout.rb:325-332).
     const procish = typeof listener === "function" ? listener : listener.call;
     if (procish.length === 1) {
       kind = "event_object";

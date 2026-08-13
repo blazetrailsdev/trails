@@ -38,9 +38,12 @@ export class SQLCounter {
     return this.logFull.map(([sql]) => sql);
   }
 
-  /** @internal */
-  // Rails' `def call(*, payload)` (query_assertions.rb:103) takes the payload
-  // as the LAST positional, whatever the subscriber arity handed it.
+  /**
+   * Mirrors Ruby's `def call(*, payload)` — the payload is the last positional,
+   * whatever arity the notifier's subscriber hands it.
+   *
+   * @internal
+   */
   call(...args: unknown[]): void {
     const payload = args[args.length - 1] as SqlPayload;
     if (payload.cached) return;
