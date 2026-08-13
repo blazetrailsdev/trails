@@ -65,6 +65,13 @@ type TimedCallback = (
 
 type EventObjectCallback = (event: Event) => void;
 
+/**
+ * Any object responding to `call` — Rails' `Subscribers.new` reaches for
+ * `listener.method(:call)` whenever the listener is not itself procish
+ * (fanout.rb:328), so a plain object with a `call` method subscribes.
+ */
+export type CallableListener = { call(...args: never[]): void };
+
 export interface Matcher {
   matches(name: string): boolean;
   unsubscribe(name: string): void;
@@ -123,11 +130,15 @@ interface Subscriber {
 
 function createSubscriber(
   pattern: string | RegExp | null,
-  listener: EventedListener | TimedCallback | EventObjectCallback,
+  listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
   monotonic: boolean,
 ): Subscriber {
   const matcher = wrapMatcher(pattern);
   let kind: SubscriberKind;
+  // Rails calls `@delegate.call` uniformly for procs and callable objects
+  // (fanout.rb:437, 452); JS has no such uniform invocation, so bind the
+  // object's `call` to its receiver here.
+  let delegate = listener as EventedListener | TimedCallback | EventObjectCallback;
 
   if (
     typeof listener === "object" &&
@@ -138,8 +149,13 @@ function createSubscriber(
     kind = "evented";
   } else {
     kind = monotonic ? "monotonic" : "timed";
-    if (typeof listener === "function" && listener.length === 1) {
+    // Doing this to detect a single argument block or callable (fanout.rb:325-332).
+    const procish = typeof listener === "function" ? listener : listener.call;
+    if (procish.length === 1) {
       kind = "event_object";
+    }
+    if (typeof listener !== "function") {
+      delegate = procish.bind(listener) as TimedCallback;
     }
   }
 
@@ -149,7 +165,7 @@ function createSubscriber(
   return {
     matcher,
     kind,
-    delegate: listener,
+    delegate,
     silenceable,
     subscribed(name: string) {
       return matcher.matches(name);
@@ -312,7 +328,7 @@ export class Fanout {
 
   subscribe(
     pattern: string | RegExp | null,
-    listener: EventedListener | TimedCallback | EventObjectCallback,
+    listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
     monotonic = false,
   ): Subscriber {
     const sub = createSubscriber(pattern, listener, monotonic);

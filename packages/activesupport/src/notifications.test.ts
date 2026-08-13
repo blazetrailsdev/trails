@@ -59,7 +59,7 @@ describe("SubscribeEventObjectsTest", () => {
   it("subscribe with a single arity callable listener", () => {
     const received: Event[] = [];
     const handler = { call: (e: Event) => received.push(e) };
-    Notifications.subscribe("qux", (e) => handler.call(e));
+    Notifications.subscribe("qux", handler);
     Notifications.instrument("qux");
     expect(received).toHaveLength(1);
   });

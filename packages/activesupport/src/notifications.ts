@@ -11,6 +11,7 @@ import { Temporal } from "@blazetrails/date";
 import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";
+import type { CallableListener } from "./notifications/fanout.js";
 
 // The concrete subscriber handle the notifier hands back. Kept internal (not the
 // public `NotificationSubscriber`) so the `Fanout` subscriber's members don't
@@ -31,9 +32,12 @@ export type { NotificationHandle };
  * `ActiveSupport::Notifications.subscribe`): a single-arity block receives the
  * built `Event`, while the five-arity block receives `(name, start, finish, id,
  * payload)`. The notifier classifies by arity, so `monotonic` subscribers must
- * be the five-arity form to see monotonic (`number`) start/finish times.
+ * be the five-arity form to see monotonic (`number`) start/finish times. Rails
+ * also accepts any object responding to `call` (`Fanout::Subscribers.new`,
+ * notifications/fanout.rb:328), so a callable object is a subscriber too.
  */
 export type NotificationCallback =
+  | CallableListener
   | ((event: Event) => void)
   | ((
       name: string,
@@ -82,9 +86,11 @@ export class Notifications {
    */
   static subscribe(
     pattern: string | RegExp | null | undefined,
-    callback: (event: Event) => void,
+    callback: ((event: Event) => void) | { call(event: Event): void },
   ): NotificationSubscriber {
-    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event));
+    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) =>
+      typeof callback === "function" ? callback(event) : callback.call(event),
+    );
     return sub as unknown as NotificationSubscriber;
   }
 
@@ -107,12 +113,16 @@ export class Notifications {
   ): NotificationSubscriber {
     let pattern: string | RegExp | null;
     let callback: NotificationCallback;
-    if (typeof patternOrCallback === "function") {
-      pattern = null;
-      callback = patternOrCallback;
-    } else {
+    if (
+      typeof patternOrCallback === "string" ||
+      patternOrCallback instanceof RegExp ||
+      patternOrCallback == null
+    ) {
       pattern = patternOrCallback ?? null;
       callback = maybeCallback!;
+    } else {
+      pattern = null;
+      callback = patternOrCallback;
     }
     const sub = this._notifier.subscribe(pattern, callback as FanoutListener, true);
     return sub as unknown as NotificationSubscriber;
