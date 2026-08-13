@@ -35,13 +35,7 @@ import {
   findTakeWithLimit as baseFindTakeWithLimit,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import {
-  underscore,
-  singularize,
-  camelize,
-  constantize,
-  isAbortSignal,
-} from "@blazetrails/activesupport";
+import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
 import {
   RecordNotSaved,
   ConfigurationError,
@@ -1182,16 +1176,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     for (const r of records) assoc.setStrictLoading(r);
   }
 
-  // Rails raises this once, in `CollectionAssociation#_create_record`
-  // (collection_association.rb:355-357). The non-through arm reaches that
-  // ported guard through `association.create`; the through arm does not route
-  // through `_createRecord` yet, so it keeps the check here until it does.
-  private _ensurePersistedOwnerForCreate(): void {
-    if (this._record.isNewRecord()) {
-      throw new RecordNotSaved(`You cannot call create unless the parent is saved`, this._record);
-    }
-  }
-
   private _ensureThroughWritable(): void {
     if (!this._isThrough) return;
     const ctor = this._record.constructor as typeof Base;
@@ -1308,31 +1292,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Mirrors Rails' `Association#build_record` (association.rb:383-388):
-   *
-   *   reflection.build_association(attributes) do |record|
-   *     initialize_attributes(record, attributes)
-   *   end
-   *
-   * Construction, including STI-subclass resolution, belongs to
-   * `AssociationReflection#build_association` → `klass.new(attributes, &block)`
-   * (reflection.rb:182) and `Base.new`'s inheritance-column handling
-   * (inheritance.rb `new` / `subclass_from_attributes`); the foreign key and
-   * the polymorphic type come off `scope_for_create` inside
-   * `initialize_attributes` (association.rb:224). The through arm
-   * (`HasManyThroughAssociation#build_record`,
-   * has_many_through_association.rb:88-114) is an override on the same holder,
-   * so there is one call here and no through/non-through split on the proxy.
-   */
-  private _buildRecord(attrs: Record<string, unknown> = {}): Base {
-    return (
-      this._record.association(this._assocName) as unknown as {
-        buildRecord(attributes?: Record<string, unknown>): Base;
-      }
-    ).buildRecord(attrs);
-  }
-
-  /**
    * Bulk insert/upsert through a collection association. Mirrors
    * ActiveRecord::AssociationRelation, which guards `insert`, `insert_all`,
    * `insert!`, `insert_all!`, `upsert`, and `upsert_all`: when the
@@ -1393,16 +1352,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Build and save a new associated record.
-   *
-   * Rails' `CollectionAssociation#_create_record` routes both regular and
-   * :through associations through `add_to_target` (HasManyThroughAssociation
-   * overrides only `build_record`/`insert_record`, not `_create_record`). The
-   * non-:through path goes through `CollectionAssociation#create` directly; the
-   * :through path builds + saves the target in `_createThrough`, then hands the
-   * in-memory mutation to `_pushThrough`, which routes through the same
-   * `CollectionAssociation#addToTarget` (shared set_inverse_instance +
-   * `@replaced_or_added_targets` dedup).
+   * Mirrors `CollectionProxy#create` (collection_proxy.rb:334-336): a plain
+   * delegation to `@association.create(attributes, &block)`. The persisted-owner
+   * guard, the Array arm, `build_record`, and the
+   * `transaction { add_to_target(record) { insert_record } }` shape all live
+   * once on `CollectionAssociation#_create_record`
+   * (collection_association.rb:354-372); the :through arm reaches it through
+   * `HasManyThroughAssociation#build_record`/`#insert_record`, exactly as Rails
+   * reaches it.
    */
   async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -1410,29 +1367,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs) && (this._isSingular || this._isThrough)) {
-      const records: T[] = [];
-      for (const a of attrs) {
-        records.push(await this.create(a, block));
-      }
-      return records;
-    }
     if (this._isSingular) {
-      return this._createSingular(attrs as Record<string, unknown>, block, false);
+      if (Array.isArray(attrs)) {
+        const records: T[] = [];
+        for (const a of attrs) records.push(await this.create(a, block));
+        return records;
+      }
+      return this._createSingular(attrs, block, false);
     }
-    if (this._isThrough) this._ensurePersistedOwnerForCreate();
-    this._ensureThroughWritable();
-    if (this._isThrough) {
-      return (await this._createThrough(
-        attrs as Record<string, unknown>,
-        block,
-        (this as unknown as { _pendingThroughScope?: unknown })._pendingThroughScope,
-      )) as T;
-    }
-    // Rails: `@association.create(...)` (collection_proxy.rb:308-310).
-    return (await this._record
-      .association(this._assocName)
-      .create(attrs, block as ((record: Base) => void) | undefined)) as T;
+    return (await this._collectionAssociation().create(
+      attrs,
+      block as ((record: Base) => void) | undefined,
+    )) as T | T[];
   }
 
   /**
@@ -1477,26 +1423,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       replace: true,
       inversing: true,
     }) as Base | null;
-  }
-
-  // NOTE: If _pushThrough fails after the target is saved, the target record
-  // will be orphaned (no join row). Rails wraps this in a transaction. We don't
-  // have transaction support yet — tracked in the roadmap under "Transactions".
-  private async _createThrough(
-    attrs: Record<string, unknown> = {},
-    block?: (r: T) => void,
-    throughScope?: unknown,
-  ): Promise<Base> {
-    const ctor = this._record.constructor as typeof Base;
-    if (this._record.isNewRecord()) {
-      throw new Error(`You cannot call create unless the parent is saved`);
-    }
-    const record = this._buildRecord(attrs) as T;
-    if (block) block(record);
-    const saved = await record.save();
-    if (!saved) return record;
-    await this._pushThrough([record], false, throughScope);
-    return record;
   }
 
   /**
@@ -3292,9 +3218,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Build and save a new associated record, raising on validation failure.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#create!
+   * Mirrors `CollectionProxy#create!` (collection_proxy.rb:344-346): a plain
+   * delegation to `@association.create!(attributes, &block)`, which routes into
+   * `_create_record(attributes, true, &block)` (association.rb:231-233).
    */
   async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -3302,44 +3228,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (Array.isArray(attrs) && (this._isSingular || this._isThrough)) {
-      const records: T[] = [];
-      for (const a of attrs) records.push(await this.createBang(a, block));
-      return records;
-    }
     if (this._isSingular) {
-      return this._createSingular(attrs as Record<string, unknown>, block, true);
-    }
-    if (this._isThrough) this._ensurePersistedOwnerForCreate();
-    this._ensureThroughWritable();
-    if (this._isThrough) {
-      const record = this._buildRecord(attrs as Record<string, unknown>) as T;
-      if (block) block(record);
-      try {
-        this._callbackHost.callback("beforeAdd", record);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        throw new RecordNotSaved("Callback prevented record creation", record);
+      if (Array.isArray(attrs)) {
+        const records: T[] = [];
+        for (const a of attrs) records.push(await this.createBang(a, block));
+        return records;
       }
-      // Rails' `_create_record` runs the target save INSIDE the transaction —
-      // it is `insert_record`'s `record.save!` (collection_association.rb:361-370)
-      // — so a join-row failure rolls the target row back with it.
-      const targetBefore = this._target.length;
-      await this._throughTransaction(async () => {
-        const saved = await record.save();
-        if (!saved) throw new RecordInvalid(record);
-        await this._pushThrough([record], true);
-      });
-      if (this._target.length === targetBefore) {
-        throw new RecordNotSaved("Failed to create join record for through association", record);
-      }
-      this._callbackHost.callback("afterAdd", record);
-      return record;
+      return this._createSingular(attrs, block, true);
     }
-    // Rails: `@association.create!(...)` (collection_proxy.rb:319-321).
-    return (await this._record
-      .association(this._assocName)
-      .createBang(attrs, block as ((record: Base) => void) | undefined)) as T;
+    return (await this._collectionAssociation().createBang(
+      attrs,
+      block as ((record: Base) => void) | undefined,
+    )) as T | T[];
   }
 
   /**
