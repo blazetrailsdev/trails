@@ -322,17 +322,7 @@ export class SQLiteDatabaseTasks {
   }
 
   static register(): void {
-    DatabaseTasks.registerTask(/sqlite/, {
-      create: async (config) => new SQLiteDatabaseTasks(config).create(),
-      drop: async (config) => new SQLiteDatabaseTasks(config).drop(),
-      purge: async (config) => new SQLiteDatabaseTasks(config).purge(),
-      charset: async (config) => new SQLiteDatabaseTasks(config).charset(),
-      truncateAll: async (config) => new SQLiteDatabaseTasks(config).truncateAll(),
-      structureDump: async (config, filename, flags, root) =>
-        new SQLiteDatabaseTasks(config, root).structureDump(filename, flags),
-      structureLoad: async (config, filename, flags, root) =>
-        new SQLiteDatabaseTasks(config, root).structureLoad(filename, flags),
-    });
+    DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);
   }
 }
 

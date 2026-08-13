@@ -152,17 +152,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   static register(): void {
-    DatabaseTasks.registerTask(/postgres/, {
-      create: async (config) => new PostgreSQLDatabaseTasks(config).create(),
-      drop: async (config) => new PostgreSQLDatabaseTasks(config).drop(),
-      purge: async (config) => new PostgreSQLDatabaseTasks(config).purge(),
-      charset: async (config) => new PostgreSQLDatabaseTasks(config).charset(),
-      collation: async (config) => new PostgreSQLDatabaseTasks(config).collation(),
-      structureDump: async (config, filename, flags) =>
-        new PostgreSQLDatabaseTasks(config).structureDump(filename, flags),
-      structureLoad: async (config, filename, flags) =>
-        new PostgreSQLDatabaseTasks(config).structureLoad(filename, flags),
-    });
+    DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);
   }
 
   private encoding(): string {

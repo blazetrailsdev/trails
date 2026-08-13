@@ -47,7 +47,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
 
     // No handler `truncateAll` registered, so truncation takes the Rails path.
     DatabaseTasks.clearRegisteredTasks();
-    DatabaseTasks.registerTask(/sqlite/, {});
+    DatabaseTasks.registerTask(/sqlite/, class {});
     await DatabaseTasks.truncateTables(config);
 
     const reader = new BetterSQLite3Adapter(dbPath);

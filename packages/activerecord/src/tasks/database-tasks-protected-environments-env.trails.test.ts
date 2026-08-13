@@ -31,7 +31,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.registerTask(
+      "sqlite",
+      class {
+        async create(): Promise<void> {}
+      },
+    );
 
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");
@@ -123,7 +128,12 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
-    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    DatabaseTasks.registerTask(
+      "sqlite",
+      class {
+        async create(): Promise<void> {}
+      },
+    );
 
     const { BetterSQLite3Adapter } =
       await import("../connection-adapters/better-sqlite3-adapter.js");

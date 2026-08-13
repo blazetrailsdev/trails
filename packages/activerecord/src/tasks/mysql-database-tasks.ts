@@ -168,25 +168,7 @@ export class MySQLDatabaseTasks {
   }
 
   static register(): void {
-    const handler = {
-      create: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).create(),
-      drop: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).drop(),
-      purge: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).purge(),
-      charset: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).charset(),
-      collation: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).collation(),
-      truncateAll: async (config: DatabaseConfig) => new MySQLDatabaseTasks(config).truncateAll(),
-      structureDump: async (
-        config: DatabaseConfig,
-        filename: string,
-        flags?: string | string[] | null,
-      ) => new MySQLDatabaseTasks(config).structureDump(filename, flags),
-      structureLoad: async (
-        config: DatabaseConfig,
-        filename: string,
-        flags?: string | string[] | null,
-      ) => new MySQLDatabaseTasks(config).structureLoad(filename, flags),
-    };
-    DatabaseTasks.registerTask(/mysql/, handler);
+    DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
   }
 
   private creationOptions(): { charset?: string; collation?: string } {
