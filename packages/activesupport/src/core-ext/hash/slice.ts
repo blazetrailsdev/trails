@@ -7,7 +7,7 @@ type AnyObject = Record<string, unknown>;
 export function extractBang<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
   const result: Partial<T> = {};
   for (const key of keys) {
-    if (key in obj) {
+    if (Object.hasOwn(obj, key)) {
       result[key as keyof T] = obj[key as keyof T];
       delete obj[key as keyof T];
     }
