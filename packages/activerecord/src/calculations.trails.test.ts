@@ -386,6 +386,17 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.asyncSum(1000)).toBe(1000 * rows);
   });
 
+  // `async_sum(identity_or_column = nil)` (calculations.rb:182) does NOT share
+  // `sum`'s `0` default: the nil reaches `arel_column`, whose `field.to_s`
+  // (query_methods.rb:1993) is `""`, so the query is `SUM()`. Measured on MRI
+  // (activerecord 8.0.2, sqlite3): `Person.sum` => 0, while `Person.async_sum`
+  // raises `ActiveRecord::StatementInvalid: SQLite3::SQLException: wrong number
+  // of arguments to function SUM()`.
+  it("async sums the nil identity value when no column is given", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    await expect(Account.asyncSum()).rejects.toThrow();
+  });
+
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
   // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
   // narrow it away.
