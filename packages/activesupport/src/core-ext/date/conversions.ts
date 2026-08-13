@@ -26,7 +26,7 @@ import { ArgumentError } from "../../time-zone-config.js";
  * keep Rails' single delegating expression instead of a two-arm dispatch.
  */
 export function toTime(date: Temporal.PlainDate, form: string = "local"): TimeWithZone {
-  if (form !== "local" && form !== "utc") {
+  if (!["local", "utc"].includes(form)) {
     throw new ArgumentError(`Expected :local or :utc, got :${form}.`);
   }
   const zone = TimeZone.find(form === "utc" ? "UTC" : Temporal.Now.timeZoneId())!;

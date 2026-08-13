@@ -1569,10 +1569,7 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
-  const exists = await reflectionAdapter(this).schemaCache.dataSourceExists(this.tableName);
-  // BoundSchemaReflection answers `undefined` when the pool can't be probed;
-  // Rails' schema_cache always answers a boolean, so treat unknown as present.
-  return exists !== false;
+  return (await reflectionAdapter(this).schemaCache.dataSourceExists(this.tableName)) ?? false;
 }
 
 /**
