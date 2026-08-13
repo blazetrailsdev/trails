@@ -732,6 +732,12 @@ export const filterParameters = [
       "db/schema.ts",
       `// This file is auto-generated from the current state of the database.
 // Instead of editing this file, use migrations to change your schema.
+//
+// Regenerate with \`trails db schema:dump\`.
+import type { DatabaseAdapter } from "@blazetrails/activerecord";
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default async function defineSchema(ctx: DatabaseAdapter) {}
 `,
     );
   }

@@ -4,6 +4,7 @@ import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { ControllerGenerator } from "../generators/rails/controller/controller-generator.js";
 import { ScaffoldGenerator } from "../generators/rails/scaffold/scaffold-generator.js";
+import { AuthenticationGenerator } from "../generators/rails/authentication/authentication-generator.js";
 
 export function generateCommand(): Command {
   const cmd = new Command("generate");
@@ -61,6 +62,16 @@ export function generateCommand(): Command {
     .action((name: string, attributes: string[]) => {
       const gen = new ScaffoldGenerator({ cwd: cwd(), output: console.log });
       gen.run(name, attributes);
+    });
+
+  cmd
+    .command("authentication")
+    .description("Generate session-based authentication")
+    .option("--api", "Skip the views")
+    .option("--skip-mailer", "Skip the password-reset mailer")
+    .action((opts: { api?: boolean; skipMailer?: boolean }) => {
+      const gen = new AuthenticationGenerator({ cwd: cwd(), output: console.log });
+      gen.run({ api: opts.api, skipMailer: opts.skipMailer });
     });
 
   return cmd;
