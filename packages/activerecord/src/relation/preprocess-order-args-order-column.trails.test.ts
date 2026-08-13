@@ -26,7 +26,7 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     );
 
   it("falls back to a bare quoted literal for an unknown column in the Symbol arm", () => {
-    const [node] = preprocess(Topic.all(), [Symbol.for("nonexistent")]);
+    const [node] = preprocess(Topic.all(), [":nonexistent"]);
     expect(node).toBeInstanceOf(Nodes.Ascending);
     expect(sqlOf(node)).not.toMatch(/topics/i);
     expect(sqlOf(node)).toMatch(/nonexistent.*ASC/i);
@@ -40,7 +40,7 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
   });
 
   it("keeps a known column qualified against the relation's table", () => {
-    const [node] = preprocess(Topic.all(), [Symbol.for("title")]);
+    const [node] = preprocess(Topic.all(), [":title"]);
     expect(sqlOf(node)).toMatch(/"topics"\."title" ASC|`topics`\.`title` ASC/);
   });
 
@@ -64,7 +64,7 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     const quoteTableName = vi.spyOn(connection as never, "quoteTableName");
     const quoteColumnName = vi.spyOn(connection as never, "quoteColumnName");
     try {
-      preprocess(Topic.all(), [Symbol.for("nonexistent")]);
+      preprocess(Topic.all(), [":nonexistent"]);
       expect(quoteTableName).toHaveBeenCalledWith("nonexistent");
       expect(quoteColumnName).not.toHaveBeenCalledWith("nonexistent");
     } finally {

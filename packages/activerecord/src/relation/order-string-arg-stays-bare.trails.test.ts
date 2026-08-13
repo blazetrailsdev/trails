@@ -35,9 +35,7 @@ describe("order string arg stays bare", () => {
     // Rails' order! runs `order_values |= args`, deduping repeated terms.
     const dupString = Customer.order("name", "name").toSql();
     expect(dupString.match(/ORDER BY name/g)).toHaveLength(1);
-    const dupSymbol = (Customer as unknown as { order(...a: symbol[]): { toSql(): string } })
-      .order(Symbol.for("name"), Symbol.for("name"))
-      .toSql();
+    const dupSymbol = Customer.order(":name", ":name").toSql();
     expect(dupSymbol.match(new RegExp(qualifiedName, "g"))).toHaveLength(1);
   });
 
@@ -48,9 +46,7 @@ describe("order string arg stays bare", () => {
   });
 
   it("qualifies a Symbol order arg to the table, like Rails order(:name)", () => {
-    const sql = (Customer as unknown as { order(arg: symbol): { toSql(): string } })
-      .order(Symbol.for("name"))
-      .toSql();
+    const sql = Customer.order(":name").toSql();
     expect(sql).toMatch(new RegExp(`ORDER BY ${qualifiedName} ASC`));
   });
 

@@ -150,7 +150,6 @@ type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
  */
 export type OrderArg =
   | string
-  | symbol
   | Record<string, OrderDirection | Record<string, OrderDirection>>
   | Nodes.Node
   | string[]
@@ -483,7 +482,6 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const flat = columns.flat(Infinity);
   const normalized = flat.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
-    if (typeof c === "symbol") return c;
     // Rails' `_select!(-> { aliases.columns })` (join_dependency.rb:155) stores
     // the Proc itself; `arel_columns` calls it at build_select time.
     if (typeof c === "function") return c;
@@ -509,17 +507,15 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   const seenThunks = new Set<unknown>();
   for (const existing of this._selectColumns) {
     if (typeof existing === "string") seenStrings.add(existing);
-    else if (typeof existing === "symbol") seenStrings.add(symbolToName(existing));
     else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
     else if (typeof existing === "function") seenThunks.add(existing);
     else seenStrings.add((existing as { value: string }).value);
   }
   for (const col of normalized) {
-    if (typeof col === "string" || typeof col === "symbol") {
-      const key = typeof col === "symbol" ? symbolToName(col) : col;
-      if (!seenStrings.has(key)) {
+    if (typeof col === "string") {
+      if (!seenStrings.has(col)) {
         this._selectColumns.push(col);
-        seenStrings.add(key);
+        seenStrings.add(col);
       }
     } else if (col instanceof Nodes.Node) {
       if (!nodeIsDuplicate(col)) {
@@ -1537,12 +1533,7 @@ export function isBlankArgument(value: unknown): boolean {
   if (value === null || value === undefined || value === false) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
-  if (isPlainObject(value)) {
-    // A hash is blank only with no keys. trails represents Ruby symbol hash keys
-    // (e.g. `select(foo: :post_title)`) as Symbol-keyed objects, which
-    // Object.keys omits — count those too so a symbol-keyed hash isn't compacted.
-    return Object.keys(value).length === 0 && Object.getOwnPropertySymbols(value).length === 0;
-  }
+  if (isPlainObject(value)) return Object.keys(value).length === 0;
   return false;
 }
 
@@ -1784,9 +1775,21 @@ export function extractTableNameFrom(orderTerm: string): string | null {
   return match ? match[1] : null;
 }
 
-function symbolToName(s: symbol): string {
-  const name = Symbol.keyFor(s) ?? s.description;
-  if (name === undefined || name.trim() === "") {
+/**
+ * Ruby `x.is_a?(Symbol)`. A Ruby Symbol is a JS string carrying its leading
+ * colon (CLAUDE.md) — `:bar` is `":bar"` — so the colon is the discriminator
+ * the Ruby side gets from the type. Rails turns on it at
+ * query_methods.rb:1980 (`column_name.is_a?(Symbol) || !column_name.match?(/\W/)`)
+ * and :2003 (`Arel.sql(is_symbol ? quote_table_name(field) : field)`).
+ */
+function isRubySymbol(value: unknown): value is string {
+  return typeof value === "string" && value.startsWith(":");
+}
+
+/** Ruby `Symbol#name`. */
+function symbolToName(s: string): string {
+  const name = s.slice(1);
+  if (name.trim() === "") {
     throw argumentError("Order symbols must have a non-blank name");
   }
   return name;
@@ -1802,8 +1805,8 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       // `order(["comments.body", ...])`) never registers its table reference and
       // an `includes` it names is not promoted to `eager_load`.
       refs.push(...columnReferences(arg));
-    } else if (typeof arg === "string" || typeof arg === "symbol") {
-      const term = typeof arg === "symbol" ? symbolToName(arg) : arg;
+    } else if (typeof arg === "string") {
+      const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);
     } else if (arg instanceof Nodes.Attribute) {
@@ -1820,8 +1823,8 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       for (const [key, value] of arg) {
         if (isPlainObject(value)) {
           refs.push(String(key));
-        } else if (typeof key === "string" || typeof key === "symbol") {
-          const t = extractTableNameFrom(typeof key === "symbol" ? symbolToName(key) : key);
+        } else if (typeof key === "string") {
+          const t = extractTableNameFrom(isRubySymbol(key) ? symbolToName(key) : key);
           if (t) refs.push(t);
         }
       }
@@ -1848,18 +1851,18 @@ export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknow
   return orderArgs;
 }
 
-function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): (string | symbol)[] {
-  const result: (string | symbol)[] = [];
+function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): string[] {
+  const result: string[] = [];
   for (const arg of orderArgs) {
     if (Array.isArray(arg)) {
       result.push(...flattenedOrderKeysForRawSqlCheck(arg));
-    } else if (typeof arg === "string" || typeof arg === "symbol") {
+    } else if (typeof arg === "string") {
       result.push(arg);
     } else if (arg instanceof Nodes.Node) {
       // Arel nodes (SqlLiteral, Attribute, Ordering, …) are pre-sanitized; skip them.
     } else if (arg instanceof Map) {
       for (const key of arg.keys()) {
-        if (typeof key === "string" || typeof key === "symbol") result.push(key);
+        if (typeof key === "string") result.push(key);
       }
     } else if (isPlainObject(arg)) {
       for (const [key, value] of Object.entries(arg)) {
@@ -1882,7 +1885,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   // disallowRawSqlBang skips symbols — resolve symbol names to strings first
   // so their descriptions are validated against the column-name matcher.
   const flattenedArgs = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
-    typeof k === "symbol" ? symbolToName(k) : k,
+    isRubySymbol(k) ? symbolToName(k) : k,
   );
   disallowRawSqlBang(flattenedArgs, {
     permit: (
@@ -1897,7 +1900,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   }
   const mapped: unknown[] = [];
   for (const arg of orderArgs) {
-    if (typeof arg === "symbol") {
+    if (isRubySymbol(arg)) {
       mapped.push(new Nodes.Ascending(orderColumn.call(this, symbolToName(arg))));
     } else if (arg instanceof Map) {
       // JS object keys can't be Arel nodes, so a Map is the analogue of Rails'
@@ -1911,8 +1914,8 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
         );
       }
     } else if (isPlainObject(arg)) {
-      for (const rawKey of Reflect.ownKeys(arg)) {
-        const key = typeof rawKey === "symbol" ? symbolToName(rawKey) : rawKey;
+      for (const rawKey of Object.keys(arg)) {
+        const key = isRubySymbol(rawKey) ? symbolToName(rawKey) : rawKey;
         const value = (arg as Record<PropertyKey, unknown>)[rawKey];
         if (isPlainObject(value)) {
           for (const [field, dir] of Object.entries(value)) {
@@ -2079,7 +2082,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | symbol | number | Nodes.Node | null,
+  field: string | number | Nodes.Node | null,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
@@ -2091,9 +2094,8 @@ export function arelColumn(
   // (query_methods.rb:1991-1992) — which is what carries `sum`'s Integer identity
   // default through as the literal it sums over, and `async_sum`'s nil one
   // (calculations.rb:182) as `""`, the empty `SUM()`.
-  const isSymbol = typeof field === "symbol";
-  let fieldStr =
-    typeof field === "symbol" ? symbolToName(field) : field == null ? "" : String(field);
+  const isSymbol = isRubySymbol(field);
+  let fieldStr = isSymbol ? symbolToName(field) : field == null ? "" : String(field);
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
 
   const fromClause = (this as any)._fromClause;
@@ -2109,8 +2111,7 @@ export function arelColumn(
   if (fallback) return fallback(fieldStr);
   // Ruby `Arel.sql(is_symbol ? quote_table_name(field) : field)`
   // (query_methods.rb:2003): a Symbol names a column and is quoted; a String is
-  // raw SQL and is not. TS has no way to recover that distinction from a bare
-  // string, so the JS-`Symbol` modelling is retained here (RFC 0096 debt).
+  // raw SQL and is not.
   const quoted = isSymbol ? safeQuoteColumnName(modelClass, fieldStr) : fieldStr;
   return arelSql(quoted);
 }
@@ -2119,8 +2120,7 @@ export function arelColumn(
 export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
-    if (typeof field === "string" || typeof field === "symbol")
-      return [arelColumn.call(this, field)];
+    if (typeof field === "string") return [arelColumn.call(this, field)];
     if (typeof field === "function") return [field()];
     if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
     return [field];
@@ -2131,16 +2131,14 @@ export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown
 export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
-  columnName: string | symbol,
+  columnName: string,
 ): unknown {
   const existing = (this as any)._referencesValues ?? [];
   if (!existing.includes(tableName)) (this as any)._referencesValues = [...existing, tableName];
   // Ruby discriminates `column_name.is_a?(Symbol)` (query_methods.rb:1980): a
-  // Symbol names a column, a String may be an expression. TS cannot recover that
-  // from a bare string, so the JS-`Symbol` modelling is retained (RFC 0096 debt);
-  // the name itself is Rails' `columnName` from here down.
-  const isSymbol = typeof columnName === "symbol";
-  if (typeof columnName === "symbol") columnName = symbolToName(columnName);
+  // Symbol names a column, a String may be an expression.
+  const isSymbol = isRubySymbol(columnName);
+  if (isSymbol) columnName = symbolToName(columnName);
   const modelClass: any = this.model;
   // Schema-qualified table names (e.g. "schema.table") must not be passed to
   // ArelTable — the visitor quotes the whole string as one identifier, producing
@@ -2168,13 +2166,13 @@ export function arelColumnWithTable(
 /** @internal */
 export function arelColumnsFromHash(
   this: QueryMethodsHost,
-  fields: Record<PropertyKey, unknown>,
+  fields: Record<string, unknown>,
 ): unknown[] {
-  return Reflect.ownKeys(fields).flatMap((key) => {
-    const columns = (fields as Record<string | symbol, unknown>)[key];
-    const tbl = typeof key === "symbol" ? symbolToName(key) : key;
-    if (typeof columns === "string" || typeof columns === "symbol") {
-      return [arelColumnWithTable.call(this, tbl, columns as any)];
+  return Object.keys(fields).flatMap((key) => {
+    const columns = fields[key];
+    const tbl = isRubySymbol(key) ? symbolToName(key) : key;
+    if (typeof columns === "string") {
+      return [arelColumnWithTable.call(this, tbl, columns)];
     }
     if (Array.isArray(columns)) {
       return columns.map((col) => arelColumnWithTable.call(this, tbl, col));
@@ -2217,28 +2215,28 @@ function nodeAs(attr: unknown, quotedAlias: string): unknown {
 /** @internal */
 export function arelColumnAliasesFromHash(
   this: QueryMethodsHost,
-  fields: Record<string | symbol, unknown>,
+  fields: Record<string, unknown>,
 ): unknown[] {
-  return Reflect.ownKeys(fields).flatMap((key) => {
-    const columnsAliases = fields[key as any];
-    const tableName = typeof key === "symbol" ? symbolToName(key) : key;
+  return Object.keys(fields).flatMap((key) => {
+    const columnsAliases = fields[key];
+    const tableName = isRubySymbol(key) ? symbolToName(key) : key;
     const modelClass: any = this.model;
     const quoteAlias = (a: unknown): string =>
-      safeQuoteColumnName(modelClass, typeof a === "symbol" ? symbolToName(a) : String(a));
+      safeQuoteColumnName(modelClass, isRubySymbol(a) ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
-      return Reflect.ownKeys(columnsAliases as object).map((col) => {
+      return Object.keys(columnsAliases as object).map((col) => {
         const alias = (columnsAliases as any)[col];
-        const attr = arelColumnWithTable.call(this, tableName, col as any);
+        const attr = arelColumnWithTable.call(this, tableName, col);
         return nodeAs(attr instanceof Nodes.Node ? attr : arelSql(String(col)), quoteAlias(alias));
       });
     }
     if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as (string | symbol)[]).map((col) =>
+      return (columnsAliases as string[]).map((col) =>
         arelColumnWithTable.call(this, tableName, col),
       );
     }
-    if (typeof columnsAliases === "string" || typeof columnsAliases === "symbol") {
-      return [nodeAs(arelColumn.call(this, key as any), quoteAlias(columnsAliases))];
+    if (typeof columnsAliases === "string") {
+      return [nodeAs(arelColumn.call(this, key), quoteAlias(columnsAliases))];
     }
     return [];
   });
@@ -2394,8 +2392,8 @@ export function buildWithValueFromHash(
   this: QueryMethodsHost,
   hash: Record<string, unknown>,
 ): unknown[] {
-  return Reflect.ownKeys(hash).map((key) => {
-    const name = typeof key === "symbol" ? symbolToName(key) : key;
+  return Object.keys(hash).map((key) => {
+    const name = isRubySymbol(key) ? symbolToName(key) : key;
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
       throw argumentError(
         `Invalid CTE name "${name}": must be a valid SQL identifier (letters, digits, underscores, not starting with a digit).`,
@@ -2515,7 +2513,7 @@ export function selectNamedJoins(
   const associations: unknown[] = [];
 
   for (const joinName of joinNames) {
-    if (typeof joinName === "symbol" && cteNames.has(symbolToName(joinName))) {
+    if (isRubySymbol(joinName) && cteNames.has(symbolToName(joinName))) {
       cteJoins.push(symbolToName(joinName));
     } else {
       associations.push(joinName);
@@ -2540,7 +2538,6 @@ export function selectAssociationList(
   for (const association of associations) {
     if (
       typeof association === "string" ||
-      typeof association === "symbol" ||
       Array.isArray(association) ||
       isPlainObject(association)
     ) {
@@ -2573,12 +2570,7 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   for (const v of values) {
     if (typeof v === "string") {
       if (/\s/.test(v)) throw argumentError("only Hash, Symbol and Array are allowed");
-    } else if (
-      typeof v !== "symbol" &&
-      !Array.isArray(v) &&
-      !isPlainObject(v) &&
-      !(v instanceof JoinDependency)
-    ) {
+    } else if (!Array.isArray(v) && !isPlainObject(v) && !(v instanceof JoinDependency)) {
       throw argumentError("only Hash, Symbol and Array are allowed");
     }
   }
