@@ -11,8 +11,8 @@ import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
  * Test-only schema-dump helpers. Mirrors Rails'
  * `ActiveRecord::SchemaDumpingHelper` (test/support/schema_dumping_helper.rb).
  *
- * Rails captures `SchemaDumper.dump(pool)` stdout; our dumper returns the
- * generated DSL string directly, so there is no `capture_io`. The
+ * Rails captures `SchemaDumper.dump(pool)` stdout; our dump stream is the
+ * array of generated DSL lines, so there is no `capture_io`. The
  * `SchemaDumper.ignore_tables` save/restore dance is faithful — both helpers
  * scope the global filter to a single dump and always restore it (even on
  * throw), so concurrent suites don't observe a mutated baseline.
@@ -45,7 +45,7 @@ export async function dumpTableSchema(source: SchemaSource, ...tables: string[])
     : await source.tables();
   BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
-    return await SchemaDumper.dump(source);
+    return (await SchemaDumper.dump(source)).join("\n");
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
@@ -63,7 +63,7 @@ export async function dumpAllTableSchema(
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
   try {
-    return await SchemaDumper.dump(source);
+    return (await SchemaDumper.dump(source)).join("\n");
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }

@@ -25,7 +25,7 @@ describe("SchemaDumper trails-only cases", () => {
       ],
       indexes: () => [],
     };
-    const output = TopLevelDumper.dump(source) as string;
+    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
@@ -55,7 +55,7 @@ describe("SchemaDumper trails-only cases", () => {
       ],
       indexes: () => [],
     };
-    const output = TopLevelDumper.dump(source) as string;
+    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     for (const helper of [
       "int4range",
       "int8range",
@@ -91,7 +91,7 @@ describe("SchemaDumper trails-only cases", () => {
       ],
       indexes: () => [],
     };
-    const output = TopLevelDumper.dump(source) as string;
+    const output = (TopLevelDumper.dump(source) as string[]).join("\n");
     // Regression guard against collapsing to the `enum` fallback. timestamptz/
     // interval/oid resolve to their TableDefinition helpers (`t.timestamptz`/
     // `t.interval`/`t.oid`); uuid has no helper and round-trips through the
@@ -183,12 +183,12 @@ describe("SchemaDumper trails-only cases", () => {
     });
     // auto-generated Rails name → name: omitted (export_name_on_schema_dump? == false)
     const autoName = "fk_rails_abc123def4";
-    const autoOutput = await SchemaDumper.dump(mkSource(autoName) as any);
+    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");
     expect(autoOutput).toContain("addForeignKey");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     // custom name → name: included
     const customName = "fk_books_author_id";
-    const customOutput = await SchemaDumper.dump(mkSource(customName) as any);
+    const customOutput = (await SchemaDumper.dump(mkSource(customName) as any)).join("\n");
     expect(customOutput).toContain(`name: "${customName}"`);
   });
 
@@ -200,11 +200,11 @@ describe("SchemaDumper trails-only cases", () => {
       checkConstraints: async () => [{ expression: "price > 0", name: chkName }],
     });
     const autoName = "chk_rails_abc123def4";
-    const autoOutput = await SchemaDumper.dump(mkSource(autoName) as any);
+    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).join("\n");
     expect(autoOutput).toContain("t.checkConstraint");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     const customChkName = "products_price_check";
-    const customOutput = await SchemaDumper.dump(mkSource(customChkName) as any);
+    const customOutput = (await SchemaDumper.dump(mkSource(customChkName) as any)).join("\n");
     expect(customOutput).toContain(`name: "${customChkName}"`);
   });
 });
@@ -279,7 +279,7 @@ describe("SchemaDumperAdapterTest", () => {
     await adapter.createTable("reminders", {}, (t) => {
       t.string("name");
     });
-    const result = await TopLevelDumper.dump(adapter);
+    const result = (await TopLevelDumper.dump(adapter)).join("\n");
     expect(result).toContain("reminders");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");
@@ -414,7 +414,7 @@ describe("SchemaDumper async header ordering", () => {
     }
     const source = { tables: () => [], columns: () => [], indexes: () => [] };
     const dumper = new (OrderedDumper as any)(source);
-    const result = await (dumper.dump() as Promise<string>);
+    const result = (await (dumper.dump() as Promise<string[]>)).join("\n");
     expect(log).toEqual(["schemas", "extensions", "types"]);
     const schemasIdx = result.indexOf("SCHEMAS");
     const extensionsIdx = result.indexOf("EXTENSIONS");

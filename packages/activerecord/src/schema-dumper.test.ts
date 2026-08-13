@@ -431,7 +431,7 @@ describe("SchemaDumperTest", () => {
       indexes: async () => [],
     };
     SchemaDumper.ignoreTables = [/^temp_/];
-    const output = await SchemaDumper.dump(source as any);
+    const output = (await SchemaDumper.dump(source as any)).join("\n");
     expect(output).toContain("users");
     expect(output).not.toContain("temp_cache");
   });
@@ -697,7 +697,7 @@ describe("SchemaDumperTest", () => {
               ]
             : [],
       };
-      const output = await SchemaDumper.dump(source as any);
+      const output = (await SchemaDumper.dump(source as any)).join("\n");
       const authorsIdx = output.indexOf('createTable("authors"');
       const booksIdx = output.indexOf('createTable("books"');
       const fkIdx = output.indexOf("addForeignKey");
@@ -726,7 +726,7 @@ describe("SchemaDumperTest", () => {
             ]
           : [],
     };
-    const output = await SchemaDumper.dump(source as any);
+    const output = (await SchemaDumper.dump(source as any)).join("\n");
     expect(output).not.toContain("addForeignKey");
     expect(output).not.toContain('"books"');
   });
@@ -737,7 +737,7 @@ describe("SchemaDumperTest", () => {
       columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
       indexes: async () => [],
     };
-    const output = await SchemaDumper.dump(source as any);
+    const output = (await SchemaDumper.dump(source as any)).join("\n");
     expect(output).not.toContain("addForeignKey");
   });
 
@@ -747,10 +747,12 @@ describe("SchemaDumperTest", () => {
       columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
       indexes: async () => [],
     };
-    const output = await SchemaDumper.dump(source as any, {
-      tableNamePrefix: "myapp_",
-      tableNameSuffix: "_v1",
-    });
+    const output = (
+      await SchemaDumper.dump(source as any, [], {
+        tableNamePrefix: "myapp_",
+        tableNameSuffix: "_v1",
+      })
+    ).join("\n");
     expect(output).toContain('"users"');
     expect(output).not.toContain("myapp_users_v1");
   });
@@ -761,7 +763,9 @@ describe("SchemaDumperTest", () => {
       columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
       indexes: async () => [],
     };
-    const output = await SchemaDumper.dump(source as any, { tableNamePrefix: "app.prefix_" });
+    const output = (
+      await SchemaDumper.dump(source as any, [], { tableNamePrefix: "app.prefix_" })
+    ).join("\n");
     expect(output).toContain('"users"');
     expect(output).not.toContain("app.prefix_users");
   });
@@ -772,7 +776,9 @@ describe("SchemaDumperTest", () => {
       indexes: async () => [],
     };
     SchemaDumper.ignoreTables = ["posts"];
-    const output = await SchemaDumper.dump(source as any, { tableNamePrefix: "myapp_" });
+    const output = (await SchemaDumper.dump(source as any, [], { tableNamePrefix: "myapp_" })).join(
+      "\n",
+    );
     expect(output).toContain('"users"');
     expect(output).not.toContain('"posts"');
     expect(output).not.toContain("myapp_");
