@@ -605,16 +605,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`ActiveSupport::EnumerableCoreExt::Constants#const_missing` " +
-      "(core_ext/enumerable.rb:14-22) exists only to keep the deprecated " +
-      "`Enumerable::SoleItemExpectedError` constant resolvable through Ruby's " +
-      "constant-lookup hook. JS has no const_missing hook and trails exports the " +
-      "error class directly, so there is nothing to intercept.",
-    names: ["const_missing"],
-    rubyFiles: ["core_ext/enumerable.rb"],
-  },
-  {
-    reason:
       "PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a " +
       "live `SELECT '<type>'::regtype::oid` query, so trails' port is async and " +
       "diverges from the sync abstract signature it overrides; it is tracked by " +
