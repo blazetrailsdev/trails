@@ -2603,11 +2603,16 @@ export function main() {
       const rubyOwnersByName = new Map<string, Set<string>>();
       const rubyCallsByOwnerName = new Map<string, { calls: string[]; weak: string[] }>();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
+      const rubyReaderNames = new Set<string>();
       const ownerKey = (owner: string, name: string) => `${owner}\u0000${name}`;
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         for (const rm of rubyMethods) {
+          // Collected ahead of the mode filter: a Rails `attr_reader` is
+          // usually private while the bodies reading it are public, so a
+          // public-mode run would otherwise never see the declaration.
+          if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
           if (!rubyParamsByName.has(rm.name)) {
@@ -2813,7 +2818,22 @@ export function main() {
           (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
             ? rubyCallArgsByOwnerName.get(ownerKey(rubyModule, rubyName))
             : rubyCallArgsByName.get(rubyName);
-        const rubySites = rubyOwnSites?.filter((s) => !s.flags.includes("weak"));
+        // Also dropped: a receiver-less zero-arg read of an `attr_reader` name.
+        // Ruby spells such a read exactly like a call, so `if foreign_key`
+        // (schema_definitions.rb:241) arrives as a second, zero-arg
+        // `foreign_key` site beside the body's real `table.foreign_key(...)`
+        // (:242) — and the port, carrying the reader as a FIELD, has only the
+        // real one. Left in, the pairing hands the guard read the port's
+        // genuine call and manufactures a shape row for a correct body.
+        const rubySites = rubyOwnSites?.filter(
+          (s) =>
+            !s.flags.includes("weak") &&
+            !(
+              s.args.length === 0 &&
+              s.recv === undefined &&
+              rubyReaderNames.has(ownerKey(rubyModule, s.name))
+            ),
+        );
         if (!rubySites || rubySites.length === 0) return;
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a

@@ -1008,7 +1008,14 @@ class ApiExtractor
     names = extract_symbol_args(args)
     names.each do |name|
       if kind == :reader || kind == :accessor
-        entry = { name: name, visibility: vis.to_s, params: [], file: file, line: @current_line }
+        entry = {
+          name: name,
+          visibility: vis.to_s,
+          params: [],
+          file: file,
+          line: @current_line,
+          reader: true,
+        }
         entry[:umbrellaConfig] = true if redirect_fqn
         target[bucket] << entry
       end
@@ -1059,6 +1066,7 @@ class ApiExtractor
           params: [],
           file: @current_file,
           line: @current_line,
+          reader: true,
         }
       end
       if kind == :writer || kind == :accessor

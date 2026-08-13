@@ -25,14 +25,5 @@
     "rubyName": "transform_value",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association-scope.ts",
-    "rubyName": "transform_value",
-    "call": "value_transformation",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "association_scope.rb:52,78 — Rails' `value_transformation` is an `attr_reader`, so `value_transformation.call(value)` is TWO nodes (a 0-arg reader call, then `call`); trails' `this.valueTransformation(value)` reads a TS getter (not a call node) and invokes it in one expression. Same receiver, same argument — extractor pairing artifact, no argument divergence."
   }
 ]
