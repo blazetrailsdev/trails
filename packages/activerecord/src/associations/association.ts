@@ -508,7 +508,7 @@ export class Association {
    *
    * Mirrors: ActiveRecord::Associations::Association#load_target
    */
-  async loadTarget(): Promise<Base | Base[] | null> {
+  loadTarget(): Promise<Base | Base[] | null> | Base | Base[] | null {
     // Corresponds to Rails' guard `(@stale_state && stale_target?) ||
     // find_target?` (association.rb:190). Rails relies on
     // `SingularAssociation#reader` resetting a stale association *before*
@@ -526,21 +526,27 @@ export class Association {
     // record assigned before its owner FK was set): that would clobber the
     // unsaved build. The stale and find-target branches stay mutually exclusive
     // (`stale_target?` requires loaded, `find_target?` requires not-loaded).
+    // The find is the only I/O here, so the body runs inline and answers a
+    // promise only when it actually ran — the `Promise<T> | T` shape callers reached
+    // from a synchronous writer (`CollectionAssociation#concat`) depend on.
+    const loaded = (): Base | Base[] | null => {
+      this.loadedBang();
+      return this.target;
+    };
     if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
       // Rails `find_target` always issues a query; skip the in-memory
       // `doFindTarget` cache so a stale target is actually re-fetched.
-      await this._findTarget();
+      return this._findTarget().then(loaded);
     } else if (this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined) {
         this.target = cached;
       } else {
-        await this._findTarget();
+        return this._findTarget().then(loaded);
       }
     }
 
-    this.loadedBang();
-    return this.target;
+    return loaded();
   }
 
   /**

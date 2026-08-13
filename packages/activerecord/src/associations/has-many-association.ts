@@ -25,7 +25,7 @@ import {
   routeThroughCheckValidity,
 } from "./validate-through-reflection.js";
 import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./errors.js";
-import { CollectionAssociation, includesRecord } from "./collection-association.js";
+import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
@@ -289,8 +289,11 @@ export class HasManyAssociation extends CollectionAssociation {
    * records.length)`.
    * @internal
    */
-  protected override async concatRecords(records: Base[], raise = false): Promise<Base[]> {
-    return this.updateCounterIfSuccess(await super.concatRecords(records, raise), records.length);
+  protected override concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
+    const concatenated = super.concatRecords(records, raise);
+    return isThenable(concatenated)
+      ? concatenated.then((saved) => this.updateCounterIfSuccess(saved, records.length))
+      : this.updateCounterIfSuccess(concatenated, records.length);
   }
 
   /**
