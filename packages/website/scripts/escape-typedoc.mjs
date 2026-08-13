@@ -5,7 +5,7 @@
  * docs (guides/, root index, …) are never touched, so genuine dead links there
  * still fail the build.
  *
- * 1. Escape angle brackets for the Vue SFC parser.
+ * 1. Escape angle brackets and braces for the Vue SFC parser.
  *    VitePress compiles markdown as Vue SFC templates. The Vue SFC parser must
  *    successfully parse the entire template before any directives (like v-pre)
  *    take effect. TypeScript generics (Array<T>), JSDoc HTML examples (<script>,
@@ -250,12 +250,6 @@ export function escapeForVue(content) {
       continue;
     }
 
-    // markdown-it-attrs consumes a trailing `{...}` as an attribute list, so a
-    // Ruby example like `# => {:a=>:b}` becomes `<p :a="&gt;:b">` — a Vue
-    // binding whose value is not a JS expression, which kills the SFC parse.
-    // `{{ }}` in prose is the same hazard as an interpolation. Escaping `{`
-    // outside inline code spans defuses both; inside a code span the entity
-    // would render literally, and attrs/interpolation do not apply there.
     const escaped = line.replace(/</g, "&lt;");
     const spans = codeSpanRanges(escaped);
     const inCode = (idx) => spans.some(([s, e]) => idx >= s && idx < e);
