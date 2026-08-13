@@ -1017,15 +1017,21 @@ export class DatabaseTasks {
     const dir = path.dirname(filename);
     fs.mkdirSync(dir, { recursive: true });
     // Rails' dumper only ever emits Ruby, so its `dump` has no language slot;
-    // ours reads the class default, which `schema_format` decides here.
+    // ours reads the class default, scoped to this dump the way `load_schema`
+    // scopes `Migration.verbose` (`database_tasks.rb:380,394`).
+    const languageWas = SchemaDumper.language;
     SchemaDumper.language = format === "js" ? "js" : "ts";
-    const migrationConnectionPool = this.migrationConnectionPool();
-    // Rails: `File.open(filename, "w:utf-8") { |file| SchemaDumper.dump(pool, file) }`
-    // (`database_tasks.rb:439-442`). `file` is the dump stream — ours collects
-    // the lines, then writes them, because the fs port has no open-file handle.
-    const file: string[] = [];
-    await SchemaDumper.dump(migrationConnectionPool, file);
-    fs.writeFileSync(filename, file.join("\n"));
+    try {
+      const migrationConnectionPool = this.migrationConnectionPool();
+      // Rails: `File.open(filename, "w:utf-8") { |file| SchemaDumper.dump(pool, file) }`
+      // (`database_tasks.rb:439-442`). `file` is the dump stream — ours collects
+      // the lines, then writes them, because the fs port has no open-file handle.
+      const file: string[] = [];
+      await SchemaDumper.dump(migrationConnectionPool, file);
+      fs.writeFileSync(filename, file.join("\n"));
+    } finally {
+      SchemaDumper.language = languageWas;
+    }
   }
 
   static async loadSchema(
