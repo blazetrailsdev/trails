@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
+import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
+import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
 import { coder } from "../coder.js";
-import { setFormatVersion } from "../format-version-slot.js";
 import { Notifications } from "../../notifications.js";
 
 // Rails calls the private `serialize_entry` through `send` (cache_store_coder_behavior.rb:90).
@@ -71,6 +72,14 @@ describe("MemoryStoreTest", () => {
     store.write("key", "original", { unlessExist: true });
     store.write("key", "overwrite", { unlessExist: true });
     expect(store.read("key")).toBe("original");
+  });
+
+  // Mirrors `include CacheStoreBehavior` (memory_store_test.rb:16).
+  cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
+
+  // Mirrors `include CacheStoreSerializerBehavior` (memory_store_test.rb:20).
+  cacheStoreSerializerBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
   });
 
   // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
@@ -497,43 +506,5 @@ describe("CacheStoreCoderBehavior", () => {
     const store = new MemoryStore({ coder: null });
     const entry = new Entry("value");
     expect(serializeEntry(store, entry)).toBe(entry);
-  });
-});
-
-// Port of Rails' CacheStoreSerializerBehavior
-// (test/cache/behaviors/cache_store_serializer_behavior.rb).
-describe("CacheStoreSerializerBehavior", () => {
-  afterEach(() => {
-    setFormatVersion(7.0);
-  });
-
-  it("serializer can be specified", () => {
-    const serializer = {
-      dump(value: unknown): string {
-        return (value as object).constructor.name;
-      },
-      load(dumped: string): unknown {
-        return dumped;
-      },
-    };
-
-    setFormatVersion(7.1);
-    const cache = new MemoryStore({ serializer });
-    cache.write("key", 123);
-    expect(cache.read("key")).toBe("Number");
-  });
-
-  it("serializer can be :message_pack", () => {
-    setFormatVersion(7.1);
-    const cache = new MemoryStore({ serializer: ":message_pack" });
-    cache.write("key", 123);
-    expect(cache.read("key")).toBe(123);
-  });
-
-  it("specifying a serializer raises when also specifying a coder", () => {
-    setFormatVersion(7.1);
-    expect(() => new MemoryStore({ serializer: ":marshal_7_1", coder: null })).toThrow(
-      /serializer/i,
-    );
   });
 });

@@ -55,45 +55,10 @@ describe("CacheBehaviorTest", () => {
     cache = new TestStore();
   });
 
-  it("should read and write strings", () => {
-    cache.write("foo", "bar");
-    expect(cache.read("foo")).toBe("bar");
-  });
-
-  it("fetch without cache miss", () => {
-    cache.write("foo", "bar");
-    expect(cache.fetch("foo", () => "fallback")).toBe("bar");
-  });
-
-  it("fetch with cache miss", () => {
-    expect(cache.fetch("foo", () => "bar")).toBe("bar");
-  });
-
-  it("fetch with forced cache miss", () => {
-    cache.write("foo", "bar");
-    expect(cache.fetch("foo", { force: true }, () => "baz")).toBe("baz");
-  });
-
-  it("fetch with cached nil", () => {
-    cache.write("foo", null);
-    let calls = 0;
-    cache.fetch("foo", () => {
-      calls++;
-      return "bar";
-    });
-    expect(calls).toBe(0);
-  });
-
   it("delete", () => {
     cache.write("foo", "bar");
     expect(cache.delete("foo")).toBe(true);
     expect(cache.read("foo")).toBeNull();
-  });
-
-  it("exist", () => {
-    cache.write("foo", "bar");
-    expect(cache.exist("foo")).toBe(true);
-    expect(cache.exist("missing")).toBe(false);
   });
 
   it("fetch with block receiving write options", () => {
