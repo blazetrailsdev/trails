@@ -188,7 +188,6 @@ export class AppGenerator extends AppBase {
           },
           devDependencies: {
             "@blazetrails/trails-tsc": "*",
-            // Ships the `trails-tsc` bin the `typecheck` script above calls.
             "@blazetrails/activerecord-cli": "*",
             typescript: "^5.7.0",
             vite: "^7.0.0",

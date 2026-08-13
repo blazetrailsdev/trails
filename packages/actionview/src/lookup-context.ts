@@ -743,6 +743,13 @@ export class LookupContext {
    *
    * `name` may be qualified (`"users/user"`), in which case the leading
    * segments replace `prefix` — mirroring `PartialRenderer#partial_path`.
+   *
+   * @noRailsEquivalent CONVERGEABLE (story:
+   * 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope).
+   * Rails has no sync/async split: a template is compiled into a method on
+   * `ActionView::Base`, so nested `render` is just a call on the view. This
+   * exists only because a trails handler receives source + locals rather than
+   * a view object, and is deleted when that lands.
    */
   renderPartialSync(
     name: string,
