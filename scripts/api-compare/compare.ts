@@ -2846,9 +2846,6 @@ export function main() {
         }
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
-        // The weak drop is decided against the TS body: a weak site whose name
-        // the port still has an unconsumed site for is a real call to compare
-        // (RFC 0099 — `schema_definitions.rb:242` `table.foreign_key(...)`).
         const rubySites = comparableRubySites(rubyReadableSites, tsSites[0], (name) =>
           rubyOwnersByName.has(name),
         );

@@ -543,20 +543,20 @@ function alignReceiverArgs(
  * {@link stripMixinReceiver} handles when the port spells that parameter
  * `this`.
  *
+ * Only an `id:` receiver qualifies — a `const:` receiver is the CLASS a
+ * `Foo.new(x)` construction names, which the TS side already spells as the
+ * `new Foo(x)` callee rather than an argument.
+ *
  * The receiver is COMPARED, not stripped: it is prepended to the Ruby list, so
  * `stiName(other)` where Rails wrote `klass.sti_name` still reads as the
- * divergence it is. Only a SIMPLE receiver qualifies and only when the extra
- * argument is exactly one — a port that also passes a genuine extra argument
- * keeps reporting.
+ * divergence it is, and only when the extra argument is exactly one — a port
+ * that also passes a genuine extra argument keeps reporting.
  */
 function alignPortedReceiver(
   ruby: CallSite,
   aligned: { rubyArgs: string[]; tsArgs: string[] },
 ): { rubyArgs: string[]; tsArgs: string[] } {
   if (aligned.rubyArgs !== ruby.args) return aligned;
-  // `id:` only: a `const:` receiver is the CLASS a `Foo.new(x)` construction
-  // names, which the TS side already spells as the `new Foo(x)` callee rather
-  // than an argument.
   if (ruby.recv === undefined || !/^id:/.test(ruby.recv)) return aligned;
   if (aligned.tsArgs.length !== aligned.rubyArgs.length + 1) return aligned;
   return { rubyArgs: [ruby.recv, ...aligned.rubyArgs], tsArgs: aligned.tsArgs };

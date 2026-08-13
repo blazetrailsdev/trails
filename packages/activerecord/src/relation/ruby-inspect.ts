@@ -81,8 +81,6 @@ export function rubyInspectArray(values: unknown[]): string {
 export function inspectArelValue(value: unknown): string {
   if (value instanceof Nodes.SqlLiteral) return `sql(${JSON.stringify(value.value)})`;
   if (value instanceof Nodes.Node) return `sql(${JSON.stringify(value.toSql())})`;
-  // A Ruby Symbol is a colon-prefixed string in trails, and `:name.inspect` is
-  // `:name` — it renders as-is rather than quoted like a String.
   if (typeof value === "string" && value.startsWith(":")) return value;
   return JSON.stringify(value);
 }

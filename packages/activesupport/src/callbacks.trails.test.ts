@@ -72,11 +72,9 @@ describe("CallbackChain compile memoization (trails)", () => {
   });
 });
 
-// trails-only coverage: the callback type lives in the variadic filter list
-// (`callbacks.rb:698`), so the documented type-omitted form
+// trails-only coverage: the documented type-omitted form
 // `set_callback :save, :before_method` (`callbacks.rb:713`) defaults to
-// `:before`. Rails covers this through Ruby's `*filter_list` signature; trails
-// used to take `kind` as a positional parameter, so this pins the fold.
+// `:before` (`callbacks.rb:698`).
 describe("setCallback type-omitted form (trails)", () => {
   it("defaults the callback type to before", () => {
     const target = {};
