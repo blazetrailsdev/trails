@@ -529,7 +529,37 @@ function alignReceiverArgs(
   ruby: CallSite,
   tsArgs: string[],
 ): { rubyArgs: string[]; tsArgs: string[] } {
-  return alignBuiltinReceiver(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs));
+  return alignPortedReceiver(
+    ruby,
+    alignBuiltinReceiver(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs)),
+  );
+}
+
+/**
+ * The explicit receiver argument the ported free-function idiom adds
+ * (RFC 0099). Ruby `klass.sti_name` is `stiName(klass)` in
+ * `inheritance.ts:844` — a Ruby module/class method ported as a top-level
+ * function whose FIRST parameter is the receiver, the same shape
+ * {@link stripMixinReceiver} handles when the port spells that parameter
+ * `this`.
+ *
+ * The receiver is COMPARED, not stripped: it is prepended to the Ruby list, so
+ * `stiName(other)` where Rails wrote `klass.sti_name` still reads as the
+ * divergence it is. Only a SIMPLE receiver qualifies and only when the extra
+ * argument is exactly one — a port that also passes a genuine extra argument
+ * keeps reporting.
+ */
+function alignPortedReceiver(
+  ruby: CallSite,
+  aligned: { rubyArgs: string[]; tsArgs: string[] },
+): { rubyArgs: string[]; tsArgs: string[] } {
+  if (aligned.rubyArgs !== ruby.args) return aligned;
+  // `id:` only: a `const:` receiver is the CLASS a `Foo.new(x)` construction
+  // names, which the TS side already spells as the `new Foo(x)` callee rather
+  // than an argument.
+  if (ruby.recv === undefined || !/^id:/.test(ruby.recv)) return aligned;
+  if (aligned.tsArgs.length !== aligned.rubyArgs.length + 1) return aligned;
+  return { rubyArgs: [ruby.recv, ...aligned.rubyArgs], tsArgs: aligned.tsArgs };
 }
 
 /**
@@ -810,6 +840,57 @@ export function pairCallSites(
     const tsIdx = matched.get(rubyIdx);
     return tsIdx === undefined ? [] : [{ ruby, ts: tsSites[tsIdx] }];
   });
+}
+
+/**
+ * The Ruby sites the argument gate compares, given the TS body they will pair
+ * against.
+ *
+ * A `weak` site — one whose receiver `extract-ruby-api.rb#inert_receiver?` read
+ * as a literal or a plain local (`xs.map`, `opts.fetch`) — is dropped, because a
+ * name that collides with an unrelated ported method says nothing about the
+ * port. But that is a receiver heuristic, not a verdict: a local can hold a
+ * ported object, and `table.foreign_key(...)` (schema_definitions.rb:242) is
+ * weak even though `table` is a `TableDefinition` — so `add_to` → `foreign_key`
+ * compared nothing while `schema-definitions.ts:842` made exactly that call.
+ *
+ * So a weak site is RESTORED when both hold (RFC 0099):
+ *
+ * - `declaredNearby(name)` — the file being compared declares a method of that
+ *   name, so the receiver is a ported collaborator sitting right there
+ *   (`foreign_key`, `grouped_records`, `transform_value`, `selected_shard`)
+ *   rather than an Enumerable/String builtin, which no ported file declares.
+ * - the TS body still has an unconsumed same-named site once every non-weak
+ *   Ruby site has claimed one — the port makes that call, so there is a real
+ *   pair to compare.
+ *
+ * Sites are consumed in source order and the surviving list stays in source
+ * order, so the pairing {@link pairCallSites} then performs is unchanged for any
+ * body that had no spare TS site.
+ */
+export function comparableRubySites(
+  rubySites: readonly CallSite[],
+  tsSites: readonly CallSite[],
+  declaredNearby: (rubyName: string) => boolean,
+): CallSite[] {
+  const budget = new Map<string, number>();
+  for (const ts of tsSites) budget.set(ts.name, (budget.get(ts.name) ?? 0) + 1);
+  const consume = (name: string): boolean => {
+    for (const key of tsCallNameKeys(name)) {
+      const left = budget.get(key) ?? 0;
+      if (left > 0) {
+        budget.set(key, left - 1);
+        return true;
+      }
+    }
+    return false;
+  };
+  for (const ruby of rubySites) {
+    if (!ruby.flags.includes("weak")) consume(ruby.name);
+  }
+  return rubySites.filter(
+    (ruby) => !ruby.flags.includes("weak") || (declaredNearby(ruby.name) && consume(ruby.name)),
+  );
 }
 
 /** Compare one name-matched pair of call sites, mirroring

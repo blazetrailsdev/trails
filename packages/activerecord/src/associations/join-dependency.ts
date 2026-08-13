@@ -382,15 +382,14 @@ export class JoinDependency {
    * @internal
    */
   private build(
-    hash: Record<PropertyKey, any>,
+    hash: Record<string, any>,
     model: typeof Base,
     alias: string,
     parentPath: string,
   ): void {
-    for (const key of Reflect.ownKeys(hash)) {
-      const name = typeof key === "symbol" ? (key.description ?? String(key)) : String(key);
+    for (const name of Object.keys(hash)) {
       const node = this._addOrReuse(name, model, alias, parentPath);
-      const child = hash[key];
+      const child = hash[name];
       const childPath = parentPath ? `${parentPath}.${name}` : name;
       if (child != null && Reflect.ownKeys(child).length > 0) {
         this.build(child, node.baseKlass, node.effectiveSqlName, childPath);
@@ -916,13 +915,13 @@ export class JoinDependency {
     return this.nodes[Symbol.iterator]();
   }
 
-  static makeTree(associations: any): Record<PropertyKey, any> {
-    const hash: Record<PropertyKey, any> = Object.create(null);
+  static makeTree(associations: any): Record<string, any> {
+    const hash: Record<string, any> = Object.create(null);
     JoinDependency.walkTree(associations, hash);
     return hash;
   }
 
-  static walkTree(associations: any, hash: Record<PropertyKey, any>): void {
+  static walkTree(associations: any, hash: Record<string, any>): void {
     if (typeof associations === "string") {
       // Ruby `when Symbol, String then hash[associations.to_sym] ||= {}`
       // (join_dependency.rb:55-56): a Symbol and the equivalent String key the
@@ -946,8 +945,7 @@ export class JoinDependency {
         // (`_reflect_on_association(name)`). `build` looks the stored key up by
         // its string form, so a Symbol key — `{ ":agents": ":agents" }` — drops
         // its colon here instead.
-        const k =
-          typeof key === "string" && key.startsWith(":") ? key.slice(1) : (key as PropertyKey);
+        const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key);
         if (!hash[k]) hash[k] = Object.create(null);
         if (value != null) JoinDependency.walkTree(value, hash[k]);
       }

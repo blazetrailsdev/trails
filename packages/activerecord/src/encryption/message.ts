@@ -16,7 +16,7 @@ export class Message {
     headers = {},
   }: {
     payload?: string | Buffer | null;
-    headers?: Record<string, unknown>;
+    headers?: Record<string, unknown> | Properties;
   } = {}) {
     this.validatePayloadType(payload);
     this.payload = payload ?? "";

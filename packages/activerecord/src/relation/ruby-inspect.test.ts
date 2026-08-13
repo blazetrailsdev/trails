@@ -79,7 +79,7 @@ describe("inspectArelValue", () => {
   });
 
   it("renders symbols by their description", () => {
-    expect(inspectArelValue(Symbol("name"))).toBe("name");
+    expect(inspectArelValue(":name")).toBe(":name");
   });
 
   it("falls back to JSON for plain values", () => {

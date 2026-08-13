@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/message-pack-message-serializer.ts",
-    "rubyName": "hash_to_message",
-    "call": "order:constructor,parseProperties",
-    "reason": "Order artifact: the port's earlier construction is credited before parseProperties, where Rails evaluates the parse_properties argument before Message.new."
-  }
-]

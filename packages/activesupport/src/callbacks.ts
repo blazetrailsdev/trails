@@ -1277,7 +1277,7 @@ export interface ClassMethods<T extends object = object> {
     callback: AroundCallback<T> | CallbackObject,
     options?: CallbackOptions<T>,
   ): void;
-  skipCallback(name: string, kind: CallbackKind, ...filterList: FilterListEntry<T>[]): void;
+  skipCallback(name: string, ...filterList: FilterListEntry<T>[]): void;
   resetCallbacks(name: string): void;
 }
 
@@ -1357,14 +1357,10 @@ export namespace Callbacks {
   export function setCallback<T extends object>(
     target: T,
     name: string,
-    kind: CallbackKind,
     ...filterList: FilterListEntry<T>[]
   ): void {
-    // trails names the callback type in its own `kind` parameter; putting it
-    // back at the head reconstructs Rails' `*filter_list` exactly, so the
-    // `type` shift and `extract_options!` split are the ported ones.
     const [type, filters, options] = normalizeCallbackParams(
-      [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
+      filterList as Parameters<typeof normalizeCallbackParams>[0],
       null,
     );
     const chains = getCallbackChains(target);
@@ -1395,11 +1391,10 @@ export namespace Callbacks {
   export function skipCallback<T extends object>(
     target: T,
     name: string,
-    kind: CallbackKind,
     ...filterList: FilterListEntry<T>[]
   ): void {
     const [type, filters, options] = normalizeCallbackParams(
-      [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
+      filterList as Parameters<typeof normalizeCallbackParams>[0],
       null,
     );
     if (!("raise" in options)) options.raise = true;
@@ -1470,19 +1465,17 @@ export function defineCallbacks<T extends object>(
 export function setCallback<T extends object>(
   target: T,
   name: string,
-  kind: CallbackKind,
   ...filterList: FilterListEntry<T>[]
 ): void {
-  Callbacks.setCallback(target, name, kind, ...filterList);
+  Callbacks.setCallback(target, name, ...filterList);
 }
 
 export function skipCallback<T extends object>(
   target: T,
   name: string,
-  kind: CallbackKind,
   ...filterList: FilterListEntry<T>[]
 ): void {
-  Callbacks.skipCallback(target, name, kind, ...filterList);
+  Callbacks.skipCallback(target, name, ...filterList);
 }
 
 export function resetCallbacks(target: object, name: string): void {
@@ -1540,10 +1533,9 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
     static skipCallback<T extends object>(
       this: { prototype: T },
       name: string,
-      kind: CallbackKind,
       ...filterList: FilterListEntry<T>[]
     ): void {
-      skipCallback(this.prototype, name, kind, ...filterList);
+      skipCallback(this.prototype, name, ...filterList);
     }
 
     static resetCallbacks(name: string): void {

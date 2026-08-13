@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import type { CallSite, ParamInfo } from "@blazetrails/parity/types";
-import { compareCallArgs, normalizeArg, normalizeArgs, pairCallSites } from "./call-args.js";
+import {
+  comparableRubySites,
+  compareCallArgs,
+  normalizeArg,
+  normalizeArgs,
+  pairCallSites,
+} from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
   return { name, args, flags };
@@ -810,5 +816,43 @@ describe("compareCallArgs Symbol-discriminated arguments", () => {
         params,
       ).verdict,
     ).toBe("match");
+  });
+});
+
+describe("comparableRubySites", () => {
+  it("drops a weak site the TS body makes no such call for", () => {
+    const kept = comparableRubySites(
+      [site("map", ["id:x"], ["weak"])],
+      [site("foreignKey", ["id:name"])],
+      () => true,
+    );
+    expect(kept).toEqual([]);
+  });
+
+  it("keeps a weak site the TS body has an unconsumed same-named site for", () => {
+    const kept = comparableRubySites(
+      [site("foreign_key", ["id:foreign_table_name"], ["weak"])],
+      [site("foreignKey", ["id:foreignTableName"])],
+      (name) => name === "foreign_key",
+    );
+    expect(kept.map((s) => s.name)).toEqual(["foreign_key"]);
+  });
+
+  it("lets the non-weak sites claim the TS sites first", () => {
+    const kept = comparableRubySites(
+      [site("foreign_key", ["id:a"], ["weak"]), site("foreign_key", ["id:b"])],
+      [site("foreignKey", ["id:b"])],
+      () => true,
+    );
+    expect(kept.map((s) => s.args)).toEqual([["id:b"]]);
+  });
+
+  it("drops a weak site whose name the compared file declares no method for", () => {
+    const kept = comparableRubySites(
+      [site("join", ["const:SEPARATOR"], ["weak"])],
+      [site("join", ["ref:SEPARATOR"])],
+      () => false,
+    );
+    expect(kept).toEqual([]);
   });
 });

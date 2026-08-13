@@ -11,13 +11,8 @@ const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
 export class Properties {
   private _data = new Map<string, unknown>();
 
-  constructor(initial?: Record<string, unknown>) {
-    if (initial) {
-      for (const [key, value] of Object.entries(initial)) {
-        this._validateType(value);
-        this._data.set(key, value);
-      }
-    }
+  constructor(initialProperties: Record<string, unknown> | Properties = {}) {
+    this.add(initialProperties);
   }
 
   equals(other: unknown): boolean {

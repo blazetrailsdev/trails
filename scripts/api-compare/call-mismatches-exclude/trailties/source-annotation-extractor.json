@@ -34,5 +34,17 @@
     "rubyName": "find_in",
     "call": "order:constructor,isDirectory",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "source-annotation-extractor.ts",
+    "rubyName": "enumerate",
+    "call": "display",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:find",
+      "ref:options"
+    ],
+    "reason": "Baseline (RFC 0099): pre-existing call-ARGUMENT divergence, newly COMPARED now that a weak Ruby site with a ported receiver is kept in the population — the port's body predates the gate seeing it. Convergence tracked separately, not ratified here."
   }
 ]
