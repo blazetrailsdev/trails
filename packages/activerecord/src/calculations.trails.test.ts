@@ -400,10 +400,8 @@ describe("empty-scope aggregate identities", () => {
     expect(queries[1]).toMatch(/SELECT SUM\(\) AS ["`]?sum["`]?/);
   });
 
-  // The block arm of `sum(initial_value_or_column = 0, &block)`
-  // (calculations.rb:172-173), whose two doc examples are
-  // `Person.sum { |person| person.age }` and `Person.sum(1000) { |person| person.age }`
-  // (calculations.rb:167-168).
+  // `Person.sum { |person| person.age }` / `Person.sum(1000) { |person| person.age }`,
+  // the two doc examples of the block arm (calculations.rb:167-168, :172-173).
   it("sums the block return values onto the initial value", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const creditLimits = await Account.sum("credit_limit");

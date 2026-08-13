@@ -1457,12 +1457,8 @@ function dateZoneToDiff(str: string): number | Rational | null {
           } else {
             const denom = 10 ** (n - 2);
             const rat = new Rational(sec, denom).add(hour * 3600);
-            // The C's OWN inline fold (`date_parse.c:531-534`:
-            // `if (rb_rational_den(offset) == INT2FIX(1)) offset = rb_rational_num(offset)`),
-            // not a canonicalization Rational arithmetic performs on its own —
-            // `f_add` leaves a `(n/1)` a Rational, which is why the C spells the
-            // fold out here and why a downstream `FIXNUM_P` test would be false
-            // without it.
+            // The C's OWN inline fold (`date_parse.c:531-534`), not one Rational
+            // arithmetic performs: `f_add` leaves a `(n/1)` a Rational.
             offset = rat.denominator === 1n ? Number(rat.numerator) : rat;
           }
           return offset;

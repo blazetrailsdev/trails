@@ -671,10 +671,14 @@ export async function calculate(
  *
  * The identity default falls through `aggregate_column` -> `arel_column`, whose
  * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
- * the no-argument answer comes out of `calculate` rather than a guard. The
- * Ruby's trailing `&block` has no TS slot, so it rides the argument list: a
- * function in the first position is the block with the default identity, and
- * `sum(1000, block)` is the explicit-initial-value form.
+ * the no-argument answer comes out of `calculate` rather than a guard.
+ *
+ * The block arm is `map(&block).sum(initial_value_or_column)`
+ * (calculations.rb:172-173): `Enumerable#map` loads the relation — a no-op when
+ * it is already loaded — and `Array#sum` seeds the accumulation with the
+ * initial value. Ruby's trailing `&block` has no TS slot, so it rides the
+ * argument list: a function in the first position is the block with the default
+ * identity, and `sum(1000, block)` is the explicit-initial-value form.
  */
 export async function performSum(
   this: CalculationRelation,
@@ -686,13 +690,13 @@ export async function performSum(
     initialValueOrColumn = 0;
   }
   if (block !== undefined) {
-    // Rails `map(&block).sum(initial_value_or_column)` (calculations.rb:172-173):
-    // Enumerable#map loads the relation (a no-op when already loaded) and
-    // Array#sum seeds the accumulation with the initial value.
     const records = await this.toArray();
     return records
       .map(block)
-      .reduce((memo: any, value: any) => memo + value, initialValueOrColumn as number | bigint);
+      .reduce(
+        (memo, value) => (memo as number) + (value as number),
+        initialValueOrColumn as number | bigint,
+      );
   }
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
