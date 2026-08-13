@@ -21,6 +21,75 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
+/** The class name Ruby's conversion errors name the offending value by. */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (value === true) return "true";
+  if (value === false) return "false";
+  if (Array.isArray(value)) return "Array";
+  if (typeof value === "string") return "String";
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  return (value as object)?.constructor?.name ?? "Object";
+}
+
+/**
+ * Mirrors Ruby's `Kernel#Integer` — the conversion `retrieve_pool_options`
+ * applies to `pool_options[:size]` (cache.rb:213). Numerics truncate, Strings
+ * are parsed with Ruby's literal grammar (leading/trailing whitespace and
+ * underscore separators allowed, `0x`/`0b`/`0o`/`0` radix prefixes honoured, a
+ * fractional or empty String rejected), and anything else is a TypeError.
+ */
+function Integer(value: unknown): number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new FloatDomainError(String(value));
+    return Math.trunc(value);
+  }
+  if (typeof value !== "string") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(`can't convert ${rubyClassName(value)} into Integer`);
+  }
+  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
+  const body = digits.replace(/^[+-]/, "");
+  let magnitude: number;
+  if (/^0[xX][0-9a-fA-F]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 16);
+  } else if (/^0[bB][01]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 2);
+  } else if (/^0[oO][0-7]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 8);
+  } else if (/^0[dD][0-9]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 10);
+  } else if (/^0[0-7]*$/.test(body)) {
+    magnitude = parseInt(body, 8);
+  } else if (/^[1-9][0-9]*$/.test(body)) {
+    magnitude = parseInt(body, 10);
+  } else {
+    throw new ArgumentError(`invalid value for Integer(): ${inspect(value)}`);
+  }
+  return digits.startsWith("-") ? -magnitude : magnitude;
+}
+
+/**
+ * Mirrors Ruby's `Kernel#Float` — the conversion `retrieve_pool_options`
+ * applies to `pool_options[:timeout]` (cache.rb:214). Same String grammar as
+ * {@link Integer} plus a fraction and exponent; an empty or whitespace-only
+ * String is an ArgumentError, not `0`.
+ */
+function Float(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(`can't convert ${rubyClassName(value)} into Float`);
+  }
+  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
+  const decimal = /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/;
+  const hexadecimal = /^[+-]?0[xX][0-9a-fA-F]+(\.[0-9a-fA-F]+)?([pP][+-]?[0-9]+)?$/;
+  if (!decimal.test(digits) && !hexadecimal.test(digits)) {
+    throw new ArgumentError(`invalid value for Float(): ${inspect(value)}`);
+  }
+  return Number(digits);
+}
+
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
 
@@ -35,6 +104,14 @@ class TypeError extends globalThis.Error {
   constructor(message: string) {
     super(message);
     this.name = "TypeError";
+  }
+}
+
+/** Mirror of Ruby's `FloatDomainError` — `Integer(Float::INFINITY)`. @internal */
+class FloatDomainError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
   }
 }
 
@@ -154,28 +231,8 @@ export abstract class Store {
       poolOptions = DEFAULT_POOL_OPTIONS;
     } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
       const hash = poolOptions as StoreOptions;
-      if ("size" in hash) {
-        const size = hash["size"];
-        if (typeof size !== "number" && typeof size !== "string") {
-          // eslint-disable-next-line blazetrails/rails-error-parity
-          throw new TypeError(`can't convert ${typeof size} into Integer`);
-        }
-        if (!Number.isInteger(Number(size))) {
-          throw new ArgumentError(`invalid value for Integer(): ${inspect(size)}`);
-        }
-        hash["size"] = Number(size);
-      }
-      if ("timeout" in hash) {
-        const timeout = hash["timeout"];
-        if (typeof timeout !== "number" && typeof timeout !== "string") {
-          // eslint-disable-next-line blazetrails/rails-error-parity
-          throw new TypeError(`can't convert ${typeof timeout} into Float`);
-        }
-        if (Number.isNaN(Number(timeout))) {
-          throw new ArgumentError(`invalid value for Float(): ${inspect(timeout)}`);
-        }
-        hash["timeout"] = Number(timeout);
-      }
+      if ("size" in hash) hash["size"] = Integer(hash["size"]);
+      if ("timeout" in hash) hash["timeout"] = Float(hash["timeout"]);
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {
       // eslint-disable-next-line blazetrails/rails-error-parity

@@ -31,11 +31,37 @@ describe("Store.retrievePoolOptions", () => {
 
   it("raises for pool size and timeout that cannot be converted", () => {
     expect(() => Store.retrievePoolOptions({ pool: { size: [] } })).toThrow(
-      "can't convert object into Integer",
+      "can't convert Array into Integer",
     );
     expect(() => Store.retrievePoolOptions({ pool: { timeout: [] } })).toThrow(
-      "can't convert object into Float",
+      "can't convert Array into Float",
     );
+    expect(() => Store.retrievePoolOptions({ pool: { size: "" } })).toThrow(
+      'invalid value for Integer(): ""',
+    );
+    expect(() => Store.retrievePoolOptions({ pool: { size: " " } })).toThrow(
+      'invalid value for Integer(): " "',
+    );
+    expect(() => Store.retrievePoolOptions({ pool: { size: "1.5" } })).toThrow(
+      'invalid value for Integer(): "1.5"',
+    );
+    expect(() => Store.retrievePoolOptions({ pool: { timeout: "" } })).toThrow(
+      'invalid value for Float(): ""',
+    );
+  });
+
+  it("converts pool size and timeout the way Kernel#Integer and Kernel#Float do", () => {
+    // `Integer("012")` is octal (10), `Integer("1_000")` allows the separator,
+    // and a Float size truncates rather than rounding.
+    expect(Store.retrievePoolOptions({ pool: { size: "012" } })).toEqual({ size: 10, timeout: 5 });
+    expect(Store.retrievePoolOptions({ pool: { size: "1_000" } })).toEqual({
+      size: 1000,
+      timeout: 5,
+    });
+    expect(Store.retrievePoolOptions({ pool: { size: 3.7, timeout: " 1.5 " } })).toEqual({
+      size: 3,
+      timeout: 1.5,
+    });
   });
 
   it("deletes the :pool key from the options it is given", () => {
