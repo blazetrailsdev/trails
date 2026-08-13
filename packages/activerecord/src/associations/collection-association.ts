@@ -1514,7 +1514,7 @@ export function concatRecordsLoop(
 }
 
 /**
- * A value the sync-hybrid chain must chain behind rather than use directly —
+ * A value a `Promise<T> | T` body must chain behind rather than use directly —
  * the port's stand-in for Ruby, where every one of these bodies has already
  * finished by the time it returns.
  * @internal

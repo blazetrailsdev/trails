@@ -5,10 +5,10 @@
  * :186-197), and for a NEW owner neither does any I/O — `concat_records` skips
  * `insert_record` under `unless owner.new_record?` (:434-448) and
  * `remove_records` skips `delete_records` when `existing_records` is empty
- * (:404-405). The chain is therefore restated as the sync-hybrid shape
- * (`Promise<T> | T`): it runs inline and answers a promise only when a call
- * actually owed I/O, so `replace`'s new-owner arm — reached synchronously from
- * the constructor's mass-assignment dispatch — can drive it. There is no Rails
+ * (:404-405). The chain is therefore restated as `Promise<T> | T` bodies: they
+ * run inline and answer a promise only when a call actually owed I/O, so
+ * `replace`'s new-owner arm — reached synchronously from the constructor's
+ * mass-assignment dispatch — can drive it. There is no Rails
  * test for this deviation.
  */
 import { describe, it, expect } from "vitest";

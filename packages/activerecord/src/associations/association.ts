@@ -527,7 +527,7 @@ export class Association {
     // unsaved build. The stale and find-target branches stay mutually exclusive
     // (`stale_target?` requires loaded, `find_target?` requires not-loaded).
     // The find is the only I/O here, so the body runs inline and answers a
-    // promise only when it actually ran — the sync-hybrid shape callers reached
+    // promise only when it actually ran — the `Promise<T> | T` shape callers reached
     // from a synchronous writer (`CollectionAssociation#concat`) depend on.
     const loaded = (): Base | Base[] | null => {
       this.loadedBang();
