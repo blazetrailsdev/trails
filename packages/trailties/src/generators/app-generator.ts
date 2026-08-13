@@ -672,7 +672,7 @@ export const filterParameters = [
   <link rel="stylesheet" href="/assets/stylesheets/application.css">
 </head>
 <body>
-  <%- yield %>
+  <%= yield %>
 </body>
 </html>
 `,
@@ -689,7 +689,7 @@ export const filterParameters = [
   </style>
 </head>
 <body>
-  <%- yield %>
+  <%= yield %>
 </body>
 </html>
 `,
@@ -697,7 +697,7 @@ export const filterParameters = [
 
     this.createFile(
       "src/app/views/layouts/mailer.text.tse",
-      `<%- yield %>
+      `<%= yield %>
 `,
     );
 

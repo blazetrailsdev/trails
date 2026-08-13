@@ -350,6 +350,10 @@ describe("SendFileController", () => {
     class C extends Base {
       async action() {
         this.sendFileHeadersBang({ type: "image/png", filename: "x.png" });
+        // `sendFileHeadersBang` only sets headers; without a render the
+        // action falls through to implicit render, which raises for a
+        // template-less HTML GET exactly as Rails does.
+        this.render({ body: "" });
       }
     }
     const c = new C();

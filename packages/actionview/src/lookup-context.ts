@@ -729,7 +729,66 @@ export class LookupContext {
     return handler.render(template.source, locals, {
       ...context,
       templatePath: template.fullPath ?? template.identifier,
+      renderPartial: (name, partialLocals) =>
+        this.renderPartialSync(name, context.controller, context.format, partialLocals),
     });
+  }
+
+  /**
+   * Render a partial synchronously, for a nested `render partial:` inside a
+   * compiled template. Rails' partial rendering is synchronous end to end;
+   * trails' handler protocol permits an async `render`, so a handler that
+   * returns a promise cannot be nested and says so rather than emitting
+   * `[object Promise]`.
+   *
+   * `name` may be qualified (`"users/user"`), in which case the leading
+   * segments replace `prefix` — mirroring `PartialRenderer#partial_path`.
+   */
+  renderPartialSync(
+    name: string,
+    prefix: string,
+    format: string,
+    locals: Record<string, unknown> = {},
+  ): string {
+    const slash = name.lastIndexOf("/");
+    const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
+    const partialName = slash === -1 ? name : name.slice(slash + 1);
+
+    const template = this.findPartial(partialName, partialPrefix, format);
+    if (!template) {
+      throw new MissingTemplate(
+        partialPrefix,
+        `_${partialName}`,
+        format,
+        this.resolverNames(),
+        this.allCandidatePaths(),
+      );
+    }
+
+    const handler = TemplateHandlers.handlerForExtension(template.extension);
+    if (!handler) {
+      throw new Error(
+        `No template handler registered for ".${template.extension}". ` +
+          `Register one with TemplateHandlers.registerTemplateHandler(extension, handler).`,
+      );
+    }
+
+    const output = handler.render(template.source, locals, {
+      controller: partialPrefix,
+      action: `_${partialName}`,
+      format,
+      templatePath: template.fullPath ?? template.identifier,
+      renderPartial: (nested, nestedLocals) =>
+        this.renderPartialSync(nested, partialPrefix, format, nestedLocals),
+    });
+
+    if (typeof output !== "string") {
+      throw new Error(
+        `Handler for ".${template.extension}" renders asynchronously and cannot be nested ` +
+          `inside a template. Render ${JSON.stringify(name)} from the controller instead.`,
+      );
+    }
+    return output;
   }
 
   private resolverNames(): string[] {

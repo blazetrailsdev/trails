@@ -70,15 +70,19 @@ class PostsController extends Base {
   }
 
   async renderXml() {
-    this.response.setHeader("content-type", "application/xml");
-    this.response.body = "<root><item>1</item></root>";
-    this.status = 200;
+    this.render({
+      body: "<root><item>1</item></root>",
+      contentType: "application/xml",
+      status: 200,
+    });
   }
 
   async renderXml2() {
-    this.response.setHeader("content-type", "application/xml");
-    this.response.body = "<response><data>2</data></response>";
-    this.status = 200;
+    this.render({
+      body: "<response><data>2</data></response>",
+      contentType: "application/xml",
+      status: 200,
+    });
   }
 }
 

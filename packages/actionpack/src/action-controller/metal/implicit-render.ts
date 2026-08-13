@@ -23,15 +23,18 @@ export function sendAction(
   return _sendAction(controller, method);
 }
 
-interface ImplicitRenderHost {
+export interface ImplicitRenderHost {
   performed: boolean;
   actionName: string;
-  controllerName?: string;
+  /** Rails reads `self.class.name` for these messages, not `controller_name`. */
+  constructor: { name: string };
   request?: {
-    isGet?(): boolean;
-    get?: boolean;
-    format?: { ref?: string; symbol?: string | null };
-    isXhr?(): boolean;
+    /** Rails `request.get?`. */
+    isGet?: boolean;
+    /** Rails compares `request.format == Mime[:html]`; `symbol` is the
+     *  trails spelling, and both `MimeType` and `NullType` answer it. */
+    format?: { symbol: string | null };
+    /** Rails `request.xhr?`. */
     xhr?: boolean;
   };
   templateExists?(action: string, prefixes?: unknown, opts?: unknown): boolean;
@@ -48,27 +51,24 @@ interface ImplicitRenderHost {
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void {
+  const name = this.constructor.name;
   if (this.templateExists?.(this.actionName)) {
     this.render();
     return;
   }
   if (this.anyTemplates?.(this.actionName)) {
-    const name = this.controllerName ?? "";
     throw new UnknownFormat(
       `${name}#${this.actionName} is missing a template for this request format and variant.`,
     );
   }
   if (isInteractiveBrowserRequest.call(this)) {
-    const name = this.controllerName ?? "";
     throw new MissingExactTemplate(
       `${name}#${this.actionName} is missing a template for request formats.`,
       name,
       this.actionName,
     );
   }
-  this.logger?.info(
-    `No template found for ${this.controllerName ?? ""}#${this.actionName}, rendering head :no_content`,
-  );
+  this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
   this.head(204);
 }
 
@@ -99,10 +99,7 @@ export function methodForAction(
 export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const req = this.request;
   if (!req) return false;
-  const isGet = typeof req.isGet === "function" ? req.isGet() : req.get === true;
-  const isHtml = req.format?.ref === "html" || req.format?.symbol === "html";
-  const isXhr = typeof req.isXhr === "function" ? req.isXhr() : req.xhr === true;
-  return Boolean(isGet) && Boolean(isHtml) && !isXhr;
+  return req.isGet === true && req.format?.symbol === "html" && req.xhr !== true;
 }
 
 export function implicitRender(context: {

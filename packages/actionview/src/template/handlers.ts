@@ -25,6 +25,13 @@ export interface RenderContext {
   yield?: string;
   /** The full template path for error reporting */
   templatePath?: string;
+  /**
+   * Synchronous nested-partial renderer, supplied by whoever owns the
+   * resolvers. Rails hands templates the `ActionView::Base` instance, which
+   * answers `render` itself; a trails handler gets only source + locals, so
+   * the capability is threaded through the context instead.
+   */
+  renderPartial?(name: string, locals: Record<string, unknown>): string;
 }
 
 /**

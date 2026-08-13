@@ -5,6 +5,9 @@
   "bin": {
     "trails": "./bin/trails.js"
   },
+  "scripts": {
+    "build": "tsc"
+  },
   "exports": {
     ".": "./dist/cli.js",
     "./generators": "./dist/generators/index.js",

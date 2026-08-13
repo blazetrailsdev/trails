@@ -3,6 +3,8 @@ import { Base } from "../../base.js";
 import { TemplateHandlers } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
+const ctx = () => ({ controller: "home", action: "index", format: "html" });
+
 describe("Template::Handlers::Tse", () => {
   const originalImpl = Tse.implementation;
   const originalEscapeIgnore = Tse.escapeIgnoreList;
@@ -113,10 +115,63 @@ describe("Template::Handlers::Tse", () => {
     expect(code).toMatch(/_ob\.safeExprAppend\(name\)/);
   });
 
-  it("render() throws — execution lands in Phase 2c", () => {
-    expect(() =>
-      new Tse().render("<%= 1 %>", {}, { controller: "c", action: "a", format: "html" }),
-    ).toThrow(/not yet implemented/);
+  it("render() executes the compiled template and returns its output", () => {
+    const out = new Tse().render("<%= 1 + 1 %>", {}, ctx());
+    expect(out).toBe("2");
+  });
+
+  it("render() resolves bare identifiers against the locals", () => {
+    const out = new Tse().render("<h1><%= title %></h1>", { title: "Home" }, ctx());
+    expect(out).toBe("<h1>Home</h1>");
+  });
+
+  it("render() escapes an unsafe local", () => {
+    const out = new Tse().render("<%= body %>", { body: "<script>" }, ctx());
+    expect(out).toBe("&lt;script&gt;");
+  });
+
+  it("render() runs template control flow", () => {
+    const out = new Tse().render(
+      "<% for (const n of names) { %><li><%= n %></li><% } %>",
+      { names: ["a", "b"] },
+      ctx(),
+    );
+    expect(out).toBe("<li>a</li><li>b</li>");
+  });
+
+  it("render() substitutes a layout's yield with the inner output", () => {
+    const out = new Tse().render(
+      "<body><%= yield %></body>",
+      {},
+      {
+        ...ctx(),
+        yield: "<p>inner</p>",
+      },
+    );
+    expect(out).toBe("<body><p>inner</p></body>");
+  });
+
+  it("render() delegates a nested partial to the context's renderPartial", () => {
+    const seen: Array<[string, Record<string, unknown>]> = [];
+    const out = new Tse().render(
+      '<%= render({ partial: "tweet", locals: { tweet: 7 } }) %>',
+      {},
+      {
+        ...ctx(),
+        renderPartial(name, locals) {
+          seen.push([name, locals]);
+          return "<article>7</article>";
+        },
+      },
+    );
+    expect(out).toBe("<article>7</article>");
+    expect(seen).toEqual([["tweet", { tweet: 7 }]]);
+  });
+
+  it("render() explains itself when a nested partial has no renderPartial", () => {
+    expect(() => new Tse().render('<%= render({ partial: "tweet" }) %>', {}, ctx())).toThrow(
+      /has no partial renderer/,
+    );
   });
 
   it("Tse.call delegates to a fresh instance", () => {

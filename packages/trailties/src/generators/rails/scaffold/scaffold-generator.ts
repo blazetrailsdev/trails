@@ -181,7 +181,7 @@ ${fields}
 function newView(singular: string, plural: string): string {
   return `<h1>New ${classify(singular)}</h1>
 
-<%- yield %>
+<%= yield %>
 
 <p><a href="/${plural}">Back</a></p>
 `;
@@ -190,7 +190,7 @@ function newView(singular: string, plural: string): string {
 function editView(singular: string, plural: string): string {
   return `<h1>Edit ${classify(singular)}</h1>
 
-<%- yield %>
+<%= yield %>
 
 <p>
   <a href="/${plural}/<%= ${singular}.id %>">Show</a>
@@ -263,7 +263,7 @@ function layoutTemplate(): string {
   </style>
 </head>
 <body>
-  <%- yield %>
+  <%= yield %>
 </body>
 </html>
 `;

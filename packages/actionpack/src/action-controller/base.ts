@@ -12,6 +12,7 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";
+import { defaultRender as implicitDefaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
   AroundCallback,
@@ -260,6 +261,11 @@ export class Base extends Metal {
       // Render action template or collection via LookupContext
       this._pendingRender = { type: "template", options };
       return; // Will be handled by async processAction wrapper
+    } else if ((this.constructor as typeof Base).lookupContext) {
+      // No render key given — render the template for the current action
+      // through the view layer, the same path `action:` takes.
+      this._pendingRender = { type: "template", options };
+      return;
     } else {
       // Implicit render — try template resolver
       this._renderTemplate(this.actionName, options);
@@ -275,6 +281,35 @@ export class Base extends Metal {
 
   /** Pending async render (for template/partial rendering). */
   _pendingRender: { type: string; options: RenderOptions } | null = null;
+
+  /**
+   * Mirrors `ActionView::ViewPaths#template_exists?`. Rails takes prefixes and
+   * a variant; trails' LookupContext resolves against a single controller
+   * prefix and format, so those arguments have no counterpart yet.
+   */
+  templateExists(action: string): boolean {
+    const ctx = (this.constructor as typeof Base).lookupContext;
+    if (!ctx) return false;
+    const format = this.request?.format?.symbol ?? "html";
+    return ctx.findTemplate(action, this.controllerPath(), format) !== null;
+  }
+
+  /**
+   * Mirrors `ImplicitRender#default_render`. Mixed in from
+   * `metal/implicit-render.ts` per the module-mixin convention.
+   */
+  defaultRender = implicitDefaultRender;
+
+  /**
+   * Mirrors `BasicImplicitRender#send_action` — `ret = super;
+   * default_render unless performed?; ret`. `_pendingRender` counts as
+   * performed here: the render was requested, it just resolves later in
+   * {@link processAction}.
+   */
+  override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
+    await super._dispatchAction(action, ...args);
+    if (!this.performed && !this._pendingRender) this.defaultRender();
+  }
 
   /** Async render — resolves pending template/partial renders. */
   async renderAsync(options: RenderOptions): Promise<void> {
