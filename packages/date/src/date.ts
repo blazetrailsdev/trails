@@ -1457,6 +1457,12 @@ function dateZoneToDiff(str: string): number | Rational | null {
           } else {
             const denom = 10 ** (n - 2);
             const rat = new Rational(sec, denom).add(hour * 3600);
+            // The C's OWN inline fold (`date_parse.c:531-534`:
+            // `if (rb_rational_den(offset) == INT2FIX(1)) offset = rb_rational_num(offset)`),
+            // not a canonicalization Rational arithmetic performs on its own —
+            // `f_add` leaves a `(n/1)` a Rational, which is why the C spells the
+            // fold out here and why a downstream `FIXNUM_P` test would be false
+            // without it.
             offset = rat.denominator === 1n ? Number(rat.numerator) : rat;
           }
           return offset;
@@ -6982,6 +6988,31 @@ export class Date {
     if (!sf.isZero()) ajd = ajd.add(nsToDay(sf));
 
     return ajd;
+  }
+
+  /**
+   * Ruby `Date#amjd` (ruby/date, `date_core.c` `d_lite_amjd`,
+   * `date_core.c:5231-5236`, over `m_amjd`, `date_core.c:1625-1651`), the
+   * astronomical modified Julian day: `m_real_jd` less 2400001 as a Rational,
+   * so `Date.new(2001,2,3).amjd` is `Rational(51943, 1)`. Unlike
+   * {@link Date#mjd} it is NOT adjusted by the offset — it reads `m_real_jd`
+   * and the stored UTC day fraction where `mjd` reads the local day.
+   *
+   * The C's two spellings of the subtraction — a `long` fast path and an
+   * `f_sub` one — build the same Rational, so there is one arm here, exactly
+   * as {@link Date#ajd} documents for its own pair.
+   */
+  get amjd(): Rational {
+    const r = new Rational(BigInt(this.mRealJd()) - 2400001n, 1);
+    if (simpleDatP(this)) return r;
+
+    let amjd = r;
+    const df = this.mDf();
+    if (df) amjd = amjd.add(isecToDay(df));
+    const sf = this.mSf();
+    if (!sf.isZero()) amjd = amjd.add(nsToDay(sf));
+
+    return amjd;
   }
 
   /**

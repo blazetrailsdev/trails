@@ -189,6 +189,9 @@ interface CalculationRelation {
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
+/** The `&block` of `Calculations#sum` (calculations.rb:172): one record in, a summable out. */
+export type SumBlock = (record: any) => number | bigint;
+
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;
   // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
@@ -669,13 +672,28 @@ export async function calculate(
  * The identity default falls through `aggregate_column` -> `arel_column`, whose
  * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
  * the no-argument answer comes out of `calculate` rather than a guard. The
- * block arm (`map(&block).sum(initial_value_or_column)`, calculations.rb:172-173)
- * is tracked by the `port-relation-sum-block-arm` story.
+ * Ruby's trailing `&block` has no TS slot, so it rides the argument list: a
+ * function in the first position is the block with the default identity, and
+ * `sum(1000, block)` is the explicit-initial-value form.
  */
 export async function performSum(
   this: CalculationRelation,
-  initialValueOrColumn: string | Nodes.Node | number | null = 0,
+  initialValueOrColumn: string | Nodes.Node | number | null | SumBlock = 0,
+  block?: SumBlock,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
+  if (typeof initialValueOrColumn === "function") {
+    block = initialValueOrColumn;
+    initialValueOrColumn = 0;
+  }
+  if (block !== undefined) {
+    // Rails `map(&block).sum(initial_value_or_column)` (calculations.rb:172-173):
+    // Enumerable#map loads the relation (a no-op when already loaded) and
+    // Array#sum seeds the accumulation with the initial value.
+    const records = await this.toArray();
+    return records
+      .map(block)
+      .reduce((memo: any, value: any) => memo + value, initialValueOrColumn as number | bigint);
+  }
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
@@ -732,7 +750,8 @@ export interface CalculationMethods {
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(
-    initialValueOrColumn?: string | Nodes.Node | number | null,
+    initialValueOrColumn?: string | Nodes.Node | number | null | SumBlock,
+    block?: SumBlock,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;

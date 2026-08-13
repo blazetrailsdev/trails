@@ -35,6 +35,7 @@ import {
   findTakeWithLimit as baseFindTakeWithLimit,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
+import type { SumBlock } from "../relation/calculations.js";
 import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
 import {
   RecordNotSaved,
@@ -1485,25 +1486,28 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // cp.whereBang({...}); cp.average('y') would both bypass the gate
   // and drop in-place mutations.
   async sum(
-    initialValueOrColumn?: string | Nodes.Node | number,
+    initialValueOrColumn?: string | Nodes.Node | number | SumBlock,
+    block?: SumBlock,
   ): Promise<number | bigint | Map<unknown, number | bigint>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
         sum: (
-          col?: string | Nodes.Node | number,
+          col?: string | Nodes.Node | number | SumBlock,
+          block?: SumBlock,
         ) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
     ).sum;
-    if (this._relationStateDiverged()) return fn.call(this, initialValueOrColumn);
+    if (this._relationStateDiverged()) return fn.call(this, initialValueOrColumn, block);
     const s = this.scope();
     return (
       s as unknown as {
         sum: (
-          col?: string | Nodes.Node | number,
+          col?: string | Nodes.Node | number | SumBlock,
+          block?: SumBlock,
         ) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
-    ).sum(initialValueOrColumn);
+    ).sum(initialValueOrColumn, block);
   }
 
   async average(column: string): Promise<unknown | null | Map<unknown, unknown>> {

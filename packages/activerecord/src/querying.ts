@@ -512,9 +512,10 @@ export function average<T extends typeof Base>(
 export function sum<T extends typeof Base>(
   this: T,
   column?: Parameters<ReturnType<T["all"]>["sum"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["sum"]>[1],
 ): ReturnType<ReturnType<T["all"]>["sum"]> {
   const rel = this.all() as ReturnType<T["all"]>;
-  return rel.sum(column) as ReturnType<ReturnType<T["all"]>["sum"]>;
+  return rel.sum(column, block) as ReturnType<ReturnType<T["all"]>["sum"]>;
 }
 
 /**

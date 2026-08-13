@@ -2198,6 +2198,23 @@ describe("Date's second registration names", () => {
  * own tests pass Integers throughout and never pin which arm a Rational takes,
  * which is why these live here.
  */
+describe("Date#amjd", () => {
+  it("answers m_real_jd less 2400001 as a Rational", () => {
+    // ruby 3.3.11 -rdate:
+    //   Date.new(2001,2,3).amjd       #=> (51943/1)
+    //   Date.new(2001,2,3).amjd.class #=> Rational
+    expect(new RubyDate(2001, 2, 3).amjd.toString()).toBe("51943/1");
+  });
+
+  it("is not adjusted by the offset", () => {
+    // The C's own doc example (date_core.c:5224-5228):
+    //   DateTime.new(2001,2,3,4,5,6,'+7').amjd  #=> (249325817/4800)
+    //   DateTime.new(2001,2,2,14,5,6,'-7').amjd #=> (249325817/4800)
+    expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, "+7").amjd.toString()).toBe("249325817/4800");
+    expect(new RubyDateTime(2001, 2, 2, 14, 5, 6, "-7").amjd.toString()).toBe("249325817/4800");
+  });
+});
+
 describe("a reducible Rational operand at the C's Integer branches", () => {
   it("takes d_lite_rshift's f_idiv/f_mod arm, never the FIXNUM_P one", () => {
     // ruby 3.3.11 -rdate:

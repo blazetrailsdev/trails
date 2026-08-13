@@ -400,6 +400,21 @@ describe("empty-scope aggregate identities", () => {
     expect(queries[1]).toMatch(/SELECT SUM\(\) AS ["`]?sum["`]?/);
   });
 
+  // The block arm of `sum(initial_value_or_column = 0, &block)`
+  // (calculations.rb:172-173), whose two doc examples are
+  // `Person.sum { |person| person.age }` and `Person.sum(1000) { |person| person.age }`
+  // (calculations.rb:167-168).
+  it("sums the block return values onto the initial value", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const creditLimits = await Account.sum("credit_limit");
+    expect(await Account.sum((account: { credit_limit: number }) => account.credit_limit)).toBe(
+      Number(creditLimits),
+    );
+    expect(
+      await Account.sum(1000, (account: { credit_limit: number }) => account.credit_limit),
+    ).toBe(1000 + Number(creditLimits));
+  });
+
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
   // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
   // narrow it away.
