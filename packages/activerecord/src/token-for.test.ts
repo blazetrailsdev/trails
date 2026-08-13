@@ -23,10 +23,10 @@ class TokenUser extends User {
     this.generatesTokenFor("password_reset", {
       expiresIn: 15 * 60,
       // first 10 characters of the BCrypt salt — Rails: password_digest.to_s[-(31 + 22), 10]
-      generator: (r: any) => String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
+      block: (r: any) => String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
     });
     this.generatesTokenFor("snapshot", {
-      generator: (r: any) => ({ updated_at: r.updated_at }),
+      block: (r: any) => ({ updated_at: r.updated_at }),
     });
   }
 }

@@ -17,7 +17,7 @@ class TokenUser extends User {
     // reads the model. A `function` block is trails' spelling of that; an arrow
     // takes the same value from its `model` parameter.
     this.generatesTokenFor("token_snapshot", {
-      generator: function (this: TokenUser) {
+      block: function (this: TokenUser) {
         return this.token;
       },
     });

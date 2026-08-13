@@ -84,9 +84,17 @@ export class Default {
     });
   }
 
-  /** @internal */
-  static unscoped(modelClass: any, buildRelation: () => any): any {
-    return buildRelation();
+  /**
+   * Returns a scope for the model without the previously set scopes; with a
+   * block, runs it with that relation installed as the current scope.
+   *
+   * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#unscoped
+   * (default.rb:17-26) — `block_given? ? relation.scoping(&block) : relation`.
+   * trails spells Rails' `relation` `_buildUnscopedRelation` (see named.ts).
+   * @internal
+   */
+  static unscoped(this: any, block?: () => any): any {
+    return block ? this._buildUnscopedRelation().scoping(block) : this._buildUnscopedRelation();
   }
 }
 
@@ -183,13 +191,7 @@ export function unscoped<T extends typeof Base, R>(
   this: T,
   block?: () => R | Promise<R>,
 ): Relation<InstanceType<T>> | Promise<R> {
-  const rel = Default.unscoped(this, () => this._buildUnscopedRelation()) as Relation<
-    InstanceType<T>
-  >;
-  if (block) {
-    return rel.scoping(block);
-  }
-  return rel;
+  return Default.unscoped.call(this, block) as Relation<InstanceType<T>> | Promise<R>;
 }
 
 /**

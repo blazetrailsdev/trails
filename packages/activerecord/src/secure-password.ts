@@ -265,14 +265,14 @@ export function hasSecurePassword(
     const purpose = `${attribute}_reset` as const;
     const FIFTEEN_MINUTES = 15 * 60;
 
-    // Register the token purpose. The generator derives a version by hashing
+    // Register the token purpose. The block derives a version by hashing
     // the current digest with SHA-256 and embedding the first 16 hex chars.
     // When the password (and therefore the digest) changes, the hash changes
     // too — existing tokens are automatically invalidated, matching Rails'
     // BCrypt::Password#version approach.
     modelClass.generatesTokenFor(purpose, {
       expiresIn: FIFTEEN_MINUTES,
-      generator: (record: Base) => {
+      block: (record: Base) => {
         const digest = record._readAttribute(digestAttr);
         if (typeof digest !== "string" || !digest) return "";
         // Derive a version from the digest without embedding raw digest

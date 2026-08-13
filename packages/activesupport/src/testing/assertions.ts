@@ -23,7 +23,8 @@
  */
 import { indexWith } from "../enumerable-utils.js";
 
-import { trailsLogger } from "../trails-logger-slot.js";
+import { cwd } from "../process-adapter.js";
+import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
 class Assertion extends Error {
@@ -41,6 +42,12 @@ class Assertion extends Error {
  * vendored Rails file for the comparator to map onto. Porting it here is what
  * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
  * rescue, the class Rails names.
+ *
+ * `message` and `backtrace` are METHODS in minitest (minitest.rb:1097-1107),
+ * reading the wrapped error when called. TypeScript cannot declare an accessor
+ * over a base-class data property (`Error#message`/`#stack`, TS2611), so they
+ * are installed on the prototype below — and the constructor deletes the own
+ * properties `Error` installs, which would otherwise shadow them.
  */
 export class UnexpectedError extends Assertion {
   override name = "UnexpectedError";
@@ -48,14 +55,95 @@ export class UnexpectedError extends Assertion {
 
   constructor(error: Error) {
     super("Unexpected exception");
+    delete (this as { message?: string }).message;
+    delete (this as { stack?: string }).stack;
     this.error = error;
-    this.message = `${error.name}: ${error.message}\n    ${error.stack ?? ""}`;
-    this.stack = error.stack;
   }
 
   get resultLabel(): string {
     return "Error";
   }
+}
+
+/**
+ * Rails' `e.class` rendered as a name (minitest.rb:1105, assertions.rb:285).
+ * trails carries the namespaced Rails name on `name` where it has been ported
+ * (`ActionDispatch::ParamError`, param-error.ts:28), which `constructor.name`
+ * truncates — so prefer it and fall back to the constructor, mirroring
+ * ExceptionWrapper's `classNameOf` (exception-wrapper.ts:75).
+ */
+function classNameOf(e: Error): string {
+  if (e.name && e.name !== "Error") return e.name;
+  const ctor = e.constructor?.name;
+  if (ctor && ctor !== "Error") return ctor;
+  return e.name || ctor || "Error";
+}
+
+/** Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1176). */
+const MT_RE = /node_modules[/\\]@?vitest|node:internal/;
+
+/** Mirrors `Minitest::UnexpectedError::BASE_RE` (minitest.rb:1101). */
+function baseRe(): RegExp {
+  let pwd: string;
+  try {
+    pwd = cwd();
+  } catch {
+    return /(?!)/g;
+  }
+  return new RegExp(`${pwd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`, "g");
+}
+
+/**
+ * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1190-1198): the
+ * frames before the first framework frame, else every non-framework frame,
+ * else the whole trace. Ruby's `$DEBUG`/`MT_DEBUG` escape hatch reads the
+ * process, which this repo's rules keep out of runtime code.
+ */
+function filter(bt: string[] | null): string[] {
+  if (!bt) return ["No backtrace"];
+
+  const framework = bt.findIndex((line) => MT_RE.test(line));
+  let newBt = framework === -1 ? [...bt] : bt.slice(0, framework);
+  if (newBt.length === 0) newBt = bt.filter((line) => !MT_RE.test(line));
+  if (newBt.length === 0) newBt = [...bt];
+
+  return newBt;
+}
+
+/** Mirrors `Minitest.filter_backtrace` (minitest.rb:365-369). */
+function filterBacktrace(bt: string[] | null): string[] {
+  let result = filter(bt);
+  if (result.length === 0 && bt) result = [...bt];
+  return result;
+}
+
+Object.defineProperties(UnexpectedError.prototype, {
+  stack: {
+    configurable: true,
+    get(this: UnexpectedError): string | undefined {
+      return this.error.stack;
+    },
+  },
+  message: {
+    configurable: true,
+    get(this: UnexpectedError): string {
+      const bt = filterBacktrace(backtrace(this.error)).join("\n    ").replace(baseRe(), "");
+      return `${classNameOf(this.error)}: ${this.error.message}\n    ${bt}`;
+    },
+  },
+});
+
+/**
+ * Ruby's `Exception#backtrace` is the frame list alone, unindented; a JS
+ * `stack` prepends a `"Name: message"` header line and indents each frame,
+ * both of which are dropped here so the two carry the same thing.
+ */
+function backtrace(error: Error): string[] | null {
+  if (error.stack == null) return null;
+  return error.stack
+    .split("\n")
+    .filter((line) => /^\s+at /.test(line))
+    .map((line) => line.trim());
 }
 
 /** :nodoc: */
@@ -308,14 +396,7 @@ export async function assertNoChanges<T>(
   return retval;
 }
 
-/**
- * Ruby's warning heredoc opens with `#{self.class} - #{name}:`, the Minitest
- * test case and the running test's name (assertions.rb:285). These assertions
- * are free functions with no test-case instance to read either from, so the
- * warning starts at the raised error's class.
- *
- * @internal
- */
+/** @internal */
 async function _assertNothingRaisedOrWarn<T>(
   assertion: string,
   block?: () => T | Promise<T>,
@@ -329,7 +410,7 @@ async function _assertNothingRaisedOrWarn<T>(
     const logger = taggedLogger();
     if (logger && (logger as { "warn?"?: boolean })["warn?"]) {
       const warning =
-        `${e.error.name} raised.\n` +
+        `${_testCaseIdentity()}: ${classNameOf(e.error)} raised.\n` +
         "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
         `Other block based assertions (e.g. \`${assertion}\`) can be used, as long as \`assert_raises\` is inside their block.\n`;
       logger.warn(warning);
@@ -337,15 +418,6 @@ async function _assertNothingRaisedOrWarn<T>(
 
     throw e;
   }
-}
-
-/**
- * Mirrors `ActiveSupport::Testing::TaggedLogging#tagged_logger`
- * (tagged_logging.rb:22-24) — `defined?(Rails.logger) && Rails.logger`, which
- * is the late-bound `Trails.logger` slot here.
- */
-function taggedLogger(): { warn(msg: unknown): void } | null {
-  return trailsLogger;
 }
 
 /**

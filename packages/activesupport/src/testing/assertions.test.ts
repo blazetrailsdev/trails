@@ -61,7 +61,8 @@ describe("AssertionsTest", () => {
 
       expect(error).toBeInstanceOf(UnexpectedError);
       expect(String(warnings[0])).toBe(
-        "RangeError raised.\n" +
+        "AssertionsTest - assert difference warns through the tagged logger and re-raises: " +
+          "RangeError raised.\n" +
           "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
           "Other block based assertions (e.g. `assert_difference`) can be used, as long as `assert_raises` is inside their block.\n",
       );
