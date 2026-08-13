@@ -134,11 +134,11 @@ isn't used here.
 Sampled against `vendor/`: trilogy (Ruby-only adapter), Marshal/Psych/YAML
 safe-load machinery, Ractor/GVL/fork tests, `dbconsole` PTY tests,
 thread-backed `FutureResult`/async-queries, per-thread attribute accessors,
-mem*cache/redis stores (outside the AR/AM require-closure, RFC 0072) — all
+`mem_cache`/redis stores (outside the AR/AM require-closure, RFC 0072) — all
 still legitimately unportable or out of closure. `SKIP_GROUPS` reasons
 (`scripts/parity/conventions.ts:368+`) are Ruby value-protocol/lifecycle names
 and remain sound. `load_async_test.rb` (38 tests) is the next-most-arguable
-entry after fixtures: the \_mechanism* (thread pool) doesn't port but the
+entry after fixtures: the _mechanism_ (thread pool) doesn't port but the
 _surface_ (`loadAsync` returning a promise-backed relation) plausibly does.
 
 **Denominator impact if only the clearly-unjustified entries return:** ≈170
