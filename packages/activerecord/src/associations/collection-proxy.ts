@@ -1618,20 +1618,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // treatment as pluck/pick/count. Without overriding, cp.sum('x') /
   // cp.whereBang({...}); cp.average('y') would both bypass the gate
   // and drop in-place mutations.
-  async sum(column?: string): Promise<number | bigint | Map<unknown, number | bigint>> {
+  async sum(
+    initialValueOrColumn?: string | Nodes.Node | number,
+  ): Promise<number | bigint | Map<unknown, number | bigint>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        sum: (col?: string) => Promise<number | bigint | Map<unknown, number | bigint>>;
+        sum: (
+          col?: string | Nodes.Node | number,
+        ) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
     ).sum;
-    if (this._relationStateDiverged()) return fn.call(this, column);
+    if (this._relationStateDiverged()) return fn.call(this, initialValueOrColumn);
     const s = this.scope();
     return (
       s as unknown as {
-        sum: (col?: string) => Promise<number | bigint | Map<unknown, number | bigint>>;
+        sum: (
+          col?: string | Nodes.Node | number,
+        ) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
-    ).sum(column);
+    ).sum(initialValueOrColumn);
   }
 
   async average(column: string): Promise<unknown | null | Map<unknown, unknown>> {

@@ -117,6 +117,11 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
  * segment is dropped so both sides land on `packages/i18n/src/<x>`.
+ *
+ * A shared test-behavior mixin (a `_behavior.rb` file under a `behaviors`
+ * directory) is not a test file on either side — ours is a plain module the
+ * including store test calls — so it maps onto `-behavior.ts`, not
+ * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack") {
@@ -139,7 +144,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   // are credited, not counted as unmapped.
   const base = PATH_SEGMENT_ALIASES[rawBase] ?? rawBase;
   const kebab = base.replace(/_/g, "-");
-  const tsFile = kebab + ".test.ts";
+  const tsFile = /_behavior$/.test(rawBase) ? kebab + ".ts" : kebab + ".test.ts";
 
   let tsDir =
     dir === "."

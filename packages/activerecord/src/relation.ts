@@ -3422,7 +3422,7 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#async_sum
    */
-  asyncSum(identityOrColumn?: string) {
+  asyncSum(identityOrColumn?: Parameters<Relation<T>["sum"]>[0]) {
     return this.sum(identityOrColumn);
   }
 
@@ -7144,7 +7144,7 @@ export class Relation<T extends Base> {
   /** @internal */
   private async executeSimpleCalculation(
     operation: string,
-    columnName: string,
+    columnName: Parameters<typeof _executeSimpleCalculation>[2],
     distinct: boolean,
   ): Promise<unknown> {
     return _executeSimpleCalculation(this as any, operation, columnName, distinct);
@@ -7153,7 +7153,7 @@ export class Relation<T extends Base> {
   /** @internal */
   private async executeGroupedCalculation(
     operation: string,
-    columnName: string,
+    columnName: Parameters<typeof _executeGroupedCalculation>[2],
     distinct: boolean,
   ): Promise<Record<string, unknown> | Map<unknown, unknown>> {
     return _executeGroupedCalculation(this as any, operation, columnName, distinct);

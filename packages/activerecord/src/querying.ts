@@ -1004,12 +1004,10 @@ export function except<T extends typeof Base>(
 export function calculate<T extends typeof Base>(
   this: T,
   operation: "count" | "sum" | "average" | "minimum" | "maximum",
-  column?: string,
+  column?: Parameters<Relation<InstanceType<T>>["calculate"]>[1],
 ): ReturnType<Relation<InstanceType<T>>["calculate"]> {
   const rel = this.all();
-  return rel.calculate(operation as "count", column) as ReturnType<
-    Relation<InstanceType<T>>["calculate"]
-  >;
+  return rel.calculate(operation, column);
 }
 
 /** Mirrors: ActiveRecord::Querying#async_count — params/return derived from Relation#asyncCount. */
@@ -1048,9 +1046,9 @@ export function asyncMaximum<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#async_sum — delegates through all(). */
 export function asyncSum<T extends typeof Base>(
   this: T,
-  column?: string,
+  identityOrColumn?: Parameters<Relation<InstanceType<T>>["asyncSum"]>[0],
 ): ReturnType<Relation<InstanceType<T>>["asyncSum"]> {
-  return this.all().asyncSum(column);
+  return this.all().asyncSum(identityOrColumn);
 }
 
 /** Mirrors: ActiveRecord::Querying#async_pluck — params/return derived from Relation#asyncPluck. */

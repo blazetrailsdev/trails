@@ -373,6 +373,32 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.none().sum("firm_id")).toBe(0);
   });
 
+  // Rails' `sum(initial_value_or_column = 0)` (calculations.rb:171-177) sends the
+  // identity through `calculate`, where `arel_column`'s `field.to_s`
+  // (query_methods.rb:1993) turns it into the literal summed over.
+  it("sums the identity value when no column is given", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const rows = (await Account.count()) as number;
+    expect(await Account.sum()).toBe(0);
+    expect(await Account.sum(1000)).toBe(1000 * rows);
+    expect(await Account.calculate("sum", 1000)).toBe(1000 * rows);
+    expect(await Account.all().calculate("sum", 1000)).toBe(1000 * rows);
+    expect(await Account.asyncSum(1000)).toBe(1000 * rows);
+  });
+
+  // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
+  // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
+  // narrow it away.
+  it("sums the identity value through a collection proxy", async () => {
+    const { Firm } = await import("./test-helpers/models/company.js");
+    const firm = (await Firm.firstBang()) as unknown as {
+      accounts: { sum(v?: string | number): Promise<number | bigint> };
+    };
+    const rows = Number(await firm.accounts.sum(1));
+    expect(rows).toBeGreaterThan(0);
+    expect(await firm.accounts.sum(1000)).toBe(1000 * rows);
+  });
+
   it("keeps the empty identity for every aggregate on a contradictory scope", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const empty = Account.where({ id: [] });

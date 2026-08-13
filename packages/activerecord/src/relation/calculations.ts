@@ -9,7 +9,7 @@
  */
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
-import { BigIntegerType } from "@blazetrails/activemodel";
+import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, many, tryCall } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
@@ -113,7 +113,7 @@ interface CalculationRelation {
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
   _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
   /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
-  calculate(operation: string, columnName?: string | Nodes.Node): Promise<unknown>;
+  calculate(operation: string, columnName?: string | Nodes.Node | number): Promise<unknown>;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -149,7 +149,7 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
 function buildAggNode(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node,
+  column: string | Nodes.Node | number,
   distinct: boolean,
 ): any {
   const sqlName = SQL_FN_NAMES[fn];
@@ -337,13 +337,17 @@ function applyFromToManager(rel: CalculationRelation, manager: any): void {
   if (fromNode !== undefined && fromNode !== null) manager.from(fromNode);
 }
 
-function isBigintColumn(rel: CalculationRelation, fn: AggFn, column: string | Nodes.Node): boolean {
+function isBigintColumn(
+  rel: CalculationRelation,
+  fn: AggFn,
+  column: string | Nodes.Node | number,
+): boolean {
   if (fn === "count" || fn === "average" || column === "*") return false;
   if (column instanceof Nodes.Node) return false;
   const table = rel._model.arelTable as {
     typeForAttribute?(col: string): unknown;
   };
-  return table.typeForAttribute?.(column) instanceof BigIntegerType;
+  return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
 }
 
 /**
@@ -423,7 +427,7 @@ function foldSelectValuesForHaving(rel: CalculationRelation, manager: any): void
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node,
+  column: string | Nodes.Node | number,
   distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
@@ -591,7 +595,7 @@ async function groupedCompositeAssoc(
   rel: CalculationRelation,
   association: any,
   fn: AggFn,
-  column: string | Nodes.Node,
+  column: string | Nodes.Node | number,
 ): Promise<Map<unknown, unknown>> {
   const table = rel._model.arelTable;
   const fkCols = association.foreignKey as string[];
@@ -675,7 +679,13 @@ async function groupedCompositeAssoc(
 export async function performCount(
   this: CalculationRelation,
   columnName?: string | Nodes.Node,
+  ...rest: unknown[]
 ): Promise<number | Map<unknown, number>> {
+  // Ruby's `def count(column_name = nil)` arity check; JS silently drops the
+  // extra arguments, so the ArgumentError has to be raised explicitly.
+  if (rest.length > 0) {
+    throw new ArgumentError(`wrong number of arguments (given ${rest.length + 1}, expected 0..1)`);
+  }
   return calculate.call(this, "count", columnName) as Promise<number | Map<unknown, number>>;
 }
 
@@ -685,7 +695,7 @@ export async function performCount(
 export async function calculate(
   this: CalculationRelation,
   operation: string,
-  columnName?: string | Nodes.Node,
+  columnName?: string | Nodes.Node | number,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -732,12 +742,20 @@ export async function calculate(
   }
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#sum (calculations.rb:171-177).
+ *
+ * The identity default falls through `aggregate_column` -> `arel_column`, whose
+ * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
+ * the no-argument answer comes out of `calculate` rather than a guard. The
+ * block arm (`map(&block).sum(initial_value_or_column)`, calculations.rb:172-173)
+ * is tracked by the `port-relation-sum-block-arm` story.
+ */
 export async function performSum(
   this: CalculationRelation,
-  column?: string | Nodes.Node,
+  initialValueOrColumn: string | Nodes.Node | number = 0,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
-  if (!column) return 0;
-  const sum = await calculate.call(this, "sum", column);
+  const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
 }
@@ -784,15 +802,17 @@ export interface CalculationMethods {
   calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
   calculate(
     operation: "sum",
-    column: string,
+    column: string | Nodes.Node | number,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
   ): Promise<unknown | null | Map<unknown, unknown>>;
-  calculate(operation: string, column?: string | Nodes.Node): Promise<unknown>;
+  calculate(operation: string, column?: string | Nodes.Node | number): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
-  sum(column?: string | Nodes.Node): Promise<number | bigint | Map<unknown, number | bigint>>;
+  sum(
+    initialValueOrColumn?: string | Nodes.Node | number,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   maximum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
@@ -861,7 +881,7 @@ export class ColumnAliasTracker {
  * has no name to build an alias from and keeps the internal "val".
  * @internal
  */
-function aggregateAliasFor(fn: AggFn, column: string | Nodes.Node): string {
+function aggregateAliasFor(fn: AggFn, column: string | Nodes.Node | number): string {
   if (typeof column !== "string") return "val";
   return columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"));
 }
@@ -882,7 +902,7 @@ function truncate(name: string): string {
 /** @internal */
 export function aggregateColumn(
   rel: CalculationRelation,
-  columnName: string | Nodes.Node,
+  columnName: string | Nodes.Node | number,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._model.arelTable;
@@ -916,7 +936,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 /** @internal */
 export function hasInclude(
   rel: CalculationRelation,
-  columnName: string | Nodes.Node | null,
+  columnName: string | Nodes.Node | number | null,
 ): boolean {
   const anyRel = rel as any;
   // eager_load_values.any? → always triggers (part of eager_loading?)
@@ -940,7 +960,9 @@ export function hasInclude(
  * than pretending trails supports it.
  * @internal
  */
-function aggregateTarget(columnName: string | string[] | Nodes.Node | null): string | Nodes.Node {
+function aggregateTarget(
+  columnName: string | string[] | Nodes.Node | number | null,
+): string | Nodes.Node | number {
   if (columnName == null) return "*";
   return Array.isArray(columnName) ? columnName.join(",") : columnName;
 }
@@ -949,7 +971,7 @@ function aggregateTarget(columnName: string | string[] | Nodes.Node | null): str
 export function performCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | number | null,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -976,15 +998,35 @@ export function performCalculation(
   }
 
   if (any(rel.groupValues)) {
-    return (rel as any).executeGroupedCalculation(operation, columnName, distinct);
+    return dispatchTarget(rel).executeGroupedCalculation(operation, columnName, distinct);
   }
-  return (rel as any).executeSimpleCalculation(operation, columnName, distinct);
+  return dispatchTarget(rel).executeSimpleCalculation(operation, columnName, distinct);
+}
+
+// Rails' `perform_calculation` calls its two private siblings directly
+// (calculations.rb:455-457). They are `private` on `Relation` too, and a TS
+// `private` member cannot satisfy a public interface member, so the dispatch
+// reaches them through this structural view rather than `any` — the column name
+// keeps the type `perform_calculation` resolved it to.
+function dispatchTarget(rel: CalculationRelation): {
+  executeSimpleCalculation(
+    operation: string,
+    columnName: string | string[] | Nodes.Node | number | null,
+    distinct: boolean | null,
+  ): Promise<unknown>;
+  executeGroupedCalculation(
+    operation: string,
+    columnName: string | string[] | Nodes.Node | number | null,
+    distinct: boolean | null,
+  ): Promise<unknown>;
+} {
+  return rel as never;
 }
 
 /** @internal */
 export function isDistinctSelect(
   _rel: CalculationRelation,
-  columnName: string | string[] | Nodes.Node,
+  columnName: string | string[] | Nodes.Node | number,
 ): boolean {
   return typeof columnName === "string" && /\bDISTINCT[\s(]/i.test(columnName);
 }
@@ -1010,7 +1052,7 @@ export function operationOverAggregateColumn(
  */
 function buildCountSubquery(
   relation: CalculationRelation,
-  columnName: string | Nodes.Node | null,
+  columnName: string | Nodes.Node | number | null,
   distinct: boolean,
 ): [SelectManager, unknown[]] {
   const table = relationTable(relation);
@@ -1072,7 +1114,7 @@ function buildCountSubquery(
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<unknown> {
   // DIVERGENCE (calculations.rb:469-511): each arm compiles to SQL + binds
@@ -1190,7 +1232,7 @@ function typeCasterFor(column: unknown): unknown {
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
@@ -1204,7 +1246,7 @@ export async function executeGroupedCalculation(
 }
 
 /** @internal */
-export function typeFor(rel: CalculationRelation, field: string | Nodes.Node): unknown {
+export function typeFor(rel: CalculationRelation, field: string | Nodes.Node | number): unknown {
   const fieldName =
     field instanceof Nodes.Node
       ? String((field as unknown as { name?: string }).name ?? "")
@@ -1362,7 +1404,7 @@ export function selectForCount(rel: CalculationRelation): string {
 export function isBuildCountSubquery(
   rel: CalculationRelation,
   operation: string,
-  columnName: string | string[] | Nodes.Node | null,
+  columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean,
 ): boolean {
   const isAll = columnName == null || columnName === "*" || columnName === "all";

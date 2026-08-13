@@ -1544,9 +1544,13 @@ def run
 
     # Find test files, excluding arel tests from the activerecord package
     # (they belong to the arel package)
+    # Shared test-behavior mixins define their `test` blocks in a module and
+    # match none of the three name patterns above; process_module /
+    # flush_collected_modules materialize them once the file is scanned.
     test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "spec_*.rb"))
+                 Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
+                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb"))
     test_files.uniq!
 
     # For activerecord, exclude arel test files (handled by arel package)
