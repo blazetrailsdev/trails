@@ -17,8 +17,6 @@ import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
 registerModel(Post);
 registerModel(Comment);
 
-const sym = (name: string) => Symbol(name) as unknown as string;
-
 // ==========================================================================
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
@@ -48,22 +46,22 @@ describe("SelectTest", () => {
 
   it("select with non field values", () => {
     const expected = new RegExp(`^SELECT 1, foo\\(\\), ${q("bar")} FROM`);
-    expect(Post.select("1", "foo()", sym("bar")).toSql()).toMatch(expected);
+    expect(Post.select("1", "foo()", ":bar").toSql()).toMatch(expected);
   });
 
   it("select with non field hash values", () => {
     const expected = new RegExp(
       `^SELECT 1 AS ${q("a")}, foo\\(\\) AS ${q("b")}, ${q("bar")} AS ${q("c")} FROM`,
     );
-    expect(
-      Post.select({ "1": sym("a"), "foo()": sym("b"), [sym("bar")]: sym("c") } as never).toSql(),
-    ).toMatch(expected);
+    expect(Post.select({ "1": ":a", "foo()": ":b", ":bar": ":c" } as never).toSql()).toMatch(
+      expected,
+    );
   });
 
   it("select with hash argument", async () => {
     const post = (await Post.select({
-      "UPPER(title)": sym("title"),
-      posts: { title: sym("post_title") },
+      "UPPER(title)": ":title",
+      posts: { title: ":post_title" },
     }).first()) as never as { title: string; readAttribute(n: string): unknown };
 
     expect(post.title).toBe("WELCOME TO THE WEBLOG");
@@ -72,8 +70,8 @@ describe("SelectTest", () => {
 
   it("select with reserved words aliases", async () => {
     const post = (await Post.select({
-      "UPPER(title)": sym("from"),
-      title: sym("group"),
+      "UPPER(title)": ":from",
+      title: ":group",
     }).first()) as never as { readAttribute(n: string): unknown };
 
     expect(post.readAttribute("from")).toBe("WELCOME TO THE WEBLOG");
@@ -82,8 +80,8 @@ describe("SelectTest", () => {
 
   it("select with one level hash argument", async () => {
     const post = (await Post.select({
-      "UPPER(title)": sym("title"),
-      title: sym("post_title"),
+      "UPPER(title)": ":title",
+      title: ":post_title",
     }).first()) as never as { title: string; readAttribute(n: string): unknown };
 
     expect(post.title).toBe("WELCOME TO THE WEBLOG");
@@ -92,7 +90,7 @@ describe("SelectTest", () => {
 
   it("select with not exists field", async () => {
     const expected = new RegExp(`^SELECT ${q("foo")} AS ${q("post_title")} FROM`);
-    expect(Post.select({ [sym("foo")]: sym("post_title") } as never).toSql()).toMatch(expected);
+    expect(Post.select({ [":foo"]: ":post_title" } as never).toSql()).toMatch(expected);
 
     // Rails guards the raise with `skip if sqlite3_adapter_strict_strings_disabled?`
     // (select_test.rb:53). That guard only matters when the SQLite adapter is
@@ -100,35 +98,33 @@ describe("SelectTest", () => {
     // identifier (`"foo"`) parse as a string literal instead of raising. Our
     // SQLite test adapter always runs with DQS off, so `"foo"` always errors;
     // PG/MySQL raise too. The guard condition is therefore always false here.
-    await expect(Post.select({ [sym("foo")]: sym("post_title") } as never).take()).rejects.toThrow(
+    await expect(Post.select({ [":foo"]: ":post_title" } as never).take()).rejects.toThrow(
       StatementInvalid,
     );
   });
 
   it("select with hash with not exists field", async () => {
     const expected = new RegExp(`^SELECT ${q("posts.bar")} AS ${q("post_title")} FROM`);
-    expect(Post.select({ posts: { bar: sym("post_title") } }).toSql()).toMatch(expected);
+    expect(Post.select({ posts: { bar: ":post_title" } }).toSql()).toMatch(expected);
 
-    await expect(Post.select({ posts: { boo: sym("post_title") } }).take()).rejects.toThrow(
+    await expect(Post.select({ posts: { boo: ":post_title" } }).take()).rejects.toThrow(
       StatementInvalid,
     );
   });
 
   it("select with hash array value with not exists field", async () => {
     const expected = new RegExp(`^SELECT ${q("posts.bar")}, ${q("posts.id")} FROM`);
-    expect(Post.select({ posts: [sym("bar"), sym("id")] }).toSql()).toMatch(expected);
+    expect(Post.select({ posts: [":bar", ":id"] }).toSql()).toMatch(expected);
 
-    await expect(Post.select({ posts: [sym("bar"), sym("id")] }).take()).rejects.toThrow(
-      StatementInvalid,
-    );
+    await expect(Post.select({ posts: [":bar", ":id"] }).take()).rejects.toThrow(StatementInvalid);
   });
 
   it("select with hash and table alias", async () => {
     const post = (await Post.joins("comments", "commentsWithExtend")
       .select("title", {
-        posts: { title: sym("post_title") },
-        comments: { body: sym("comment_body") },
-        commentsWithExtend: { body: sym("comment_body_2") },
+        posts: { title: ":post_title" },
+        comments: { body: ":comment_body" },
+        commentsWithExtend: { body: ":comment_body_2" },
       } as never)
       .take()) as never as { title: string; readAttribute(n: string): unknown };
 
@@ -138,15 +134,15 @@ describe("SelectTest", () => {
   });
 
   it("select with invalid nested field", async () => {
-    await expect(
-      Post.select({ posts: { "UPPER(title)": sym("post_title") } }).take(),
-    ).rejects.toThrow(StatementInvalid);
+    await expect(Post.select({ posts: { "UPPER(title)": ":post_title" } }).take()).rejects.toThrow(
+      StatementInvalid,
+    );
     await expect(Post.select({ posts: ["UPPER(title)"] }).take()).rejects.toThrow(StatementInvalid);
   });
 
   it("select with hash argument without aliases", async () => {
     const post = (await Post.select({
-      posts: [sym("title"), "title as post_title"],
+      posts: [":title", "title as post_title"],
     }).first()) as never as { title: string; readAttribute(n: string): unknown };
 
     expect(post.title).toBe("Welcome to the weblog");
@@ -156,8 +152,8 @@ describe("SelectTest", () => {
   it("select with hash argument with few tables", async () => {
     const post = (await Post.joins("comments")
       .select("title", {
-        posts: { title: sym("post_title") },
-        comments: { body: sym("comment_body") },
+        posts: { title: ":post_title" },
+        comments: { body: ":comment_body" },
       } as never)
       .take()) as never as { title: string; readAttribute(n: string): unknown };
 
@@ -178,18 +174,16 @@ describe("SelectTest", () => {
   });
 
   it("reselect with hash argument", () => {
-    const expected = Post.select("title", { posts: { title: sym("post_title") } }).toSql();
+    const expected = Post.select("title", { posts: { title: ":post_title" } }).toSql();
     const actual = Post.select("title", "body")
-      .reselect("title", { posts: { title: sym("post_title") } })
+      .reselect("title", { posts: { title: ":post_title" } })
       .toSql();
     expect(actual).toBe(expected);
   });
 
   it("reselect with one level hash argument", () => {
-    const expected = Post.select("title", { title: sym("post_title") }).toSql();
-    const actual = Post.select("title", "body")
-      .reselect("title", { title: sym("post_title") })
-      .toSql();
+    const expected = Post.select("title", { title: ":post_title" }).toSql();
+    const actual = Post.select("title", "body").reselect("title", { title: ":post_title" }).toSql();
     expect(actual).toBe(expected);
   });
 

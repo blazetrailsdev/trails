@@ -34,8 +34,6 @@ function toIds(ids: any[]): number[] {
 // trails collapses Ruby Symbol and String to one JS string type; a genuine
 // Symbol is how a caller signals "association/CTE name" (vs a raw SQL fragment)
 // to the join partitioner (query_methods.ts `selectNamedJoins`).
-const cteSym = (name: string) => Symbol(name) as unknown as string;
-
 // ==========================================================================
 // WithTest — targets relation/with_test.rb
 // ==========================================================================
@@ -188,7 +186,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     // joins() to build_with_join_node(name, InnerJoin) — an
     // `INNER JOIN commented_posts ON commented_posts.post_id = posts.id`.
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() }).joins(
-      cteSym("commented_posts"),
+      ":commented_posts",
     );
 
     expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
@@ -206,7 +204,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     const sql = (
       Post.with({
         commented_posts: Comment.select("post_id").distinct(),
-      }).joins(cteSym("commented_posts")) as unknown as { toSql(): string }
+      }).joins(":commented_posts") as unknown as { toSql(): string }
     ).toSql();
 
     // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
@@ -247,11 +245,11 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     // the LEFT OUTER JOIN directly (no `from(...)` subquery wrapper). Lock the
     // OuterJoin routing: the CTE symbol must emit a LEFT OUTER JOIN to the CTE
     // (`commented_posts.post_id = posts.id`), not an INNER JOIN. (trails Symbol
-    // is `Symbol("name")`.)
+    // is `":name"`.)
     const relation = Post.with({
       commented_posts: Comment.select("post_id").distinct(),
     })
-      .leftOuterJoins(cteSym("commented_posts"))
+      .leftOuterJoins(":commented_posts")
       .select("posts.id");
 
     const sql = (relation as unknown as { toSql(): string }).toSql();
@@ -277,7 +275,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
       commented_posts: Comment.select("post_id").distinct(),
     })
       .joins("INNER JOIN authors ON authors.id = posts.author_id")
-      .leftOuterJoins(cteSym("commented_posts"))
+      .leftOuterJoins(":commented_posts")
       .select("posts.id");
 
     const sql = (relation as unknown as { toSql(): string }).toSql();

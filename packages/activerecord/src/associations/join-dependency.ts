@@ -923,13 +923,15 @@ export class JoinDependency {
   }
 
   static walkTree(associations: any, hash: Record<PropertyKey, any>): void {
-    if (typeof associations === "symbol") {
-      if (!hash[associations]) hash[associations] = Object.create(null);
-    } else if (typeof associations === "string") {
+    if (typeof associations === "string") {
+      // Ruby `when Symbol, String then hash[associations.to_sym] ||= {}`
+      // (join_dependency.rb:55-56): a Symbol and the equivalent String key the
+      // same node, so a Symbol — spelled `":comments"` — drops its colon here.
+      const name = associations.startsWith(":") ? associations.slice(1) : associations;
       // Dotted strings ("comments.author") are a trails affordance: split them
       // into nested levels so the builder joins each segment in turn.
       let cur = hash;
-      for (const part of associations.split(".")) {
+      for (const part of name.split(".")) {
         cur = cur[part] ??= Object.create(null);
       }
     } else if (Array.isArray(associations)) {
@@ -939,8 +941,15 @@ export class JoinDependency {
     } else if (associations && typeof associations === "object") {
       for (const key of Reflect.ownKeys(associations)) {
         const value = associations[key];
-        if (!hash[key]) hash[key] = Object.create(null);
-        if (value != null) JoinDependency.walkTree(value, hash[key]);
+        // Ruby `cache = hash[k] ||= {}` (join_dependency.rb:61-64) stores the key
+        // object as-is, and `find_reflection` resolves a Symbol or a String alike
+        // (`_reflect_on_association(name)`). `build` looks the stored key up by
+        // its string form, so a Symbol key — `{ ":agents": ":agents" }` — drops
+        // its colon here instead.
+        const k =
+          typeof key === "string" && key.startsWith(":") ? key.slice(1) : (key as PropertyKey);
+        if (!hash[k]) hash[k] = Object.create(null);
+        if (value != null) JoinDependency.walkTree(value, hash[k]);
       }
     } else {
       let desc: string;

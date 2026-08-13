@@ -365,7 +365,7 @@ export class Relation<T extends Base> {
   private _reverseOrderValue: boolean | undefined = undefined;
   private _limitValue: number | null = null;
   private _offsetValue: number | null = null;
-  private _selectColumns: (string | symbol | Nodes.Node)[] | null = null;
+  private _selectColumns: (string | Nodes.Node)[] | null = null;
   private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
   private _groupColumns: string[] = [];
@@ -412,19 +412,19 @@ export class Relation<T extends Base> {
   private _joinsValues: (AssociationSpec | string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
   // A `joins_values` entry is a "named" inner association join (resolved through
-  // JoinDependency) when it is a nested-association hash, a genuine Symbol
-  // (trails' signal for an association/CTE name, e.g. `joins(:name)`), or a
-  // string naming an association; everything else (Arel join nodes, raw SQL
-  // strings) is a raw join value. The two derived getters below partition
-  // `_joinsValues` by this rule — the same rule `joins` uses at insert time. A
-  // raw Symbol misrouted to `_joinValues` would reach the arel visitor and raise
-  // "Unknown node type: Symbol", so Symbols must land in `_namedInnerJoins`.
+  // JoinDependency) when it is a nested-association hash, a Symbol — spelled as
+  // a leading-colon string, trails' signal for an association/CTE name, e.g.
+  // `joins(":name")` — or a string naming an association; everything else (Arel
+  // join nodes, raw SQL strings) is a raw join value. The two derived getters
+  // below partition `_joinsValues` by this rule — the same rule `joins` uses at
+  // insert time. A raw Symbol misrouted to `_joinValues` would reach the arel
+  // visitor and raise "Unknown node type: Symbol", so Symbols must land in
+  // `_namedInnerJoins`.
   private _isNamedJoinValue(v: unknown): boolean {
     return (
       _isPlainObject(v) ||
-      typeof v === "symbol" ||
       v instanceof JoinDependency ||
-      (typeof v === "string" && this._isAssociationName(v))
+      (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
     );
   }
   // INNER `joins(:assoc)` association names (and nested hash/through specs),
@@ -4052,10 +4052,8 @@ export class Relation<T extends Base> {
    * fresh allocation, matching the stored-reference semantics of the other
    * value readers.
    */
-  get selectValues(): (string | symbol | Nodes.Node)[] {
-    return (
-      this._selectColumns ?? (EMPTY_VALUE_ARRAY as unknown as (string | symbol | Nodes.Node)[])
-    );
+  get selectValues(): (string | Nodes.Node)[] {
+    return this._selectColumns ?? (EMPTY_VALUE_ARRAY as unknown as (string | Nodes.Node)[]);
   }
 
   /**
@@ -5544,7 +5542,7 @@ export class Relation<T extends Base> {
    * resolution.
    * @internal
    */
-  arelColumnWithTable(tableName: string, columnName: string | symbol): unknown {
+  arelColumnWithTable(tableName: string, columnName: string): unknown {
     return _arelColumnWithTable.call(this as any, tableName, columnName);
   }
 
@@ -5552,7 +5550,7 @@ export class Relation<T extends Base> {
    * Rails `Relation#arel_column`. Delegates to the canonical helper.
    * @internal
    */
-  arelColumn(field: string | symbol | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
+  arelColumn(field: string | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
     if (field instanceof Nodes.Node) return field;
     return _arelColumn.call(this as any, field, fallback);
   }
@@ -7005,7 +7003,7 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private arelColumnAliasesFromHash(fields: Record<string | symbol, unknown>): unknown[] {
+  private arelColumnAliasesFromHash(fields: Record<string, unknown>): unknown[] {
     return _qm.arelColumnAliasesFromHash.call(this as any, fields);
   }
 
