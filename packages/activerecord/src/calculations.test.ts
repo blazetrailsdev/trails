@@ -6,6 +6,7 @@ import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { StatementInvalid } from "./errors.js";
 import { captureSql } from "./testing/sql-capture.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
@@ -1722,9 +1723,18 @@ describe("CalculationsTest", () => {
   });
 
   it("sum uses enumerable version when block is given", async () => {
-    const clients = await Client.all();
-    const total = clients.reduce((sum: number) => sum + 0, 0);
-    expect(total).toBe(0);
+    let blockCalled = false;
+    const relation = await Client.all().load();
+
+    await assertNoQueries(false, async () => {
+      expect(
+        await relation.sum(() => {
+          blockCalled = true;
+          return 0;
+        }),
+      ).toBe(0);
+    });
+    expect(blockCalled).toBe(true);
   });
 
   it("having with strong parameters", async () => {

@@ -400,6 +400,48 @@ describe("empty-scope aggregate identities", () => {
     expect(queries[1]).toMatch(/SELECT SUM\(\) AS ["`]?sum["`]?/);
   });
 
+  // `Person.sum { |person| person.age }` / `Person.sum(1000) { |person| person.age }`,
+  // the two doc examples of the block arm (calculations.rb:167-168, :172-173).
+  it("sums the block return values onto the initial value", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const creditLimits = await Account.sum("credit_limit");
+    expect(await Account.sum((account: { credit_limit: number }) => account.credit_limit)).toBe(
+      Number(creditLimits),
+    );
+    expect(
+      await Account.sum(1000, (account: { credit_limit: number }) => account.credit_limit),
+    ).toBe(1000 + Number(creditLimits));
+  });
+
+  // Ruby folds Integer and Bignum block results together (`Array#sum`), where
+  // JS `0 + 1n` is a TypeError — so the default `0` seed must still take a
+  // `bigint`-returning block.
+  it("sums bigint block return values onto the default identity", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const rows = BigInt((await Account.count()) as number);
+    expect(await Account.sum(() => 1n)).toBe(rows);
+    expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
+  });
+
+  // A column name is not an initial value for the block arm: the overloads
+  // reject it at compile time, and for an untyped caller Ruby raises from
+  // `String#+` at the first addition — so `[1].sum("age")` raises while
+  // `[].sum("age")` answers `"age"`.
+  it("rejects a non-numeric initial value for the block arm", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const sum = Account.sum as unknown as (
+      initialValueOrColumn: unknown,
+      block: () => number,
+    ) => Promise<unknown>;
+    await expect(sum.call(Account, "credit_limit", () => 1)).rejects.toThrow(
+      "no implicit conversion of Integer into String",
+    );
+    const empty = Account.where({ id: [] }) as unknown as {
+      sum(initialValueOrColumn: unknown, block: () => number): Promise<unknown>;
+    };
+    expect(await empty.sum("credit_limit", () => 1)).toBe("credit_limit");
+  });
+
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
   // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
   // narrow it away.

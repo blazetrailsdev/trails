@@ -189,6 +189,21 @@ interface CalculationRelation {
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
+/** The `&block` of `Calculations#sum` (calculations.rb:172): one record in, a summable out. */
+export type SumBlock = (record: any) => number | bigint;
+
+/**
+ * Mirror of Ruby's `TypeError`, as `attribute-assignment.ts` and `cache/store.ts`
+ * carry it — what `Array#sum` raises when its initial value cannot be added to
+ * the block results.
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
+
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;
   // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
@@ -668,14 +683,60 @@ export async function calculate(
  *
  * The identity default falls through `aggregate_column` -> `arel_column`, whose
  * `field.to_s` (query_methods.rb:1993) makes it the SQL literal summed over, so
- * the no-argument answer comes out of `calculate` rather than a guard. The
- * block arm (`map(&block).sum(initial_value_or_column)`, calculations.rb:172-173)
- * is tracked by the `port-relation-sum-block-arm` story.
+ * the no-argument answer comes out of `calculate` rather than a guard.
+ *
+ * The block arm is `map(&block).sum(initial_value_or_column)`
+ * (calculations.rb:172-173): `Enumerable#map` loads the relation — a no-op when
+ * it is already loaded — and `Array#sum` seeds the accumulation with the
+ * initial value. Ruby's trailing `&block` has no TS slot, so it rides the
+ * argument list: a function in the first position is the block with the default
+ * identity, and `sum(1000, block)` is the explicit-initial-value form.
  */
+/**
+ * Ruby's `Integer#+` across the numeric tower, which is what `Array#sum` folds
+ * with: an Integer and a Bignum add exactly, and a Float operand takes the sum
+ * to Float. JS has no tower — `0 + 1n` is a TypeError — so a `bigint` operand
+ * pulls a whole-number partner up to `bigint`, and a fractional `number` pulls
+ * both down to `number`, which is where Ruby's Float arm lands too.
+ *
+ * A non-numeric memo is the seed of a `sum(column) { … }` call, and Ruby raises
+ * it here rather than up front — from `String#+`, at the FIRST addition, so
+ * `[].sum("age")` still answers `"age"` and only `[1].sum("age")` raises. The
+ * `rails-error-parity` rule keys on the constructor name, so it flags this
+ * throw whether the class is the global `TypeError` or the ported mirror above;
+ * `attribute-assignment.ts` and `cache/store.ts` carry the same suppression for
+ * the same reason.
+ */
+function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
+  if (typeof memo !== "number" && typeof memo !== "bigint") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(
+      `no implicit conversion of ${
+        typeof value === "bigint" || Number.isInteger(value) ? "Integer" : "Float"
+      } into ${typeof memo === "string" ? "String" : (memo as object).constructor.name}`,
+    );
+  }
+  if (typeof memo === typeof value) {
+    return typeof memo === "bigint" ? memo + (value as bigint) : memo + (value as number);
+  }
+  const [n, b] = typeof memo === "bigint" ? [value as number, memo] : [memo, value];
+  if (!Number.isInteger(n)) return n + Number(b);
+  return BigInt(n) + (b as bigint);
+}
+
 export async function performSum(
   this: CalculationRelation,
-  initialValueOrColumn: string | Nodes.Node | number | null = 0,
+  initialValueOrColumn: string | Nodes.Node | number | null | SumBlock = 0,
+  block?: SumBlock,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
+  if (typeof initialValueOrColumn === "function") {
+    block = initialValueOrColumn;
+    initialValueOrColumn = 0;
+  }
+  if (block !== undefined) {
+    const records = await this.toArray();
+    return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
+  }
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
@@ -731,6 +792,10 @@ export interface CalculationMethods {
   ): Promise<unknown | null | Map<unknown, unknown>>;
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  /** `sum { |record| … }` — the block arm on the default identity. */
+  sum(block: SumBlock): Promise<number | bigint>;
+  /** `sum(1000) { |record| … }` — the block arm on an explicit initial value. */
+  sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
