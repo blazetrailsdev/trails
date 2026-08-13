@@ -178,7 +178,7 @@ export class UniquenessValidator extends EachValidator {
     const finderClass = this.findFinderClassFor(record) ?? record.constructor;
     if (!finderClass.where) return;
 
-    const mapped = mapEnumAttribute(finderClass, attribute, value);
+    value = mapEnumAttribute(finderClass, attribute, value);
 
     if (
       record.isPersisted?.() &&
@@ -197,7 +197,7 @@ export class UniquenessValidator extends EachValidator {
     // that constructs the validator directly with a strict option.
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
-    let [relation] = await this.buildRelation(finderClass, attribute, mapped);
+    let [relation] = await this.buildRelation(finderClass, attribute, value);
 
     if (record.isPersisted?.()) {
       const pk = finderClass.primaryKey;

@@ -911,13 +911,15 @@ export function buildWhereClause(
     // raw to PredicateBuilder, whose QueryAttribute bind casts/serializes at
     // compile time (predicate_builder.rb:57-69 → build_bind_attribute →
     // value_for_database).
-    const normalized: Record<string, unknown> = {};
+    const transformed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(opts)) {
       const resolved = aliases[key] ?? key;
-      normalized[resolved] = value;
+      transformed[resolved] = value;
     }
-    const parts = this.predicateBuilder.buildFromHash(normalized, (tableName: string) =>
-      lookupTableKlassFromJoinDependencies.call(this, tableName),
+    opts = transformed;
+    const parts = this.predicateBuilder.buildFromHash(
+      opts as Record<string, unknown>,
+      (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),
     );
     return new WhereClause(parts);
   }

@@ -346,40 +346,40 @@ export interface StoreOptions {
  */
 export function storeAccessor(
   modelClass: typeof Base,
-  attribute: string,
+  storeAttribute: string,
   options: { accessors?: string[]; prefix?: boolean | string; suffix?: boolean | string },
 ): void {
-  const { accessors = [], prefix, suffix } = options;
+  const { accessors: keys = [], prefix, suffix } = options;
 
-  addLocalStoredAttribute(modelClass, attribute, accessors);
+  addLocalStoredAttribute(modelClass, storeAttribute, keys);
 
-  for (const accessor of accessors) {
-    let accessorName = accessor;
+  for (const key of keys) {
+    let accessorKey = key;
     if (prefix) {
-      const pre = prefix === true ? attribute : String(prefix);
-      accessorName = `${pre}_${accessorName}`;
+      const accessorPrefix = prefix === true ? storeAttribute : String(prefix);
+      accessorKey = `${accessorPrefix}_${accessorKey}`;
     }
     if (suffix) {
-      const suf = suffix === true ? attribute : String(suffix);
-      accessorName = `${accessorName}_${suf}`;
+      const accessorSuffix = suffix === true ? storeAttribute : String(suffix);
+      accessorKey = `${accessorKey}_${accessorSuffix}`;
     }
 
     // Install on the intermediate storeModule prototype so that user overrides
     // on modelClass.prototype can reach the store accessor via `super`.
     // Mirrors Rails: _store_accessors_module.module_eval { define_method ... }
-    storeAccessorsModule(modelClass).add(accessorName);
+    storeAccessorsModule(modelClass).add(accessorKey);
 
     const storeModuleProto = getOrCreateStoreModuleProto(modelClass);
-    Object.defineProperty(storeModuleProto, accessorName, {
+    Object.defineProperty(storeModuleProto, accessorKey, {
       get: function (this: Base) {
-        return this.readStoreAttribute(attribute, accessor);
+        return this.readStoreAttribute(storeAttribute, key);
       },
       set: function (this: Base, value: unknown) {
-        this.writeStoreAttribute(attribute, accessor, value);
+        this.writeStoreAttribute(storeAttribute, key, value);
       },
       configurable: true,
     });
-    defineStoreAccessorDirtyMethods(storeModuleProto, accessorName, attribute, accessor);
+    defineStoreAccessorDirtyMethods(storeModuleProto, accessorKey, storeAttribute, key);
   }
 }
 

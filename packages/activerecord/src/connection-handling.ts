@@ -749,7 +749,7 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
 
 export async function establishConnection(
   modelClass: typeof Base,
-  config?:
+  configOrEnv?:
     | string
     | DatabaseConfig
     | {
@@ -777,7 +777,7 @@ export async function establishConnection(
     current = parent;
   }
 
-  if (config === undefined) {
+  if (configOrEnv === undefined) {
     await autoConnect(modelClass);
   } else {
     // Mirrors Rails `establish_connection(config_or_env)`
@@ -789,7 +789,7 @@ export async function establishConnection(
     // resolved object then goes to the handler verbatim, so the pool stores it
     // as-is instead of rebuilding a fresh UrlConfig/HashConfig. tz validation
     // and buildAdapterArg live inside establishWithDbConfig.
-    const dbConfig = modelClass.resolveConfigForConnection(config);
+    const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
     await establishWithDbConfig(modelClass, dbConfig);
   }
 }

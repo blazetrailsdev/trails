@@ -325,18 +325,17 @@ export function rebuildHandlers(
   tags: TagDefinition[],
 ): [string, (ctx: Record<string, TagValue>) => TagValue][] {
   const handlers: [string, (ctx: Record<string, TagValue>) => TagValue][] = [];
-  for (const tag of tags) {
-    if (typeof tag === "function") {
+  for (const i of tags) {
+    if (typeof i === "function") {
       // Function tags are invoked directly — mirror tagContent()'s "custom" branch.
-      const fn = tag;
+      const fn = i;
       handlers.push(["custom", (ctx) => fn(ctx)]);
-    } else if (typeof tag === "object" && tag !== null) {
-      for (const [k, v] of Object.entries(tag)) {
+    } else if (typeof i === "object" && i !== null) {
+      for (const [k, v] of Object.entries(i)) {
         handlers.push([k, buildHandler(k, v)]);
       }
     } else {
-      const name = String(tag);
-      handlers.push([name, buildHandler(name)]);
+      handlers.push([String(i), buildHandler(String(i))]);
     }
   }
   handlers.sort((a, b) => a[0].localeCompare(b[0]));

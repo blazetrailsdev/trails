@@ -148,20 +148,21 @@ export class TypeMapInitializer {
     oid: number | string,
     oidType: unknown | ((oid: number | string, ...args: unknown[]) => unknown),
   ): void {
-    const validOid = this.assertValidRegistration(oid, oidType);
+    oid = this.assertValidRegistration(oid, oidType);
     if (typeof oidType === "function") {
       this.store.registerType(
-        validOid,
+        oid,
         undefined,
         oidType as (oid: number | string, ...args: unknown[]) => unknown,
       );
     } else {
-      this.store.registerType(validOid, oidType);
+      this.store.registerType(oid, oidType);
     }
   }
 
   private aliasType(oid: number | string, target: number | string): void {
-    this.store.aliasType(this.assertValidRegistration(oid, target), target);
+    oid = this.assertValidRegistration(oid, target);
+    this.store.aliasType(oid, target);
   }
 
   private registerWithSubtype(

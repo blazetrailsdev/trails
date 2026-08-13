@@ -499,8 +499,8 @@ export class InsertAll {
   private async uniqueIndexes(): Promise<unknown[]> {
     const conn = this.connection as any;
     const cache = conn.schemaCache;
-    if (!cache || typeof cache.indexes !== "function") return [];
-    const indexes: unknown[] = await cache.indexes(this.model.arelTable.name);
+    if (!cache) return [];
+    const indexes: unknown[] = await cache.indexes(this.model.tableName);
     return indexes.filter((i: any) => i.unique);
   }
 
