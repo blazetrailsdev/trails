@@ -1393,14 +1393,11 @@ function buildPackageReport(
   for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
 
   // A reopened class is stamped with whichever reopening the extractor read
-  // first — `Date` with `core_ext/date/acts_like.rb`, never with
-  // `core_ext/date/conversions.rb` — so every other file that reopens it is
-  // absent from `rubyFiles` and its TS target falls into the
-  // `uncoveredTsFiles(...)` arm, scored against an EMPTY allowed set and tagged
-  // `[no Rails counterpart]`. The methods themselves ARE stamped per-file, so
-  // recover the file list from them: every `.rb` any method is declared in is a
-  // Rails counterpart, whether or not it also has a `RUBY_FILE_TS_OVERRIDES`
-  // row (the overrides are the subset of this population found by hand).
+  // first (`Date` with `core_ext/date/acts_like.rb`), so every other file that
+  // reopens it is absent from `rubyFiles` and its TS target falls into the
+  // `uncoveredTsFiles(...)` arm below — scored against an EMPTY allowed set.
+  // The methods ARE stamped per-file, so recover the file list from them; the
+  // `RUBY_FILE_TS_OVERRIDES` rows are the subset of it found by hand.
   const methodDeclarationFiles = new Set<string>();
   for (const info of [...Object.values(rubyPkg.classes), ...Object.values(rubyPkg.modules)]) {
     for (const m of [...info.instanceMethods, ...info.classMethods]) {
