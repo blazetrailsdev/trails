@@ -19,7 +19,8 @@
     "smoke": "TRAILS_ENV=test tsx test/integration/smoke.ts",
     "start": "TRAILS_ENV=${TRAILS_ENV:-development} tsx src/server.ts",
     "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
-    "routes": "trails routes"
+    "routes": "trails routes",
+    "dev:remote": "TRAILS_ENV=development HOST=0.0.0.0 PORT=${PORT:-3210} tsx src/server.ts"
   },
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",

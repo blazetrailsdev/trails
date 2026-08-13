@@ -1,5 +1,6 @@
 import { Base, registerModel } from "@blazetrails/activerecord";
 import { getCryptoAsync } from "@blazetrails/activesupport/crypto-adapter";
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { Application as ServerApplication } from "@blazetrails/trailties/server";
 import { User } from "../app/models/user.js";
 import { Tweet } from "../app/models/tweet.js";
@@ -21,10 +22,11 @@ let connected = false;
 export async function connect(): Promise<void> {
   if (connected) return;
   // TODO(0104-twitter-app-full-stack-integration/esm-adapters-need-explicit-priming):
-  // activesupport's crypto adapter only self-registers under CommonJS, so an
-  // ESM app has to prime it through the async getter before anything reaches
-  // `getCrypto()` synchronously — here, the signed session cookie.
-  await getCryptoAsync();
+  // activesupport's adapters only self-register under CommonJS, so an ESM app
+  // has to prime each through its async getter before anything reaches the
+  // sync accessor: crypto for the signed session cookie, fs and path for
+  // `ActionDispatch::Static`.
+  await Promise.all([getCryptoAsync(), getFsAsync(), getPathAsync()]);
   await Base.establishConnection();
   for (const m of MODELS) registerModel(m);
   await Promise.all(MODELS.map((m) => m.loadSchema()));

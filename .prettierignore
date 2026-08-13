@@ -21,3 +21,9 @@ packages/i18n/src/test-data/locales/
 # verify byte-for-byte). Prettier collapses a short `rubyArgs` array onto one
 # line, which that serializer never emits, so the two formatters fight.
 scripts/api-compare/call-mismatches-exclude/
+
+# Byte-for-byte `trails new` output. The canonical form is the generator
+# template in packages/trailties/src/generators/app-generator.ts, which mirrors
+# Rails' public/*.html — including `<!DOCTYPE html>`, which prettier lowercases.
+# Formatting the copies here would drift them from what the generator emits.
+examples/*/public/*.html

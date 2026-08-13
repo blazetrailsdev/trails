@@ -1,8 +1,9 @@
 import * as http from "node:http";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { RackEnv } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyToString } from "@blazetrails/rack";
+import { Static } from "@blazetrails/actionpack";
 import { boot } from "./config/application.js";
 
 export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -15,13 +16,14 @@ export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)
  * `Rack::Handler` equivalent, so the only copy in the repo is inlined in
  * `trailties/src/server/vite-plugin.ts`.
  */
-export async function listen(port = 0): Promise<http.Server> {
-  const app = await boot(APP_ROOT);
+export async function listen(port = 0, host = "127.0.0.1"): Promise<http.Server> {
+  const booted = await boot(APP_ROOT);
+  const app = withStaticFiles((env) => booted.call(env));
 
   const server = http.createServer((req, res) => {
     void (async () => {
       try {
-        const [status, headers, body] = await app.call(await buildRackEnv(req, port));
+        const [status, headers, body] = await app(await buildRackEnv(req, port));
         res.writeHead(status, headers as http.OutgoingHttpHeaders);
         res.end(await bodyToString(body));
       } catch (error) {
@@ -31,8 +33,27 @@ export async function listen(port = 0): Promise<http.Server> {
     })();
   });
 
-  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => server.listen(port, host, resolve));
   return server;
+}
+
+/**
+ * Serve `public/` and `app/assets`, then fall through to the application.
+ *
+ * TODO(0104-twitter-app-full-stack-integration/no-static-or-asset-pipeline):
+ * Rails' default middleware stack mounts `ActionDispatch::Static` on
+ * `public/`, and Propshaft serves `app/assets` under `/assets`. Neither is in
+ * a trails app's request path, so the stylesheet the `trails new` layout
+ * links 404s on a freshly generated app.
+ */
+function withStaticFiles(app: (env: RackEnv) => Promise<RackResponse>) {
+  const assets = new Static(app, {
+    root: path.join(APP_ROOT, "src", "app", "assets"),
+  });
+  const publicFiles = new Static((env) => assets.call(env), {
+    root: path.join(APP_ROOT, "public"),
+  });
+  return (env: RackEnv) => publicFiles.call(env);
 }
 
 async function buildRackEnv(req: http.IncomingMessage, port: number): Promise<RackEnv> {
@@ -69,7 +90,8 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 // `node src/server.ts` (or `tsx src/server.ts`) starts the app directly.
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 3000);
-  listen(port).then(() => {
-    console.log(`=> twitter-app listening on http://127.0.0.1:${port}`);
+  const host = process.env.HOST ?? "127.0.0.1";
+  listen(port, host).then(() => {
+    console.log(`=> twitter-app listening on http://${host}:${port}`);
   });
 }
