@@ -70,6 +70,10 @@ export function taggedLogger(): TaggedLogger | null {
  * Ruby reads `self.class`/`name` off the Minitest test-case instance the module
  * is mixed into; the ported assertions are free functions with no such
  * receiver, so the same two values come from the test runner.
+ *
+ * `separator` is the punctuation Ruby writes between the pair at each site:
+ * `" - "` for the assertion warning (assertions.rb:285) and `": "` for
+ * `before_setup`'s heading (tagged_logging.rb:12).
  * @internal
  */
 export function _testCaseIdentity(separator = " - "): string {

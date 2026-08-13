@@ -1537,7 +1537,13 @@ export function isBlankArgument(value: unknown): boolean {
   return false;
 }
 
-/** @internal */
+/**
+ * Mirrors `Relation#check_if_method_has_arguments!`
+ * (query_methods.rb:2213-2222). `methodName` is Rails' `__callee__` Symbol,
+ * spelled with its leading colon; interpolating a Symbol renders its name, so
+ * the message drops the colon.
+ * @internal
+ */
 export function checkIfMethodHasArgumentsBang(
   this: QueryMethodsHost,
   methodName: string,
@@ -1546,8 +1552,6 @@ export function checkIfMethodHasArgumentsBang(
   block?: (args: unknown[]) => void,
 ): void {
   if (!args || args.length === 0) {
-    // `methodName` is Rails' `__callee__` Symbol, spelled with its leading
-    // colon; interpolating a Symbol renders its name, so drop the colon.
     throw argumentError(message ?? `The method .${methodName.slice(1)}() must contain arguments.`);
   } else {
     block?.(args);
