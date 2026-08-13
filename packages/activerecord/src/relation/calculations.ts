@@ -19,7 +19,7 @@ import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
-import { arelColumn, arelColumns, buildCteSql, buildJoinDependencies } from "./query-methods.js";
+import { arelColumn, arelColumns, buildJoinDependencies } from "./query-methods.js";
 
 /**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
@@ -91,6 +91,16 @@ interface CalculationRelation {
   _isDistinct: boolean;
   /** Mirrors `Relation#distinct!` (query_methods.rb). */
   distinctBang(value?: boolean): unknown;
+  /** Mirrors `Relation#unscope` (query_methods.rb). */
+  unscope(...args: unknown[]): CalculationRelation;
+  /** Mirrors `SpawnMethods#except` (spawn_methods.rb:59). */
+  except(...skips: string[]): CalculationRelation;
+  /** Mirrors `Relation#arel` (query_methods.rb:1594). */
+  arel(): SelectManager;
+  /** Mirrors `Relation#build_subquery` (query_methods.rb:1605). */
+  buildSubquery(subqueryAlias: string, selectValue: unknown): SelectManager;
+  /** Mirrors `Relation#spawn` (spawn_methods.rb:10). */
+  spawn(): CalculationRelation;
   _groupColumns: string[];
   /** Mirrors `Relation#group_values`. */
   groupValues: string[];
@@ -123,14 +133,6 @@ interface CalculationRelation {
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
-const SQL_FN_NAMES: Record<AggFn, string> = {
-  count: "COUNT",
-  sum: "SUM",
-  average: "AVG",
-  minimum: "MIN",
-  maximum: "MAX",
-};
-
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;
   // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
@@ -144,83 +146,6 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
     name === "unsigned_integer" ||
     name === "boolean"
   );
-}
-
-function buildAggNode(
-  rel: CalculationRelation,
-  fn: AggFn,
-  column: string | Nodes.Node | number,
-  distinct: boolean,
-): any {
-  const sqlName = SQL_FN_NAMES[fn];
-  // "all" is the JS analogue of Rails' :all symbol — aggregate_column maps it
-  // to Arel.star (calculations.rb:414-423), i.e. COUNT(*), not a column ref.
-  if (column === "*" || column === "all" || column instanceof Nodes.SqlLiteral) {
-    const lit = column instanceof Nodes.SqlLiteral ? column : new Nodes.SqlLiteral("*");
-    return new Nodes.NamedFunction(sqlName, [lit], undefined, distinct);
-  }
-  // Arel node (e.g. arelTable.get("col")) — use it directly without string resolution.
-  // Mirrors Rails: calculate() passes Arel::Attribute through aggregate_column unchanged.
-  if (column instanceof Nodes.Node) {
-    const node = column as Nodes.Node & {
-      count(distinct: boolean): Nodes.Node;
-      sum(): Nodes.Node;
-      average(): Nodes.Node;
-      minimum(): Nodes.Node;
-      maximum(): Nodes.Node;
-    };
-    if (distinct) return new Nodes.NamedFunction(sqlName, [node], undefined, true);
-    switch (fn) {
-      case "count":
-        return node.count(false);
-      case "sum":
-        return node.sum();
-      case "average":
-        return node.average();
-      case "minimum":
-        return node.minimum();
-      case "maximum":
-        return node.maximum();
-    }
-  }
-  // Mirrors Rails' aggregate_column → arel_column (query_methods.rb): a known
-  // column (after attribute-alias resolution) becomes a qualified column
-  // reference, a "table.column" string resolves through the join dependencies
-  // so it lands on the joined table (not the model's own), and any other
-  // string (e.g. "id * wealth") passes through as raw SQL. Every Arel node —
-  // attribute or SqlLiteral — mixes in Expressions, so the aggregate builder
-  // (count/sum/…) is callable uniformly.
-  // Fallback for a column absent from the model's columns_hash: the primary key
-  // still belongs to the base table (our test models omit the implicit PK from
-  // columns_hash, unlike Rails), so qualify it there; anything else is a joined
-  // or expression column and stays unqualified raw SQL — exactly what
-  // MIN(written_on) over a joined table needs.
-  const pk = rel._model.primaryKey;
-  const pks = Array.isArray(pk) ? pk : [pk];
-  const node = arelColumn.call(rel as never, column, (field: string) =>
-    pks.includes(field) ? rel._model.arelTable.get(field) : new Nodes.SqlLiteral(field),
-  ) as Nodes.Node & {
-    count(distinct: boolean): Nodes.Node;
-    sum(): Nodes.Node;
-    average(): Nodes.Node;
-    minimum(): Nodes.Node;
-    maximum(): Nodes.Node;
-  };
-  if (distinct) {
-    return new Nodes.NamedFunction(sqlName, [node], undefined, true);
-  }
-  switch (fn) {
-    case "count":
-      return node.count(false);
-    case "sum":
-      return node.sum();
-    case "average":
-      return node.average();
-    case "minimum":
-      return node.minimum();
-    case "maximum":
-      return node.maximum();
-  }
 }
 
 /**
@@ -255,37 +180,6 @@ function wrapBigintAgg(
     return `SELECT ${keys}, CAST("${aggAlias}" AS TEXT) AS "${aggAlias}" FROM (${innerSql}) AS "_bigint_agg"`;
   }
   return `SELECT CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
-}
-
-/**
- * Prefix the `WITH` clause onto an aggregate's compiled SQL, collecting the
- * CTE-body binds through the visitor and prepending them to the main query's
- * binds — exactly as the SELECT path does — rather than inlining them. The
- * `WITH` clause renders first, so its binds lead; for PG `$N` placeholders the
- * main body is renumbered up by the CTE bind count (SQLite/MySQL `?` are
- * positional, so document order suffices and the shift is a no-op).
- */
-function prependCtes(
-  rel: CalculationRelation,
-  body: string,
-  binds: unknown[],
-): [string, unknown[]] {
-  if (rel._ctes.length === 0) return [body, binds];
-  const connection = rel._conn();
-  const compile = (node: Nodes.Node): [string, unknown[]] => {
-    if (!connection.visitor?.compileWithBinds) return [connection.toSql(node), []];
-    return connection.visitor.compileWithBinds(node);
-  };
-  const { sql: cteSql, binds: cteRawBinds } = buildCteSql(rel._ctes, compile, (name) =>
-    connection.quoteTableName(name),
-  );
-  const cteBinds = cteRawBinds.map(typeCastCalcBind);
-  const offset = cteBinds.length;
-  // PG `$N` placeholders in the body restart at `$1`; shift them past the
-  // CTE binds that now lead the bind array (mirrors buildCteSql's own shift).
-  const shifted =
-    offset > 0 ? body.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + offset}`) : body;
-  return [`${cteSql} ${shifted}`, [...cteBinds, ...binds]];
 }
 
 function typeCastCalcBind(b: unknown): unknown {
@@ -323,20 +217,6 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
   return [conn.toSql(manager), []];
 }
 
-/**
- * Apply this relation's `from()` source onto a calculation `SelectManager`
- * **before** compilation, reusing `Relation#_buildFromNode` / `buildFrom` so
- * the FROM source — string, Arel node, or live subquery Relation — threads
- * through the single visitor collector exactly as the main SELECT path does
- * (relation.ts `_buildSelectManager`). Binds land in document order (FROM
- * before WHERE) and identifier quoting stays in the visitor; there is no
- * Rails analog of the old `applyFromClause` SQL rewrite.
- */
-function applyFromToManager(rel: CalculationRelation, manager: any): void {
-  const fromNode = rel._buildFromNode();
-  if (fromNode !== undefined && fromNode !== null) manager.from(fromNode);
-}
-
 function isBigintColumn(
   rel: CalculationRelation,
   fn: AggFn,
@@ -348,31 +228,6 @@ function isBigintColumn(
     typeForAttribute?(col: string): unknown;
   };
   return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
-}
-
-/**
- * The table a calculation's manager is seeded FROM: the relation's own table,
- * which is the model's `arel_table` unless the relation was built on a table
- * ALIAS. Rails gets this for free — `execute_simple_calculation` runs
- * `relation.arel`, and `build_arel` starts from `table` — but our arms project
- * explicitly, so they have to seed the manager the same way. A `Nodes.TableAlias`
- * is a bare AST node with no `project` helper, hence the `SelectManager`.
- * @internal
- */
-function relationTable(rel: CalculationRelation): any {
-  return (rel as unknown as { table?: unknown }).table ?? rel._model.arelTable;
-}
-
-/** @internal Seed a SelectManager FROM {@link relationTable}. */
-function projectOnRelationTable(
-  rel: CalculationRelation,
-  ...projections: unknown[]
-): SelectManager {
-  const table = relationTable(rel);
-  if (table instanceof Table) return table.project(...(projections as never[]));
-  const m = new SelectManager(table as never);
-  m.project(...(projections as never[]));
-  return m;
 }
 
 /**
@@ -396,32 +251,27 @@ function eagerJoinedRelation(rel: CalculationRelation, eagerLoading: boolean): C
 }
 
 /**
- * Every calculation arm — including each of `performCount`'s managers — runs
- * `select_all` on the relation's own arel, and `build_arel` emits
- * `arel.having(having_clause.ast) unless having_clause.empty?`
- * unconditionally — with or without a GROUP BY (query_methods.rb:1756). Our arms
- * project explicitly instead of reusing `build_arel`, so the having clause has to
- * be re-applied by hand.
+ * `execute_grouped_calculation`'s projection (calculations.rb:540-550): the
+ * aggregate, then the relation's own `select_values` whenever the having clause
+ * is non-empty — that is what makes an aliased select
+ * (`select("MIN(x) AS min_x").having("min_x > 50")`) referencable from HAVING —
+ * then the aliased group columns. Grouped only: `execute_simple_calculation`
+ * REPLACES `select_values` with the lone aggregate (calculations.rb:484).
  * @internal
  */
-function applyHavingToManager(rel: CalculationRelation, manager: any): void {
-  const having = rel.havingClause;
-  if (!having.isEmpty()) manager.having(having.ast);
-}
-
-/**
- * `execute_grouped_calculation` folds the relation's own `select_values` into the
- * projection whenever the having clause is non-empty (calculations.rb:542) — that
- * is what makes an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
- * referencable from HAVING. Grouped only: `execute_simple_calculation` REPLACES
- * `select_values` with the lone aggregate (calculations.rb:484), so the ungrouped
- * arm must not fold.
- * @internal
- */
-function foldSelectValuesForHaving(rel: CalculationRelation, manager: any): void {
-  if (rel.havingClause.isEmpty()) return;
-  const extraSelects = arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[];
-  if (extraSelects.length > 0) manager.project(...extraSelects);
+function buildGroupedSelectValues(
+  rel: CalculationRelation,
+  selectValue: Nodes.Node,
+  groupColumns: Nodes.Node[],
+): (string | symbol | Nodes.Node)[] {
+  const selectValues: Nodes.Node[] = [selectValue];
+  if (!rel.havingClause.isEmpty()) {
+    selectValues.push(
+      ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
+    );
+  }
+  selectValues.push(...groupColumns);
+  return selectValues;
 }
 
 async function groupedAggregate(
@@ -449,36 +299,35 @@ async function groupedAggregate(
   // the plural `arel_columns` — so a `from(subquery, alias)` leaves the group
   // column unqualified (matching the subquery alias) instead of pinning it to
   // the original model table, and a raw Arel node passes straight through.
-  const groupNodes = arelColumns.call(rel as never, groupFields) as Nodes.Node[];
+  // calculations.rb:524: `relation = except(:group).distinct!(false)`, with the
+  // eager JoinDependency already folded into joins_values by
+  // `apply_join_dependency` (calculations.rb:232) — `eager_loading: false`,
+  // since this arm only ever runs grouped.
+  const relation = eagerJoinedRelation(rel, false)
+    .except("group")
+    .distinctBang(false) as CalculationRelation;
+  const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
   // One alias per field, standing in for Rails' `column_alias_tracker.alias_for`.
   // A lone field keeps the bare `group_key` the belongs_to arm below reads by
   // name; these aliases are fixed-length, so unlike Rails they never need
   // truncating for a long table name.
   const aliases =
     groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
-  const aggNode = buildAggNode(rel, fn, column, distinct ?? false);
+  const aggNode = operationOverAggregateColumn(
+    aggregateColumn(relation, column),
+    fn,
+    distinct ?? false,
+  ) as any;
   const groupKeyAliases = groupNodes.map(
     (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
   );
   const aggAlias = aggregateAliasFor(fn, column);
-  const manager = table.project(...groupKeyAliases, aggNode.as(aggAlias));
-  // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
-  // into `joins_values` via `apply_join_dependency` before dispatching to the
-  // grouped calculation, passing `eager_loading: group_values.empty?` — false
-  // here, since this arm only ever runs grouped.
-  eagerJoinedRelation(rel, false)._applyJoinsToManager(manager);
-  rel._applyWheresToManager(manager, table);
-  applyFromToManager(rel, manager);
-  for (const n of groupNodes) manager.group(n);
-  foldSelectValuesForHaving(rel, manager);
-  applyHavingToManager(rel, manager);
-  // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
-  // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
-  // arbitrary groups on PG/MySQL.
-  rel._applyOrderToManager(manager);
-
-  if (rel._limitValue !== null) manager.take(rel._limitValue);
-  if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
+  const selectValues = buildGroupedSelectValues(rel, aggNode.as(aggAlias), groupKeyAliases);
+  // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
+  // `from(subquery)` group column stays unqualified instead of being re-pinned
+  // to the model's table by `build_group`.
+  relation._groupColumns = groupNodes as unknown as string[];
+  relation._selectColumns = selectValues;
 
   // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
   // own type caster, then a type discovered through the join dependencies, then
@@ -491,14 +340,13 @@ async function groupedAggregate(
       defaultValue();
     if (type instanceof EnumType) type = type.subtypeType();
   }
-  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
-  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
+  const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(withCtes, aliases, aggAlias)
-      : withCtes;
+      ? wrapBigintAgg(rawSql, aliases, aggAlias)
+      : rawSql;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
+  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds);
   const rows = queryResult.toArray();
 
   // calculations.rb:591: every group's aggregate folds through the same
@@ -601,28 +449,21 @@ async function groupedCompositeAssoc(
   const fkCols = association.foreignKey as string[];
   const aliases = fkCols.map((_, i) => `group_key_${i}`);
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
-  const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
-  const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
-  const aggAlias = aggregateAliasFor(fn, column);
-  const manager = table.project(...projections, aggNode.as(aggAlias));
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
-  // grouped calculation, regardless of key arity — mirroring `singleAggregate`/
-  // `groupedAggregate`.
-  eagerJoinedRelation(rel, false)._applyJoinsToManager(manager);
-  rel._applyWheresToManager(manager, table);
-  applyFromToManager(rel, manager);
-  for (const n of groupNodes) manager.group(n);
-  foldSelectValuesForHaving(rel, manager);
-  applyHavingToManager(rel, manager);
-  // Rails `execute_grouped_calculation` does not special-case key arity — it
-  // runs `select_all` on the relation's own arel, so order_values ride along
-  // for composite FKs too. Without the ORDER BY, LIMIT/OFFSET pick arbitrary
-  // groups on PG/MySQL.
-  rel._applyOrderToManager(manager);
-
-  if (rel._limitValue !== null) manager.take(rel._limitValue);
-  if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
+  // grouped calculation, regardless of key arity — mirroring `groupedAggregate`.
+  const relation = eagerJoinedRelation(rel, false)
+    .except("group")
+    .distinctBang(false) as CalculationRelation;
+  const aggNode = operationOverAggregateColumn(
+    aggregateColumn(relation, column),
+    fn,
+    rel._isDistinct,
+  ) as any;
+  const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
+  const aggAlias = aggregateAliasFor(fn, column);
+  relation._groupColumns = groupNodes as unknown as string[];
+  relation._selectColumns = buildGroupedSelectValues(rel, aggNode.as(aggAlias), projections);
 
   // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
   // own type caster, then a type discovered through the join dependencies, then
@@ -635,14 +476,13 @@ async function groupedCompositeAssoc(
       defaultValue();
     if (type instanceof EnumType) type = type.subtypeType();
   }
-  const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
-  const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
+  const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(withCtes, aliases, aggAlias)
-      : withCtes;
+      ? wrapBigintAgg(rawSql, aliases, aggAlias)
+      : rawSql;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, ctedBinds);
+  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds);
   const rows = queryResult.toArray();
 
   // calculations.rb:591: every group's aggregate folds through the same
@@ -911,7 +751,7 @@ export function aggregateColumn(
   if (columnName === "*" || columnName === "all" || columnName === "1") {
     return new Nodes.SqlLiteral(columnName === "1" ? "1" : "*");
   }
-  // Mirrors buildAggNode / Rails' aggregate_column → arel_column: a known column
+  // Mirrors Rails' aggregate_column → arel_column: a known column
   // qualifies onto the model's own table, a "table.column" string resolves
   // through the join dependencies onto the joined table, and the primary key
   // falls back to the base table (our test models omit the implicit PK from
@@ -1043,10 +883,7 @@ export function operationOverAggregateColumn(
 
 /**
  * Mirrors: ActiveRecord::Calculations#build_count_subquery
- * (calculations.rb:663-685). Rails returns the outer `SelectManager`; trails
- * returns it alongside the inner query's binds, because the inner manager is
- * compiled to SQL here (a trails `SelectManager` cannot carry another
- * manager's binds through `Nodes.Grouping`).
+ * (calculations.rb:662-678).
  *
  * @internal
  */
@@ -1054,60 +891,26 @@ function buildCountSubquery(
   relation: CalculationRelation,
   columnName: string | Nodes.Node | number | null,
   distinct: boolean,
-): [SelectManager, unknown[]] {
-  const table = relationTable(relation);
-  const project = (...projections: unknown[]): SelectManager =>
-    projectOnRelationTable(relation, ...projections);
-
+): SelectManager {
   const isAll = columnName == null || columnName === "*" || columnName === "all";
   let columnAlias: Nodes.Node;
-  let innerManager: SelectManager;
   if (isAll) {
     columnAlias = new Nodes.SqlLiteral("*");
-    if (!distinct) {
-      innerManager = project(new Nodes.SqlLiteral("1 AS one"));
-    } else {
-      // DIVERGENCE (calculations.rb:665-666): Rails leaves `select_values`
-      // alone for `distinct` and lets the adapter dedupe the projected `*`.
-      // SQLite/PG reject `COUNT(DISTINCT *)`, so the inner query projects the
-      // primary key columns under DISTINCT instead.
-      const pk = (relation._model as any).primaryKey ?? "id";
-      innerManager = Array.isArray(pk)
-        ? project(...pk.map((c: string) => table.get(c)))
-        : project(table.get(pk));
-      innerManager.distinct();
-    }
+    if (!distinct) relation._selectColumns = [new Nodes.SqlLiteral("1 AS one")];
   } else {
     columnAlias = new Nodes.SqlLiteral("count_column");
-    const colNode = aggregateColumn(relation, columnName) as Nodes.Node & {
-      as(alias: string): unknown;
+    const column = aggregateColumn(relation, columnName) as Nodes.Node & {
+      as(alias: string): Nodes.Node;
     };
-    innerManager = project(colNode.as("count_column"));
-    if (distinct) innerManager.distinct();
+    relation._selectColumns = [column.as("count_column")];
   }
 
-  relation._applyJoinsToManager(innerManager);
-  relation._applyWheresToManager(innerManager, table);
-  applyFromToManager(relation, innerManager);
-  applyHavingToManager(relation, innerManager);
-  // calculations.rb:681-684: only the `:all` branch unscopes the order.
-  if (!isAll) relation._applyOrderToManager(innerManager);
-  if (relation._limitValue !== null) innerManager.take(relation._limitValue);
-  if (relation._offsetValue !== null) innerManager.skip(relation._offsetValue);
-  const [innerSql, innerBinds] = compileManagerWithBinds(relation, innerManager);
+  const subqueryAlias = "subquery_for_count";
+  const selectValue = operationOverAggregateColumn(columnAlias, "count", false);
 
-  const subqueryAlias = new Nodes.SqlLiteral("subquery_for_count", { retryable: true });
-  const selectValue = operationOverAggregateColumn(columnAlias, "count", false) as Nodes.Node & {
-    as(alias: string): unknown;
-  };
-  const outerManager = project(selectValue.as("count"));
-  outerManager.from(
-    new Nodes.TableAlias(new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)), subqueryAlias),
-  );
-  if (relation._optimizerHints.length > 0) {
-    outerManager.optimizerHints(...relation._optimizerHints);
-  }
-  return [outerManager, innerBinds];
+  return isAll
+    ? relation.unscope("order").buildSubquery(subqueryAlias, selectValue)
+    : relation.buildSubquery(subqueryAlias, selectValue);
 }
 
 /** @internal */
@@ -1129,23 +932,20 @@ export async function executeSimpleCalculation(
     // Shortcut when limit is zero (calculations.rb:471-472).
     if (rel._limitValue === 0) return 0;
 
-    const [queryBuilder, innerBinds] = buildCountSubquery(
-      rel,
+    const queryBuilder = buildCountSubquery(
+      rel.spawn(),
       columnName as string | Nodes.Node | null,
       distinct === true,
     );
-    const [outerSql, outerBinds] = compileManagerWithBinds(rel, queryBuilder);
-    [sql, binds] = prependCtes(rel, outerSql, [...innerBinds, ...outerBinds]);
+    [sql, binds] = compileManagerWithBinds(rel, queryBuilder);
   } else {
-    // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
-    // (calculations.rb:477-478). DIVERGENCE: the manager below is projected
-    // explicitly rather than read off `relation.arel`, so neither ORDER BY nor
-    // DISTINCT reaches the emitted SQL and the `unscope(:order).distinct!(false)`
-    // rebase has nothing left to strip.
-    const relation = rel;
     // Rails routes aggregates through apply_join_dependency when eager loading,
     // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
-    relation._checkEagerLoadable();
+    rel._checkEagerLoadable();
+    const joined = eagerJoinedRelation(rel, rel._groupColumns.length === 0);
+    // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
+    // (calculations.rb:477-478).
+    const relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
 
     column = aggregateColumn(relation, aggregateTarget(columnName));
     const selectValue = operationOverAggregateColumn(
@@ -1155,33 +955,19 @@ export async function executeSimpleCalculation(
     ) as Nodes.Node & { distinct: boolean; as(alias: string): Nodes.Node };
     if (operation === "sum" && distinct) selectValue.distinct = true;
 
-    // DIVERGENCE (calculations.rb:485-487): Rails assigns
-    // `relation.select_values` and compiles `relation.arel`; the manager here is
-    // projected directly, so everything `build_arel` would have applied — joins,
-    // wheres, from, having — is applied by hand below. The "val" alias is what
-    // the SQLite bigint CAST wrapper reads back.
-    const manager = projectOnRelationTable(relation, selectValue.as("val"));
-    // Rails routes sum/average/maximum/minimum through apply_join_dependency when
-    // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
-    eagerJoinedRelation(relation, relation._groupColumns.length === 0)._applyJoinsToManager(
-      manager,
-    );
-    relation._applyWheresToManager(manager, relationTable(relation));
-    applyFromToManager(relation, manager);
-    // `build_arel` applies the having clause with no GROUP BY guard — an
-    // ungrouped `having("sum(x) > n").sum(:x)` is unusual but valid (see
-    // query_methods.rb:1756).
-    applyHavingToManager(relation, manager);
-
-    const [rawSql, managerBinds] = compileManagerWithBinds(relation, manager);
-    const [withCtes, ctedBinds] = prependCtes(relation, rawSql, managerBinds);
     const target = aggregateTarget(columnName);
-    sql =
+    const castsBigint =
       isBigintColumn(relation, operation.toLowerCase() as AggFn, target) &&
-      needsBigintCast(relation)
-        ? wrapBigintAgg(withCtes)
-        : withCtes;
-    binds = ctedBinds;
+      needsBigintCast(relation);
+    // Rails' `relation.select_values = [select_value]` (calculations.rb:484) —
+    // `selectValues` is a reader in trails, so the assignment lands on its
+    // store. DIVERGENCE: the "val" alias is the anchor the SQLite bigint CAST
+    // wrapper reads back, so it is added only on that path.
+    relation._selectColumns = [castsBigint ? selectValue.as("val") : selectValue];
+
+    const [rawSql, managerBinds] = compileManagerWithBinds(relation, relation.arel());
+    sql = castsBigint ? wrapBigintAgg(rawSql) : rawSql;
+    binds = managerBinds;
   }
 
   // calculations.rb:487-497: a contradictory where clause (`where(col: [])`,

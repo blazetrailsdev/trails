@@ -1704,19 +1704,16 @@ export function buildSubquery(
   subqueryAlias: string,
   selectValue: unknown,
 ): SelectManager {
-  // Rails: except(:optimizer_hints).arel.as(alias) — call unscope directly. (Note:
-  // Relation#except is the value-key remover and is NOT unscope; here we want the
-  // unscope semantics, so we call unscope explicitly.)
+  // query_methods.rb:1606: `except(:optimizer_hints).arel.as(subquery_alias)`.
   const relation =
-    typeof (this as any).unscope === "function" ? (this as any).unscope("optimizerHints") : this;
+    typeof (this as any).except === "function" ? (this as any).except("optimizerHints") : this;
   if (typeof relation.toArel !== "function") {
     throw new ActiveRecordError("Cannot build subquery: relation does not support toArel()");
   }
   // No identifier gate — the alias is caller-trusted and wrapped verbatim in a
   // `SqlLiteral` by `SelectManager#as`, matching Rails' `build_from`.
-  const aliasedSubquery = relation.toArel().as(subqueryAlias);
-  const sm = new SelectManager();
-  sm.from(aliasedSubquery);
+  const subquery = relation.toArel().as(subqueryAlias);
+  const sm = new SelectManager(subquery);
   sm.project(selectValue as any);
   const hints: string[] = (this as any)._optimizerHints ?? [];
   if (hints.length > 0) sm.optimizerHints(...hints);
