@@ -73,6 +73,13 @@ type EventObjectCallback = (event: Event) => void;
  * (fanout.rb:437, 452); JS has no such uniform invocation, so `createSubscriber`
  * binds the object's `call` to its receiver and the groups keep calling a
  * function.
+ *
+ * Rails classifies a listener as EventObject on `procish.arity == 1 &&
+ * procish.parameters.length == 1` (fanout.rb:330). JS exposes only
+ * `Function.length`, which counts the parameters before the first defaulted or
+ * rest one and has no `parameters` analogue — so `(event, ...rest)`, which Ruby
+ * keeps timed, reads as single-arity here. There is no runtime reflection that
+ * closes that gap short of parsing `Function.prototype.toString`.
  */
 export type CallableListener = { call(...args: never[]): void };
 

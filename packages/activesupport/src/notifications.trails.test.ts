@@ -254,6 +254,22 @@ describe("Notifications (trails)", () => {
       expect(events[0].payload).toBe(payload);
     });
 
+    it("a multi-argument callable object is subscribed as a timed listener", () => {
+      const calls: unknown[][] = [];
+      const listener = {
+        call(name: string, start: unknown, finish: unknown, id: unknown, payload: unknown) {
+          calls.push([name, start, finish, id, payload]);
+        },
+      };
+      Notifications.subscribe("callable.timed", listener);
+
+      Notifications.instrument("callable.timed", { a: 1 });
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toBe("callable.timed");
+      expect((calls[0][4] as Record<string, unknown>).a).toBe(1);
+    });
+
     it("publishEvent routes a prebuilt event to matching subscribers", () => {
       const received: Event[] = [];
       Notifications.subscribe("prebuilt", (e) => received.push(e));

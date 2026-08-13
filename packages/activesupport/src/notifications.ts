@@ -80,17 +80,21 @@ export class Notifications {
    * - RegExp: regex match against name
    * - null/omitted: all events
    *
-   * The callback is wrapped so it presents to the `Fanout` as an event-object
-   * (single-arity) subscriber, which always receives the built `Event` — trails'
-   * public API always yields the Event, regardless of the callback's arity.
+   * A function callback is wrapped so it presents to the `Fanout` as an
+   * event-object (single-arity) subscriber, which always receives the built
+   * `Event` — trails' public API always yields the Event, regardless of the
+   * callback's arity. A callable object is forwarded to the notifier untouched,
+   * as `notifications.rb:244-245` forwards `callback`, so `Subscribers.new`
+   * classifies it by its own `call` (fanout.rb:328-331).
    */
   static subscribe(
     pattern: string | RegExp | null | undefined,
-    callback: ((event: Event) => void) | { call(event: Event): void },
+    callback: ((event: Event) => void) | CallableListener,
   ): NotificationSubscriber {
-    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) =>
-      typeof callback === "function" ? callback(event) : callback.call(event),
-    );
+    const sub =
+      typeof callback === "function"
+        ? this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event))
+        : this._notifier.subscribe(pattern ?? null, callback);
     return sub as unknown as NotificationSubscriber;
   }
 
