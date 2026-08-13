@@ -20,8 +20,11 @@ function eq<T extends number | Date>(b: T | null, e: T | null): boolean {
   return toNum(b) === toNum(e);
 }
 
-/** Ruby's private `Range#_empty_range?` (overlap.rb:31). */
-function _isEmptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
+/**
+ * Ruby's private `Range#_empty_range?` (overlap.rb:31). The spelling is what
+ * the `parity:api` name convention produces from `_empty_range?`.
+ */
+function is_emptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
   if (b === null || e === null) return false;
 
   const comp = toNum(b) - toNum(e);
@@ -41,17 +44,17 @@ export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>
   const otherEnd = other.end;
   const otherExcl = other.excludeEnd;
 
-  if (_isEmptyRange(selfBegin, otherEnd, otherExcl)) return false;
+  if (is_emptyRange(selfBegin, otherEnd, otherExcl)) return false;
 
   const otherBegin = other.begin;
   const selfEnd = this.end;
   const selfExcl = this.excludeEnd;
 
-  if (_isEmptyRange(otherBegin, selfEnd, selfExcl)) return false;
+  if (is_emptyRange(otherBegin, selfEnd, selfExcl)) return false;
   if (eq(selfBegin, otherBegin)) return true;
 
-  if (_isEmptyRange(selfBegin, selfEnd, selfExcl)) return false;
-  if (_isEmptyRange(otherBegin, otherEnd, otherExcl)) return false;
+  if (is_emptyRange(selfBegin, selfEnd, selfExcl)) return false;
+  if (is_emptyRange(otherBegin, otherEnd, otherExcl)) return false;
 
   return true;
 }

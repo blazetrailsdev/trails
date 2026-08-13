@@ -145,17 +145,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
-      // Construction-time validation routes preparedStatements through
-      // the setter, so a non-boolean (string, number, etc.) hits the
-      // same TypeError guard as direct assignment. Without this test
-      // the runtime guard could regress silently.
-      expect(
-        () =>
-          new PostgreSQLAdapter({
-            connectionString: PG_TEST_URL,
-            preparedStatements: "false" as unknown as boolean,
-          }),
-      ).toThrow(TypeError);
+      // A config value that survives `type_cast_config_to_boolean` without
+      // becoming a boolean still hits the setter's TypeError guard, as direct
+      // assignment does. `"false"` is NOT one of those: abstract_adapter.rb:159
+      // pipes the config through `type_cast_config_to_boolean`, which maps the
+      // string `"false"` to `false` (abstract_adapter.rb:65-71), so a
+      // database.yml value survives.
+      const cast = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        preparedStatements: "false" as unknown as boolean,
+      });
+      try {
+        expect(cast.preparedStatements).toBe(false);
+      } finally {
+        await cast.close();
+      }
       expect(
         () =>
           new PostgreSQLAdapter({

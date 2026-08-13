@@ -124,18 +124,6 @@ export function stripHeredoc(str: string): string {
   return lines.map((l) => l.slice(minIndent)).join("\n");
 }
 
-/** Lowercase the first character of a string. */
-export function downcaseFirst(str: string): string {
-  if (str.length === 0) return str;
-  return str[0].toLowerCase() + str.slice(1);
-}
-
-/** Uppercase the first character of a string. */
-export function upcaseFirst(str: string): string {
-  if (str.length === 0) return str;
-  return str[0].toUpperCase() + str.slice(1);
-}
-
 /**
  * Returns the character at the given position (supports negative indexing).
  * Returns undefined if out of range.

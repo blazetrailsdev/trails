@@ -561,9 +561,6 @@ export class PostgreSQLAdapter
     deprecatedConfig?: Record<string, unknown> | null,
   ) {
     super();
-    // Rails: `PostgreSQLAdapter` inherits the abstract adapter's
-    // `default_prepared_statements = true`.
-    this.preparedStatements = true;
     // Deprecated raw-connection overload (abstract_adapter.rb:141): a
     // pre-opened pg.Client passed positionally is stashed in
     // `_unconfiguredConnection`, mirroring Rails' `initialize`, which likewise
@@ -596,6 +593,19 @@ export class PostgreSQLAdapter
     if (typeof config === "object" && config !== null) {
       this._config = { ...(config as Record<string, unknown>) };
     }
+    // abstract_adapter.rb:159 — `@prepared_statements = !ActiveRecord
+    // .disable_prepared_statements && type_cast_config_to_boolean(
+    // @config.fetch(:prepared_statements) { default_prepared_statements })`.
+    // Rails reads it once, in the common tail of `initialize`; trails' config
+    // parsing forks below into a connection-string branch that returns early,
+    // so the read sits above the fork to cover both.
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (PostgreSQLAdapter.typeCastConfigToBoolean(
+        "preparedStatements" in this._config
+          ? this._config.preparedStatements
+          : this.defaultPreparedStatements(),
+      ) as boolean);
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
@@ -658,7 +668,6 @@ export class PostgreSQLAdapter
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled =
         PostgreSQLAdapter.typeCastConfigToBoolean(advisoryLocks) !== false;

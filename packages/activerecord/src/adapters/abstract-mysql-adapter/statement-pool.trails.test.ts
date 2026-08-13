@@ -138,14 +138,19 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
       // Mirror coverage to PG's statement-pool tests — without an
       // explicit guard test the runtime TypeError could regress
-      // silently when adapter options are wired.
-      expect(
-        () =>
-          new Mysql2Adapter({
-            uri: MYSQL_TEST_URL,
-            preparedStatements: "false" as unknown as boolean,
-          }),
-      ).toThrow(TypeError);
+      // silently when adapter options are wired. `"false"` is NOT rejected:
+      // abstract_adapter.rb:159 pipes the config through
+      // `type_cast_config_to_boolean`, which maps the string `"false"` to
+      // `false` (abstract_adapter.rb:65-71), so a database.yml value survives.
+      const cast = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        preparedStatements: "false" as unknown as boolean,
+      });
+      try {
+        expect(cast.preparedStatements).toBe(false);
+      } finally {
+        await cast.close();
+      }
       expect(
         () =>
           new Mysql2Adapter({

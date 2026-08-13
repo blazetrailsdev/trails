@@ -178,6 +178,10 @@ export {
   parameterize,
   ordinal,
   ordinalize,
+  upcaseFirst,
+  downcaseFirst,
+  camelcase,
+  titlecase,
 } from "./inflector.js";
 
 export { Inflections, loadDefaults } from "./inflector/inflections.js";
@@ -203,8 +207,6 @@ export {
   remove,
   ord,
   stripHeredoc,
-  downcaseFirst,
-  upcaseFirst,
   at,
   first,
   last,
@@ -233,7 +235,22 @@ export {
   assertValidKeys,
   withIndifferentAccess,
   deepTransformValues,
-  extractKeys,
+  stringifyKeysBang,
+  symbolizeKeysBang,
+  toOptions,
+  toOptionsBang,
+  deepTransformKeysBang,
+  deepStringifyKeysBang,
+  deepSymbolizeKeysBang,
+  _deepTransformKeysInObject,
+  _deepTransformKeysInObjectBang,
+  withDefaults,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaultsBang,
+  sliceBang,
+  exceptBang,
+  nestedUnderIndifferentAccess,
   toParam,
   toQuery,
   isPlainObject,
@@ -261,6 +278,7 @@ export {
 export {
   sum,
   indexBy,
+  indexWith,
   groupBy,
   pluck,
   maximum,
@@ -285,6 +303,13 @@ export {
   isIn,
   presenceIn,
 } from "./enumerable-utils.js";
+
+// Note: hash-utils' `extractBang` is intentionally kept off this flat index and
+// reached from "./hash-utils.js" directly. `Hash#extract!`
+// (core_ext/hash/slice.rb:24-26) and `Array#extract!` (core_ext/array/extract.rb)
+// are distinct Ruby methods on distinct receivers, so they never collide there;
+// in a flat ESM namespace they do, and array-utils' `extractBang` owns the
+// spelling here. Same shape as the core-ext/range and core-ext/date notes above.
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
@@ -580,6 +605,14 @@ export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // Rails users reach them through `require "active_support/core_ext/range/..."`.
 // Re-exporting them here would collide with `time-ext.ts`'s `Date#to_fs` and the
 // enumerable `each`/`step`. Mirrors the pattern used by glob, digest, etc.
+//
+// Same for core-ext/date's calculations
+// (`@blazetrails/activesupport/core-ext/date/calculations`), the `Date` arm of
+// `active_support/core_ext/date/calculations.rb`: in Ruby its `ago`/`since`/
+// `beginning_of_day`/`middle_of_day`/`end_of_day`/`advance`/`change`/`current`
+// are methods on `Date`, so they never collide with the `Time` arm's
+// same-named methods; in a flat ESM namespace they would, and `time-ext.js`
+// below owns those spellings.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

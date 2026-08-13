@@ -12,6 +12,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
+import { ActiveRecord } from "../ar-config.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
@@ -414,10 +415,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._readonly = options.readonly ?? false;
     this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
-    // Rails: `SQLite3Adapter#default_prepared_statements` inherits the
-    // abstract adapter's `true`. Mirror that default and let options
-    // override per connection.
-    this.preparedStatements = options.preparedStatements ?? true;
+    // abstract_adapter.rb:159 — `@prepared_statements = !ActiveRecord
+    // .disable_prepared_statements && type_cast_config_to_boolean(
+    // @config.fetch(:prepared_statements) { default_prepared_statements })`.
+    // `SQLite3Adapter` inherits the abstract `default_prepared_statements`.
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (SQLite3Adapter.typeCastConfigToBoolean(
+        options.preparedStatements !== undefined
+          ? options.preparedStatements
+          : this.defaultPreparedStatements(),
+      ) as boolean);
     // Apply adapter-level options FIRST so invalid values fail before
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) {

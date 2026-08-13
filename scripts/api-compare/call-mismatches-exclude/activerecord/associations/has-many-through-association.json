@@ -30,6 +30,13 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-many-through-association.ts",
+    "rubyName": "distribution",
+    "call": "new",
+    "reason": "Ruby's `Hash.new(0)` is an auto-zeroing hash keyed by the record, hashing on AR::Core `hash`/`eql?`. A JS Map keys on identity, so the buckets are an array matched with `record.equals` instead — there is no constructor to call."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-many-through-association.ts",
     "rubyName": "find_target",
     "call": "scope",
     "reason": "Baseline (RFC 0084): `find_target` delegates to the module-private loader in the same file, which builds and runs the association scope; the body compared here is the delegating wrapper, so `scope` is called one frame down. Surfaced when the loader stopped being exported (RFC 0072)."

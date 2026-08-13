@@ -133,12 +133,42 @@ export function humanize(
   return result;
 }
 
+/**
+ * Converts the first character in the string to uppercase.
+ *
+ * Mirrors: ActiveSupport::Inflector.upcase_first (inflector/methods.rb:166-168),
+ * reached from `String#upcase_first` (core_ext/string/inflections.rb:273-275).
+ */
+export function upcaseFirst(string: string): string {
+  return string.length > 0 ? string[0].toUpperCase().concat(string.slice(1)) : "";
+}
+
+/**
+ * Converts the first character in the string to lowercase.
+ *
+ * Mirrors: ActiveSupport::Inflector.downcase_first (inflector/methods.rb:175-177),
+ * reached from `String#downcase_first` (core_ext/string/inflections.rb:284-286).
+ */
+export function downcaseFirst(string: string): string {
+  return string.length > 0 ? string[0].toLowerCase().concat(string.slice(1)) : "";
+}
+
 export function titleize(word: string, options: { keepIdSuffix?: boolean } = {}): string {
   return humanize(underscore(word), { keepIdSuffix: options.keepIdSuffix }).replace(
     /\b(?<![''`])[a-z]/g,
     (match) => match.toUpperCase(),
   );
 }
+
+/**
+ * `alias_method :camelcase, :camelize` (core_ext/string/inflections.rb:111).
+ */
+export const camelcase = camelize;
+
+/**
+ * `alias_method :titlecase, :titleize` (core_ext/string/inflections.rb:129).
+ */
+export const titlecase = titleize;
 
 export function tableize(className: string): string {
   return pluralize(underscore(className));

@@ -1200,11 +1200,12 @@ export class AbstractAdapter implements Quoting {
         `preparedStatements must be a boolean; got ${typeof value}: ${String(value)}`,
       );
     }
-    // Mirrors Rails' `@prepared_statements = !ActiveRecord.disable_prepared_statements && ...`
-    // (abstract_adapter.rb:159). Every concrete adapter assigns
-    // `this.preparedStatements` from its config in the constructor, so honoring
-    // the global toggle here covers (re-)establishConnection uniformly.
-    this._preparedStatements = value && !ActiveRecord.disablePreparedStatements;
+    // Rails has no writer here — `@prepared_statements` is assigned once, in
+    // `initialize` (abstract_adapter.rb:159), where the global
+    // `ActiveRecord.disable_prepared_statements` is folded in. This setter is
+    // therefore a plain assignment: each constructor applies the global flag at
+    // its own config-reading site, exactly as Rails' single `initialize` does.
+    this._preparedStatements = value;
   }
 
   async active(): Promise<boolean> {
@@ -1415,9 +1416,9 @@ export class AbstractAdapter implements Quoting {
       "preparedStatements" in this._config
         ? this._config.preparedStatements
         : this.defaultPreparedStatements();
-    this.preparedStatements = (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
-      configured,
-    ) as boolean;
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      ((this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(configured) as boolean);
   }
 
   disconnectBang(): void {

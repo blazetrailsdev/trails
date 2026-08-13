@@ -30,6 +30,28 @@ export function indexBy<T, K extends string | number>(
 }
 
 /**
+ * Convert an enumerable to a hash keyed by its elements, with the value
+ * produced by the block (or the given `default` when there is no block).
+ *
+ * Mirrors: Enumerable#index_with (core_ext/enumerable.rb:75-87). Ruby's
+ * no-block/no-default arm returns an Enumerator; there is no trails analogue,
+ * so `indexWith` requires one of the two. The result is a `Map` for the same
+ * reason `groupBy` below returns one: Ruby keys the Hash by the ELEMENT, which
+ * is an arbitrary object (a callable, in `assert_difference`'s case) that a JS
+ * object would collapse by string coercion.
+ */
+export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) => V)): Map<T, V> {
+  const result = new Map<T, V>();
+  if (typeof defaultOrBlock === "function") {
+    const block = defaultOrBlock as (elem: T) => V;
+    for (const elem of collection) result.set(elem, block(elem));
+  } else {
+    for (const elem of collection) result.set(elem, defaultOrBlock);
+  }
+  return result;
+}
+
+/**
  * Group a collection by a key function. The result is a `Map` because Ruby's
  * `group_by` returns a Hash keyed by VALUE — the keys are arbitrary objects
  * (Integer, String, nil), which a JS object would collapse by string coercion.

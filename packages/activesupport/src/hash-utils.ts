@@ -197,6 +197,14 @@ export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unkno
 }
 
 /**
+ * Destructively converts all keys to strings — Ruby's `Hash#stringify_keys!`
+ * (core_ext/hash/keys.rb:15-17). Mutates the receiver and returns it.
+ */
+export function stringifyKeysBang<T extends AnyObject>(hash: T): T {
+  return transformKeysBang(hash, (k) => String(k));
+}
+
+/**
  * Recursively convert all keys to strings (Rails' deep_stringify_keys).
  */
 export function deepStringifyKeys(obj: unknown): unknown {
@@ -212,6 +220,26 @@ export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unkno
 }
 
 /**
+ * Destructively converts all keys to symbols — Ruby's `Hash#symbolize_keys!`
+ * (core_ext/hash/keys.rb:33-35). A Ruby Symbol is a JS string, so this is
+ * `stringify_keys!`'s transform, exactly as `symbolize_keys` is
+ * `stringify_keys`'s here.
+ */
+export function symbolizeKeysBang<T extends AnyObject>(hash: T): T {
+  return stringifyKeysBang(hash);
+}
+
+/**
+ * `alias_method :to_options, :symbolize_keys` (core_ext/hash/keys.rb:30).
+ */
+export const toOptions = symbolizeKeys;
+
+/**
+ * `alias_method :to_options!, :symbolize_keys!` (core_ext/hash/keys.rb:36).
+ */
+export const toOptionsBang = symbolizeKeysBang;
+
+/**
  * Recursively convert all keys to symbols (strings in TS).
  */
 export function deepSymbolizeKeys(obj: unknown): unknown {
@@ -219,16 +247,149 @@ export function deepSymbolizeKeys(obj: unknown): unknown {
 }
 
 /**
- * Merge defaults into obj without overwriting existing keys (Rails' reverse_merge).
+ * Destructively converts all keys by the block operation, through the root
+ * hash and every nested hash and array — Ruby's `Hash#deep_transform_keys!`
+ * (core_ext/hash/keys.rb:74-76).
  */
-export function reverseMerge<T extends AnyObject>(obj: T, defaults: AnyObject): T {
-  const result = { ...obj } as AnyObject;
-  for (const key of Object.keys(defaults)) {
-    if (!(key in result)) {
-      result[key] = defaults[key];
+export function deepTransformKeysBang(hash: AnyObject, block: (key: string) => string): AnyObject {
+  return _deepTransformKeysInObjectBang(hash, block) as AnyObject;
+}
+
+/**
+ * Ruby's `Hash#deep_stringify_keys!` (core_ext/hash/keys.rb:90-92).
+ */
+export function deepStringifyKeysBang(hash: AnyObject): AnyObject {
+  return deepTransformKeysBang(hash, (k) => String(k));
+}
+
+/**
+ * Ruby's `Hash#deep_symbolize_keys!` (core_ext/hash/keys.rb:110-112).
+ */
+export function deepSymbolizeKeysBang(hash: AnyObject): AnyObject {
+  return deepTransformKeysBang(hash, (key) => String(key));
+}
+
+/**
+ * Support method for deep transforming nested hashes and arrays — Ruby's
+ * private `Hash#_deep_transform_keys_in_object` (core_ext/hash/keys.rb:116-125).
+ * @internal
+ */
+export function _deepTransformKeysInObject(
+  object: unknown,
+  block: (key: string) => string,
+): unknown {
+  if (isPlainObject(object)) {
+    const result: AnyObject = {};
+    for (const key of Object.keys(object)) {
+      result[block(key)] = _deepTransformKeysInObject(object[key], block);
     }
+    return result;
+  } else if (Array.isArray(object)) {
+    return object.map((e) => _deepTransformKeysInObject(e, block));
+  } else {
+    return object;
   }
-  return result as T;
+}
+
+/**
+ * Ruby's private `Hash#_deep_transform_keys_in_object!`
+ * (core_ext/hash/keys.rb:127-138). Ruby's `Array#map!` mutates in place; so
+ * does this, so array identity survives the transform as it does in Ruby.
+ * @internal
+ */
+export function _deepTransformKeysInObjectBang(
+  object: unknown,
+  block: (key: string) => string,
+): unknown {
+  if (isPlainObject(object)) {
+    for (const key of Object.keys(object)) {
+      const value = object[key];
+      delete object[key];
+      object[block(key)] = _deepTransformKeysInObjectBang(value, block);
+    }
+    return object;
+  } else if (Array.isArray(object)) {
+    for (let i = 0; i < object.length; i++) {
+      object[i] = _deepTransformKeysInObjectBang(object[i], block);
+    }
+    return object;
+  } else {
+    return object;
+  }
+}
+
+/**
+ * Ruby's `Hash#transform_keys!`, the in-place primitive the `keys.rb` bang
+ * forms are written on top of.
+ * @internal
+ */
+function transformKeysBang<T extends AnyObject>(hash: T, block: (key: string) => string): T {
+  for (const key of Object.keys(hash)) {
+    const value = hash[key];
+    delete hash[key];
+    (hash as AnyObject)[block(key)] = value;
+  }
+  return hash;
+}
+
+/**
+ * Merges the caller into `otherHash` — Ruby's `Hash#reverse_merge`
+ * (core_ext/hash/reverse_merge.rb:14-16), which is literally
+ * `other_hash.merge(self)`, so the result carries `other_hash`'s key ORDER
+ * with the receiver's values winning (hash_ext_test.rb:317 asserts it).
+ */
+export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject): T {
+  return { ...otherHash, ...obj } as T;
+}
+
+/**
+ * `alias_method :with_defaults, :reverse_merge`
+ * (core_ext/hash/reverse_merge.rb:16).
+ */
+export const withDefaults = reverseMerge;
+
+/**
+ * Destructive `reverse_merge` — Ruby's `Hash#reverse_merge!`
+ * (core_ext/hash/reverse_merge.rb:19-21), which `replace`s the receiver.
+ */
+export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
+  const merged = reverseMerge(hash, otherHash);
+  for (const key of Object.keys(hash)) delete hash[key];
+  Object.assign(hash, merged);
+  return hash;
+}
+
+/**
+ * `alias_method :reverse_update, :reverse_merge!`
+ * (core_ext/hash/reverse_merge.rb:22).
+ */
+export const reverseUpdate = reverseMergeBang;
+
+/**
+ * `alias_method :with_defaults!, :reverse_merge!`
+ * (core_ext/hash/reverse_merge.rb:23).
+ */
+export const withDefaultsBang = reverseMergeBang;
+
+/**
+ * Replaces the hash with only the given keys, returning the removed
+ * key/value pairs — Ruby's `Hash#slice!` (core_ext/hash/slice.rb:10-17).
+ */
+export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T> {
+  const omit = slice(hash, ...(Object.keys(hash).filter((k) => !keys.includes(k)) as (keyof T)[]));
+  const result = slice(hash, ...(keys as (keyof T)[]));
+  for (const key of Object.keys(hash)) delete hash[key];
+  Object.assign(hash, result);
+  return omit as Partial<T>;
+}
+
+/**
+ * Removes the given keys from the hash and returns it — Ruby's `Hash#except!`
+ * (core_ext/hash/except.rb:8-11).
+ */
+export function exceptBang<T extends AnyObject>(hash: T, ...keys: string[]): T {
+  keys.forEach((key) => delete hash[key]);
+  return hash;
 }
 
 /**
@@ -240,6 +401,12 @@ export function reverseMerge<T extends AnyObject>(obj: T, defaults: AnyObject): 
 export function withIndifferentAccess(obj: AnyObject): HashWithIndifferentAccess<unknown> {
   return new HashWithIndifferentAccess(obj);
 }
+
+/**
+ * `alias nested_under_indifferent_access with_indifferent_access`
+ * (core_ext/hash/indifferent_access.rb:23).
+ */
+export const nestedUnderIndifferentAccess = withIndifferentAccess;
 
 /**
  * Assert that all keys in obj are within the allowed set of validKeys.
@@ -281,10 +448,10 @@ export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknow
 }
 
 /**
- * Extract the specified keys from obj, removing them in-place and returning
- * them as a new object (Rails' extract!).
+ * Removes and returns the key/value pairs matching the given keys, mutating
+ * the receiver — Ruby's `Hash#extract!` (core_ext/hash/slice.rb:24-26).
  */
-export function extractKeys<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
+export function extractBang<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
   const result: Partial<T> = {};
   for (const key of keys) {
     if (key in obj) {

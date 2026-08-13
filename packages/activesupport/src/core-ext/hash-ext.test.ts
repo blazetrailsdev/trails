@@ -12,7 +12,7 @@ import {
   assertValidKeys,
   slice,
   except,
-  extractKeys,
+  extractBang,
 } from "../hash-utils.js";
 
 describe("HashExtTest", () => {
@@ -257,14 +257,14 @@ describe("HashExtTest", () => {
 
   it("extract", () => {
     const h = { a: 1, b: 2, c: 3 };
-    const extracted = extractKeys(h, "a", "b");
+    const extracted = extractBang(h, "a", "b");
     expect(extracted).toEqual({ a: 1, b: 2 });
     expect(h).toEqual({ c: 3 });
   });
 
   it("extract nils", () => {
     const h = { a: null, b: 2 } as Record<string, unknown>;
-    const extracted = extractKeys(h, "a");
+    const extracted = extractBang(h, "a");
     expect(extracted).toEqual({ a: null });
   });
 

@@ -432,6 +432,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (typeof config === "object" && config !== null) {
       this._config = { ...(config as Record<string, unknown>) };
     }
+    // abstract_adapter.rb:159 — the global toggle is folded into the config
+    // read, which Rails does in the common tail of `initialize`. trails' config
+    // parsing forks below into a connection-string branch that returns early,
+    // so the read sits above the fork to cover both.
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (Mysql2Adapter.typeCastConfigToBoolean(
+        "preparedStatements" in this._config
+          ? this._config.preparedStatements
+          : this.defaultPreparedStatements(),
+      ) as boolean);
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
       let uri = config;
@@ -471,7 +482,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;
     }

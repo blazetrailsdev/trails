@@ -32,10 +32,13 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
   });
 
   it("rejects non-boolean preparedStatements at construction time and via assignment", () => {
+    // `"false"` is NOT rejected: abstract_adapter.rb:159 pipes the config
+    // through `type_cast_config_to_boolean`, which maps the string `"false"`
+    // to `false` (abstract_adapter.rb:65-71) so a database.yml value survives.
     expect(
-      () =>
-        new BetterSQLite3Adapter(":memory:", { preparedStatements: "false" as unknown as boolean }),
-    ).toThrow(TypeError);
+      new BetterSQLite3Adapter(":memory:", { preparedStatements: "false" as unknown as boolean })
+        .preparedStatements,
+    ).toBe(false);
     expect(
       () => new BetterSQLite3Adapter(":memory:", { preparedStatements: 0 as unknown as boolean }),
     ).toThrow(TypeError);
