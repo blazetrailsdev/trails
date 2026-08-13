@@ -176,12 +176,14 @@ const LOCK_RETRY_MS = 5;
 const LOCK_STALE_MS = 10_000;
 
 // Millisecond sleep with no event loop: `Atomics.wait` blocks the calling
-// thread, which is what a synchronous lock needs. It is disallowed on some main
-// threads, so a spin is the fallback.
-const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+// thread, which is what a synchronous lock needs. Both the buffer and the wait
+// are guarded — SharedArrayBuffer is absent on cross-origin-unisolated pages and
+// `Atomics.wait` is disallowed on some main threads — so a spin is the fallback.
+let sleepBuffer: Int32Array | null = null;
 
 function sleepSync(ms: number): void {
   try {
+    sleepBuffer ??= new Int32Array(new SharedArrayBuffer(4));
     if (Atomics.wait(sleepBuffer, 0, 0, ms) !== "timed-out") return;
   } catch {
     const until = Date.now() + ms;

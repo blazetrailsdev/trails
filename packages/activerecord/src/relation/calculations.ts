@@ -94,7 +94,7 @@ interface CalculationRelation {
   /** Mirrors `Relation#unscope` (query_methods.rb). */
   unscope(...args: unknown[]): CalculationRelation;
   /** Mirrors `Relation#arel` (query_methods.rb:1594). */
-  arel(): any;
+  arel(): SelectManager;
   _groupColumns: string[];
   /** Mirrors `Relation#group_values`. */
   groupValues: string[];
@@ -375,8 +375,6 @@ async function groupedAggregate(
   // truncating for a long table name.
   const aliases =
     groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
-  // calculations.rb:537-538: the aggregate is `aggregate_column` fed through
-  // `operation_over_aggregate_column`, exactly as the ungrouped arm builds it.
   const aggNode = operationOverAggregateColumn(
     aggregateColumn(rel, column),
     fn,
@@ -1069,8 +1067,6 @@ export async function executeSimpleCalculation(
     // Rails routes aggregates through apply_join_dependency when eager loading,
     // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
     rel._checkEagerLoadable();
-    // Rails routes sum/average/maximum/minimum through apply_join_dependency when
-    // has_include? — includes().references() promotes to a LEFT OUTER JOIN here.
     const joined = eagerJoinedRelation(rel, rel._groupColumns.length === 0);
     // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
     // (calculations.rb:477-478).
@@ -1088,16 +1084,12 @@ export async function executeSimpleCalculation(
     const castsBigint =
       isBigintColumn(relation, operation.toLowerCase() as AggFn, target) &&
       needsBigintCast(relation);
-    // DIVERGENCE (calculations.rb:484): Rails projects the bare aggregate; the
-    // "val" alias is the anchor the SQLite bigint CAST wrapper below reads back,
-    // so it is added only on that path.
-    // Rails' `relation.select_values = [select_value]` (calculations.rb:484);
-    // `selectValues` is a reader in trails, so the assignment lands on its store.
+    // Rails' `relation.select_values = [select_value]` (calculations.rb:484) —
+    // `selectValues` is a reader in trails, so the assignment lands on its
+    // store. DIVERGENCE: the "val" alias is the anchor the SQLite bigint CAST
+    // wrapper reads back, so it is added only on that path.
     relation._selectColumns = [castsBigint ? selectValue.as("val") : selectValue];
 
-    // `relation.arel` already carries the relation's CTEs and annotations
-    // (build_arel), so unlike the count-subquery arm this one needs no
-    // after-the-fact `WITH` prefix.
     const [rawSql, managerBinds] = compileManagerWithBinds(relation, relation.arel());
     sql = castsBigint ? wrapBigintAgg(rawSql) : rawSql;
     binds = managerBinds;
