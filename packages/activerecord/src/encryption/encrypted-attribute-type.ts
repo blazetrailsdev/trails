@@ -93,7 +93,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get deterministic(): boolean {
-    return this.scheme.deterministic ?? false;
+    return this.scheme.isDeterministic();
   }
 
   // Mirrors Rails' `delegate :key_provider, :downcase?, :previous_schemes,
@@ -103,7 +103,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get isDowncase(): boolean {
-    return this.scheme.downcase;
+    return this.scheme.downcase ?? false;
   }
 
   get previousSchemes(): Scheme[] {
@@ -119,7 +119,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get ignoreCase(): boolean {
-    return this.scheme.ignoreCase;
+    return this.scheme.ignoreCase ?? false;
   }
 
   override type(): string | undefined {
@@ -301,16 +301,8 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private cleanTextScheme(): Scheme {
-    // Rails' clean_text_scheme passes `downcase: downcase?`, and Rails'
-    // `Scheme` sets `@downcase = downcase || ignore_case` internally so
-    // `downcase?` is true for either flag. Our Scheme keeps the flags
-    // separate, so fold `ignoreCase` into `downcase` here to mirror
-    // Rails' effective behavior. Without this, a scheme configured
-    // `ignoreCase: true, downcase: false` would produce a non-lower-
-    // casing clean-text fallback and miss normalized plaintext rows.
     return new Scheme({
-      deterministic: this.scheme.deterministic,
-      downcase: this.scheme.downcase || this.scheme.ignoreCase,
+      downcase: this.isDowncase,
       encryptor: new NullEncryptor(),
     });
   }

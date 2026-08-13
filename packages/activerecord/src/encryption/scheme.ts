@@ -24,8 +24,7 @@ import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 export interface SchemeOptions {
   keyProvider?: unknown;
   key?: string;
-  deterministic?: boolean;
-  fixed?: boolean;
+  deterministic?: boolean | { fixed?: boolean };
   supportUnencryptedData?: boolean;
   downcase?: boolean;
   ignoreCase?: boolean;
@@ -55,27 +54,29 @@ export class Scheme {
   private _keyProviderParam?: unknown;
   private _cachedKeyProviderFromKey?: DerivedSecretKeyProvider;
   private _cachedDeterministicKeyProvider?: DeterministicKeyProvider;
+  private _fixed?: boolean;
   key?: string;
-  deterministic: boolean;
-  downcase: boolean;
-  ignoreCase: boolean;
+  deterministic?: boolean | { fixed?: boolean };
+  private _supportUnencryptedData?: boolean;
+  downcase?: boolean;
+  ignoreCase?: boolean;
+  private _previousSchemesParam?: Scheme[];
   previousSchemes: Scheme[];
   private compress: boolean;
   private compressor?: Compressor;
   /** Rails' `@context_properties` — the leftover `**` kwargs (scheme.rb:13). */
   private _contextProperties: Partial<Context>;
-  // Original options as-passed — used by toH() / merge() to distinguish
-  // "not set" (undefined) from "explicitly set to false", mirroring Rails'
-  // @context_properties + nil-defaulted ivars + to_h.compact pattern.
-  private _opts: SchemeOptions;
 
   constructor(options: SchemeOptions = {}) {
-    this._opts = { ...options };
+    // Initializing all attributes to +undefined+ as we want to allow a "not set" semantics so that we
+    // can merge schemes without overriding values with defaults. See +#merge+
     this._keyProviderParam = options.keyProvider;
     this.key = options.key;
-    this.deterministic = options.deterministic ?? false;
-    this.downcase = options.downcase ?? false;
-    this.ignoreCase = options.ignoreCase ?? false;
+    this.deterministic = options.deterministic;
+    this._supportUnencryptedData = options.supportUnencryptedData;
+    this.downcase = options.downcase || options.ignoreCase;
+    this.ignoreCase = options.ignoreCase;
+    this._previousSchemesParam = options.previousSchemes;
     this.previousSchemes = options.previousSchemes ?? [];
 
     this._contextProperties = {};
@@ -96,10 +97,11 @@ export class Scheme {
       this._contextProperties.encryptor = new Encryptor({ compressor: options.compressor });
   }
 
+  isDeterministic(): boolean {
+    return this.deterministic != null && this.deterministic !== false;
+  }
+
   get keyProvider(): unknown {
-    // When an explicit encryptor is provided, key providers are irrelevant —
-    // the encryptor handles encryption without needing key material from here.
-    if (this._opts.encryptor !== undefined) return this._keyProviderParam ?? undefined;
     return (
       this._keyProviderParam ??
       this.keyProviderFromKey() ??
@@ -109,14 +111,16 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._opts.supportUnencryptedData ?? Configurable.config.supportUnencryptedData;
+    return this._supportUnencryptedData ?? Configurable.config.supportUnencryptedData;
   }
 
-  // fixed: true (default for deterministic) → serialize uses the oldest previous
-  // scheme so existing deterministic ciphertexts remain stable across key rotations.
-  // fixed: false → serialize always uses the current (newest) scheme.
   isFixed(): boolean {
-    return this._opts.fixed ?? this.deterministic;
+    // by default deterministic encryption is fixed
+    return (this._fixed ??=
+      this.deterministic != null &&
+      this.deterministic !== false &&
+      (typeof this.deterministic !== "object" ||
+        (this.deterministic.fixed != null && this.deterministic.fixed !== false)));
   }
 
   merge(other: Scheme): Scheme {
@@ -131,34 +135,23 @@ export class Scheme {
   }
 
   isCompatibleWith(other: Scheme): boolean {
-    return this.deterministic === other.deterministic;
+    return this.isDeterministic() === other.isDeterministic();
   }
 
-  /**
-   * Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68) — the
-   * as-passed options plus `@context_properties`, compacted.
-   *
-   * Carries four keys Rails' `to_h` does not (`key`, `fixed`,
-   * `supportUnencryptedData`, `compress`/`compressor`). That is pre-existing
-   * (`_toOptions`, which this renames onto the Rails name) and is what `merge`
-   * currently relies on to carry them across; narrowing it to Rails' five keys
-   * is story `converge-scheme-to-h-key-set`.
-   */
+  /** Mirrors: ActiveRecord::Encryption::Scheme#to_h (scheme.rb:65-68). */
   toH(): SchemeOptions {
-    const o = this._opts;
-    const opts: SchemeOptions = {};
-    if (o.keyProvider !== undefined) opts.keyProvider = o.keyProvider;
-    if (o.key !== undefined) opts.key = o.key;
-    if (o.deterministic !== undefined) opts.deterministic = o.deterministic;
-    if (o.fixed !== undefined) opts.fixed = o.fixed;
-    if (o.downcase !== undefined) opts.downcase = o.downcase;
-    if (o.ignoreCase !== undefined) opts.ignoreCase = o.ignoreCase;
-    if (o.previousSchemes !== undefined) opts.previousSchemes = o.previousSchemes;
-    if (o.supportUnencryptedData !== undefined)
-      opts.supportUnencryptedData = o.supportUnencryptedData;
-    if (o.compress !== undefined) opts.compress = o.compress;
-    if (o.compressor !== undefined) opts.compressor = o.compressor;
-    return { ...opts, ...(this._contextProperties as Partial<SchemeOptions>) };
+    const h: SchemeOptions = {
+      keyProvider: this._keyProviderParam,
+      deterministic: this.deterministic,
+      downcase: this.downcase,
+      ignoreCase: this.ignoreCase,
+      previousSchemes: this._previousSchemesParam,
+      ...(this._contextProperties as Partial<SchemeOptions>),
+    };
+    for (const key of Object.keys(h) as (keyof SchemeOptions)[]) {
+      if (h[key] == null) delete h[key];
+    }
+    return h;
   }
 
   /** @internal */
@@ -177,7 +170,7 @@ export class Scheme {
 
   /** @internal */
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
-    if (this.deterministic) {
+    if (this.isDeterministic()) {
       const deterministicKey = Configurable.config.deterministicKey;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
@@ -187,20 +180,17 @@ export class Scheme {
 
   /** @internal */
   private validateConfigBang(): void {
-    if (this.ignoreCase && !this.deterministic) {
-      throw new Configuration("ignoreCase requires deterministic encryption");
-    }
-    if (this.downcase && !this.deterministic) {
-      throw new Configuration("downcase requires deterministic encryption");
+    if (this.ignoreCase != null && this.ignoreCase !== false && !this.isDeterministic()) {
+      throw new Configuration("ignore_case: can only be used with deterministic encryption");
     }
     if (this._keyProviderParam != null && this.key != null) {
-      throw new Configuration("key and keyProvider can't be used simultaneously");
+      throw new Configuration("key_provider: and key: can't be used simultaneously");
     }
     if (!this.compress && this.compressor !== undefined) {
-      throw new Configuration("compressor can't be used with compress: false");
+      throw new Configuration("compressor: can't be used with compress: false");
     }
     if (this.compressor !== undefined && this._contextProperties.encryptor !== undefined) {
-      throw new Configuration("compressor can't be used with encryptor");
+      throw new Configuration("compressor: can't be used with encryptor");
     }
   }
 }
