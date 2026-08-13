@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
+import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
 import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 
 describe("MysqlTest", () => {
@@ -228,6 +229,14 @@ describe("MySQL dialect overrides (audit follow-up)", () => {
 
   it("Bin uses CAST(... AS BINARY) (mirrors Rails)", () => {
     expect(compile(new Nodes.Bin(users.get("name")))).toBe("CAST(`users`.`name` AS BINARY)");
+  });
+
+  // AbstractMysqlAdapter#case_sensitive_comparison wraps the *bind* in
+  // Arel::Nodes::Bin, so the visitor has to dispatch on an
+  // ActiveModel::Attribute the same way `visit` does everywhere else.
+  it("Bin visits a bind attribute rather than stringifying it", () => {
+    const bind = AMAttribute.fromDatabase("name", "x", new StringType());
+    expect(compile(new Nodes.Bin(bind))).toBe("CAST(? AS BINARY)");
   });
 
   it("UnqualifiedColumn delegates to its inner expression", () => {
