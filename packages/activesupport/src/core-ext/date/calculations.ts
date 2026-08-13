@@ -7,6 +7,9 @@
  * `Date` — always an instant — and is that `Time` arm; this file is the `Date`
  * one, keyed on `Temporal.PlainDate`, the calendar-day analogue.
  *
+ * `in_time_zone` comes from `DateAndTime::Zones`, which `core_ext/date/zones.rb`
+ * mixes into `Date`, so it is imported rather than redefined here.
+ *
  * Mirrors: `class Date` (`core_ext/date/calculations.rb`)
  */
 
@@ -15,8 +18,6 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, getZone } from "../../time-zone-config.js";
-// `core_ext/date/zones.rb` — `Date.include DateAndTime::Zones`; the Date arm's
-// `in_time_zone` is that mixin's, not a Date-local method.
 import { inTimeZone } from "../date-and-time/zones.js";
 
 /**

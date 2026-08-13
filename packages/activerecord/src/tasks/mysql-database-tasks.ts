@@ -195,12 +195,15 @@ export class MySQLDatabaseTasks {
    * hash into it (`database_configurations/url_config.rb:41-43`), so there is
    * nothing left to re-parse here.
    *
+   * Ruby's `filter_map` guard is `if configuration_hash[opt]`, so only nil/false
+   * are dropped — an empty string still emits its flag.
+   *
    * The one deviation is `password: "--password"`, deliberately NOT placed in
    * argv (it would otherwise be visible in `ps` to other local users); it is
    * passed via MYSQL_PWD in {@link commandEnv} instead.
    */
   private prepareCommandOptions(): string[] {
-    const args: Record<string, string> = {
+    const args = Object.entries({
       host: "--host",
       port: "--port",
       socket: "--socket",
@@ -212,12 +215,12 @@ export class MySQLDatabaseTasks {
       sslcipher: "--ssl-cipher",
       sslkey: "--ssl-key",
       ssl_mode: "--ssl-mode",
-    };
-    return Object.entries(args).flatMap(([opt, arg]) => {
+    }).flatMap(([opt, arg]) => {
       const value = this.configurationHash[opt];
-      // Ruby's `if configuration_hash[opt]` — only nil/false are skipped.
       return value != null && value !== false ? [`${arg}=${String(value)}`] : [];
     });
+
+    return args;
   }
 
   private commandEnv(): NodeJS.ProcessEnv {
