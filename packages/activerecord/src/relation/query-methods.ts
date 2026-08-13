@@ -2079,7 +2079,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | number | Nodes.Node | null,
+  field: string | symbol | number | Nodes.Node | null,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
@@ -2087,11 +2087,13 @@ export function arelColumn(
   // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
   if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
-  // Ruby `field.to_s` (query_methods.rb:1992) — which is what carries `sum`'s
-  // Integer identity default through as the literal it sums over, and
-  // `async_sum`'s nil one (calculations.rb:182) as `""`, the empty `SUM()`.
-  // A Ruby Symbol is a JS string here, so `is_symbol` is always false.
-  let fieldStr = field == null ? "" : String(field);
+  // Ruby `field = field.name if is_symbol = field.is_a?(Symbol)` then `field.to_s`
+  // (query_methods.rb:1991-1992) — which is what carries `sum`'s Integer identity
+  // default through as the literal it sums over, and `async_sum`'s nil one
+  // (calculations.rb:182) as `""`, the empty `SUM()`.
+  const isSymbol = typeof field === "symbol";
+  let fieldStr =
+    typeof field === "symbol" ? symbolToName(field) : field == null ? "" : String(field);
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
 
   const fromClause = (this as any)._fromClause;
@@ -2105,14 +2107,20 @@ export function arelColumn(
     return arelColumnWithTable.call(this, dotMatch.groups!.tbl, dotMatch.groups!.col);
   }
   if (fallback) return fallback(fieldStr);
-  return arelSql(fieldStr);
+  // Ruby `Arel.sql(is_symbol ? quote_table_name(field) : field)`
+  // (query_methods.rb:2003): a Symbol names a column and is quoted; a String is
+  // raw SQL and is not. TS has no way to recover that distinction from a bare
+  // string, so the JS-`Symbol` modelling is retained here (RFC 0096 debt).
+  const quoted = isSymbol ? safeQuoteColumnName(modelClass, fieldStr) : fieldStr;
+  return arelSql(quoted);
 }
 
 /** @internal */
 export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
-    if (typeof field === "string") return [arelColumn.call(this, field)];
+    if (typeof field === "string" || typeof field === "symbol")
+      return [arelColumn.call(this, field)];
     if (typeof field === "function") return [field()];
     if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
     return [field];
@@ -2123,10 +2131,16 @@ export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown
 export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
-  columnName: string,
+  columnName: string | symbol,
 ): unknown {
   const existing = (this as any)._referencesValues ?? [];
   if (!existing.includes(tableName)) (this as any)._referencesValues = [...existing, tableName];
+  // Ruby discriminates `column_name.is_a?(Symbol)` (query_methods.rb:1980): a
+  // Symbol names a column, a String may be an expression. TS cannot recover that
+  // from a bare string, so the JS-`Symbol` modelling is retained (RFC 0096 debt);
+  // the name itself is Rails' `columnName` from here down.
+  const isSymbol = typeof columnName === "symbol";
+  if (typeof columnName === "symbol") columnName = symbolToName(columnName);
   const modelClass: any = this.model;
   // Schema-qualified table names (e.g. "schema.table") must not be passed to
   // ArelTable — the visitor quotes the whole string as one identifier, producing
@@ -2136,9 +2150,7 @@ export function arelColumnWithTable(
     const quotedCol = safeQuoteColumnName(modelClass, columnName);
     return arelSql(`${quotedTable}.${quotedCol}`);
   }
-  // Rails' `column_name.is_a?(Symbol) ||` arm (query_methods.rb:1980) collapses
-  // here: a Ruby Symbol is a JS string in trails, so only the `\W` test remains.
-  if (!/\W/.test(columnName)) {
+  if (isSymbol || !/\W/.test(columnName)) {
     const builder = (this as any).predicateBuilder;
     // Rails passes `lookup_table_klass_from_join_dependencies` as the block
     // (query_methods.rb:1982-1984), so a table name that only resolves through a
@@ -2221,7 +2233,7 @@ export function arelColumnAliasesFromHash(
       });
     }
     if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as string[]).map((col) =>
+      return (columnsAliases as (string | symbol)[]).map((col) =>
         arelColumnWithTable.call(this, tableName, col),
       );
     }
