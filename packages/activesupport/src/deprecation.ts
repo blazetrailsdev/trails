@@ -1,13 +1,12 @@
 import { wrap } from "./array-utils.js";
+import { currentErrorReporter } from "./error-reporter.js";
 import { deprecateMethods } from "./deprecation/method-wrappers.js";
 import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
-import { ActiveSupport } from "./index.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { stderr } from "./process-adapter.js";
 import { trailsLogger } from "./trails-logger-slot.js";
-import { _setDeprecator } from "./deprecator-slot.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
 
@@ -90,7 +89,7 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
       (message, callstack) => {
         const error = new DeprecationError(message);
         error.stack = callstack.map((l) => String(l)).join("\n");
-        ActiveSupport.errorReporter.report(error);
+        currentErrorReporter.report(error);
       },
     ],
   ]);
@@ -467,5 +466,3 @@ export class Deprecation {
 }
 
 export const deprecator = new Deprecation();
-
-_setDeprecator(deprecator);

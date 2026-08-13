@@ -88,7 +88,7 @@ import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";
 import { osAdapterConfig } from "./os-adapter.js";
 import { processAdapterConfig } from "./process-adapter.js";
-import { ErrorReporter } from "./error-reporter.js";
+import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 
 /**
  * ActiveSupport configuration — mirrors Rails' ActiveSupport module.
@@ -111,7 +111,12 @@ export const ActiveSupport = {
    * (activesupport/lib/active_support.rb:104-105) — always a reporter, never
    * nil, so `ActiveSupport.error_reporter.report(...)` call sites need no guard.
    */
-  errorReporter: new ErrorReporter(),
+  get errorReporter(): ErrorReporter {
+    return currentErrorReporter;
+  },
+  set errorReporter(reporter: ErrorReporter) {
+    _setErrorReporter(reporter);
+  },
 
   get fsAdapter(): string | null {
     return fsAdapterConfig.adapter;
