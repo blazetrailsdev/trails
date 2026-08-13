@@ -5,27 +5,160 @@ import {
   setBackend,
   toTag,
   withBackend,
+  PARSING,
   XmlStringBuilder,
   type ToTagOptions,
   type XmlMiniBackend,
 } from "./xml-mini.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Date as RubyDate } from "@blazetrails/date";
+import { Duration } from "./duration.js";
+import { ArgumentError } from "./hash-utils.js";
 
 describe("ParsingTest", () => {
-  it.skip("symbol");
-  it.skip("date");
-  it.skip("datetime");
-  it.skip("duration");
-  it.skip("integer");
-  it.skip("float");
-  it.skip("decimal");
-  it.skip("boolean");
-  it.skip("string");
-  it.skip("yaml");
-  it.skip("hexBinary");
-  it.skip("base64Binary and binary");
+  const parsing = PARSING;
+
+  // `symbol`, `integer`, `float`, `decimal` and `string` each close in Rails
+  // with `assert_raises(ArgumentError) { parser.call(Date.new(2013, 11, 12,
+  // 02, 11)) }`. That assertion is vacuous: MRI raises from `Date.new` itself
+  // — "wrong number of arguments (given 5, expected 0..4)", verified against
+  // the `ruby` on PATH — before the parser is ever called, so it pins
+  // `Date.new`'s arity rather than anything about PARSING. trails spells
+  // `Date.new` as `Date.civil` (date.ts:6037) with four parameters, where a
+  // fifth argument is a compile error and not a runtime raise, so the
+  // assertion has no faithful counterpart and is dropped rather than restated
+  // against a stand-in Rails never exercised.
+
+  it("symbol", () => {
+    const parser = parsing["symbol"];
+    expect(parser("symbol")).toBe(":symbol");
+    expect(parser(":symbol")).toBe(":symbol");
+    expect(parser(123)).toBe(":123");
+  });
+
+  it("date", () => {
+    const parser = parsing["date"];
+    expect(parser("2013-11-12T0211Z")).toEqual(RubyDate.parse("2013-11-12"));
+    expect(() => parser(1384190018)).toThrow(TypeError);
+    expect(() => parser("not really a date")).toThrow();
+  });
+
+  it("datetime", () => {
+    const parser = parsing["datetime"];
+    expect(parser("2013-11-12T02:11:00Z")).toEqual(Temporal.Instant.from("2013-11-12T02:11:00Z"));
+    expect(parser("2013-11-12T0211Z")).toEqual(Temporal.Instant.from("2013-11-12T00:00:00Z"));
+    expect(parser("2013-11-12T02:11Z")).toEqual(Temporal.Instant.from("2013-11-12T02:11:00Z"));
+    expect(parser("2013-11-12T11:11+9")).toEqual(Temporal.Instant.from("2013-11-12T02:11:00Z"));
+    expect(() => parser("1384190018")).toThrow();
+  });
+
+  it("duration", () => {
+    const parser = parsing["duration"];
+    expect(parser("PT1S")).toEqual(Duration.parse("PT1S"));
+    expect(parser("PT1M")).toEqual(Duration.parse("PT1M"));
+    expect(parser("P3Y6M4DT12H30M5S")).toEqual(Duration.parse("P3Y6M4DT12H30M5S"));
+    expect(() => parser("not really a duration")).toThrow();
+  });
+
+  it("integer", () => {
+    const parser = parsing["integer"];
+    expect(parser(123)).toBe(123);
+    expect(parser(123.003)).toBe(123);
+    expect(parser("123")).toBe(123);
+    expect(parser("")).toBe(0);
+  });
+
+  it("float", () => {
+    const parser = parsing["float"];
+    expect(parser("123")).toBe(123);
+    expect(parser("123.003")).toBe(123.003);
+    expect(parser("123,003")).toBe(123.0);
+    expect(parser("")).toBe(0.0);
+    expect(parser(123)).toBe(123);
+    expect(parser(123.05)).toBe(123.05);
+  });
+
+  it("decimal", () => {
+    const parser = parsing["decimal"];
+    expect(String(parser("123"))).toBe(new BigDecimal("123").toString());
+    expect(String(parser("123.003"))).toBe(new BigDecimal("123.003").toString());
+    expect(String(parser("123,003"))).toBe(new BigDecimal("123").toString());
+    expect(String(parser(""))).toBe(new BigDecimal("0").toString());
+    expect(String(parser(123))).toBe(new BigDecimal("123").toString());
+    expect(() => parser(123.04)).toThrow(ArgumentError);
+  });
+
+  it("boolean", () => {
+    const parser = parsing["boolean"];
+    for (const value of [1, true, "1"]) {
+      expect(parser(value)).toBe(true);
+    }
+
+    for (const value of [0, false, "0"]) {
+      expect(parser(value)).toBe(false);
+    }
+  });
+
+  it("string", () => {
+    const parser = parsing["string"];
+    expect(parser(123)).toBe("123");
+    expect(parser("123")).toBe("123");
+    expect(parser("[]")).toBe("[]");
+    expect(parser([])).toBe("[]");
+    expect(parser({})).toBe("{}");
+  });
+
+  it("yaml", async () => {
+    const yaml = [
+      "product:",
+      "  - sku         : BL394D",
+      "    quantity    : 4",
+      "    description : Basketball",
+      "",
+    ].join("\n");
+    const expected = {
+      product: [{ sku: "BL394D", quantity: 4, description: "Basketball" }],
+    };
+    const parser = parsing["yaml"];
+    expect(await parser(yaml)).toEqual(expected);
+    expect(await parser({ 1: "test" })).toEqual({ 1: "test" });
+    expect(await parser("{1 => 'test'}")).toEqual({ "1 => 'test'": null });
+  });
+
+  it("hexBinary", () => {
+    const expected = "Hello, World!";
+    const hexBinary = "48656C6C6F2C20576F726C6421";
+
+    let parser = parsing["hexBinary"];
+    expect(parser(hexBinary)).toBe(expected);
+
+    parser = parsing["binary"];
+    expect(parser(hexBinary, { encoding: "hexBinary" })).toBe(expected);
+    expect(parser(hexBinary, { encoding: "hex" })).toBe(expected);
+  });
+
+  it("base64Binary and binary", () => {
+    const base64 =
+      "TWFuIGlzIGRpc3Rpbmd1aXNoZWQsIG5vdCBvbmx5IGJ5IGhpcyByZWFzb24sIGJ1dCBieSB0aGlz\n" +
+      "IHNpbmd1bGFyIHBhc3Npb24gZnJvbSBvdGhlciBhbmltYWxzLCB3aGljaCBpcyBhIGx1c3Qgb2Yg\n" +
+      "dGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0aGUgY29udGlu\n" +
+      "dWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRo\n" +
+      "ZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVhc3VyZS4=\n";
+    const expectedBase64 =
+      "Man is distinguished, not only by his reason, but by this singular passion from\n" +
+      "other animals, which is a lust of the mind, that by a perseverance of delight\n" +
+      "in the continued and indefatigable generation of knowledge, exceeds the short\n" +
+      "vehemence of any carnal pleasure.\n";
+
+    let parser = parsing["base64Binary"];
+    expect(parser(base64)).toBe(expectedBase64.replace(/\n/g, " ").trim());
+    parser("NON BASE64 INPUT");
+
+    parser = parsing["binary"];
+    expect(parser(base64, { encoding: "base64" })).toBe(expectedBase64.replace(/\n/g, " ").trim());
+    expect(parser("IGNORED INPUT", {})).toBe("IGNORED INPUT");
+  });
 });
 
 describe("RenameKeyTest", () => {

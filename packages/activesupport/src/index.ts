@@ -187,6 +187,7 @@ export {
 export { Inflections, loadDefaults } from "./inflector/inflections.js";
 
 export {
+  PARSING,
   renameKey,
   toTag,
   XmlStringBuilder,

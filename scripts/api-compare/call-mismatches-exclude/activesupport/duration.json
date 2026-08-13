@@ -30,6 +30,13 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
+    "rubyName": "parse",
+    "call": "calculate_total_seconds",
+    "reason": "Rails' `Duration.parse` is `new(calculate_total_seconds(parts), parts)` (duration.rb:212-215) — the total is computed to fill the `value` constructor seat. trails' constructor is `(parts, variable)` and derives the total itself via `inSeconds()`, so there is no argument for the call to fill; `calculateTotalSeconds` is ported and holds the same PARTS_IN_SECONDS arithmetic."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "duration.ts",
     "rubyName": "since",
     "call": "sum",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

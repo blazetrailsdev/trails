@@ -13,6 +13,10 @@ import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Rational, strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
+import {
+  preserveTimezone,
+  utcToLocalReturnsUtcOffsetTimes,
+} from "./core-ext/date-and-time/compatibility.js";
 
 /**
  * Options for the change() method.
@@ -131,6 +135,11 @@ export class TimeWithZone {
 
   /** Alias for utcOffset */
   get gmtOffset(): number {
+    return this.utcOffset;
+  }
+
+  /** `alias_method :gmtoff, :utc_offset` (time_with_zone.rb:115). */
+  get gmtoff(): number {
     return this.utcOffset;
   }
 
@@ -278,6 +287,14 @@ export class TimeWithZone {
 
   /** Alias for utc() */
   gmtime(): Temporal.Instant {
+    return this.utc();
+  }
+
+  /**
+   * `alias_method :comparable_time, :utc` (time_with_zone.rb:66) — the value
+   * `<=>` and `between?` compare on.
+   */
+  comparableTime(): Temporal.Instant {
     return this.utc();
   }
 
@@ -447,6 +464,11 @@ export class TimeWithZone {
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
       `${this.formattedOffset(false)}`
     );
+  }
+
+  /** `alias_method :rfc822, :rfc2822` (time_with_zone.rb:197). */
+  rfc822(): string {
+    return this.rfc2822();
   }
 
   /** HTTP date format */
@@ -912,6 +934,51 @@ export class TimeWithZone {
 
   isBlank(): boolean {
     return false;
+  }
+
+  /**
+   * `def present?; true; end` (time_with_zone.rb:519-521) — the counterpart to
+   * {@link isBlank}, defined outright rather than derived so a TimeWithZone
+   * never routes through `Object#present?`'s `!blank?`.
+   */
+  isPresent(): boolean {
+    return true;
+  }
+
+  /**
+   * Mirrors: `ActiveSupport::TimeWithZone#to_datetime`
+   * (time_with_zone.rb:486-488) — `utc.to_datetime.new_offset(Rational(
+   * utc_offset, 86_400))`, the same instant carrying this zone's offset.
+   */
+  toDatetime(): Temporal.ZonedDateTime {
+    return this._zoned;
+  }
+
+  /**
+   * Mirrors: `ActiveSupport::TimeWithZone#duration_of_variable_length?`
+   * (time_with_zone.rb:589-591) — `ActiveSupport::Duration === obj &&
+   * obj.variable?`. A variable-length duration (years/months/days) has to be
+   * applied in local time, where a fixed one can be added to the UTC instant.
+   */
+  private durationOfVariableLength(obj: unknown): boolean {
+    return obj instanceof Duration && obj.isVariable();
+  }
+
+  /**
+   * `DateAndTime::Compatibility#preserve_timezone`, reached through the
+   * `include DateAndTime::Compatibility` at time_with_zone.rb:29. Rails' one
+   * module-level switch, read here rather than re-seated.
+   */
+  preserveTimezone(): boolean | string {
+    return preserveTimezone();
+  }
+
+  /**
+   * `DateAndTime::Compatibility#utc_to_local_returns_utc_offset_times`, the
+   * other half of the same `include`.
+   */
+  utcToLocalReturnsUtcOffsetTimes(): boolean {
+    return utcToLocalReturnsUtcOffsetTimes();
   }
 
   /** Returns the internal UTC timestamp in milliseconds */

@@ -8,6 +8,7 @@ import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapt
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
 import { classifyCompareStep } from "./classify-compare-step.js";
+import { isTransientGhError } from "./gh-transient-error.js";
 
 const REPO = "blazetrailsdev/trails";
 const [REPO_OWNER, REPO_NAME] = REPO.split("/");
@@ -115,6 +116,15 @@ function gh(args: string): string {
         rateLimitCooldownUntil = Date.now() + backoffMs;
         console.warn(
           `  Rate limited, cooling down ${backoffMs / 1000}s (retry ${attempt + 1}/${MAX_RETRIES})...`,
+        );
+        continue;
+      }
+      if (isTransientGhError(msg) && attempt < MAX_RETRIES) {
+        const backoffMs = Math.min(30_000, 2_000 * Math.pow(2, attempt));
+        rateLimitCooldownUntil = Date.now() + backoffMs;
+        console.warn(
+          `  Transient gh transport error, retrying in ${backoffMs / 1000}s ` +
+            `(retry ${attempt + 1}/${MAX_RETRIES}): ${msg.split("\n")[0]}`,
         );
         continue;
       }
