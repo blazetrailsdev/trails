@@ -77,18 +77,18 @@ export class ExtendedDeterministicQueries {
 
     prepend(relProto, {
       where(super_, ...args) {
-        return RelationQueries.where(super_ as (...args: any[]) => unknown, this, args);
+        return RelationQueries.where.call(this, super_ as (...args: any[]) => unknown, args);
       },
       exists(super_, ...args) {
-        return RelationQueries.isExists(super_ as (...args: any[]) => unknown, this, args);
+        return RelationQueries.isExists.call(this, super_ as (...args: any[]) => unknown, args);
       },
       scopeForCreate(super_) {
-        return RelationQueries.scopeForCreate(super_ as (...args: any[]) => unknown, this);
+        return RelationQueries.scopeForCreate.call(this, super_ as (...args: any[]) => unknown);
       },
     });
     prepend(baseTarget, {
       findBy(super_, ...args) {
-        return CoreQueries.findBy(super_ as (...args: any[]) => unknown, this, args);
+        return CoreQueries.findBy.call(this, super_ as (...args: any[]) => unknown, args);
       },
     });
     prepend(eatProto, {
@@ -203,26 +203,23 @@ export class EncryptedQuery {
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQueries
  */
 export class RelationQueries {
-  static where(
-    originalWhere: (...args: any[]) => unknown,
-    relation: any,
-    args: unknown[],
-  ): unknown {
-    return originalWhere.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
+  static where(this: any, originalWhere: (...args: any[]) => unknown, args: unknown[]): unknown {
+    return originalWhere.call(this, ...EncryptedQuery.processArguments(this, args, true));
   }
 
   static isExists(
+    this: any,
     originalExists: (...args: any[]) => unknown,
-    relation: any,
     args: unknown[],
   ): unknown {
-    return originalExists.call(relation, ...EncryptedQuery.processArguments(relation, args, true));
+    return originalExists.call(this, ...EncryptedQuery.processArguments(this, args, true));
   }
 
   static scopeForCreate(
+    this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
-    relation: any,
   ): Record<string, unknown> {
+    const relation = this;
     const model = relation.model ?? relation;
     const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
     if (!encryptedAttrs?.size)
@@ -259,8 +256,8 @@ export class RelationQueries {
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicQueries::CoreQueries
  */
 export class CoreQueries {
-  static findBy(originalFindBy: (...args: any[]) => unknown, klass: any, args: unknown[]): unknown {
-    return originalFindBy.call(klass, ...EncryptedQuery.processArguments(klass, args, false));
+  static findBy(this: any, originalFindBy: (...args: any[]) => unknown, args: unknown[]): unknown {
+    return originalFindBy.call(this, ...EncryptedQuery.processArguments(this, args, false));
   }
 }
 

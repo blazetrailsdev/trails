@@ -140,7 +140,7 @@ export class HasOne extends SingularAssociation {
     // persisted) before the after_create/after_update touch fires — mirrors
     // Rails, where has_one.rb's `define_callbacks` runs `super` (which wires
     // autosave) before `add_touch_callbacks`.
-    addAutosaveAssociationCallbacks(model, reflection);
+    addAutosaveAssociationCallbacks.call(model, reflection);
     if (options.touch) {
       this.addTouchCallbacks(model, reflection);
     }

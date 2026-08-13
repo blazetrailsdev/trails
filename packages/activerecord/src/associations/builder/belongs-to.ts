@@ -69,7 +69,7 @@ export class BelongsTo extends SingularAssociation {
     // gated on the `autosave` option. The option only steers behavior inside
     // save_belongs_to_association (validate flag, destroy of marked-for-
     // destruction targets, save of changed-but-persisted records).
-    addAutosaveAssociationCallbacks(model, reflection);
+    addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {

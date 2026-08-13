@@ -2210,7 +2210,8 @@ export class Base extends Model {
       const r = new (_relationCtorFor(this))(this);
       return wrapWithScopeProxy(r);
     };
-    const rel = DefaultScoping.buildDefaultScope(this, buildBase, { allQueries }) ?? buildBase();
+    const rel =
+      DefaultScoping.buildDefaultScope.call(this, buildBase(), { allQueries }) ?? buildBase();
     return this._applyStiTypeCondition(rel);
   }
 
@@ -4106,7 +4107,11 @@ export class Base extends Model {
     signedId: string,
     options?: { purpose?: string },
   ): Promise<InstanceType<T> | null> {
-    return _findSigned(this, signedId, options);
+    return _findSigned.call<
+      T,
+      [string, { purpose?: string } | undefined],
+      Promise<InstanceType<T> | null>
+    >(this, signedId, options);
   }
 
   /**
@@ -4120,7 +4125,11 @@ export class Base extends Model {
     signedId: string,
     options?: { purpose?: string },
   ): Promise<InstanceType<T>> {
-    return _findSignedBang(this, signedId, options);
+    return _findSignedBang.call<
+      T,
+      [string, { purpose?: string } | undefined],
+      Promise<InstanceType<T>>
+    >(this, signedId, options);
   }
 
   /**
@@ -4313,7 +4322,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::TokenFor#generate_token_for (token_for.rb:118).
    */
   generateTokenFor(purpose: string): string {
-    return _generateTokenFor(this, purpose);
+    return _generateTokenFor.call(this, purpose);
   }
 }
 

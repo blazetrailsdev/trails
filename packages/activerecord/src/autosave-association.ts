@@ -11,7 +11,6 @@ import { NestedError as AssociationsNestedError } from "./associations/nested-er
 import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { throwAbort, underscore } from "@blazetrails/activesupport";
-import { afterCreate, afterUpdate, beforeSave } from "./callbacks.js";
 
 const MARKED_FOR_DESTRUCTION = Symbol.for("blazetrails.markedForDestruction");
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
@@ -817,6 +816,10 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 /** @internal */
 export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) => any): void {
   const klass = this;
+  // Rails passes a Symbol here and `define_method` names the method after it;
+  // a Ruby Symbol is a colon-prefixed string in trails, so drop the colon to
+  // get the method name.
+  if (name.startsWith(":")) name = name.slice(1);
   if (!klass.prototype) return;
   // Mirrors Ruby method_defined?(name, false) — check only the immediate class prototype.
   if (Object.prototype.hasOwnProperty.call(klass.prototype, name)) return;
@@ -867,13 +870,8 @@ export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) =
  *
  * @internal
  */
-export function addAutosaveAssociationCallbacks(model: any, reflection: any): void {
-  const saveMethod = `autosaveAssociatedRecordsFor_${reflection.name}`;
-  // Mirrors Rails' `define_non_cyclic_method` early-return: if the method is
-  // already defined on the model's own prototype, all callbacks for this
-  // association are already registered — calling again would duplicate the
-  // after_create/after_update/before_save lambdas.
-  if (Object.prototype.hasOwnProperty.call(model.prototype ?? {}, saveMethod)) return;
+export function addAutosaveAssociationCallbacks(this: any, reflection: any): void {
+  const saveMethod = `:autosaveAssociatedRecordsFor_${reflection.name}`;
   const isCollection: boolean =
     typeof reflection.isCollection === "function"
       ? reflection.isCollection()
@@ -888,22 +886,18 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
       : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
 
   if (isCollection) {
-    model.aroundSave(":aroundSaveCollectionAssociation");
-    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
+    this.aroundSave(":aroundSaveCollectionAssociation");
+    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
       return saveCollectionAssociation.call(this, reflection);
     });
     // Doesn't use after_save as that would save associations added in
     // after_create/after_update twice (autosave_association.rb:196-198). The
     // registration is unconditional: the `autosave != false` decision lives
     // INSIDE `save_collection_association` (autosave_association.rb:429-431).
-    afterCreate(model, async (record: any) => {
-      await record[saveMethod]();
-    });
-    afterUpdate(model, async (record: any) => {
-      await record[saveMethod]();
-    });
+    this.afterCreate(saveMethod);
+    this.afterUpdate(saveMethod);
   } else if (isHasOne) {
-    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
       return saveHasOneAssociation.call(this, reflection);
     });
     // Mirrors Rails: `save_has_one_association` is registered for after_create
@@ -914,12 +908,8 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // unconditionally keeps a nil/true-autosave NEW/changed child's persistence
     // in-save (via the `_record_changed?` → `new_record?` leg) rather than
     // deferring it to the post-commit `flushPendingReplaces` net.
-    afterCreate(model, async (record: any) => {
-      await record[saveMethod]();
-    });
-    afterUpdate(model, async (record: any) => {
-      await record[saveMethod]();
-    });
+    this.afterCreate(saveMethod);
+    this.afterUpdate(saveMethod);
   } else {
     // belongs_to
     // Mirrors autosave_association.rb:213 — the `== false` check and the
@@ -927,15 +917,15 @@ export function addAutosaveAssociationCallbacks(model: any, reflection: any): vo
     // takes the bare method reference. `Promise.resolve` covers the re-entrant
     // branch of `defineNonCyclicMethod`, which returns a sync `true` to mirror
     // Rails' cyclic-guard early return.
-    defineNonCyclicMethod.call(model, saveMethod, async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
       if ((await Promise.resolve(saveBelongsToAssociation.call(this, reflection))) === false) {
         throwAbort();
       }
     });
-    beforeSave(model, (record: any) => record[saveMethod]());
+    this.beforeSave(saveMethod);
   }
 
-  defineAutosaveValidationCallbacks.call(model, reflection);
+  defineAutosaveValidationCallbacks.call(this, reflection);
 }
 
 /** @internal */

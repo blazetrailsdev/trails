@@ -103,17 +103,17 @@ export function signedId(
  * Mirrors: ActiveRecord::SignedId::ClassMethods#find_signed
  */
 export async function findSigned<T extends typeof Base>(
-  modelClass: T,
+  this: T,
   signedId: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T> | null> {
-  const pk = modelClass.primaryKey;
+  const pk = this.primaryKey;
   if (!_hasPrimaryKey(pk)) {
-    throw new UnknownPrimaryKey(modelClass);
+    throw new UnknownPrimaryKey(this);
   }
-  const verifier = modelClass.signedIdVerifier;
+  const verifier = this.signedIdVerifier;
   const id = verifier.verified(signedId, {
-    purpose: modelClass.combineSignedIdPurposes(options?.purpose) || undefined,
+    purpose: this.combineSignedIdPurposes(options?.purpose) || undefined,
   });
   if (id === null) return null;
   if (Array.isArray(pk)) {
@@ -121,9 +121,9 @@ export async function findSigned<T extends typeof Base>(
     pk.forEach((col, i) => {
       conditions[col] = (id as unknown[])[i];
     });
-    return modelClass.findBy(conditions);
+    return this.findBy(conditions);
   }
-  return modelClass.findBy({ [pk]: id });
+  return this.findBy({ [pk]: id });
 }
 
 /**
@@ -133,15 +133,15 @@ export async function findSigned<T extends typeof Base>(
  * Mirrors: ActiveRecord::SignedId::ClassMethods#find_signed!
  */
 export async function findSignedBang<T extends typeof Base>(
-  modelClass: T,
+  this: T,
   signedId: string,
   options?: { purpose?: string },
 ): Promise<InstanceType<T>> {
-  const verifier = modelClass.signedIdVerifier;
+  const verifier = this.signedIdVerifier;
   const id = verifier.verify(signedId, {
-    purpose: modelClass.combineSignedIdPurposes(options?.purpose) || undefined,
+    purpose: this.combineSignedIdPurposes(options?.purpose) || undefined,
   });
-  return modelClass.find(id);
+  return this.find(id);
 }
 
 /**

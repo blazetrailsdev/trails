@@ -303,8 +303,8 @@ export function generatesTokenFor(
  *
  * Mirrors: ActiveRecord::TokenFor#generate_token_for
  */
-export function generateTokenFor(record: Base, purpose: string): string {
-  return (record.constructor as typeof Base).tokenDefinitions.fetch(purpose).generateToken(record);
+export function generateTokenFor(this: Base, purpose: string): string {
+  return (this.constructor as typeof Base).tokenDefinitions.fetch(purpose).generateToken(this);
 }
 
 /**
