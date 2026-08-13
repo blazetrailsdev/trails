@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { underscore } from "@blazetrails/activesupport";
+import { JSON, underscore } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import { UnknownPrimaryKey } from "./errors.js";
 
@@ -37,19 +37,21 @@ export class ClassMethods {
       return (this as any)._signedIdVerifier;
     }
 
-    const secret = (this as any).signedIdVerifierSecret as
+    let secret = (this as any).signedIdVerifierSecret as
       | string
       | (() => string | null | undefined)
-      | null;
-    const resolvedSecret = typeof secret === "function" ? secret() : secret;
-    if (!resolvedSecret) {
+      | null
+      | undefined;
+    if (typeof secret === "function") secret = secret();
+    if (!secret) {
       throw new Error(
         "You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids",
       );
     }
 
-    const verifier = new MessageVerifier(resolvedSecret, {
-      digest: "sha256",
+    const verifier = new MessageVerifier(secret, {
+      digest: "SHA256",
+      serializer: JSON,
       url_safe: true,
     });
     (this as any)._signedIdVerifier = verifier;
