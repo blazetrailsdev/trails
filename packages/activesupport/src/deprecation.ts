@@ -7,6 +7,7 @@ import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { stderr } from "./process-adapter.js";
 import { trailsLogger } from "./trails-logger-slot.js";
+import { _setDeprecator } from "./deprecator-slot.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
 
@@ -466,3 +467,5 @@ export class Deprecation {
 }
 
 export const deprecator = new Deprecation();
+
+_setDeprecator(deprecator);

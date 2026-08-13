@@ -12,7 +12,7 @@
  * prepending onto the generated one.
  */
 
-import { deprecator } from "../../deprecation.js";
+import { deprecator } from "../../deprecator-slot.js";
 
 /**
  * `mattr_accessor :preserve_timezone, instance_accessor: false, default: nil`
@@ -39,7 +39,7 @@ export function preserveTimezone(): boolean | string {
   if (_preserveTimezone === null) {
     // Only warn once, the first time the value is used (which should
     // be the first time #to_time is called).
-    deprecator.warn(
+    deprecator?.warn(
       "`to_time` will always preserve the receiver timezone rather than system local time in Rails 8.1." +
         "To opt in to the new behavior, set `config.active_support.to_time_preserves_timezone = :zone`.",
     );
