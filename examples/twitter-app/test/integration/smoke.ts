@@ -17,6 +17,7 @@ import { User } from "../../src/app/models/user.js";
 import { Tweet } from "../../src/app/models/tweet.js";
 import { Follow } from "../../src/app/models/follow.js";
 import { Like } from "../../src/app/models/like.js";
+import { Hashtag } from "../../src/app/models/hashtag.js";
 
 /** A cookie-retaining HTTP client — the browser stand-in. */
 class Client {
@@ -60,7 +61,7 @@ class Client {
 
 async function resetDatabase(): Promise<void> {
   await connect();
-  for (const model of [Like, Follow, Tweet, User]) await model.deleteAll();
+  for (const model of [Like, Follow, Tweet, User, Hashtag]) await model.deleteAll();
   await User.createBang({
     handle: "ada",
     display_name: "Ada Lovelace",
@@ -206,6 +207,56 @@ async function main(): Promise<void> {
     // --- 404s ---
     const missing = await client.get("/@nobody");
     check(missing.status === 404, "an unknown handle returns 404");
+
+    // --- ActiveRecord: callbacks, counter caches, HABTM, threading ---
+    await client.submit("/login", { handle: "dean", password: "swordfish" });
+
+    const tagged = await client.submit("/tweets", {
+      "tweet[body]": "  Shipping #Trails today #trails  ",
+    });
+    check(
+      tagged.includes("Shipping #Trails today"),
+      "the beforeValidation callback trims the body",
+    );
+    check(
+      (await Hashtag.where({ name: "trails" }).count()) === 1,
+      "the afterSave callback creates each hashtag once, case-folded",
+    );
+    check(tagged.includes('href="/hashtags/trails"'), "the tweet renders its hashtag link");
+
+    const dean = (await User.findBy({ handle: "dean" }))!;
+    const tweet = (await Tweet.where({ user_id: dean.id }).order({ created_at: "desc" }))[0];
+    check(
+      Number(dean.tweets_count) === Number(await Tweet.where({ user_id: dean.id }).count()),
+      "belongsTo counterCache matches the live count of users.tweets_count",
+    );
+
+    const hashtagPage = await client.get("/hashtags/trails");
+    check(hashtagPage.status === 200, "GET /hashtags/:name returns 200");
+    check(
+      (await hashtagPage.text()).includes("Shipping #Trails today"),
+      "the hashtag page lists tweets through the HABTM join table",
+    );
+
+    const threaded = await client.submit("/tweets", {
+      "tweet[body]": "replying to myself",
+      "tweet[reply_to_id]": String(tweet.id),
+    });
+    check(threaded.includes("replying to myself"), "a reply renders in its parent's thread");
+    check(
+      Number((await Tweet.findBy({ id: tweet.id }))!.replies_count) === 1,
+      "the self-referential counterCache maintains replies_count",
+    );
+    check(
+      (await Tweet.roots().count()) < (await Tweet.count()),
+      "the roots scope excludes replies",
+    );
+
+    const explore = await client.get("/explore");
+    check(explore.status === 200, "GET /explore returns 200");
+    const exploreHtml = await explore.text();
+    check(exploreHtml.includes("#trails"), "explore lists trending hashtags from the join query");
+    check(exploreHtml.includes("Who to follow"), "explore renders the suggestion query");
 
     console.log(`\n${checks} checks passed.`);
   } finally {

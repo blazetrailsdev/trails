@@ -2,4 +2,24 @@
 
 <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
 
+<% if (likers.length > 0) { %>
+  <p class="muted">Liked by
+    <% for (const u of likers) { %><a href="/@<%= u.handle %>">@<%= u.handle %></a> <% } %>
+  </p>
+<% } %>
+
+<h2><%= tweet.replies_count %> replies</h2>
+
+<% if (isLoggedIn) { %>
+  <form method="post" action="/tweets">
+    <input type="hidden" name="tweet[reply_to_id]" value="<%= tweet.id %>">
+    <textarea name="tweet[body]" rows="3" cols="60" placeholder="Post your reply"></textarea>
+    <button type="submit">Reply</button>
+  </form>
+<% } %>
+
+<% for (const reply of replies) { %>
+  <%= render({ partial: "tweets/tweet", locals: { tweet: reply, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+<% } %>
+
 <p><a href="/">&larr; Back to the timeline</a></p>

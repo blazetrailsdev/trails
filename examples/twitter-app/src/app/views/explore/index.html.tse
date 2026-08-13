@@ -1,0 +1,31 @@
+<h1>Explore</h1>
+
+<section>
+  <h2>Trending</h2>
+  <% if (trending.length === 0) { %><p class="empty">No hashtags yet.</p><% } %>
+  <ul class="trending">
+    <% for (const tag of trending) { %>
+      <li><a href="/hashtags/<%= tag.name %>">#<%= tag.name %></a> <span class="muted"><%= tag.count %></span></li>
+    <% } %>
+  </ul>
+</section>
+
+<section>
+  <h2>Who to follow</h2>
+  <ul class="users">
+    <% for (const u of suggestions) { %>
+      <li class="user">
+        <a href="/@<%= u.handle %>"><%= u.display_name %></a>
+        <span class="handle">@<%= u.handle %></span>
+        <span class="muted"><%= u.tweets_count %> tweets</span>
+      </li>
+    <% } %>
+  </ul>
+</section>
+
+<section>
+  <h2>Most liked</h2>
+  <% for (const tweet of popular) { %>
+    <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+  <% } %>
+</section>

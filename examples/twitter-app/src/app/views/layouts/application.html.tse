@@ -12,11 +12,13 @@
     <nav>
       <% if (isLoggedIn) { %>
         <a href="/@<%= currentUser.handle %>">@<%= currentUser.handle %></a>
+        <a href="/explore">Explore</a>
         <a href="/tweets/new">Tweet</a>
         <form method="post" action="/logout" class="inline">
           <button type="submit">Log out</button>
         </form>
       <% } else { %>
+        <a href="/explore">Explore</a>
         <a href="/login">Log in</a>
         <a href="/signup">Sign up</a>
       <% } %>

@@ -16,13 +16,19 @@ export class TweetsController extends ApplicationController {
 
     if (user) {
       const followeeIds = (await user.following).map((u) => u.id);
-      tweets = await Tweet.where({ user_id: [user.id, ...followeeIds] })
+      // A scope only type-checks at the head of a chain, so the rest of the
+      // conditions are spelled out — see the scope-typing story in the README.
+      tweets = await Tweet.roots()
+        .where({ user_id: [user.id, ...followeeIds] })
         .order({ created_at: "desc" })
-        .includes("user")
+        .includes("user", "hashtags")
         .limit(50);
     } else {
       // Signed out: show the public firehose so the root path is useful.
-      tweets = await Tweet.order({ created_at: "desc" }).includes("user").limit(50);
+      tweets = await Tweet.roots()
+        .order({ created_at: "desc" })
+        .includes("user", "hashtags")
+        .limit(50);
     }
 
     this.render({ action: "index", locals: { ...(await this.layoutLocals()), tweets } });
@@ -34,7 +40,13 @@ export class TweetsController extends ApplicationController {
 
     this.render({
       action: "show",
-      locals: { ...(await this.layoutLocals()), tweet, author: await tweet.user },
+      locals: {
+        ...(await this.layoutLocals()),
+        tweet,
+        author: await tweet.user,
+        replies: await tweet.replies.recent().includes("user", "hashtags"),
+        likers: await tweet.likers.limit(10),
+      },
     });
   }
 
@@ -47,8 +59,8 @@ export class TweetsController extends ApplicationController {
     const tweet = await user.tweets.build(this.tweetParams());
 
     if (await tweet.save()) {
-      this.setFlash("notice", "Tweet posted.");
-      this.redirectTo("/");
+      this.setFlash("notice", tweet.reply_to_id ? "Reply posted." : "Tweet posted.");
+      this.redirectTo(tweet.reply_to_id ? `/tweets/${tweet.reply_to_id}` : "/");
     } else {
       this.setFlash("alert", "Your tweet can't be blank.");
       this.redirectTo("/tweets/new");
@@ -70,12 +82,12 @@ export class TweetsController extends ApplicationController {
     this.redirectTo("/");
   }
 
-  /** Rails: `params.require(:tweet).permit(:body)`. */
+  /** Rails: `params.require(:tweet).permit(:body, :reply_to_id)`. */
   private tweetParams(): Record<string, unknown> {
     // `require` is typed `unknown` because Rails' returns either a nested
     // Parameters or a scalar; a nested key always yields Parameters.
     const tweet = this.params.require("tweet") as StrongParameters;
-    return tweet.permit("body").toHash();
+    return tweet.permit("body", "reply_to_id").toHash();
   }
 
   private notFound(): void {

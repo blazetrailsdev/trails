@@ -6,8 +6,9 @@ import { User } from "../app/models/user.js";
 import { Tweet } from "../app/models/tweet.js";
 import { Follow } from "../app/models/follow.js";
 import { Like } from "../app/models/like.js";
+import { Hashtag } from "../app/models/hashtag.js";
 
-const MODELS = [User, Tweet, Follow, Like];
+const MODELS = [User, Tweet, Follow, Like, Hashtag];
 
 let connected = false;
 

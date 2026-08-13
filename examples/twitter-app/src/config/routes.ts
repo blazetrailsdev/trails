@@ -16,6 +16,9 @@ export function drawRoutes(router: Mapper): void {
 
   router.resources("tweets", { only: ["index", "new", "create", "show", "destroy"] });
 
+  router.get("/explore", "explore#index");
+  router.get("/hashtags/:name", "hashtags#show");
+
   // Profiles are addressed by handle, not id: /@dean
   router.get("/@:handle", "users#show");
   router.get("/@:handle/following", "users#following");

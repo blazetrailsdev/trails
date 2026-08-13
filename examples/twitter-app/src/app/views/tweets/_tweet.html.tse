@@ -4,8 +4,20 @@
     <span class="handle">@<%= tweet.user.handle %></span>
   </p>
   <p class="body"><%= tweet.body %></p>
+<%# `hashtags.length` is a method on the proxy, not a number — read the
+     eager-loaded rows through `map`, which resolves synchronously. %>
+  <% const tags = tweet.hashtags.map((t) => t); %>
+  <% if (tags.length > 0) { %>
+    <p class="tags">
+      <% for (const tag of tags) { %>
+        <a href="/hashtags/<%= tag.name %>">#<%= tag.name %></a>
+      <% } %>
+    </p>
+  <% } %>
   <p class="actions">
-    <a href="/tweets/<%= tweet.id %>">permalink</a>
+    <a href="/tweets/<%= tweet.id %>">
+      <%= tweet.likes_count %> likes &middot; <%= tweet.replies_count %> replies
+    </a>
     <% if (isLoggedIn) { %>
       <form method="post" action="/tweets/<%= tweet.id %>/like" class="inline">
         <button type="submit">Like</button>

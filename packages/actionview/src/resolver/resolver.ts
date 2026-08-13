@@ -48,6 +48,7 @@ export abstract class Resolver implements TemplateResolver, PathSetResolver {
     prefix: string,
     format: string,
     extensions: string[],
+    variants?: ReadonlyArray<string>,
   ): Template | null;
 
   findAll(
@@ -64,8 +65,9 @@ export abstract class Resolver implements TemplateResolver, PathSetResolver {
     const bare = typeof path === "string" ? path : path.name;
     const name = partial ? `_${bare}` : bare;
 
+    const variants = requestedVariants(details);
     for (const format of requestedFormats(details)) {
-      const template = this.find(name, prefix, format, extensions);
+      const template = this.find(name, prefix, format, extensions, variants);
       if (template) return [template];
     }
     return [];
@@ -79,6 +81,17 @@ export abstract class Resolver implements TemplateResolver, PathSetResolver {
 
   /** @internal Subclasses with internal caches override this. */
   clearCache(): void {}
+}
+
+/**
+ * The requested variants, as `LookupContext#detail_args_for` supplies them.
+ * Rails filters filesystem matches against the whole `TemplateDetails::Requested`
+ * — variants included — before returning
+ * (`actionview/lib/action_view/template/resolver.rb:131`).
+ */
+function requestedVariants(details: LookupDetails): string[] {
+  const variants = (details as { variants?: ReadonlyArray<string | symbol> }).variants ?? [];
+  return variants.filter((v): v is string => typeof v === "string");
 }
 
 function requestedFormats(details: LookupDetails): string[] {
