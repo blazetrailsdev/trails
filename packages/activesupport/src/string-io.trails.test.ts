@@ -27,10 +27,20 @@ describe("StringIO", () => {
     expect(io.size).toBe(3);
   });
 
-  it("appends written characters", () => {
+  it("writes from the current position", () => {
     const io = new StringIO("ab");
     expect(io.write("cd")).toBe(2);
-    expect(io.string()).toBe("abcd");
+    expect(io.string()).toBe("cd");
+
+    const io2 = new StringIO("abcdef");
+    io2.read(2);
+    io2.write("XY");
+    expect(io2.string()).toBe("abXYef");
+
+    const io3 = new StringIO("ab");
+    io3.read();
+    io3.write("Z");
+    expect(io3.string()).toBe("abZ");
   });
 
   it("closes", () => {

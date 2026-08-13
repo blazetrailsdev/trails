@@ -48,10 +48,14 @@ export class StringIO {
     return chunk;
   }
 
-  /** Ruby: `StringIO#write` — appends and returns the characters written. */
+  /**
+   * Ruby: `StringIO#write` — overwrites from the current position, advances it
+   * past what was written, and returns the number of characters written.
+   */
   write(string: string): number {
-    this._string += string;
-    this._pos = this._string.length;
+    this._string =
+      this._string.slice(0, this._pos) + string + this._string.slice(this._pos + string.length);
+    this._pos += string.length;
     return string.length;
   }
 
