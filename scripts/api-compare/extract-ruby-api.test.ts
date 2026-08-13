@@ -1812,3 +1812,51 @@ describe("Ruby extractor call-argument capture", () => {
     ]);
   });
 });
+
+describe("Ruby extractor attr_reader flag", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  type AttrMethod = { name: string; reader?: boolean };
+
+  // Returns "<fqn>" -> instance methods, so a test can assert which entries the
+  // extractor generated from an `attr_*` declaration.
+  function attrMethods(src: string): Record<string, AttrMethod[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attr-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "attr.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "attr.rb"), ${JSON.stringify(dir)})
+        out = {}
+        ex.classes.each { |fqn, info| out[fqn] = info[:instanceMethods] }
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // The flag is what tells compare.ts's checkCallArgs that `if foreign_key`
+  // (schema_definitions.rb:241) is a FIELD read in the port, so it must not be
+  // paired against the body's real `table.foreign_key(...)` call at :242.
+  it("flags attr_reader and attr_accessor readers, not the writer or a def", () => {
+    const m = attrMethods(`
+      class ReferenceDefinition
+        attr_accessor :name
+        attr_reader(:foreign_key)
+
+        def add_to(table)
+          table.foreign_key(foreign_table_name) if foreign_key
+        end
+      end
+    `);
+    const byName = new Map(m["ReferenceDefinition"].map((x) => [x.name, x]));
+    expect(byName.get("foreign_key")?.reader).toBe(true);
+    expect(byName.get("name")?.reader).toBe(true);
+    expect(byName.get("name=")?.reader).toBeUndefined();
+    expect(byName.get("add_to")?.reader).toBeUndefined();
+  });
+});
