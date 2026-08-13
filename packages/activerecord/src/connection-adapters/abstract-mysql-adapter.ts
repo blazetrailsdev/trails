@@ -249,7 +249,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   protected _statementLimit = 1000;
 
   get adapterName(): AdapterName {
-    return "mysql";
+    return "mysql2";
   }
 
   // Rails maps MySQL::SchemaStatements#table_alias_length (256, not the

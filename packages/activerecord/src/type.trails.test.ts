@@ -42,7 +42,7 @@ describe("Type.currentAdapterName", () => {
 
   it("normalizes the configured adapter to the registration namespace", () => {
     expect(adapterNameFrom(modelWith("postgresql"))).toBe("postgres");
-    expect(adapterNameFrom(modelWith("mysql2"))).toBe("mysql");
+    expect(adapterNameFrom(modelWith("mysql2"))).toBe("mysql2");
     expect(adapterNameFrom(modelWith("sqlite3"))).toBe("sqlite");
   });
 
@@ -98,7 +98,7 @@ describe("Type.lookup under a non-sqlite configuration", () => {
 
   it("picks the mysql registration for a mysql2 configuration", () => {
     register("foo", GenericType, { override: false });
-    register("foo", AdapterType, { adapter: "mysql" });
+    register("foo", AdapterType, { adapter: "mysql2" });
 
     stubAdapter("mysql2");
     expect(lookup("foo")).toBeInstanceOf(AdapterType);
@@ -131,7 +131,7 @@ describe("the PostgreSQL OID registrations", () => {
     expect(lookup("uuid", { adapter: "postgres" })).toBeInstanceOf(Uuid);
 
     expect(() => lookup("money", { adapter: "sqlite" })).toThrow("Unknown type :money");
-    expect(() => lookup("interval", { adapter: "mysql" })).toThrow("Unknown type :interval");
+    expect(() => lookup("interval", { adapter: "mysql2" })).toThrow("Unknown type :interval");
   });
 
   it("shadow the generic registrations of the same name under postgres", () => {

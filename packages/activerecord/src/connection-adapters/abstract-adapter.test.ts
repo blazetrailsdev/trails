@@ -384,7 +384,7 @@ describe("per-adapter visitor isolation", () => {
       return "MySQL" as const;
     }
     override get adapterName() {
-      return "mysql" as const;
+      return "mysql2" as const;
     }
     override arelVisitor() {
       return new Visitors.MySQL(this);

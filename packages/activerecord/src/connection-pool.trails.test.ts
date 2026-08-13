@@ -833,9 +833,9 @@ describe("adapterNameFromConfig", () => {
   });
 
   it("maps mysql variants to mysql", async () => {
-    expect(adapterNameFromConfig("mysql2")).toBe("mysql");
-    expect(adapterNameFromConfig("mysql")).toBe("mysql");
-    expect(adapterNameFromConfig("mariadb")).toBe("mysql");
+    expect(adapterNameFromConfig("mysql2")).toBe("mysql2");
+    expect(adapterNameFromConfig("mysql")).toBe("mysql2");
+    expect(adapterNameFromConfig("mariadb")).toBe("mysql2");
   });
 
   it("maps sqlite variants to sqlite", async () => {
@@ -1156,7 +1156,7 @@ describe("checkout/checkin callbacks", () => {
     const pool = makeAmbientPool({ pool: 1 });
     try {
       await pool.checkout();
-      expect(calls).toEqual([adapterType]);
+      expect(calls).toEqual([adapterNameFromConfig(adapterType)]);
     } finally {
       await closePoolConnections(pool);
       // Drop the test-registered callback so it can't leak into sibling tests.

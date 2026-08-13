@@ -243,7 +243,7 @@ describe("SelectTest", () => {
     // the bare `Number(...)` coercion above would otherwise mask (the raw mysql2
     // driver string "1.1" also numeric-equals 1.1).
     const adapterName = (Post.connection as unknown as { adapterName: string }).adapterName;
-    const expectsBigDecimal = adapterName === "postgres" || adapterName === "mysql";
+    const expectsBigDecimal = adapterName === "postgres" || adapterName === "mysql2";
     expect(foo instanceof BigDecimal).toBe(expectsBigDecimal);
   });
 

@@ -5,7 +5,7 @@ import { Table as MysqlTable } from "./schema-definitions.js";
 describe("MysqlSchemaStatements#changeTable", () => {
   it("yields the MySQL Table subclass", async () => {
     const ss = Object.setPrototypeOf(
-      { adapterName: "mysql" },
+      { adapterName: "mysql2" },
       MysqlSchemaStatements.prototype,
     ) as MysqlSchemaStatements;
     let yielded: unknown;

@@ -83,13 +83,13 @@ export class TableDefinition extends AbstractTableDefinition {
       options?: string;
       comment?: string;
       adapter: VisitorHostAdapter;
-      adapterName?: "sqlite" | "postgres" | "mysql";
+      adapterName?: "sqlite" | "postgres" | "mysql2";
     },
   ) {
     const { adapter, adapterName: _ignoredAdapterName, charset, collation, ...rest } = options;
     super(tableName, {
       ...rest,
-      adapterName: "mysql",
+      adapterName: "mysql2",
       adapter,
     });
     this.charset = charset ?? undefined;

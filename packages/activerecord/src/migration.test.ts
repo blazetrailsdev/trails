@@ -30,7 +30,7 @@ function emitTableSql(td: TableDefinition): Promise<string> {
   // the `supports*` / isMariadb() flags), so thread the table definition's through —
   // matching the real adapter call sites and the production `*.toSql()` overrides.
   if (adapterName === "postgres") return new PgSchemaCreation(adapter).accept(td);
-  if (adapterName === "mysql") return new MysqlSchemaCreation(adapter).accept(td);
+  if (adapterName === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";

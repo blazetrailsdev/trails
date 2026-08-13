@@ -135,7 +135,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("addTableOptionsBang appends charset and collation", async () => {
-    const td = new TableDefinition("users", { adapter: mysqlConn(), adapterName: "mysql" });
+    const td = new TableDefinition("users", { adapter: mysqlConn(), adapterName: "mysql2" });
     (td as any).charset = "utf8mb4";
     (td as any).collation = "utf8mb4_unicode_ci";
     const result = (sc as any).addTableOptionsBang("CREATE TABLE `users` ()", td);

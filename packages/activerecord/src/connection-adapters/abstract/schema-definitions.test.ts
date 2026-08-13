@@ -492,7 +492,7 @@ describe("Table#aliasedTypes", () => {
 
 describe("TableDefinition id hash form", () => {
   it("extracts type and merges remaining keys as pk column options", () => {
-    const td = new TableDefinition("t", { adapterName: "mysql", adapter: conn });
+    const td = new TableDefinition("t", { adapterName: "mysql2", adapter: conn });
     td.setPrimaryKey("t", { type: "string", collation: "utf8mb4_bin" });
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.type).toBe("string");
@@ -501,7 +501,7 @@ describe("TableDefinition id hash form", () => {
   });
 
   it("defaults type to primary_key when hash omits type", () => {
-    const td = new TableDefinition("t", { adapterName: "mysql", adapter: conn });
+    const td = new TableDefinition("t", { adapterName: "mysql2", adapter: conn });
     td.setPrimaryKey("t", { collation: "utf8mb4_bin" });
     const id = td.columns.find((c) => c.name === "id")!;
     expect(id.type).toBe("primary_key");
@@ -509,7 +509,7 @@ describe("TableDefinition id hash form", () => {
   });
 
   it("outer default is merged first, hash content overrides", () => {
-    const td = new TableDefinition("t", { adapterName: "mysql", adapter: conn });
+    const td = new TableDefinition("t", { adapterName: "mysql2", adapter: conn });
     td.setPrimaryKey("t", { type: "string", default: "generated" }, undefined, {
       default: "outer",
     });

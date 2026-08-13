@@ -116,7 +116,7 @@ class TableBuilder {
     // MySQL DATETIME without precision = DATETIME(0); upgrade to DATETIME(6)
     // unless an explicit precision (incl. null) opted out.
     if (
-      this.adapterName === "mysql" &&
+      this.adapterName === "mysql2" &&
       primitive === "datetime" &&
       options["precision"] === undefined
     ) {
@@ -273,7 +273,7 @@ export async function prepareSchema(
   const typeMap =
     adapter.adapterName === "postgres"
       ? COLUMN_TYPE_MAP_PG
-      : adapter.adapterName === "mysql"
+      : adapter.adapterName === "mysql2"
         ? COLUMN_TYPE_MAP_MYSQL
         : COLUMN_TYPE_MAP_SQLITE;
   return { ss, typeMap };
@@ -766,7 +766,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     // schema.rb:426 — MySQL-only functional index (current_adapter?(:Mysql2, :Trilogy)).
     t.index("(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))", {
       name: "full_name_index",
-      adapters: ["mysql"],
+      adapters: ["mysql2"],
     });
   });
 

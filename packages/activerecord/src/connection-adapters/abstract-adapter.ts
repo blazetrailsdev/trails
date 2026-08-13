@@ -136,7 +136,7 @@ import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
  * Mirrors: the three families Rails branches on throughout
  * ActiveRecord (sqlite3, postgresql, mysql2).
  */
-export type AdapterName = "sqlite" | "postgres" | "mysql";
+export type AdapterName = "sqlite" | "postgres" | "mysql2";
 
 /**
  * Map a database.yml `adapter:` config string to the normalized `AdapterName` family.
@@ -152,7 +152,7 @@ export function adapterNameFromConfig(configAdapter: string | undefined): Adapte
     case "mysql":
     case "mysql2":
     case "mariadb":
-      return "mysql";
+      return "mysql2";
     default:
       return "sqlite";
   }
@@ -1300,7 +1300,7 @@ export class AbstractAdapter implements Quoting {
   // which is NOT a member of the normalized `AdapterName` family). The deleted
   // `DatabaseAdapter` interface typed this `AdapterName`; rather than force that
   // infidelitous narrow type onto the base, concrete adapters already override
-  // the getter to return `AdapterName` (sqlite3/postgresql/mysql), and the few
+  // the getter to return `AdapterName` (sqlite3/postgresql/mysql2), and the few
   // downstream sites that need the narrow family narrow/guard at the call site.
   get adapterName(): string {
     return "Abstract";

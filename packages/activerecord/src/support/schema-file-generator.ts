@@ -91,7 +91,7 @@ function colOpts(spec: ColumnSpec, primitive: string, adapterName?: string): str
   // Mirrors schema-types.ts: MySQL DATETIME without precision defaults to
   // DATETIME(0), which rejects fractional seconds. Inject precision:6 unless
   // the spec sets precision explicitly (even precision:null opts out).
-  if (adapterName === "mysql" && primitive === "datetime" && !hasPrecision) {
+  if (adapterName === "mysql2" && primitive === "datetime" && !hasPrecision) {
     parts.push(`precision: 6`);
   }
   return parts.length === 0 ? "{}" : `{ ${parts.join(", ")} }`;
@@ -120,7 +120,7 @@ function generateCode(
   // PG/MySQL: loadSchema runs on a shared database that other workers may already
   // have connected to, so we can't DROP DATABASE. Use force:"cascade" per-table
   // drop+recreate instead — safe for concurrent workers on a shared DB.
-  const needsForce = adapterName === "postgres" || adapterName === "mysql";
+  const needsForce = adapterName === "postgres" || adapterName === "mysql2";
 
   // A referencing table must go before the table it points at: PG/MySQL below
   // drop+recreate each table in declaration order, and a live child FK blocks
@@ -205,12 +205,12 @@ function generateCode(
       // threads in `supportsExpressionIndex` (resolved from the DB version) to
       // match `emitTableIndexes`' runtime `supportsExpressionIndex(adapter)`
       // check (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB). When the flag is
-      // omitted, fall back to the coarse `adapterName === "mysql"` skip — a
+      // omitted, fall back to the coarse `adapterName === "mysql2"` skip — a
       // last resort for a caller with no live connection. Live callers
       // (test-setup-dy.ts, template-global-setup.ts) must thread the flag, or
       // a MySQL-8 worker rebuild strips the canonical expression indexes.
       const dropExpression =
-        supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql";
+        supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql2";
       if (isExpression && dropExpression) continue;
       // schema.rb's inline current_adapter? gate (e.g. the MySQL-only
       // full_name_index) — mirrors emitTableIndexes' `opts.adapters` skip.
@@ -250,7 +250,7 @@ function generateCode(
  * Pass `supportsExpressionIndex` (resolved from the caller's live DB version)
  * to gate expression indexes with `supportsExpressionIndex` semantics
  * (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB) instead of the coarse
- * `adapterName === "mysql"` skip. Omitted for the PG-only template caller,
+ * `adapterName === "mysql2"` skip. Omitted for the PG-only template caller,
  * where PG always supports expression indexes.
  */
 export async function generateSchemaFile(
