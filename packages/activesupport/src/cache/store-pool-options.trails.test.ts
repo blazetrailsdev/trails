@@ -50,6 +50,26 @@ describe("Store.retrievePoolOptions", () => {
     );
   });
 
+  it("accepts the Float literal forms Kernel#Float does", () => {
+    // Verified against MRI: a leading-dot decimal and a hexadecimal float are
+    // valid, while a trailing-dot one is not.
+    expect(Store.retrievePoolOptions({ pool: { timeout: ".5" } })).toEqual({
+      size: 5,
+      timeout: 0.5,
+    });
+    expect(Store.retrievePoolOptions({ pool: { timeout: ".5e2" } })).toEqual({
+      size: 5,
+      timeout: 50,
+    });
+    expect(Store.retrievePoolOptions({ pool: { timeout: "0x1.8p1" } })).toEqual({
+      size: 5,
+      timeout: 3,
+    });
+    expect(() => Store.retrievePoolOptions({ pool: { timeout: "1." } })).toThrow(
+      'invalid value for Float(): "1."',
+    );
+  });
+
   it("converts pool size and timeout the way Kernel#Integer and Kernel#Float do", () => {
     // `Integer("012")` is octal (10), `Integer("1_000")` allows the separator,
     // and a Float size truncates rather than rounding.

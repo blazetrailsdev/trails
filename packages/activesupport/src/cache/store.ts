@@ -72,8 +72,9 @@ function Integer(value: unknown): number {
 /**
  * Mirrors Ruby's `Kernel#Float` — the conversion `retrieve_pool_options`
  * applies to `pool_options[:timeout]` (cache.rb:214). Same String grammar as
- * {@link Integer} plus a fraction and exponent; an empty or whitespace-only
- * String is an ArgumentError, not `0`.
+ * {@link Integer} plus a fraction and exponent (including Ruby's hexadecimal
+ * float literals); an empty or whitespace-only String is an ArgumentError, not
+ * `0`.
  */
 function Float(value: unknown): number {
   if (typeof value === "number") return value;
@@ -82,12 +83,24 @@ function Float(value: unknown): number {
     throw new TypeError(`can't convert ${rubyClassName(value)} into Float`);
   }
   const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
-  const decimal = /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/;
-  const hexadecimal = /^[+-]?0[xX][0-9a-fA-F]+(\.[0-9a-fA-F]+)?([pP][+-]?[0-9]+)?$/;
-  if (!decimal.test(digits) && !hexadecimal.test(digits)) {
-    throw new ArgumentError(`invalid value for Float(): ${inspect(value)}`);
+  const decimal = /^[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/;
+  if (decimal.test(digits)) return Number(digits);
+
+  // Ruby's Float literal grammar also admits hexadecimal floats — `0x1p4`,
+  // `0x1.8p1` — which `Number()` cannot read, so the mantissa and binary
+  // exponent are assembled here.
+  const hexadecimal =
+    /^([+-]?)0[xX]([0-9a-fA-F]+)(?:\.([0-9a-fA-F]+))?(?:[pP]([+-]?[0-9]+))?$/.exec(digits);
+  if (!hexadecimal) throw new ArgumentError(`invalid value for Float(): ${inspect(value)}`);
+  const [, sign, whole, fraction, exponent] = hexadecimal;
+  let magnitude = parseInt(whole, 16);
+  if (fraction !== undefined) {
+    for (let i = 0; i < fraction.length; i++) {
+      magnitude += parseInt(fraction[i], 16) * Math.pow(16, -(i + 1));
+    }
   }
-  return Number(digits);
+  if (exponent !== undefined) magnitude *= Math.pow(2, parseInt(exponent, 10));
+  return sign === "-" ? -magnitude : magnitude;
 }
 
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
