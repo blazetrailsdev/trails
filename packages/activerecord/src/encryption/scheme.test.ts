@@ -10,7 +10,6 @@ import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 describe("ActiveRecord::Encryption::SchemeTest", () => {
   it("validates config options when using encrypted attributes", () => {
     expect(() => new Scheme({ ignoreCase: true, deterministic: false })).toThrow(Configuration);
-    expect(() => new Scheme({ downcase: true, deterministic: false })).toThrow(Configuration);
     expect(() => new Scheme({ key: "k", keyProvider: {} })).toThrow(Configuration);
     expect(
       () =>

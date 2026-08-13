@@ -33,7 +33,7 @@ describe("ActiveRecord::Encryption::ConfigTest", () => {
 
     expect(() => {
       config.previous = [{ compressor, compress: false }];
-    }).toThrow("compressor can't be used with compress: false");
+    }).toThrow("compressor: can't be used with compress: false");
   });
 
   it("credential predicates treat a blank credential as absent", () => {
