@@ -923,13 +923,15 @@ export class JoinDependency {
   }
 
   static walkTree(associations: any, hash: Record<PropertyKey, any>): void {
-    if (typeof associations === "symbol") {
-      if (!hash[associations]) hash[associations] = Object.create(null);
-    } else if (typeof associations === "string") {
+    if (typeof associations === "string") {
+      // Ruby `when Symbol, String then hash[associations.to_sym] ||= {}`
+      // (join_dependency.rb:55-56): a Symbol and the equivalent String key the
+      // same node, so a Symbol — spelled `":comments"` — drops its colon here.
+      const name = associations.startsWith(":") ? associations.slice(1) : associations;
       // Dotted strings ("comments.author") are a trails affordance: split them
       // into nested levels so the builder joins each segment in turn.
       let cur = hash;
-      for (const part of associations.split(".")) {
+      for (const part of name.split(".")) {
         cur = cur[part] ??= Object.create(null);
       }
     } else if (Array.isArray(associations)) {
