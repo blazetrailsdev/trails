@@ -2612,7 +2612,7 @@ export function main() {
           // Collected ahead of the mode filter: a Rails `attr_reader` is
           // usually private while the bodies reading it are public, so a
           // public-mode run would otherwise never see the declaration.
-          if (rm.reader) rubyReaderNames.add(rm.name);
+          if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
           if (!rubyParamsByName.has(rm.name)) {
@@ -2828,7 +2828,11 @@ export function main() {
         const rubySites = rubyOwnSites?.filter(
           (s) =>
             !s.flags.includes("weak") &&
-            !(s.args.length === 0 && s.recv === undefined && rubyReaderNames.has(s.name)),
+            !(
+              s.args.length === 0 &&
+              s.recv === undefined &&
+              rubyReaderNames.has(ownerKey(rubyModule, s.name))
+            ),
         );
         if (!rubySites || rubySites.length === 0) return;
         // Two overloads/overrides under one (file, name) give no ground for
