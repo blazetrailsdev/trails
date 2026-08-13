@@ -91,7 +91,9 @@ export abstract class Type<T = unknown> {
     return false;
   }
 
-  map(value: T | null): T | null {
+  // Rails: `def map(value, &) = value` (value.rb:117-119). The block is the
+  // subtype's hook — the default drops it, OID::Range/OID::Array apply it.
+  map(value: T | null, _block?: (value: unknown) => unknown): T | null {
     return value;
   }
 
