@@ -55,7 +55,7 @@ class StubAdapter extends AbstractAdapter {
 class CapturingAdapter extends AbstractAdapter {
   lastSql = "";
   lastParams: unknown[] = [];
-  constructor(private readonly dialect: "sqlite" | "postgres" | "mysql") {
+  constructor(private readonly dialect: "sqlite" | "postgres" | "mysql2") {
     super();
   }
   get adapterName() {

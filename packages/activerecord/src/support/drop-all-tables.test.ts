@@ -173,7 +173,7 @@ describe("dropAllTables", () => {
   });
 
   it("drops 3-table FK chain without error", async () => {
-    const int = dropAdapter.adapterName === "mysql" ? "INT" : "INTEGER";
+    const int = dropAdapter.adapterName === "mysql2" ? "INT" : "INTEGER";
     await dropAdapter.executeMutation(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
     await dropAdapter.executeMutation(
       `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,

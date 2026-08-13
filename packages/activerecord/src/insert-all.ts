@@ -665,7 +665,7 @@ export class Builder implements InsertBuilder {
       if (this._insertAll.inserts.length > 1) {
         throw new Error("Bulk insert with no explicit columns is not supported");
       }
-      if (this._dialect === "mysql") {
+      if (this._dialect === "mysql2") {
         return `INTO ${tableName} () VALUES ()`;
       }
       return `INTO ${tableName} DEFAULT VALUES`;
@@ -778,7 +778,7 @@ export class Builder implements InsertBuilder {
     const v = this._insertAll.connection.visitor;
     if (v) return v;
     const q = this._insertAll.connection as unknown as Visitors.ArelConnection;
-    if (this._dialect === "mysql") return new Visitors.MySQL(q);
+    if (this._dialect === "mysql2") return new Visitors.MySQL(q);
     if (this._dialect === "postgres") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
   }

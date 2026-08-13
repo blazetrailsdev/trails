@@ -833,9 +833,9 @@ describe("adapterNameFromConfig", () => {
   });
 
   it("maps mysql variants to mysql", async () => {
-    expect(adapterNameFromConfig("mysql2")).toBe("mysql");
-    expect(adapterNameFromConfig("mysql")).toBe("mysql");
-    expect(adapterNameFromConfig("mariadb")).toBe("mysql");
+    expect(adapterNameFromConfig("mysql2")).toBe("mysql2");
+    expect(adapterNameFromConfig("mysql")).toBe("mysql2");
+    expect(adapterNameFromConfig("mariadb")).toBe("mysql2");
   });
 
   it("maps sqlite variants to sqlite", async () => {

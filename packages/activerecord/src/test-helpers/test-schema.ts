@@ -568,7 +568,7 @@ export const TEST_SCHEMA: Schema = {
       {
         columns: "(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))",
         name: "full_name_index",
-        adapters: ["mysql"],
+        adapters: ["mysql2"],
       },
     ],
   },

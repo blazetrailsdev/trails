@@ -461,7 +461,7 @@ function sqlTypeFor(typeName: string, adapterName?: string): string {
         return "varchar";
     }
   }
-  if (adapterName === "mysql") {
+  if (adapterName === "mysql2") {
     switch (typeName) {
       case "integer":
         return "int";
@@ -518,7 +518,7 @@ export async function createTable(this: typeof Base): Promise<void> {
   const table = resolveTableName.call(this);
   const pks = Array.isArray(this.primaryKey) ? this.primaryKey : [this.primaryKey];
   const adapterName = this.connection.adapterName;
-  const isMysql = adapterName === "mysql";
+  const isMysql = adapterName === "mysql2";
   const isPg = adapterName === "postgres";
   const pkSet = new Set(pks);
   const a = this.connection;

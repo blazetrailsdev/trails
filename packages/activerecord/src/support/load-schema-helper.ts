@@ -489,7 +489,7 @@ async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void>
  */
 const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
   postgres: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
-  mysql: (adapter) => loadMysql2SpecificSchema(adapter as unknown as AbstractMysqlAdapter),
+  mysql2: (adapter) => loadMysql2SpecificSchema(adapter as unknown as AbstractMysqlAdapter),
   sqlite: loadSqliteSpecificSchema,
 };
 

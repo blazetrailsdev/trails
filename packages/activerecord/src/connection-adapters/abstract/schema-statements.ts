@@ -559,7 +559,7 @@ export class SchemaStatements {
     // then drops by that real name — never a silent DROP ... IF EXISTS.
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    if (this.adapterName === "mysql") {
+    if (this.adapterName === "mysql2") {
       await this.execute(
         `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteColumnName(tableName)}`,
       );
@@ -578,7 +578,7 @@ export class SchemaStatements {
     const table = this.quoteColumnName(tableName);
     const col = this.quoteColumnName(columnName);
 
-    if (this.adapterName === "mysql") {
+    if (this.adapterName === "mysql2") {
       const nullable = options.null === false ? " NOT NULL" : "";
       const defaultClause =
         options.default === undefined
@@ -1120,7 +1120,7 @@ export class SchemaStatements {
           });
         });
       }
-      case "mysql": {
+      case "mysql2": {
         const rows = await this.schemaQuery(
           `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
           [tableName],
@@ -1227,7 +1227,7 @@ export class SchemaStatements {
           });
         });
       }
-      case "mysql": {
+      case "mysql2": {
         const rows = await this.schemaQuery(
           `SHOW INDEX FROM ${this.quoteTableName(tableName)} WHERE Key_name != 'PRIMARY'`,
         );
@@ -1282,7 +1282,7 @@ export class SchemaStatements {
         );
         return rows.length > 0 ? (rows[0] as any).attname : null;
       }
-      case "mysql": {
+      case "mysql2": {
         const rows = await this.schemaQuery(
           `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`,
         );

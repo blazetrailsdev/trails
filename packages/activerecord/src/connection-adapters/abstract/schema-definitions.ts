@@ -1003,13 +1003,13 @@ export class TableDefinition {
   readonly options?: string;
   readonly comment?: string;
   private _primaryKeys?: PrimaryKeyDefinition;
-  private _adapterName: "sqlite" | "postgres" | "mysql";
+  private _adapterName: "sqlite" | "postgres" | "mysql2";
   protected _adapter: TableDefinitionConn;
 
   constructor(
     name: string,
     tdOptions: {
-      adapterName?: "sqlite" | "postgres" | "mysql";
+      adapterName?: "sqlite" | "postgres" | "mysql2";
       adapter: TableDefinitionConn;
       temporary?: boolean;
       ifNotExists?: boolean;

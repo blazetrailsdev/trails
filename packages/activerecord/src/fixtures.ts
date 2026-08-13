@@ -293,15 +293,15 @@ export function resolveCompositeRefColumn(
 }
 
 /**
- * Returns the adapter's normalized name (`"postgres"` / `"mysql"` / `"sqlite"`).
+ * Returns the adapter's normalized name (`"postgres"` / `"mysql2"` / `"sqlite"`).
  * Lets ERB-style adapter-conditional fixture data translate to TS:
  *
  * ```ts
  * { data: adapterName(adapter) === "postgres" ? a : b }
  * ```
  */
-export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql" | "sqlite" {
-  return adapter.adapterName as "postgres" | "mysql" | "sqlite";
+export function adapterName(adapter: DatabaseAdapter): "postgres" | "mysql2" | "sqlite" {
+  return adapter.adapterName as "postgres" | "mysql2" | "sqlite";
 }
 
 // --- Phase 1b: tableName → ModelClass registry (scoped per adapter) ---

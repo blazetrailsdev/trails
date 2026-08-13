@@ -405,8 +405,8 @@ export class Migration {
   private static _disableDdlTransaction = false;
 
   /** Return the normalized adapter name from the configured adapter. */
-  protected get _adapterName(): "sqlite" | "postgres" | "mysql" {
-    return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
+  protected get _adapterName(): "sqlite" | "postgres" | "mysql2" {
+    return this.connection.adapterName as "sqlite" | "postgres" | "mysql2";
   }
 
   /**

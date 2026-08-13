@@ -165,7 +165,7 @@ async function resetTables(
     case "postgres":
       await resetPgTables(adapter, mode, bootLaid);
       break;
-    case "mysql":
+    case "mysql2":
       await resetMysqlTables(adapter, mode, bootLaid);
       break;
     case "sqlite":

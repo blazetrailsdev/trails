@@ -284,7 +284,7 @@ describe("bulkInboundFkHost", () => {
       name: "fk_rails_13f362e4f5",
     };
     // MySQL's key_column_usage reports one row per constrained column.
-    const { adapter } = fakeAdapter("mysql", [row, { ...row }]);
+    const { adapter } = fakeAdapter("mysql2", [row, { ...row }]);
     const blockers = await bulkInboundFkHost(adapter, base).foreignKeysReferencing!(["authors"]);
     expect(blockers).toEqual([
       { fromTable: "lessons_students", toTable: "authors", name: "fk_rails_13f362e4f5" },
@@ -292,7 +292,7 @@ describe("bulkInboundFkHost", () => {
   });
 
   test("skips the catalog query when nothing is being dropped", async () => {
-    const { adapter, queries } = fakeAdapter("mysql");
+    const { adapter, queries } = fakeAdapter("mysql2");
     expect(await bulkInboundFkHost(adapter, base).foreignKeysReferencing!([])).toEqual([]);
     expect(queries).toEqual([]);
   });

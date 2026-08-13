@@ -194,7 +194,7 @@ export function bulkInboundFkHost(
   ss: FkSafeDropPlanHost,
 ): FkSafeDropPlanHost {
   const name = adapter.adapterName;
-  if (name !== "postgres" && name !== "mysql") return ss;
+  if (name !== "postgres" && name !== "mysql2") return ss;
   const foreignKeysReferencing = async (
     toTables: readonly string[],
   ): Promise<readonly FkDropBlocker[]> => {

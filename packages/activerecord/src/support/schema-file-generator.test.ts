@@ -136,7 +136,7 @@ describe("generateSchemaFile (MySQL adapter)", () => {
   let filePath: string;
 
   beforeAll(async () => {
-    filePath = await generateSchemaFile(MYSQL_SCHEMA, "mysql");
+    filePath = await generateSchemaFile(MYSQL_SCHEMA, "mysql2");
     const fs = await getFsAsync();
     content = fs.readFileSync(filePath, "utf-8");
   });
@@ -244,7 +244,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
   });
 
   it("uses integer (INT auto-increment) on mysql, not bigint", async () => {
-    const filePath = await generateSchemaFile(SCHEMA, "mysql");
+    const filePath = await generateSchemaFile(SCHEMA, "mysql2");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
@@ -266,7 +266,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
   });
 
   it("uses bigint (BIGINT auto-increment) on mysql", async () => {
-    const filePath = await generateSchemaFile(SCHEMA, "mysql");
+    const filePath = await generateSchemaFile(SCHEMA, "mysql2");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "bigint", { primaryKey: true }');
@@ -328,7 +328,7 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     map: Record<string, string>;
   }> = [
     { adapter: "postgres", map: COLUMN_TYPE_MAP_PG },
-    { adapter: "mysql", map: COLUMN_TYPE_MAP_MYSQL },
+    { adapter: "mysql2", map: COLUMN_TYPE_MAP_MYSQL },
     { adapter: "sqlite", map: COLUMN_TYPE_MAP_SQLITE },
   ];
 
@@ -347,14 +347,16 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   // The exact #4461 regression, pinned: the generator's stale map remapped
   // date/time/json → string on MySQL, so these must stay native, not VARCHAR.
   it("emits native date/time/json (not string) on MySQL — the PR #4461 regression", async () => {
-    const emitted = emittedTypes(await readGenerated(schemaFor(["date", "time", "json"]), "mysql"));
+    const emitted = emittedTypes(
+      await readGenerated(schemaFor(["date", "time", "json"]), "mysql2"),
+    );
     expect(emitted["c_date"]).toBe("date");
     expect(emitted["c_time"]).toBe("time");
     expect(emitted["c_json"]).toBe("json");
   });
 
   it("injects precision:6 on MySQL bare datetime columns (mirrors define-schema.ts)", async () => {
-    const content = await readGenerated({ parity_probe: { at: "datetime" } }, "mysql");
+    const content = await readGenerated({ parity_probe: { at: "datetime" } }, "mysql2");
     expect(content).toContain('t.column("at", "datetime", { precision: 6 })');
   });
 
@@ -366,7 +368,7 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   });
 
   it("emits serial-PK width matching serialIdType for every adapter", async () => {
-    for (const adapter of ["postgres", "mysql", "sqlite"]) {
+    for (const adapter of ["postgres", "mysql2", "sqlite"]) {
       for (const type of ["integer", "big_integer"] as PrimitiveColumnSpec[]) {
         const schema: Schema = {
           parity_probe: { columns: { pk: type }, primaryKey: ["pk"] },
@@ -499,7 +501,7 @@ const PARITY_INDEXES: Parameters<typeof emitTableIndexes>[3] = [
   { columns: "(lower(external_id))", opts: {} },
   // Adapter-restricted index (schema.rb's inline current_adapter? gate, e.g.
   // the MySQL-only full_name_index) — both emitters must apply the same skip.
-  { columns: "body", opts: { name: "idx_probe_mysql_only", adapters: ["mysql"] } },
+  { columns: "body", opts: { name: "idx_probe_mysql_only", adapters: ["mysql2"] } },
 ];
 const PARITY_EXPRESSION_INDEX = "(lower(external_id))";
 const GENERATOR_INDEXES: IndexSpec[] = PARITY_INDEXES.map((i) => ({
@@ -543,8 +545,8 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
   // in lockstep. (The MySQL-8 divergence is the tracked residual below.)
   it("emits the same addIndex calls as canonical-schema.ts on mysql (MariaDB, no expression index)", async () => {
     const [gen, canon] = await Promise.all([
-      generatorIndexes(GENERATOR_SCHEMA, "mysql"),
-      canonicalIndexes(PARITY_INDEXES, "mysql", false),
+      generatorIndexes(GENERATOR_SCHEMA, "mysql2"),
+      canonicalIndexes(PARITY_INDEXES, "mysql2", false),
     ]);
     // Only the expression index is dropped (the adapters-gated MySQL-only
     // index survives here), so the rest come through — pin the count so the
@@ -574,7 +576,7 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
 
   // Expression-index gating parity on MySQL 8. The generator now threads the
   // caller-resolved `supportsExpressionIndex` capability (MySQL >= 8.0.13,
-  // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql"`
+  // SQLite >= 3.9, never MariaDB) instead of the coarse `adapterName === "mysql2"`
   // skip, so on a live MySQL 8 (supportsExpressionIndex true) it keeps the
   // expression index — matching canonical-schema.ts's `emitTableIndexes`, which
   // uses the same runtime check. (Previously the PR #4471 tracked residual: the
@@ -582,8 +584,8 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
   // the capability flag from the caller into `generateSchemaFile`.)
   it("emits the same addIndex calls as canonical-schema.ts on mysql 8 (expression index kept)", async () => {
     const [gen, canonMysql8] = await Promise.all([
-      generatorIndexes(GENERATOR_SCHEMA, "mysql", true),
-      canonicalIndexes(PARITY_INDEXES, "mysql", true),
+      generatorIndexes(GENERATOR_SCHEMA, "mysql2", true),
+      canonicalIndexes(PARITY_INDEXES, "mysql2", true),
     ]);
     // All four indexes survive on MySQL 8 (expression kept). Pin the count so
     // the equality below can't pass vacuously.

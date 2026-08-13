@@ -111,10 +111,10 @@ export function postgresqlNativeDatabaseTypes(
 }
 
 export const NATIVE_DATABASE_TYPES_BY_ADAPTER: Record<
-  "sqlite" | "postgres" | "mysql",
+  "sqlite" | "postgres" | "mysql2",
   NativeDatabaseTypes
 > = {
   sqlite: SQLITE3_NATIVE_DATABASE_TYPES,
   postgres: POSTGRESQL_NATIVE_DATABASE_TYPES,
-  mysql: MYSQL_NATIVE_DATABASE_TYPES,
+  mysql2: MYSQL_NATIVE_DATABASE_TYPES,
 };
