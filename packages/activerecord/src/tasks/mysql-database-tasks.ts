@@ -58,13 +58,13 @@ export class MySQLDatabaseTasks {
     await this.establishConnection(this.configurationHashWithoutDatabase());
     await (
       await this.connection()
-    ).createDatabase(this.requireDatabaseName(), this.creationOptions());
+    ).createDatabase(this.dbConfig.database as string, this.creationOptions());
     await this.establishConnection();
   }
 
   async drop(): Promise<void> {
     await this.establishConnection();
-    await (await this.connection()).dropDatabase(this.requireDatabaseName());
+    await (await this.connection()).dropDatabase(this.dbConfig.database as string);
   }
 
   async purge(): Promise<void> {
@@ -84,7 +84,7 @@ export class MySQLDatabaseTasks {
     await this.establishConnection(this.configurationHashWithoutDatabase());
     await (
       await this.connection()
-    ).createDatabase(this.requireDatabaseName(), { ...this.creationOptions(), ...saved });
+    ).createDatabase(this.dbConfig.database as string, { ...this.creationOptions(), ...saved });
     await this.establishConnection();
   }
 
@@ -115,11 +115,11 @@ export class MySQLDatabaseTasks {
         }),
       );
       for (const table of ignoreTables) {
-        args.push(`--ignore-table=${this.requireDatabaseName()}.${table as string}`);
+        args.push(`--ignore-table=${this.dbConfig.database as string}.${table as string}`);
       }
     }
 
-    args.push(this.requireDatabaseName());
+    args.push(this.dbConfig.database as string);
     if (extraFlags) {
       args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
@@ -128,7 +128,7 @@ export class MySQLDatabaseTasks {
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const args = this.prepareCommandOptions();
-    args.push("--database", this.requireDatabaseName());
+    args.push("--database", this.dbConfig.database as string);
     if (extraFlags) {
       args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
@@ -144,7 +144,7 @@ export class MySQLDatabaseTasks {
    * Mysql2Adapter#truncate_tables behavior).
    */
   async truncateAll(): Promise<void> {
-    const dbName = this.requireDatabaseName();
+    const dbName = this.dbConfig.database as string;
     await this.establishConnection();
     const adapter = await this.connection();
     const bookkeeping = metadataTableNames();
@@ -201,7 +201,7 @@ export class MySQLDatabaseTasks {
   }
 
   private async savedCharset(): Promise<{ charset?: string; collation?: string }> {
-    const dbName = this.requireDatabaseName();
+    const dbName = this.dbConfig.database as string;
     // Connect without selecting a database: information_schema.SCHEMATA is
     // server-global, and connecting to the target DB would fail with error 1049
     // if it doesn't exist yet (e.g. purge() called before create() on a clean env).
@@ -300,12 +300,6 @@ export class MySQLDatabaseTasks {
           (details.length ? `${details.join("\n\n")}\n` : ""),
       );
     }
-  }
-
-  private requireDatabaseName(): string {
-    const name = this.dbConfig.database ?? this.urlParts.database;
-    if (!name) throw new Error("MySQL configuration missing 'database'");
-    return name;
   }
 
   /** @internal */

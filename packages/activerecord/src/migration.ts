@@ -1573,15 +1573,21 @@ export class Migration {
         // Build a fresh migration factory that imports the NEW path — spreading
         // `source` would carry over a closure pinned to the old engine file.
         const proxyName = source.name;
+        // `@migration ||= load_migration` (`migration.rb:1191`) — the proxy loads
+        // once and every delegated call sees the same instance.
+        let loaded: Promise<Migration> | undefined;
         const copy: MigrationProxy = {
           name: source.name,
           version: newVersion,
           scope,
           filename: newPath,
           migration: async () => {
-            const { pathToFileURL } = await import("node:url");
-            const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
-            return loadMigrationFrom(mod, proxyName, newVersion);
+            loaded ??= (async () => {
+              const { pathToFileURL } = await import("node:url");
+              const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
+              return loadMigrationFrom(mod, proxyName, newVersion);
+            })();
+            return loaded;
           },
         };
         last = copy;
@@ -2210,15 +2216,21 @@ export class MigrationContext<
       }
       const version = toInteger(rawVersion);
       const name = camelize(rawName);
+      // `@migration ||= load_migration` (`migration.rb:1191`) — the proxy loads
+      // once and every delegated call sees the same instance.
+      let loaded: Promise<Migration> | undefined;
       return {
         version,
         name,
         filename: file,
         scope: scope || undefined,
         migration: async (): Promise<Migration> => {
-          const { pathToFileURL } = await import("node:url");
-          const mod = await import(pathToFileURL(file).href);
-          return loadMigrationFrom(mod, name, version);
+          loaded ??= (async () => {
+            const { pathToFileURL } = await import("node:url");
+            const mod = await import(pathToFileURL(file).href);
+            return loadMigrationFrom(mod, name, version);
+          })();
+          return loaded;
         },
       } satisfies MigrationProxy;
     });
@@ -2540,37 +2552,40 @@ export class Migrator {
    * migration actually ran, which is what `run_without_lock` hands back to
    * `MigrationContext#run`.
    */
-  async executeMigrationInTransaction(proxy: MigrationProxy): Promise<number | undefined> {
-    let migration: Migration | undefined;
+  async executeMigrationInTransaction(migration: MigrationProxy): Promise<number | undefined> {
     // Ruby's method-level `rescue` (`migration.rb:1538`) covers the guards and
     // the log line too, not just the ddl_transaction.
     try {
       const applied = await this.migrated();
-      if (this.isDown() && !applied.has(proxy.version)) return undefined;
-      if (this.isUp() && applied.has(proxy.version)) return undefined;
+      if (this.isDown() && !applied.has(migration.version)) return undefined;
+      if (this.isUp() && applied.has(migration.version)) return undefined;
 
       // Rails' guard is just `if Base.logger`; the `?.` on `info` is forced by
       // trails' `Base.logger` type, which declares every level optional
       // (base.ts:1717-1723) because the logger is app-supplied, where Ruby's is
       // an ActiveSupport::Logger that always responds to `info`.
-      if (_base?.logger) _base.logger.info?.(`Migrating to ${proxy.name} (${proxy.version})`);
+      if (_base?.logger)
+        _base.logger.info?.(`Migrating to ${migration.name} (${migration.version})`);
 
-      const loaded = (migration = await proxy.migration());
-      await this.ddlTransaction(loaded, async () => {
-        await loaded.migrate(this._direction);
-        await this.recordVersionStateAfterMigrating(proxy.version);
+      await this.ddlTransaction(migration, async () => {
+        // `delegate :migrate, ..., to: :migration` (`migration.rb:1187`). The
+        // proxy's own `migration()` is async — an ESM `import()` where Ruby's
+        // `load` is synchronous — so the delegating members cannot be plain
+        // methods on the proxy and the await lands here instead.
+        await (await migration.migration()).migrate(this._direction);
+        await this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
       // Rails re-resolves the proxy here (`migration.rb:1540` → `use_transaction?`
       // → `MigrationProxy#disable_ddl_transaction`), so a migration that failed to
       // load raises again from inside the rescue and escapes unwrapped.
-      const useTx = this.isUseTransaction(migration ?? (await proxy.migration()));
+      const useTx = await this.isUseTransaction(migration);
       // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
       // the `Error: ` prefix JS String(e) would add.
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
-    return proxy.version;
+    return migration.version;
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#target */
@@ -2860,8 +2875,8 @@ export class Migrator {
    *
    * @internal
    */
-  async ddlTransaction(migration: Migration, fn: () => Promise<void>): Promise<void> {
-    if (this.isUseTransaction(migration)) {
+  async ddlTransaction(migration: MigrationProxy, fn: () => Promise<void>): Promise<void> {
+    if (await this.isUseTransaction(migration)) {
       await this.connection.transaction(fn);
     } else {
       await fn();
@@ -2874,8 +2889,11 @@ export class Migrator {
    *
    * @internal
    */
-  isUseTransaction(migration: Migration): boolean {
-    if (migration.disableDdlTransaction) return false;
+  async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
+    // `migration.disable_ddl_transaction` is delegated through the proxy
+    // (`migration.rb:1187`); trails resolves it here because the proxy's loader
+    // is an async ESM `import()` where Ruby's `load` is synchronous.
+    if ((await migration.migration()).disableDdlTransaction) return false;
     // Check adapter support via the DatabaseAdapter interface.
     // SQLite returns true, PG returns true, MySQL returns false.
     // Absent (undefined) defaults to false.
