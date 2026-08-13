@@ -35,29 +35,51 @@ export class BacktraceCleaner {
     return this;
   }
 
-  /** clean — applies filters then silencer selection per `kind`. */
+  /** clean — applies filters then silencer selection per `kind` (backtrace_cleaner.rb:45-56). */
   clean(backtrace: string[], kind: CleanKind = "silent"): string[] {
-    const filtered = backtrace.map((line) => this._applyFilters(line));
-    if (kind === "all") return filtered;
-    if (kind === "noise") return filtered.filter((line) => this._isSilenced(line));
-    return filtered.filter((line) => !this._isSilenced(line));
+    const filtered = this.filterBacktrace(backtrace);
+
+    switch (kind) {
+      case "silent":
+        return this.silence(filtered);
+      case "noise":
+        return this.noise(filtered);
+      default:
+        return filtered;
+    }
   }
 
   /** cleanFrame — clean a single frame; returns undefined when excluded by the selected kind. */
   cleanFrame(frame: string, kind: CleanKind = "silent"): string | undefined {
-    const filtered = this._applyFilters(frame);
-    if (kind === "all") return filtered;
-    const silenced = this._isSilenced(filtered);
-    if (kind === "noise") return silenced ? filtered : undefined;
-    return silenced ? undefined : filtered;
+    for (const f of this._filters) frame = f(frame);
+
+    switch (kind) {
+      case "silent":
+        return this._silencers.some((s) => s(frame)) ? undefined : frame;
+      case "noise":
+        return this._silencers.some((s) => s(frame)) ? frame : undefined;
+      default:
+        return frame;
+    }
   }
 
-  protected _applyFilters(line: string): string {
-    return this._filters.reduce((l, filter) => filter(l), line);
+  /** backtrace_cleaner.rb:139-145 */
+  protected filterBacktrace(backtrace: string[]): string[] {
+    for (const f of this._filters) backtrace = backtrace.map((line) => f(line));
+
+    return backtrace;
   }
 
-  protected _isSilenced(line: string): boolean {
-    return this._silencers.some((s) => s(line));
+  /** backtrace_cleaner.rb:147-153 */
+  protected silence(backtrace: string[]): string[] {
+    for (const s of this._silencers) backtrace = backtrace.filter((line) => !s(line));
+
+    return backtrace;
+  }
+
+  /** backtrace_cleaner.rb:155-161 */
+  protected noise(backtrace: string[]): string[] {
+    return backtrace.filter((line) => this._silencers.some((s) => s(line)));
   }
 
   dup(): this {

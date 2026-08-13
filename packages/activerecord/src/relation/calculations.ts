@@ -352,7 +352,6 @@ async function groupedAggregate(
   distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
-  const table = rel._model.arelTable;
   // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
   // group field, uniq'ing only when there is more than one. A belongs_to
   // reflection is attempted from a LONE field, which then expands to that
@@ -362,10 +361,14 @@ async function groupedAggregate(
   if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
   const association =
     groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
-  if (association && Array.isArray(association.foreignKey)) {
-    return groupedCompositeAssoc(rel, association, fn, column);
+  // calculations.rb:521: `group_fields = Array(association.foreign_key)` — a
+  // composite-key belongs_to expands to every foreign key column here, and the
+  // rest of the body carries whatever arity that produces.
+  if (association) {
+    groupFields = Array.isArray(association.foreignKey)
+      ? [...(association.foreignKey as string[])]
+      : [association.foreignKey as string];
   }
-  if (association) groupFields = [association.foreignKey as string];
   // Mirror Rails `execute_grouped_calculation`, which resolves group fields via
   // the plural `arel_columns` — so a `from(subquery, alias)` leaves the group
   // column unqualified (matching the subquery alias) instead of pinning it to
@@ -438,13 +441,31 @@ async function groupedAggregate(
     // foreign-key value. JS Map keys compare by reference, so callers locate a
     // key by its `id` rather than by holding the same instance.
     const klass = association.klass.baseClass ?? association.klass;
-    const ids = rows.map((row) => row[aliases[0]]).filter((v) => v != null);
-    const records: any[] =
-      ids.length > 0 ? await klass.where({ [klass.primaryKey]: ids }).toArray() : [];
-    const byId = new Map(records.map((r) => [String(r.id), r]));
+    const primaryKey = (
+      Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
+    ) as string[];
+    // NUL-join so string-valued key components cannot collide across the tuple
+    // boundary (e.g. ["a b","c"] vs ["a","b c"]).
+    const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
+    const keyIds = rows
+      .map((row) => aliases.map((a) => row[a]))
+      .filter((vals) => vals.every((v) => v != null));
+    const keyRecords: any[] =
+      keyIds.length === 0
+        ? []
+        : primaryKey.length === 1
+          ? await klass.where({ [primaryKey[0]]: keyIds.map((vals) => vals[0]) }).toArray()
+          : await klass.where(primaryKey, keyIds).toArray();
+    // The composite-PK `id` accessor returns an array, so key the lookup map by
+    // the raw per-column attribute values to match the SQL group-key tuple.
+    const byKey = new Map(
+      keyRecords.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
+    );
     const result = new Map<unknown, unknown>();
     for (const row of rows) {
-      result.set(byId.get(String(row[aliases[0]])) ?? null, aggOf(row[aggAlias]));
+      const vals = aliases.map((a) => row[a]);
+      const record = vals.every((v) => v != null) ? (byKey.get(keyOf(vals)) ?? null) : null;
+      result.set(record, aggOf(row[aggAlias]));
     }
     return result;
   }
@@ -504,107 +525,7 @@ function resolveGroupAssociation(rel: CalculationRelation, groupCol: unknown): a
   if (typeof groupCol !== "string") return null;
   const reflection = (rel.model as any)._reflectOnAssociation?.(groupCol);
   if (!reflection || !reflection.belongsTo?.()) return null;
-  // Rails (calculations.rb:521) does `group_fields = Array(association.foreign_key)`
-  // and builds a multi-column GROUP BY for a composite-key belongs_to, keyed by
-  // the loaded record. A composite FK (string[]) is handled by
-  // `groupedCompositeAssoc`; a single-column FK by the caller's main path.
   return reflection;
-}
-
-/**
- * Grouped calculation keyed by a composite-key belongs_to association. Mirrors
- * Rails' `execute_grouped_calculation` (calculations.rb): GROUP BY every foreign
- * key column, then map each group's key tuple back to the loaded associated
- * record via the target's composite primary key. JS Map keys compare by
- * reference, so callers locate a key record by its component values, not by
- * holding the same instance.
- */
-async function groupedCompositeAssoc(
-  rel: CalculationRelation,
-  association: any,
-  fn: AggFn,
-  column: string | Nodes.Node | number | null,
-): Promise<Map<unknown, unknown>> {
-  const table = rel._model.arelTable;
-  const fkCols = association.foreignKey as string[];
-  const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
-  const columnAliasTracker = new ColumnAliasTracker(rel._conn());
-  const aliases = groupNodes.map((field) =>
-    columnAliasTracker.aliasFor(
-      (field instanceof Nodes.Node
-        ? (rel._conn().visitor?.compile(field) ?? String(field))
-        : String(field)
-      ).toLowerCase(),
-    ),
-  );
-  // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
-  // into `joins_values` via `apply_join_dependency` before dispatching to the
-  // grouped calculation, regardless of key arity — mirroring `groupedAggregate`.
-  const relation = eagerJoinedRelation(rel, false)
-    .except("group")
-    .distinctBang(false) as CalculationRelation;
-  const aggNode = operationOverAggregateColumn(
-    aggregateColumn(relation, column),
-    fn,
-    rel._isDistinct,
-  ) as any;
-  const projections = groupNodes.map(
-    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(rel._conn().quoteColumnName(aliases[i]))),
-  );
-  const aggAlias = columnAliasTracker.aliasFor(
-    `${fn} ${(column == null ? "" : String(column)).toLowerCase()}`,
-  );
-  relation._groupColumns = groupNodes as unknown as string[];
-  relation._selectColumns = buildGroupedSelectValues(
-    rel,
-    aggNode.as(rel._conn().quoteColumnName(aggAlias)),
-    projections,
-  );
-
-  // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
-  // own type caster, then a type discovered through the join dependencies, then
-  // Type.default_value, with an EnumType unwrapped to its subtype.
-  let type: unknown;
-  if (fn !== "count") {
-    type =
-      typeCasterFor(aggregateColumn(rel, column)) ??
-      lookupCastTypeFromJoinDependencies(rel, String(column)) ??
-      defaultValue();
-    if (type instanceof EnumType) type = type.subtypeType();
-  }
-  const [rawSql, binds] = compileManagerWithBinds(relation, relation.arel());
-  const sql =
-    isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(rawSql, aliases, aggAlias)
-      : rawSql;
-  const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds);
-  const rows = queryResult.toArray();
-
-  // calculations.rb:591: every group's aggregate folds through the same
-  // type_cast_calculated_value the ungrouped arm uses.
-  const aggOf = (val: unknown): unknown => typeCastCalculatedValue(val ?? null, fn, type);
-
-  const klass = association.klass.baseClass ?? association.klass;
-  const pk = (Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]) as string[];
-  // NUL-join so string-valued key components cannot collide across the tuple
-  // boundary (e.g. ["a b","c"] vs ["a","b c"]).
-  const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-  const tuples = rows
-    .map((row) => aliases.map((a) => row[a]))
-    .filter((vals) => vals.every((v) => v != null));
-  const records: any[] = tuples.length > 0 ? await klass.where(pk, tuples).toArray() : [];
-  // The composite-PK `id` accessor returns an array, so key the lookup map by
-  // the raw per-column attribute values to match the SQL group-key tuple.
-  const byKey = new Map(records.map((r) => [keyOf(pk.map((k) => r._readAttribute(k))), r]));
-
-  const result = new Map<unknown, unknown>();
-  for (const row of rows) {
-    const vals = aliases.map((a) => row[a]);
-    const record = vals.every((v) => v != null) ? (byKey.get(keyOf(vals)) ?? null) : null;
-    result.set(record, aggOf(row[aggAlias]));
-  }
-  return result;
 }
 
 /**
@@ -1124,11 +1045,7 @@ export async function executeGroupedCalculation(
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
-  // DIVERGENCE (Rails calculations.rb:513-595): the grouped aggregate body —
-  // group-field uniq'ing, the belongs_to reflection, the column-alias tracker
-  // and the `association.klass.base_class.where(primary_key => key_ids)`
-  // key-record lookup — lives in the shared `groupedAggregate` helper. The
-  // resolved `distinct` is threaded into it so it reaches
+  // The resolved `distinct` is threaded through so it reaches
   // `operation_over_aggregate_column` (calculations.rb:538).
   return groupedAggregate(rel, fn, aggregateTarget(columnName), distinct);
 }

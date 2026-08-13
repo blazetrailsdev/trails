@@ -287,13 +287,13 @@ export function generatesTokenFor(
   purpose: string,
   options: {
     expiresIn?: number;
-    generator?: (record: any) => unknown;
+    block?: (record: any) => unknown;
   } = {},
 ): void {
   setTokenDefinitions(
     this,
     tokenDefinitions(this).merge({
-      [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.generator),
+      [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.block),
     }),
   );
 }
