@@ -709,9 +709,11 @@ export async function setCurrentThreadBackend(
  * `require`: `activesupport/lib/active_support/xml_mini/` holds jdom.rb,
  * libxml.rb, libxmlsax.rb, nokogiri.rb, nokogirisax.rb and rexml.rb. A name
  * maps either to its trails module's loader or — for the three backends trails
- * does not carry — to the reason, so an unported backend is named in one place
- * instead of being implied by an absent branch. Every entry raises the same
- * `LoadError` message its Ruby `require` would.
+ * does not carry, which wrap a JRuby-only DOM (jdom.rb:3) and the libxml-ruby
+ * gem (libxml.rb:3, libxmlsax.rb:3) — to the message that Ruby file itself
+ * raises, so an unported backend is named in one place instead of being implied
+ * by an absent branch. A name with no entry at all raises what Ruby's `require`
+ * raises for a missing file.
  *
  * The specifiers are spelled out rather than interpolated: a bundler resolves
  * `import(`./xml-mini/${x}.js`)` by globbing `./xml-mini/*.js`, which matches
@@ -719,10 +721,9 @@ export async function setCurrentThreadBackend(
  * `Unknown variable dynamic import` under vitest.
  */
 const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
-  jdom: "jdom.rb raises unless RUBY_PLATFORM includes java (jdom.rb:3) — it is a JRuby-only backend over javax.xml.parsers, with nothing to bind to here",
-  libxml:
-    "libxml.rb requires the libxml-ruby gem (libxml.rb:3), a native binding trails has no counterpart for",
-  libxmlsax: "libxmlsax.rb requires the same libxml-ruby gem (libxmlsax.rb:3) for its SAX parser",
+  jdom: "JRuby is required to use the JDOM backend for XmlMini",
+  libxml: "cannot load such file -- libxml",
+  libxmlsax: "cannot load such file -- libxml",
   nokogiri: () => import("./xml-mini/nokogiri.js"),
   nokogirisax: () => import("./xml-mini/nokogirisax.js"),
   rexml: () => import("./xml-mini/rexml.js"),
@@ -745,13 +746,13 @@ export async function castBackendNameToModule(name: XmlMiniBackendName): Promise
   } else {
     const backend = XML_MINI_BACKENDS[name.toLowerCase()];
     if (typeof backend === "function") return (await backend()) as XmlMiniBackend;
-    // Ruby's counterpart is the core `LoadError` that
-    // `require "active_support/xml_mini/#{name.downcase}"` raises for a name
-    // with no file — or, for a backend whose gem is missing, for the gem it
-    // requires; there is no Rails error class to port here, the same reason
-    // `yaml.ts:16` gives for its own LoadError stand-in.
+    // Ruby's counterpart is the core `LoadError` / `RuntimeError` the file's own
+    // `require` or guard raises; there is no Rails error class to port here, the
+    // same reason `yaml.ts:16` gives for its own LoadError stand-in.
     // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(`cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`);
+    throw new Error(
+      backend ?? `cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`,
+    );
   }
 }
 

@@ -2342,8 +2342,7 @@ describe("Date#inspect", () => {
       "#<DateTime: 2001-02-03T00:00:00+00:00 ((2451944j,0s,0n),+0s,2299161j)>",
     );
 
-    // esbuild renames a class binding when it collides, which rewrites
-    // `constructor.name` but not a static string field.
+    // esbuild renames a colliding class binding, rewriting `constructor.name`.
     const renamed = Object.defineProperty(RubyDate, "name", {
       value: "Date2",
       configurable: true,

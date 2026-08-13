@@ -8,8 +8,8 @@ import { castBackendNameToModule } from "./xml-mini.js";
  * so its reachable set IS the directory listing. trails spells the set out in
  * `XML_MINI_BACKENDS`, which a new backend file could silently miss — these
  * cover the two halves of that: every ported file resolves, and the three
- * backends Rails ships that trails does not carry raise the LoadError message
- * their `require` raises.
+ * backends Rails ships that trails does not carry raise what their own Ruby
+ * file raises.
  */
 describe("XmlMini backends", () => {
   // Vite rewrites a LITERAL `import.meta.glob` call at transform time, so the
@@ -28,10 +28,13 @@ describe("XmlMini backends", () => {
     }
   });
 
-  it("raises LoadError for the backends Rails ships that trails does not carry", async () => {
-    for (const name of ["JDOM", "LibXML", "LibXMLSAX"]) {
+  it("raises what the Ruby file raises for the backends trails does not carry", async () => {
+    await expect(castBackendNameToModule("JDOM")).rejects.toThrow(
+      "JRuby is required to use the JDOM backend for XmlMini",
+    );
+    for (const name of ["LibXML", "LibXMLSAX"]) {
       await expect(castBackendNameToModule(name)).rejects.toThrow(
-        `cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`,
+        "cannot load such file -- libxml",
       );
     }
   });
