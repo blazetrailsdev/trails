@@ -404,7 +404,7 @@ export async function newColumnFromField(
   this: MysqlColumnReflectionHost,
   tableName: string,
   field: Record<string, string | null>,
-  _definitions?: unknown,
+  _definitions: unknown,
 ): Promise<Column> {
   const fieldName = field["Field"] ?? "";
   const meta = fetchTypeMetadata(

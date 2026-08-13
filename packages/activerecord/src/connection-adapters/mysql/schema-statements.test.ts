@@ -135,14 +135,19 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("newColumnFromField: builds Column from SHOW COLUMNS field hash", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "users", {
-      Field: "name",
-      Type: "varchar(255)",
-      Null: "YES",
-      Default: "Dean",
-      Extra: "",
-      Collation: "utf8_general_ci",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "users",
+      {
+        Field: "name",
+        Type: "varchar(255)",
+        Null: "YES",
+        Default: "Dean",
+        Extra: "",
+        Collation: "utf8_general_ci",
+      },
+      [],
+    );
     expect(col.name).toBe("name");
     expect(col.default).toBe("Dean");
     expect(col.null).toBe(true);
@@ -150,85 +155,120 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("newColumnFromField: CURRENT_TIMESTAMP default becomes defaultFunction on timestamp (alias for datetime)", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "events", {
-      Field: "updated_at",
-      Type: "timestamp",
-      Null: "NO",
-      Default: "CURRENT_TIMESTAMP",
-      Extra: "",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "updated_at",
+        Type: "timestamp",
+        Null: "NO",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
   });
 
   it("newColumnFromField: CURRENT_TIMESTAMP default becomes defaultFunction on datetime", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "events", {
-      Field: "created_at",
-      Type: "datetime",
-      Null: "NO",
-      Default: "CURRENT_TIMESTAMP",
-      Extra: "",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "created_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "CURRENT_TIMESTAMP",
+        Extra: "",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
   });
 
   it("newColumnFromField: NOW() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "events", {
-      Field: "created_at",
-      Type: "datetime",
-      Null: "NO",
-      Default: "now()",
-      Extra: "DEFAULT_GENERATED",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "events",
+      {
+        Field: "created_at",
+        Type: "datetime",
+        Null: "NO",
+        Default: "now()",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("(now())");
   });
 
   it("newColumnFromField: UUID() via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "items", {
-      Field: "uid",
-      Type: "char(36)",
-      Null: "NO",
-      Default: "uuid()",
-      Extra: "DEFAULT_GENERATED",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "items",
+      {
+        Field: "uid",
+        Type: "char(36)",
+        Null: "NO",
+        Default: "uuid()",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("(uuid())");
   });
 
   it("newColumnFromField: CURRENT_DATE via DEFAULT_GENERATED becomes defaultFunction (MySQL 8)", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "items", {
-      Field: "due_on",
-      Type: "date",
-      Null: "YES",
-      Default: "CURRENT_DATE",
-      Extra: "DEFAULT_GENERATED",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "items",
+      {
+        Field: "due_on",
+        Type: "date",
+        Null: "YES",
+        Default: "CURRENT_DATE",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("(CURRENT_DATE)");
   });
 
   it("newColumnFromField: DEFAULT_GENERATED extra becomes defaultFunction", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "orders", {
-      Field: "total",
-      Type: "decimal(10,2)",
-      Null: "YES",
-      Default: "price * qty",
-      Extra: "DEFAULT_GENERATED",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "orders",
+      {
+        Field: "total",
+        Type: "decimal(10,2)",
+        Null: "YES",
+        Default: "price * qty",
+        Extra: "DEFAULT_GENERATED",
+      },
+      [],
+    );
     expect(col.default).toBeNull();
     expect(col.defaultFunction).toBe("(price * qty)");
   });
 
   it("newColumnFromField: text default strips surrounding quotes", async () => {
-    const col = await newColumnFromField.call(reflectionHost(), "users", {
-      Field: "bio",
-      Type: "text",
-      Null: "YES",
-      Default: "'hello world'",
-      Extra: "",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(),
+      "users",
+      {
+        Field: "bio",
+        Type: "text",
+        Null: "YES",
+        Default: "'hello world'",
+        Extra: "",
+      },
+      [],
+    );
     expect(col.default).toBe("hello world");
   });
 
@@ -253,13 +293,18 @@ describe("MySQL::SchemaStatements", () => {
 
   it("newColumnFromField: limit from lookupCastType is preserved on Column", async () => {
     const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
-    const col = await newColumnFromField.call(reflectionHost(null, lookup), "t", {
-      Field: "id",
-      Type: "bigint",
-      Null: "NO",
-      Default: null,
-      Extra: "",
-    });
+    const col = await newColumnFromField.call(
+      reflectionHost(null, lookup),
+      "t",
+      {
+        Field: "id",
+        Type: "bigint",
+        Null: "NO",
+        Default: null,
+        Extra: "",
+      },
+      [],
+    );
     expect(col.sqlTypeMetadata?.limit).toBe(8);
   });
 
