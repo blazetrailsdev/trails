@@ -16,6 +16,12 @@ import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Firm } from "./test-helpers/models/company.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
+import { Member } from "./test-helpers/models/member.js";
+import { Membership, CurrentMembership } from "./test-helpers/models/membership.js";
+import { Club } from "./test-helpers/models/club.js";
 
 interface ReflectionHost {
   _reflectOnAssociation(name: string): { options: Record<string, unknown> };
@@ -45,7 +51,15 @@ interface ReflectionHost {
 describe("StrictLoadingNewRecordFindTargetTest", () => {
   // `fixtures` wires the handler suite internally; the `developers`
   // fixture gives a persisted owner for the unchanged-behavior assertion.
-  const { developers } = fixtures(["developers"]);
+  const { developers, authors, members } = fixtures([
+    "developers",
+    "authors",
+    "posts",
+    "comments",
+    "members",
+    "memberships",
+    "clubs",
+  ]);
   // The loaders resolve target classes by name from the registry; register the
   // canonical targets so `Developer`'s declared associations resolve.
   registerModel(Developer);
@@ -53,6 +67,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   registerModel(Ship);
   registerModel(Project);
   registerModel(Firm);
+  registerModel([Author, Post, Comment, Member, Membership, CurrentMembership, Club]);
 
   const optionsFor = (name: string) =>
     (Developer as unknown as ReflectionHost)._reflectOnAssociation(name).options;
@@ -111,6 +126,29 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     await expect(
       findHasManyTarget(developer, "auditLogs", optionsFor("auditLogs")),
     ).rejects.toThrow(StrictLoadingViolationError);
+  });
+
+  // `SingularAssociation#find_target` (singular_association.rb:47-55) answers a
+  // `disable_joins` association from `scope.first`, and
+  // `HasManyThroughAssociation#find_target` (has_many_through_association.rb
+  // :225-229) returns `scope.to_a if disable_joins` — both BEFORE `super`, so
+  // neither route reaches the strict-loading raise in the base body.
+  it("does not raise on lazy loading a disable_joins has_many :through on a strict-loading owner", async () => {
+    const author = await Author.find(authors("david").id);
+    author.strictLoadingBang();
+    await expect(
+      findHasManyTarget(
+        author,
+        "noJoinsComments",
+        (Author as unknown as ReflectionHost)._reflectOnAssociation("noJoinsComments").options,
+      ),
+    ).resolves.toBeInstanceOf(Array);
+  });
+
+  it("does not raise on lazy loading a disable_joins has_one :through on a strict-loading owner", async () => {
+    const member = await Member.find(members("groucho").id);
+    member.strictLoadingBang();
+    await expect(loadSingularTarget(member, "clubWithoutJoins")).resolves.not.toBeUndefined();
   });
 
   it("still raises on lazy loading a strict-loading has_many on a persisted owner", async () => {

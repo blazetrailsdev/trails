@@ -61,7 +61,6 @@ import {
   resolveAssocClass,
   _routeThroughViaAssociationScope,
   ownerHasUnresolvedThroughKey,
-  _violatesStrictLoading,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
@@ -1102,7 +1101,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _checkStrictLoading(): void {
-    if (_violatesStrictLoading(this._record, this._assocDef.options)) {
+    // Rails reaches `violates_strict_loading?` through the association the
+    // proxy delegates to (`find_target`, association.rb:248-250); trails' proxy
+    // loads on its own path, so it consults the same association instance.
+    const association = this._staleWrapper() as unknown as
+      | { isViolatesStrictLoading(): boolean }
+      | undefined;
+    if (association?.isViolatesStrictLoading()) {
       strictLoadingViolationBang(this._record, this._assocName, {
         className: this._assocDef.options.className ?? camelize(singularize(this._assocName)),
       });

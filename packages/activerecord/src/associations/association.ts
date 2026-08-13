@@ -886,13 +886,29 @@ export class Association {
     return result;
   }
 
-  private isViolatesStrictLoading(): boolean {
+  /**
+   * Mirrors `Association#violates_strict_loading?` (association.rb:284-292),
+   * called from `findTarget` (association.rb:248-250) and from
+   * `CollectionProxy._checkStrictLoading`.
+   *
+   * The `@skip_strict_loading` guard reads two flags rather than one: the
+   * association-level ivar Rails has, plus the owner-level bypass counter the
+   * explicit loaders (`loadBelongsTo` / `loadHasOne` / `CollectionProxy`'s
+   * `_withoutStrictLoading`) raise. Those loaders are the trails spelling of a
+   * deliberate load, and they run where Ruby would have had an association
+   * handle to call `skip_strict_loading` on.
+   * @internal
+   */
+  protected isViolatesStrictLoading(): boolean {
     if (this._skipStrictLoading) return false;
+    if (this.owner._strictLoadingBypassCount) return false;
 
     if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
 
-    if ("strictLoading" in (this.reflection.options as object)) {
-      return (this.reflection as { strictLoading?: boolean }).strictLoading ?? false;
+    if (Object.prototype.hasOwnProperty.call(this.reflection.options, "strictLoading")) {
+      // `AssociationReflection#strict_loading?` is `!!options[:strict_loading]`
+      // (reflection.rb:1344); the lightweight definition carries no getter.
+      return this.reflection.options.strictLoading === true;
     }
 
     return this.owner.isStrictLoading() && !this.owner.isStrictLoadingNPlusOneOnly();

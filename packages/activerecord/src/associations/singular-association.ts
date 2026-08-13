@@ -11,7 +11,6 @@ import {
   _resolveInverseName,
   _scopeForAssociation,
   _skipSingularStatementCache,
-  _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
@@ -215,7 +214,7 @@ export class SingularAssociation extends Association {
 
     // A DB load would be required to answer.
     if (this.findTargetNeeded()) {
-      if (this._isStrictOnOwner()) {
+      if (this.isViolatesStrictLoading()) {
         strictLoadingViolationBang(this.owner, this.reflection.name, {
           polymorphic: this.reflection.options?.polymorphic,
           className: this.reflection.options?.className,
@@ -228,11 +227,6 @@ export class SingularAssociation extends Association {
       return this.loadTarget() as Promise<Base | null>;
     }
     return this.target;
-  }
-
-  private _isStrictOnOwner(): boolean {
-    const owner = this.owner as any;
-    return Boolean(owner._strictLoading) && !owner._strictLoadingBypassCount;
   }
 
   /**
@@ -314,11 +308,22 @@ export class SingularAssociation extends Association {
         validateThroughReflection(ctor, assocName);
       }
 
-      // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
-      // a new-record owner without the key present never reaches `find_target` and
-      // so never raises.
+      // `SingularAssociation#find_target` (singular_association.rb:47-55) answers
+      // a `disable_joins` association from `scope.first` and never calls `super`,
+      // so that route never reaches the base body's strict-loading raise.
       if (
-        _violatesStrictLoading(owner, options) &&
+        !isBelongsTo &&
+        options.through &&
+        _canRouteThroughViaDisableJoinsAssociationScope(reflection, options)
+      ) {
+        return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
+      }
+
+      // `Association#find_target`'s first statement (association.rb:248-250).
+      // Gated by `find_target?`: a new-record owner without the key present never
+      // reaches `find_target` and so never raises.
+      if (
+        this.isViolatesStrictLoading() &&
         _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
       ) {
         strictLoadingViolationBang(owner, assocName, {
@@ -331,9 +336,6 @@ export class SingularAssociation extends Association {
       // still routes the shapes AssociationScope cannot build through the two-step
       // `HasOneThroughAssociation#findTarget`.
       if (!isBelongsTo && options.through) {
-        if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, options)) {
-          return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
-        }
         if (!_routeThroughViaAssociationScope(owner, reflection, options)) {
           return (
             this as unknown as { loadHasOneThrough(): Promise<Base | null> }

@@ -36,6 +36,34 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect(dev.id).toBe(developers("david").id);
   });
 
+  // `Association#violates_strict_loading?` (association.rb:284-292) ends at
+  // `owner.strict_loading? && !owner.strict_loading_n_plus_one_only?`, so the
+  // first level loads lazily under `:n_plus_one_only` — the sync reader has to
+  // consult the same predicate rather than the bare owner flag.
+  it("sync belongsTo access does not throw under n_plus_one_only mode", async () => {
+    const ship = await Ship.create({ name: "N+1 Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang(true, { mode: "n_plus_one_only" });
+    expect(() => (ship as any).developer).not.toThrow();
+  });
+
+  // `return reflection.strict_loading? if reflection.options.key?(:strict_loading)`
+  // — the reflection-level option wins over the owner's flag, in both directions.
+  it("sync hasOne access does not throw when the reflection opts out of strict loading", async () => {
+    const developer = await Developer.find(developers("jamis").id);
+    developer.strictLoadingBang();
+    const options = (
+      Developer as unknown as {
+        _reflectOnAssociation(name: string): { options: Record<string, unknown> };
+      }
+    )._reflectOnAssociation("ship").options;
+    options.strictLoading = false;
+    try {
+      expect(() => (developer as any).ship).not.toThrow();
+    } finally {
+      delete options.strictLoading;
+    }
+  });
+
   it("strict loading stays off by default (Rails parity)", () => {
     expect(Ship.strictLoadingByDefault).toBe(false);
     expect(Developer.strictLoadingByDefault).toBe(false);

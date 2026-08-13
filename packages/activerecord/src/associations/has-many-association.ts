@@ -12,7 +12,6 @@ import {
   _resolveInverseName,
   _routeThroughViaAssociationScope,
   _scopeForAssociation,
-  _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
@@ -190,7 +189,7 @@ export class HasManyAssociation extends CollectionAssociation {
         this.reflection.name,
         this.reflection.options,
         this._queryExecutor,
-        this._skipStrictLoading,
+        this.isViolatesStrictLoading(),
       );
       // Rails applies `set_strict_loading` per record inside `find_target`'s
       // instantiation block (association.rb:269-271), not in `load_target`.
@@ -548,9 +547,12 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
  * the model never declared that way; that triple shape is a trails-only
  * calling convention, not Rails surface, and it is module-private.
  *
- * `skipStrictLoading` carries the association's `@skip_strict_loading`
- * (association.rb) into this loader, since the strict-loading check Rails runs
- * inside `find_target` lives here rather than on the association instance.
+ * `violatesStrictLoading` carries the result of the association's
+ * `violates_strict_loading?` (association.rb:284-292) into this loader: Rails
+ * raises on it as `find_target`'s first statement, but trails only knows a
+ * query is actually needed after the cache/preload lookups below, which are
+ * Rails' `find_target?` guard (association.rb:190). The predicate reads only
+ * owner/reflection state, so evaluating it at the call site is the same answer.
  *
  * @internal
  */
@@ -559,7 +561,7 @@ async function findTarget(
   assocName: string,
   options: AssociationOptions,
   queryExecutor?: () => Promise<Base[]>,
-  skipStrictLoading = false,
+  violatesStrictLoading = false,
 ): Promise<Base[]> {
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
@@ -588,13 +590,22 @@ async function findTarget(
     }
   }
 
-  // Strict loading check. Gated by `find_target?`: a new-record owner without
-  // the FK present never reaches `find_target` and so never raises.
-  if (
-    !skipStrictLoading &&
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, "foreign")
-  ) {
+  // `HasManyThroughAssociation#find_target` (has_many_through_association.rb
+  // :225-229) returns `scope.to_a if disable_joins` BEFORE `super`, so that
+  // route never reaches the base body's strict-loading raise. The scope-override
+  // executor below still wins, as it did when this branch sat under it.
+  const reflEarly =
+    options.through && !queryExecutor
+      ? (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)
+      : undefined;
+  if (reflEarly && _canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
+    return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
+  }
+
+  // `Association#find_target`'s first statement (association.rb:248-250). Gated
+  // by `find_target?`: a new-record owner without the FK present never reaches
+  // `find_target` and so never raises.
+  if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
     });
@@ -611,17 +622,14 @@ async function findTarget(
   // 2-step loadHasManyThrough.
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
-    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
-    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
-      return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
-    }
+    const reflThrough = ctorEarly._reflectOnAssociation?.(assocName);
     // Nested-through shapes flatten their whole `reflection.chain` into the
     // JOIN-based AssociationScope path below, sharing its inverse-wiring and
     // null-FK short-circuit. An unsaved owner resolves its through step from
     // the in-memory association target (e.g. `post.author = mary` before save),
     // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
     // those on the 2-step loader.
-    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
+    if (!_routeThroughViaAssociationScope(record, reflThrough, options)) {
       const { _buildAssociationInstance } = await import("./instance-methods.js");
       const through = _buildAssociationInstance.call(record, {
         name: assocName,
