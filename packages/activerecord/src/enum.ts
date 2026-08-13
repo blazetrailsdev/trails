@@ -679,8 +679,10 @@ export function _enum(
   // another enum" when a *different* enum on the same class already generated a
   // value method with this name. `dangerousAttributeMethods()` covers only
   // framework methods, so we track enum-generated predicate/bang names and
-  // consult them here; the set is populated during the generation pass below, so
-  // the conflict pass only sees names from prior `enum()` declarations.
+  // consult them here. Within one `_enum` an intra-enum collision is caught by
+  // `definedNames` first, which raises the same "already defined by another
+  // enum" error, so recording into this set as each label is generated —
+  // Rails' own interleaving — changes no message.
   //
   // Crucially the set is per-class and NOT inherited: Rails' `_enum_methods_module`
   // is a class-instance variable (enum.rb:326-332) that Ruby does not inherit, so
@@ -696,8 +698,11 @@ export function _enum(
   const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
-  const aliasedLabels = new Set<string>();
-  for (const [n] of Object.entries(mapping)) {
+  // Rails generates the per-value methods inside `_enum_methods_module`
+  // (enum.rb:252); route trails' generation through the same module so
+  // `EnumMethods.defineEnumMethods` is the single generator.
+  const methodsModule = this._enumMethodsModule();
+  for (const [n, value] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
     const { predicateName, bangName, notScopeName } = enumMethodNamesFor(fullName);
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
@@ -708,13 +713,12 @@ export function _enum(
     // same guard also gates the alias's define_enum_methods call (enum.rb:273):
     // two labels mangling to one alias (e.g. "Etc/GMT+1" / "Etc/GMT-1") is NOT
     // a conflict — the alias sticks to the first label and the second label
-    // simply doesn't get one. Record the decision in `aliasedLabels` so the
-    // generation pass below skips the alias for later same-mangling labels too.
+    // simply doesn't get one, and its `define_enum_methods` call is skipped
+    // with it.
     valueMethodNames.push(fullName);
     const aliasIsNew = friendlyName !== fullName && !valueMethodNames.includes(friendlyName);
     if (aliasIsNew) {
       valueMethodNames.push(friendlyName);
-      aliasedLabels.add(n);
     }
 
     // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
@@ -797,23 +801,6 @@ export function _enum(
         detectEnumConflictBang.call(this, attribute, notFriendlyName, true);
       }
     }
-  }
-
-  // Rails only warns (never raises) when an enum element's auto-generated
-  // negative scope (`not*`) would clash with a positively-named element, and
-  // skips the check entirely when scopes are disabled.
-  // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`.
-  if (scopesEnabled) {
-    detectNegativeEnumConditionsBang(valueMethodNames);
-  }
-
-  // Rails generates the per-value methods inside `_enum_methods_module`
-  // (enum.rb:251); route trails' generation through the same module so
-  // `EnumMethods.defineEnumMethods` is the single generator.
-  const methodsModule = this._enumMethodsModule();
-  for (const [n, value] of Object.entries(mapping)) {
-    const fullName = toCamel(methodName(n));
-    const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
     // Route the value method name — and, when it differs, its special-char
     // friendly alias — through the single generator, mirroring Rails' two
@@ -827,7 +814,7 @@ export function _enum(
       scopesEnabled,
       instanceMethodsEnabled,
     );
-    if (aliasedLabels.has(n)) {
+    if (aliasIsNew) {
       methodsModule.defineEnumMethods(
         attrName,
         friendlyName,
@@ -869,12 +856,21 @@ export function _enum(
       const names = enumMethodNamesFor(fullName);
       enumMethodNames.add(names.predicateName);
       enumMethodNames.add(names.bangName);
-      if (aliasedLabels.has(n)) {
+      if (aliasIsNew) {
         const friendlyNames = enumMethodNamesFor(friendlyName);
         enumMethodNames.add(friendlyNames.predicateName);
         enumMethodNames.add(friendlyNames.bangName);
       }
     }
+  }
+
+  // Rails only warns (never raises) when an enum element's auto-generated
+  // negative scope (`not*`) would clash with a positively-named element, and
+  // skips the check entirely when scopes are disabled.
+  // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`
+  // (enum.rb:262), after the generation loop.
+  if (scopesEnabled) {
+    detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
   // Mirrors Rails:
