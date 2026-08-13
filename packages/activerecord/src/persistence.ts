@@ -339,7 +339,7 @@ export async function _updateRecord(
 
   const adapter = threadedConnectionFor((this as any).constructor) ?? (this as any).connection;
   if (typeof adapter.update === "function") {
-    return adapter.update(um);
+    return adapter.update(um, `${(this as any).name} Update`);
   }
   const sql = adapter.toSql(um);
   return adapter.executeMutation(sql);
