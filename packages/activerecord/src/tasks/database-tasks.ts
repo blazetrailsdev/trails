@@ -222,9 +222,6 @@ export class DatabaseTasks {
       klass.usingDatabaseConfigurations();
 
     const config = converted ? dbConfig : dbConfig.configurationHash;
-    // `klass.new(config, *arguments)` is untyped in Ruby; the declared construct
-    // signature pins the converted shape, so the unconverted hash and the
-    // splat are widened here rather than on every task class.
     const ctor = klass as unknown as new (
       config: DatabaseConfig | DatabaseConfigOptions,
       ...args: unknown[]
@@ -874,7 +871,7 @@ export class DatabaseTasks {
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const flags = this.structureDumpFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, root);
+    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
     if (!handler.structureDump) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureDump`);
     }
@@ -889,7 +886,7 @@ export class DatabaseTasks {
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const flags = this.structureLoadFlagsFor(dbConfig.adapter);
-    const handler = this.databaseAdapterFor(dbConfig, root);
+    const handler = this.databaseAdapterFor(dbConfig, ...(root === undefined ? [] : [root]));
     if (!handler.structureLoad) {
       throw new Error(`Adapter '${dbConfig.adapter}' does not support structureLoad`);
     }
@@ -1603,11 +1600,19 @@ export interface DatabaseTaskInstance {
 
 /**
  * The task class `register_task` records (`database_tasks.rb:73-81`) and
- * `database_adapter_for` instantiates with the db config plus Ruby's leftover
- * `*arguments` (`database_tasks.rb:566-572`).
+ * `database_adapter_for` instantiates as
+ * `klass.new(converted ? db_config : db_config.configuration_hash, *arguments)`
+ * (`database_tasks.rb:566-572`).
+ *
+ * The construct signature is bottom-typed because that call is untyped on both
+ * counts, and both are Rails-reachable: a class that answers
+ * `using_database_configurations?` takes a `DatabaseConfig`, one that does not
+ * takes the configuration hash, and `*arguments` is whatever the `structure_dump`
+ * / `structure_load` caller threaded past the filename (`:362-374`). A named
+ * parameter type here would admit one of those arms and reject the others.
  */
 export interface DatabaseTaskHandler {
-  new (config: DatabaseConfig, ...args: never[]): DatabaseTaskInstance;
+  new (...args: never[]): DatabaseTaskInstance;
   usingDatabaseConfigurations?(): boolean;
 }
 

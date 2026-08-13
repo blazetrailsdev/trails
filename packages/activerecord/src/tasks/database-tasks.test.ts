@@ -230,12 +230,21 @@ describe("DatabaseTasksRegisterTask", () => {
     DatabaseTasks.clearRegisteredTasks();
   });
 
-  it("register task", () => {
-    const handler = class {
-      async create(): Promise<void> {}
+  it("register task", async () => {
+    const constructed: unknown[][] = [];
+    const dumped: unknown[][] = [];
+    const klazz = class {
+      constructor(...args: unknown[]) {
+        constructed.push(args);
+      }
+      async structureDump(filename: string, flags?: string | string[] | null): Promise<void> {
+        dumped.push([filename, flags]);
+      }
     };
-    DatabaseTasks.registerTask("sqlite", handler);
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBe(handler);
+    DatabaseTasks.registerTask(/abstract/, klazz);
+    await DatabaseTasks.structureDump({ adapter: "abstract" }, "awesome-file.sql");
+    expect(dumped).toEqual([["awesome-file.sql", null]]);
+    expect(constructed).toEqual([[{ adapter: "abstract" }]]);
   });
 
   it("register task precedence", () => {
