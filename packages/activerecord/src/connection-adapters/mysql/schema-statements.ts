@@ -386,8 +386,9 @@ export async function defaultType(
 ): Promise<"string" | "integer" | "function" | undefined> {
   const createTableInfo = await this.createTableInfo(tableName);
   if (!createTableInfo) return undefined;
-  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = createTableInfo.match(new RegExp("`" + escaped + "` (.+) DEFAULT ('|\\d+|[A-z]+)"));
+  const match = createTableInfo.match(
+    new RegExp("`" + fieldName + "` (.+) DEFAULT ('|\\d+|[A-z]+)"),
+  );
   const defaultPre = match?.[2];
   if (defaultPre === "'") return "string";
   if (defaultPre?.match(/^\d+$/)) return "integer";
