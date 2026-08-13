@@ -152,7 +152,16 @@ export function assertNotCalledOnInstanceOf<T>(
 }
 
 /**
- * Stubs `klass.new` to return `instance` for the duration of `block`.
+ * Stubs `klass.new` to return `instance` for the duration of `block`
+ * (method_call_assertions.rb:64-65).
+ *
+ * In Ruby `new` is an ordinary class method, so stubbing it redirects every
+ * construction of `klass`, however the caller spells it. In JavaScript `new` is
+ * an operator on the class object itself, not a property of it, and a class
+ * binding cannot be replaced in modules that already imported it — so the stub
+ * can only cover the literal `Klass.new()` spelling, which is the direct analog
+ * of the Ruby method being stubbed. Code under test that says `new Klass()`
+ * still constructs normally; pass the yielded `instance` to it instead.
  *
  * @internal
  */

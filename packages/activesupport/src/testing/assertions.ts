@@ -94,23 +94,38 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
  * is +1+. A list of expressions, or a Map of expression => difference, can be
  * passed in place of a single expression.
  *
- * Ruby reads `*args` positionally — `args[0]` is the message when `expression`
- * is a Hash and the difference otherwise. A TS rest parameter cannot precede
- * the block, so `difference` and `message` are named parameters and the Map
- * form ignores `difference`, exactly as Rails' Hash form does.
+ * Ruby reads `*args` positionally: `args[0]` is the message when `expression`
+ * is a Hash, and the difference (with `args[1]` the message) otherwise. The
+ * rest parameter here carries the same positions, with the block last — Ruby
+ * takes it as a block rather than in `*args`.
  */
 export async function assertDifference<T>(
+  expression: Map<Expression<number>, number>,
+  ...args: [message?: string | null, block?: () => T | Promise<T>]
+): Promise<T | undefined>;
+export async function assertDifference<T>(
+  expression: Expression<number> | Expression<number>[],
+  ...args: [difference?: number, message?: string | null, block?: () => T | Promise<T>]
+): Promise<T | undefined>;
+export async function assertDifference<T>(
   expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
-  difference: number = 1,
-  message: string | null = null,
-  block?: () => T | Promise<T>,
+  ...args: unknown[]
 ): Promise<T | undefined> {
-  const expressions =
-    expression instanceof Map
-      ? expression
-      : new Map(
-          (Array.isArray(expression) ? expression : [expression]).map((e) => [e, difference]),
-        );
+  const block =
+    typeof args[args.length - 1] === "function" ? (args.pop() as () => T | Promise<T>) : undefined;
+
+  let message: string | null | undefined;
+  let expressions: Map<Expression<number>, number>;
+  if (expression instanceof Map) {
+    message = args[0] as string | null | undefined;
+    expressions = expression;
+  } else {
+    const difference = (args[0] as number | undefined) ?? 1;
+    message = args[1] as string | null | undefined;
+    expressions = new Map(
+      (Array.isArray(expression) ? expression : [expression]).map((e) => [e, difference]),
+    );
+  }
 
   const exps = [...expressions.keys()];
   const before: number[] = [];
@@ -142,7 +157,12 @@ export async function assertNoDifference<T>(
   message: string | null = null,
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
-  return assertDifference(expression, 0, message, block);
+  return assertDifference(
+    expression as Expression<number>,
+    0,
+    message,
+    block as () => T | Promise<T>,
+  );
 }
 
 /**

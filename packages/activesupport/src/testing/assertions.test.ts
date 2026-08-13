@@ -78,13 +78,16 @@ describe("AssertionsTest", () => {
         [() => a, 1],
         [() => b, 2],
       ]),
-      1,
-      null,
+      "counts should move together",
       () => {
         a += 1;
         b += 2;
       },
     );
+
+    await expect(
+      assertDifference(new Map([[() => a, 1]]), "counts should move together", () => {}),
+    ).rejects.toThrow(/counts should move together/);
   });
 
   it("assert no difference", async () => {

@@ -130,9 +130,13 @@ export function afterTeardown(): void {
  * Ruby's `duration` is a Duration; a plain number of milliseconds is accepted
  * too, because that is what trails' own callers had before this port.
  */
-export function travel(duration: Duration | number, block?: () => void): void {
+export function travel(
+  duration: Duration | number,
+  { withUsec = false }: { withUsec?: boolean } = {},
+  block?: () => void,
+): void {
   const ms = duration instanceof Duration ? duration.inSeconds() * 1000 : duration;
-  travelTo(new Date(currentTime().getTime() + ms), block);
+  travelTo(new Date(currentTime().getTime() + ms), { withUsec }, block);
 }
 
 /**
@@ -148,8 +152,8 @@ export function travel(duration: Duration | number, block?: () => void): void {
  */
 export function travelTo(
   dateOrTime: Date | Temporal.Instant | string,
-  block?: () => void,
   { withUsec = false }: { withUsec?: boolean } = {},
+  block?: () => void,
 ): void {
   if (block && inBlock()) {
     const travelToNestedBlockCall = `
@@ -240,10 +244,10 @@ export function unfreezeTime(block?: () => void): void {
  * argument.
  */
 export function freezeTime(
-  block?: () => void,
   { withUsec = false }: { withUsec?: boolean } = {},
+  block?: () => void,
 ): void {
-  travelTo(currentTime(), block, { withUsec });
+  travelTo(currentTime(), { withUsec }, block);
 }
 
 /** @internal */

@@ -25,7 +25,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel with block", () => {
     let inside: Date | null = null;
-    travel(1000, () => {
+    travel(1000, {}, () => {
       inside = currentTime();
     });
     expect(inside).not.toBeNull();
@@ -38,7 +38,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel to with block", () => {
     let inside: Date | null = null;
-    travelTo(new Date("2032-06-15T12:00:00Z"), () => {
+    travelTo(new Date("2032-06-15T12:00:00Z"), {}, () => {
       inside = currentTime();
     });
     expect(inside!.getUTCFullYear()).toBe(2032);
@@ -65,17 +65,17 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel back with block", () => {
-    travelTo(new Date("2040-01-01"), () => {
+    travelTo(new Date("2040-01-01"), {}, () => {
       expect(currentTime().getUTCFullYear()).toBe(2040);
     });
     expect(currentTime().getUTCFullYear()).not.toBe(2040);
   });
 
   it("time helper travel to with nested calls with blocks", () => {
-    travelTo(new Date("2035-01-01"), () => {
+    travelTo(new Date("2035-01-01"), {}, () => {
       expect(currentTime().getUTCFullYear()).toBe(2035);
       expect(() =>
-        travelTo(new Date("2036-01-01"), () => {
+        travelTo(new Date("2036-01-01"), {}, () => {
           // noop
         }),
       ).toThrow(
@@ -107,7 +107,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper with usec true", () => {
     const target = new Date(2004, 10, 24, 1, 4, 44, 250);
-    travelTo(target, undefined, { withUsec: true });
+    travelTo(target, { withUsec: true });
     expect(currentTime().getMilliseconds()).toBe(250);
   });
 
@@ -120,7 +120,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel to with datetime and usec true", () => {
     const target = new Date(2004, 10, 24, 1, 4, 44, 333);
-    travelTo(target, undefined, { withUsec: true });
+    travelTo(target, { withUsec: true });
     expect(currentTime().getMilliseconds()).toBe(333);
   });
 
@@ -132,7 +132,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel to with string and usec true", () => {
     const target = new Date("2004-11-24T01:04:44.500Z");
-    travelTo(target, undefined, { withUsec: true });
+    travelTo(target, { withUsec: true });
     expect(currentTime().getUTCMilliseconds()).toBe(500);
   });
 
@@ -144,10 +144,10 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel with subsequent block", () => {
     const results: number[] = [];
-    travelTo(new Date("2041-01-01"), () => {
+    travelTo(new Date("2041-01-01"), {}, () => {
       results.push(currentTime().getUTCFullYear());
     });
-    travelTo(new Date("2042-01-01"), () => {
+    travelTo(new Date("2042-01-01"), {}, () => {
       results.push(currentTime().getUTCFullYear());
     });
     expect(results).toEqual([2041, 2042]);
@@ -175,7 +175,7 @@ describe("TimeTravelTest", () => {
 
   it("time helper freeze time with block", () => {
     let frozen: Date | null = null;
-    freezeTime(() => {
+    freezeTime({}, () => {
       frozen = currentTime();
     });
     expect(frozen).not.toBeNull();

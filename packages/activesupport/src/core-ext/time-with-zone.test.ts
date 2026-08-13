@@ -280,7 +280,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("today", () => {
-    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), {}, () => {
       expect(eastern.local(1999, 12, 31, 23, 59, 59).isToday()).toBe(false);
       expect(eastern.local(2000, 1, 1, 0).isToday()).toBe(true);
       expect(eastern.local(2000, 1, 1, 23, 59, 59).isToday()).toBe(true);
@@ -289,7 +289,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("yesterday?", () => {
-    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), {}, () => {
       expect(eastern.local(1999, 12, 31, 23, 59, 59).isYesterday()).toBe(true);
       expect(eastern.local(2000, 1, 1, 0).isYesterday()).toBe(false);
       expect(eastern.local(1999, 12, 31).isYesterday()).toBe(true);
@@ -298,7 +298,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("prev day?", () => {
-    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), {}, () => {
       expect(eastern.local(1999, 12, 31, 23, 59, 59).isPrevDay()).toBe(true);
       expect(eastern.local(2000, 1, 1, 0).isPrevDay()).toBe(false);
       expect(eastern.local(1999, 12, 31).isPrevDay()).toBe(true);
@@ -307,7 +307,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("tomorrow?", () => {
-    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), {}, () => {
       expect(eastern.local(1999, 12, 31, 23, 59, 59).isTomorrow()).toBe(false);
       expect(eastern.local(2000, 1, 2, 0).isTomorrow()).toBe(true);
       expect(eastern.local(2000, 1, 1, 23, 59, 59).isTomorrow()).toBe(false);
@@ -316,7 +316,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("next day?", () => {
-    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1, 12, 0, 0)), {}, () => {
       expect(eastern.local(1999, 12, 31, 23, 59, 59).isNextDay()).toBe(false);
       expect(eastern.local(2000, 1, 2, 0).isNextDay()).toBe(true);
       expect(eastern.local(2000, 1, 1, 23, 59, 59).isNextDay()).toBe(false);
@@ -325,7 +325,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("past with time current as time local", () => {
-    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), () => {
+    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), {}, () => {
       expect(eastern.local(2005, 2, 10, 15, 30, 44).isPast()).toBe(true);
       expect(eastern.local(2005, 2, 10, 15, 30, 45).isPast()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 46).isPast()).toBe(false);
@@ -333,7 +333,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("past with time current as time with zone", () => {
-    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), () => {
+    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), {}, () => {
       expect(eastern.local(2005, 2, 10, 15, 30, 44).isPast()).toBe(true);
       expect(eastern.local(2005, 2, 10, 15, 30, 45).isPast()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 46).isPast()).toBe(false);
@@ -341,7 +341,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("future with time current as time local", () => {
-    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), () => {
+    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), {}, () => {
       expect(eastern.local(2005, 2, 10, 15, 30, 44).isFuture()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 45).isFuture()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 46).isFuture()).toBe(true);
@@ -349,7 +349,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("future with time current as time with zone", () => {
-    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), () => {
+    travelTo(eastern.local(2005, 2, 10, 15, 30, 45).utc(), {}, () => {
       expect(eastern.local(2005, 2, 10, 15, 30, 44).isFuture()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 45).isFuture()).toBe(false);
       expect(eastern.local(2005, 2, 10, 15, 30, 46).isFuture()).toBe(true);
@@ -1317,7 +1317,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("current returns time now when zone not set", () => {
     setZone(null);
-    travelTo(new Date(Date.UTC(2000, 0, 1)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1)), {}, () => {
       const c = current();
       expect(c).toBeInstanceOf(Date);
       expect(c instanceof TimeWithZone).toBe(false);
@@ -1326,7 +1326,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("current returns time zone now when zone set", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
-    travelTo(new Date(Date.UTC(2000, 0, 1)), () => {
+    travelTo(new Date(Date.UTC(2000, 0, 1)), {}, () => {
       const c = current();
       expect(c).toBeInstanceOf(TimeWithZone);
       expect((c as TimeWithZone).timeZone.name).toBe("Eastern Time (US & Canada)");
