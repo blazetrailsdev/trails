@@ -5,16 +5,5 @@
     "rubyName": "cast",
     "call": "user_input_in_time_zone",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/time-zone-conversion.ts",
-    "rubyName": "convert_time_to_time_zone",
-    "call": "map",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:value"
-    ],
-    "reason": "time_zone_conversion.rb:48 `map(value) { ... }` is the DelegateClass hop to the SUBTYPE's own `map` hook (postgresql/oid/range.rb:50-54); the port maps arrays inline with `Array#map` and never reaches a subtype hook, so the `value` argument has no receiver. Converging needs the subtype `map` hook ported — story call-args-ar-time-zone-converter-subtype-map."
   }
 ]
