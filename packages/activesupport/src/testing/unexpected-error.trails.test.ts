@@ -13,6 +13,12 @@ describe("UnexpectedErrorTest", () => {
     expect(wrapped.message).toMatch(/^TypeError: louder\n/);
   });
 
+  it("message renders the wrapped error's class", () => {
+    class DomainFailure extends Error {}
+    const wrapped = new UnexpectedError(new DomainFailure("boom"));
+    expect(wrapped.message).toMatch(/^DomainFailure: boom\n/);
+  });
+
   it("stack reads the wrapped error when called", () => {
     const raised = new RangeError("nope");
     const wrapped = new UnexpectedError(raised);

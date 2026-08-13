@@ -65,6 +65,20 @@ export class UnexpectedError extends Assertion {
   }
 }
 
+/**
+ * Rails' `e.class` rendered as a name (minitest.rb:1105, assertions.rb:285).
+ * trails carries the namespaced Rails name on `name` where it has been ported
+ * (`ActionDispatch::ParamError`, param-error.ts:28), which `constructor.name`
+ * truncates — so prefer it and fall back to the constructor, mirroring
+ * ExceptionWrapper's `classNameOf` (exception-wrapper.ts:75).
+ */
+function classNameOf(e: Error): string {
+  if (e.name && e.name !== "Error") return e.name;
+  const ctor = e.constructor?.name;
+  if (ctor && ctor !== "Error") return ctor;
+  return e.name || ctor || "Error";
+}
+
 /** Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1176). */
 const MT_RE = /node_modules[/\\]@?vitest|node:internal/;
 
@@ -114,7 +128,7 @@ Object.defineProperties(UnexpectedError.prototype, {
     configurable: true,
     get(this: UnexpectedError): string {
       const bt = filterBacktrace(backtrace(this.error)).join("\n    ").replace(baseRe(), "");
-      return `${this.error.name}: ${this.error.message}\n    ${bt}`;
+      return `${classNameOf(this.error)}: ${this.error.message}\n    ${bt}`;
     },
   },
 });
@@ -396,7 +410,7 @@ async function _assertNothingRaisedOrWarn<T>(
     const logger = taggedLogger();
     if (logger && (logger as { "warn?"?: boolean })["warn?"]) {
       const warning =
-        `${_testCaseIdentity()}: ${e.error.name} raised.\n` +
+        `${_testCaseIdentity()}: ${classNameOf(e.error)} raised.\n` +
         "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
         `Other block based assertions (e.g. \`${assertion}\`) can be used, as long as \`assert_raises\` is inside their block.\n`;
       logger.warn(warning);
