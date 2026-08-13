@@ -222,11 +222,9 @@ export class DatabaseTasks {
       klass.usingDatabaseConfigurations();
 
     const config = converted ? dbConfig : dbConfig.configurationHash;
-    // Ruby's `klass.new(config, *arguments)` is untyped on both counts: the
-    // `converted` branch decides between a DatabaseConfig and a plain hash, and
-    // `*arguments` is whatever the caller threaded through. The declared
-    // constructor signature pins the reachable (converted) shape, so the widened
-    // form is asserted here rather than pushed onto every task class.
+    // `klass.new(config, *arguments)` is untyped in Ruby; the declared construct
+    // signature pins the converted shape, so the unconverted hash and the
+    // splat are widened here rather than on every task class.
     const ctor = klass as unknown as new (
       config: DatabaseConfig | DatabaseConfigOptions,
       ...args: unknown[]
