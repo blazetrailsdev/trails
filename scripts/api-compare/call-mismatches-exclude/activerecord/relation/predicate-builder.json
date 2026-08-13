@@ -34,24 +34,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:this"
-    ],
-    "reason": "predicate_builder.rb:16-20 constructs five handlers, registering `ArrayHandler.new(self)` for BOTH Array and Set; the port normalizes Set to Array before dispatch (predicate-builder.ts:332) so only four are constructed. Converging is the handler-registry port tracked by story call-args-ar-predicate-builder-set-handler."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "initialize",
-    "call": "register_handler",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
     "rubyName": "references",
     "call": "sql",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

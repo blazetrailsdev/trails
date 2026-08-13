@@ -9,8 +9,6 @@
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { TimeWithZone } from "./time-with-zone.js";
-import { currentTime } from "./time-travel.js";
-import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 
 // NOTE: Zone state is stored in module-level variables, mirroring Rails'
@@ -116,18 +114,6 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
   const found = TimeZone.find(zone);
   if (found == null) throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
   return found;
-}
-
-/**
- * Returns Time.current — if zone is set, returns a TimeWithZone in that zone.
- * Otherwise returns a plain Date.
- */
-export function current(): TimeWithZone | Date {
-  const zone = getZone();
-  if (zone) {
-    return new TimeWithZone(instantFrom(currentTime()), zone);
-  }
-  return currentTime();
 }
 
 /**

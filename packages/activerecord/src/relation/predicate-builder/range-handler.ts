@@ -1,5 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
+import type { PredicateBuilder } from "../predicate-builder.js";
 
 /**
  * Stand-in for a range bound that is out of range for its column type.
@@ -50,11 +51,10 @@ export class UnboundableBound {
  * `infinity?` recognizing ±Float::INFINITY at the Arel layer.
  */
 export class RangeHandler {
-  private _castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown;
-  private _predicateBuilder: unknown = undefined;
+  private _predicateBuilder: PredicateBuilder;
 
-  constructor(castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown) {
-    this._castBound = castBound;
+  constructor(predicateBuilder: PredicateBuilder) {
+    this._predicateBuilder = predicateBuilder;
   }
 
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
@@ -73,16 +73,26 @@ export class RangeHandler {
     // regular numeric value.
     const skipCast = (v: unknown): boolean =>
       v === null || v === undefined || v === Infinity || v === -Infinity;
-    const cast = this._castBound
-      ? (v: unknown) => this._castBound!(attribute, v)
-      : (v: unknown) => v;
+    // Rails wraps each bound in `predicate_builder.build_bind_attribute`
+    // (range_handler.rb:13-14) and lets `QueryAttribute#unboundable?` answer for
+    // out-of-range bounds. We build the same bind, but keep the plain cast value
+    // for in-range bounds (see UnboundableBound above): the bind's
+    // `isUnboundable()` is the byte-for-byte port of
+    // `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
+    // so detection and sign come from the same type as the cast.
+    const cast = (v: unknown): unknown => {
+      const bind = this.predicateBuilder.buildBindAttribute(attribute.name, v);
+      const sign = bind.isUnboundable();
+      if (sign !== false) return new UnboundableBound(sign);
+      return this.predicateBuilder.table.type(attribute.name).cast(v);
+    };
     return [
       skipCast(value.begin) ? value.begin : cast(value.begin),
       skipCast(value.end) ? value.end : cast(value.end),
     ];
   }
 
-  private get predicateBuilder(): unknown {
+  private get predicateBuilder(): PredicateBuilder {
     return this._predicateBuilder;
   }
 }

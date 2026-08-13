@@ -50,6 +50,8 @@ import {
   floor,
   ceil,
   secFraction,
+  subsec,
+  rfc3339,
   toFs,
   xmlschema,
   lastWeek,
@@ -610,10 +612,19 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("rfc3339 parse", () => {
-    const str = "2005-02-22T10:10:10Z";
-    const t = new Date(str);
-    expect(t.getUTCFullYear()).toBe(2005);
-    expect(t.getUTCMonth()).toBe(1); // February
+    const time = asDate(rfc3339("1999-12-31T19:00:00.125-05:00"));
+
+    expect(time.getUTCFullYear()).toBe(2000);
+    expect(time.getUTCMonth()).toBe(0);
+    expect(time.getUTCDate()).toBe(1);
+    expect(time.getUTCHours()).toBe(0);
+    expect(time.getUTCMinutes()).toBe(0);
+    expect(time.getUTCSeconds()).toBe(0);
+    expect(time.getUTCMilliseconds()).toBe(125);
+
+    for (const str of ["1999-12-31", "1999-12-31T19:00:00", "foobar"]) {
+      expect(() => rfc3339(str)).toThrow("invalid date");
+    }
   });
 
   it("acts like time", () => {
@@ -1381,6 +1392,11 @@ describe("DateTimeExtCalculationsTest", () => {
   it("utc", () => {
     const dt = new Date("2005-02-22T10:10:10Z");
     expect(dt.getUTCHours()).toBe(10);
+  });
+
+  it("subsec", () => {
+    expect(subsec(new Date(Date.UTC(2000, 0, 1)))).toBe(0);
+    expect(subsec(new Date(Date.UTC(2000, 0, 1, 0, 0, 0, 500)))).toBe(1 / 2);
   });
 
   it("compare with integer", () => {

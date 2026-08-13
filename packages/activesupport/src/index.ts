@@ -386,7 +386,6 @@ export {
   useZone,
   findZone,
   findZoneBang,
-  current,
   dateInTimeZone,
   ArgumentError,
 } from "./time-zone-config.js";

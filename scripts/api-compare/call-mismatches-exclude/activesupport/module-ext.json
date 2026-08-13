@@ -40,5 +40,19 @@
     "rubyName": "mattr_accessor",
     "call": "first",
     "reason": "Rails passes `location: caller_locations(1, 1).first` to `mattr_reader`/`mattr_writer` (attribute_accessors.rb:66) so a raised NameError points at the declaring line. trails generates the accessors directly with no location plumbing."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "delegate",
+    "call": "caller_locations",
+    "reason": "Pre-existing: Ruby captures `caller_locations` only to rewrite the generated method's backtrace to the `delegate`/`mattr_accessor` call site (module/delegation.rb, module/attribute_accessors.rb). trails' generated accessors carry a real JS stack already and there is no `module_eval` line/file to attribute. Surfaced by the population, not introduced by this PR."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_accessor",
+    "call": "caller_locations",
+    "reason": "Pre-existing: Ruby captures `caller_locations` only to rewrite the generated method's backtrace to the `delegate`/`mattr_accessor` call site (module/delegation.rb, module/attribute_accessors.rb). trails' generated accessors carry a real JS stack already and there is no `module_eval` line/file to attribute. Surfaced by the population, not introduced by this PR."
   }
 ]

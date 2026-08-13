@@ -12,6 +12,9 @@
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
+import { getZone } from "./time-zone-config.js";
+import { TimeWithZone } from "./time-with-zone.js";
+import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -23,6 +26,19 @@ function dayIndex(day: string): number {
 
 function clone(date: Date): Date {
   return new Date(date.getTime());
+}
+
+/**
+ * Returns `Time.zone.now` when `Time.zone` or `config.time_zone` are set,
+ * otherwise just returns `Time.now` — time/calculations.rb:39-41. DateTime's
+ * `current` (date_time/calculations.rb:10-12) is the same value.
+ */
+export function current(): TimeWithZone | Date {
+  const zone = getZone();
+  if (zone) {
+    return new TimeWithZone(instantFrom(currentTime()), zone);
+  }
+  return currentTime();
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +57,18 @@ export function endOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 23, min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
+// Rails' `alias`es on the day boundaries — time/calculations.rb:241-243, 250-254,
+// 264 and the identical set on DateTime (date_time/calculations.rb:126-137).
+export { beginningOfDay as midnight };
+export { beginningOfDay as atMidnight };
+export { beginningOfDay as atBeginningOfDay };
+export { middleOfDay as midday };
+export { middleOfDay as noon };
+export { middleOfDay as atMidday };
+export { middleOfDay as atNoon };
+export { middleOfDay as atMiddleOfDay };
+export { endOfDay as atEndOfDay };
+
 // ---------------------------------------------------------------------------
 // Hour boundaries
 // ---------------------------------------------------------------------------
@@ -53,6 +81,10 @@ export function endOfHour(date: Date): Temporal.Instant {
   return change(date, { min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
+// time/calculations.rb:270, 281; date_time/calculations.rb:148, 155.
+export { beginningOfHour as atBeginningOfHour };
+export { endOfHour as atEndOfHour };
+
 // ---------------------------------------------------------------------------
 // Minute boundaries
 // ---------------------------------------------------------------------------
@@ -64,6 +96,10 @@ export function beginningOfMinute(date: Date): Temporal.Instant {
 export function endOfMinute(date: Date): Temporal.Instant {
   return change(date, { sec: 59, usec: 999999999 / 1000 });
 }
+
+// time/calculations.rb:286, 295; date_time/calculations.rb:162, 168.
+export { beginningOfMinute as atBeginningOfMinute };
+export { endOfMinute as atEndOfMinute };
 
 // ---------------------------------------------------------------------------
 // Week boundaries
@@ -352,6 +388,9 @@ export function since(date: Date, seconds: number): Temporal.Instant {
   return instantFrom(new Date(date.getTime() + seconds * 1000));
 }
 
+// `alias :in :since` — time/calculations.rb:235.
+export { since as in };
+
 // ---------------------------------------------------------------------------
 // change
 // ---------------------------------------------------------------------------
@@ -592,6 +631,11 @@ export function secFraction(date: Date): number {
   return date.getMilliseconds() / 1000;
 }
 
+// `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38); the
+// Time direction is the mirror image (`Time#sec_fraction` is `subsec`,
+// time/calculations.rb:107-109), so one function answers both names.
+export { secFraction as subsec };
+
 /**
  * toFs — formats a Date as a string using various named formats.
  */
@@ -629,6 +673,25 @@ export function toFs(date: Date, format: string = "default"): string {
         date.toTimeString().slice(0, 8)
       );
   }
+}
+
+/**
+ * Creates a Time instance from an RFC 3339 string — time/calculations.rb:68-81.
+ *
+ *   rfc3339("1999-12-31T14:00:00-10:00") // => 2000-01-01 00:00:00 UTC
+ *
+ * If the time or offset components are missing then an ArgumentError is raised,
+ * mirroring Rails' `raise ArgumentError, "invalid date" if parts.empty?` — Ruby's
+ * `Date._rfc3339` answers an empty hash for anything that is not a full
+ * date-time-with-offset.
+ */
+export function rfc3339(str: string): Temporal.Instant {
+  const parts =
+    /^(-?\d{4,})-(\d\d)-(\d\d)[Tt ](\d\d):(\d\d):(\d\d)(\.\d+)?([Zz]|[+-]\d\d:\d\d)$/.exec(str);
+  if (!parts) throw new ArgumentError("invalid date");
+  const ms = Date.parse(str.replace(" ", "T"));
+  if (Number.isNaN(ms)) throw new ArgumentError("invalid date");
+  return instantFrom(new Date(ms));
 }
 
 /**

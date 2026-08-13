@@ -2,7 +2,7 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
-import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handler.js";
+import { RangeHandler } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
@@ -11,18 +11,6 @@ import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-val
 import { argumentError } from "./query-methods.js";
 import type { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
-
-/**
- * The shape `table.type` answers with. Rails' single source
- * (`TableMetadata#type` → `arel_table.type_for_attribute`) always returns a
- * real Type — casters resolve unknown columns to `Type.default_value`, never
- * nil — so no member is optional and there is no fallback.
- */
-interface BoundType {
-  cast(x: unknown): unknown;
-  serialize(x: unknown): unknown;
-  isForceEquality?(v: unknown): boolean;
-}
 
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
@@ -41,47 +29,16 @@ export class PredicateBuilder {
   protected set table(value: TableMetadata) {
     this._table = value;
   }
-  private arrayHandler: ArrayHandler;
-  private rangeHandler: RangeHandler;
-  private basicObjectHandler: BasicObjectHandler;
-  private relationHandler: RelationHandler;
   private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
 
   constructor(table: TableMetadata) {
     this._table = table;
-    this.arrayHandler = new ArrayHandler(this);
-    this.rangeHandler = new RangeHandler((attribute, v) => {
-      // Resolve the type once so sign detection and the cast below agree —
-      // single source, like Rails' `build_bind_attribute` (predicate_builder.rb:67-69).
-      const type: BoundType = this.table.type(attribute.name);
-      const sentinel = this.unboundableSentinel(attribute.name, v, type);
-      if (sentinel) return sentinel;
-      return type.cast(v);
-    });
-    this.basicObjectHandler = new BasicObjectHandler(this);
-    this.relationHandler = new RelationHandler();
-  }
 
-  /**
-   * Returns an {@link UnboundableBound} sentinel when `value` is out of range
-   * for `type`, else null. Both the detection and the sign come from a
-   * QueryAttribute bind's `isUnboundable()` — the byte-for-byte port of Rails'
-   * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
-   * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
-   * than a second sign computation) keeps this in lockstep with the
-   * equality single-value path, and handles non-numeric out-of-range
-   * bounds (e.g. custom types) type-agnostically.
-   *
-   * Callers pass the type from `table.type(...)` so sign detection uses the
-   * same type as the accompanying cast.
-   */
-  private unboundableSentinel(
-    columnName: string,
-    value: unknown,
-    type: BoundType,
-  ): UnboundableBound | null {
-    const sign = new QueryAttribute(columnName, value, type).isUnboundable();
-    return sign === false ? null : new UnboundableBound(sign);
+    this.registerHandler(BasicObject, new BasicObjectHandler(this));
+    this.registerHandler(Range, new RangeHandler(this));
+    this.registerHandler(Relation, new RelationHandler());
+    this.registerHandler(Array, new ArrayHandler(this));
+    this.registerHandler(Set, new ArrayHandler(this));
   }
 
   buildFromHash(
@@ -329,26 +286,7 @@ export class PredicateBuilder {
     if (this.table.type(attribute.name).isForceEquality?.(value) === true) {
       return attribute.eq(this.buildBindAttribute(attribute.name, value));
     }
-    // Normalize Set → Array before dispatch so every code path (custom handlers,
-    // explicit Array branch, handlerFor fallback) receives an array. Rails registers
-    // Set with ArrayHandler by default (predicate_builder.rb:20).
-    if (value instanceof Set) {
-      value = Array.from(value);
-    }
-    const customHandler = this.handlers.length > 0 ? this.handlerFor(value) : null;
-    if (customHandler && customHandler !== this.basicObjectHandler) {
-      return customHandler.call(attribute, value);
-    }
-    if (value instanceof Range) {
-      return this.rangeHandler.call(attribute, value);
-    }
-    if (Array.isArray(value)) {
-      return this.arrayHandler.call(attribute, value);
-    }
-    if (this.isRelation(value)) {
-      return this.relationHandler.call(attribute, value);
-    }
-    return this.basicObjectHandler.call(attribute, value);
+    return this.handlerFor(value).call(attribute, value);
   }
 
   /**
@@ -595,12 +533,37 @@ export class PredicateBuilder {
 
   private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
     for (const [klass, handler] of this.handlers) {
-      if (object instanceof klass) return handler;
+      if (this.caseEquals(klass, object)) return handler;
     }
-    if (object instanceof Array) return this.arrayHandler;
-    return this.basicObjectHandler;
+    throw new Error("no handler registered for value");
+  }
+
+  /**
+   * Ruby's `klass === object`, the test `handler_for` runs over the registry.
+   * Two of the five classes Rails registers have no `instanceof`-able TS
+   * counterpart: `BasicObject` (the root of Ruby's hierarchy, so `===` is true
+   * for every value) and `Relation` (importing `relation.js` here would close a
+   * module cycle — relation.ts constructs a PredicateBuilder — so it is matched
+   * structurally, as everywhere else in this file).
+   */
+  private caseEquals(klass: any, object: unknown): boolean {
+    if (klass === BasicObject) return true;
+    if (klass === Relation) return this.isRelation(object);
+    return object instanceof klass;
   }
 }
+
+/**
+ * Stand-in for Ruby's `BasicObject` as a `register_handler` key
+ * (predicate_builder.rb:16). See {@link PredicateBuilder#caseEquals}.
+ */
+class BasicObject {}
+
+/**
+ * Stand-in for `ActiveRecord::Relation` as a `register_handler` key
+ * (predicate_builder.rb:18). See {@link PredicateBuilder#caseEquals}.
+ */
+class Relation {}
 
 // Rails: `value.respond_to?(:id)`. In Ruby only Active Record records (and things
 // defining #id) respond, since Object#id was removed in 1.9 — a bare `Hash` does

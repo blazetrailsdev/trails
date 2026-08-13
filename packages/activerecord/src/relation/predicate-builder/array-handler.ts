@@ -29,8 +29,11 @@ export class ArrayHandler {
     this.predicateBuilder = predicateBuilder;
   }
 
-  call(attribute: Nodes.Attribute, value: unknown[]): Nodes.Node {
-    if (value.length === 0) {
+  call(attribute: Nodes.Attribute, value: unknown[] | Set<unknown>): Nodes.Node {
+    // Rails' `value.empty?` — ArrayHandler is registered for BOTH Array and Set
+    // (predicate_builder.rb:19-20), and every read below is iteration, which
+    // both types answer.
+    if ((Array.isArray(value) ? value.length : value.size) === 0) {
       return attribute.in([]);
     }
 

@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation/method-wrappers.ts",
+    "rubyName": "deprecate_methods",
+    "call": "define_method",
+    "reason": "method_wrappers.rb:44-64 has two arms: `redefine_method` on the target for a method it owns, and `Module.new` + `define_method` + `prepend` for one it only inherits. A JS function assigned to the target shadows an inherited implementation exactly as the prepended module does, and the captured original is what the prepended arm reaches with `super`, so one assignment covers both arms and there is no module to construct."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation/method-wrappers.ts",
+    "rubyName": "deprecate_methods",
+    "call": "new",
+    "reason": "method_wrappers.rb:44-64 has two arms: `redefine_method` on the target for a method it owns, and `Module.new` + `define_method` + `prepend` for one it only inherits. A JS function assigned to the target shadows an inherited implementation exactly as the prepended module does, and the captured original is what the prepended arm reaches with `super`, so one assignment covers both arms and there is no module to construct."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation/method-wrappers.ts",
+    "rubyName": "deprecate_methods",
+    "call": "redefine_method",
+    "reason": "method_wrappers.rb:44-64 has two arms: `redefine_method` on the target for a method it owns, and `Module.new` + `define_method` + `prepend` for one it only inherits. A JS function assigned to the target shadows an inherited implementation exactly as the prepended module does, and the captured original is what the prepended arm reaches with `super`, so one assignment covers both arms and there is no module to construct."
+  }
+]
