@@ -1850,9 +1850,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      // Rails reads `database_version` (`postgresql/schema_statements.rb:347`),
-      // the pool memo; the inherited accessor is typed for every adapter, so PG
-      // narrows it here the same way `columns` does.
       const dbVersion = (await this.databaseVersion) as number;
       minvalue =
         dbVersion >= 100000

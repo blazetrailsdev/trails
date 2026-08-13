@@ -373,10 +373,8 @@ export function newColumnFromField(
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
-  const extraRaw = field["Extra"] ?? "";
-
   if (meta.type === "datetime" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def ?? "")) {
-    if (/on update CURRENT_TIMESTAMP/i.test(extraRaw)) def = `${def} ON UPDATE ${def}`;
+    if (/on update CURRENT_TIMESTAMP/i.test(field["Extra"] ?? "")) def = `${def} ON UPDATE ${def}`;
     [def, defFn] = [null, def];
   } else if (meta.extra === "DEFAULT_GENERATED") {
     if (def != null && !def.startsWith("(")) def = `(${def})`;
@@ -397,7 +395,7 @@ export function newColumnFromField(
     unsigned: /\bunsigned(?: zerofill)?$/.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
-    extra: extraRaw,
+    extra: field["Extra"] ?? "",
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });
 }

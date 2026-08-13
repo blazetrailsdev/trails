@@ -4,9 +4,10 @@
  * and `Rack::MockRequest` hand to their callers. Only the members Ruby code in
  * this repo sends are ported.
  *
- * Positions are counted in characters: a trails string is the port of a Ruby
- * String, and the payloads that reach here (`Base64.decode64`'s binary string,
- * a request body) are already one character per byte.
+ * Read positions are counted in characters, where Ruby counts bytes: the
+ * payloads that reach here (`Base64.decode64`'s binary string, a request body)
+ * are one character per byte. `size` is Ruby's bytesize, which callers send to
+ * fill a `CONTENT_LENGTH`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO` ships with
  * the interpreter, so no Rails file defines it and no port can remove the need
@@ -26,9 +27,9 @@ export class StringIO {
     return this._string;
   }
 
-  /** Ruby: `StringIO#size` (aliased `length`). */
+  /** Ruby: `StringIO#size` (aliased `length`) — the buffer's bytesize. */
   get size(): number {
-    return this._string.length;
+    return new TextEncoder().encode(this._string).length;
   }
 
   /**
