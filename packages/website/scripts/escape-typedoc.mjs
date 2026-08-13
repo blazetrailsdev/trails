@@ -11,7 +11,10 @@
  *    take effect. TypeScript generics (Array<T>), JSDoc HTML examples (<script>,
  *    <br>), and type signatures all produce angle brackets that break parsing.
  *    Fix: escape all `<` outside fenced code blocks to `&lt;`, so nothing looks
- *    like an HTML tag to the Vue parser.
+ *    like an HTML tag to the Vue parser, and all `{` outside fenced blocks and
+ *    inline code spans to `&#123;`, so no prose brace group is picked up as a
+ *    markdown-it-attrs attribute list (which renders as a Vue binding) or as a
+ *    `{{ }}` interpolation.
  *
  * 2. Repoint dead relative links in generated pages at working GitHub URLs.
  *    typedoc copies package READMEs and every locally-linked markdown file
@@ -247,7 +250,16 @@ export function escapeForVue(content) {
       continue;
     }
 
-    result.push(line.replace(/</g, "&lt;"));
+    // markdown-it-attrs consumes a trailing `{...}` as an attribute list, so a
+    // Ruby example like `# => {:a=>:b}` becomes `<p :a="&gt;:b">` — a Vue
+    // binding whose value is not a JS expression, which kills the SFC parse.
+    // `{{ }}` in prose is the same hazard as an interpolation. Escaping `{`
+    // outside inline code spans defuses both; inside a code span the entity
+    // would render literally, and attrs/interpolation do not apply there.
+    const escaped = line.replace(/</g, "&lt;");
+    const spans = codeSpanRanges(escaped);
+    const inCode = (idx) => spans.some(([s, e]) => idx >= s && idx < e);
+    result.push(escaped.replace(/\{/g, (brace, offset) => (inCode(offset) ? brace : "&#123;")));
   }
 
   return result.join("\n");
