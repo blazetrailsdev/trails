@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
-import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
+import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import { reloadSchemaFromCache } from "../model-schema.js";
@@ -169,6 +169,12 @@ export async function updateCounters(
 
 type InstanceLockingHost = {
   constructor: typeof Base & LockingHost;
+  _attributes: {
+    getAttribute(name: string): {
+      valueForDatabase: unknown;
+      originalValueForDatabase(): unknown;
+    };
+  };
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
@@ -266,9 +272,13 @@ export function destroyRow(
  */
 export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: string): unknown {
   if (isWillSaveChangeToAttribute(this as any, lockingColumn)) {
-    return this.readAttribute(lockingColumn) ?? 0;
+    return this._attributes.getAttribute(lockingColumn).valueForDatabase;
   }
-  return attributeInDatabase(this as any, lockingColumn) ?? 0;
+  // `Attribute::FromDatabase#_original_value_for_database` is the raw
+  // `value_before_type_cast`, so a lock column that is NULL in the row
+  // constrains on NULL — `LockingType#deserialize`'s `nil.to_i` 0 never reaches
+  // the WHERE (locking/optimistic.rb:134-139, activemodel attribute.rb).
+  return this._attributes.getAttribute(lockingColumn).originalValueForDatabase();
 }
 
 /**

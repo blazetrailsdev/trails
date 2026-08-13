@@ -21,6 +21,7 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
+import { rbWarning } from "./rb-warning.js";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const ABBR_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -70,6 +71,18 @@ function pad2(n: number): string {
  */
 export interface StrftimeSubject {
   year: number | bigint;
+  /**
+   * `m_local_jd` (`date_core.c:1485-1497`), the residue Julian day the
+   * week-number readers below are defined over. It is carried rather than
+   * rebuilt from {@link StrftimeSubject.year}, which is the REAL year
+   * (`m_real_year`, `date_core.c:1746-1762`) and has no `int` to rebuild from
+   * once `nth` is nonzero.
+   */
+  jd: number;
+  /** `m_nth` (`date_core.c:1478-1483`), the period count `year` encodes. */
+  nth: bigint;
+  /** `m_gregorian_p` (`date_core.c:1965-1973`), which picks `encode_year`'s period. */
+  gregorianP: boolean;
   mon: number;
   day: number;
   wday: number;
@@ -118,6 +131,9 @@ function temporalSubject(
 
   return {
     year: plain.year,
+    jd: cCivilToJd(plain.year, plain.month, plain.day),
+    nth: 0n,
+    gregorianP: true,
     mon: plain.month,
     day: plain.day,
     wday: cJdToWday(cCivilToJd(plain.year, plain.month, plain.day)),
@@ -150,7 +166,7 @@ function temporalSubject(
  */
 function epochSeconds(subject: StrftimeSubject): number {
   return (
-    (mLocalJd(subject) - UNIX_EPOCH_IN_CJD) * DAY_IN_SECONDS +
+    (subject.jd - UNIX_EPOCH_IN_CJD) * DAY_IN_SECONDS +
     timeToDf(subject.hour, subject.min, subject.sec) -
     subject.utcOffset
   );
@@ -169,27 +185,18 @@ function msecs(subject: StrftimeSubject): number {
 }
 
 /**
- * @internal `m_local_jd` (`date_core.c:1485-1497`), the Julian day the
- * week-number readers below work off. The subject carries the civil date and no
- * `df`, so the `complex_dat_p` arm's `local_jd` shift has no bearer and the
- * conversion is {@link cCivilToJd} over it. The subject carries the REAL year,
- * `nth` and all, where the C's `c_civil_to_jd` takes the residue `int`, so the
- * conversion back is where the magnitude drops — as it does in the C's own
- * `int` day, which is what these week readers are defined over.
- */
-function mLocalJd(subject: StrftimeSubject): number {
-  return cCivilToJd(Number(subject.year), subject.mon, subject.day);
-}
-
-/**
- * @internal `m_cwyear` (`date_core.c:1848-1856`), which reaches `%G`
+ * @internal `m_real_cwyear` (`date_core.c:1858-1873`) over `m_cwyear`
+ * (`date_core.c:1848-1856`), which reaches `%G`
  * (`date_strftime.c:238`) and `%g` (`date_strftime.c:251`) as the `cwyear` slot
  * of the `tmx_funcs` table (`date_core.c:7153`, through `m_real_cwyear`) that
- * `tmx_cwyear` (`date_tmx.h:35`) reads.
+ * `tmx_cwyear` (`date_tmx.h:35`) reads. `m_cwyear` is an `int` over the residue
+ * day; `m_real_cwyear` puts `nth` back afterwards, exactly as `m_real_year`
+ * does, so `%G` past a Fixnum answers a `bigint`.
  */
-function cwyear(subject: StrftimeSubject): number {
-  const [ry] = cJdToCommercial(mLocalJd(subject));
-  return ry;
+function cwyear(subject: StrftimeSubject): number | bigint {
+  const [ry] = cJdToCommercial(subject.jd);
+  if (subject.nth === 0n) return ry;
+  return encodeYear(subject.nth, ry, subject.gregorianP ? -1 : +1);
 }
 
 /**
@@ -198,7 +205,7 @@ function cwyear(subject: StrftimeSubject): number {
  * (`date_core.c:7154`) that `tmx_cweek` (`date_tmx.h:36`) reads.
  */
 function cweek(subject: StrftimeSubject): number {
-  const [, rw] = cJdToCommercial(mLocalJd(subject));
+  const [, rw] = cJdToCommercial(subject.jd);
   return rw;
 }
 
@@ -209,7 +216,7 @@ function cweek(subject: StrftimeSubject): number {
  * between the two.
  */
 function wnumx(subject: StrftimeSubject, f: number): number {
-  const [, rw] = cJdToWeeknum(mLocalJd(subject), f);
+  const [, rw] = cJdToWeeknum(subject.jd, f);
   return rw;
 }
 
@@ -3486,11 +3493,13 @@ function cValidStartP(sg: number): boolean {
  * @internal `date_core.c`'s `val2sg` macro (`date_core.c:3320-3327`), the macro
  * every user-facing `start` argument is read through — the `start` counterpart
  * of {@link val2off}: whatever {@link cValidStartP} rejects becomes
- * {@link DEFAULT_SG}. The C's `rb_warning("invalid start is ignored")` is a
- * `$VERBOSE`-only warning with no analogue here, as `val2off`'s is.
+ * {@link DEFAULT_SG}.
  */
 function val2sg(vsg: number): number {
-  if (!cValidStartP(vsg)) return DEFAULT_SG;
+  if (!cValidStartP(vsg)) {
+    rbWarning("invalid start is ignored");
+    return DEFAULT_SG;
+  }
   return vsg;
 }
 
@@ -4842,7 +4851,10 @@ export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime 
   // `Rational` offset truncates toward zero before the bound below — not
   // `round()`: 34399.8 becomes 34399.
   let of = to == null ? 0 : to instanceof Rational ? to.toI() : Math.trunc(to);
-  if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) of = 0;
+  if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) {
+    of = 0;
+    rbWarning("invalid offset is ignored");
+  }
 
   const [nth, rjd] = decodeJd(jd);
   return new DateTime(SEAT, nth, jdLocalToUtc(rjd, df, of), dfLocalToUtc(df, of), sf, of, sg);
@@ -4930,9 +4942,6 @@ function dayToSec(d: Rational): Rational {
  * `day_to_sec(Rational(2,1))` is `(172800/1)` and `k_rational_p(vs)` holds.
  * Folding it to an Integer here would route the value through `rounded:`
  * instead and reject `Rational(2,1)` that MRI accepts.
- *
- * C's `rb_warning("fraction of offset is ignored")` has no port analogue: it
- * writes to stderr under `$VERBOSE` only and is not part of the value.
  */
 function offsetToSec(vof: number | bigint | Rational | string): number | null {
   // `default:` (`:2398-2405`) — `expect_numeric` then `f_to_r`, so a Bignum
@@ -4950,7 +4959,9 @@ function offsetToSec(vof: number | bigint | Rational | string): number | null {
     }
     const n = vof * DAY_IN_SECONDS;
     if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
-    return round(n);
+    const rof = round(n);
+    if (rof !== n) rbWarning("fraction of offset is ignored");
+    return rof;
   }
   if (vof instanceof Rational) {
     const vs = dayToSec(vof);
@@ -4959,6 +4970,7 @@ function offsetToSec(vof: number | bigint | Rational | string): number | null {
       n = Number(vs.numerator);
     } else {
       n = vs.round();
+      if (vs.cmp(n) !== 0) rbWarning("fraction of offset is ignored");
       if (n < -DAY_IN_SECONDS || n > DAY_IN_SECONDS) return null;
     }
     return n;
@@ -7470,6 +7482,9 @@ export class Date {
     return strftime(
       {
         year: this.year,
+        jd: this.mLocalJd(),
+        nth: this.nth,
+        gregorianP: this.isGregorian,
         mon: this.mon,
         day: this.day,
         wday: this.wday,
@@ -8272,9 +8287,7 @@ export class DateTime extends DateWithoutParseStatics {
    * does not screen its `start` (`date_core.c:8147-8150`, against
    * `date_s_today`'s `val2sg` at `:3799-3802`).
    *
-   * An offset past a day is dropped to `0` (`date_core.c:8217-8220`); the
-   * `rb_warning("invalid offset is ignored")` beside it has no port analogue,
-   * as `val2sg`'s and `val2off`'s do not.
+   * An offset past a day is dropped to `0` (`date_core.c:8217-8220`).
    */
   static now(start = DEFAULT_SG): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     const sg = start;
@@ -8293,6 +8306,7 @@ export class DateTime extends DateWithoutParseStatics {
 
     if (of < -DAY_IN_SECONDS || of > DAY_IN_SECONDS) {
       of = 0;
+      rbWarning("invalid offset is ignored");
     }
 
     const [nth, ry] = decodeYear(y, -1);
@@ -8734,6 +8748,9 @@ export class DateTime extends DateWithoutParseStatics {
     return strftime(
       {
         year: this.year,
+        jd: this.mLocalJd(),
+        nth: this.nth,
+        gregorianP: this.isGregorian,
         mon: this.mon,
         day: this.day,
         wday: this.wday,

@@ -13,15 +13,13 @@
  * through the exported `dtNewByFrags`/`dNewByFrags` builders those statics
  * themselves call — the gem-shaped object that carries `strftime`.
  *
- * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm asserts the
- * *effect* rather than the warning: `rb_warning("invalid offset is ignored")`
- * (`date_core.c:8304`) is `$VERBOSE`-only and has no port analogue — the same
- * position `date.ts` already records for `val2sg` and `val2off`. The offset
- * itself is still dropped to `0` (`date_core.c:8301-8305`), which is what the
- * assertion reads.
+ * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm goes through
+ * {@link assertWarning}, which sets `$VERBOSE` for the block the way Ruby's
+ * does — `rb_warning("invalid offset is ignored")` (`date_core.c:8304`) is
+ * emitted only under it.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ArgumentError,
   Errno,
@@ -31,6 +29,27 @@ import {
   dtNewByFrags,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
+import { setRubyVerbose } from "./rb-warning.js";
+
+/**
+ * Ruby's `assert_warning` (`test/lib/core_assertions.rb`): runs the block with
+ * `$VERBOSE` set, capturing what `rb_warning` writes, and matches it against
+ * the pattern. `$VERBOSE` is restored in a `finally` so it cannot leak past the
+ * block, let alone past this file.
+ */
+function assertWarning(pattern: RegExp, block: () => void): void {
+  const stderr = vi.spyOn(console, "warn").mockImplementation(() => {});
+  let output: string;
+  setRubyVerbose(true);
+  try {
+    block();
+  } finally {
+    setRubyVerbose(false);
+    output = stderr.mock.calls.map((call) => String(call[0])).join("\n");
+    stderr.mockRestore();
+  }
+  expect(output).toMatch(pattern);
+}
 
 const gemDateTimeParse = (str: string) => dtNewByFrags(RubyDate._parse(str));
 const gemDateTimeStrptime = (str: string, fmt: string) =>
@@ -251,7 +270,9 @@ describe("TestDateStrftime", () => {
       }
     }
     for (const r of ["+2430", "-2430"]) {
-      expect(gemDateTimeParse(s + r).zone).toEqual("+00:00");
+      assertWarning(/invalid offset/, () => {
+        gemDateTimeParse(s + r);
+      });
     }
   });
 

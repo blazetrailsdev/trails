@@ -202,6 +202,27 @@ function subsecNanoseconds(sec: number | Rational): number {
 }
 
 /**
+ * MRI's `obj2ubits` (`time.c`), which every `::Time` constructor positional
+ * goes through before `validate_vtm` sees it: the value has to fit in `bits`
+ * unsigned bits or the argument is rejected outright, with a message that names
+ * no field. That is why `Time.utc(2015, 6, 32)` is `"argument out of range"`
+ * while `Time.utc(2015, 6, 0)` — inside 5 bits — is `"mday out of range"`.
+ */
+function obj2ubits(obj: number, bits: number): number {
+  const usableMask = (1 << bits) - 1;
+  if ((obj & usableMask) !== obj) throw new ArgumentError("argument out of range");
+  return obj;
+}
+
+/**
+ * MRI's `validate_vtm_range` macro (`time.c`), which interpolates the struct
+ * member's own name into the message.
+ */
+function validateVtmRange(mem: string, value: number, b: number, e: number): void {
+  if (value < b || value > e) throw new ArgumentError(`${mem} out of range`);
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby core `::Time`. Rails never defines the
  * class, only reopens it in `core_ext/time/*.rb`, so there is no Rails
  * counterpart for a port to converge on. trails carries only the members a
@@ -291,6 +312,13 @@ export class Time {
    * `2015-07-01 00:00:00 UTC` and its `#sec` is `0`. `Temporal` rejects the
    * value outright (`RejectTime`: `0 <= 60 <= 59`), so the roll is spelled here
    * rather than in the slot. A 61st second is `ArgumentError` there and here.
+   * Every other positional is range-checked here too, ahead of the
+   * `Temporal.PlainDateTime` construction, because `Temporal` raises its own
+   * `RangeError` with its own wording where MRI raises `ArgumentError` naming
+   * the field (`time.c` `obj2ubits` / `validate_vtm`). MRI's `hour` upper bound
+   * is 24, not 23 — `Time.utc(2015, 6, 30, 24)` is `2015-07-01 00:00:00 UTC`,
+   * the same roll `sec == 60` takes, and it admits only a zero `min`/`sec`.
+   *
    * That MRI reading is why `Time#toDatetime`'s `s == 60` fold
    * (`date_core.c:8913-8915`) is unreachable through the constructor on both
    * runtimes; the C carries it for a `right/`-zoneinfo build, which is not a
@@ -307,19 +335,29 @@ export class Time {
   ) {
     const nsec = subsecNanoseconds(sec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
-    if (wholeSec > 60) throw new ArgumentError("sec out of range");
+    obj2ubits(month, 4);
+    obj2ubits(day, 5);
+    obj2ubits(hour, 5);
+    obj2ubits(min, 6);
+    obj2ubits(wholeSec, 6);
+    validateVtmRange("mon", month, 1, 12);
+    validateVtmRange("mday", day, 1, 31);
+    validateVtmRange("hour", hour, 0, 24);
+    validateVtmRange("min", min, 0, hour === 24 ? 0 : 59);
+    validateVtmRange("sec", wholeSec, 0, hour === 24 ? 0 : 60);
     const plain = new Temporal.PlainDateTime(
       year,
       month,
       day,
-      hour,
+      hour === 24 ? 23 : hour,
       min,
       wholeSec === 60 ? 59 : wholeSec,
       Math.floor(nsec / 1_000_000),
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
     );
-    this.#plain = wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
+    this.#plain =
+      hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone);
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#utcOffset =
@@ -524,6 +562,9 @@ export class Time {
     return strftime(
       {
         year: this.year,
+        jd: cCivilToJd(this.year, this.mon, this.day),
+        nth: 0n,
+        gregorianP: true,
         mon: this.mon,
         day: this.day,
         wday: this.wday,

@@ -11,7 +11,7 @@ import { currentTime } from "./time-travel.js";
 import { getZone, findZoneBang } from "./time-zone-config.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
-import { Rational, strftime } from "@blazetrails/date";
+import { Rational, cCivilToJd, strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
 
 /**
@@ -397,6 +397,9 @@ export class TimeWithZone {
     return strftime(
       {
         year: l.year,
+        jd: cCivilToJd(l.year, l.month, l.day),
+        nth: 0n,
+        gregorianP: true,
         mon: l.month,
         day: l.day,
         wday: this.wday,

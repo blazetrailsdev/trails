@@ -93,7 +93,9 @@
     "tsFile": "hash-utils.ts",
     "rubyName": "stringify_keys",
     "call": "transform_keys",
-    "reason": "Rails routes both key casts through `transform_keys` (keys.rb:11), the Hash primitive JS lacks: trails builds the result with an `Object.keys` loop (hash-utils.ts:145-148). Converging needs a ported `transformKeys` for plain objects to delegate to — filed as its own work, not resolvable inside the measurement fix that surfaced it."
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
   },
   {
     "package": "activesupport",
@@ -109,6 +111,17 @@
     "tsFile": "hash-utils.ts",
     "rubyName": "symbolize_keys",
     "call": "transform_keys",
-    "reason": "Same as `stringify_keys` above: Rails' `transform_keys` (keys.rb:22) has no JS Hash counterpart, so trails inlines the key loop."
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "hash-utils.ts",
+    "rubyName": "symbolize_keys!",
+    "call": "transform_keys!",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
   }
 ]

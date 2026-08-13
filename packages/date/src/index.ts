@@ -15,6 +15,7 @@ export {
   Date,
   DateTime,
   Rational,
+  cCivilToJd,
   dNewByFrags,
   dtNewByFrags,
   strftime,

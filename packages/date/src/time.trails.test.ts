@@ -147,6 +147,31 @@ describe("Time", () => {
     expect(time.strftime("%L")).toBe("000");
   });
 
+  it("raises MRI's ArgumentError, naming the field, for an out-of-range positional", () => {
+    expect(() => Time.utc(2015, 6, 30, 23, 60, 0)).toThrow(new ArgumentError("min out of range"));
+    expect(() => Time.utc(2015, 13, 1)).toThrow(new ArgumentError("mon out of range"));
+    expect(() => Time.utc(2015, 6, 0)).toThrow(new ArgumentError("mday out of range"));
+    expect(() => Time.utc(2015, 6, 1, 25)).toThrow(new ArgumentError("hour out of range"));
+    expect(() => Time.utc(2015, 6, 1, 0, 0, 61)).toThrow(new ArgumentError("sec out of range"));
+  });
+
+  it("raises MRI's unnamed ArgumentError for a positional wider than its bit field", () => {
+    expect(() => Time.utc(2015, 6, 32)).toThrow(new ArgumentError("argument out of range"));
+    expect(() => Time.utc(2015, 16, 1)).toThrow(new ArgumentError("argument out of range"));
+    expect(() => Time.utc(2015, 6, 1, 32)).toThrow(new ArgumentError("argument out of range"));
+    expect(() => Time.utc(2015, 6, 1, 0, 64)).toThrow(new ArgumentError("argument out of range"));
+    expect(() => Time.utc(2015, 6, 1, 0, 0, 64)).toThrow(
+      new ArgumentError("argument out of range"),
+    );
+    expect(() => Time.utc(2015, 6, -1)).toThrow(new ArgumentError("argument out of range"));
+  });
+
+  it("admits a 24th hour and rolls it into the next day, as MRI does", () => {
+    expect(Time.utc(2015, 6, 30, 24).strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-07-01 00:00:00");
+    expect(() => Time.utc(2015, 6, 30, 24, 1)).toThrow(new ArgumentError("min out of range"));
+    expect(() => Time.utc(2015, 6, 30, 24, 0, 1)).toThrow(new ArgumentError("sec out of range"));
+  });
+
   describe("in a local zone `Intl` has no abbreviation for", () => {
     afterEach(() => {
       vi.restoreAllMocks();

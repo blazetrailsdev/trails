@@ -4833,6 +4833,24 @@ for (const [name, fn] of [
     },
   ],
   [
+    // Rails' MRO for `_update_row` is Persistence ← Locking::Optimistic
+    // (base.rb includes Locking::Optimistic after Persistence), so the locking
+    // body runs first and reaches Persistence's through `super`
+    // (optimistic.rb:92-118 over persistence.rb:884-889). Without this wiring
+    // the override was never installed and neither the save path nor `touch`
+    // enforced the lock-version WHERE.
+    "_updateRow",
+    function (this: Base, attributeNames: string[], attemptedAction = "update"): Promise<number> {
+      return LockingOptimistic._updateRow.call(
+        this as any,
+        attributeNames,
+        attemptedAction,
+        (names: string[], action: string) =>
+          _Persistence._updateRow.call(this as any, names, action),
+      );
+    },
+  ],
+  [
     "_updateRecord",
     function (this: Base, block?: (record: Base) => void): Promise<boolean> {
       return Timestamp._updateRecord.call(this as any, () =>
