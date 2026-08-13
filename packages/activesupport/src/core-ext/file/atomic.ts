@@ -83,13 +83,15 @@ export function atomicWrite<T>(
  *
  * Mirrors Ruby `File.probe_stat_in` (core_ext/file/atomic.rb:55-70).
  *
- * The basename's uniqueness components in Rails are the thread id and pid
- * (atomic.rb:59-60); neither exists here (single thread, no `process.*`), so
- * two random draws stand in for them.
+ * The basename keeps Rails' three uniqueness components after the prefix
+ * (atomic.rb:57-62). The third is Rails' own `rand(1000000)`; the first two
+ * stand in for `Thread.current.object_id` and `Process.pid`, neither of which
+ * exists here (single thread, no `process.*`).
  */
 export function probeStatIn(dir: string): FsStatResult | null {
   const basename = [
     ".permissions_check",
+    Math.floor(Math.random() * 1000000),
     Math.floor(Math.random() * 1000000),
     Math.floor(Math.random() * 1000000),
   ].join(".");
