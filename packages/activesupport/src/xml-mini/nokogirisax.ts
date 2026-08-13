@@ -139,12 +139,25 @@ export function setDocumentClass(klass: new () => HashBuilder): void {
   _documentClass = klass;
 }
 
-export async function parse(data: string | null | undefined): Promise<XmlHash> {
-  if (!data) return {};
+/**
+ * Mirrors: ActiveSupport::XmlMini_NokogiriSAX#parse (nokogirisax.rb:69-80) —
+ * `Blob` is the platform's in-memory readable byte container, so it stands in
+ * for the `StringIO` Rails wraps a non-readable `data` in (the same stand-in
+ * `XmlMini._parse_file` makes), and `instanceof Blob` for `respond_to?(:read)`.
+ * Reading the blob out is the `eof?` test: an empty read is Ruby's `eof?`.
+ */
+export async function parse(data: string | Blob | null | undefined): Promise<XmlHash> {
+  if (!(data instanceof Blob)) {
+    data = new Blob([data ?? ""]);
+  }
+
+  const text = await data.text();
+  if (text.length === 0) return {};
+
   const { SAX } = await loadNokogiri();
 
   const document = new (documentClass())();
   const parser = new SAX.Parser(document);
-  parser.parse(data);
+  parser.parse(text);
   return document.hash;
 }

@@ -11,8 +11,30 @@ import type { EventPayload } from "../notifications/instrumenter.js";
 /** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
+/** Mirrors Rails `Cache::Store::DEFAULT_POOL_OPTIONS` (cache.rb:197). */
+const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
+
+/** Mirrors Ruby `Object#inspect` for the values `retrieve_pool_options` reports. */
+function inspect(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value === null || value === undefined) return "nil";
+  return String(value);
+}
+
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
+
+/**
+ * Mirror of Ruby's `TypeError` — what `retrieve_pool_options` raises for a
+ * non-Hash `:pool`, and what `Integer()`/`Float()` raise for a value they
+ * cannot convert. @internal
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
 
 /** Mirrors Ruby ArgumentError. @internal */
 export class ArgumentError extends Error {
@@ -101,6 +123,71 @@ export abstract class Store {
     } finally {
       Store.logger = prev;
     }
+  }
+
+  /**
+   * Mirrors Rails `Cache::Store.retrieve_pool_options` (cache.rb:200-220), a
+   * private class method the pooled stores call on their own options hash.
+   * `options.key?(:pool)` distinguishes an explicit `pool: nil` from an absent
+   * key, so the read is `"pool" in options`, not `?? true`.
+   *
+   * @missingRailsCall merge — `DEFAULT_POOL_OPTIONS.merge(pool_options)`
+   * (cache.rb:215) is the object spread here; a plain Hash#merge has no named
+   * counterpart in the package.
+   */
+  static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
+    let poolOptions: unknown;
+    if ("pool" in options) {
+      poolOptions = options["pool"];
+      delete options["pool"];
+    } else {
+      poolOptions = true;
+    }
+
+    if (poolOptions === false || poolOptions == null) {
+      return false;
+    } else if (poolOptions === true) {
+      poolOptions = DEFAULT_POOL_OPTIONS;
+    } else if (typeof poolOptions === "object") {
+      const hash = poolOptions as StoreOptions;
+      // Ruby's `Integer()`/`Float()` raise on a value they can't convert rather
+      // than yielding NaN the way `Number()` does.
+      if ("size" in hash) {
+        const size = hash["size"];
+        if (typeof size !== "number" && typeof size !== "string") {
+          // The local `TypeError` above is the ported Ruby class; the lint rule reads
+          // the native name.
+          // eslint-disable-next-line blazetrails/rails-error-parity
+          throw new TypeError(`can't convert ${typeof size} into Integer`);
+        }
+        if (!Number.isInteger(Number(size))) {
+          throw new ArgumentError(`invalid value for Integer(): ${inspect(size)}`);
+        }
+        hash["size"] = Number(size);
+      }
+      if ("timeout" in hash) {
+        const timeout = hash["timeout"];
+        if (typeof timeout !== "number" && typeof timeout !== "string") {
+          // The local `TypeError` above is the ported Ruby class; the lint rule reads
+          // the native name.
+          // eslint-disable-next-line blazetrails/rails-error-parity
+          throw new TypeError(`can't convert ${typeof timeout} into Float`);
+        }
+        if (Number.isNaN(Number(timeout))) {
+          throw new ArgumentError(`invalid value for Float(): ${inspect(timeout)}`);
+        }
+        hash["timeout"] = Number(timeout);
+      }
+      poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
+    } else {
+      // The local `TypeError` above is the ported Ruby class; the lint rule reads
+      // the native name.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`Invalid :pool argument, expected Hash, got: ${inspect(poolOptions)}`);
+    }
+
+    const result = poolOptions as StoreOptions;
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   silence = false;
