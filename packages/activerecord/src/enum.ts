@@ -136,12 +136,8 @@ export function installEnumAttribute(
   // seeds the attribute default and flows through the EnumType on read. Pass a
   // bare `attribute(name)` when there are no options to preserve the
   // column-seeded FromDatabase attribute.
-  // The deferred-type-check marker keys off the *resolved* name, the same name
-  // `attribute` / `decorate_attributes` register under
-  // (attribute_registration.rb:13,24): an `enum` declared after its
-  // `alias_attribute` checks the backing column, while one declared before it
-  // resolves to itself and still raises, exactly as Rails' captured-at-declaration
-  // decorator does.
+  // The deferred-type-check marker below keys off the same name `attribute` /
+  // `decorate_attributes` register under (attribute_registration.rb:13,24).
   const resolved = klass.resolveAttributeName(name);
   // Rails raises for an enum on an attribute with no declared type AND no
   // backing DB column, but only once the schema is reflected (inside the
@@ -220,11 +216,8 @@ export function installEnumAttribute(
   // accessor attribute() installed.
   Object.defineProperty(klass.prototype, name, {
     get(this: Base) {
-      // `readAttribute`, not a direct `_attributes` read: with `alias_attribute
-      // :aliased_status, :status` the enum is stored under the resolved backing
-      // column (Rails resolves the alias inside `attribute` /
-      // `decorate_attributes`, attribute_registration.rb:13,24), and
-      // `readAttribute` is the alias-resolving reader.
+      // `readAttribute`, not a direct `_attributes` read: an aliased enum is
+      // stored under the resolved backing column.
       return (this as unknown as EnumInstanceHost).readAttribute(name);
     },
     set(this: Base, value: unknown) {
@@ -1040,8 +1033,7 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // `decorate_attributes` block raises (type_caster/map.rb:10-16, enum.rb:240-245).
   assertEnumTypeDeclared(klass, attribute);
   // `defined_enums` is keyed by the *declared* enum name, alias or not
-  // (enum.rb:232); only the attribute-set lookup below resolves the alias, the
-  // way Rails' `type_for_attribute` does.
+  // (enum.rb:232); only the attribute-set lookup resolves the alias.
   if (!host._enums?.has(attribute)) return null;
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
   // Reflect synchronously from the warm schema cache before reading the
