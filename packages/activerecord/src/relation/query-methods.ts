@@ -2389,7 +2389,7 @@ export function buildWithValueFromHash(
       );
     }
     const expr = buildWithExpressionFromValue.call(this, (hash as any)[key]);
-    return new Nodes.Cte(name, expr as any);
+    return new Nodes.TableAlias(expr as any, name);
   });
 }
 
