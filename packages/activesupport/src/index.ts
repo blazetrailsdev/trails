@@ -365,6 +365,17 @@ export type {
   DeprecationBehaviorInput,
 } from "./deprecation.js";
 export { Deprecators } from "./deprecation/deprecators.js";
+export {
+  DeprecationProxy,
+  DeprecatedObjectProxy,
+  DeprecatedInstanceVariableProxy,
+  DeprecatedConstantProxy,
+} from "./deprecation/proxy-wrappers.js";
+export {
+  assertDeprecated,
+  assertNotDeprecated,
+  collectDeprecations,
+} from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
 // MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:

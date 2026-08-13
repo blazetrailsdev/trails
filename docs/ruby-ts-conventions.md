@@ -108,6 +108,8 @@ parity:api never expects a TS counterpart for these Ruby methods:
   - `extended`, `included`, `inherited`
 - Ruby object hooks — no TypeScript equivalent.
   - `singleton_method_added`
+- Ruby constant-resolution hook — the VM calls it when a constant name misses. JS resolves nothing at runtime by name, so there is no slot for it.
+  - `const_missing`
 - NoTouching: TS uses a Map-based depth counter (\_noTouchingDepth) instead of a thread-local array; klasses() is the Rails internal accessor for that array.
   - `klasses`
 - CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and the ActiveRecord::Tasks infrastructure that has no JS equivalent.

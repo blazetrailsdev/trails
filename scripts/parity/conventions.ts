@@ -423,6 +423,14 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
+      "Ruby constant-resolution hook — the VM calls it when a constant name " +
+      "misses. JS resolves nothing at runtime by name, so there is no slot " +
+      "for it.",
+    names: ["const_missing"],
+    tsMirrorIsDrift: true,
+  },
+  {
+    reason:
       "NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead " +
       "of a thread-local array; klasses() is the Rails internal accessor for " +
       "that array.",
