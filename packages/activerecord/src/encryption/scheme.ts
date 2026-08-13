@@ -181,10 +181,10 @@ export class Scheme {
   /** @internal */
   private validateConfigBang(): void {
     if (this.ignoreCase != null && this.ignoreCase !== false && !this.isDeterministic()) {
-      throw new Configuration("ignoreCase: can only be used with deterministic encryption");
+      throw new Configuration("ignore_case: can only be used with deterministic encryption");
     }
     if (this._keyProviderParam != null && this.key != null) {
-      throw new Configuration("keyProvider: and key: can't be used simultaneously");
+      throw new Configuration("key_provider: and key: can't be used simultaneously");
     }
     if (!this.compress && this.compressor !== undefined) {
       throw new Configuration("compressor: can't be used with compress: false");
