@@ -3,13 +3,6 @@
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "delegate",
-    "call": "caller_locations",
-    "reason": "Pre-existing divergence surfaced (not introduced) by this PR: `caller_locations` entered the compared call-name population when deprecation.ts gained a member of that name. Rails passes `location: caller_locations(1, 1).first` into both generation paths (module/delegation.rb:160-165, module/attribute_accessors.rb:208-211) so a NameError raised by a generated method points at the declaring line; trails' generated accessors are real JS functions with a real stack and there is no `module_eval` file/line to attribute. Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "delegate",
     "call": "first",
     "reason": "Part of the same omission: the `location: caller_locations(1, 1).first` argument Rails passes to `Delegation.generate` for error backtraces has no caller in trails' inline generation."
   },
@@ -40,13 +33,6 @@
     "rubyName": "descendants",
     "call": "subclasses",
     "reason": "Same delegation; the tracker reads the subclass set directly, not through this file's `subclasses`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "mattr_accessor",
-    "call": "caller_locations",
-    "reason": "Pre-existing divergence surfaced (not introduced) by this PR: `caller_locations` entered the compared call-name population when deprecation.ts gained a member of that name. Rails passes `location: caller_locations(1, 1).first` into both generation paths (module/delegation.rb:160-165, module/attribute_accessors.rb:208-211) so a NameError raised by a generated method points at the declaring line; trails' generated accessors are real JS functions with a real stack and there is no `module_eval` file/line to attribute. Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations."
   },
   {
     "package": "activesupport",

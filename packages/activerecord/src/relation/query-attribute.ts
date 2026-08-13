@@ -138,8 +138,8 @@ export class QueryAttribute extends Attribute {
  * than a boolean; see `isInfinite` above.
  *
  * `infinite?` ports to `isInfinite()`, the one spelling the protocol has across
- * the port — `Quoted` (casted.ts), `BindParam` (bind-param.ts), `UnboundableBound`
- * (predicate-builder/range-handler.ts) and arel's `infinitySign` all read it.
+ * the port — `Quoted` (casted.ts), `BindParam` (bind-param.ts) and arel's
+ * `infinitySign` all read it.
  * Rails has a single `respond_to?(:infinite?)` protocol, so this must not fork
  * into a second name: reading `infinite()` here made
  * `QueryAttribute(Quoted(INFINITY)).infinite?` false while `infinitySign` said 1.

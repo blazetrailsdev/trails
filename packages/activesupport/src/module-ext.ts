@@ -12,6 +12,12 @@ import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
  * Usage:
  *   delegate(MyClass.prototype, "street", "city", { to: "place" });
  *   delegate(MyClass.prototype, "name", { to: "place", prefix: true });
+ *
+ * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
+ * into the generated definition (module/delegation.rb:160-165) so an error raised inside it points at the
+ * declaring line rather than at the framework file. trails generates real JS functions,
+ * which carry a real stack, and there is no `module_eval` file/line to attribute.
+ * Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations.
  */
 export function delegate(
   target: object,
@@ -93,6 +99,12 @@ function assertValidAttrName(name: string): void {
  * mattrAccessor — defines class-level attribute accessors (mattr_accessor).
  * Also adds instance-level delegates by default (like Rails).
  * Supports: default, instanceWriter, instanceReader, instanceAccessor options.
+ *
+ * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
+ * into the generated definition (module/attribute_accessors.rb:208-211) so an error raised inside it points at the
+ * declaring line rather than at the framework file. trails generates real JS functions,
+ * which carry a real stack, and there is no `module_eval` file/line to attribute.
+ * Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations.
  */
 export function mattrAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   const options: MattrOptions =
