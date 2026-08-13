@@ -38,6 +38,9 @@ export function assertNot(object: unknown, message?: string | null): void {
  *   assert_raises(ArgumentError, match: /incorrect param/i) do
  *     perform_service(param: 'exception')
  *   end
+ *
+ * Ruby's `*exp` splat is an array here: a TS rest parameter cannot precede the
+ * `match` kwarg and the block, which Ruby takes after it.
  */
 export async function assertRaises(
   exp: (new (...args: any[]) => Error)[],
@@ -90,6 +93,11 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
  * An arbitrary positive or negative difference can be specified. The default
  * is +1+. A list of expressions, or a Map of expression => difference, can be
  * passed in place of a single expression.
+ *
+ * Ruby reads `*args` positionally — `args[0]` is the message when `expression`
+ * is a Hash and the difference otherwise. A TS rest parameter cannot precede
+ * the block, so `difference` and `message` are named parameters and the Map
+ * form ignores `difference`, exactly as Rails' Hash form does.
  */
 export async function assertDifference<T>(
   expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
@@ -229,6 +237,14 @@ export async function assertNoChanges<T>(
 }
 
 /** @internal */
+/**
+ * Rails re-raises after warning through `tagged_logger` when the block raised
+ * (`assertions.rb:281-294`). The warning describes a `Minitest::UnexpectedError`
+ * wrapper that {@link assertNothingRaised} does not create here, so the rescue
+ * arm has nothing to catch and the error propagates as Rails re-raises it.
+ *
+ * @internal
+ */
 async function _assertNothingRaisedOrWarn<T>(
   _assertion: string,
   block?: () => T | Promise<T>,
