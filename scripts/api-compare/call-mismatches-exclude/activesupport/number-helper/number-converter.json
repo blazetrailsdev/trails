@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/number-converter.ts",
+    "rubyName": "format_options",
+    "call": "merge!",
+    "reason": "Per-entry verified: Rails number_converter.rb:146 spells `default_format_options.merge!(i18n_format_options)`; the TS body merges both with an object spread, which is not a call node — Ruby's `Hash#merge!` is core, not Rails, so there is no ported name for the gate to match. Pre-existing; only became visible when porting XmlMini_REXML#merge! put `merge!` in the gate's ported-name population. Convergence of the surrounding decomposition is tracked by story 0101-activesupport-out-of-closure-surface/converge-number-converter-format-options."
+  }
+]

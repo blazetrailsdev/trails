@@ -1,9 +1,18 @@
-import { describe, it } from "vitest";
+import { describe, it, expect } from "vitest";
+import { backend, parse } from "../xml-mini.js";
+import * as XmlMini_REXML from "./rexml.js";
 
 describe("REXMLEngineTest", () => {
-  it.skip("default is rexml");
+  it("default is rexml", () => {
+    expect(backend()).toBe(XmlMini_REXML);
+  });
 
-  it.skip("parse from empty string");
+  it("parse from empty string", async () => {
+    expect(await parse("")).toEqual({});
+  });
 
-  it.skip("parse from frozen string");
+  it("parse from frozen string", async () => {
+    const xmlString = "<root></root>";
+    expect(await parse(xmlString)).toEqual({ root: {} });
+  });
 });
