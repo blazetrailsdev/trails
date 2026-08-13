@@ -42,6 +42,12 @@ class Assertion extends Error {
  * vendored Rails file for the comparator to map onto. Porting it here is what
  * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
  * rescue, the class Rails names.
+ *
+ * `message` and `backtrace` are METHODS in minitest (minitest.rb:1097-1107),
+ * reading the wrapped error when called. TypeScript cannot declare an accessor
+ * over a base-class data property (`Error#message`/`#stack`, TS2611), so they
+ * are installed on the prototype below — and the constructor deletes the own
+ * properties `Error` installs, which would otherwise shadow them.
  */
 export class UnexpectedError extends Assertion {
   override name = "UnexpectedError";
@@ -49,10 +55,6 @@ export class UnexpectedError extends Assertion {
 
   constructor(error: Error) {
     super("Unexpected exception");
-    // `message` and `stack` are own data properties on a constructed Error and
-    // would shadow the prototype accessors defined below, which are minitest's
-    // `message`/`backtrace` METHODS — read off the wrapped error when called,
-    // not composed once here.
     delete (this as { message?: string }).message;
     delete (this as { stack?: string }).stack;
     this.error = error;
@@ -86,16 +88,12 @@ function baseRe(): RegExp {
 function filter(bt: string[] | null): string[] {
   if (!bt) return ["No backtrace"];
 
-  let newBt = takeWhile(bt, (line) => !MT_RE.test(line));
+  const framework = bt.findIndex((line) => MT_RE.test(line));
+  let newBt = framework === -1 ? [...bt] : bt.slice(0, framework);
   if (newBt.length === 0) newBt = bt.filter((line) => !MT_RE.test(line));
   if (newBt.length === 0) newBt = [...bt];
 
   return newBt;
-}
-
-function takeWhile(bt: string[], predicate: (line: string) => boolean): string[] {
-  const index = bt.findIndex((line) => !predicate(line));
-  return index === -1 ? [...bt] : bt.slice(0, index);
 }
 
 /** Mirrors `Minitest.filter_backtrace` (minitest.rb:365-369). */
@@ -106,11 +104,6 @@ function filterBacktrace(bt: string[] | null): string[] {
 }
 
 Object.defineProperties(UnexpectedError.prototype, {
-  // TypeScript cannot declare an accessor over a base-class DATA property
-  // (`Error#message`/`#stack`, TS2611), so minitest's `backtrace`
-  // (minitest.rb:1097-1099) and `message` (minitest.rb:1103-1107) methods are
-  // installed on the prototype here. `backtrace` is JS' frame lines, which
-  // `stack` carries after its leading `"Name: message"` header.
   stack: {
     configurable: true,
     get(this: UnexpectedError): string | undefined {
@@ -120,7 +113,7 @@ Object.defineProperties(UnexpectedError.prototype, {
   message: {
     configurable: true,
     get(this: UnexpectedError): string {
-      const bt = filterBacktrace(backtraceOf(this.error)).join("\n    ").replace(baseRe(), "");
+      const bt = filterBacktrace(backtrace(this.error)).join("\n    ").replace(baseRe(), "");
       return `${this.error.name}: ${this.error.message}\n    ${bt}`;
     },
   },
@@ -131,7 +124,7 @@ Object.defineProperties(UnexpectedError.prototype, {
  * `stack` prepends a `"Name: message"` header line and indents each frame,
  * both of which are dropped here so the two carry the same thing.
  */
-function backtraceOf(error: Error): string[] | null {
+function backtrace(error: Error): string[] | null {
   if (error.stack == null) return null;
   return error.stack
     .split("\n")

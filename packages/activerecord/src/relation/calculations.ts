@@ -361,9 +361,9 @@ async function groupedAggregate(
   if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
   const association =
     groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
-  // calculations.rb:521: `group_fields = Array(association.foreign_key)` — a
-  // composite-key belongs_to expands to every foreign key column here, and the
-  // rest of the body carries whatever arity that produces.
+  // calculations.rb:521 — `Array(association.foreign_key)` expands a
+  // composite-key belongs_to to every FK column; the rest of the body carries
+  // whatever arity that produces.
   if (association) {
     groupFields = Array.isArray(association.foreignKey)
       ? [...(association.foreignKey as string[])]
@@ -1045,8 +1045,6 @@ export async function executeGroupedCalculation(
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
-  // The resolved `distinct` is threaded through so it reaches
-  // `operation_over_aggregate_column` (calculations.rb:538).
   return groupedAggregate(rel, fn, aggregateTarget(columnName), distinct);
 }
 
