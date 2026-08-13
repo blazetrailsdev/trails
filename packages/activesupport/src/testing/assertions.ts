@@ -286,9 +286,8 @@ function _callableToSourceString(callable: unknown): string {
 /**
  * @noRailsEquivalent Minitest's `assert`, which every assertion in
  * `testing/assertions.rb` and `testing/deprecation.rb` calls. Rails inherits it
- * from Minitest rather than defining it, so there is no Ruby counterpart in a
- * mapped file; it is exported so the sibling testing modules raise the same
- * `Assertion` rather than each rolling their own.
+ * from Minitest, so there is no Ruby counterpart in a mapped file; exported so
+ * both testing modules raise the same `Assertion`.
  */
 export function assert(value: boolean, message: string | (() => string)): void {
   if (!value) throw new Assertion(typeof message === "function" ? message() : message);

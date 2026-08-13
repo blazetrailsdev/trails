@@ -5,34 +5,25 @@ import { constantize } from "../inflector.js";
 /**
  * Mirrors: active_support/deprecation/proxy_wrappers.rb
  *
- * Ruby's `def self.new` can answer something other than an instance, and
- * `instance_methods.each { |m| undef_method m }` strips the inherited methods
- * so every call lands in `method_missing`. A TS constructor can neither return
- * `nil`/`false` nor un-define an inherited method, so `new` is a static method
- * (which is what Rails writes anyway) and the undef'd lookup is a `Proxy` whose
- * `get` is `method_missing` — the same shape `methodMissingProxy`
- * (method-missing-proxy.ts) uses, spelled out here because Rails' hook warns on
- * every forwarded call and takes the called name and args to build the message.
+ * A TS constructor can neither return `nil`/`false` nor un-define an inherited
+ * method, so `new` stays the static method Rails writes, and the
+ * `undef_method` + `method_missing` lookup is a `Proxy` — the shape
+ * `methodMissingProxy` (method-missing-proxy.ts) uses, spelled out here because
+ * Rails' hook warns on every forwarded call, from the called name and args.
  */
 
-/** Ruby truthiness: only `nil` and `false` take the `return object` arm. */
-function isFalsy(object: unknown): boolean {
-  return object == null || object === false;
+/** Mirrors Ruby's `Object#inspect` for the values these messages interpolate. */
+function inspect(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value === null || value === undefined) return "nil";
+  if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
+  return String(value);
 }
 
-/**
- * Names JS itself probes on an arbitrary object — forwarding them through
- * `method_missing` would emit a deprecation warning for an `await` or an
- * equality check the user never wrote.
- */
+/** Names JS probes on any object; forwarding them would warn for an `await`. */
 const PROTOCOL_PROBES = new Set(["then", "catch", "finally", "toJSON", "$$typeof", "nodeType"]);
 
-/**
- * The `instance_methods.each { |m| undef_method m unless /^__|^object_id$/ }`
- * lookup: everything but the proxy's own public methods routes to
- * `method_missing`. `proxy` is the object handed back to the caller, so `this`
- * inside a forwarded `warn` is the proxy's own instance.
- */
+/** The `instance_methods.each { |m| undef_method m }` lookup. */
 function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMissing): T {
   return new Proxy(instance, {
     get(target, prop, receiver) {
@@ -48,12 +39,12 @@ function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMi
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
 
 /** :nodoc: */
-export class DeprecationProxy {
+export abstract class DeprecationProxy {
   /** Mirrors: proxy_wrappers.rb:6-11. */
   static new(...args: unknown[]): unknown {
     const object = args[0];
 
-    if (isFalsy(object)) return object;
+    if (object == null || object === false) return object;
     const instance = new (this as unknown as new (...a: unknown[]) => DeprecationProxy)(...args);
     return undefMethodProxy(instance, DeprecationProxy.prototype.methodMissing);
   }
@@ -61,14 +52,12 @@ export class DeprecationProxy {
   // Don't give a deprecation warning on inspect since test/unit and error
   // logs rely on it for diagnostics.
   inspect(): string {
-    return String(this.target);
+    return inspect(this.target);
   }
 
-  protected get target(): unknown {
-    return undefined;
-  }
+  protected abstract get target(): unknown;
 
-  protected warn(_callstack: CallerLocation[], _called: string, _args: unknown[]): void {}
+  protected abstract warn(callstack: CallerLocation[], called: string, args: unknown[]): void;
 
   /** Mirrors: proxy_wrappers.rb:19-22. */
   private methodMissing(called: string, args: unknown[]): unknown {
@@ -83,12 +72,6 @@ export class DeprecationProxy {
 /**
  * DeprecatedObjectProxy transforms an object into a deprecated one. It takes an
  * object, a deprecation message, and a deprecator.
- *
- *   const deprecatedObject = DeprecatedObjectProxy.new(
- *     new Object(), "This object is now deprecated", new Deprecation());
- *
- *   deprecatedObject.toString();
- *   // DEPRECATION WARNING: This object is now deprecated.
  *
  * Mirrors: proxy_wrappers.rb:35-51.
  */
@@ -119,7 +102,9 @@ export class DeprecatedObjectProxy extends DeprecationProxy {
  * instance variable, and a deprecator as the last argument.
  *
  * Trying to use the deprecated instance variable will result in a deprecation
- * warning, pointing to the method as a replacement.
+ * warning, pointing to the method as a replacement. Ruby's `var = "@#{method}"`
+ * default sits before the `deprecator:` kwarg, so a caller passing only the
+ * kwarg lands it in the `var` slot; both arrangements are accepted.
  *
  * Mirrors: proxy_wrappers.rb:83-99.
  */
@@ -136,8 +121,6 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
     options?: { deprecator: Deprecation },
   ) {
     super();
-    // Ruby's `var = "@#{method}"` default sits before the `deprecator:` kwarg,
-    // so a caller passing only the kwarg lands it in the `var` slot here.
     const varName = typeof varOrOptions === "string" ? varOrOptions : `@${method}`;
     const deprecator = (typeof varOrOptions === "string" ? options : varOrOptions)?.deprecator;
     this._instance = instance as Record<string, unknown>;
@@ -153,7 +136,7 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
 
   protected override warn(callstack: CallerLocation[], called: string, args: unknown[]): void {
     this._deprecator.warn(
-      `${this._var} is deprecated! Call ${this._method}.${called} instead of ${this._var}.${called}. Args: ${JSON.stringify(args)}`,
+      `${this._var} is deprecated! Call ${this._method}.${called} instead of ${this._var}.${called}. Args: ${inspect(args)}`,
       callstack,
     );
   }
@@ -165,9 +148,6 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
  * string form) and a deprecator. The deprecated constant now returns the value
  * of the new one.
  *
- *   const PLANETS = DeprecatedConstantProxy.new(
- *     "PLANETS", "PLANETS_POST_2006", new Deprecation());
- *
  * Mirrors: proxy_wrappers.rb:117-180.
  */
 export class DeprecatedConstantProxy extends Module {
@@ -175,7 +155,7 @@ export class DeprecatedConstantProxy extends Module {
   static new(...args: unknown[]): unknown {
     const object = args[0];
 
-    if (isFalsy(object)) return object;
+    if (object == null || object === false) return object;
     const instance = new (this as unknown as new (...a: unknown[]) => DeprecatedConstantProxy)(
       ...args,
     );
@@ -206,7 +186,7 @@ export class DeprecatedConstantProxy extends Module {
   // Don't give a deprecation warning on inspect since test/unit and error
   // logs rely on it for diagnostics.
   inspect(): string {
-    return String(this.target);
+    return inspect(this.target);
   }
 
   // Don't give a deprecation warning on methods that IRB may invoke
@@ -220,11 +200,7 @@ export class DeprecatedConstantProxy extends Module {
     return (this.target as { name: string }).name;
   }
 
-  /**
-   * Returns the class of the new constant.
-   *
-   * Mirrors: proxy_wrappers.rb:152-154.
-   */
+  /** Returns the class of the new constant. Mirrors: proxy_wrappers.rb:152-154. */
   class(): unknown {
     return (this.target as object).constructor;
   }

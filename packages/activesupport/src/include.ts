@@ -159,12 +159,10 @@ type CallableMethods<M extends object> = {
 export type Included<M extends object> = CallableMethods<M>;
 
 /**
- * Ruby's `include` / `prepend` / `extend` are defined in terms of the module's
- * own `append_features` / `prepend_features` / `extended` hooks, which a module
- * may override to do something else entirely —
- * `Deprecation::DeprecatedConstantProxy` overrides all three to warn first
- * (proxy_wrappers.rb:156-169). Only a `Module` instance can carry them, so a
- * plain-object module that happens to have a same-named method is untouched.
+ * Ruby's `include`/`prepend`/`extend` are defined in terms of the module's own
+ * `append_features`/`prepend_features`/`extended` hooks, which a module may
+ * override — `Deprecation::DeprecatedConstantProxy` overrides all three to warn
+ * first (proxy_wrappers.rb:156-169). Only a `Module` instance can carry them.
  */
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) return undefined;
@@ -287,10 +285,10 @@ export type Extended<M extends object> = CallableMethods<M>;
  * plain assignment onto the class prototype.
  *
  * Distinct from `prepend.ts`'s same-named helper, which wraps existing methods
- * so the module's version receives the original as an explicit `super_`; this
- * one is the ancestry splice that pairs with `include()` above and is what a
- * module's `prepend_features` hook installs. It is deliberately not re-exported
- * from the package index, where `prepend.ts`'s helper owns the name.
+ * so the module's version receives the original as an explicit `super_`. This
+ * one is the ancestry splice that pairs with `include()` and is what a module's
+ * `prepend_features` hook installs; it is not re-exported from the package
+ * index, where `prepend.ts`'s helper owns the name.
  *
  * Mirrors: Ruby's Module#prepend (core language feature)
  */

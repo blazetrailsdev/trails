@@ -14,15 +14,9 @@ import { assert } from "./assertions.js";
 
 /**
  * Asserts that a matching deprecation warning was emitted by the given
- * deprecator during the execution of the yielded block.
- *
- *   assertDeprecated(/foo/, CustomDeprecator, () => {
- *     CustomDeprecator.warn("foo should no longer be used");
- *   });
- *
- * The `match` object may be a `RegExp`, or `String` appearing in the message.
- * If the `match` is omitted (or explicitly `null`), any deprecation warning
- * will match.
+ * deprecator during the execution of the yielded block. The `match` object may
+ * be a `RegExp`, or `String` appearing in the message; omitted (or explicitly
+ * `null`), any deprecation warning will match.
  *
  * Mirrors: testing/deprecation.rb:31-44.
  */
@@ -71,12 +65,6 @@ export async function assertNotDeprecated<T>(
  * Returns the return value of the block and an array of all the deprecation
  * warnings emitted by the given `deprecator` during the execution of the
  * yielded block.
- *
- *   collectDeprecations(CustomDeprecator, () => {
- *     CustomDeprecator.warn("message");
- *     new Deprecation().warn("other message");
- *     return ":result";
- *   }); // => [":result", ["message"]]
  *
  * Mirrors: testing/deprecation.rb:68-77.
  */

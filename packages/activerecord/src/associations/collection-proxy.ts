@@ -74,20 +74,6 @@ import { throughForeignKeyPresent } from "./through-association.js";
 import { foreignKeyPresentFor } from "./foreign-association.js";
 import type { AssociationReflection } from "../reflection.js";
 
-/**
- * Minimal shape of the OO singular association holder
- * (`record.association(name)` → HasOneAssociation / BelongsToAssociation)
- * used by `_createSingular` to route create/createBang through the
- * single-target path. @internal
- */
-interface SingularCreateHolder {
-  create(
-    attributes?: Record<string, unknown>,
-    block?: (record: Base) => void,
-  ): Promise<Base | null>;
-  createBang(attributes?: Record<string, unknown>, block?: (record: Base) => void): Promise<Base>;
-}
-
 // Declaration merging with `class CollectionProxy extends Relation`
 // propagates Relation's method types into this interface. `load()`
 // diverges (CP returns T[], Relation returns LoadedRelation<this>)
@@ -1114,44 +1100,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
   }
 
-  /**
-   * Whether this proxy backs a singular (has_one / belongs_to) association
-   * rather than a collection. The module-level `association()` helper returns
-   * a CollectionProxy for *every* association type, so `create`/`createBang`
-   * must route singular associations through their OO holder
-   * (`record.association(name)`) — otherwise the created record lands in the
-   * proxy's array `_target`, surfacing through `_associationCache` as an
-   * array-shaped `target` and tripping `autosaveHasOne`'s
-   * `Array.isArray(child)` bail (autosave-association.ts).
-   * `has_one :through` is excluded — it is handled by the through path.
-   * @internal
-   */
-  private get _isSingular(): boolean {
-    const type = this._assocDef.type as string;
-    return (type === "hasOne" || type === "belongsTo") && !this._isThrough;
-  }
-
-  /**
-   * Route a singular create/createBang through the OO singular holder so the
-   * target is stored as a single record (Rails' `SingularAssociation#create`),
-   * not appended to the proxy's array `_target`.
-   * @internal
-   */
-  private async _createSingular(
-    attrs: Record<string, unknown>,
-    block: ((r: T) => void) | undefined,
-    shouldRaise: boolean,
-  ): Promise<T> {
-    const holder = (
-      this._record as unknown as { association(name: string): SingularCreateHolder }
-    ).association(this._assocName);
-    const cb = block as ((r: Base) => void) | undefined;
-    const record = shouldRaise
-      ? await holder.createBang(attrs, cb)
-      : await holder.create(attrs, cb);
-    return record as T;
-  }
-
   private _checkStrictLoading(): void {
     if (_violatesStrictLoading(this._record, this._assocDef.options)) {
       strictLoadingViolationBang(this._record, this._assocName, {
@@ -1367,14 +1315,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (this._isSingular) {
-      if (Array.isArray(attrs)) {
-        const records: T[] = [];
-        for (const a of attrs) records.push(await this.create(a, block));
-        return records;
-      }
-      return this._createSingular(attrs, block, false);
-    }
     return (await this._collectionAssociation().create(
       attrs,
       block as ((record: Base) => void) | undefined,
@@ -3228,14 +3168,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
-    if (this._isSingular) {
-      if (Array.isArray(attrs)) {
-        const records: T[] = [];
-        for (const a of attrs) records.push(await this.createBang(a, block));
-        return records;
-      }
-      return this._createSingular(attrs, block, true);
-    }
     return (await this._collectionAssociation().createBang(
       attrs,
       block as ((record: Base) => void) | undefined,
