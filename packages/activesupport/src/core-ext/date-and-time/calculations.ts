@@ -15,7 +15,6 @@
 import { Temporal } from "@blazetrails/date";
 import * as date from "../date/calculations.js";
 import * as time from "../../time-ext.js";
-import { current as timeCurrent } from "../../time-zone-config.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
 
@@ -59,7 +58,7 @@ function wday(dateOrTime: DateOrTime): number {
 /** `self.class.current` — `Date.current` for a day, `Time.current` for a time. */
 function classCurrent(dateOrTime: DateOrTime): Temporal.PlainDate | TimeWithZone | Date {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
-  return dateOrTime instanceof Date ? timeCurrent() : date.current();
+  return dateOrTime instanceof Date ? time.current() : date.current();
 }
 
 /** `self < other` / `self > other`, across both arms. */
