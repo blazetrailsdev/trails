@@ -593,6 +593,19 @@ export class PostgreSQLAdapter
     if (typeof config === "object" && config !== null) {
       this._config = { ...(config as Record<string, unknown>) };
     }
+    // abstract_adapter.rb:159 — `@prepared_statements = !ActiveRecord
+    // .disable_prepared_statements && type_cast_config_to_boolean(
+    // @config.fetch(:prepared_statements) { default_prepared_statements })`.
+    // Rails reads it once, in the common tail of `initialize`; trails' config
+    // parsing forks below into a connection-string branch that returns early,
+    // so the read sits above the fork to cover both.
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (PostgreSQLAdapter.typeCastConfigToBoolean(
+        "preparedStatements" in this._config
+          ? this._config.preparedStatements
+          : this.defaultPreparedStatements(),
+      ) as boolean);
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};
@@ -655,16 +668,6 @@ export class PostgreSQLAdapter
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    // abstract_adapter.rb:159 — `@prepared_statements = !ActiveRecord
-    // .disable_prepared_statements && type_cast_config_to_boolean(
-    // @config.fetch(:prepared_statements) { default_prepared_statements })`.
-    // Rails reads it once, in the constructor that parses the config; in trails
-    // that constructor is this one.
-    this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
-      (PostgreSQLAdapter.typeCastConfigToBoolean(
-        preparedStatements !== undefined ? preparedStatements : this.defaultPreparedStatements(),
-      ) as boolean);
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled =
         PostgreSQLAdapter.typeCastConfigToBoolean(advisoryLocks) !== false;
