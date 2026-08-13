@@ -664,6 +664,53 @@ function tsCallNameKeys(rubyName: string): string[] {
   return [snakeToCamel(rubyName)];
 }
 
+/** The descriptor of a `&blk` block-pass the Ruby site's argument list dropped
+ *  — `&block` is `blockarg=ref:block` (extract-ruby-api.rb#describe_args) —
+ *  or undefined at a site that passes no block. */
+function rubyBlockArg(ruby: CallSite): string | undefined {
+  return ruby.flags.find((flag) => flag.startsWith("blockarg="))?.slice("blockarg=".length);
+}
+
+/** Where the TS site passes the block the Ruby site block-passed, or -1 when it
+ *  passes no such argument.
+ *
+ *  TS has no `&`, so the port forwards the block as an ordinary argument —
+ *  `associatedTable(key, block)` (predicate-builder.ts:79) for
+ *  `predicate_builder.rb:100`'s `associated_table(key, &block)` — which the TS
+ *  extractor cannot tell from a value argument. The Ruby-side descriptor is
+ *  what names it. */
+function tsBlockArgIndex(ruby: CallSite, ts: CallSite): number {
+  const blockArg = rubyBlockArg(ruby);
+  return blockArg === undefined ? -1 : ts.args.lastIndexOf(blockArg);
+}
+
+/** The TS argument list with the forwarded block dropped, so that a
+ *  block-passing Ruby site scores against its block-carrying TS counterpart on
+ *  the arguments the two actually share ({@link tsBlockArgIndex}). */
+function stripForwardedBlockArg(ruby: CallSite, ts: CallSite): string[] {
+  const index = tsBlockArgIndex(ruby, ts);
+  return index === -1 ? ts.args : ts.args.filter((_, i) => i !== index);
+}
+
+/**
+ * Whether a candidate pairs a block-passing Ruby site with the TS site that
+ * carries the block, and a block-less Ruby site with one that does not — the
+ * {@link pairCallSites} tie-break that keeps two occurrences of a name
+ * differing only in a block from being interchangeable.
+ *
+ * `predicate_builder.rb:100` calls `associated_table(key, &block)` and `:108`
+ * calls `associated_table(key)`; both describe as `(key)`, because the
+ * block-pass is a flag rather than an argument, so both agree exactly with both
+ * of the port's two sites and source order strands the block-less Ruby site
+ * against the block-carrying TS one. The block is the only thing that
+ * distinguishes them, so it is what the tie is broken on.
+ */
+function blockAffinity(ruby: CallSite, ts: CallSite): number {
+  const rubyCarries = rubyBlockArg(ruby) !== undefined || ruby.flags.includes("block");
+  const tsCarries = tsBlockArgIndex(ruby, ts) !== -1 || ts.flags.includes("block");
+  return rubyCarries === tsCarries ? 1 : 0;
+}
+
 /**
  * How well two same-named call sites' argument lists agree, for
  * {@link pairCallSites}. Higher is a better pairing. Ordered so that an exact
@@ -687,7 +734,7 @@ function tsCallNameKeys(rubyName: string): string[] {
  * assignment takes it whenever the key matches tie.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
-  const aligned = alignReceiverArgs(ruby, ts.args);
+  const aligned = alignReceiverArgs(ruby, stripForwardedBlockArg(ruby, ts));
   const sameArity = aligned.rubyArgs.length === aligned.tsArgs.length ? 1 : 0;
   const rubyArgs = normalizeArgs(aligned.rubyArgs);
   const tsArgs = normalizeArgs(aligned.tsArgs);
@@ -726,23 +773,30 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
  * within one name it consumes exactly the min(Ruby, TS) sites the source-order
  * zip did, and nothing that used to be compared silently stops being compared.
  *
- * Greedy over the globally best-scoring candidate, ties broken by source order
- * on the Ruby then the TS side, so the verdict never depends on the order the
- * candidates were enumerated in.
+ * Greedy over the globally best-scoring candidate, ties broken by
+ * {@link blockAffinity} and then by source order on the Ruby then the TS side,
+ * so the verdict never depends on the order the candidates were enumerated in.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const candidates: { rubyIdx: number; tsIdx: number; score: number }[] = [];
+  const candidates: { rubyIdx: number; tsIdx: number; score: number; block: number }[] = [];
   rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
     tsSites.forEach((ts, tsIdx) => {
       if (!keys.has(ts.name)) return;
-      candidates.push({ rubyIdx, tsIdx, score: argSimilarity(ruby, tsSites[tsIdx]) });
+      candidates.push({
+        rubyIdx,
+        tsIdx,
+        score: argSimilarity(ruby, ts),
+        block: blockAffinity(ruby, ts),
+      });
     });
   });
-  candidates.sort((a, b) => b.score - a.score || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx);
+  candidates.sort(
+    (a, b) => b.score - a.score || b.block - a.block || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx,
+  );
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();
   const matched = new Map<number, number>();
