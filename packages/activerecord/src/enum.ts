@@ -1086,19 +1086,20 @@ export function castEnumValue(
  * Validate enum values are non-empty array or hash with proper types.
  * Mirrors: ActiveRecord::Enum#assert_valid_enum_definition_values (private)
  *
- * Accepts both strings and symbols in arrays (Rails parity). JavaScript symbols
- * are the closest equivalent to Ruby symbols; strings are used directly.
+ * Accepts both strings and symbols in arrays (Rails parity). A Ruby Symbol is
+ * spelled as a leading-colon string here (`:draft` is `":draft"`), so the
+ * blank-name guard tests the name after the colon.
  *
  * @internal
  */
 export function assertValidEnumDefinitionValues(
   values: any,
-): Record<string, string | number | boolean | null> | (string | symbol)[] {
+): Record<string, string | number | boolean | null> | string[] {
   if (Array.isArray(values)) {
     if (values.length === 0) {
       throw new ArgumentError("Enum values must not be empty.");
     }
-    const allValid = values.every((v) => typeof v === "string" || typeof v === "symbol");
+    const allValid = values.every((v) => typeof v === "string");
     if (!allValid) {
       throw new ArgumentError(
         `Enum values must only contain strings or symbols, got: ${Array.from(
@@ -1106,42 +1107,22 @@ export function assertValidEnumDefinitionValues(
         ).join(", ")}`,
       );
     }
-    if (
-      values.some((v) => {
-        if (typeof v === "symbol") {
-          // Reject Symbol("") / Symbol("   ") — mirror Ruby Symbol#blank?
-          const desc = v.description ?? Symbol.keyFor(v) ?? "";
-          return isBlank(desc);
-        }
-        return isBlank(v);
-      })
-    ) {
+    if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
       throw new ArgumentError("Enum values must not contain a blank name.");
     }
     return values;
   }
 
   if (isPlainHash(values)) {
-    // Use Reflect.ownKeys so symbol-keyed entries (e.g. { [Symbol('draft')]: 0 })
-    // aren't silently dropped by Object.keys; symbols are validated alongside
-    // strings to mirror Ruby Hash + Symbol semantics.
-    const keys = Reflect.ownKeys(values as object);
+    const keys = Object.keys(values as object);
     if (keys.length === 0) {
       throw new ArgumentError("Enum values must not be empty.");
     }
-    if (
-      keys.some((k) => {
-        if (typeof k === "symbol") {
-          const desc = k.description ?? Symbol.keyFor(k) ?? "";
-          return isBlank(desc);
-        }
-        return isBlank(k);
-      })
-    ) {
+    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
       throw new ArgumentError("Enum values must not contain a blank name.");
     }
     for (const k of keys) {
-      const value = (values as Record<string | symbol, unknown>)[k as string];
+      const value = (values as Record<string, unknown>)[k];
       const isFiniteNumber = typeof value === "number" && Number.isFinite(value);
       if (
         !(

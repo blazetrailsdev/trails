@@ -514,18 +514,6 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
-      "`ActiveSupport::Testing::TaggedLogging#before_setup` (testing/" +
-      "tagged_logging.rb:10-19) is Minitest lifecycle: the module is mixed into " +
-      "a test case and `super`s up the per-test hook chain to log its heading. " +
-      "vitest has no per-test-case object to mix a module into and no hook a " +
-      "library module can insert itself into, so there is no receiver for the " +
-      "method; the logger and its writer are ported (testing/tagged-logging.ts). " +
-      "Scoped to tagged_logging.rb so it cannot silence other `before_setup`s.",
-    names: ["before_setup"],
-    rubyFiles: ["testing/tagged_logging.rb"],
-  },
-  {
-    reason:
       "Rails' alias_method chains around Ruby's Time operators — `+`/`-`/`<=>`/" +
       "`eql?` (time/calculations.rb:304-355) and `Time.at` (:59-60). Each pair " +
       "exists only so the redefined operator can fall back to the original " +

@@ -4,13 +4,19 @@
  * Logs a "PostsControllerTest: test name" heading before each test to make
  * test.log easier to search and follow along with.
  *
- * `before_setup` (tagged_logging.rb:10-19) is Minitest lifecycle — vitest has
- * no per-test-case hook a module can be mixed into, so it is not ported; the
- * skip is registered in `SKIP_GROUPS` with that reason.
+ * `before_setup` (tagged_logging.rb:10-19) is Minitest lifecycle: Ruby mixes
+ * the module into the test case and `super`s up the hook chain. There is no
+ * such receiver here, so the ported `beforeSetup` is installed from the suite's
+ * `beforeEach` (activerecord/src/cases/helper.ts, the port of helper.rb).
  */
 import { trailsLogger } from "../trails-logger-slot.js";
 
-type TaggedLogger = { warn(msg: unknown): void; debug(msg: unknown): void };
+type TaggedLogger = {
+  warn(msg: unknown): void;
+  debug(msg: unknown): void;
+  info?(msg: unknown): unknown;
+  readonly "info?"?: boolean;
+};
 
 let taggedLoggerValue: TaggedLogger | null = null;
 
@@ -20,6 +26,23 @@ let taggedLoggerValue: TaggedLogger | null = null;
  */
 export function setTaggedLogger(logger: TaggedLogger | null): void {
   taggedLoggerValue = logger;
+}
+
+/**
+ * Mirrors `before_setup` (tagged_logging.rb:10-19) — logs the
+ * `"<TestCase>: <name>"` heading, fenced by a divider of its own width, before
+ * each test. Ruby's trailing `super` continues the Minitest hook chain; the
+ * vitest `beforeEach` that calls this has no chain to continue.
+ */
+export function beforeSetup(): void {
+  const logger = taggedLogger();
+  if (logger && logger["info?"]) {
+    const heading = _testCaseIdentity(": ");
+    const divider = "-".repeat(heading.length);
+    logger.info?.(divider);
+    logger.info?.(heading);
+    logger.info?.(divider);
+  }
 }
 
 /**
@@ -49,11 +72,11 @@ export function taggedLogger(): TaggedLogger | null {
  * receiver, so the same two values come from the test runner.
  * @internal
  */
-export function _testCaseIdentity(): string {
+export function _testCaseIdentity(separator = " - "): string {
   const currentTestName =
     (globalThis as { expect?: { getState?(): { currentTestName?: string } } }).expect?.getState?.()
       ?.currentTestName ?? "";
-  const separator = currentTestName.lastIndexOf(" > ");
-  if (separator === -1) return currentTestName;
-  return `${currentTestName.slice(0, separator)} - ${currentTestName.slice(separator + 3)}`;
+  const sep = currentTestName.lastIndexOf(" > ");
+  if (sep === -1) return currentTestName;
+  return `${currentTestName.slice(0, sep)}${separator}${currentTestName.slice(sep + 3)}`;
 }

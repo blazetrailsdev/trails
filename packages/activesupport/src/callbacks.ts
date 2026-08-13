@@ -1,3 +1,4 @@
+import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
 
 export type CallbackKind = "before" | "after" | "around";
@@ -604,8 +605,7 @@ export class Callback {
 
   mergeConditionalOptions(
     chain: { name: string; config: DefineCallbacksOptions },
-    ifOption: CallbackCondition[],
-    unlessOption: CallbackCondition[],
+    { ifOption, unlessOption }: { ifOption?: unknown; unlessOption?: unknown },
   ): Callback {
     const existingIf = Array.isArray(this.options.if)
       ? this.options.if
@@ -622,8 +622,8 @@ export class Callback {
       this.filter,
       this.kind,
       {
-        if: [...existingIf, ...unlessOption],
-        unless: [...existingUnless, ...ifOption],
+        if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
+        unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
       },
       chain.config,
       this.originalObject,
@@ -1192,11 +1192,6 @@ export function normalizeCallbackParams(
  * `save` — callbacks.rb:510, :890), so the object is a filter.
  */
 /** Ruby `Array(x)` over a condition option, which Rails accepts as one or many. */
-function arrayWrap(value: unknown): CallbackCondition[] {
-  if (value === undefined || value === null) return [];
-  return (Array.isArray(value) ? value : [value]) as CallbackCondition[];
-}
-
 function isCallbackOptions(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
@@ -1419,11 +1414,10 @@ export namespace Callbacks {
       }
 
       if (callback && ("if" in options || "unless" in options)) {
-        const newCallback = callback.mergeConditionalOptions(
-          chain,
-          arrayWrap(options.if),
-          arrayWrap(options.unless),
-        );
+        const newCallback = callback.mergeConditionalOptions(chain, {
+          ifOption: options.if,
+          unlessOption: options.unless,
+        });
         chain.insert(chain.index(callback), newCallback);
       }
       if (callback) chain.delete(callback);

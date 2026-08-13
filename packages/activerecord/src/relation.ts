@@ -990,7 +990,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#order
    */
   order(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("order", args as unknown[], undefined, () => {
+    this.checkIfMethodHasArgumentsBang(":order", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
     return this._clone().orderBang(...args);
@@ -1036,7 +1036,7 @@ export class Relation<T extends Base> {
       }
       return this.toArray().then((records) => records.filter(fields[0]));
     }
-    this.checkIfMethodHasArgumentsBang("select", fields, "Call `select' with at least one field.");
+    this.checkIfMethodHasArgumentsBang(":select", fields, "Call `select' with at least one field.");
     fields = this.processSelectArgs(fields);
     return this._clone()._selectBang(...fields);
   }
@@ -1047,7 +1047,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reselect
    */
   reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reselect", args as unknown[]);
+    this.checkIfMethodHasArgumentsBang(":reselect", args as unknown[]);
     args = this.processSelectArgs(args as unknown[]) as typeof args;
     return this._clone().reselectBang(...args);
   }
@@ -1079,7 +1079,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#group
    */
   group(...args: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("group", args as unknown[]);
+    this.checkIfMethodHasArgumentsBang(":group", args as unknown[]);
     return this._clone().groupBang(...(args as string[]));
   }
 
@@ -1105,7 +1105,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#regroup
    */
   regroup(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("regroup", args);
+    this.checkIfMethodHasArgumentsBang(":regroup", args);
     return this._clone().regroupBang(...args);
   }
 
@@ -1115,7 +1115,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reorder
    */
   reorder(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("reorder", args as unknown[], undefined, () => {
+    this.checkIfMethodHasArgumentsBang(":reorder", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
     return this._clone().reorderBang(...args);
@@ -1346,7 +1346,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#annotate
    */
   annotate(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("annotate", args);
+    this.checkIfMethodHasArgumentsBang(":annotate", args);
     return this._clone().annotateBang(...args);
   }
 
@@ -1356,7 +1356,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#optimizer_hints
    */
   optimizerHints(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("optimizer_hints", args);
+    this.checkIfMethodHasArgumentsBang(":optimizer_hints", args);
     return this._clone().optimizerHintsBang(...args);
   }
 
@@ -1396,7 +1396,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#unscope
    */
   unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("unscope", args as unknown[]);
+    this.checkIfMethodHasArgumentsBang(":unscope", args as unknown[]);
     return this._clone().unscopeBang(...args);
   }
 
@@ -1530,7 +1530,7 @@ export class Relation<T extends Base> {
   joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("joins", args as unknown[]);
+    this.checkIfMethodHasArgumentsBang(":joins", args as unknown[]);
     const rel = this._clone();
     // Rails joins! uses `joins_values |= args` — one array union over the whole
     // set, deduplicating by eql?/hash (structural for Arel `Nodes.Binary`, plain
@@ -1562,7 +1562,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#left_joins
    */
   leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    return this._leftOuterJoins("left_joins", args);
+    return this._leftOuterJoins(":left_joins", args);
   }
 
   /**
@@ -1572,7 +1572,7 @@ export class Relation<T extends Base> {
    * alias of the same method).
    */
   leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    return this._leftOuterJoins("left_outer_joins", args);
+    return this._leftOuterJoins(":left_outer_joins", args);
   }
 
   /**
@@ -2032,7 +2032,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#includes
    */
   includes(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("includes", args);
+    this.checkIfMethodHasArgumentsBang(":includes", args);
     return this._clone().includesBang(...args);
   }
 
@@ -2042,7 +2042,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#preload
    */
   preload(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("preload", args);
+    this.checkIfMethodHasArgumentsBang(":preload", args);
     return this._clone().preloadBang(...args);
   }
 
@@ -2052,7 +2052,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#eager_load
    */
   eagerLoad(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("eager_load", args);
+    this.checkIfMethodHasArgumentsBang(":eager_load", args);
     return this._clone().eagerLoadBang(...args);
   }
 
@@ -5512,18 +5512,12 @@ export class Relation<T extends Base> {
    * @internal
    */
   checkIfMethodHasArgumentsBang(
-    methodName: string | symbol,
+    methodName: string,
     args: unknown[],
     message?: string,
     block?: (args: unknown[]) => void,
   ): void {
-    // Rails passes a Symbol via __callee__; we collapse it to its
-    // description so the error message reads `.select()` rather than
-    // the verbose `.Symbol(select)()`. Anonymous symbols (no
-    // description) fall through to "<anonymous>".
-    const name =
-      typeof methodName === "symbol" ? (methodName.description ?? "<anonymous>") : methodName;
-    return _checkIfMethodHasArgumentsBang.call(this as any, name, args, message, block);
+    return _checkIfMethodHasArgumentsBang.call(this as any, methodName, args, message, block);
   }
 
   /**
@@ -5694,7 +5688,7 @@ export class Relation<T extends Base> {
     // mirrors `args.flatten!` (arrays only — CTE definition hashes survive) and
     // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
     // `with(null)` no-ops). It mutates `args` in place.
-    this.checkIfMethodHasArgumentsBang("with", args);
+    this.checkIfMethodHasArgumentsBang(":with", args);
     return this._clone().withBang(...args);
   }
 
@@ -5711,7 +5705,7 @@ export class Relation<T extends Base> {
     // — unlike `with`, it has no `block_given?` guard. The shared helper raises on
     // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
     // (so `withRecursive(null)` no-ops). It mutates `args` in place.
-    this.checkIfMethodHasArgumentsBang("with_recursive", args);
+    this.checkIfMethodHasArgumentsBang(":with_recursive", args);
     return this._clone().withRecursiveBang(...args);
   }
 
@@ -5723,7 +5717,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references
    */
   references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang("references", tableNames);
+    this.checkIfMethodHasArgumentsBang(":references", tableNames);
     // Tag bare-string references as manual so they don't act as eager-load join
     // aliases — mirrors Rails seeding @references only from SqlLiteral
     // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so

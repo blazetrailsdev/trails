@@ -42,7 +42,7 @@ describe("Relation private build-arel helpers", () => {
   describe("checkIfMethodHasArgumentsBang", () => {
     it("raises ArgumentError-named error when args is empty", () => {
       try {
-        relation().checkIfMethodHasArgumentsBang("select", []);
+        relation().checkIfMethodHasArgumentsBang(":select", []);
         expect.fail("expected throw");
       } catch (err) {
         expect((err as Error).name).toBe("ArgumentError");
@@ -51,12 +51,12 @@ describe("Relation private build-arel helpers", () => {
     });
 
     it("does not raise when args has at least one entry", () => {
-      expect(() => relation().checkIfMethodHasArgumentsBang("select", ["id"])).not.toThrow();
+      expect(() => relation().checkIfMethodHasArgumentsBang(":select", ["id"])).not.toThrow();
     });
 
     it("uses a symbol's description in the error message (Rails passes a Symbol via __callee__)", () => {
       try {
-        relation().checkIfMethodHasArgumentsBang(Symbol("select"), []);
+        relation().checkIfMethodHasArgumentsBang(":select", []);
         expect.fail("expected throw");
       } catch (err) {
         expect((err as Error).message).toMatch(/\.select\(\) must contain arguments/);
@@ -65,7 +65,7 @@ describe("Relation private build-arel helpers", () => {
 
     it("flattens arrays and compacts blanks (nil, false, '', [], {}) per Rails compact_blank!", () => {
       const args: unknown[] = [["a", null, "", false], "b", undefined, {}, [], "  "];
-      relation().checkIfMethodHasArgumentsBang("select", args);
+      relation().checkIfMethodHasArgumentsBang(":select", args);
       expect(args).toEqual(["a", "b"]);
     });
 
@@ -73,7 +73,7 @@ describe("Relation private build-arel helpers", () => {
       // Ruby `args.flatten!` recurses into nested arrays only; hashes pass
       // through untouched, so a CTE definition hash like {a: rel} survives.
       const args: unknown[] = [[{ a: "x" }]];
-      relation().checkIfMethodHasArgumentsBang("select", args);
+      relation().checkIfMethodHasArgumentsBang(":select", args);
       expect(args).toEqual([{ a: "x" }]);
     });
   });

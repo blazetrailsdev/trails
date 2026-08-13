@@ -1546,7 +1546,9 @@ export function checkIfMethodHasArgumentsBang(
   block?: (args: unknown[]) => void,
 ): void {
   if (!args || args.length === 0) {
-    throw argumentError(message ?? `The method .${methodName}() must contain arguments.`);
+    // `methodName` is Rails' `__callee__` Symbol, spelled with its leading
+    // colon; interpolating a Symbol renders its name, so drop the colon.
+    throw argumentError(message ?? `The method .${methodName.slice(1)}() must contain arguments.`);
   } else {
     block?.(args);
 
