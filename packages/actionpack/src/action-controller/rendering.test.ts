@@ -682,15 +682,36 @@ describe("ActionController render edge cases", () => {
 // action_controller/metal/implicit_render.rb
 // ==========================================================================
 describe("ActionController::ImplicitRender", () => {
-  /** A LookupContext stand-in: templates keyed by `prefix/action.format`. */
+  /**
+   * A LookupContext stand-in. Templates are keyed `prefix/action.format`, and
+   * a variant template as `prefix/action.format+variant` — the same
+   * precedence `FileSystemResolver` implements.
+   */
   function lookupContextWith(templates: Record<string, string>) {
+    const lookup = (
+      name: string,
+      prefix: string,
+      format: string,
+      variants: ReadonlyArray<string> = [],
+    ) => {
+      for (const variant of variants) {
+        const hit = templates[`${prefix}/${name}.${format}+${variant}`];
+        if (hit !== undefined) return hit;
+      }
+      return templates[`${prefix}/${name}.${format}`] ?? null;
+    };
     return {
       formats: ["html", "text", "js"],
-      findTemplate(name: string, prefix: string, format: string) {
-        return templates[`${prefix}/${name}.${format}`] ?? null;
-      },
-      async render(prefix: string, action: string, format: string) {
-        return templates[`${prefix}/${action}.${format}`] ?? "";
+      variants: [] as string[],
+      findTemplate: lookup,
+      async render(
+        prefix: string,
+        action: string,
+        format: string,
+        _locals: Record<string, unknown>,
+        options: { variants?: ReadonlyArray<string> } = {},
+      ) {
+        return lookup(action, prefix, format, options.variants) ?? "";
       },
     };
   }
@@ -773,5 +794,32 @@ describe("ActionController::ImplicitRender", () => {
       makeResponse(),
     );
     expect(c.status).toBe(204);
+  });
+  it("renders the variant template the exact-template check matched", async () => {
+    const C = controllerClass({
+      "implicit/show.html": "<h1>desktop</h1>",
+      "implicit/show.html+phone": "<h1>phone</h1>",
+    });
+    class WithAction extends C {
+      show(): void {}
+    }
+    const c = new WithAction();
+    const request = makeRequest();
+    request.variant = "phone";
+    await c.dispatch("show", request, makeResponse());
+    expect(c.body).toBe("<h1>phone</h1>");
+  });
+
+  it("renders the plain template when no variant is active", async () => {
+    const C = controllerClass({
+      "implicit/show.html": "<h1>desktop</h1>",
+      "implicit/show.html+phone": "<h1>phone</h1>",
+    });
+    class WithAction extends C {
+      show(): void {}
+    }
+    const c = new WithAction();
+    await c.dispatch("show", makeRequest(), makeResponse());
+    expect(c.body).toBe("<h1>desktop</h1>");
   });
 });

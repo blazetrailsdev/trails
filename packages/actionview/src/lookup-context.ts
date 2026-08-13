@@ -568,8 +568,13 @@ export class LookupContext {
   /**
    * Find a partial template. Partials are prefixed with underscore.
    */
-  findPartial(name: string, prefix: string, format: string): Template | null {
-    return this.findTemplate(`_${name}`, prefix, format);
+  findPartial(
+    name: string,
+    prefix: string,
+    format: string,
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
+  ): Template | null {
+    return this.findTemplate(`_${name}`, prefix, format, variants);
   }
 
   /**
@@ -577,7 +582,11 @@ export class LookupContext {
    *
    * @internal
    */
-  findLayout(name: string, format: string): Template | null {
+  findLayout(
+    name: string,
+    format: string,
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
+  ): Template | null {
     const extensions = TemplateHandlers.extensions();
     if (extensions.length === 0) return null;
 
@@ -587,7 +596,7 @@ export class LookupContext {
         if (layout) return layout;
       }
       // Fallback: look in "layouts" prefix
-      const template = resolver.find(name, "layouts", format, extensions);
+      const template = resolver.find(name, "layouts", format, extensions, variants);
       if (template) {
         return template.asLayout();
       }
@@ -610,9 +619,15 @@ export class LookupContext {
     action: string,
     format: string,
     locals: Record<string, unknown> = {},
-    options: { layout?: string | false } = {},
+    options: { layout?: string | false; variants?: ReadonlyArray<string> } = {},
   ): Promise<string> {
-    const template = this.findTemplate(action, controller, format);
+    // Rails' `_render_template` pulls `:variant` out of the render options and
+    // assigns `lookup_context.variants = variant` for the duration of the
+    // render (actionview/lib/action_view/rendering.rb:127-134). Trails' lookup
+    // context is shared across requests, so the variant is threaded through
+    // the lookup calls instead of assigned onto shared state.
+    const variants = options.variants ?? (this.variants as ReadonlyArray<string>);
+    const template = this.findTemplate(action, controller, format, variants);
     if (!template) {
       throw new MissingTemplate(
         controller,
@@ -635,7 +650,7 @@ export class LookupContext {
     // Apply layout
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
     if (layoutName !== false && layoutName) {
-      const layoutTemplate = this.findLayout(layoutName, format);
+      const layoutTemplate = this.findLayout(layoutName, format, variants);
       if (layoutTemplate) {
         const layoutContext: RenderContext = {
           ...context,
@@ -662,8 +677,9 @@ export class LookupContext {
     prefix: string,
     format: string,
     locals: Record<string, unknown> = {},
+    variants: ReadonlyArray<string> = this.variants as ReadonlyArray<string>,
   ): Promise<string> {
-    const template = this.findPartial(name, prefix, format);
+    const template = this.findPartial(name, prefix, format, variants);
     if (!template) {
       throw new MissingTemplate(
         prefix,

@@ -82,6 +82,8 @@ export type RenderOptions = {
   contentType?: string;
   layout?: boolean | string;
   formats?: string;
+  /** Rails `options[:variant]`, set by `_process_variant`. */
+  variant?: ReadonlyArray<string>;
 };
 
 export type RescueHandler = (error: Error) => void | Promise<void>;
@@ -220,6 +222,8 @@ export class Base extends Metal {
       );
     }
 
+    this._processVariant(options);
+
     if (options.status) {
       this.status = options.status;
     }
@@ -275,6 +279,19 @@ export class Base extends Metal {
     }
 
     this.markPerformed();
+  }
+
+  /**
+   * Mirrors `ActionController::Rendering#_process_variant`
+   * (`action_controller/metal/rendering.rb:196-199`) — copy the request's
+   * variant into the render options so the lookup that resolves the template
+   * sees the same variant `templateExists` checked against.
+   *
+   * @internal
+   */
+  private _processVariant(options: RenderOptions): void {
+    const variant = this.request?.variant;
+    if (variant != null && variant.length > 0) options.variant = variant;
   }
 
   /** Pending async render (for template/partial rendering). */
@@ -424,12 +441,19 @@ export class Base extends Metal {
           options.as,
         );
       } else {
-        this.body = await ctx.renderPartial(options.partial, controllerPrefix, format, locals);
+        this.body = await ctx.renderPartial(
+          options.partial,
+          controllerPrefix,
+          format,
+          locals,
+          options.variant,
+        );
       }
     } else {
       const action = options.action ?? this.actionName;
       this.body = await ctx.render(controllerPrefix, action, format, locals, {
         layout: layout === false ? false : layout || undefined,
+        variants: options.variant,
       });
     }
 
