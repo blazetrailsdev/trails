@@ -44,10 +44,10 @@ export function taggedLogger(): TaggedLogger | null {
  * `currentTestName` is `"<describe> > <test>"`, whose halves are Minitest's
  * test-case class and test name.
  *
+ * Ruby reads `self.class`/`name` off the Minitest test-case instance the module
+ * is mixed into; the ported assertions are free functions with no such
+ * receiver, so the same two values come from the test runner.
  * @internal
- * @noRailsEquivalent PERMANENT — Ruby reads `self.class`/`name` off the Minitest test-case
- * instance the module is mixed into; TypeScript's ported assertions have no
- * such receiver, so the same two values are read from the test runner.
  */
 export function _testCaseIdentity(): string {
   const currentTestName =
