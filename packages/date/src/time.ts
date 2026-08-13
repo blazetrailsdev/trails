@@ -318,6 +318,11 @@ export class Time {
    * the field (`time.c` `obj2ubits` / `validate_vtm`). MRI's `hour` upper bound
    * is 24, not 23 — `Time.utc(2015, 6, 30, 24)` is `2015-07-01 00:00:00 UTC`,
    * the same roll `sec == 60` takes, and it admits only a zero `min`/`sec`.
+   * `mday` is bounded at 31 and nothing narrower: the month's own length is
+   * never checked, and `timegmw` normalizes the overflow, so
+   * `Time.utc(2015, 2, 29)` is `2015-03-01 00:00:00 UTC` and
+   * `Time.utc(2015, 2, 31)` is the 3rd of March. `Temporal.PlainDateTime`
+   * rejects both outright, so the day is carried in as `1` and added back.
    *
    * That MRI reading is why `Time#toDatetime`'s `s == 60` fold
    * (`date_core.c:8913-8915`) is unreachable through the constructor on both
@@ -348,14 +353,14 @@ export class Time {
     const plain = new Temporal.PlainDateTime(
       year,
       month,
-      day,
+      1,
       hour === 24 ? 23 : hour,
       min,
       wholeSec === 60 ? 59 : wholeSec,
       Math.floor(nsec / 1_000_000),
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
-    );
+    ).add({ days: day - 1 });
     this.#plain =
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const utcOffset = zone == null ? Temporal.Now.timeZoneId() : utcOffsetArgument(zone);

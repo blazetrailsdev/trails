@@ -87,41 +87,5 @@
     "rubyName": "slice!",
     "call": "replace",
     "reason": "Ruby's `Hash#replace` swaps a hash's contents in place; JS objects have no such method, so the port clears the own keys and `Object.assign`s the sliced result — the same in-place replacement."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "stringify_keys",
-    "call": "transform_keys",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "stringify_keys!",
-    "call": "transform_keys!",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "symbolize_keys",
-    "call": "transform_keys",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "symbolize_keys!",
-    "call": "transform_keys!",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
   }
 ]

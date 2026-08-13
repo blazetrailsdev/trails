@@ -166,6 +166,13 @@ describe("Time", () => {
     expect(() => Time.utc(2015, 6, -1)).toThrow(new ArgumentError("argument out of range"));
   });
 
+  it("normalizes a day past the month's length, as MRI's timegmw does", () => {
+    expect(Time.utc(2015, 2, 29).strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-03-01 00:00:00");
+    expect(Time.utc(2015, 2, 31).strftime("%Y-%m-%d")).toBe("2015-03-03");
+    expect(Time.utc(2015, 6, 31).strftime("%Y-%m-%d")).toBe("2015-07-01");
+    expect(Time.utc(2016, 2, 29).strftime("%Y-%m-%d")).toBe("2016-02-29");
+  });
+
   it("admits a 24th hour and rolls it into the next day, as MRI does", () => {
     expect(Time.utc(2015, 6, 30, 24).strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-07-01 00:00:00");
     expect(() => Time.utc(2015, 6, 30, 24, 1)).toThrow(new ArgumentError("min out of range"));
