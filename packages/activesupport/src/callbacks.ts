@@ -1,3 +1,5 @@
+import { ArgumentError } from "./hash-utils.js";
+
 export type CallbackKind = "before" | "after" | "around";
 
 /**
@@ -38,6 +40,8 @@ export interface CallbackOptions<T extends object = object> {
   if?: CallbackCondition<T> | CallbackCondition<T>[];
   unless?: CallbackCondition<T> | CallbackCondition<T>[];
   prepend?: boolean;
+  /** `skip_callback`'s `:raise` (callbacks.rb:788) — defaults to true. */
+  raise?: boolean;
 }
 
 export interface DefineCallbacksOptions<T extends object = object> {
@@ -1096,12 +1100,12 @@ export class CallbackChain {
     if (i !== -1) this.chain.splice(i, 1);
   }
 
-  append(callback: Callback): void {
-    this.appendOne(callback);
+  append(...callbacks: Callback[]): void {
+    callbacks.forEach((c) => this.appendOne(c));
   }
 
-  prepend(callback: Callback): void {
-    this.prependOne(callback);
+  prepend(...callbacks: Callback[]): void {
+    callbacks.forEach((c) => this.prependOne(c));
   }
 
   private appendOne(callback: Callback): void {
@@ -1169,16 +1173,37 @@ export function normalizeCallbackParams(
     type = rest.shift() as CallbackKind;
   }
   let options: Record<string, unknown> = {};
-  if (
-    rest.length > 0 &&
-    typeof rest[rest.length - 1] === "object" &&
-    rest[rest.length - 1] !== null &&
-    !("call" in (rest[rest.length - 1] as object))
-  ) {
+  if (rest.length > 0 && isCallbackOptions(rest[rest.length - 1])) {
     options = rest.pop() as unknown as Record<string, unknown>;
   }
   if (block) rest.unshift(block);
-  return [type, rest as Array<AnyCallback | string | symbol>, options];
+  return [type, rest as Array<AnyCallback | string | symbol>, { ...options }];
+}
+
+/**
+ * `filters.extract_options!`'s discriminator (callbacks.rb:699). Ruby splits by
+ * class — a trailing `Hash` is the options bag, anything else is a filter — but
+ * in TS an options bag and a CallbackObject filter are both `typeof "object"`.
+ * So: a **plain** object (prototype `Object.prototype` or `null`, hence a class
+ * instance is always a filter) whose only function-valued keys are `if` and
+ * `unless` — the two option values Rails lets be callable (callbacks.rb:747,
+ * 752). Any other callable key is the scoped method an ObjectCall would
+ * dispatch to (`before`/`after`, `beforeSave`, or under `scope: [:name]` a bare
+ * `save` — callbacks.rb:510, :890), so the object is a filter.
+ */
+/** Ruby `Array(x)` over a condition option, which Rails accepts as one or many. */
+function arrayWrap(value: unknown): CallbackCondition[] {
+  if (value === undefined || value === null) return [];
+  return (Array.isArray(value) ? value : [value]) as CallbackCondition[];
+}
+
+function isCallbackOptions(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return false;
+  return !Object.entries(value as Record<string, unknown>).some(
+    ([k, v]) => typeof v === "function" && k !== "if" && k !== "unless",
+  );
 }
 
 /**
@@ -1252,7 +1277,7 @@ export interface ClassMethods<T extends object = object> {
     callback: AroundCallback<T> | CallbackObject,
     options?: CallbackOptions<T>,
   ): void;
-  skipCallback(name: string, kind: CallbackKind, callback?: AnyCallback<T> | CallbackObject): void;
+  skipCallback(name: string, kind: CallbackKind, ...filterList: FilterListEntry<T>[]): void;
   resetCallbacks(name: string): void;
 }
 
@@ -1310,6 +1335,13 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
   return t[CALLBACKS] as Map<string, CallbackChain>;
 }
 
+/** One entry of a `set_callback(name, *filter_list)` list: a filter, or the trailing options bag. */
+export type FilterListEntry<T extends object = object> =
+  | AnyCallback<T>
+  | CallbackObject
+  | string
+  | CallbackOptions<T>;
+
 export namespace Callbacks {
   export function defineCallbacks<T extends object>(
     target: T,
@@ -1326,29 +1358,37 @@ export namespace Callbacks {
     target: T,
     name: string,
     kind: CallbackKind,
-    callback: AnyCallback<T> | CallbackObject | string,
-    options: CallbackOptions<T> = {},
+    ...filterList: FilterListEntry<T>[]
   ): void {
+    // trails names the callback type in its own `kind` parameter; putting it
+    // back at the head reconstructs Rails' `*filter_list` exactly, so the
+    // `type` shift and `extract_options!` split are the ported ones.
+    const [type, filters, options] = normalizeCallbackParams(
+      [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
+      null,
+    );
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
-    // Rails hands the callback object straight to Callback.build, which compiles
-    // it to an ObjectCall honouring the chain scope — no function-wrapping.
-    const isObj = typeof callback === "object" && callback !== null;
-    const entry = new Callback(
-      name,
-      callback as AnyCallback | CallbackObject,
-      kind,
-      options as CallbackOptions,
-      chain.config,
-      isObj ? callback : undefined,
-    );
+    const mapped = filters.map((filter) => {
+      // Rails hands the callback object straight to Callback.build, which compiles
+      // it to an ObjectCall honouring the chain scope — no function-wrapping.
+      const isObj = typeof filter === "object" && filter !== null;
+      return new Callback(
+        name,
+        filter as AnyCallback | CallbackObject,
+        type,
+        options as CallbackOptions,
+        chain.config,
+        isObj ? (filter as CallbackObject) : undefined,
+      );
+    });
     if (options.prepend) {
-      chain.prepend(entry);
+      chain.prepend(...mapped);
     } else {
-      chain.append(entry);
+      chain.append(...mapped);
     }
   }
 
@@ -1356,12 +1396,38 @@ export namespace Callbacks {
     target: T,
     name: string,
     kind: CallbackKind,
-    callback?: AnyCallback<T> | CallbackObject,
+    ...filterList: FilterListEntry<T>[]
   ): void {
+    const [type, filters, options] = normalizeCallbackParams(
+      [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
+      null,
+    );
+    if (!("raise" in options)) options.raise = true;
+
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) return;
-    chain.remove(kind, callback as AnyCallback | CallbackObject | undefined);
+    for (const filter of filters) {
+      const callback = chain.entries.find((c) =>
+        c.matches(type, filter as AnyCallback | CallbackObject),
+      );
+
+      if (!callback && options.raise) {
+        throw new ArgumentError(
+          `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
+        );
+      }
+
+      if (callback && ("if" in options || "unless" in options)) {
+        const newCallback = callback.mergeConditionalOptions(
+          chain,
+          arrayWrap(options.if),
+          arrayWrap(options.unless),
+        );
+        chain.insert(chain.index(callback), newCallback);
+      }
+      if (callback) chain.delete(callback);
+    }
   }
 
   export function resetCallbacks(target: object, name: string): void {
@@ -1405,19 +1471,18 @@ export function setCallback<T extends object>(
   target: T,
   name: string,
   kind: CallbackKind,
-  callback: AnyCallback<T> | CallbackObject | string,
-  options: CallbackOptions<T> = {},
+  ...filterList: FilterListEntry<T>[]
 ): void {
-  Callbacks.setCallback(target, name, kind, callback, options);
+  Callbacks.setCallback(target, name, kind, ...filterList);
 }
 
 export function skipCallback<T extends object>(
   target: T,
   name: string,
   kind: CallbackKind,
-  callback?: AnyCallback<T> | CallbackObject,
+  ...filterList: FilterListEntry<T>[]
 ): void {
-  Callbacks.skipCallback(target, name, kind, callback);
+  Callbacks.skipCallback(target, name, kind, ...filterList);
 }
 
 export function resetCallbacks(target: object, name: string): void {
@@ -1476,9 +1541,9 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       this: { prototype: T },
       name: string,
       kind: CallbackKind,
-      callback?: AnyCallback<T> | CallbackObject,
+      ...filterList: FilterListEntry<T>[]
     ): void {
-      skipCallback(this.prototype, name, kind, callback);
+      skipCallback(this.prototype, name, kind, ...filterList);
     }
 
     static resetCallbacks(name: string): void {
