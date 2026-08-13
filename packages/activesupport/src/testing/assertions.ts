@@ -1,17 +1,61 @@
 /**
  * Mirrors: active_support/testing/assertions.rb
  *
- * Rails accepts a String expression and `eval`s it against the block's
- * binding. TypeScript has no binding to eval against, so every expression here
- * is a callable — the arm Rails documents as `-> { Article.count }`. Blocks may
- * be async (trails' `count` is), so each assertion returns a Promise and awaits
- * both the expression and the block.
+ * Rails accepts a String expression and `eval`s it against the block's binding
+ * (assertions.rb:110-111, 186), and `assert_changes` also accepts a Symbol,
+ * `to_s`-ed before that eval (assertions.rb:186). TypeScript has no binding to
+ * eval against and no `eval` at all under the repo's rules, so the String and
+ * Symbol arms are transcribed mechanically into the callable arm Rails
+ * documents alongside them (`-> { Article.count }`):
+ *
+ *   assert_difference 'Article.count'      ->  assertDifference(() => Article.count())
+ *   assert_difference 'Post.last.size', -1 ->  assertDifference(() => (await …).size, -1)
+ *   assert_changes :@object, from: nil     ->  assertChanges(() => object, null, { from: null })
+ *
+ * The expression text survives the rewrite: `_callableToSourceString` quotes
+ * the arrow's BODY, so an enrolled test's failure message reads
+ * ``` `Article.count()` didn't change by 1 ``` — Rails' message with Rails'
+ * expression in it. That also collapses Rails' `expression.respond_to?(:call)`
+ * ternaries (assertions.rb:129, 199, 220): every expression here is a callable.
+ *
+ * Blocks may be async (trails' `count` is), so each assertion returns a Promise
+ * and awaits both the expression and the block.
  */
 import { indexWith } from "../enumerable-utils.js";
+
+import { trailsLogger } from "../trails-logger-slot.js";
 
 /** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
 class Assertion extends Error {
   override name = "Assertion";
+}
+
+/**
+ * Mirrors `Minitest::UnexpectedError` (minitest.rb:1078-1110) — the wrapper
+ * `assert_nothing_raised` re-raises an unexpected error in, and the class
+ * {@link _assertNothingRaisedOrWarn} rescues to warn about it.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails names the class
+ * (assertions.rb:52, 283) but defines it in the minitest gem
+ * (minitest.rb:1078-1110), which is a test-framework dependency with no
+ * vendored Rails file for the comparator to map onto. Porting it here is what
+ * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
+ * rescue, the class Rails names.
+ */
+export class UnexpectedError extends Assertion {
+  override name = "UnexpectedError";
+  error: Error;
+
+  constructor(error: Error) {
+    super("Unexpected exception");
+    this.error = error;
+    this.message = `${error.name}: ${error.message}\n    ${error.stack ?? ""}`;
+    this.stack = error.stack;
+  }
+
+  get resultLabel(): string {
+    return "Error";
+  }
 }
 
 /** :nodoc: */
@@ -78,9 +122,13 @@ export async function assertRaise(
  * Passes if evaluated code in the yielded block raises no exception.
  */
 export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promise<T> {
-  const retval = await block();
-  assert(true, "");
-  return retval;
+  try {
+    const retval = await block();
+    assert(true);
+    return retval;
+  } catch (error) {
+    throw new UnexpectedError(error as Error);
+  }
 }
 
 /**
@@ -260,31 +308,74 @@ export async function assertNoChanges<T>(
   return retval;
 }
 
-/** @internal */
 /**
- * Rails re-raises after warning through `tagged_logger` when the block raised
- * (`assertions.rb:281-294`). The warning describes a `Minitest::UnexpectedError`
- * wrapper that {@link assertNothingRaised} does not create here, so the rescue
- * arm has nothing to catch and the error propagates as Rails re-raises it.
+ * Ruby's warning heredoc opens with `#{self.class} - #{name}:`, the Minitest
+ * test case and the running test's name (assertions.rb:285). These assertions
+ * are free functions with no test-case instance to read either from, so the
+ * warning starts at the raised error's class.
  *
  * @internal
  */
 async function _assertNothingRaisedOrWarn<T>(
-  _assertion: string,
+  assertion: string,
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
   if (!block) return undefined;
-  return assertNothingRaised(block);
+  try {
+    return await assertNothingRaised(block);
+  } catch (e) {
+    if (!(e instanceof UnexpectedError)) throw e;
+
+    const logger = taggedLogger();
+    if (logger && (logger as { "warn?"?: boolean })["warn?"]) {
+      const warning =
+        `${e.error.name} raised.\n` +
+        "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
+        `Other block based assertions (e.g. \`${assertion}\`) can be used, as long as \`assert_raises\` is inside their block.\n`;
+      logger.warn(warning);
+    }
+
+    throw e;
+  }
 }
 
 /**
- * Ruby reads the callable's source through `RubyVM::InstructionSequence`;
- * `Function#toString` is the JS equivalent and needs no fallback.
+ * Mirrors `ActiveSupport::Testing::TaggedLogging#tagged_logger`
+ * (tagged_logging.rb:22-24) — `defined?(Rails.logger) && Rails.logger`, which
+ * is the late-bound `Trails.logger` slot here.
+ */
+function taggedLogger(): { warn(msg: unknown): void } | null {
+  return trailsLogger;
+}
+
+/**
+ * Ruby reads the callable's source through `RubyVM::InstructionSequence` and
+ * returns the lambda's BODY — `assert_difference -> { Article.count }` quotes
+ * `Article.count` (assertions.rb:296-330). `Function#toString` is the JS
+ * equivalent of the iseq source slice; the trimming below is Ruby's, in JS
+ * spelling: only a zero-parameter arrow has a body worth quoting (Ruby returns
+ * the callable itself otherwise), the braces and a `do`/`end`-style multi-line
+ * body are stripped, and the trimmed body is kept only when it reads nice — a
+ * single line, and not one taking arguments.
  *
  * @internal
  */
 function _callableToSourceString(callable: unknown): string {
-  return String(callable);
+  const source = String(callable);
+  const match = /^(?:async\s+)?\(\s*\)\s*=>\s*([\s\S]+)$/.exec(source.trim());
+  if (!match) return source;
+
+  let body = match[1].trim();
+  if (body.startsWith("{")) {
+    body = body.replace(/\}$/, "").replace(/^\{/, "").trim();
+    body = body
+      .replace(/^return\s+/, "")
+      .replace(/;$/, "")
+      .trim();
+  }
+  if (!body.includes("\n")) return body;
+
+  return source;
 }
 
 /**
@@ -293,7 +384,7 @@ function _callableToSourceString(callable: unknown): string {
  * from Minitest, so there is no Ruby counterpart in a mapped file; exported so
  * both testing modules raise the same `Assertion`.
  */
-export function assert(value: boolean, message: string | (() => string)): void {
+export function assert(value: boolean, message: string | (() => string) = ""): void {
   if (!value) throw new Assertion(typeof message === "function" ? message() : message);
 }
 

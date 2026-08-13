@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { _setTrailsLogger } from "../trails-logger-slot.js";
 import {
   assertChanges,
   assertDifference,
@@ -8,6 +9,7 @@ import {
   assertNot,
   assertNothingRaised,
   assertRaises,
+  UnexpectedError,
 } from "./assertions.js";
 
 describe("AssertionsTest", () => {
@@ -26,6 +28,58 @@ describe("AssertionsTest", () => {
 
   it("assert nothing raised", async () => {
     expect(await assertNothingRaised(() => 42)).toBe(42);
+  });
+
+  it("assert nothing raised wraps the raised error", async () => {
+    const raised = new TypeError("boom");
+    const error = await assertNothingRaised(() => {
+      throw raised;
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UnexpectedError);
+    expect((error as UnexpectedError).error).toBe(raised);
+    expect((error as UnexpectedError).message).toMatch(/TypeError: boom/);
+  });
+
+  it("assert difference warns through the tagged logger and re-raises", async () => {
+    const warnings: unknown[] = [];
+    _setTrailsLogger({
+      warn: (msg: unknown) => warnings.push(msg),
+      debug: () => {},
+      "warn?": true,
+    } as never);
+    try {
+      let counter = 0;
+      const error = await assertDifference(
+        () => counter,
+        1,
+        null,
+        () => {
+          counter += 1;
+          throw new RangeError("nope");
+        },
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(UnexpectedError);
+      expect(String(warnings[0])).toBe(
+        "RangeError raised.\n" +
+          "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
+          "Other block based assertions (e.g. `assert_difference`) can be used, as long as `assert_raises` is inside their block.\n",
+      );
+    } finally {
+      _setTrailsLogger(null);
+    }
+  });
+
+  it("assert difference quotes the expression, not the whole closure", async () => {
+    const counter = 0;
+    await expect(
+      assertDifference(
+        () => counter,
+        1,
+        null,
+        () => {},
+      ),
+    ).rejects.toThrow("`counter` didn't change by 1, but by 0");
   });
 
   it("assert difference", async () => {

@@ -592,6 +592,7 @@ export {
   assertNoDifference,
   assertChanges,
   assertNoChanges,
+  UnexpectedError,
   UNTRACKED,
 } from "./testing/assertions.js";
 export { currentTime } from "./time-travel.js";

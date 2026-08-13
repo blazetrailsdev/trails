@@ -22,6 +22,60 @@ import { defaultValue } from "../type.js";
 import { arelColumn, arelColumns, buildJoinDependencies } from "./query-methods.js";
 
 /**
+ * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
+ * (calculations.rb:8-47).
+ */
+export class ColumnAliasTracker {
+  private connection: AliasingConnection;
+  private aliases: Map<string, number> = new Map();
+
+  constructor(connection: AliasingConnection) {
+    this.connection = connection;
+  }
+
+  aliasFor(field: string): string {
+    const aliasedName = this.columnAliasFor(field);
+
+    if ((this.aliases.get(aliasedName) ?? 0) === 0) {
+      this.aliases.set(aliasedName, 1);
+      return aliasedName;
+    } else {
+      const count = (this.aliases.get(aliasedName) ?? 0) + 1;
+      this.aliases.set(aliasedName, count);
+      return `${this.truncate(aliasedName)}_${count}`;
+    }
+  }
+
+  /**
+   * Converts the given field to the value that the database adapter returns as
+   * a usable column name:
+   *
+   *   columnAliasFor("users.id")                 // => "users_id"
+   *   columnAliasFor("sum(id)")                  // => "sum_id"
+   *   columnAliasFor("count(distinct users.id)") // => "count_distinct_users_id"
+   *   columnAliasFor("count(*)")                 // => "count_all"
+   */
+  private columnAliasFor(field: string): string {
+    let columnAlias = field;
+    columnAlias = columnAlias.replace(/\*/g, "all");
+    columnAlias = columnAlias.replace(/\W+/g, " ");
+    columnAlias = columnAlias.trim();
+    columnAlias = columnAlias.replace(/ +/g, "_");
+    return this.connection.tableAliasFor(columnAlias);
+  }
+
+  private truncate(name: string): string {
+    return name.slice(0, this.connection.tableAliasLength() - 2);
+  }
+}
+
+/** The connection surface {@link ColumnAliasTracker} needs. @internal */
+interface AliasingConnection {
+  tableAliasFor(tableName: string): string;
+  tableAliasLength(): number;
+}
+
+/**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
  * plain SQL identifier (letters, digits, underscores), mirroring Rails'
  * `arel_columns` / `build_group` behaviour. Positional args ("1"), cast
@@ -50,6 +104,8 @@ interface CalculationConnection {
   quote(value: unknown): string;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
+  tableAliasFor(tableName: string): string;
+  tableAliasLength(): number;
   columnsForDistinct(
     columns: string | string[],
     orders?: (string | Nodes.Node)[],
@@ -123,7 +179,7 @@ interface CalculationRelation {
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
   _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
   /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
-  calculate(operation: string, columnName?: string | Nodes.Node | number): Promise<unknown>;
+  calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
   _applyWheresToManager(manager: any, table: any): void;
   _applyOrderToManager(manager: any): void;
   _buildFromNode(): Nodes.Node | string | undefined;
@@ -220,9 +276,9 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
 function isBigintColumn(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
 ): boolean {
-  if (fn === "count" || fn === "average" || column === "*") return false;
+  if (fn === "count" || fn === "average" || column == null || column === "*") return false;
   if (column instanceof Nodes.Node) return false;
   const table = rel._model.arelTable as {
     typeForAttribute?(col: string): unknown;
@@ -277,7 +333,7 @@ function buildGroupedSelectValues(
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
   distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
@@ -307,22 +363,31 @@ async function groupedAggregate(
     .except("group")
     .distinctBang(false) as CalculationRelation;
   const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
-  // One alias per field, standing in for Rails' `column_alias_tracker.alias_for`.
-  // A lone field keeps the bare `group_key` the belongs_to arm below reads by
-  // name; these aliases are fixed-length, so unlike Rails they never need
-  // truncating for a long table name.
-  const aliases =
-    groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
+  const columnAliasTracker = new ColumnAliasTracker(rel._conn());
+  const aliases = groupNodes.map((field) =>
+    columnAliasTracker.aliasFor(
+      (field instanceof Nodes.Node
+        ? (rel._conn().visitor?.compile(field) ?? String(field))
+        : String(field)
+      ).toLowerCase(),
+    ),
+  );
   const aggNode = operationOverAggregateColumn(
     aggregateColumn(relation, column),
     fn,
     distinct ?? false,
   ) as any;
   const groupKeyAliases = groupNodes.map(
-    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
+    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(rel._conn().quoteColumnName(aliases[i]))),
   );
-  const aggAlias = aggregateAliasFor(fn, column);
-  const selectValues = buildGroupedSelectValues(rel, aggNode.as(aggAlias), groupKeyAliases);
+  const aggAlias = columnAliasTracker.aliasFor(
+    `${fn} ${(column == null ? "" : String(column)).toLowerCase()}`,
+  );
+  const selectValues = buildGroupedSelectValues(
+    rel,
+    aggNode.as(rel._conn().quoteColumnName(aggAlias)),
+    groupKeyAliases,
+  );
   // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
   // `from(subquery)` group column stays unqualified instead of being re-pinned
   // to the model's table by `build_group`.
@@ -358,13 +423,13 @@ async function groupedAggregate(
     // foreign-key value. JS Map keys compare by reference, so callers locate a
     // key by its `id` rather than by holding the same instance.
     const klass = association.klass.baseClass ?? association.klass;
-    const ids = rows.map((row) => row.group_key).filter((v) => v != null);
+    const ids = rows.map((row) => row[aliases[0]]).filter((v) => v != null);
     const records: any[] =
       ids.length > 0 ? await klass.where({ [klass.primaryKey]: ids }).toArray() : [];
     const byId = new Map(records.map((r) => [String(r.id), r]));
     const result = new Map<unknown, unknown>();
     for (const row of rows) {
-      result.set(byId.get(String(row.group_key)) ?? null, aggOf(row[aggAlias]));
+      result.set(byId.get(String(row[aliases[0]])) ?? null, aggOf(row[aggAlias]));
     }
     return result;
   }
@@ -443,12 +508,20 @@ async function groupedCompositeAssoc(
   rel: CalculationRelation,
   association: any,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
 ): Promise<Map<unknown, unknown>> {
   const table = rel._model.arelTable;
   const fkCols = association.foreignKey as string[];
-  const aliases = fkCols.map((_, i) => `group_key_${i}`);
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
+  const columnAliasTracker = new ColumnAliasTracker(rel._conn());
+  const aliases = groupNodes.map((field) =>
+    columnAliasTracker.aliasFor(
+      (field instanceof Nodes.Node
+        ? (rel._conn().visitor?.compile(field) ?? String(field))
+        : String(field)
+      ).toLowerCase(),
+    ),
+  );
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
   // grouped calculation, regardless of key arity — mirroring `groupedAggregate`.
@@ -460,10 +533,18 @@ async function groupedCompositeAssoc(
     fn,
     rel._isDistinct,
   ) as any;
-  const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
-  const aggAlias = aggregateAliasFor(fn, column);
+  const projections = groupNodes.map(
+    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(rel._conn().quoteColumnName(aliases[i]))),
+  );
+  const aggAlias = columnAliasTracker.aliasFor(
+    `${fn} ${(column == null ? "" : String(column)).toLowerCase()}`,
+  );
   relation._groupColumns = groupNodes as unknown as string[];
-  relation._selectColumns = buildGroupedSelectValues(rel, aggNode.as(aggAlias), projections);
+  relation._selectColumns = buildGroupedSelectValues(
+    rel,
+    aggNode.as(rel._conn().quoteColumnName(aggAlias)),
+    projections,
+  );
 
   // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
   // own type caster, then a type discovered through the join dependencies, then
@@ -535,7 +616,7 @@ export async function performCount(
 export async function calculate(
   this: CalculationRelation,
   operation: string,
-  columnName?: string | Nodes.Node | number,
+  columnName?: string | Nodes.Node | number | null,
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
@@ -593,7 +674,7 @@ export async function calculate(
  */
 export async function performSum(
   this: CalculationRelation,
-  initialValueOrColumn: string | Nodes.Node | number = 0,
+  initialValueOrColumn: string | Nodes.Node | number | null = 0,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
@@ -642,16 +723,16 @@ export interface CalculationMethods {
   calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
   calculate(
     operation: "sum",
-    column: string | Nodes.Node | number,
+    column: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
   ): Promise<unknown | null | Map<unknown, unknown>>;
-  calculate(operation: string, column?: string | Nodes.Node | number): Promise<unknown>;
+  calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(
-    initialValueOrColumn?: string | Nodes.Node | number,
+    initialValueOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
@@ -691,58 +772,14 @@ export const Calculations = {
   maximum: inQueryConnection(performMaximum),
 } as const;
 
-/**
- * Tracks column aliases during calculation queries to avoid
- * conflicts when multiple aggregates are computed.
- *
- * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
- */
-export class ColumnAliasTracker {
-  private _aliases: Map<string, number> = new Map();
-
-  aliasFor(column: string): string {
-    const count = this._aliases.get(column) ?? 0;
-    this._aliases.set(column, count + 1);
-    if (count === 0) return column;
-    return `${column}_${count}`;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
 // ---------------------------------------------------------------------------
 
-/**
- * The alias Rails' `execute_grouped_calculation` gives the aggregate column:
- * `column_alias_tracker.alias_for("#{operation} #{column_name.to_s.downcase}")`
- * (calculations.rb:536) — `count_all`, `sum_credit_limit`, … — which is what
- * makes `order("count_all desc")` resolvable. Rails does not special-case
- * foreign-key arity, so both grouped arms alias through here. A raw Arel node
- * has no name to build an alias from and keeps the internal "val".
- * @internal
- */
-function aggregateAliasFor(fn: AggFn, column: string | Nodes.Node | number): string {
-  if (typeof column !== "string") return "val";
-  return columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"));
-}
-
-/** @internal */
-function columnAliasFor(field: string): string {
-  return field
-    .replace(/[^a-zA-Z0-9_]/g, "_")
-    .replace(/_{2,}/g, "_")
-    .slice(0, 255);
-}
-
-/** @internal */
-function truncate(name: string): string {
-  return name.slice(0, 255);
-}
-
 /** @internal */
 export function aggregateColumn(
   rel: CalculationRelation,
-  columnName: string | Nodes.Node | number,
+  columnName: string | Nodes.Node | number | null,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._model.arelTable;
@@ -794,16 +831,16 @@ export function hasInclude(
 
 /**
  * Narrows the resolved `column_name` to what `aggregate_column` accepts. Rails
- * hands its own resolved value straight through (calculations.rb:414-423), so a
- * composite `primary_key` reaches Arel as an array and emits broken SQL there
- * too; the join here picks one spelling for that already-degenerate case rather
- * than pretending trails supports it.
+ * hands its own resolved value straight through (calculations.rb:414-423) — nil
+ * included, which is how `async_sum`'s identity default reaches `arel_column`
+ * as `""` — so a composite `primary_key` reaches Arel as an array and emits
+ * broken SQL there too; the join here picks one spelling for that already-
+ * degenerate case rather than pretending trails supports it.
  * @internal
  */
 function aggregateTarget(
   columnName: string | string[] | Nodes.Node | number | null,
-): string | Nodes.Node | number {
-  if (columnName == null) return "*";
+): string | Nodes.Node | number | null {
   return Array.isArray(columnName) ? columnName.join(",") : columnName;
 }
 

@@ -3422,7 +3422,7 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#async_sum
    */
-  asyncSum(identityOrColumn?: Parameters<Relation<T>["sum"]>[0]) {
+  asyncSum(identityOrColumn: Parameters<Relation<T>["sum"]>[0] = null) {
     return this.sum(identityOrColumn);
   }
 
