@@ -183,10 +183,9 @@ export function defaultScoped(
   // Relation instance.
   const kwargsOnly =
     scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
-  const scope = kwargsOnly ? undefined : scopeOrOptions;
+  const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this._buildUnscopedRelation?.();
   const opts = kwargsOnly ? (scopeOrOptions as { allQueries?: boolean | null }) : options;
-  const rel = scope ?? this._buildUnscopedRelation?.();
-  return Default.buildDefaultScope(this as any, () => rel, { allQueries: opts?.allQueries }) ?? rel;
+  return Default.buildDefaultScope.call(this, scope, { allQueries: opts?.allQueries }) ?? scope;
 }
 
 /**

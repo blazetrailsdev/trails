@@ -35,46 +35,45 @@ export class Default {
    * @internal
    */
   static buildDefaultScope(
-    modelClass: any,
-    buildRelation: () => any,
+    this: any,
+    relation: any,
     { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
-    if (modelClass.abstractClass) return undefined;
+    if (this.abstractClass) return undefined;
 
     // Rails default.rb:145-152 — memoize the `default_scope_override` boolean on
     // first build (the class_attribute starts nil): does this class own a
     // `default_scope` method override rather than only inheriting the macro?
     // Written through the class-attribute setter (`self.default_scope_override = `).
-    if (modelClass.defaultScopeOverride == null) {
-      modelClass.defaultScopeOverride = hasDefaultScopeOverride(modelClass);
+    if (this.defaultScopeOverride == null) {
+      this.defaultScopeOverride = hasDefaultScopeOverride(this);
     }
 
     // Rails: when the model defines its own `default_scope` method (the
     // proc/method form, `def self.default_scope`) rather than registering via
     // the `default_scope { }` macro, call that method with the base relation
     // installed as the current scope (`relation.scoping { default_scope }`).
-    const override = modelClass.defaultScopeOverride ? defaultScopeMethod(modelClass) : undefined;
+    const override = this.defaultScopeOverride ? defaultScopeMethod(this) : undefined;
     if (override) {
-      return evaluateDefaultScope.call(modelClass, () => {
-        const base = buildRelation();
-        const prev = ScopeRegistry.currentScope(modelClass);
-        modelClass.setCurrentScope(base);
+      return evaluateDefaultScope.call(this, () => {
+        const prev = ScopeRegistry.currentScope(this);
+        this.setCurrentScope(relation);
         try {
           // Return the override's value unchanged (nullish included), mirroring
           // Rails' `relation.scoping { default_scope }`; the `|| scope` fallback
           // lives at the call site (`?? buildBase()` / `?? rel`).
-          return override.call(modelClass);
+          return override.call(this);
         } finally {
-          modelClass.setCurrentScope(prev);
+          this.setCurrentScope(prev);
         }
       });
     }
 
-    const scopes: DefaultScope[] = modelClass.defaultScopes ?? [];
+    const scopes: DefaultScope[] = this.defaultScopes ?? [];
     if (scopes.length === 0) return undefined;
 
-    return evaluateDefaultScope.call(modelClass, () => {
-      let rel = buildRelation();
+    return evaluateDefaultScope.call(this, () => {
+      let rel = relation;
       for (const scopeObj of scopes) {
         if (isExecuteScope(allQueries, scopeObj)) {
           const result = scopeObj.scope(rel);

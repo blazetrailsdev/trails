@@ -366,7 +366,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       whereValuesHash: () => ({ email: [avCurrent, avPrev] }),
     };
 
-    const result = RelationQueries.scopeForCreate(() => ({}), relation);
+    const result = RelationQueries.scopeForCreate.call(relation, () => ({}));
     // scope_for_create keeps the AV reference so serialize unwraps to
     // ciphertext on save without re-encrypting (our cast->toString
     // path would otherwise double-encrypt a plaintext-unwrapped value).
@@ -381,7 +381,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     };
     const relation = { model, whereValuesHash: () => ({}) };
 
-    const result = RelationQueries.scopeForCreate(() => ({ email: "plain@example.com" }), relation);
+    const result = RelationQueries.scopeForCreate.call(relation, () => ({
+      email: "plain@example.com",
+    }));
     expect(result.email).toBe("plain@example.com");
   });
 
@@ -394,7 +396,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     };
     const relation = { model, whereValuesHash: () => ({ body: [av] }) };
 
-    const result = RelationQueries.scopeForCreate(() => ({}), relation);
+    const result = RelationQueries.scopeForCreate.call(relation, () => ({}));
     expect(result.body).toBeUndefined();
   });
 
@@ -408,7 +410,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       model,
       whereValuesHash: () => ({ email: "plain@example.com" }),
     };
-    const result = RelationQueries.scopeForCreate(() => ({}), relation);
+    const result = RelationQueries.scopeForCreate.call(relation, () => ({}));
     expect(result.email).toBeUndefined();
   });
 
@@ -449,7 +451,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     expect((hash.email as unknown[])[0]).toBeInstanceOf(AdditionalValue);
     expect((hash.email as AdditionalValue[])[0].value).toBe(avCurrent.value);
 
-    const scope = RelationQueries.scopeForCreate(() => ({}), rel);
+    const scope = RelationQueries.scopeForCreate.call(rel, () => ({}));
     expect(scope.email).toBeInstanceOf(AdditionalValue);
     expect((scope.email as AdditionalValue).value).toBe(avCurrent.value);
   });

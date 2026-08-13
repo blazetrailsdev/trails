@@ -813,7 +813,7 @@ export class Associations {
     // here so `validate: false` is observable (`treasure.valid?` must not
     // run child validations) regardless of an explicit `autosave:` option.
     const habtmReflection = Reflection._reflectOnAssociation(this as any, name);
-    if (habtmReflection) addAutosaveAssociationCallbacks(this, habtmReflection);
+    if (habtmReflection) addAutosaveAssociationCallbacks.call(this, habtmReflection);
   }
 }
 

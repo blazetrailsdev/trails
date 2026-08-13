@@ -35,7 +35,7 @@ export class CollectionAssociation extends Association {
     // association regardless of the `autosave:` option. The option only
     // gates extra behavior inside save_collection_association; insert-of-new
     // children must always propagate so failures surface on owner.save.
-    addAutosaveAssociationCallbacks(model, reflection);
+    addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
   static override defineExtensions(model: any, name: string, block?: (...args: any[]) => any): any {

@@ -2701,7 +2701,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     registerModel("DuplicateCallbackProfileUser", DuplicateCallbackProfileUser);
     // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
     const reflection = (DuplicateCallbackProfileUser as any)._reflectOnAssociation("profile");
-    addAutosaveAssociationCallbacks(DuplicateCallbackProfileUser, reflection);
+    addAutosaveAssociationCallbacks.call(DuplicateCallbackProfileUser, reflection);
 
     const user = await DuplicateCallbackProfileUser.create({ name: "Test" });
     const profile = new Profile({ name: "Hello" });
@@ -2743,7 +2743,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       className: "DuplicateCallbacksBelongsToAuthor",
     });
     const reflection = (Post as any)._reflectOnAssociation("author");
-    addAutosaveAssociationCallbacks(Post, reflection);
+    addAutosaveAssociationCallbacks.call(Post, reflection);
 
     const author = new Author({ name: "New" });
     const post = await Post.create({ name: "Test" });
@@ -2784,7 +2784,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       className: "DuplicateCallbacksHasManyBook",
     });
     const reflection = (Author as any)._reflectOnAssociation("books");
-    addAutosaveAssociationCallbacks(Author, reflection);
+    addAutosaveAssociationCallbacks.call(Author, reflection);
 
     const author = await Author.create({ name: "Test" });
     const book = new Book({ name: "My Book" });
@@ -2828,7 +2828,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
     const reflection = (DupCbPirate as any)._reflectOnAssociation("parrots");
     expect(reflection).toBeDefined();
-    addAutosaveAssociationCallbacks(DupCbPirate, reflection);
+    addAutosaveAssociationCallbacks.call(DupCbPirate, reflection);
 
     const pirate = await DupCbPirate.create({ catchphrase: "Arrr" });
     const parrot = await DupCbParrot.create({ name: "Polly" });
@@ -2878,7 +2878,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     // Wire _ensureNoDuplicateErrors as after_validation on ShipCyclic (mirrors Rails'
     // AssociationBuilderExtension.build → add_autosave_association_callbacks).
     const prisonersRef = ShipCyclic.reflectOnAssociation("prisoners");
-    addAutosaveAssociationCallbacks(ShipCyclic, prisonersRef);
+    addAutosaveAssociationCallbacks.call(ShipCyclic, prisonersRef);
 
     const ship = new ShipCyclic({ name: "" });
     const prisoner = new PrisonerCyclic({});
