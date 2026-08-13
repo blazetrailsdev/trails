@@ -163,7 +163,6 @@ interface FlockableFs {
   openSync(path: string, flags: string): number;
   closeSync(fd: number): void;
   unlinkSync(path: string): void;
-  statSync(path: string): FsStatResult;
 }
 
 // Node exposes no flock(2), so the exclusive lock is an O_EXCL lockfile beside
@@ -171,10 +170,6 @@ interface FlockableFs {
 // releases" shape Ruby's `File#flock File::LOCK_EX` gives us, and, being a real
 // filesystem entry, it excludes other threads and other processes alike.
 const LOCK_RETRY_MS = 5;
-// A lockfile older than this is assumed to belong to a process that died
-// holding it; without the sweep every later locker would block forever.
-const LOCK_STALE_MS = 10_000;
-
 // Millisecond sleep with no event loop: `Atomics.wait` blocks the calling
 // thread, which is what a synchronous lock needs. Both the buffer and the wait
 // are guarded — SharedArrayBuffer is absent on cross-origin-unisolated pages and
@@ -222,13 +217,9 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
         return;
       } catch (error) {
         if ((error as { code?: string }).code !== "EEXIST") throw error;
-        if (Date.now() - lockAge(nodeFs, lockPath) > LOCK_STALE_MS) {
-          try {
-            nodeFs.unlinkSync(lockPath);
-          } catch {
-            // Another locker swept it first.
-          }
-        }
+        // `File#flock File::LOCK_EX` blocks until the holder releases, with no
+        // timeout (file_store.rb:150-154), so the retry loop never gives up or
+        // breaks another locker's hold.
         sleepSync(LOCK_RETRY_MS);
       }
     }
@@ -247,15 +238,6 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
     },
     flockSync,
   };
-}
-
-function lockAge(nodeFs: FlockableFs, lockPath: string): number {
-  try {
-    return nodeFs.statSync(lockPath).mtime.getTime();
-  } catch {
-    // Released between the failed create and the stat — retry immediately.
-    return Date.now();
-  }
 }
 
 function syncBuiltinLoader(): ((id: string) => unknown) | null {
