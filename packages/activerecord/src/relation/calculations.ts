@@ -680,6 +680,22 @@ export async function calculate(
  * argument list: a function in the first position is the block with the default
  * identity, and `sum(1000, block)` is the explicit-initial-value form.
  */
+/**
+ * Ruby's `Integer#+` across the numeric tower, which is what `Array#sum` folds
+ * with: an Integer and a Bignum add exactly, and a Float operand takes the sum
+ * to Float. JS has no tower — `0 + 1n` is a TypeError — so a `bigint` operand
+ * pulls a whole-number partner up to `bigint`, and a fractional `number` pulls
+ * both down to `number`, which is where Ruby's Float arm lands too.
+ */
+function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
+  if (typeof memo === typeof value) {
+    return typeof memo === "bigint" ? memo + (value as bigint) : memo + (value as number);
+  }
+  const [n, b] = typeof memo === "bigint" ? [value as number, memo] : [memo, value];
+  if (!Number.isInteger(n)) return n + Number(b);
+  return BigInt(n) + (b as bigint);
+}
+
 export async function performSum(
   this: CalculationRelation,
   initialValueOrColumn: string | Nodes.Node | number | null | SumBlock = 0,
@@ -691,12 +707,7 @@ export async function performSum(
   }
   if (block !== undefined) {
     const records = await this.toArray();
-    return records
-      .map(block)
-      .reduce(
-        (memo, value) => (memo as number) + (value as number),
-        initialValueOrColumn as number | bigint,
-      );
+    return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
   }
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
   if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;

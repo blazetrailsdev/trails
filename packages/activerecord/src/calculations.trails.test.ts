@@ -413,6 +413,16 @@ describe("empty-scope aggregate identities", () => {
     ).toBe(1000 + Number(creditLimits));
   });
 
+  // Ruby folds Integer and Bignum block results together (`Array#sum`), where
+  // JS `0 + 1n` is a TypeError — so the default `0` seed must still take a
+  // `bigint`-returning block.
+  it("sums bigint block return values onto the default identity", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const rows = BigInt((await Account.count()) as number);
+    expect(await Account.sum(() => 1n)).toBe(rows);
+    expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
+  });
+
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
   // `sum(initial_value_or_column = 0)`, so the strict-loading override must not
   // narrow it away.
