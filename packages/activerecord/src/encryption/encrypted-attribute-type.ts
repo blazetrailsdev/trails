@@ -93,7 +93,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get deterministic(): boolean {
-    return this.scheme.deterministic ?? false;
+    return this.scheme.isDeterministic();
   }
 
   // Mirrors Rails' `delegate :key_provider, :downcase?, :previous_schemes,

@@ -305,8 +305,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const type = new EncryptedAttributeType({
       scheme: new Scheme({
         encryptor: currentEncryptor,
-        deterministic: true,
-        fixed: false,
+        deterministic: { fixed: false },
         previousSchemes: [oldScheme],
       }),
     });
@@ -352,8 +351,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
           this.adapter = adp;
           this.encrypts("name", {
             encryptor: currentEncryptor,
-            deterministic: true,
-            fixed: false,
+            deterministic: { fixed: false },
           });
         }
       } as any;
