@@ -158,6 +158,15 @@ export class Tse implements TemplateHandler {
    * emits `_ob.append(user.name)`), matching ERB, which resolves them
    * against the view's local_assigns binding. An object environment record
    * is the only JS construct with that resolution behavior.
+   *
+   * Deviation, tracked by
+   * 0104-twitter-app-full-stack-integration/helper-methods-not-in-tse-scope:
+   * Rails compiles into a method **on the view**, so `self` is an
+   * `ActionView::Base` carrying every helper module. Trails' handler protocol
+   * hands a handler only `(source, locals, context)`, so compilation and the
+   * helper scope live here instead, and the scope is a fixed set rather than
+   * the view's method table. Porting `Template#compile!` onto a view object
+   * retires both this method and {@link scopeFor}.
    */
   render(source: string, locals: Record<string, unknown>, context: RenderContext): string {
     const compiled = this.compiled(source, context);
@@ -201,6 +210,9 @@ export class Tse implements TemplateHandler {
  * for the same names, so the scope object carries both: the view helpers
  * first, then the locals, which win on collision the way a Ruby block
  * parameter shadows a method of the same name.
+ *
+ * The literal helper list is the deviation — Rails gets the whole of
+ * `ActionView::Helpers` for free. See {@link Tse#render}.
  *
  * @internal
  */
