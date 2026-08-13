@@ -171,9 +171,7 @@ export function travelTo(
 
   let now: Temporal.Instant;
   if (typeof dateOrTime === "string") {
-    // Rails' String arm is `Time.zone.parse(date_or_time)`; without a zone set
-    // there is no `Time.zone` to parse through, so the ISO string is read
-    // directly.
+    // Without a `Time.zone` set there is no zone to parse through.
     const zone = getZone();
     now = zone ? zone.parse(dateOrTime).toTime() : Temporal.Instant.from(dateOrTime);
   } else if (dateOrTime instanceof Date) {

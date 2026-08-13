@@ -178,10 +178,8 @@ export function writingPoolsLeakedSinceBaseline(): string[] {
   return leaked;
 }
 
-// Mirror `ActiveSupport::Testing::TimeHelpers#after_teardown`
-// (activesupport/lib/active_support/testing/time_helpers.rb:70-73), which Rails
-// gets on every test case through the `super` chain: travel is unwound after
-// each test whether or not the case remembered to call `travel_back`.
+// Mirror `ActiveSupport::Testing::TimeHelpers#after_teardown` (time_helpers.rb:70-73),
+// which Rails gets on every test case through the `super` chain.
 afterEach(() => {
   afterTeardown();
 });

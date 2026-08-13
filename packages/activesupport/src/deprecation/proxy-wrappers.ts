@@ -200,16 +200,20 @@ export class DeprecatedConstantProxy extends Module {
     return (this.target as { name: string }).name;
   }
 
-  // Ruby's `Object#hash` and `Object#respond_to?` are universal; TypeScript has
-  // no such members, so each delegation calls the target's own port when it has
-  // one and answers from the object itself otherwise. Either way the probe is
-  // answered here rather than falling through to `methodMissing`, which is the
-  // whole point of Rails' delegate line.
+  /**
+   * Ruby's `Object#hash` is universal and TypeScript's is not, so the delegation
+   * calls the target's own port when it has one.
+   */
   hash(): unknown {
     const target = this.target as { hash?: () => unknown };
     return typeof target.hash === "function" ? target.hash() : undefined;
   }
 
+  /**
+   * Ruby's `Object#respond_to?` is universal and TypeScript's is not, so the
+   * delegation calls the target's own port when it has one and reads the object
+   * itself otherwise.
+   */
   respondTo(method: string): boolean {
     const target = this.target as { respondTo?: (m: string) => boolean };
     return typeof target.respondTo === "function"

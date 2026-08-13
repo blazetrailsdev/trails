@@ -37,16 +37,18 @@ export class Merger {
     const rel = this.relation;
     this.mergeUnscope(rel);
     this.mergeExtending(rel);
+    this.mergeCtes(rel);
+    this.mergeEagerLoad(rel);
+
+    if (this.other._isNone) rel._isNone = true;
+
     this.mergeSelectValues(rel);
     this.mergeMultiValues(rel);
     this.mergeSingleValues(rel);
     this.mergeClauses(rel);
-    this.mergeCtes(rel);
-    this.mergeEagerLoad(rel);
     this.mergePreloads(rel);
     this.mergeJoins(rel);
     this.mergeOuterJoins(rel);
-    if (this.other._isNone) rel._isNone = true;
     return rel;
   }
 
