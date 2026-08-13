@@ -4842,6 +4842,18 @@ for (const [name, fn] of [
     },
   ],
   [
+    "_updateRow",
+    function (this: Base, attributeNames: string[], attemptedAction = "update"): Promise<number> {
+      return LockingOptimistic._updateRow.call(
+        this as any,
+        attributeNames,
+        attemptedAction,
+        (names: string[], action: string) =>
+          _Persistence._updateRow.call(this as any, names, action),
+      );
+    },
+  ],
+  [
     "_updateRecord",
     function (this: Base, block?: (record: Base) => void): Promise<boolean> {
       return Timestamp._updateRecord.call(this as any, () =>

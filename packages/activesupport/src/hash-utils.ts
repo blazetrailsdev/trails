@@ -189,11 +189,7 @@ export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
  * Convert all keys to strings (Rails' stringify_keys).
  */
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const key of Object.keys(obj)) {
-    result[String(key)] = obj[key];
-  }
-  return result;
+  return transformKeys(obj, (k) => String(k));
 }
 
 /**
@@ -216,7 +212,7 @@ export function deepStringifyKeys(obj: unknown): unknown {
  * equivalent to stringifyKeys but mirrors Rails' symbolize_keys semantics.
  */
 export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
-  return stringifyKeys(obj);
+  return transformKeys(obj, (key) => key);
 }
 
 /**
@@ -226,7 +222,7 @@ export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unkno
  * `stringify_keys`'s here.
  */
 export function symbolizeKeysBang<T extends AnyObject>(hash: T): T {
-  return stringifyKeysBang(hash);
+  return transformKeysBang(hash, (key) => key);
 }
 
 /**
@@ -319,11 +315,32 @@ export function _deepTransformKeysInObjectBang(
 }
 
 /**
+ * Ruby's `Hash#transform_keys` — a new hash with each key replaced by the
+ * block's result. The primitive the `keys.rb` key casts are written on top of.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash`, not Rails. `keys.rb` writes
+ * every key cast on top of it (keys.rb:11, :22) but never defines it, so there
+ * is no Rails method for the port to converge on; JS objects have no such
+ * primitive, so it is spelled here in the file that consumes it.
+ */
+export function transformKeys<T extends AnyObject>(
+  hash: T,
+  block: (key: string) => string,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(hash)) {
+    result[block(key)] = hash[key];
+  }
+  return result;
+}
+
+/**
  * Ruby's `Hash#transform_keys!`, the in-place primitive the `keys.rb` bang
  * forms are written on top of.
- * @internal
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link transformKeys} is.
  */
-function transformKeysBang<T extends AnyObject>(hash: T, block: (key: string) => string): T {
+export function transformKeysBang<T extends AnyObject>(hash: T, block: (key: string) => string): T {
   for (const key of Object.keys(hash)) {
     const value = hash[key];
     delete hash[key];

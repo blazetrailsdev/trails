@@ -23,7 +23,7 @@
  * address and calls into this file.
  */
 
-import { Rational, Temporal, strftime, type StrftimeSubject } from "@blazetrails/date";
+import { Rational, Temporal, cCivilToJd, strftime, type StrftimeSubject } from "@blazetrails/date";
 import { ActiveRecord } from "../../ar-config.js";
 
 /**
@@ -56,6 +56,9 @@ function strftimeSubject(v: {
 }): StrftimeSubject {
   return {
     year: v.year,
+    jd: cCivilToJd(v.year, v.month, v.day),
+    nth: 0n,
+    gregorianP: true,
     mon: v.month,
     day: v.day,
     wday: v.dayOfWeek % 7,

@@ -72,6 +72,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "assert_valid_keys",
   "to_param",
   "as_json",
+  // Ruby core `Hash#transform_keys(!)` — `hash.transform_keys { … }`, exported
+  // by @blazetrails/activesupport as `transformKeys(hash, block)` because JS
+  // objects have no such primitive to hang it on.
+  "transform_keys",
+  "transform_keys!",
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
   "with_indifferent_access",

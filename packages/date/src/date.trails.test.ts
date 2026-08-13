@@ -1054,6 +1054,12 @@ describe("Date", () => {
     expect(dt.jd).toBe(1180591620717411303424n);
   });
 
+  it("reads strftime's week numbers off the residue day, as the C's int readers do", () => {
+    const d = dNewByFrags({ jd: 2n ** 70n });
+    expect(d.strftime("%G|%V|%U")).toBe("3232350070754114273|02|01");
+    expect(d.strftime("%W|%g")).toBe("01|73");
+  });
+
   it("truncates a fractional year through valid_civil_p, as decode_year does", () => {
     // ruby 3.3.11 -rdate — valid_civil_p (date_core.c:2246-2277) runs
     // decode_year before c_valid_civil_p's `int y`, and the truncation is of

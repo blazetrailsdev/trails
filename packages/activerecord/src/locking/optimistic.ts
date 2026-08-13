@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
-import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
+import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import { reloadSchemaFromCache } from "../model-schema.js";
@@ -169,6 +169,19 @@ export async function updateCounters(
 
 type InstanceLockingHost = {
   constructor: typeof Base & LockingHost;
+  _attributes: {
+    getAttribute(name: string): {
+      value: unknown;
+      valueBeforeTypeCast: unknown;
+      type: unknown;
+      valueForDatabase: unknown;
+      originalValueForDatabase(): unknown;
+    };
+    set(name: string, attribute: unknown): void;
+  };
+  _dirty: {
+    attributeWritten(name: string, value: unknown, before: unknown, type: unknown): void;
+  };
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
@@ -223,11 +236,12 @@ export async function _updateRow(
   if (!ctor.lockingEnabled) return superFn(attributeNames, attemptedAction);
 
   const col = ctor.lockingColumn;
-  const lockVersionWas = this.readAttribute(col);
-  const baseConstraints = buildBaseConstraints(this, ctor);
-  const updateConstraints = { ...baseConstraints, [col]: _lockValueForDatabase.call(this, col) };
+  const lockAttributeWas = this._attributes.getAttribute(col);
 
-  attributeNames = [...attributeNames.filter((n) => n !== col), col];
+  const updateConstraints = _queryConstraintsHash.call(this, buildBaseConstraints(this, ctor));
+
+  attributeNames = [...attributeNames, col];
+
   this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
 
   try {
@@ -236,10 +250,18 @@ export async function _updateRow(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
     );
+
     if (affectedRows !== 1) throw new StaleObjectError(this, attemptedAction);
+
     return affectedRows;
   } catch (e) {
-    this.writeAttribute(col, lockVersionWas);
+    this._attributes.set(col, lockAttributeWas);
+    this._dirty.attributeWritten(
+      col,
+      lockAttributeWas.value,
+      lockAttributeWas.valueBeforeTypeCast,
+      lockAttributeWas.type,
+    );
     throw e;
   }
 }
@@ -263,12 +285,16 @@ export function destroyRow(
 /**
  * @internal
  * Mirrors: ActiveRecord::Locking::Optimistic#_lock_value_for_database
+ *
+ * `Attribute::FromDatabase#_original_value_for_database` is the raw
+ * `value_before_type_cast`, so a lock column that is NULL in the row constrains
+ * on NULL: `LockingType#deserialize`'s `nil.to_i` 0 never reaches the WHERE.
  */
 export function _lockValueForDatabase(this: InstanceLockingHost, lockingColumn: string): unknown {
   if (isWillSaveChangeToAttribute(this as any, lockingColumn)) {
-    return this.readAttribute(lockingColumn) ?? 0;
+    return this._attributes.getAttribute(lockingColumn).valueForDatabase;
   }
-  return attributeInDatabase(this as any, lockingColumn) ?? 0;
+  return this._attributes.getAttribute(lockingColumn).originalValueForDatabase();
 }
 
 /**
