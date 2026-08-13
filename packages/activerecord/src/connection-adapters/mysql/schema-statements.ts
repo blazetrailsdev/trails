@@ -355,14 +355,40 @@ export function createTableDefinition(
   return new TableDefinition(name, { ...options, adapter: this });
 }
 
-/** @internal */
-export function defaultType(
-  createTableInfo: string | null,
+/**
+ * Host for the column-reflection pair below, which Rails defines as private
+ * methods on `MySQL::SchemaStatements` and so reaches `create_table_info` /
+ * `lookup_cast_type` through `self`.
+ * @internal
+ */
+export interface MysqlColumnReflectionHost {
+  createTableInfo(tableName: string): Promise<string | null>;
+  // Optional so a caller that has no type map still reflects columns through
+  // `fetch_type_metadata`'s modifier-stripping fallback.
+  lookupCastType?(sqlType: string): {
+    name: string;
+    limit?: number | null;
+    precision?: number | null;
+    scale?: number | null;
+  };
+}
+
+/**
+ * Mirrors: MySQL::SchemaStatements#default_type (mysql/schema_statements.rb:176).
+ * async unlike Rails because `create_table_info` is a query, which blocks in
+ * Ruby but not here.
+ * @internal
+ */
+export async function defaultType(
+  this: MysqlColumnReflectionHost,
+  tableName: string,
   fieldName: string,
-): "string" | "integer" | "function" | undefined {
+): Promise<"string" | "integer" | "function" | undefined> {
+  const createTableInfo = await this.createTableInfo(tableName);
   if (!createTableInfo) return undefined;
-  const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = createTableInfo.match(new RegExp("`" + escaped + "` (.+) DEFAULT ('|\\d+|[A-z]+)"));
+  const match = createTableInfo.match(
+    new RegExp("`" + fieldName + "` (.+) DEFAULT ('|\\d+|[A-z]+)"),
+  );
   const defaultPre = match?.[2];
   if (defaultPre === "'") return "string";
   if (defaultPre?.match(/^\d+$/)) return "integer";
@@ -370,20 +396,23 @@ export function defaultType(
   return undefined;
 }
 
-/** @internal */
-export function newColumnFromField(
+/**
+ * Mirrors: MySQL::SchemaStatements#new_column_from_field (mysql/schema_statements.rb:189).
+ * async unlike Rails because the `default_type` branch queries the server.
+ * @internal
+ */
+export async function newColumnFromField(
+  this: MysqlColumnReflectionHost,
   tableName: string,
   field: Record<string, string | null>,
-  createTableInfoFn: (tableName: string) => string | null,
-  lookupCastType?: (sqlType: string) => {
-    name: string;
-    limit?: number | null;
-    precision?: number | null;
-    scale?: number | null;
-  },
-): Column {
+  _definitions: unknown,
+): Promise<Column> {
   const fieldName = field["Field"] ?? "";
-  const meta = fetchTypeMetadata(field["Type"] ?? "", field["Extra"] ?? "", lookupCastType);
+  const meta = fetchTypeMetadata(
+    field["Type"] ?? "",
+    field["Extra"] ?? "",
+    this.lookupCastType ? (sqlType) => this.lookupCastType!(sqlType) : undefined,
+  );
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
@@ -395,9 +424,10 @@ export function newColumnFromField(
     [def, defFn] = [null, def?.replace(/\\'/g, "'") ?? null];
   } else if (meta.type === "text" && def?.startsWith("'")) {
     def = def.slice(1, -1).replace(/\\'/g, "'");
-  } else if (def != null && !/^\d/.test(def)) {
-    if (defaultType(createTableInfoFn(tableName), fieldName) === "function")
-      [def, defFn] = [null, def];
+  } else if (def != null && /^\d/.test(def)) {
+    // Its a number so we can skip the query to check if it is a function
+  } else if (def != null && (await defaultType.call(this, tableName, fieldName)) === "function") {
+    [def, defFn] = [null, def];
   }
 
   return new Column(fieldName, def, meta, field["Null"] === "YES", {

@@ -302,23 +302,22 @@ export class HasOneAssociation extends SingularAssociation {
         // associated record (possibly a DB row on a freshly-found owner) so it
         // can be nullified/removed rather than silently orphaned.
         if (!this.loaded) await this.loadTarget();
-        const displaced = this.target;
         // Rails: `return target unless load_target || record` (:61) — nothing
         // associated and nothing being assigned means no work. This does NOT
         // leave the association unloaded: `load_target` calls `loaded!`
         // unconditionally (association.rb:192), as does the `loadTarget()`.
-        if (!displaced && !record) return;
+        if (!this.target && !record) return;
         // `hasChangesToSave` is a getter, read (not called) per #4900.
-        const assigningAnotherRecord = !sameRecord(displaced, record);
+        const assigningAnotherRecord = !sameRecord(this.target, record);
         if (assigningAnotherRecord || record?.hasChangesToSave === true) {
           // Rails: `save &&= owner.persisted?` (:66).
           save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
-          // `this.target` is left as `displaced` for the whole block — Rails
-          // reaches `self.target = record` (:84) only after it — so a throw
+          // `this.target` still holds the displaced record for the whole block —
+          // Rails reaches `self.target = record` (:84) only after it — so a throw
           // anywhere inside (a failed `remove_target!` nullify, or the
           // `RecordNotSaved` on a failed save) leaves the OLD record cached.
           await transactionIf(this, save, async () => {
-            if (displaced && !(displaced as any).isDestroyed?.() && assigningAnotherRecord) {
+            if (this.target && !(this.target as any).isDestroyed?.() && assigningAnotherRecord) {
               await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
             }
             if (record) {
@@ -326,7 +325,7 @@ export class HasOneAssociation extends SingularAssociation {
               this.setInverseInstance(record);
               if (save && !(await record.save())) {
                 this.nullifyOwnerAttributes(record);
-                if (displaced) this.setOwnerAttributes(displaced);
+                if (this.target) this.setOwnerAttributes(this.target);
                 throw new RecordNotSaved(
                   `Failed to save the new associated ${this.reflection.name}.`,
                   record,
@@ -341,8 +340,7 @@ export class HasOneAssociation extends SingularAssociation {
     }
     {
       if (record) (this as any).raiseOnTypeMismatchBang(record);
-      const displaced = this.target;
-      const assigningAnotherRecord = !sameRecord(displaced, record);
+      const assigningAnotherRecord = !sameRecord(this.target, record);
       if (assigningAnotherRecord || record?.hasChangesToSave === true) {
         // Rails' `remove_target!(options[:dependent])` (:69) runs on this arm
         // too — `save = false` gates only `transaction_if` (:68) and
@@ -355,14 +353,14 @@ export class HasOneAssociation extends SingularAssociation {
         // `_createRecord`) and from the nested-attributes writer
         // (nested-attributes.ts, `detachDisplacedThenSetNewRecord`).
         if (
-          displaced &&
+          this.target &&
           assigningAnotherRecord &&
-          (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true
+          (this.target as { isDestroyed?: () => boolean }).isDestroyed?.() !== true
         ) {
           const dependent = (this.reflection.options.dependent as string) ?? "";
           if (dependent !== "delete" && dependent !== "destroy") {
-            this.nullifyOwnerAttributes(displaced);
-            this.removeInverseInstance(displaced);
+            this.nullifyOwnerAttributes(this.target);
+            this.removeInverseInstance(this.target);
           }
         }
         if (record) {
@@ -490,9 +488,8 @@ export class HasOneAssociation extends SingularAssociation {
    * @internal
    */
   protected async detachDisplacedTarget(): Promise<void> {
-    const displaced = this.target;
-    if (!displaced) return;
-    if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
+    if (!this.target) return;
+    if ((this.target as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
   }
 

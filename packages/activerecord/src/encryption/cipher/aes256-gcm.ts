@@ -68,14 +68,15 @@ export class Aes256Gcm {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     const inputBuf = Buffer.isBuffer(clearText) ? clearText : Buffer.from(clearText, "utf-8");
-    const iv = this.generateIv(inputBuf, this.deterministic);
+    const iv = this.generateIv(this.deterministic, inputBuf);
     const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
       authTagLength: AUTH_TAG_LENGTH,
     });
-    const encrypted = Buffer.concat([
-      Buffer.from(cipher.update(inputBuf)),
-      Buffer.from(cipher.final()),
-    ]);
+    // Rails' `clear_text.empty? ? clear_text.dup : cipher.update(clear_text)`
+    // (aes256_gcm.rb:46) — an empty input never reaches `update`.
+    const encryptedData =
+      inputBuf.length === 0 ? Buffer.from(inputBuf) : Buffer.from(cipher.update(inputBuf));
+    const encrypted = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
     if (!cipher.getAuthTag) {
       throw new Configuration("Crypto adapter does not support GCM auth tags (getAuthTag)");
     }
@@ -84,7 +85,8 @@ export class Aes256Gcm {
     // Store raw bytes as Buffers, like MRI keeps binary Strings on the Message;
     // the serializer then does a single base64 hop, byte-identical to Rails.
     const message = new Message({ payload: encrypted });
-    message.addHeaders({ iv, at: authTag });
+    message.headers.iv = iv;
+    message.headers.authTag = authTag;
     return message;
   }
 
@@ -121,10 +123,14 @@ export class Aes256Gcm {
         throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
       }
       decipher.setAuthTag(authTagBuf);
-      return Buffer.concat([
-        Buffer.from(decipher.update(toBytes(message.payload))),
-        Buffer.from(decipher.final()),
-      ]);
+      // Rails' `encrypted_data.empty? ? encrypted_data : cipher.update(encrypted_data)`
+      // (aes256_gcm.rb:73) — an empty payload never reaches `update`.
+      const encryptedData = toBytes(message.payload);
+      const decryptedData =
+        encryptedData.length === 0
+          ? Buffer.from(encryptedData)
+          : Buffer.from(decipher.update(encryptedData));
+      return Buffer.concat([decryptedData, Buffer.from(decipher.final())]);
     } catch (e) {
       if (e instanceof Configuration) throw e;
       // Wrong key or corrupted ciphertext — a decryption failure, retried per-key.
@@ -144,12 +150,13 @@ export class Aes256Gcm {
   /**
    * Rails' first parameter is the live `OpenSSL::Cipher` (only so the random
    * branch can call `cipher.random_iv`). WebCrypto has no such object before
-   * the IV exists, so the slot carries the deterministic flag instead, which
-   * Rails reads off `@deterministic`.
+   * the IV exists, so that slot carries the deterministic flag instead, which
+   * Rails reads off `@deterministic`. Everything else — arity, order, the
+   * branch — is Rails' `generate_iv(cipher, clear_text)` (aes256_gcm.rb:84).
    *
    * @internal
    */
-  private generateIv(clearText: Buffer, deterministic: boolean): Buffer {
+  private generateIv(deterministic: boolean, clearText: Buffer): Buffer {
     if (deterministic) {
       return this.generateDeterministicIv(clearText);
     }

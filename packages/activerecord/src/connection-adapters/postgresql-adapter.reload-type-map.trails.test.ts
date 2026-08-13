@@ -16,6 +16,9 @@ describe("PostgreSQLAdapter#reloadTypeMap", () => {
     // `Object.create` skips the field initializers, so install the monitor the
     // adapter would have built as `@lock` (abstract_adapter.rb:181-192).
     a.lock = new LoadInterlockAwareMonitor();
+    // Likewise `@statements = build_statement_pool` (abstract_adapter.rb:156);
+    // reloadTypeMap resets it so the next PREPARE re-parses against fresh OIDs.
+    a._statements = { reset: () => {} };
     a._transactionManager = new TransactionManager(adapter as never);
     a._typeMap = { loaded: 0 };
     const observed: unknown[] = [];
