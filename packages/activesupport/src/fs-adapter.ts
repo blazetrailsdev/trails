@@ -43,8 +43,9 @@ export interface FsAdapter {
   renameSync(src: string, dest: string): void;
   /**
    * Advisory file lock on an open descriptor, mirroring Ruby `File#flock` with
-   * `File::LOCK_EX` / `File::LOCK_UN`. Optional: Node's `fs` exposes no flock,
-   * so callers (FileStore#lockFile) degrade to running the block unlocked.
+   * `File::LOCK_EX` / `File::LOCK_UN`. Optional: custom adapters need not
+   * implement it, and callers (FileStore#lockFile) then run the block
+   * unlocked. The Node adapter implements it with an O_EXCL lockfile.
    */
   flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
@@ -158,6 +159,103 @@ export function registerFsAdapter(name: string, fs: FsAdapter, path: PathAdapter
 let nodeAttempted = false;
 let nodeAsyncPromise: Promise<boolean> | null = null;
 
+interface FlockableFs {
+  openSync(path: string, flags: string): number;
+  closeSync(fd: number): void;
+  unlinkSync(path: string): void;
+  statSync(path: string): FsStatResult;
+}
+
+// Node exposes no flock(2), so the exclusive lock is an O_EXCL lockfile beside
+// the locked file plus a blocking retry loop — the same "wait until the holder
+// releases" shape Ruby's `File#flock File::LOCK_EX` gives us, and, being a real
+// filesystem entry, it excludes other threads and other processes alike.
+const LOCK_RETRY_MS = 5;
+// A lockfile older than this is assumed to belong to a process that died
+// holding it; without the sweep every later locker would block forever.
+const LOCK_STALE_MS = 10_000;
+
+// Millisecond sleep with no event loop: `Atomics.wait` blocks the calling
+// thread, which is what a synchronous lock needs. It is disallowed on some main
+// threads, so a spin is the fallback.
+const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepSync(ms: number): void {
+  try {
+    if (Atomics.wait(sleepBuffer, 0, 0, ms) !== "timed-out") return;
+  } catch {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      /* spin */
+    }
+  }
+}
+
+// The `FsAdapter` flock takes a descriptor (Ruby locks a `File`), so the lock
+// path has to be recovered from the descriptor the caller opened.
+const flockPaths = new Map<number, string>();
+const flockHeld = new Map<number, string>();
+
+function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
+  const flockSync = (fd: number, operation: "ex" | "un"): void => {
+    if (operation === "un") {
+      const lockPath = flockHeld.get(fd);
+      if (lockPath == null) return;
+      flockHeld.delete(fd);
+      try {
+        nodeFs.unlinkSync(lockPath);
+      } catch {
+        // Already swept as stale by another locker.
+      }
+      return;
+    }
+
+    const path = flockPaths.get(fd);
+    if (path == null) return;
+    const lockPath = `${path}.lock`;
+    for (;;) {
+      try {
+        nodeFs.closeSync(nodeFs.openSync(lockPath, "wx"));
+        flockHeld.set(fd, lockPath);
+        return;
+      } catch (error) {
+        if ((error as { code?: string }).code !== "EEXIST") throw error;
+        if (Date.now() - lockAge(nodeFs, lockPath) > LOCK_STALE_MS) {
+          try {
+            nodeFs.unlinkSync(lockPath);
+          } catch {
+            // Another locker swept it first.
+          }
+        }
+        sleepSync(LOCK_RETRY_MS);
+      }
+    }
+  };
+
+  return {
+    openSync: (path: string, flags: string) => {
+      const fd = nodeFs.openSync(path, flags);
+      flockPaths.set(fd, path);
+      return fd;
+    },
+    closeSync: (fd: number) => {
+      if (flockHeld.has(fd)) flockSync(fd, "un");
+      flockPaths.delete(fd);
+      nodeFs.closeSync(fd);
+    },
+    flockSync,
+  };
+}
+
+function lockAge(nodeFs: FlockableFs, lockPath: string): number {
+  try {
+    return nodeFs.statSync(lockPath).mtime.getTime();
+  } catch {
+    // Released between the failed create and the stat — retry immediately.
+    return Date.now();
+  }
+}
+
 function syncBuiltinLoader(): ((id: string) => unknown) | null {
   const proc = globalThis.process as
     | (typeof globalThis.process & { getBuiltinModule?: (id: string) => unknown })
@@ -224,6 +322,7 @@ function tryAutoRegisterNode(): boolean {
       readdir: (p: string) => fsPromises.readdir(p),
       mkdir: (p: string, opts?: { recursive?: boolean }) =>
         fsPromises.mkdir(p, opts).then(() => undefined),
+      ...withFlock(nodeFs as unknown as FlockableFs),
     }) as FsAdapter;
     const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;
     const nodeUrl = req("node:url") as { pathToFileURL(p: string): URL };
@@ -290,6 +389,7 @@ function tryAutoRegisterNodeAsync(): Promise<boolean> {
           readdir: (p: string) => fsPromises.readdir(p),
           mkdir: (p: string, opts?: { recursive?: boolean }) =>
             fsPromises.mkdir(p, opts).then(() => undefined),
+          ...withFlock(nodeFs as unknown as FlockableFs),
         }) as FsAdapter;
         const nodePath = (await import("node:path")) as unknown as Required<
           Omit<PathAdapter, "pathToFileURL">

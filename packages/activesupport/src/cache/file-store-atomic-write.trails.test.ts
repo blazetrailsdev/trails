@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Worker } from "node:worker_threads";
 import { FileStore } from "./file-store.js";
 import { MemoryStore } from "./memory-store.js";
 
@@ -37,6 +38,37 @@ describe("FileStore atomic write and inspect", () => {
       expect(store.increment("counter")).toBe(2);
       expect(store.decrement("counter")).toBe(1);
     });
+  });
+
+  it("does not lose concurrent increments", { timeout: 60_000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-file-store-"));
+    const iterations = 100;
+    try {
+      const store = new FileStore(dir);
+      const worker = new Worker(new URL("./file-store-lock-worker.trails.mjs", import.meta.url), {
+        workerData: { dir, iterations },
+        execArgv: [
+          "--import",
+          new URL("./file-store-lock-worker-loader.trails.mjs", import.meta.url).href,
+        ],
+      });
+      const finished = new Promise<void>((resolve, reject) => {
+        worker.on("message", (message) => {
+          if (message === "ready") {
+            worker.postMessage("go");
+            for (let i = 0; i < iterations; i++) store.increment("counter");
+          } else {
+            resolve();
+          }
+        });
+        worker.on("error", reject);
+      });
+      await finished;
+      await worker.terminate();
+      expect(store.read("counter")).toBe(iterations * 2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("inspect reports the cache path and options", () => {
