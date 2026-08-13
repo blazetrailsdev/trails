@@ -162,7 +162,7 @@ export interface CallerLocation {
 }
 
 /**
- * @noRailsEquivalent Ruby's `Kernel#caller_locations(start)`. V8 exposes the
+ * @noRailsEquivalent PERMANENT — Ruby's `Kernel#caller_locations(start)`. V8 exposes the
  * same information only as the pre-rendered `Error#stack` text, so the frames
  * are parsed back out of it; `start` counts frames the same way, past this
  * function and its caller, and defaults to 1 as Ruby's does.

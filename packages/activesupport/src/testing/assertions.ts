@@ -284,7 +284,7 @@ function _callableToSourceString(callable: unknown): string {
 }
 
 /**
- * @noRailsEquivalent Minitest's `assert`, which every assertion in
+ * @noRailsEquivalent PERMANENT — Minitest's `assert`, which every assertion in
  * `testing/assertions.rb` and `testing/deprecation.rb` calls. Rails inherits it
  * from Minitest, so there is no Ruby counterpart in a mapped file; exported so
  * both testing modules raise the same `Assertion`.
