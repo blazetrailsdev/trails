@@ -215,6 +215,9 @@ describe("Enum private validators", () => {
       const out = assertValidEnumDefinitionValues([":draft", ":published"]);
       expect(out).toEqual([":draft", ":published"]);
     });
+    it("rejects array mixing symbols and strings", () => {
+      expect(() => assertValidEnumDefinitionValues([":draft", "published"])).toThrow(/symbols/);
+    });
     it("rejects array with blank name", () => {
       expect(() => assertValidEnumDefinitionValues(["a", ""])).toThrow(/blank name/);
     });

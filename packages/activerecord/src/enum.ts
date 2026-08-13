@@ -1099,7 +1099,12 @@ export function assertValidEnumDefinitionValues(
     if (values.length === 0) {
       throw new ArgumentError("Enum values must not be empty.");
     }
-    const allValid = values.every((v) => typeof v === "string");
+    // Rails' `values.all?(Symbol) || values.all?(String)` (enum.rb:349): the
+    // array must be homogeneous. A Ruby Symbol is a leading-colon string here,
+    // so `[":draft", "published"]` is the mixed array Rails rejects.
+    const allValid =
+      values.every((v) => typeof v === "string" && v.startsWith(":")) ||
+      values.every((v) => typeof v === "string" && !v.startsWith(":"));
     if (!allValid) {
       throw new ArgumentError(
         `Enum values must only contain strings or symbols, got: ${Array.from(
