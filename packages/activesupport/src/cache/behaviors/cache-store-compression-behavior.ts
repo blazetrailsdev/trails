@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 import { Entry } from "../entry.js";
 import type { Store, StoreOptions } from "../store.js";
 
@@ -27,6 +27,13 @@ export interface CompressionBehaviorHost {
 export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): void {
   let cache: Store;
 
+  // Stands in for the including test class's `setup` (`@cache = lookup_store`,
+  // e.g. file_store_test.rb:30-32), which the cases that never call
+  // `lookup_store` themselves rely on.
+  beforeEach(() => {
+    cache = host.lookupStore();
+  });
+
   function computeEntrySizeReduction(value: unknown, withOptions: StoreOptions = {}): number {
     const entry = new Entry(value);
 
@@ -39,12 +46,20 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     const uncompressed = send.serializeEntry(entry, { ...withOptions, compress: false });
     const actual = send.serializeEntry(entry, withOptions);
 
-    const sizeOf = (payload: unknown): number =>
+    // Ruby's payload is a String either way, so `#bytesize` is unambiguous. A JS
+    // string carries no encoding, and the two shapes count differently (see
+    // Entry#bytesize, entry.rb:60-69): a serializer dump is UTF-8, while a
+    // deflated payload is the binary string `gzip.ts` returns, one char per
+    // byte. A payload that differs from the uncompressed one is the compressed
+    // shape.
+    const sizeOf = (payload: unknown, compressed = false): number =>
       payload instanceof Entry
         ? payload.bytesize()
-        : new TextEncoder().encode(String(payload)).length;
+        : compressed
+          ? String(payload).length
+          : new TextEncoder().encode(String(payload)).length;
 
-    return sizeOf(uncompressed) - sizeOf(actual);
+    return sizeOf(uncompressed) - sizeOf(actual, actual !== uncompressed);
   }
 
   function assertCompress(value: unknown, withOptions?: StoreOptions): void {
@@ -107,5 +122,14 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
 
     cache = host.lookupStore({ compress: true, compressThreshold: 1024 * 1024 });
     assertCompression(":all", { compressThreshold: 1 });
+  });
+
+  it("compression ignores incompressible data", () => {
+    assertNotCompress("", { compress: true, compressThreshold: 1 });
+    // Ruby's `[*0..127].pack("C*")`.
+    assertNotCompress(Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join(""), {
+      compress: true,
+      compressThreshold: 1,
+    });
   });
 }
