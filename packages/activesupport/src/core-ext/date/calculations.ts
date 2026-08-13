@@ -88,6 +88,13 @@ export function current(): Temporal.PlainDate {
 }
 
 /**
+ * TODO(converge-time-zone-reader-names): the mixin this specialises now lives
+ * at its Rails path, `core-ext/date-and-time/zones.ts`. This Date-only copy
+ * stays only because its `else` arm returns a `TimeWithZone` where the mixin
+ * returns the `Temporal.Instant` Ruby's `to_time` gives, so folding the two
+ * changes the return type of every caller (`ago`, `since`, …). Route them
+ * through the mixin and delete this pair; do not add a third copy.
+ *
  * Mirrors: `DateAndTime::Zones#in_time_zone` (`date_and_time/zones.rb:20-28`)
  * for the `Date` receiver (`core_ext/date/zones.rb` mixes it in). A Date never
  * `acts_like?(:time)`, so Rails' `time` local is always nil here and

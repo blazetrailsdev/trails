@@ -3,7 +3,9 @@ import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { StringIO } from "./string-io.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
+import { Duration } from "./duration.js";
+import { ArgumentError } from "./hash-utils.js";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 
 /**
@@ -119,6 +121,153 @@ function formatDateTime(value: unknown): string {
   }
   if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
     return value.toString();
+  }
+  return String(value);
+}
+
+/**
+ * The lexical form `Time.xmlschema` accepts (Ruby stdlib `lib/time.rb`) —
+ * extended format only, seconds required, offset optional.
+ */
+const XMLSCHEMA = /^(-?\d+)-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)?$/;
+
+/**
+ * Per-type value parsers, keyed by the `type=` attribute a document carries.
+ *
+ * Mirrors: ActiveSupport::XmlMini::PARSING (xml_mini.rb:66-96), including the
+ * trailing `PARSING.update("double" => PARSING["float"], "dateTime" =>
+ * PARSING["datetime"])` aliasing at xml_mini.rb:93-96.
+ */
+export const PARSING: Record<
+  string,
+  (value: unknown, entity?: Record<string, string | undefined>) => unknown
+> = {
+  // `symbol.to_s.to_sym` (xml_mini.rb:68). A Ruby Symbol is a colon-prefixed
+  // string in trails, so `to_s` on a value that is already a Symbol drops the
+  // colon that `to_sym` puts straight back.
+  symbol: (symbol) => {
+    const s = String(symbol);
+    return s.startsWith(":") ? s : `:${s}`;
+  },
+  date: (date) => RubyDate.parse(date as string),
+  // `Time.xmlschema(time).utc rescue ::DateTime.parse(time).utc`
+  // (xml_mini.rb:70). @blazetrails/date carries `Time#xmlschema` for
+  // formatting but no `Time.xmlschema` reader — that is Ruby's stdlib
+  // lib/time.rb, not Rails — so the lexical form is gated on that method's own
+  // regex before `Temporal.Instant.from` runs. The gate is load-bearing:
+  // Temporal also accepts ISO *basic* format, so a bare `Instant.from` reads
+  // "2013-11-12T0211Z" as 02:11 where `Time.xmlschema` raises and Ruby falls
+  // through to `DateTime.parse`, which reads no time at all. Only the strict
+  // arm is guarded, exactly as the Ruby `rescue` modifier binds: a
+  // `DateTime.parse` failure propagates.
+  datetime: (time) => {
+    try {
+      const s = String(time).trim();
+      if (!XMLSCHEMA.test(s)) {
+        throw new ArgumentError(`invalid xmlschema format: ${JSON.stringify(s)}`);
+      }
+      // An offset-less lexical form is local time to `Time.xmlschema`; trails
+      // has no local-zone seat here, so it reads as UTC.
+      return Temporal.Instant.from(/(Z|[+-]\d\d:\d\d)$/.test(s) ? s : `${s}Z`);
+    } catch {
+      const parsed = DateTime.parse(String(time));
+      // Ruby's `DateTime#utc` is `new_offset(0)`; an offset-less lexical form
+      // parses to a PlainDateTime, which Ruby reads as +00:00 already.
+      return parsed instanceof Temporal.ZonedDateTime
+        ? parsed.toInstant()
+        : parsed.toZonedDateTime("UTC").toInstant();
+    }
+  },
+  duration: (duration) => Duration.parse(String(duration)),
+  integer: (integer) => toI(integer),
+  float: (float) => toF(float),
+  decimal: (number) => {
+    if (typeof number === "string") {
+      return toD(number);
+    }
+    // Ruby's `BigDecimal(Float)` raises ArgumentError ("can't omit precision
+    // for a Float"); only Integers convert without an explicit precision.
+    if (typeof number === "number" && !Number.isInteger(number)) {
+      throw new ArgumentError("can't omit precision for a Float.");
+    }
+    return new BigDecimal(number as string | number | bigint);
+  },
+  boolean: (boolean) => ["1", "true"].includes(String(boolean).trim()),
+  string: (string) => toS(string),
+  // `YAML.load(yaml) rescue yaml` (xml_mini.rb:83). `yaml` is an
+  // optionalDependency and this module sits in the package's root graph, so
+  // the parser is reached through the `./yaml.js` shim by a call-time
+  // `import()` — a static edge would either break the root import when the
+  // package is absent or drag top-level await into two bundles that cannot
+  // represent it. This is the one entry in the table that returns a Promise.
+  yaml: async (yaml) => {
+    try {
+      const { parse: parseYaml } = await import("./yaml.js");
+      if (typeof yaml !== "string") {
+        // Ruby's `YAML.load` takes a String; anything else raises there, and
+        // the `rescue` modifier hands the input straight back. The raise is
+        // Ruby's core TypeError — there is no Rails error class to port here,
+        // the same reason `yaml.ts:16` gives for its own LoadError stand-in.
+        // eslint-disable-next-line blazetrails/rails-error-parity
+        throw new TypeError("no implicit conversion into String");
+      }
+      return parseYaml(yaml);
+    } catch {
+      return yaml;
+    }
+  },
+  base64Binary: (bin) => decode64(String(bin)),
+  hexBinary: (bin) => _parseHexBinary(String(bin)),
+  binary: (bin, entity) => _parseBinary(String(bin), entity ?? {}),
+  file: (file, entity) => _parseFile(String(file), entity ?? {}),
+};
+
+Object.assign(PARSING, {
+  double: PARSING["float"],
+  dateTime: PARSING["datetime"],
+});
+
+/**
+ * Ruby `String#to_i` / `Numeric#to_i`: a leading integer is taken and the rest
+ * of the string discarded, with no match yielding 0; Floats truncate.
+ */
+function toI(value: unknown): number {
+  if (typeof value === "number") return Math.trunc(value);
+  const parsed = parseInt(String(value), 10);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Ruby `String#to_f` / `Numeric#to_f`: a leading float is taken and the rest of
+ * the string discarded (so `"123,003"` is `123.0`), with no match yielding 0.0.
+ */
+function toF(value: unknown): number {
+  if (typeof value === "number") return value;
+  const parsed = parseFloat(String(value));
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Ruby `String#to_d`: like `to_f`, the leading numeric prefix is taken and the
+ * remainder discarded, so this never raises where `BigDecimal(str)` would.
+ */
+function toD(value: string): BigDecimal {
+  const match = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/.exec(value);
+  return new BigDecimal(match ? match[0].trim() : "0");
+}
+
+/**
+ * Ruby `Object#to_s`, for the shapes `PARSING["string"]` is asked to render:
+ * an Array is `"[]"`-bracketed and a Hash `"{}"`-braced, where JS `String()`
+ * gives `""` and `"[object Object]"`.
+ */
+function toS(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map((v) => toS(v)).join(", ")}]`;
+  // boundary: a JS `Date` is one of the values a document can carry, and it
+  // renders through `String()` rather than as a Hash.
+  if (value !== null && typeof value === "object" && !(value instanceof Date)) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    return `{${entries.map(([k, v]) => `${k} => ${toS(v)}`).join(", ")}}`;
   }
   return String(value);
 }

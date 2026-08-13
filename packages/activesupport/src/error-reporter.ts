@@ -410,3 +410,25 @@ function isKwargs(value: unknown): boolean {
     Object.getPrototypeOf(value) === Object.prototype
   );
 }
+
+/**
+ * The process-wide reporter behind `ActiveSupport.error_reporter`
+ * (activesupport/lib/active_support.rb:104-105 — `@error_reporter =
+ * ActiveSupport::ErrorReporter.new` plus `singleton_class.attr_accessor
+ * :error_reporter`). It lives here rather than as a data property on the
+ * `ActiveSupport` barrel object so that a caller inside the package can read
+ * the CURRENT reporter without importing the barrel: that import is eager in
+ * ESM, and from `deprecation.ts` it closed a cycle through `index.ts` into
+ * `message-pack` that left `Serializer` in TDZ. `ActiveSupport.errorReporter`
+ * is an accessor pair over this binding — the same shape `fsAdapter` and
+ * `cryptoAdapter` already use — so the two can never disagree and assigning
+ * through the barrel still works.
+ *
+ * @internal
+ */
+export let currentErrorReporter = new ErrorReporter();
+
+/** @internal Writer behind `ActiveSupport.errorReporter =`. */
+export function _setErrorReporter(reporter: ErrorReporter): void {
+  currentErrorReporter = reporter;
+}

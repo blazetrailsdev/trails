@@ -25,8 +25,21 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 const SECONDS_PER_DAY = 86400;
 const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
-const SECONDS_PER_MONTH = 30.4375 * SECONDS_PER_DAY; // 1/12 of 365.25 * 86400
-const SECONDS_PER_YEAR = 365.2425 * SECONDS_PER_DAY;
+const SECONDS_PER_MONTH = 2629746; // 1/12 of a gregorian year (duration.rb:117)
+const SECONDS_PER_YEAR = 31556952; // length of a gregorian year (duration.rb:118)
+
+/**
+ * Mirrors: ActiveSupport::Duration::PARTS_IN_SECONDS (duration.rb:120-128).
+ */
+const PARTS_IN_SECONDS: Record<keyof DurationParts, number> = {
+  seconds: 1,
+  minutes: SECONDS_PER_MINUTE,
+  hours: SECONDS_PER_HOUR,
+  days: SECONDS_PER_DAY,
+  weeks: SECONDS_PER_WEEK,
+  months: SECONDS_PER_MONTH,
+  years: SECONDS_PER_YEAR,
+};
 
 // Part ordering for inspect()
 const PART_ORDER: (keyof DurationParts)[] = [
@@ -191,7 +204,7 @@ export class Duration {
       );
     }
     return new Duration(
-      mergeParts(this.parts, this._partKeys, other._givenParts()),
+      mergeParts(this.parts, this._partKeys, other._parts()),
       this._variable || other._variable,
     );
   }
@@ -220,11 +233,6 @@ export class Duration {
       this._transformValues((number) => number / n),
       this._variable,
     );
-  }
-
-  /** @internal Rails' `@parts` itself — the sparse hash `+` and `-` merge. */
-  private _givenParts(): Partial<DurationParts> {
-    return this._transformValues((number) => number);
   }
 
   /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
@@ -392,6 +400,63 @@ export class Duration {
    * `@variable` flag computed (or passed) at construction. */
   isVariable(): boolean {
     return this._variable;
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#_parts (duration.rb:481-483) — the
+   * `:nodoc:` reader `@parts` is exposed through, which `Duration#sum` and
+   * `TimeWithZone#advance` read off another Duration.
+   *
+   * `@parts` is sparse: `initialize` runs `@parts.reject! { |k, v| v.zero? }`
+   * unless the whole value is zero (duration.rb:228), so a zero-valued unit is
+   * absent rather than present-and-zero. `parts` here is a total record, so the
+   * sparseness lives in `_partKeys` and is applied on the way out.
+   */
+  _parts(): Partial<DurationParts> {
+    return this._transformValues((number) => number);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#as_json (duration.rb:459-461).
+   */
+  asJson(_options: unknown = null): number {
+    return Math.trunc(this.inSeconds());
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#coerce (duration.rb:245-254). Ruby's
+   * numeric-coercion protocol hands back `[other, self]` so the arithmetic
+   * operator re-dispatches with a Scalar on the left.
+   */
+  coerce(other: unknown): [Scalar, Duration] {
+    if (other instanceof Scalar) {
+      return [other, this];
+    }
+    if (other instanceof Duration) {
+      return [new Scalar(other.inSeconds()), this];
+    }
+    return [new Scalar(other as number), this];
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration#raise_type_error (duration.rb:520-522).
+   *
+   * @internal
+   */
+  raiseTypeError(other: unknown): never {
+    throw new TypeError(
+      `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Duration`,
+    );
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration.calculate_total_seconds (duration.rb:217-221).
+   */
+  private static calculateTotalSeconds(parts: Partial<DurationParts>): number {
+    return Object.entries(parts).reduce(
+      (total, [part, value]) => total + value * PARTS_IN_SECONDS[part as keyof DurationParts],
+      0,
+    );
   }
 
   // ISO 8601 output
@@ -704,6 +769,30 @@ export class Scalar {
 
   constructor(value: number) {
     this.value = value;
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration::Scalar#coerce (duration.rb:23-25).
+   */
+  coerce(other: unknown): [Scalar, Scalar] {
+    return [new Scalar(other as number), this];
+  }
+
+  /**
+   * Mirrors: ActiveSupport::Duration::Scalar#raise_type_error
+   * (duration.rb:108-110).
+   *
+   * @internal
+   */
+  raiseTypeError(other: unknown): never {
+    throw new TypeError(
+      `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Scalar`,
+    );
+  }
+
+  /** Mirrors: ActiveSupport::Duration::Scalar#variable? (duration.rb:93-95). */
+  isVariable(): boolean {
+    return false;
   }
 
   toI(): number {

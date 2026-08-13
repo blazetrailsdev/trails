@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/date-and-time/zones.ts",
+    "rubyName": "in_time_zone",
+    "call": "acts_like?",
+    "reason": "Preserving the call inverts the branch for every receiver: `Object.actsLike` (core-ext/object/acts-like.ts:38-44) discovers a duck-type by looking for the marker METHOD on the value, and no trails receiver carries one — `actsLikeDate` appears in no production file, and `actsLikeTime` only on TimeWithZone. Measured against the built dist: `DateTime.parse(...)` returns a `Temporal.PlainDateTime`, for which `actsLike(v, \"date\")` and `actsLike(v, \"time\")` are both false, so `acts_like?(:time)` would send every Date AND every Time down the wrong arm. Installing the markers needs `core_ext/{time,date,date_time}/acts_like.rb`, which reopen classes `@blazetrails/date` and the Temporal polyfill own; that is filed as 0098/time-with-zone-residue-structural-blockers section D. Delete this row when it lands."
+  }
+]
