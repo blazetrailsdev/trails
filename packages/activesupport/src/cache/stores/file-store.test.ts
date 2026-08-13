@@ -5,6 +5,9 @@ import { dirname, join } from "node:path";
 import { FileStore } from "../file-store.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
+import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
+import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
+import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
@@ -171,6 +174,11 @@ describe("FileStoreTest", () => {
   // Mirrors `include CacheStoreBehavior` (file_store_test.rb:32).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
 
+  // Mirrors `include CacheStoreCoderBehavior` (file_store_test.rb:34).
+  cacheStoreCoderBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
   // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
   cacheStoreCompressionBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
@@ -178,6 +186,16 @@ describe("FileStoreTest", () => {
 
   // Mirrors `include CacheStoreSerializerBehavior` (file_store_test.rb:36).
   cacheStoreSerializerBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
+  // Mirrors `include CacheDeleteMatchedBehavior` (file_store_test.rb:38).
+  cacheDeleteMatchedBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
+  // Mirrors `include CacheIncrementDecrementBehavior` (file_store_test.rb:39).
+  cacheIncrementDecrementBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
@@ -231,7 +249,7 @@ describe("FileStore coder fidelity", () => {
   });
 });
 
-describe("CacheIncrementDecrementBehavior", () => {
+describe("FileStore increment/decrement amount coercion", () => {
   let cacheDir: string;
   let cache: FileStore;
 
@@ -244,32 +262,6 @@ describe("CacheIncrementDecrementBehavior", () => {
     try {
       rmSync(cacheDir, { recursive: true, force: true });
     } catch {}
-  });
-
-  it("test_increment", () => {
-    cache.write("foo", 1, { raw: true });
-    expect(Number(cache.read("foo"))).toBe(1);
-    expect(cache.increment("foo")).toBe(2);
-    expect(Number(cache.read("foo"))).toBe(2);
-    expect(cache.increment("foo")).toBe(3);
-    expect(Number(cache.read("foo"))).toBe(3);
-
-    // Rails: a missing key is created set to `amount` (file_store.rb:230-231).
-    expect(cache.increment("bar")).toBe(1);
-    expect(cache.increment("baz", 100)).toBe(100);
-  });
-
-  it("test_decrement", () => {
-    cache.write("foo", 3, { raw: true });
-    expect(Number(cache.read("foo"))).toBe(3);
-    expect(cache.decrement("foo")).toBe(2);
-    expect(Number(cache.read("foo"))).toBe(2);
-    expect(cache.decrement("foo")).toBe(1);
-    expect(Number(cache.read("foo"))).toBe(1);
-
-    // Non-MemCacheStore backends return -amount on a missing key.
-    expect(cache.decrement("qux")).toBe(-1);
-    expect(cache.decrement("quux", 100)).toBe(-100);
   });
 
   // Rails coerces `amount = Integer(amount)` (file_store.rb:226), which raises
@@ -294,13 +286,5 @@ describe("CacheIncrementDecrementBehavior", () => {
     expect(Number(cache.read("frac"))).toBe(1);
     expect(cache.increment("frac", 2.9)).toBe(3);
     expect(Number(cache.read("frac"))).toBe(3);
-  });
-
-  it("test_ttl_isnt_updated", async () => {
-    expect(cache.increment("foo", 1, { expiresIn: 0.1 })).toBe(1);
-    // A second increment with a longer TTL must not reset the original expiry.
-    expect(cache.increment("foo", 1, { expiresIn: 5000 })).toBe(2);
-    await new Promise((r) => setTimeout(r, 150));
-    expect(cache.read("foo")).toBeNull();
   });
 });

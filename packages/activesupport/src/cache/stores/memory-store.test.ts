@@ -2,17 +2,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../memory-store.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
+import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
+import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
+import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
-import { coder } from "../coder.js";
 import { Notifications } from "../../notifications.js";
-
-// Rails calls the private `serialize_entry` through `send` (cache_store_coder_behavior.rb:90).
-function serializeEntry(store: MemoryStore, entry: Entry): unknown {
-  return (store as unknown as { serializeEntry(entry: Entry): unknown }).serializeEntry(entry);
-}
 
 // Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
 // (memory_store_test.rb:101-104), the record size the pruning budget is sized in.
@@ -78,6 +75,9 @@ describe("MemoryStoreTest", () => {
   // Mirrors `include CacheStoreBehavior` (memory_store_test.rb:16).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
+  // Mirrors `include CacheStoreCoderBehavior` (memory_store_test.rb:18).
+  cacheStoreCoderBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
+
   // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
   // MemoryStore overrides `compression_always_disabled_by_default?`
   // (memory_store_test.rb:93-96).
@@ -91,6 +91,14 @@ describe("MemoryStoreTest", () => {
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
   });
 
+  // Mirrors `include CacheDeleteMatchedBehavior` (memory_store_test.rb:21).
+  cacheDeleteMatchedBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
+
+  // Mirrors `include CacheIncrementDecrementBehavior` (memory_store_test.rb:22).
+  cacheIncrementDecrementBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
+  });
+
   // Mirrors `include CacheInstrumentationBehavior` (memory_store_test.rb:23).
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
@@ -98,37 +106,11 @@ describe("MemoryStoreTest", () => {
   });
 });
 
-describe("CacheIncrementDecrementBehavior", () => {
+describe("MemoryStore increment/decrement amount coercion", () => {
   let cache: MemoryStore;
 
   beforeEach(() => {
     cache = new MemoryStore();
-  });
-
-  it("test_increment", () => {
-    cache.write("foo", 1, { raw: true });
-    expect(Number(cache.read("foo"))).toBe(1);
-    expect(cache.increment("foo")).toBe(2);
-    expect(Number(cache.read("foo"))).toBe(2);
-    expect(cache.increment("foo")).toBe(3);
-    expect(Number(cache.read("foo"))).toBe(3);
-
-    // Rails: a missing key is created set to `amount` (memory_store.rb:136).
-    expect(cache.increment("bar")).toBe(1);
-    expect(cache.increment("baz", 100)).toBe(100);
-  });
-
-  it("test_decrement", () => {
-    cache.write("foo", 3, { raw: true });
-    expect(Number(cache.read("foo"))).toBe(3);
-    expect(cache.decrement("foo")).toBe(2);
-    expect(Number(cache.read("foo"))).toBe(2);
-    expect(cache.decrement("foo")).toBe(1);
-    expect(Number(cache.read("foo"))).toBe(1);
-
-    // Non-MemCacheStore backends return -amount on a missing key.
-    expect(cache.decrement("qux")).toBe(-1);
-    expect(cache.decrement("quux", 100)).toBe(-100);
   });
 
   // The seed path writes `Integer(amount)` (memory_store.rb:248), which raises
@@ -159,30 +141,9 @@ describe("CacheIncrementDecrementBehavior", () => {
     cache.write("frac", 1, { raw: true });
     expect(cache.increment("frac", 2.5)).toBe(3.5);
   });
-
-  it("test_ttl_isnt_updated", async () => {
-    expect(cache.increment("foo", 1, { expiresIn: 0.1 })).toBe(1);
-    // A second increment with a longer TTL must not reset the original expiry.
-    expect(cache.increment("foo", 1, { expiresIn: 5000 })).toBe(2);
-    await new Promise((r) => setTimeout(r, 150));
-    expect(cache.read("foo")).toBeNull();
-  });
 });
 
-describe("CacheDeleteMatchedBehavior", () => {
-  it("test_delete_matched", () => {
-    const cache = new MemoryStore();
-    cache.write("foo", "bar");
-    cache.write("fu", "baz");
-    cache.write("foo/bar", "baz");
-    cache.write("fu/baz", "bar");
-    cache.deleteMatched(/oo/);
-    expect(cache.exist("foo")).toBe(false);
-    expect(cache.exist("fu")).toBe(true);
-    expect(cache.exist("foo/bar")).toBe(false);
-    expect(cache.exist("fu/baz")).toBe(true);
-  });
-
+describe("MemoryStore delete_matched namespacing", () => {
   it("scopes delete_matched to the configured namespace", () => {
     // keyMatcher prefixes the namespace into the regex source, so an unanchored
     // pattern only deletes this store's namespaced keys.
@@ -439,79 +400,5 @@ describe("MemoryStore coder fidelity", () => {
     expect(r1).not.toBe(r2);
     r1.nested.count = 42;
     expect(r2.nested.count).toBe(1);
-  });
-});
-
-// Port of Rails' CacheStoreCoderBehavior (test/cache/behaviors/cache_store_coder_behavior.rb).
-// SpyCoder mirrors the Rails double; the fidelity `coder` (cache/coder.ts) stands
-// in for Marshal, so a dumped entry is its packed members.
-class SpyCoder {
-  dumpedEntries: Entry[] = [];
-  loadedEntries: Entry[] = [];
-  dumpCompressedEntries: Entry[] = [];
-
-  dump(entry: Entry): string {
-    this.dumpedEntries.push(entry);
-    return coder.dump(entry.pack());
-  }
-
-  load(payload: string): Entry {
-    const entry = Entry.unpack(coder.load(payload) as unknown[]);
-    this.loadedEntries.push(entry);
-    return entry;
-  }
-
-  dumpCompressed(entry: Entry, threshold: number): string {
-    if (threshold === 0) {
-      this.dumpCompressedEntries.push(entry);
-      return coder.dump(entry.pack());
-    } else {
-      return this.dump(entry);
-    }
-  }
-}
-
-describe("CacheStoreCoderBehavior", () => {
-  it("test_coder_receive_the_entry_on_write", () => {
-    const spy = new SpyCoder();
-    const store = new MemoryStore({ coder: spy });
-    store.write("foo", "bar");
-    expect(spy.dumpedEntries.length).toBe(1);
-    const entry = spy.dumpedEntries[0];
-    expect(entry).toBeInstanceOf(Entry);
-    expect(entry.value).toBe("bar");
-  });
-
-  it("test_coder_receive_the_entry_on_read", () => {
-    const spy = new SpyCoder();
-    const store = new MemoryStore({ coder: spy });
-    store.write("foo", "bar");
-    store.read("foo");
-    expect(spy.loadedEntries.length).toBe(1);
-    const entry = spy.loadedEntries[0];
-    expect(entry).toBeInstanceOf(Entry);
-    expect(entry.value).toBe("bar");
-  });
-
-  it("test_coder_receive_the_entry_on_write_multi", () => {
-    const spy = new SpyCoder();
-    const store = new MemoryStore({ coder: spy });
-    store.writeMulti({ foo: "bar", egg: "spam" });
-    expect(spy.dumpedEntries.length).toBe(2);
-    expect(spy.dumpedEntries[0].value).toBe("bar");
-    expect(spy.dumpedEntries[1].value).toBe("spam");
-  });
-
-  it("test_coder_does_not_receive_the_entry_on_read_miss", () => {
-    const spy = new SpyCoder();
-    const store = new MemoryStore({ coder: spy });
-    store.read("foo");
-    expect(spy.loadedEntries.length).toBe(0);
-  });
-
-  it("test_nil_coder_bypasses_serialization", () => {
-    const store = new MemoryStore({ coder: null });
-    const entry = new Entry("value");
-    expect(serializeEntry(store, entry)).toBe(entry);
   });
 });
