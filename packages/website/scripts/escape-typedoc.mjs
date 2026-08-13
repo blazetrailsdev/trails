@@ -5,13 +5,16 @@
  * docs (guides/, root index, …) are never touched, so genuine dead links there
  * still fail the build.
  *
- * 1. Escape angle brackets for the Vue SFC parser.
+ * 1. Escape angle brackets and braces for the Vue SFC parser.
  *    VitePress compiles markdown as Vue SFC templates. The Vue SFC parser must
  *    successfully parse the entire template before any directives (like v-pre)
  *    take effect. TypeScript generics (Array<T>), JSDoc HTML examples (<script>,
  *    <br>), and type signatures all produce angle brackets that break parsing.
  *    Fix: escape all `<` outside fenced code blocks to `&lt;`, so nothing looks
- *    like an HTML tag to the Vue parser.
+ *    like an HTML tag to the Vue parser, and all `{` outside fenced blocks and
+ *    inline code spans to `&#123;`, so no prose brace group is picked up as a
+ *    markdown-it-attrs attribute list (which renders as a Vue binding) or as a
+ *    `{{ }}` interpolation.
  *
  * 2. Repoint dead relative links in generated pages at working GitHub URLs.
  *    typedoc copies package READMEs and every locally-linked markdown file
@@ -247,7 +250,10 @@ export function escapeForVue(content) {
       continue;
     }
 
-    result.push(line.replace(/</g, "&lt;"));
+    const escaped = line.replace(/</g, "&lt;");
+    const spans = codeSpanRanges(escaped);
+    const inCode = (idx) => spans.some(([s, e]) => idx >= s && idx < e);
+    result.push(escaped.replace(/\{/g, (brace, offset) => (inCode(offset) ? brace : "&#123;")));
   }
 
   return result.join("\n");

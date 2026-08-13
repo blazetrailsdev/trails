@@ -280,4 +280,21 @@ describe("escapeForVue", () => {
     const src = ["```ts", "const x: Array<T> = [];", "```"].join("\n");
     expect(escapeForVue(src)).toBe(src);
   });
+
+  it("escapes braces outside fenced code", () => {
+    expect(escapeForVue("  options(1, 2, a: :b) # => {:a=>:b}")).toBe(
+      "  options(1, 2, a: :b) # => &#123;:a=>:b}",
+    );
+    expect(escapeForVue("renders {{ value }}")).toBe("renders &#123;&#123; value }}");
+  });
+
+  it("leaves braces inside inline code spans alone", () => {
+    expect(escapeForVue("returns `{}` always")).toBe("returns `{}` always");
+    expect(escapeForVue("`{a}` and {b}")).toBe("`{a}` and &#123;b}");
+  });
+
+  it("leaves braces in fenced code blocks alone", () => {
+    const src = ["```ts", "const x = { a: 1 };", "```"].join("\n");
+    expect(escapeForVue(src)).toBe(src);
+  });
 });
