@@ -16,11 +16,7 @@ export class MySQL extends ToSql {
   // emitted SQL.
   protected override visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
     collector.append("CAST(");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else if (o.expr !== null) {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     collector.append(" AS BINARY)");
     return collector;
   }

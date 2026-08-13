@@ -1054,7 +1054,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<Nodes.Node> {
     const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
     if (column?.collation && !column.isCaseSensitive()) {
-      return attribute.eq(new Nodes.Bin(attribute.quotedNode(value)));
+      return attribute.eq(new Nodes.Bin(value));
     }
     return super.caseSensitiveComparison(attribute, value);
   }
