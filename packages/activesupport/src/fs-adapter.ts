@@ -9,6 +9,12 @@ export interface FsStatResult {
   isSymbolicLink?(): boolean;
   size: number;
   mtime: Date;
+  /** File mode, including the type bits (e.g. 0o100644). Optional: not every adapter models permissions. */
+  mode?: number;
+  /** Owner user id. Optional: not every adapter models ownership. */
+  uid?: number;
+  /** Owner group id. Optional: not every adapter models ownership. */
+  gid?: number;
 }
 
 export interface FsDirent {
@@ -42,6 +48,17 @@ export interface FsAdapter {
    */
   flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
+  /**
+   * Sync chmod, mirroring Ruby `File.chmod`. Optional: adapters that model no
+   * permissions (an in-memory VFS) may omit it, and callers skip the copy.
+   */
+  chmodSync?(path: string, mode: number): void;
+  /**
+   * Sync chown, mirroring Ruby `File.chown`. Optional for the same reason as
+   * {@link FsAdapter.chmodSync}. Argument order follows the adapter's Node
+   * shape (path first), not Ruby's.
+   */
+  chownSync?(path: string, uid: number, gid: number): void;
   /**
    * Sync realpath — resolves symlinks, mirroring Ruby File.realpath. Optional;
    * adapters without symlink support may omit it (callers fall back to a

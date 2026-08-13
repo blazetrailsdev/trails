@@ -1,4 +1,4 @@
-import { getFs, getPath } from "../../fs-adapter.js";
+import { getFs, getPath, type FsStatResult } from "../../fs-adapter.js";
 
 /**
  * Write to a file atomically. Useful for situations where you don't
@@ -21,10 +21,10 @@ import { getFs, getPath } from "../../fs-adapter.js";
  * yielded object stands in for the `Tempfile` the Ruby block writes to; only
  * `write` is used by callers, and `binmode`/`close` are the adapter's job.
  *
- * @missingRailsCall exist? — the fs adapter models no uid/gid/mode, so the
- * `exist?`/`probe_stat_in` permission probe (atomic.rb:28-34) has nothing to
- * probe and the `chown`/`chmod` copy is unrepresentable.
- * @missingRailsCall stat — same permission probe (atomic.rb:30).
+ * @missingRailsCall exist? — spelled `existsSync`, the fs adapter's name for
+ * the sync existence check (atomic.rb:28).
+ * @missingRailsCall stat — spelled `statSync`, the fs adapter's name for the
+ * sync stat (atomic.rb:30).
  * @missingRailsCall rename — spelled `renameSync`, the fs adapter's name for
  * the sync rename every other trails caller uses (atomic.rb:48).
  */
@@ -51,6 +51,28 @@ export function atomicWrite<T>(
   const returnVal = block(tempFile);
   getFs().writeFileSync(tempPath, payload, "utf-8");
 
+  const oldStat = getFs().existsSync(fileName)
+    ? // Get original file permissions
+      getFs().statSync(fileName)
+    : // If not possible, probe which are the default permissions in the
+      // destination directory.
+      probeStatIn(getPath().dirname(fileName));
+
+  if (oldStat) {
+    // Set correct permissions on new file
+    try {
+      if (oldStat.uid != null && oldStat.gid != null) {
+        getFs().chownSync?.(tempPath, oldStat.uid, oldStat.gid);
+      }
+      // This operation will affect filesystem ACL's
+      if (oldStat.mode != null) getFs().chmodSync?.(tempPath, oldStat.mode);
+    } catch (error) {
+      // Changing file ownership failed, moving on.
+      const code = (error as { code?: string }).code;
+      if (code !== "EPERM" && code !== "EACCES") throw error;
+    }
+  }
+
   // Overwrite original file with temp file (atomic.rb:48).
   try {
     getFs().renameSync(tempPath, fileName);
@@ -61,4 +83,40 @@ export function atomicWrite<T>(
     throw error;
   }
   return returnVal;
+}
+
+/**
+ * Private utility method.
+ *
+ * Mirrors Ruby `File.probe_stat_in` (core_ext/file/atomic.rb:55-70).
+ *
+ * The basename's uniqueness components in Rails are the thread id and pid
+ * (atomic.rb:59-60); neither exists here (single thread, no `process.*`), so
+ * two random draws stand in for them.
+ *
+ * @missingRailsCall stat — spelled `statSync`, the fs adapter's name for the
+ * sync stat (atomic.rb:66).
+ */
+export function probeStatIn(dir: string): FsStatResult | null {
+  const basename = [
+    ".permissions_check",
+    Math.floor(Math.random() * 1000000),
+    Math.floor(Math.random() * 1000000),
+  ].join(".");
+
+  let fileName: string | null = getPath().join(dir, basename);
+  try {
+    getFs().appendFileSync(fileName, "");
+    return getFs().statSync(fileName);
+  } catch (error) {
+    if ((error as { code?: string }).code !== "ENOENT") throw error;
+    fileName = null;
+    return null;
+  } finally {
+    if (fileName) {
+      try {
+        getFs().unlinkSync(fileName);
+      } catch {}
+    }
+  }
 }
