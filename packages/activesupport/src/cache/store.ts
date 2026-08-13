@@ -26,8 +26,10 @@ const Zlib: CoderCompressor = { deflate, inflate };
 
 /**
  * Mirror of Ruby's `TypeError` — what `retrieve_pool_options` raises for a
- * non-Hash `:pool`, and what `Integer()`/`Float()` raise for a value they
- * cannot convert. @internal
+ * non-Hash `:pool` (cache.rb:217), and what `Integer()`/`Float()` raise for a
+ * value they cannot convert (cache.rb:213-214). Its throw sites carry an
+ * eslint-disable because `rails-error-parity` matches on the native name.
+ * @internal
  */
 class TypeError extends globalThis.Error {
   constructor(message: string) {
@@ -129,7 +131,9 @@ export abstract class Store {
    * Mirrors Rails `Cache::Store.retrieve_pool_options` (cache.rb:200-220), a
    * private class method the pooled stores call on their own options hash.
    * `options.key?(:pool)` distinguishes an explicit `pool: nil` from an absent
-   * key, so the read is `"pool" in options`, not `?? true`.
+   * key, so the read is `"pool" in options`, not `?? true`. Ruby's
+   * `Integer()`/`Float()` (cache.rb:213-214) raise on a value they cannot
+   * convert rather than yielding NaN the way `Number()` does.
    *
    * @missingRailsCall merge — `DEFAULT_POOL_OPTIONS.merge(pool_options)`
    * (cache.rb:215) is the object spread here; a plain Hash#merge has no named
@@ -148,15 +152,11 @@ export abstract class Store {
       return false;
     } else if (poolOptions === true) {
       poolOptions = DEFAULT_POOL_OPTIONS;
-    } else if (typeof poolOptions === "object") {
+    } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
       const hash = poolOptions as StoreOptions;
-      // Ruby's `Integer()`/`Float()` raise on a value they can't convert rather
-      // than yielding NaN the way `Number()` does.
       if ("size" in hash) {
         const size = hash["size"];
         if (typeof size !== "number" && typeof size !== "string") {
-          // The local `TypeError` above is the ported Ruby class; the lint rule reads
-          // the native name.
           // eslint-disable-next-line blazetrails/rails-error-parity
           throw new TypeError(`can't convert ${typeof size} into Integer`);
         }
@@ -168,8 +168,6 @@ export abstract class Store {
       if ("timeout" in hash) {
         const timeout = hash["timeout"];
         if (typeof timeout !== "number" && typeof timeout !== "string") {
-          // The local `TypeError` above is the ported Ruby class; the lint rule reads
-          // the native name.
           // eslint-disable-next-line blazetrails/rails-error-parity
           throw new TypeError(`can't convert ${typeof timeout} into Float`);
         }
@@ -180,8 +178,6 @@ export abstract class Store {
       }
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {
-      // The local `TypeError` above is the ported Ruby class; the lint rule reads
-      // the native name.
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`Invalid :pool argument, expected Hash, got: ${inspect(poolOptions)}`);
     }
