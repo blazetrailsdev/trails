@@ -46,9 +46,6 @@ export class UnexpectedError extends Assertion {
   constructor(error: Error) {
     super("Unexpected exception");
     this.error = error;
-    // Ruby `message` renders the wrapped error's class, message and filtered
-    // backtrace (minitest.rb:1103-1107); `stack` is the JS backtrace, and
-    // `backtrace` (minitest.rb:1097-1099) delegates to the wrapped error too.
     this.message = `${error.name}: ${error.message}\n    ${error.stack ?? ""}`;
     this.stack = error.stack;
   }
@@ -308,7 +305,14 @@ export async function assertNoChanges<T>(
   return retval;
 }
 
-/** @internal */
+/**
+ * Ruby's warning heredoc opens with `#{self.class} - #{name}:`, the Minitest
+ * test case and the running test's name (assertions.rb:285). These assertions
+ * are free functions with no test-case instance to read either from, so the
+ * warning starts at the raised error's class.
+ *
+ * @internal
+ */
 async function _assertNothingRaisedOrWarn<T>(
   assertion: string,
   block?: () => T | Promise<T>,
@@ -321,10 +325,6 @@ async function _assertNothingRaisedOrWarn<T>(
 
     const logger = taggedLogger();
     if (logger && (logger as { "warn?"?: boolean })["warn?"]) {
-      // Ruby's heredoc opens with `#{self.class} - #{name}:`, the Minitest test
-      // case and the running test's name (assertions.rb:285). These assertions
-      // are free functions with no test-case instance to read either from, so
-      // the warning starts at the raised error's class.
       const warning =
         `${e.error.name} raised.\n` +
         "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
@@ -350,21 +350,19 @@ function taggedLogger(): { warn(msg: unknown): void } | null {
  * returns the lambda's BODY — `assert_difference -> { Article.count }` quotes
  * `Article.count` (assertions.rb:296-330). `Function#toString` is the JS
  * equivalent of the iseq source slice; the trimming below is Ruby's, in JS
- * spelling: strip the arrow's parameter list and braces, and keep the trimmed
- * body only when it reads nice — a single line, and not one taking arguments
- * (which Ruby skips too, `source.start_with?("|")`).
+ * spelling: only a zero-parameter arrow has a body worth quoting (Ruby returns
+ * the callable itself otherwise), the braces and a `do`/`end`-style multi-line
+ * body are stripped, and the trimmed body is kept only when it reads nice — a
+ * single line, and not one taking arguments.
  *
  * @internal
  */
 function _callableToSourceString(callable: unknown): string {
   const source = String(callable);
-  // Only a zero-parameter arrow has a body worth quoting; Ruby returns the
-  // callable itself for anything else.
   const match = /^(?:async\s+)?\(\s*\)\s*=>\s*([\s\S]+)$/.exec(source.trim());
   if (!match) return source;
 
   let body = match[1].trim();
-  // We ignore procs defined with do/end as they are likely multi-line anyway.
   if (body.startsWith("{")) {
     body = body.replace(/\}$/, "").replace(/^\{/, "").trim();
     body = body
@@ -372,8 +370,6 @@ function _callableToSourceString(callable: unknown): string {
       .replace(/;$/, "")
       .trim();
   }
-  // It won't read nice if the callable contains multiple lines, and it should
-  // be a rare occurrence anyway.
   if (!body.includes("\n")) return body;
 
   return source;

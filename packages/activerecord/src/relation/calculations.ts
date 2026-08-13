@@ -22,6 +22,60 @@ import { defaultValue } from "../type.js";
 import { arelColumn, arelColumns, buildJoinDependencies } from "./query-methods.js";
 
 /**
+ * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
+ * (calculations.rb:8-47).
+ */
+export class ColumnAliasTracker {
+  private connection: AliasingConnection;
+  private aliases: Map<string, number> = new Map();
+
+  constructor(connection: AliasingConnection) {
+    this.connection = connection;
+  }
+
+  aliasFor(field: string): string {
+    const aliasedName = this.columnAliasFor(field);
+
+    if ((this.aliases.get(aliasedName) ?? 0) === 0) {
+      this.aliases.set(aliasedName, 1);
+      return aliasedName;
+    } else {
+      const count = (this.aliases.get(aliasedName) ?? 0) + 1;
+      this.aliases.set(aliasedName, count);
+      return `${this.truncate(aliasedName)}_${count}`;
+    }
+  }
+
+  /**
+   * Converts the given field to the value that the database adapter returns as
+   * a usable column name:
+   *
+   *   columnAliasFor("users.id")                 // => "users_id"
+   *   columnAliasFor("sum(id)")                  // => "sum_id"
+   *   columnAliasFor("count(distinct users.id)") // => "count_distinct_users_id"
+   *   columnAliasFor("count(*)")                 // => "count_all"
+   */
+  private columnAliasFor(field: string): string {
+    let columnAlias = field;
+    columnAlias = columnAlias.replace(/\*/g, "all");
+    columnAlias = columnAlias.replace(/\W+/g, " ");
+    columnAlias = columnAlias.trim();
+    columnAlias = columnAlias.replace(/ +/g, "_");
+    return this.connection.tableAliasFor(columnAlias);
+  }
+
+  private truncate(name: string): string {
+    return name.slice(0, this.connection.tableAliasLength() - 2);
+  }
+}
+
+/** The connection surface {@link ColumnAliasTracker} needs. @internal */
+interface AliasingConnection {
+  tableAliasFor(tableName: string): string;
+  tableAliasLength(): number;
+}
+
+/**
  * Qualify a GROUP BY column string as an Arel attribute node when it is a
  * plain SQL identifier (letters, digits, underscores), mirroring Rails'
  * `arel_columns` / `build_group` behaviour. Positional args ("1"), cast
@@ -276,19 +330,6 @@ function buildGroupedSelectValues(
   return selectValues;
 }
 
-/**
- * Ruby `field = connection.visitor.compile(field) if Arel.arel_node?(field)`
- * followed by `field.to_s` (calculations.rb:531-533) — the alias is derived
- * from the SQL text of the group field, not from the node object.
- */
-function compileGroupField(rel: CalculationRelation, field: Nodes.Node | string): string {
-  if (field instanceof Nodes.Node) {
-    const visitor = rel._conn().visitor;
-    return visitor ? visitor.compile(field) : String(field);
-  }
-  return String(field);
-}
-
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
@@ -322,22 +363,20 @@ async function groupedAggregate(
     .except("group")
     .distinctBang(false) as CalculationRelation;
   const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
-  // calculations.rb:528-536: every alias — group keys and aggregate alike —
-  // comes out of one `ColumnAliasTracker`, keyed off the COMPILED field text,
-  // so a repeat alias gets its `_N` suffix and a long one is truncated to the
-  // adapter's table_alias_length.
   const columnAliasTracker = new ColumnAliasTracker(rel._conn());
   const aliases = groupNodes.map((field) =>
-    columnAliasTracker.aliasFor(compileGroupField(rel, field).toLowerCase()),
+    columnAliasTracker.aliasFor(
+      (field instanceof Nodes.Node
+        ? (rel._conn().visitor?.compile(field) ?? String(field))
+        : String(field)
+      ).toLowerCase(),
+    ),
   );
   const aggNode = operationOverAggregateColumn(
     aggregateColumn(relation, column),
     fn,
     distinct ?? false,
   ) as any;
-  // calculations.rb:539,546-551: both the aggregate and the group columns are
-  // projected under a QUOTED alias, which is what lets a table whose name is
-  // not a bare identifier ("1_need_quoting") produce a legal alias.
   const groupKeyAliases = groupNodes.map(
     (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(rel._conn().quoteColumnName(aliases[i]))),
   );
@@ -474,11 +513,14 @@ async function groupedCompositeAssoc(
   const table = rel._model.arelTable;
   const fkCols = association.foreignKey as string[];
   const groupNodes = fkCols.map((c) => groupColumnToArel(c, table));
-  // calculations.rb:528-536 — the same single tracker names the group keys and
-  // the aggregate here too; Rails does not special-case foreign-key arity.
   const columnAliasTracker = new ColumnAliasTracker(rel._conn());
   const aliases = groupNodes.map((field) =>
-    columnAliasTracker.aliasFor(compileGroupField(rel, field).toLowerCase()),
+    columnAliasTracker.aliasFor(
+      (field instanceof Nodes.Node
+        ? (rel._conn().visitor?.compile(field) ?? String(field))
+        : String(field)
+      ).toLowerCase(),
+    ),
   );
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
@@ -729,61 +771,6 @@ export const Calculations = {
   minimum: inQueryConnection(performMinimum),
   maximum: inQueryConnection(performMaximum),
 } as const;
-
-/**
- * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
- * (calculations.rb:8-47).
- */
-export class ColumnAliasTracker {
-  private connection: AliasingConnection;
-  private aliases: Map<string, number> = new Map();
-
-  constructor(connection: AliasingConnection) {
-    this.connection = connection;
-  }
-
-  aliasFor(field: string): string {
-    const aliasedName = this.columnAliasFor(field);
-
-    if ((this.aliases.get(aliasedName) ?? 0) === 0) {
-      this.aliases.set(aliasedName, 1);
-      return aliasedName;
-    } else {
-      // Update the count
-      const count = (this.aliases.get(aliasedName) ?? 0) + 1;
-      this.aliases.set(aliasedName, count);
-      return `${this.truncate(aliasedName)}_${count}`;
-    }
-  }
-
-  /**
-   * Converts the given field to the value that the database adapter returns as
-   * a usable column name:
-   *
-   *   columnAliasFor("users.id")                 // => "users_id"
-   *   columnAliasFor("sum(id)")                  // => "sum_id"
-   *   columnAliasFor("count(distinct users.id)") // => "count_distinct_users_id"
-   *   columnAliasFor("count(*)")                 // => "count_all"
-   */
-  private columnAliasFor(field: string): string {
-    let columnAlias = field;
-    columnAlias = columnAlias.replace(/\*/g, "all");
-    columnAlias = columnAlias.replace(/\W+/g, " ");
-    columnAlias = columnAlias.trim();
-    columnAlias = columnAlias.replace(/ +/g, "_");
-    return this.connection.tableAliasFor(columnAlias);
-  }
-
-  private truncate(name: string): string {
-    return name.slice(0, this.connection.tableAliasLength() - 2);
-  }
-}
-
-/** The connection surface {@link ColumnAliasTracker} needs. @internal */
-interface AliasingConnection {
-  tableAliasFor(tableName: string): string;
-  tableAliasLength(): number;
-}
 
 // ---------------------------------------------------------------------------
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
