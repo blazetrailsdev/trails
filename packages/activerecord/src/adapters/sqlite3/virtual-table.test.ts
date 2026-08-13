@@ -28,7 +28,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   it("schema dump", async () => {
-    const output = await SchemaDumper.dump(adapter);
+    const output = (await SchemaDumper.dump(adapter)).join("\n");
 
     // Internal FTS5 shadow tables (e.g. searchables_docsize) must not appear
     expect(output).not.toMatch(/searchables_docsize/);

@@ -163,6 +163,16 @@ export interface SchemaDumperOptions {
 }
 
 /**
+ * The `config` argument of `SchemaDumper.dump(pool, stream, config)` — Rails
+ * passes `ActiveRecord::Base` and reads `table_name_prefix` /
+ * `table_name_suffix` off it (`schema_dumper.rb:43,51-56`).
+ */
+export interface SchemaDumperConfig extends SchemaDumperOptions {
+  tableNamePrefix?: string;
+  tableNameSuffix?: string;
+}
+
+/**
  * DSL methods that actually exist as helpers on TableDefinition —
  * either the abstract base (connection-adapters/abstract/schema-definitions.ts)
  * or adapter-specific subclasses (e.g. PG range helpers in
@@ -350,6 +360,15 @@ export function statelessTest(pattern: RegExp, value: string): boolean {
  */
 export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
+  /**
+   * Output language for a dump that names none explicitly. Rails' dumper only
+   * ever emits Ruby, so `dump(pool, stream, config)` has no slot for this;
+   * trails emits TS or JS, and `DatabaseTasks.dumpSchema` sets it from
+   * `schema_format` — the same global that decides `:ruby` vs `:sql` in Rails.
+   * @noRailsEquivalent PERMANENT: trails' dumper emits TS or JS where Rails
+   * only ever emits Ruby, so Rails has no slot to converge this onto.
+   */
+  static language: SchemaDumpLanguage = "ts";
   /** @internal Mirrors Rails' `SchemaDumper.fk_ignore_pattern`. */
   static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
   /** @internal Mirrors Rails' `SchemaDumper.chk_ignore_pattern`. */
@@ -380,7 +399,9 @@ export abstract class SchemaDumper {
   constructor(source: SchemaSource, options: Record<string, unknown> = {}) {
     this._source = source;
     this._options = options;
-    const lang = (options.language as SchemaDumpLanguage | undefined) ?? "ts";
+    const lang =
+      (options.language as SchemaDumpLanguage | undefined) ??
+      (this.constructor as typeof SchemaDumper).language;
     this._language = lang;
     this._version = typeof options.version === "string" ? options.version : undefined;
     const subclassIgnore = (this.constructor as typeof SchemaDumper).ignoreTables ?? [];
@@ -417,12 +438,15 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  static generateOptions(
-    config: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
-  ): Record<string, unknown> {
+  static generateOptions(config: SchemaDumperConfig = {}): Record<string, unknown> {
     return {
       tableNamePrefix: config.tableNamePrefix ?? "",
       tableNameSuffix: config.tableNameSuffix ?? "",
+      // Rails' dumper reads the version off the connection in `initialize`
+      // (`schema_dumper.rb:73`); trails resolves it in `dumpWithVersion` and
+      // hands it down here, and emits TS or JS rather than only Ruby.
+      language: config.language,
+      version: config.version,
     };
   }
 
@@ -448,16 +472,18 @@ export abstract class SchemaDumper {
   }
 
   /**
-   * Dump from a SchemaSource (matches Rails) OR directly from a
-   * DatabaseAdapter (convenience overload — bridges through
-   * AdapterSchemaSource).
+   * Mirrors: `ActiveRecord::SchemaDumper.dump` (`schema_dumper.rb:43-48`) —
+   * dumps through the pool's connection into `stream` and returns `stream`.
+   * A `DatabaseAdapter` or a bare `SchemaSource` is also accepted in the
+   * `pool` slot: Rails' pool always yields a connection that is itself the
+   * dump source, while trails' mock sources are not adapters.
    */
-  static dump(source: SchemaSource, options?: Record<string, unknown>): string | Promise<string>;
-  static dump(adapter: DatabaseAdapter, options?: SchemaDumperOptions): Promise<string>;
   static dump(
-    sourceOrAdapter: SchemaSource | DatabaseAdapter,
-    options: Record<string, unknown> = {},
-  ): string | Promise<string> {
+    pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
+    stream: string[] = [],
+    config: SchemaDumperConfig = baseClass(),
+  ): string[] | Promise<string[]> {
+    const options = this.generateOptions(config);
     // Adapter check runs FIRST because concrete DatabaseAdapters
     // (PostgreSQLAdapter, SQLite3Adapter) implement `tables()` /
     // `columns()` / `indexes()` and so also satisfy the SchemaSource
@@ -465,10 +491,8 @@ export abstract class SchemaDumper {
     // does the column normalization expected by emitTable — skipping
     // it would leak raw adapter column shapes (e.g. `scale: null`)
     // into dumps.
-    if (isDatabaseAdapter(sourceOrAdapter)) {
-      const source = new AdapterSchemaSource(sourceOrAdapter);
-      const lang = (options.language as SchemaDumpLanguage) ?? "ts";
-      const dumperOptions = { ...options, language: lang };
+    if (isDatabaseAdapter(pool)) {
+      const source = new AdapterSchemaSource(pool);
       // Instantiate the adapter-specific subclass when the adapter exposes
       // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
       // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
@@ -476,18 +500,21 @@ export abstract class SchemaDumper {
       // the adapter's SchemaDumper module into the dumper. Without the hook,
       // `create` still resolves to the ConnectionAdapters subclass (see its
       // redirect) — never the bare base.
-      const createDialectDumper = (sourceOrAdapter as { createSchemaDumper?: unknown })
-        .createSchemaDumper;
+      const createDialectDumper = (pool as { createSchemaDumper?: unknown }).createSchemaDumper;
       const dumper =
         (typeof createDialectDumper === "function"
-          ? (createDialectDumper.call(sourceOrAdapter, source, dumperOptions) as
-              | SchemaDumper
-              | undefined
-              | null)
-          : undefined) ?? this.create(source, dumperOptions);
-      return dumper.dump() as Promise<string>;
+          ? (createDialectDumper.call(pool, source, options) as SchemaDumper | undefined | null)
+          : undefined) ?? this.create(source, options);
+      return dumper.dump(stream) as Promise<string[]>;
     }
-    return this.create(sourceOrAdapter, options).dump();
+    if (isConnectionPool(pool)) {
+      return pool
+        .withConnection(async (connection) => {
+          await this.dump(connection, stream, config);
+        })
+        .then(() => stream);
+    }
+    return this.create(pool, options).dump(stream);
   }
 
   static dumpTableSchema(adapter: DatabaseAdapter, tableName: string): Promise<string>;
@@ -533,12 +560,11 @@ export abstract class SchemaDumper {
         version = versions[versions.length - 1];
       }
     }
-    const schema = await this.dump(adapter, { ...options, version });
-    return `// Schema version: ${version}\n${schema}`;
+    const schema = await this.dump(adapter, [], { ...options, version });
+    return `// Schema version: ${version}\n${schema.join("\n")}`;
   }
 
-  dump(): string | Promise<string> {
-    const stream: string[] = [];
+  dump(stream: string[] = []): string[] | Promise<string[]> {
     this.header(stream);
     const schemasResult = this.schemas(stream);
     // Run header sections sequentially to preserve deterministic output order
@@ -561,24 +587,24 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  private _finalizeDump(stream: string[]): string | Promise<string> {
+  private _finalizeDump(stream: string[]): string[] | Promise<string[]> {
     const result = this.tables(stream);
     if (result instanceof Promise) {
       return result.then(async () => {
         await this.virtualTables(stream);
         this.trailer(stream);
-        return stream.join("\n");
+        return stream;
       });
     }
     const vtResult = this.virtualTables(stream);
     if (vtResult instanceof Promise) {
       return vtResult.then(() => {
         this.trailer(stream);
-        return stream.join("\n");
+        return stream;
       });
     }
     this.trailer(stream);
-    return stream.join("\n");
+    return stream;
   }
 
   /** @internal */
@@ -1132,6 +1158,24 @@ export abstract class SchemaDumper {
     }
     return JSON.stringify(options);
   }
+}
+
+/**
+ * `pool.with_connection` is all `SchemaDumper.dump` asks of its pool
+ * (`schema_dumper.rb:44`); typing the parameter structurally keeps
+ * schema-dumper.ts off connection-pool.ts's import graph, exactly as the
+ * `baseClass()` slot above keeps it off base.ts's.
+ */
+interface ConnectionPoolLike {
+  withConnection<T>(fn: (conn: DatabaseAdapter) => T | Promise<T>): Promise<T>;
+}
+
+function isConnectionPool(v: unknown): v is ConnectionPoolLike {
+  return (
+    v !== null &&
+    typeof v === "object" &&
+    typeof (v as { withConnection?: unknown }).withConnection === "function"
+  );
 }
 
 /**

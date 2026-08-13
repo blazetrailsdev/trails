@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await new EnableCitext().run(adapter, "up");
       expect(await adapter.extensionEnabled("citext")).toBe(true);
-      const dump = await adapter.createSchemaDumper(adapter).dump();
+      const dump = (await adapter.createSchemaDumper(adapter).dump()).join("\n");
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
       // A full PG schema dump under 6-fork parallel load legitimately exceeds
       // vitest's 5s default (I/O contention, not a logic bug). Bump to 60s,
