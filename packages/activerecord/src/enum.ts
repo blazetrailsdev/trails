@@ -116,7 +116,6 @@ function enumTypeFrom(
  */
 export function installEnumAttribute(
   klass: typeof Base,
-  attribute: string,
   name: string,
   mapping: Record<string, EnumValue>,
   raiseOnInvalidValues: boolean,
@@ -137,16 +136,54 @@ export function installEnumAttribute(
   // seeds the attribute default and flows through the EnumType on read. Pass a
   // bare `attribute(name)` when there are no options to preserve the
   // column-seeded FromDatabase attribute.
+  // The deferred-type-check marker below keys off the same name `attribute` /
+  // `decorate_attributes` register under (attribute_registration.rb:13,24).
+  const resolved = klass.resolveAttributeName(name);
+  // Rails raises for an enum on an attribute with no declared type AND no
+  // backing DB column, but only once the schema is reflected (inside the
+  // `decorate_attributes` block, at `type_for_attribute`). We can't tell a real
+  // column apart from a typeless attribute at `enum` time, so any enum NOT
+  // explicitly typed via `attribute(name, type)` is queued for a deferred check
+  // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
+  // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
+  // "Explicitly typed" means the user declared a concrete attribute *type*
+  // (`attribute(name, "integer")`), NOT merely a default (`attribute(name,
+  // { default })`) or nothing. Rails pushes a `PendingType` only when a type is
+  // present (attribute_registration.rb:12-18); a default-only / type-less
+  // attribute keeps the fallback `value` type until the column reflects, so its
+  // subtype must still come from the column (enum decorates the column type,
+  // enum.rb:238-248). Requiring a user-provided def AND a concrete type
+  // distinguishes the two: the `value` default's `type()` is nil (like Rails'
+  // `Value#type`), so a default-only attribute reads as `existingTypeName ==
+  // null` and is treated as column-reflected.
+  const existingDef = (klass as any)._attributeDefinitions?.get(resolved);
+  const existingTypeName =
+    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
+  const explicitlyTyped =
+    (existingDef?.source === "user" || existingDef?.userProvided === true) &&
+    existingTypeName != null;
+  const pendingHost = klass as unknown as { _enumsPendingTypeCheck?: Set<string> };
+  if (!explicitlyTyped) {
+    if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
+      pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
+    }
+    pendingHost._enumsPendingTypeCheck!.add(resolved);
+  } else if (pendingHost._enumsPendingTypeCheck?.has(resolved)) {
+    // An explicit type now backs the enum — drop any inherited pending marker.
+    pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
+    pendingHost._enumsPendingTypeCheck.delete(resolved);
+  }
+
   if (attributeOptions && "default" in attributeOptions) {
-    klass.attribute(attribute, { default: attributeOptions.default });
+    klass.attribute(name, { default: attributeOptions.default });
   } else {
-    klass.attribute(attribute);
+    klass.attribute(name);
   }
   // Rails resolves the subtype lazily inside the decorate block from the
   // reflected column type (enum.rb:239-246); the decorator re-runs on every
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
-  klass.decorateAttributes([attribute], (_name: string, reflected: Type, host?: unknown) => {
+  klass.decorateAttributes([name], (_name: string, reflected: Type, host?: unknown) => {
     // Rails raises inside the `decorate_attributes` block when the decorated
     // subtype is `ActiveModel::Type.default_value` — an enum name with no backing
     // column and no explicit type (enum.rb:240-245). trails can't mirror that via
@@ -169,7 +206,7 @@ export function installEnumAttribute(
     // skips the rare direct materialization of an abstract class itself.
     const target = (host as typeof Base | undefined) ?? klass;
     if (isDecoratorReplay() && !target.abstractClass) {
-      assertEnumTypeDeclared(target, attribute);
+      assertEnumTypeDeclared(target, resolved);
     }
     return enumTypeFrom(name, mapping, reflected, raiseOnInvalidValues);
   });
@@ -177,9 +214,11 @@ export function installEnumAttribute(
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
   // accessor attribute() installed.
-  Object.defineProperty(klass.prototype, attribute, {
+  Object.defineProperty(klass.prototype, name, {
     get(this: Base) {
-      return (this as unknown as { _attributes: Map<string, unknown> })._attributes.get(attribute);
+      // `readAttribute`, not a direct `_attributes` read: an aliased enum is
+      // stored under the resolved backing column.
+      return (this as unknown as EnumInstanceHost).readAttribute(name);
     },
     set(this: Base, value: unknown) {
       // Custom setter only because the paired custom getter would otherwise make
@@ -188,7 +227,7 @@ export function installEnumAttribute(
       // write pipeline (ActiveModel::Attribute#with_value_from_user), which our
       // writeAttribute → withValueFromUser mirrors. So `record.status = "angry"`
       // still raises ArgumentError, via the type, on every write path.
-      (this as unknown as EnumInstanceHost).writeAttribute(attribute, value);
+      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
     },
     configurable: true,
   });
@@ -529,35 +568,17 @@ export function _enum(
   assertValidEnumDefinitionValues(values);
   assertValidEnumOptions(options ?? {});
 
-  const attribute = name;
   const mapping = Array.isArray(values)
     ? Object.fromEntries(values.map((v, i) => [v, i]))
     : (values as Record<string, EnumValue>);
 
-  // Resolve an `alias_attribute` target: `enum :aliased_status` on
-  // `alias_attribute :aliased_status, :status` stores through the real `status`
-  // column. Storage, the EnumType, the reader accessor, and the generated
-  // predicate/scope conditions all key off the resolved column so reads and
-  // `where(...)` hit the backing attribute; the value-method *names* still
-  // derive from the enum labels (unaffected by the alias). Mirrors Rails, where
-  // the aliased attribute delegates to its target everywhere.
-  // The alias is resolved eagerly here, matching Rails: `enum`'s
-  // `decorate_attributes([name])` resolves the name through `attribute_aliases`
-  // at declaration time (enum.rb:238, activemodel attribute_methods.rb:396) and
-  // bakes it into a pending modification that is never re-evaluated. So
-  // `alias_attribute` MUST precede `enum` (the order Rails' own suite uses).
-  // Declaring `enum` first keys everything off the un-aliased name, which has no
-  // column of its own; real Rails raises `Undeclared attribute type for enum` on
-  // first use (verified against vendored Rails). trails converges via
-  // `assertEnumTypeDeclared` on the un-aliased name — mirroring Rails' `subtype
-  // == ActiveModel::Type.default_value` branch (enum.rb:240-245) — run from the
-  // enum decorator's deferred replay (gated by `isDecoratorReplay()`, so it never
-  // fires on trails' eager class-definition-time decorator application), matching
-  // Rails' lazy timing.
-  const attrName =
-    (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
-      attribute
-    ] ?? attribute;
+  // Rails resolves an `alias_attribute` target inside `attribute(name)` /
+  // `decorate_attributes([name])` (enum.rb:237-238 → attribute_registration.rb:13,24
+  // → attribute_methods.rb:396-398), never in `_enum`'s own body. `alias_attribute`
+  // must therefore precede `enum`, as it does in Rails' own suite: the alias is
+  // baked into the pending modification at declaration time and never
+  // re-evaluated, so the reverse order raises `Undeclared attribute type for
+  // enum` on first use (enum.rb:240-245).
 
   // Rails guards the enum *name* itself against reserved Active Record methods
   // before generating any value methods: the pluralized mapping accessor
@@ -573,23 +594,15 @@ export function _enum(
 
   detectEnumConflictBang.call(this, name, pluralize(name), true);
 
-  this._enums.set(attrName, mapping);
+  this._enums.set(name, mapping);
 
   detectEnumConflictBang.call(this, name, name);
   detectEnumConflictBang.call(this, name, `${name}=`);
 
   const prefixStr =
-    options?.prefix === true
-      ? attribute
-      : typeof options?.prefix === "string"
-        ? options.prefix
-        : "";
+    options?.prefix === true ? name : typeof options?.prefix === "string" ? options.prefix : "";
   const suffixStr =
-    options?.suffix === true
-      ? attribute
-      : typeof options?.suffix === "string"
-        ? options.suffix
-        : "";
+    options?.suffix === true ? name : typeof options?.suffix === "string" ? options.suffix : "";
 
   const methodName = (n: string) => {
     if (prefixStr && suffixStr) return `${prefixStr}_${n}_${suffixStr}`;
@@ -598,41 +611,6 @@ export function _enum(
     return n;
   };
   const toCamel = (s: string) => camelize(s, false);
-
-  // Rails raises for an enum on an attribute with no declared type AND no
-  // backing DB column, but only once the schema is reflected (inside the
-  // `decorate_attributes` block, at `type_for_attribute`). We can't tell a real
-  // column apart from a typeless attribute at `enum` time, so any enum NOT
-  // explicitly typed via `attribute(name, type)` is queued for a deferred check
-  // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
-  // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
-  // "Explicitly typed" means the user declared a concrete attribute *type*
-  // (`attribute(name, "integer")`), NOT merely a default (`attribute(name,
-  // { default })`) or nothing. Rails pushes a `PendingType` only when a type is
-  // present (attribute_registration.rb:12-18); a default-only / type-less
-  // attribute keeps the fallback `value` type until the column reflects, so its
-  // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248). Requiring a user-provided def AND a concrete type
-  // distinguishes the two: the `value` default's `type()` is nil (like Rails'
-  // `Value#type`), so a default-only attribute reads as `existingTypeName ==
-  // null` and is treated as column-reflected.
-  const existingDef = (this as any)._attributeDefinitions?.get(attrName);
-  const existingTypeName =
-    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
-  const explicitlyTyped =
-    (existingDef?.source === "user" || existingDef?.userProvided === true) &&
-    existingTypeName != null;
-  const pendingHost = this as unknown as { _enumsPendingTypeCheck?: Set<string> };
-  if (!explicitlyTyped) {
-    if (!Object.prototype.hasOwnProperty.call(this, "_enumsPendingTypeCheck")) {
-      pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
-    }
-    pendingHost._enumsPendingTypeCheck!.add(attrName);
-  } else if (pendingHost._enumsPendingTypeCheck?.has(attrName)) {
-    // An explicit type now backs the enum — drop any inherited pending marker.
-    pendingHost._enumsPendingTypeCheck = new Set(pendingHost._enumsPendingTypeCheck);
-    pendingHost._enumsPendingTypeCheck.delete(attrName);
-  }
 
   // Register the EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
@@ -647,7 +625,6 @@ export function _enum(
   const validate = options?.validate ?? false;
   installEnumAttribute(
     this,
-    attrName,
     name,
     mapping,
     !validate,
@@ -736,9 +713,9 @@ export function _enum(
       // reports `source: "another enum"` (enum.rb:302-310, 388-395), not the
       // default "Active Record".
       if (definedNames.has(predicateName))
-        raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
+        raiseConflictError.call(this, name, predicateName, { source: "another enum" });
       if (definedNames.has(bangName))
-        raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
+        raiseConflictError.call(this, name, bangName, { source: "another enum" });
       definedNames.add(predicateName);
       definedNames.add(bangName);
       // Instance value methods (predicate/bang) only conflict with *dangerous*
@@ -746,17 +723,16 @@ export function _enum(
       // super; end`) is allowed and simply wins over the generated method, so we
       // must not raise merely because the name exists on the prototype.
       // Mirrors enum.rb's `dangerous_attribute_method?` gate.
-      if (dangerousMethods.has(predicateName))
-        raiseConflictError.call(this, attribute, predicateName);
+      if (dangerousMethods.has(predicateName)) raiseConflictError.call(this, name, predicateName);
       if (enumMethodNames.has(predicateName))
-        raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
-      if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+        raiseConflictError.call(this, name, predicateName, { source: "another enum" });
+      if (dangerousMethods.has(bangName)) raiseConflictError.call(this, name, bangName);
       if (enumMethodNames.has(bangName))
-        raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
+        raiseConflictError.call(this, name, bangName, { source: "another enum" });
     }
     if (scopesEnabled) {
       if (definedNames.has(fullName))
-        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+        raiseConflictError.call(this, name, fullName, { type: "class" });
       definedNames.add(fullName);
       // The value/`not*` scope names are class methods, so route them through
       // the class-method conflict detector, which consults all three Rails
@@ -765,8 +741,8 @@ export function _enum(
       // special-case), each raising with the correct type/source rather than the
       // generic scope error. A scope inherited from a parent enum or a plain
       // user static on the model/an ancestor is NOT a conflict.
-      detectEnumConflictBang.call(this, attribute, fullName, true);
-      detectEnumConflictBang.call(this, attribute, notScopeName, true);
+      detectEnumConflictBang.call(this, name, fullName, true);
+      detectEnumConflictBang.call(this, name, notScopeName, true);
     }
     if (aliasIsNew) {
       const {
@@ -783,22 +759,21 @@ export function _enum(
         // colliding with a sibling label's generated predicate/bang raises with
         // `source: "another enum"` (module membership, per the main-label note).
         if (definedNames.has(fp))
-          raiseConflictError.call(this, attribute, fp, { source: "another enum" });
+          raiseConflictError.call(this, name, fp, { source: "another enum" });
         if (definedNames.has(friendlyBang))
-          raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
+          raiseConflictError.call(this, name, friendlyBang, { source: "another enum" });
         definedNames.add(fp);
         definedNames.add(friendlyBang);
-        if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
+        if (dangerousMethods.has(fp)) raiseConflictError.call(this, name, fp);
         if (enumMethodNames.has(fp))
-          raiseConflictError.call(this, attribute, fp, { source: "another enum" });
-        if (dangerousMethods.has(friendlyBang))
-          raiseConflictError.call(this, attribute, friendlyBang);
+          raiseConflictError.call(this, name, fp, { source: "another enum" });
+        if (dangerousMethods.has(friendlyBang)) raiseConflictError.call(this, name, friendlyBang);
         if (enumMethodNames.has(friendlyBang))
-          raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
+          raiseConflictError.call(this, name, friendlyBang, { source: "another enum" });
       }
       if (scopesEnabled) {
-        detectEnumConflictBang.call(this, attribute, friendlyName, true);
-        detectEnumConflictBang.call(this, attribute, notFriendlyName, true);
+        detectEnumConflictBang.call(this, name, friendlyName, true);
+        detectEnumConflictBang.call(this, name, notFriendlyName, true);
       }
     }
 
@@ -807,16 +782,10 @@ export function _enum(
     // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
-    methodsModule.defineEnumMethods(
-      attrName,
-      fullName,
-      value,
-      scopesEnabled,
-      instanceMethodsEnabled,
-    );
+    methodsModule.defineEnumMethods(name, fullName, value, scopesEnabled, instanceMethodsEnabled);
     if (aliasIsNew) {
       methodsModule.defineEnumMethods(
-        attrName,
+        name,
         friendlyName,
         value,
         scopesEnabled,
@@ -832,14 +801,14 @@ export function _enum(
       const carrier = methodsModule.carrier();
       Object.defineProperty(carrier, `is${originalName}`, {
         value: function (this: Base) {
-          return this.readAttribute(attrName) === n;
+          return this.readAttribute(name) === n;
         },
         writable: true,
         configurable: true,
       });
       Object.defineProperty(carrier, `${originalName}Bang`, {
         value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attrName]: value });
+          return this.updateBang({ [name]: value });
         },
         writable: true,
         configurable: true,
@@ -882,7 +851,7 @@ export function _enum(
   // hash form forwards its options (e.g. `{ allowNil: true }`) to the validator.
   if (validate) {
     const validateOptions = typeof validate === "object" ? validate : {};
-    this.validatesInclusionOf(attribute, { in: Object.keys(mapping), ...validateOptions });
+    this.validatesInclusionOf(name, { in: Object.keys(mapping), ...validateOptions });
   }
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses
@@ -892,7 +861,7 @@ export function _enum(
   // Freeze once and hand back the same object so mutation attempts throw a
   // TypeError in strict mode.
   const frozenMapping = Object.freeze({ ...mapping });
-  Object.defineProperty(this, pluralize(attribute), {
+  Object.defineProperty(this, pluralize(name), {
     get() {
       return frozenMapping;
     },
@@ -1063,8 +1032,10 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // routing type casting through `type_for_attribute(name)`, whose
   // `decorate_attributes` block raises (type_caster/map.rb:10-16, enum.rb:240-245).
   assertEnumTypeDeclared(klass, attribute);
+  // `defined_enums` is keyed by the *declared* enum name, alias or not
+  // (enum.rb:232); only the attribute-set lookup resolves the alias.
+  if (!host._enums?.has(attribute)) return null;
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
-  if (!host._enums?.has(resolved)) return null;
   // Reflect synchronously from the warm schema cache before reading the
   // attribute set — the SAME path `Base.typeForAttribute` uses (base.ts). The
   // public `Base.loadSchema()` is async and would fire-and-forget, letting a

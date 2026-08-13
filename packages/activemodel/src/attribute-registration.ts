@@ -38,6 +38,8 @@ export interface AttributeHostInternals {
   >;
   _pendingAttributeModifications?: PendingModification[];
   _attributeAliases?: Record<string, string>;
+  /** @internal Rails-private helper. Mirrors: ClassMethods#resolve_attribute_name */
+  resolveAttributeName(name: string): string;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +120,8 @@ export function decorateAttributes(
   names: string[] | null,
   decorator: AttributeDecorator,
 ): void {
+  names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
+
   // Push to pending queue so _defaultAttributes replays in declaration order.
   pushPendingDecorator(this, names, decorator);
 

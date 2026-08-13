@@ -71,6 +71,8 @@ import {
   attributeMethodSuffix,
   attributeMethodAffix,
   aliasAttribute,
+  resolveAttributeName as _resolveAttributeNameHelper,
+  type AttributeMethodHost,
   resolveAliasName,
   resolveAliasNameIn,
   undefineAttributeMethods,
@@ -107,7 +109,6 @@ import {
   decorateAttributes,
   pendingAttributeModifications as _pendingAttributeModificationsHelper,
   resetDefaultAttributesBang as _resetDefaultAttributesBangHelper,
-  resolveAttributeName as _resolveAttributeNameHelper,
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
   type AttributeHostInternals,
@@ -316,9 +317,15 @@ export class Model {
     _resetDefaultAttributesBangHelper.call(this as unknown as AttributeHostInternals);
   }
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   *
+   * ActiveModel::AttributeMethods is included after AttributeRegistration, so
+   * its alias-resolving override (attribute_methods.rb:396-398) wins over
+   * AttributeRegistration's `name.to_s` (attribute_registration.rb:101-103).
+   */
   static resolveAttributeName(name: string): string {
-    return _resolveAttributeNameHelper.call(this as unknown as AttributeHostInternals, name);
+    return _resolveAttributeNameHelper.call(this as unknown as AttributeMethodHost, name);
   }
 
   /** @internal Rails-private helper. */
