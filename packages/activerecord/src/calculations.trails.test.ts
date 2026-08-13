@@ -397,7 +397,7 @@ describe("empty-scope aggregate identities", () => {
       await expect(Account.group("firm_id").asyncSum()).rejects.toThrow();
     });
     expect(queries[0]).toMatch(/SELECT SUM\(\) FROM/);
-    expect(queries[1]).toMatch(/SELECT SUM\(\) AS "?sum"?/);
+    expect(queries[1]).toMatch(/SELECT SUM\(\) AS ["`]?sum["`]?/);
   });
 
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same

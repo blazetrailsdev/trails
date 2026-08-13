@@ -35,9 +35,12 @@ class Assertion extends Error {
  * `assert_nothing_raised` re-raises an unexpected error in, and the class
  * {@link _assertNothingRaisedOrWarn} rescues to warn about it.
  *
- * @noRailsEquivalent Minitest's, not Rails' — Rails names it
- * (assertions.rb:52, 283) but the class is defined in the minitest gem
- * (minitest.rb:1078), which has no vendored Rails file to map onto.
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails names the class
+ * (assertions.rb:52, 283) but defines it in the minitest gem
+ * (minitest.rb:1078-1110), which is a test-framework dependency with no
+ * vendored Rails file for the comparator to map onto. Porting it here is what
+ * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
+ * rescue, the class Rails names.
  */
 export class UnexpectedError extends Assertion {
   override name = "UnexpectedError";
