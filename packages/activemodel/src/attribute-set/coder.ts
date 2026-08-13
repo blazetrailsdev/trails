@@ -1,22 +1,20 @@
 import { Attribute, Uninitialized } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
-import type { TypeRegistry } from "../type/registry.js";
+import { typeRegistry, type TypeRegistry } from "../type/registry.js";
+import type { Type } from "../type/value.js";
 import { jsonCodec } from "./codecs/json.js";
 
 export interface AttributeSetEnvelope {
   v: 1;
-  /** attr → registry type key (e.g. "string", "integer", "decimal") */
-  types: Record<string, string>;
+  /**
+   * attr → registry type key (e.g. "string", "integer", "decimal"), or `null`
+   * for `attr.with_type(nil)` (`yaml_encoder.rb:15`) — the attribute's type is
+   * the model's default type for that name, so it is not written out.
+   */
+  types: Record<string, string | null>;
   /** attr → raw value before type-cast (valueBeforeTypeCast) */
   values: Record<string, unknown>;
-  /**
-   * Reserved for future use: type keys for attrs that existed in the envelope
-   * but were absent from the schema at decode time. Not written by encode() in
-   * this release — such attrs are stored in `types` alongside schema-matched
-   * ones and kept as additional attributes on the decoded set.
-   */
-  additionalTypes?: Record<string, string>;
-  /** attrs that should resolve to the schema default on decode */
+  /** attrs that were Uninitialized when encoded */
   defaultAttributes?: string[];
 }
 
@@ -35,48 +33,55 @@ export class AttributeSetCoderError extends Error {
 const warnedKeys = new Set<string>();
 
 /**
- * Format-agnostic encoder/decoder for AttributeSet.
- * Delegates wire format to an injected codec (default: JSON).
- *
- * Schema-drift policy on decode:
- * - Unknown type key: falls back to "value" type + one-time console.warn per key (opt-out via silenceDriftWarnings).
- * - v mismatch: throws AttributeSetCoderError.
- * - Attr in envelope but not in schemaAttributes: kept as an additional attribute with the envelope type.
- * - Attr in schemaAttributes but not in envelope AND in defaultAttributes: restored from schema (preserves schema default).
- * - Attr in schemaAttributes but not in envelope AND not in defaultAttributes: set to Uninitialized.
- *
- * Type reconstruction on decode:
- * - When schemaAttributes is provided and the schema type name matches the envelope type key,
- *   the schema attr's type is used directly (preserving precision/scale/limit and AR-specific types).
- * - Otherwise the registry is queried by the envelope type key.
- *
  * Mirrors: ActiveModel::AttributeSet::YAMLEncoder
+ *
+ * Rails takes the model's `attribute_types` as `default_types` and encodes an
+ * attribute whose type is that default as `attr.with_type(nil)`
+ * (`yaml_encoder.rb:14-18`), restoring the default type on the way back in
+ * (`:27-29`). trails writes that missing type as a `null` envelope key.
+ *
+ * Two things Rails gets from Psych and trails has to carry itself, both
+ * consequences of the wire format rather than choices:
+ *
+ * - Psych dumps a non-default `Type` object inline; JSON cannot, so a
+ *   non-default type travels as its registry key and comes back through
+ *   `registry`. An unknown key falls back to the "value" type with a one-time
+ *   warning per key (opt out with `silenceDriftWarnings`).
+ * - Psych round-trips an `Attribute::Uninitialized` as itself; a JSON envelope
+ *   has no value to carry for one, so those names are listed in
+ *   `defaultAttributes` and rebuilt as `Uninitialized` on decode.
  */
 export class AttributeSetCoder {
+  private defaultTypes: Record<string, Type>;
   private registry: TypeRegistry;
   private codec: AttributeSetCodec;
   private silenceDriftWarnings: boolean;
 
   constructor(
-    registry: TypeRegistry,
-    opts: { codec?: AttributeSetCodec; silenceDriftWarnings?: boolean } = {},
+    defaultTypes: Record<string, Type>,
+    opts: {
+      registry?: TypeRegistry;
+      codec?: AttributeSetCodec;
+      silenceDriftWarnings?: boolean;
+    } = {},
   ) {
-    this.registry = registry;
+    this.defaultTypes = defaultTypes;
+    this.registry = opts.registry ?? typeRegistry;
     this.codec = opts.codec ?? jsonCodec;
     this.silenceDriftWarnings = opts.silenceDriftWarnings ?? false;
   }
 
-  encode(set: AttributeSet): string {
-    const types: Record<string, string> = {};
+  encode(attributeSet: AttributeSet): string {
+    const types: Record<string, string | null> = {};
     const values: Record<string, unknown> = {};
     const defaultAttributes: string[] = [];
 
-    set.forEach((attr, name) => {
+    attributeSet.forEach((attr, name) => {
       if (attr instanceof Uninitialized) {
         defaultAttributes.push(name);
         return;
       }
-      types[name] = attr.type.name;
+      types[name] = attr.type === this.defaultTypes[name] ? null : attr.type.name;
       values[name] = attr.valueBeforeTypeCast;
     });
 
@@ -85,25 +90,19 @@ export class AttributeSetCoder {
     return this.codec.encode(envelope);
   }
 
-  decode(input: string, schemaAttributes?: Map<string, Attribute>): AttributeSet {
+  decode(input: string): AttributeSet {
     const envelope = this.codec.decode(input);
 
     if (envelope.v !== 1) {
       throw new AttributeSetCoderError(`envelope version v=${envelope.v} not supported`);
     }
 
-    const attrs = new Map<string, Attribute>();
+    const attributesHash = new Map<string, Attribute>();
 
     for (const [name, typeKey] of Object.entries(envelope.types)) {
-      const schemaAttr = schemaAttributes?.get(name);
-      const schemaType =
-        schemaAttr && !(schemaAttr instanceof Uninitialized) ? schemaAttr.type : undefined;
-
-      let type;
-      if (schemaType && schemaType.name === typeKey) {
-        // Schema type matches envelope key — use the schema instance directly so
-        // precision/scale/limit and AR-specific types (uuid, jsonb, etc.) are preserved.
-        type = schemaType;
+      let type: Type;
+      if (typeKey == null) {
+        type = this.defaultTypes[name];
       } else {
         try {
           type = this.registry.lookup(typeKey);
@@ -117,30 +116,13 @@ export class AttributeSetCoder {
           type = this.registry.lookup("value");
         }
       }
-      const rawValue = envelope.values[name];
-      attrs.set(name, Attribute.fromUser(name, rawValue, type));
+      attributesHash.set(name, Attribute.fromUser(name, envelope.values[name], type));
     }
 
-    if (schemaAttributes) {
-      const defaultAttrSet = new Set(envelope.defaultAttributes ?? []);
-      for (const [name, schemaAttr] of schemaAttributes) {
-        if (attrs.has(name)) continue;
-        if (defaultAttrSet.has(name)) {
-          attrs.set(
-            name,
-            schemaAttr instanceof Uninitialized ? schemaAttr : schemaAttr.withType(schemaAttr.type),
-          );
-        } else {
-          attrs.set(
-            name,
-            schemaAttr instanceof Uninitialized
-              ? schemaAttr
-              : new Uninitialized(name, schemaAttr.type),
-          );
-        }
-      }
+    for (const name of envelope.defaultAttributes ?? []) {
+      attributesHash.set(name, Attribute.uninitialized(name, this.defaultTypes[name]));
     }
 
-    return new AttributeSet(attrs);
+    return new AttributeSet(attributesHash);
   }
 }

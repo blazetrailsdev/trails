@@ -9,16 +9,22 @@ function makeSet(attrs: Map<string, Attribute>): AttributeSet {
   return new AttributeSet(attrs);
 }
 
+const stringType = typeRegistry.lookup("string");
+const integerType = typeRegistry.lookup("integer");
+
 function stringAttr(name: string, value: string): Attribute {
-  return Attribute.fromUser(name, value, typeRegistry.lookup("string"));
+  return Attribute.fromUser(name, value, stringType);
 }
 
 function intAttr(name: string, value: number): Attribute {
-  return Attribute.fromUser(name, value, typeRegistry.lookup("integer"));
+  return Attribute.fromUser(name, value, integerType);
 }
 
 describe("AttributeSetCoder", () => {
-  const coder = new AttributeSetCoder(typeRegistry);
+  // `default_types` is the model's `attribute_types`, whose values are the very
+  // Type instances its attributes carry — Rails' `equal?` check depends on that.
+  const defaultTypes = { name: stringType, age: integerType };
+  const coder = new AttributeSetCoder(defaultTypes);
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -35,25 +41,41 @@ describe("AttributeSetCoder", () => {
     expect(decoded.fetchValue("age")).toBe(30);
   });
 
-  it("uninitialized attributes round-trip via defaultAttributes", () => {
-    const intType = typeRegistry.lookup("integer");
-    const uninit = Attribute.uninitialized("score", intType);
-    const schemaAttr = Attribute.fromUser("score", 99, intType);
-    const schema = new Map<string, Attribute>([["score", schemaAttr]]);
-    const set = makeSet(new Map([["score", uninit]]));
+  it("omits the type of an attribute whose type is the default type", () => {
+    const set = makeSet(new Map([["name", stringAttr("name", "Alice")]]));
+    expect(JSON.parse(coder.encode(set)).types.name).toBeNull();
+  });
 
-    const encoded = coder.encode(set);
+  it("writes the type of an attribute whose type is not the default type", () => {
+    const set = makeSet(new Map([["name", intAttr("name", 7)]]));
+    expect(JSON.parse(coder.encode(set)).types.name).toBe("integer");
+  });
+
+  it("restores the default type for an attribute encoded without one", () => {
+    const custom = integerType;
+    const localCoder = new AttributeSetCoder({ qty: custom });
+    const json = JSON.stringify({ v: 1, types: { qty: null }, values: { qty: 5 } });
+    const decoded = localCoder.decode(json);
+    expect(decoded.fetchValue("qty")).toBe(5);
+    expect(decoded.castTypes().qty).toBe(custom);
+  });
+
+  it("uninitialized attributes round-trip as uninitialized", () => {
+    const intType = integerType;
+    const localCoder = new AttributeSetCoder({ score: intType });
+    const set = makeSet(new Map([["score", Attribute.uninitialized("score", intType)]]));
+
+    const encoded = localCoder.encode(set);
     expect(JSON.parse(encoded).defaultAttributes).toContain("score");
 
-    // decode with schema: score should be restored from the schema default (99)
-    const decoded = coder.decode(encoded, schema);
-    expect(decoded.has("score")).toBe(true);
-    expect(decoded.fetchValue("score")).toBe(99);
+    const decoded = localCoder.decode(encoded);
+    expect(decoded.has("score")).toBe(false);
+    expect(decoded.castTypes().score).toBe(intType);
   });
 
   it("unknown type key falls back to value type and warns once", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const localCoder = new AttributeSetCoder(typeRegistry);
+    const localCoder = new AttributeSetCoder({});
     const json = JSON.stringify({
       v: 1,
       types: { x: "unknown_type_xyz" },
@@ -69,9 +91,7 @@ describe("AttributeSetCoder", () => {
 
   it("silenceDriftWarnings suppresses the console.warn", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const silentCoder = new AttributeSetCoder(typeRegistry, {
-      silenceDriftWarnings: true,
-    });
+    const silentCoder = new AttributeSetCoder({}, { silenceDriftWarnings: true });
     const json = JSON.stringify({
       v: 1,
       types: { y: "completely_unknown_type_abc" },
@@ -87,35 +107,15 @@ describe("AttributeSetCoder", () => {
     expect(() => coder.decode(json)).toThrow("v=2 not supported");
   });
 
-  it("attr in envelope but not in schema is kept as additional", () => {
-    const schema = new Map<string, Attribute>([["name", stringAttr("name", "Bob")]]);
+  it("attr not among the default types is kept with its own type", () => {
     const json = JSON.stringify({
       v: 1,
-      types: { name: "string", extra: "string" },
+      types: { name: null, extra: "string" },
       values: { name: "Bob", extra: "bonus" },
     });
-    const decoded = coder.decode(json, schema);
+    const decoded = coder.decode(json);
     expect(decoded.fetchValue("extra")).toBe("bonus");
-  });
-
-  it("prefers schema attr type over registry lookup when names match", () => {
-    // Simulates an AR-specific type (e.g. uuid, jsonb) that isn't in AM's registry.
-    // When schemaAttributes provides the type, decode should use it directly.
-    const customType = typeRegistry.lookup("integer");
-    const schemaAttr = Attribute.fromUser("qty", 0, customType);
-    const schema = new Map<string, Attribute>([["qty", schemaAttr]]);
-    const json = JSON.stringify({
-      v: 1,
-      types: { qty: "integer" },
-      values: { qty: 5 },
-    });
-    const decoded = coder.decode(json, schema);
-    // type instance should come from the schema, not a fresh registry.lookup()
-    expect(decoded.fetchValue("qty")).toBe(5);
-    // Confirm the schema type object is reused (same reference)
-    const decodedType = (decoded as unknown as { castTypes(): Record<string, unknown> }).castTypes()
-      .qty;
-    expect(decodedType).toBe(customType);
+    expect(decoded.fetchValue("name")).toBe("Bob");
   });
 
   it("uses attr.type.name (registry key) not type() for type storage", () => {
@@ -140,31 +140,11 @@ describe("AttributeSetCoder", () => {
       }),
       decode: vi.fn((input: string) => JSON.parse(input) as AttributeSetEnvelope),
     };
-    const customCoder = new AttributeSetCoder(typeRegistry, { codec: customCodec });
+    const customCoder = new AttributeSetCoder({}, { codec: customCodec });
     const set = makeSet(new Map([["x", stringAttr("x", "hi")]]));
     customCoder.decode(customCoder.encode(set));
     expect(customCodec.encode).toHaveBeenCalledOnce();
     expect(customCodec.decode).toHaveBeenCalledOnce();
     expect(encoded[0].types.x).toBe("string");
-  });
-
-  it("schema attr not in envelope resolves to Uninitialized (retained in map, not initialized)", () => {
-    const stringType = typeRegistry.lookup("string");
-    const schema = new Map<string, Attribute>([
-      ["name", stringAttr("name", "Bob")],
-      ["missing", Attribute.uninitialized("missing", stringType)],
-    ]);
-    const json = JSON.stringify({
-      v: 1,
-      types: { name: "string" },
-      values: { name: "Bob" },
-    });
-    const decoded = coder.decode(json, schema);
-    // has() returns false for Uninitialized (not initialized)
-    expect(decoded.has("missing")).toBe(false);
-    // but the attr IS retained in the map — castTypes() iterates all attrs including Uninitialized
-    const types = decoded.castTypes();
-    expect(types["missing"]).toBeDefined();
-    expect(types["missing"].name).toBe("string");
   });
 });

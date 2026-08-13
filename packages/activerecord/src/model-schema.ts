@@ -594,6 +594,8 @@ interface SchemaHost {
   _columns?: any[];
   _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
+  _yamlEncoder?: AttributeSetCoder;
+  attributeTypes(): Record<string, any>;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
   /** Global epoch stamped on reflect/invalidate; see {@link schemaEpoch}. @internal */
@@ -776,13 +778,18 @@ export function columns(this: SchemaHost): any[] {
 
 /**
  * Rails: `@yaml_encoder ||= ActiveModel::AttributeSet::YAMLEncoder.new(attribute_types)`
- * (model_schema.rb:446). trails' coder is codec-agnostic (JSON by default) rather
- * than YAML-only, but the accessor keeps the Rails name.
+ * (model_schema.rb:446-448). trails' coder is codec-agnostic (JSON by default)
+ * rather than YAML-only, but the accessor keeps the Rails name and passes the
+ * model's own attribute types, so a declared `attribute :x, :my_type` override
+ * round-trips through that type rather than through a global registry lookup.
  *
  * @internal
  */
 export function yamlEncoder(this: SchemaHost): AttributeSetCoder {
-  return new AttributeSetCoder(typeRegistry);
+  const own = ownSchemaMemo(this, "_yamlEncoder");
+  if (own) return own;
+  this._yamlEncoder = new AttributeSetCoder(this.attributeTypes());
+  return this._yamlEncoder;
 }
 
 /**
@@ -1206,12 +1213,14 @@ function applyColumnsHash(
 
   type CacheBag = {
     _attributesBuilder?: unknown;
+    _yamlEncoder?: unknown;
     _cachedDefaultAttributes?: unknown;
     _columnsHash?: unknown;
     _columns?: unknown;
   };
   const bag = host as CacheBag;
   bag._attributesBuilder = undefined;
+  bag._yamlEncoder = undefined;
   bag._cachedDefaultAttributes = null;
   bag._columns = undefined;
   host._columnsHash = filteredHash;
