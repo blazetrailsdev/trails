@@ -56,13 +56,10 @@ export class Scheme {
   private _cachedDeterministicKeyProvider?: DeterministicKeyProvider;
   private _fixed?: boolean;
   key?: string;
-  // Initialized to `undefined` throughout, as Rails initializes every ivar to
-  // `nil`: "not set" has to stay distinguishable from "explicitly false" so
-  // that `merge` does not override a value with a default (scheme.rb:15-16).
   deterministic?: boolean | { fixed?: boolean };
   private _supportUnencryptedData?: boolean;
-  downcase: boolean;
-  ignoreCase: boolean;
+  downcase?: boolean;
+  ignoreCase?: boolean;
   private _previousSchemesParam?: Scheme[];
   previousSchemes: Scheme[];
   private compress: boolean;
@@ -71,12 +68,14 @@ export class Scheme {
   private _contextProperties: Partial<Context>;
 
   constructor(options: SchemeOptions = {}) {
+    // Initializing all attributes to +undefined+ as we want to allow a "not set" semantics so that we
+    // can merge schemes without overriding values with defaults. See +#merge+
     this._keyProviderParam = options.keyProvider;
     this.key = options.key;
     this.deterministic = options.deterministic;
     this._supportUnencryptedData = options.supportUnencryptedData;
-    this.downcase = options.downcase ?? false;
-    this.ignoreCase = options.ignoreCase ?? false;
+    this.downcase = options.downcase || options.ignoreCase;
+    this.ignoreCase = options.ignoreCase;
     this._previousSchemesParam = options.previousSchemes;
     this.previousSchemes = options.previousSchemes ?? [];
 
@@ -120,7 +119,8 @@ export class Scheme {
     return (this._fixed ??=
       this.deterministic != null &&
       this.deterministic !== false &&
-      (typeof this.deterministic !== "object" || this.deterministic.fixed !== false));
+      (typeof this.deterministic !== "object" ||
+        (this.deterministic.fixed != null && this.deterministic.fixed !== false)));
   }
 
   merge(other: Scheme): Scheme {
@@ -180,10 +180,10 @@ export class Scheme {
 
   /** @internal */
   private validateConfigBang(): void {
-    if (this.ignoreCase && !this.isDeterministic()) {
+    if (this.ignoreCase != null && this.ignoreCase !== false && !this.isDeterministic()) {
       throw new Configuration("ignoreCase requires deterministic encryption");
     }
-    if (this.downcase && !this.isDeterministic()) {
+    if (this.downcase != null && this.downcase !== false && !this.isDeterministic()) {
       throw new Configuration("downcase requires deterministic encryption");
     }
     if (this._keyProviderParam != null && this.key != null) {

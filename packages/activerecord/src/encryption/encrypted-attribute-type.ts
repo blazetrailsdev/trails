@@ -103,7 +103,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get isDowncase(): boolean {
-    return this.scheme.downcase;
+    return this.scheme.downcase ?? false;
   }
 
   get previousSchemes(): Scheme[] {
@@ -119,7 +119,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get ignoreCase(): boolean {
-    return this.scheme.ignoreCase;
+    return this.scheme.ignoreCase ?? false;
   }
 
   override type(): string | undefined {
