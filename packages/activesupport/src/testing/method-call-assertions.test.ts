@@ -5,12 +5,14 @@ import {
   assertNotCalled,
   assertCalledOnInstanceOf,
   assertNotCalledOnInstanceOf,
-} from "../testing-helpers.js";
+  assertCalledWith,
+  stubAnyInstance,
+} from "./method-call-assertions.js";
 
 describe("MethodCallAssertionsTest", () => {
   it("assert called with defaults to expect once", () => {
     const obj = { greet: (name: string) => `hello ${name}` };
-    assertCalled(obj, "greet", {}, () => {
+    assertCalled(obj, "greet", null, {}, () => {
       obj.greet("world");
     });
     // passes if called at least once (default)
@@ -18,7 +20,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called more than once", () => {
     const obj = { inc: () => 1 };
-    assertCalled(obj, "inc", { times: 3 }, () => {
+    assertCalled(obj, "inc", null, { times: 3 }, () => {
       obj.inc();
       obj.inc();
       obj.inc();
@@ -27,15 +29,15 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called method with arguments", () => {
     const obj = { add: (a: number, b: number) => a + b };
-    assertCalled(obj, "add", {}, () => {
+    assertCalled(obj, "add", null, {}, () => {
       obj.add(1, 2);
     });
   });
 
   it("assert called returns", () => {
     const obj = { val: () => 42 };
-    let result: number | undefined;
-    assertCalled(obj, "val", {}, () => {
+    let result: unknown;
+    assertCalled(obj, "val", null, { returns: 42 }, () => {
       result = obj.val();
     });
     expect(result).toBe(42);
@@ -44,7 +46,7 @@ describe("MethodCallAssertionsTest", () => {
   it("assert called failure", () => {
     const obj = { noop: () => {} };
     expect(() =>
-      assertCalled(obj, "noop", { times: 1 }, () => {
+      assertCalled(obj, "noop", null, { times: 1 }, () => {
         /* not called */
       }),
     ).toThrow();
@@ -52,20 +54,20 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called with message", () => {
     const obj = { fn: () => {} };
-    expect(() => assertCalled(obj, "fn", {}, () => {})).toThrow(/fn.*called/);
+    expect(() => assertCalled(obj, "fn", null, {}, () => {})).toThrow(/fn.*called/);
   });
 
   it("assert called with arguments", () => {
     const obj = { log: (msg: string) => msg };
-    assertCalled(obj, "log", {}, () => {
+    assertCalled(obj, "log", null, {}, () => {
       obj.log("hello");
     });
   });
 
   it("assert called with arguments and returns", () => {
     const obj = { calc: (x: number) => x * 2 };
-    let r: number | undefined;
-    assertCalled(obj, "calc", {}, () => {
+    let r: unknown;
+    assertCalled(obj, "calc", null, { returns: 10 }, () => {
       r = obj.calc(5);
     });
     expect(r).toBe(10);
@@ -74,7 +76,7 @@ describe("MethodCallAssertionsTest", () => {
   it("assert called with failure", () => {
     const obj = { fn: () => {} };
     expect(() =>
-      assertCalled(obj, "fn", { times: 2 }, () => {
+      assertCalled(obj, "fn", null, { times: 2 }, () => {
         obj.fn();
       }),
     ).toThrow();
@@ -86,7 +88,7 @@ describe("MethodCallAssertionsTest", () => {
         return "hi";
       }
     }
-    assertCalledOnInstanceOf(Greeter, "greet", { times: 1 }, () => {
+    assertCalledOnInstanceOf(Greeter, "greet", null, { times: 1 }, () => {
       new Greeter().greet();
     });
   });
@@ -95,7 +97,7 @@ describe("MethodCallAssertionsTest", () => {
     class Counter {
       count() {}
     }
-    assertCalledOnInstanceOf(Counter, "count", { times: 2 }, () => {
+    assertCalledOnInstanceOf(Counter, "count", null, { times: 2 }, () => {
       new Counter().count();
       new Counter().count();
     });
@@ -107,7 +109,7 @@ describe("MethodCallAssertionsTest", () => {
         return a + b;
       }
     }
-    assertCalledOnInstanceOf(Calc, "add", { times: 1 }, () => {
+    assertCalledOnInstanceOf(Calc, "add", null, { times: 1 }, () => {
       new Calc().add(1, 2);
     });
   });
@@ -118,8 +120,8 @@ describe("MethodCallAssertionsTest", () => {
         return x * 3;
       }
     }
-    let result: number | undefined;
-    assertCalledOnInstanceOf(Calculator, "multiply", { times: 1 }, () => {
+    let result: unknown;
+    assertCalledOnInstanceOf(Calculator, "multiply", null, { times: 1, returns: 12 }, () => {
       result = new Calculator().multiply(4);
     });
     expect(result).toBe(12);
@@ -129,21 +131,25 @@ describe("MethodCallAssertionsTest", () => {
     class MyClass {
       doThing() {}
     }
-    expect(() => assertCalledOnInstanceOf(MyClass, "doThing", { times: 1 }, () => {})).toThrow();
+    expect(() =>
+      assertCalledOnInstanceOf(MyClass, "doThing", null, { times: 1 }, () => {}),
+    ).toThrow();
   });
 
   it("assert called on instance of with message", () => {
     class MyClass {
       action() {}
     }
-    expect(() => assertCalledOnInstanceOf(MyClass, "action", { times: 1 }, () => {})).toThrow();
+    expect(() =>
+      assertCalledOnInstanceOf(MyClass, "action", null, { times: 1 }, () => {}),
+    ).toThrow();
   });
 
   it.skip("assert called on instance of nesting");
 
   it("assert not called", () => {
     const obj = { fn: () => {} };
-    assertNotCalled(obj, "fn", () => {
+    assertNotCalled(obj, "fn", null, () => {
       /* fn never called */
     });
   });
@@ -151,7 +157,7 @@ describe("MethodCallAssertionsTest", () => {
   it("assert not called failure", () => {
     const obj = { fn: () => {} };
     expect(() =>
-      assertNotCalled(obj, "fn", () => {
+      assertNotCalled(obj, "fn", null, () => {
         obj.fn();
       }),
     ).toThrow();
@@ -161,7 +167,7 @@ describe("MethodCallAssertionsTest", () => {
     class Widget {
       render() {}
     }
-    assertNotCalledOnInstanceOf(Widget, "render", () => {
+    assertNotCalledOnInstanceOf(Widget, "render", null, () => {
       /* render not called */
     });
   });
@@ -171,15 +177,47 @@ describe("MethodCallAssertionsTest", () => {
       render() {}
     }
     expect(() =>
-      assertNotCalledOnInstanceOf(Widget, "render", () => {
+      assertNotCalledOnInstanceOf(Widget, "render", null, () => {
         new Widget().render();
       }),
     ).toThrow();
   });
 
   it.skip("assert not called on instance of nesting");
-  it.skip("stub any instance");
-  it.skip("stub any instance with instance");
+  it("stub any instance", () => {
+    class Widget {}
+    let yielded: Widget | undefined;
+    stubAnyInstance(Widget, {}, (instance) => {
+      yielded = instance;
+      expect((Widget as unknown as { new: () => Widget }).new()).toBe(instance);
+    });
+    expect(yielded).toBeInstanceOf(Widget);
+  });
+
+  it("stub any instance with instance", () => {
+    class Widget {}
+    const instance = new Widget();
+    stubAnyInstance(Widget, { instance }, (yielded) => {
+      expect(yielded).toBe(instance);
+      expect((Widget as unknown as { new: () => Widget }).new()).toBe(instance);
+    });
+  });
+
+  it("assert called with", () => {
+    const obj = { log: (_msg: string) => "" };
+    assertCalledWith(obj, "log", ["hello"], {}, () => {
+      obj.log("hello");
+    });
+  });
+
+  it("assert called with arguments and returns value", () => {
+    const obj = { calc: (_x: number) => 0 };
+    let r: unknown;
+    assertCalledWith(obj, "calc", [5], { returns: 10 }, () => {
+      r = obj.calc(5);
+    });
+    expect(r).toBe(10);
+  });
   it("assert changes when assertions are included", () => {
     let counter = 0;
     const before = counter;

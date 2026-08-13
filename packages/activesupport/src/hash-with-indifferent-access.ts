@@ -29,6 +29,14 @@ export class HashWithIndifferentAccess<V = unknown> {
     }
   }
 
+  /**
+   * Returns +true+ so that `Array#extract_options!` finds members of
+   * this class.
+   */
+  isExtractableOptions(): boolean {
+    return true;
+  }
+
   get(key: string): V | undefined {
     return this.data.get(key);
   }

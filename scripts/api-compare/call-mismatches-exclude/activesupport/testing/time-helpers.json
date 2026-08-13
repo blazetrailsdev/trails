@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "testing/time-helpers.ts",
+    "rubyName": "travel_to",
+    "call": "at",
+    "reason": "`Time.at(now)` builds the stubbed Time; the trails clock seam takes a `Temporal.Instant` directly, so there is no `at` constructor to call."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "testing/time-helpers.ts",
+    "rubyName": "travel_to",
+    "call": "parse",
+    "reason": "`Time.zone.parse` handles the String arm; `Temporal.Instant.from` parses the ISO string instead."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "testing/time-helpers.ts",
+    "rubyName": "travel_to",
+    "call": "to_time",
+    "reason": "`to_time` normalizes a Date/DateTime receiver to a Time; the TS arm converts a `Date` to a `Temporal.Instant` via `fromEpochMilliseconds`."
+  }
+]

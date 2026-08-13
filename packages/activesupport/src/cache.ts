@@ -1,4 +1,4 @@
-import { extractOptions, toParam } from "./hash-utils.js";
+import { extractOptionsBang, toParam } from "./hash-utils.js";
 import { env } from "./process-adapter.js";
 import { MemoryStore } from "./cache/memory-store.js";
 // Imported for the registration side effect: each store module registers its
@@ -42,7 +42,7 @@ export { setFormatVersion } from "./cache/format-version-slot.js";
  */
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
-    const [rest, options] = extractOptions(parameters);
+    const [rest, options] = extractOptionsBang(parameters);
     return new (retrieveStoreClass(store))(...rest, options);
   }
   if (Array.isArray(store)) {

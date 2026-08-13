@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "testing/assertions.ts",
+    "rubyName": "assert_nothing_raised",
+    "call": "new",
+    "reason": "`Minitest::UnexpectedError.new(error)` re-wraps the raised error for minitest's reporter. vitest reports the thrown error itself, and there is no ported UnexpectedError to construct."
+  }
+]

@@ -40,5 +40,26 @@
     "rubyName": "xmlschema",
     "call": "in_time_zone",
     "reason": "Rails' `Date#xmlschema` goes through `in_time_zone.xmlschema` to pick up `Time.zone`; trails' is the zoneless arm, and `TimeWithZone#xmlschema` is the zone-aware one."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "day",
+    "reason": "`day` here is Date#day, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.day` — Numeric#day — newly joined the ported-name population.)"
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "month",
+    "reason": "`month` here is Date#month, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.month` — Integer#month — newly joined the ported-name population.)"
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "year",
+    "reason": "`year` here is Date#year, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.year` — Integer#year — newly joined the ported-name population.)"
   }
 ]

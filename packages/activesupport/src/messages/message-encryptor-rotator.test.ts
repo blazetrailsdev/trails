@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 
 import { getCrypto } from "../crypto-adapter.js";
 import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
-import { extractOptions } from "../hash-utils.js";
+import { extractOptionsBang } from "../hash-utils.js";
 import {
   assertRotate,
   messageRotatorTests,
@@ -25,7 +25,7 @@ describe("MessageEncryptorRotatorTest", () => {
     secret,
 
     makeCodec(...args: unknown[]): MessageEncryptor {
-      const [positional, options] = extractOptions(args);
+      const [positional, options] = extractOptionsBang(args);
       return new MessageEncryptor(
         (positional[0] as Buffer) ?? secret("secret"),
         positional[1] as Buffer | undefined,

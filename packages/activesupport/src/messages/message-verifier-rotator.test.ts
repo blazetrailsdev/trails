@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 
 import { MessageVerifier } from "../message-verifier.js";
-import { extractOptions } from "../hash-utils.js";
+import { extractOptionsBang } from "../hash-utils.js";
 import {
   assertRotate,
   messageRotatorTests,
@@ -15,7 +15,7 @@ describe("MessageVerifierRotatorTest", () => {
     secret,
 
     makeCodec(...args: unknown[]): MessageVerifier {
-      const [positional, options] = extractOptions(args);
+      const [positional, options] = extractOptionsBang(args);
       return new MessageVerifier((positional[0] as string) ?? secret("secret"), options);
     },
 

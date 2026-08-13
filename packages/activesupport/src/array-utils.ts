@@ -137,7 +137,7 @@ export function inGroups<T>(
  * Split an array on a value or using a predicate function.
  * Mirrors Rails' `Array#split`.
  */
-export function splitArray<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[][] {
+export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[][] {
   const predicate =
     typeof valueOrFn === "function"
       ? (valueOrFn as (item: T) => boolean)
@@ -161,7 +161,7 @@ export function splitArray<T>(array: T[], valueOrFn: T | ((item: T) => boolean))
  * Remove elements from `array` that match `predicate`, returning the removed elements.
  * Mirrors Rails' `Array#extract!`.
  */
-export function extract<T>(array: T[], predicate?: (item: T) => boolean): T[] {
+export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[] {
   if (!predicate) return array.splice(0, array.length);
   const extracted: T[] = [];
   for (let i = array.length - 1; i >= 0; i--) {
