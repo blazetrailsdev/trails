@@ -103,6 +103,55 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/twitter-app:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../../packages/actionview
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../../packages/activemodel
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../../packages/date
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../../packages/rack
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
+      better-sqlite3:
+        specifier: ^12.6.2
+        version: 12.6.2
+    devDependencies:
+      '@blazetrails/activerecord-cli':
+        specifier: workspace:*
+        version: link:../../packages/activerecord-cli
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../../packages/trails-tsc
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+
   examples/twitter-clone:
     dependencies:
       '@blazetrails/activerecord':
