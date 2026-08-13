@@ -816,7 +816,7 @@ export class ReferenceDefinition {
   }
 
   async add(tableName: string, connection: ReferenceDefinitionConnection): Promise<void> {
-    for (const [colName, colType, colOpts] of this._columns()) {
+    for (const [colName, colType, colOpts] of this.columns()) {
       await connection.addColumn(tableName, colName, colType, colOpts);
     }
     if (this.index) {
@@ -832,7 +832,7 @@ export class ReferenceDefinition {
   }
 
   addTo(table: TableDefinition): void {
-    for (const [colName, colType, colOpts] of this._columns()) {
+    for (const [colName, colType, colOpts] of this.columns()) {
       table.column(colName, colType, colOpts);
     }
     if (this.index) {
@@ -900,7 +900,7 @@ export class ReferenceDefinition {
 
   /** @internal */
   private columnNames(): string[] {
-    return this._columns().map(([n]) => n);
+    return this.columns().map(([n]) => n);
   }
 
   /** @internal */
@@ -910,7 +910,7 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
-  private _columns(): [string, ColumnType, ColumnOptions][] {
+  private columns(): [string, ColumnType, ColumnOptions][] {
     const result: [string, ColumnType, ColumnOptions][] = [
       [this.columnName(), this.type, this.options],
     ];
