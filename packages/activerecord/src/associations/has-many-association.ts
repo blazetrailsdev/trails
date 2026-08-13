@@ -12,7 +12,6 @@ import {
   _resolveInverseName,
   _routeThroughViaAssociationScope,
   _scopeForAssociation,
-  _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
@@ -190,7 +189,7 @@ export class HasManyAssociation extends CollectionAssociation {
         this.reflection.name,
         this.reflection.options,
         this._queryExecutor,
-        this._skipStrictLoading,
+        this.isViolatesStrictLoading(),
       );
       // Rails applies `set_strict_loading` per record inside `find_target`'s
       // instantiation block (association.rb:269-271), not in `load_target`.
@@ -548,9 +547,12 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
  * the model never declared that way; that triple shape is a trails-only
  * calling convention, not Rails surface, and it is module-private.
  *
- * `skipStrictLoading` carries the association's `@skip_strict_loading`
- * (association.rb) into this loader, since the strict-loading check Rails runs
- * inside `find_target` lives here rather than on the association instance.
+ * `violatesStrictLoading` carries the result of the association's
+ * `violates_strict_loading?` (association.rb:284-292) into this loader: Rails
+ * raises on it as `find_target`'s first statement, but trails only knows a
+ * query is actually needed after the cache/preload lookups below, which are
+ * Rails' `find_target?` guard (association.rb:190). The predicate reads only
+ * owner/reflection state, so evaluating it at the call site is the same answer.
  *
  * @internal
  */
@@ -559,7 +561,7 @@ async function findTarget(
   assocName: string,
   options: AssociationOptions,
   queryExecutor?: () => Promise<Base[]>,
-  skipStrictLoading = false,
+  violatesStrictLoading = false,
 ): Promise<Base[]> {
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
@@ -590,11 +592,7 @@ async function findTarget(
 
   // Strict loading check. Gated by `find_target?`: a new-record owner without
   // the FK present never reaches `find_target` and so never raises.
-  if (
-    !skipStrictLoading &&
-    _violatesStrictLoading(record, options) &&
-    _findTargetReachable(record, assocName, options, "foreign")
-  ) {
+  if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
     });

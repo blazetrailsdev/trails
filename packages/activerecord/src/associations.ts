@@ -24,7 +24,6 @@ export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js
 
 import { ConfigurationError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { strictLoadingViolationBang } from "./core.js";
 import { StatementCache } from "./statement-cache.js";
 import { HasManyThroughAssociationNotFoundError } from "./associations/errors.js";
 import {
@@ -1367,29 +1366,6 @@ export function syncToAssociationInstance(record: Base, assocName: string, resul
 }
 
 /**
- * Whether lazily loading an association on `record` is a strict-loading
- * violation. Mirrors Rails' `Association#violates_strict_loading?`:
- *
- *   return if @skip_strict_loading
- *   return unless owner.validation_context.nil?
- *   return reflection.strict_loading? if reflection.options.key?(:strict_loading)
- *   owner.strict_loading? && !owner.strict_loading_n_plus_one_only?
- *
- * A reflection-level `strictLoading` option wins over the owner's flag; the
- * `n_plus_one_only` clause lets the first level load lazily.
- *
- * @internal
- */
-export function _violatesStrictLoading(record: Base, options: AssociationOptions): boolean {
-  if (record._strictLoadingBypassCount) return false;
-  if (record._validationContext != null) return false;
-  if (Object.prototype.hasOwnProperty.call(options, "strictLoading")) {
-    return options.strictLoading === true;
-  }
-  return record._strictLoading && !record.isStrictLoadingNPlusOneOnly();
-}
-
-/**
  * Whether a lazy load would actually reach `find_target` — and therefore
  * `violates_strict_loading?`. Rails gates the strict-loading check inside
  * `find_target`, which `find_target?` only enters under macro-specific rules:
@@ -1917,11 +1893,7 @@ function wrapCollectionProxy<T extends Base = Base>(
         return target.target[Number(prop)];
       }
 
-      if (_violatesStrictLoading(target._record, target._assocDef.options)) {
-        strictLoadingViolationBang(target._record, target._assocName, {
-          className: target._assocDef.options.className ?? camelize(singularize(target._assocName)),
-        });
-      }
+      (target as unknown as { _checkStrictLoading(): void })._checkStrictLoading();
 
       // Class-method delegations resolve through the `Reflect.get(scope, prop,
       // scope)` fallback below: `target.scope()` returns an `AssociationRelation`

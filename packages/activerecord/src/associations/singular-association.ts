@@ -11,7 +11,6 @@ import {
   _resolveInverseName,
   _scopeForAssociation,
   _skipSingularStatementCache,
-  _violatesStrictLoading,
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
@@ -215,7 +214,7 @@ export class SingularAssociation extends Association {
 
     // A DB load would be required to answer.
     if (this.findTargetNeeded()) {
-      if (this._isStrictOnOwner()) {
+      if (this.isViolatesStrictLoading()) {
         strictLoadingViolationBang(this.owner, this.reflection.name, {
           polymorphic: this.reflection.options?.polymorphic,
           className: this.reflection.options?.className,
@@ -228,11 +227,6 @@ export class SingularAssociation extends Association {
       return this.loadTarget() as Promise<Base | null>;
     }
     return this.target;
-  }
-
-  private _isStrictOnOwner(): boolean {
-    const owner = this.owner as any;
-    return Boolean(owner._strictLoading) && !owner._strictLoadingBypassCount;
   }
 
   /**
@@ -318,7 +312,7 @@ export class SingularAssociation extends Association {
       // a new-record owner without the key present never reaches `find_target` and
       // so never raises.
       if (
-        _violatesStrictLoading(owner, options) &&
+        this.isViolatesStrictLoading() &&
         _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
       ) {
         strictLoadingViolationBang(owner, assocName, {
