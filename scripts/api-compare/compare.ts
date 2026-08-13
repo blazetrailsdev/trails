@@ -2942,11 +2942,16 @@ export function main() {
         : null;
       const hasTsCounterpart = rubyFileHasTsCounterpart(tsFileExists, misplacedActualFile);
 
+      // The Ruby names this file expects, so a writer whose reader is present
+      // resolves to `set#{Name}` instead of stealing the reader's TS body
+      // (see the `name.endsWith("=")` arm of `rubyMethodToTsIgnoringSkip`).
+      const siblingRubyNames = new Set([...seen.values()].map((m) => m.rubyName));
+
       for (const [
         _dedupeKey,
         { rubyName, rubyModule, umbrellaConfig, mixinFile, definedInFile },
       ] of seen) {
-        const tsCandidates = rubyMethodToTs(rubyName)!;
+        const tsCandidates = rubyMethodToTs(rubyName, siblingRubyNames)!;
 
         // Check direct match first — find which candidate matched
         const directMatch = tsCandidates.find((c) => tsMethods.has(c));

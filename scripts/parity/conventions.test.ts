@@ -193,6 +193,30 @@ describe("rubyMethodToTs", () => {
     expect(rubyMethodToTs("_load_from=")).toEqual(["_loadFrom"]);
   });
 
+  it("offers setX first when the Ruby reader of the same base also exists", () => {
+    const siblings = new Set(["beginning_of_week", "beginning_of_week="]);
+    expect(rubyMethodToTs("beginning_of_week=", siblings)).toEqual([
+      "setBeginningOfWeek",
+      "beginningOfWeek",
+    ]);
+    // No paired reader: the bare accessor still comes first.
+    expect(rubyMethodToTs("table_name=", new Set(["table_name="]))).toEqual([
+      "tableName",
+      "setTableName",
+    ]);
+    // A Ruby `set_#{base}` of its own already owns the `setX` spelling.
+    expect(
+      rubyMethodToTs(
+        "content_type=",
+        new Set(["content_type", "content_type=", "set_content_type"]),
+      ),
+    ).toEqual(["contentType", "setContentType"]);
+    // A paired reader does not conjure a `setX` for a storage slot.
+    expect(rubyMethodToTs("_load_from=", new Set(["_load_from", "_load_from="]))).toEqual([
+      "_loadFrom",
+    ]);
+  });
+
   it("camelCases capitalized snake-case visit method names", () => {
     expect(rubyMethodToTs("visit_Arel_Nodes_SelectStatement")).toEqual([
       "visitArelNodesSelectStatement",

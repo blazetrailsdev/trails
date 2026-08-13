@@ -147,10 +147,6 @@ export function parse(data: string | Blob | null | undefined): Promise<Record<st
  * {@link withBackend} if there is one, else the process-wide backend.
  *
  * Mirrors: ActiveSupport::XmlMini.backend (xml_mini.rb:101-103).
- *
- * @missingRailsCall cast_backend_name_to_module — belongs to `backend=`, which
- * the call gate pairs with this reader (the bare-camel candidate wins over
- * `setBackend`); {@link setBackend} makes the call.
  */
 export function backend(): XmlMiniBackend | null | undefined {
   return currentThreadBackend() ?? _backend;
