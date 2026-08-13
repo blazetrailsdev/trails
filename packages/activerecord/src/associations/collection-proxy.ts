@@ -2798,8 +2798,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
-    this._offsetMemo.clear();
     await this.load();
+    this.resetScope();
     return stripThenable(this);
   }
 
@@ -2813,7 +2813,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
-    this._offsetMemo.clear();
     // Drop the OO association's memoized named-scope relations (Rails'
     // `reset_scope`) so the next `things.someScope()` rebuilds. Only an
     // already-built instance can hold a cache, so don't construct one here.
@@ -2821,6 +2820,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       | { _namedScopeRelations?: Map<string, unknown> }
       | undefined;
     if (assoc) assoc._namedScopeRelations = undefined;
+    this.resetScope();
     return this;
   }
 
