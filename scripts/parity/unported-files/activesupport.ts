@@ -171,13 +171,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
   },
   {
-    pattern: "xml_mini/rexml.rb",
-    testFile: "rexml_engine_test.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
     pattern: "testing/parallelize_executor.rb",
     package: "activesupport",
     reason:

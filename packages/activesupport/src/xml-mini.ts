@@ -3,6 +3,7 @@ import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { Temporal } from "@blazetrails/date";
+import * as XmlMini_REXML from "./xml-mini/rexml.js";
 
 /**
  * This object decorates files deserialized using `Hash.fromXml` with the
@@ -122,10 +123,26 @@ function formatDateTime(value: unknown): string {
 }
 
 /**
- * The backend `parse` delegates to (Ruby's `@backend`). Rails'
- * `XmlMini.backend = "REXML"` (xml_mini.rb:210) has no counterpart yet:
- * `XmlMini_REXML` is unported, so there is no default and `parse` raises until
- * a backend is set.
+ * The maximum element nesting a backend will descend before raising.
+ *
+ * Mirrors: `attr_accessor :depth` / `self.depth = 100` (xml_mini.rb:97-98).
+ *
+ * @internal
+ */
+let _depth = 100;
+
+/** Mirrors: ActiveSupport::XmlMini.depth (xml_mini.rb:97). */
+export function depth(): number {
+  return _depth;
+}
+
+/** Mirrors: ActiveSupport::XmlMini.depth= (xml_mini.rb:97). */
+export function setDepth(value: number): void {
+  _depth = value;
+}
+
+/**
+ * The backend `parse` delegates to (Ruby's `@backend`).
  *
  * @internal
  */
@@ -639,3 +656,12 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
     return this.buffer;
   }
 }
+
+/**
+ * Mirrors: `XmlMini.backend = "REXML"` (xml_mini.rb:210) — the module-bottom
+ * default. {@link setBackend} resolves a name through a dynamic import, which
+ * cannot be awaited at module scope, so the default is assigned from the
+ * statically-imported module: the same value `castBackendNameToModule("REXML")`
+ * returns for `"REXML"`.
+ */
+_backend = XmlMini_REXML;
