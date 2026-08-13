@@ -698,8 +698,24 @@ export async function calculate(
  * to Float. JS has no tower — `0 + 1n` is a TypeError — so a `bigint` operand
  * pulls a whole-number partner up to `bigint`, and a fractional `number` pulls
  * both down to `number`, which is where Ruby's Float arm lands too.
+ *
+ * A non-numeric memo is the seed of a `sum(column) { … }` call, and Ruby raises
+ * it here rather than up front — from `String#+`, at the FIRST addition, so
+ * `[].sum("age")` still answers `"age"` and only `[1].sum("age")` raises. The
+ * `rails-error-parity` rule keys on the constructor name, so it flags this
+ * throw whether the class is the global `TypeError` or the ported mirror above;
+ * `attribute-assignment.ts` and `cache/store.ts` carry the same suppression for
+ * the same reason.
  */
 function sumAdd(memo: number | bigint, value: number | bigint): number | bigint {
+  if (typeof memo !== "number" && typeof memo !== "bigint") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(
+      `no implicit conversion of ${
+        typeof value === "bigint" || Number.isInteger(value) ? "Integer" : "Float"
+      } into ${typeof memo === "string" ? "String" : (memo as object).constructor.name}`,
+    );
+  }
   if (typeof memo === typeof value) {
     return typeof memo === "bigint" ? memo + (value as bigint) : memo + (value as number);
   }
@@ -718,17 +734,6 @@ export async function performSum(
     initialValueOrColumn = 0;
   }
   if (block !== undefined) {
-    // `Array#sum` folds a non-numeric seed with `String#+` (or the object's own
-    // `+`) and raises there — `[1].sum("age")` is a TypeError, not a
-    // concatenation.
-    if (typeof initialValueOrColumn !== "number") {
-      // eslint-disable-next-line blazetrails/rails-error-parity
-      throw new TypeError(
-        `no implicit conversion of Integer into ${
-          typeof initialValueOrColumn === "string" ? "String" : "Arel::Nodes::Node"
-        }`,
-      );
-    }
     const records = await this.toArray();
     return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
   }

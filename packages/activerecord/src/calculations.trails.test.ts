@@ -423,18 +423,23 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
   });
 
-  // `[1].sum("age")` is a TypeError in Ruby, so a column name is not an initial
-  // value for the block arm — the overloads reject it at compile time and the
-  // fold raises for an untyped caller.
+  // A column name is not an initial value for the block arm: the overloads
+  // reject it at compile time, and for an untyped caller Ruby raises from
+  // `String#+` at the first addition — so `[1].sum("age")` raises while
+  // `[].sum("age")` answers `"age"`.
   it("rejects a non-numeric initial value for the block arm", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const sum = Account.sum as unknown as (
       initialValueOrColumn: unknown,
       block: () => number,
-    ) => Promise<number>;
+    ) => Promise<unknown>;
     await expect(sum.call(Account, "credit_limit", () => 1)).rejects.toThrow(
       "no implicit conversion of Integer into String",
     );
+    const empty = Account.where({ id: [] }) as unknown as {
+      sum(initialValueOrColumn: unknown, block: () => number): Promise<unknown>;
+    };
+    expect(await empty.sum("credit_limit", () => 1)).toBe("credit_limit");
   });
 
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same
