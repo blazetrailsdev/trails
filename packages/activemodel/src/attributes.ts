@@ -115,6 +115,7 @@ export function attribute(
     prototype: object;
     _cachedDefaultAttributes?: AttributeSet | null;
     resolveTypeName(name: string, options?: Record<string, unknown>): Type;
+    resolveAttributeName?(name: string): string;
   },
   name: string,
   // Mirrors Rails' `attribute(name, type = nil, **options)`: the type is
@@ -125,6 +126,11 @@ export function attribute(
   typeName?: string | Type | AttributeOptions,
   options?: AttributeOptions,
 ): void {
+  // Mirrors `name = resolve_attribute_name(name)` (attribute_registration.rb:13):
+  // ActiveModel::AttributeMethods overrides it to resolve `alias_attribute`
+  // targets (attribute_methods.rb:396-398), so `attribute :aliased_status`
+  // registers against the backing column.
+  name = this.resolveAttributeName?.(name) ?? name;
   // Type-optional form: `attribute(name, options)`. The second positional is
   // the options hash rather than a type when it isn't a string or Type.
   if (typeName !== undefined && typeof typeName !== "string" && !(typeName instanceof Type)) {

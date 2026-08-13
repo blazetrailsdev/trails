@@ -38,6 +38,14 @@ export interface AttributeHostInternals {
   >;
   _pendingAttributeModifications?: PendingModification[];
   _attributeAliases?: Record<string, string>;
+  /**
+   * @internal Rails-private helper.
+   *
+   * The class-level `resolve_attribute_name`. Present on every Model subclass;
+   * optional here only because this file's own identity implementation is the
+   * fallback for bare hosts (attribute_registration.rb:101-103).
+   */
+  resolveAttributeName?(name: string): string;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +126,16 @@ export function decorateAttributes(
   names: string[] | null,
   decorator: AttributeDecorator,
 ): void {
+  // Mirrors `names = names&.map { |name| resolve_attribute_name(name) }`
+  // (attribute_registration.rb:24). `resolve_attribute_name` is overridden by
+  // ActiveModel::AttributeMethods to resolve `alias_attribute` targets
+  // (attribute_methods.rb:396-398), so dispatch through the class rather than
+  // calling this file's identity implementation directly — that override is
+  // what makes `enum :aliased_status` decorate the backing column.
+  names =
+    names?.map((name) => (this.resolveAttributeName ?? resolveAttributeName).call(this, name)) ??
+    null;
+
   // Push to pending queue so _defaultAttributes replays in declaration order.
   pushPendingDecorator(this, names, decorator);
 
