@@ -5544,7 +5544,7 @@ export class Relation<T extends Base> {
    * resolution.
    * @internal
    */
-  arelColumnWithTable(tableName: string, columnName: string | symbol): unknown {
+  arelColumnWithTable(tableName: string, columnName: string): unknown {
     return _arelColumnWithTable.call(this as any, tableName, columnName);
   }
 
@@ -5552,7 +5552,7 @@ export class Relation<T extends Base> {
    * Rails `Relation#arel_column`. Delegates to the canonical helper.
    * @internal
    */
-  arelColumn(field: string | symbol | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
+  arelColumn(field: string | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
     if (field instanceof Nodes.Node) return field;
     return _arelColumn.call(this as any, field, fallback);
   }

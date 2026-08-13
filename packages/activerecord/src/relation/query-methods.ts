@@ -2079,7 +2079,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | symbol | number | Nodes.Node | null,
+  field: string | number | Nodes.Node | null,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
@@ -2087,12 +2087,11 @@ export function arelColumn(
   // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
   if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
-  const isSymbol = typeof field === "symbol";
-  // Ruby `field = field.name if is_symbol` then `field.to_s`
-  // (query_methods.rb:1991-1993) — which is what carries `sum`'s Integer
-  // identity default through as the literal it sums over, and `async_sum`'s nil
-  // one (calculations.rb:182) as `""`, the empty `SUM()`.
-  let fieldStr = isSymbol ? symbolToName(field) : field == null ? "" : String(field);
+  // Ruby `field.to_s` (query_methods.rb:1992) — which is what carries `sum`'s
+  // Integer identity default through as the literal it sums over, and
+  // `async_sum`'s nil one (calculations.rb:182) as `""`, the empty `SUM()`.
+  // A Ruby Symbol is a JS string here, so `is_symbol` is always false.
+  let fieldStr = field == null ? "" : String(field);
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
 
   const fromClause = (this as any)._fromClause;
@@ -2106,16 +2105,14 @@ export function arelColumn(
     return arelColumnWithTable.call(this, dotMatch.groups!.tbl, dotMatch.groups!.col);
   }
   if (fallback) return fallback(fieldStr);
-  const quoted = isSymbol ? safeQuoteColumnName(modelClass, fieldStr) : fieldStr;
-  return arelSql(quoted);
+  return arelSql(fieldStr);
 }
 
 /** @internal */
 export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown[] {
   return columns.flatMap((field) => {
     if (field instanceof Nodes.Node) return [field]; // Arel nodes pass through directly
-    if (typeof field === "string" || typeof field === "symbol")
-      return [arelColumn.call(this, field as any)];
+    if (typeof field === "string") return [arelColumn.call(this, field)];
     if (typeof field === "function") return [field()];
     if (isPlainObject(field)) return arelColumnsFromHash.call(this, field);
     return [field];
@@ -2126,33 +2123,34 @@ export function arelColumns(this: QueryMethodsHost, columns: unknown[]): unknown
 export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
-  columnName: string | symbol,
+  columnName: string,
 ): unknown {
   const existing = (this as any)._referencesValues ?? [];
   if (!existing.includes(tableName)) (this as any)._referencesValues = [...existing, tableName];
-  const colStr = typeof columnName === "symbol" ? symbolToName(columnName) : columnName;
   const modelClass: any = this.model;
   // Schema-qualified table names (e.g. "schema.table") must not be passed to
   // ArelTable — the visitor quotes the whole string as one identifier, producing
   // "schema.table"."col" instead of "schema"."table"."col".
   if (tableName.includes(".")) {
     const quotedTable = safeQuoteTableName(modelClass, tableName);
-    const quotedCol = safeQuoteColumnName(modelClass, colStr);
+    const quotedCol = safeQuoteColumnName(modelClass, columnName);
     return arelSql(`${quotedTable}.${quotedCol}`);
   }
-  if (typeof columnName === "symbol" || !/\W/.test(colStr)) {
+  // Rails' `column_name.is_a?(Symbol) ||` arm (query_methods.rb:1980) collapses
+  // here: a Ruby Symbol is a JS string in trails, so only the `\W` test remains.
+  if (!/\W/.test(columnName)) {
     const builder = (this as any).predicateBuilder;
     // Rails passes `lookup_table_klass_from_join_dependencies` as the block
     // (query_methods.rb:1982-1984), so a table name that only resolves through a
     // join dependency still finds its model — and its type caster.
     return (
-      builder?.resolveArelAttribute?.(tableName, colStr, (name: string) =>
+      builder?.resolveArelAttribute?.(tableName, columnName, (name: string) =>
         lookupTableKlassFromJoinDependencies.call(this, name),
-      ) ?? new ArelTable(tableName).get(colStr)
+      ) ?? new ArelTable(tableName).get(columnName)
     );
   }
   const quotedTable = safeQuoteTableName(modelClass, tableName);
-  return arelSql(`${quotedTable}.${colStr}`);
+  return arelSql(`${quotedTable}.${columnName}`);
 }
 
 /** @internal */
@@ -2223,8 +2221,8 @@ export function arelColumnAliasesFromHash(
       });
     }
     if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as (string | symbol)[]).map((col) =>
-        arelColumnWithTable.call(this, tableName, col),
+      return (columnsAliases as unknown[]).map((col) =>
+        arelColumnWithTable.call(this, tableName, String(col)),
       );
     }
     if (typeof columnsAliases === "string" || typeof columnsAliases === "symbol") {
