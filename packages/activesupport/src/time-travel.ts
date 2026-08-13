@@ -26,9 +26,11 @@ let _timeOffsetNs: bigint = 0n;
  * method that plays that role and `SimpleStubs` (testing/time-helpers.ts)
  * replaces it exactly the way Rails replaces `Time.now`.
  *
- * @noRailsEquivalent Ruby's stub target is the `Time.now` singleton method
- * itself; TypeScript's clock seam is this module, so the method that plays that
- * role has to live here.
+ * @noRailsEquivalent CONVERGEABLE — Ruby's stub target is the `Time.now`
+ * singleton method itself. Routing the trails clock through
+ * `@blazetrails/date`'s `Time.now` / `Date.today` / `DateTime.now`, which would
+ * retire this holder, is
+ * `0098-activesupport-ar-closure-port/time-helpers-stub-date-and-datetime-clock`.
  */
 export const clock = {
   now(): Temporal.Instant {
