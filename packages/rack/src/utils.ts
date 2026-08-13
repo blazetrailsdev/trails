@@ -27,7 +27,7 @@ export function getParamDepthLimit(): number {
   return _defaultQueryParser.paramDepthLimit;
 }
 export function setParamDepthLimit(v: number): void {
-  setDefaultQueryParser(getDefaultQueryParser().newDepthLimit(v));
+  defaultQueryParser(defaultQueryParser().newDepthLimit(v));
 }
 
 export function getMultipartFileLimit(): number {

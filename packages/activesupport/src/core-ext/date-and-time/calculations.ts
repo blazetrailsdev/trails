@@ -22,6 +22,12 @@ import { instantFrom } from "../../temporal.js";
 /** A receiver of the mixin: the `Date` arm or the `Time` arm. */
 export type DateOrTime = Temporal.PlainDate | Date;
 
+/**
+ * What `before?` / `after?` accept: Ruby's `date_or_time` is any comparable
+ * date/time, which on the trails side includes the zoned receivers.
+ */
+export type Comparable = DateOrTime | TimeWithZone | Temporal.Instant;
+
 /** What a receiver-returning member answers: a day for a day, an instant for a time. */
 export type DateOrInstant = Temporal.PlainDate | Temporal.Instant;
 
@@ -57,17 +63,14 @@ function classCurrent(dateOrTime: DateOrTime): Temporal.PlainDate | TimeWithZone
 }
 
 /** `self < other` / `self > other`, across both arms. */
-function compare(
-  dateOrTime: DateOrTime | TimeWithZone | Temporal.Instant,
-  other: DateOrTime | TimeWithZone | Temporal.Instant,
-): number {
+function compare(dateOrTime: Comparable, other: Comparable): number {
   if (dateOrTime instanceof Temporal.PlainDate && other instanceof Temporal.PlainDate) {
     return Temporal.PlainDate.compare(dateOrTime, other);
   }
   return Temporal.Instant.compare(toInstant(dateOrTime), toInstant(other));
 }
 
-function toInstant(dateOrTime: DateOrTime | TimeWithZone | Temporal.Instant): Temporal.Instant {
+function toInstant(dateOrTime: Comparable): Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc();
@@ -171,7 +174,7 @@ export function isOnWeekday(dateOrTime: DateOrTime): boolean {
  *
  * Mirrors: `DateAndTime::Calculations#before?` (`:67-69`)
  */
-export function isBefore(self: DateOrTime, dateOrTime: DateOrTime): boolean {
+export function isBefore(self: DateOrTime, dateOrTime: Comparable): boolean {
   return compare(self, dateOrTime) < 0;
 }
 
@@ -180,7 +183,7 @@ export function isBefore(self: DateOrTime, dateOrTime: DateOrTime): boolean {
  *
  * Mirrors: `DateAndTime::Calculations#after?` (`:72-74`)
  */
-export function isAfter(self: DateOrTime, dateOrTime: DateOrTime): boolean {
+export function isAfter(self: DateOrTime, dateOrTime: Comparable): boolean {
   return compare(self, dateOrTime) > 0;
 }
 

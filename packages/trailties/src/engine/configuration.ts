@@ -45,7 +45,11 @@ export class EngineConfiguration extends RailtieConfiguration {
   /** Mirrors Rails `root=` (`@root = paths.path = Pathname.new(value).expand_path`):
    * the override is expanded against the working directory before it is stored,
    * so a relative value resolves to an absolute root. `null` (clear) is left
-   * as-is. Re-points `paths.path` so downstream lookups resolve against it. */
+   * as-is. Re-points `paths.path` so downstream lookups resolve against it.
+   *
+   * @missingRailsCall new — `Pathname` is a Ruby stdlib class trails has no
+   * counterpart for (`engine/configuration.rb:67-69`); `getPath().resolve`
+   * against the working directory is `Pathname#expand_path`. */
   setRoot(value: string | null): void {
     const expanded = value === null ? null : getPath().resolve(getFs().cwd(), value);
     this._root = expanded;
