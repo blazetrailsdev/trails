@@ -156,24 +156,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_subquery",
-    "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_subquery",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:subquery"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb:1608 `Arel::SelectManager.new(subquery).project(select_value).tap do |arel|`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
     "rubyName": "build_where_clause",
     "call": "order:constructor,buildNamedBoundSqlLiteral",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
