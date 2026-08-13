@@ -2080,7 +2080,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | symbol | Nodes.Node,
+  field: string | symbol | number | Nodes.Node,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
@@ -2089,7 +2089,10 @@ export function arelColumn(
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
   if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
   const isSymbol = typeof field === "symbol";
-  let fieldStr = isSymbol ? symbolToName(field) : field;
+  // Ruby `field = field.name if is_symbol` then `field.to_s`
+  // (query_methods.rb:1991-1993) — which is what carries `sum`'s Integer
+  // identity default through as the literal it sums over.
+  let fieldStr = isSymbol ? symbolToName(field) : String(field);
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
 
   const fromClause = (this as any)._fromClause;
