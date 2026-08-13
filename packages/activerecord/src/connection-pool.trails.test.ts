@@ -1156,7 +1156,7 @@ describe("checkout/checkin callbacks", () => {
     const pool = makeAmbientPool({ pool: 1 });
     try {
       await pool.checkout();
-      expect(calls).toEqual([adapterType]);
+      expect(calls).toEqual([adapterNameFromConfig(adapterType)]);
     } finally {
       await closePoolConnections(pool);
       // Drop the test-registered callback so it can't leak into sibling tests.
