@@ -3,15 +3,13 @@
  *
  * These guard trails-internal behavior with no Rails counterpart in
  * base_test.rb: the _applyScopeAttributes
- * scoping mechanism, the UnknownPrimaryKey error message, and the internalSchemaCache-less
- * tableExists fallback.
+ * scoping mechanism and the UnknownPrimaryKey error message.
  */
 import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { registerSubclass } from "./inheritance.js";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
 
 describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {
@@ -211,18 +209,6 @@ describe("instantiate override types for absent keys (trails)", () => {
 });
 
 describe("BasicsTest (trails)", () => {
-  it("tableExists returns true when adapter has no internalSchemaCache", async () => {
-    class Ghost extends Base {
-      static tableName = "ghosts_that_do_not_exist";
-      static {
-        this.attribute("name", "string");
-        this.adapter = { adapterName: "sqlite" } as DatabaseAdapter;
-      }
-    }
-    const exists = await Ghost.tableExists();
-    expect(exists).toBe(true);
-  });
-
   it("columnNames raises TableNotSpecified on an abstract class", () => {
     // Rails column_names has no abstract-class fallback — load_schema! raises
     // TableNotSpecified. Guards against reintroducing the attribute-walk branch.

@@ -38,3 +38,82 @@ describe("TimeZoneTest", () => {
     expect(TimeZone.countryZones("ua").map((z) => z.name)).not.toContain("Europe/Kiev");
   });
 });
+
+describe("TimeZone country zone membership", () => {
+  /**
+   * `TZInfo::Country#zone_identifiers` reads tzdata's `zone1970.tab`, which
+   * files a zone under every country that observes it; ECMA-402's CLDR table
+   * names one country per zone. Pinned by FULL membership rather than
+   * `toContain`, because the gap this covers is a MISSING member —
+   * `Asia/Tokyo` under `au`, `Europe/Simferopol` under `ru` — which every
+   * `assert_includes`-style assertion in `time_zone.test.ts` is blind to.
+   * Both lists are `TZInfo::Country.get(code).zone_identifiers` run through
+   * Rails' MAPPING, in Rails' `<=>` order.
+   */
+  it("country zones agree with TZInfo zone_identifiers for au", () => {
+    expect(TimeZone.countryZones("au").map((z) => z.name)).toEqual([
+      "Perth",
+      "Australia/Eucla",
+      "Osaka",
+      "Sapporo",
+      "Tokyo",
+      "Adelaide",
+      "Australia/Broken_Hill",
+      "Darwin",
+      "Antarctica/Macquarie",
+      "Australia/Lindeman",
+      "Brisbane",
+      "Hobart",
+      "Melbourne",
+      "Sydney",
+      "Australia/Lord_Howe",
+    ]);
+  });
+
+  it("country zones agree with TZInfo zone_identifiers for ru", () => {
+    expect(TimeZone.countryZones("ru").map((z) => z.name)).toEqual([
+      "Kaliningrad",
+      "Europe/Kirov",
+      "Europe/Simferopol",
+      "Moscow",
+      "St. Petersburg",
+      "Volgograd",
+      "Europe/Astrakhan",
+      "Europe/Saratov",
+      "Europe/Ulyanovsk",
+      "Samara",
+      "Ekaterinburg",
+      "Asia/Omsk",
+      "Asia/Barnaul",
+      "Asia/Novokuznetsk",
+      "Asia/Tomsk",
+      "Krasnoyarsk",
+      "Novosibirsk",
+      "Irkutsk",
+      "Asia/Chita",
+      "Asia/Khandyga",
+      "Yakutsk",
+      "Asia/Ust-Nera",
+      "Vladivostok",
+      "Asia/Sakhalin",
+      "Magadan",
+      "Srednekolymsk",
+      "Asia/Anadyr",
+      "Kamchatka",
+    ]);
+  });
+
+  /**
+   * `zone1970.tab` knows `bv`/`hm` and files no zone under either, so
+   * `TZInfo::Country.get("bv").zone_identifiers` is `[]` and Rails answers an
+   * empty list rather than raising `InvalidCountryCode`.
+   */
+  it("country zones for a known zoneless country answer an empty list", () => {
+    expect(TimeZone.countryZones("bv")).toEqual([]);
+    expect(TimeZone.countryZones("hm")).toEqual([]);
+  });
+
+  it("country zones for an unknown country code raise", () => {
+    expect(() => TimeZone.countryZones("zz")).toThrow(/Invalid country code/);
+  });
+});

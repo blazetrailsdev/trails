@@ -51,20 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "change_column_default",
-    "call": "order:changeColumnDefaultForAlter,quoteTableName",
-    "reason": "Order artifact of an await-forced hoist: the port lifts the awaited changeColumnDefaultForAlter above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:692); both are pure."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "change_column_null",
-    "call": "order:quoteColumnName,quoteTableName",
-    "reason": "Order artifact of a hoisted local: the port lifts the twice-used quoteColumnName above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:766); both are pure."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "check_constraints",
     "call": "internal_exec_query",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -194,13 +180,6 @@
     "rubyName": "remove_index_for_alter",
     "call": "index_name_for_remove",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "rename_column",
-    "call": "order:renameColumnForAlter,quoteTableName",
-    "reason": "Order artifact of an await-forced hoist: the port lifts the awaited renameColumnForAlter above the quoteTableName Rails evaluates first in the same interpolation (abstract-mysql-adapter.ts:835); both are pure."
   },
   {
     "package": "activerecord",

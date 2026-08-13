@@ -16,6 +16,7 @@ import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { ArgumentError, findZoneBang, getZone } from "../../time-zone-config.js";
+import { toTime } from "./conversions.js";
 
 /**
  * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
@@ -100,18 +101,15 @@ export function current(): Temporal.PlainDate {
  * `time_with_zone` takes its `TimeWithZone.new(nil, zone, to_time(:utc))` arm —
  * the day's midnight read in `zone`.
  *
- * The `else` arm is Ruby's `to_time`, a bare `Time` at local midnight. trails
- * has no bare-Time receiver carrying the `since`/`middle_of_day`/`end_of_day`
- * this method's five callers delegate to (`time-ext.ts` is a free-function
- * module over JS `Date`), so the fallback is the same instant expressed in the
- * system zone — `to_time`'s value under a TimeWithZone receiver.
+ * Rails' `time` local is `nil` for a `Date` receiver, so the `else` arm is
+ * `to_time` — see `core-ext/date/conversions.ts` for the receiver equivalence.
  */
 export function inTimeZone(date: Temporal.PlainDate, zone: unknown = getZone()): TimeWithZone {
   const timeZone = findZoneBang(zone);
   if (timeZone) {
     return timeWithZone(date, timeZone);
   }
-  return timeWithZone(date, TimeZone.find(Temporal.Now.timeZoneId())!);
+  return toTime(date);
 }
 
 /** Mirrors: `DateAndTime::Zones#time_with_zone` (`date_and_time/zones.rb:32-38`) */

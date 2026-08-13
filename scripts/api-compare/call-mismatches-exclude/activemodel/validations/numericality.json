@@ -24,13 +24,6 @@
     "package": "activemodel",
     "tsFile": "validations/numericality.ts",
     "rubyName": "validate_each",
-    "call": "order:add,isNumber",
-    "reason": "The pre-existing order divergence previously keyed as order:filteredOptions,isNumber; the first inversion moved when the order stream stopped positioning hoisted-closure calls (RFC 0084)."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "validations/numericality.ts",
-    "rubyName": "validate_each",
     "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
