@@ -59,9 +59,9 @@ describe("XMLMiniEngineTest", () => {
     await XmlMini.setBackend(defaultBackend);
   });
 
-  // `Hash.from_xml` — and with it `XmlMini::PARSING`, which `_parse_file`
-  // reaches through — is unported; tracked by the `port-xml-mini-parsing-table`
-  // story.
+  // `Hash.from_xml`, which this test reaches `_parse_file` through, is
+  // unported; tracked by the `port-hash-from-xml` story. (`XmlMini::PARSING`
+  // itself landed in #6465.)
   it.skip("file from xml");
 
   it("exception thrown on expansion attack", async () => {
