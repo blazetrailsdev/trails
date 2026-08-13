@@ -97,8 +97,8 @@ export type EnvReader = (key: string) => string | undefined;
  * CI routinely sets a variable to `""` to mean "no value" (an empty password,
  * an unused socket path), and `??` alone would take that literally — an empty
  * `MYSQL_USER` becomes `user: ""` and the server answers
- * `Access denied for user ''`. This matches the convention already used by
- * `MySQLDatabaseTasks#resolvedField`, which likewise rejects `""`.
+ * `Access denied for user ''`. This mirrors ActiveSupport's `presence`, which
+ * likewise treats `""` as absent.
  */
 function present(read: EnvReader, key: string): string | undefined {
   const value = read(key);

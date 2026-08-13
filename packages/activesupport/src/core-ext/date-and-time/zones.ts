@@ -37,6 +37,18 @@ export type DateOrTime = Temporal.PlainDate | Date | Temporal.Instant;
  * parameter takes both arms Rails accepts — a `TimeZone` object and a String
  * identifying one — because `Time.find_zone!` dispatches on both.
  */
+/**
+ * The `Date` arm. Ruby's `time || to_time` is `to_time` here (a Date is never
+ * `acts_like?(:time)`), and trails' `Date#to_time` answers a `TimeWithZone`
+ * (`core-ext/date/conversions.ts`, `date/conversions.rb:83-86`), so both arms
+ * of this receiver return one — `Temporal.Instant` is reachable only from the
+ * `Time` arm's `time`.
+ */
+export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
+export function inTimeZone(
+  dateOrTime: Date | Temporal.Instant,
+  zone?: unknown,
+): TimeWithZone | Temporal.Instant;
 export function inTimeZone(
   dateOrTime: DateOrTime,
   zone: unknown = getZone(),

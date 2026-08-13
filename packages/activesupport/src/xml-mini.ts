@@ -709,8 +709,14 @@ export async function setCurrentThreadBackend(
  * Mirrors: ActiveSupport::XmlMini#cast_backend_name_to_module
  * (xml_mini.rb:200-206) — Ruby's `require
  * "active_support/xml_mini/#{name.downcase}"` plus `const_get "XmlMini_#{name}"`
- * is one dynamic import here, since the module namespace object of
+ * is a dynamic import here, since the module namespace object of
  * `xml-mini/<name>.js` is the backend module.
+ *
+ * The import specifiers are spelled out rather than interpolated: a bundler
+ * resolves `import(\`./xml-mini/${x}.js\`)` by globbing `./xml-mini/*.js`, which
+ * matches nothing when the sources on disk are `.ts`, so the name arm threw
+ * `Unknown variable dynamic import` under vitest. One literal specifier per
+ * file `require` can reach keeps the arm lazy and resolvable in both.
  *
  * @internal
  */
@@ -718,7 +724,21 @@ export async function castBackendNameToModule(name: XmlMiniBackendName): Promise
   if (typeof name !== "string") {
     return name;
   } else {
-    return (await import(`./xml-mini/${name.toLowerCase()}.js`)) as XmlMiniBackend;
+    switch (name.toLowerCase()) {
+      case "rexml":
+        return (await import("./xml-mini/rexml.js")) as XmlMiniBackend;
+      case "nokogiri":
+        return (await import("./xml-mini/nokogiri.js")) as XmlMiniBackend;
+      case "nokogirisax":
+        return (await import("./xml-mini/nokogirisax.js")) as XmlMiniBackend;
+      default:
+        // Ruby's counterpart is the core `LoadError` that
+        // `require "active_support/xml_mini/#{name.downcase}"` raises for a
+        // name with no file; there is no Rails error class to port here, the
+        // same reason `yaml.ts:16` gives for its own LoadError stand-in.
+        // eslint-disable-next-line blazetrails/rails-error-parity
+        throw new Error(`cannot load such file -- active_support/xml_mini/${name.toLowerCase()}`);
+    }
   }
 }
 

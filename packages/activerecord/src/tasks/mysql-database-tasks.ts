@@ -12,37 +12,9 @@ import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 
 type ConfigHash = Record<string, unknown>;
 
-interface UrlParts {
-  host?: string;
-  port?: string;
-  username?: string;
-  password?: string;
-  database?: string;
-  socket?: string;
-}
-
-function parseDbUrl(url: string | undefined): UrlParts {
-  if (!url) return {};
-  try {
-    const parsed = new URL(url);
-    const database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-    return {
-      host: parsed.hostname || undefined,
-      port: parsed.port || undefined,
-      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
-      database: database || undefined,
-      socket: parsed.searchParams.get("socket") ?? undefined,
-    };
-  } catch {
-    return {};
-  }
-}
-
 export class MySQLDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;
   private readonly configurationHash: ConfigHash;
-  private readonly urlParts: UrlParts;
 
   static usingDatabaseConfigurations(): boolean {
     return true;
@@ -51,7 +23,6 @@ export class MySQLDatabaseTasks {
   constructor(dbConfig: DatabaseConfig) {
     this.dbConfig = dbConfig;
     this.configurationHash = { ...dbConfig.configuration };
-    this.urlParts = parseDbUrl(this.configurationHash.url as string | undefined);
   }
 
   async create(): Promise<void> {
@@ -218,55 +189,35 @@ export class MySQLDatabaseTasks {
     return { charset: row.DEFAULT_CHARACTER_SET_NAME, collation: row.DEFAULT_COLLATION_NAME };
   }
 
-  private resolvedField(name: keyof UrlParts): string | undefined {
-    const c = this.configurationHash;
-    const fromConfig = c[name as string];
-    if (fromConfig !== undefined && fromConfig !== null && fromConfig !== "") {
-      return String(fromConfig);
-    }
-    const fromUrl = this.urlParts[name];
-    return fromUrl !== undefined ? String(fromUrl) : undefined;
-  }
-
   /**
-   * Build argv for mysql/mysqldump. The password is deliberately NOT placed
-   * in argv (it would otherwise be visible in `ps` to other local users);
-   * callers should read the password via env (MYSQL_PWD) — set in
-   * {@link commandEnv}.
+   * `prepare_command_options` (`mysql_database_tasks.rb:76-93`). Reads
+   * `configuration_hash` only: `UrlConfig` has already merged the resolved URL
+   * hash into it (`database_configurations/url_config.rb:41-43`), so there is
+   * nothing left to re-parse here.
+   *
+   * Ruby's `filter_map` guard is `if configuration_hash[opt]`, so only nil/false
+   * are dropped — an empty string still emits its flag.
    */
   private prepareCommandOptions(): string[] {
-    const args: string[] = [];
-    const flagMap: Array<{ flag: string; key: string; fromUrl?: boolean }> = [
-      { flag: "--host", key: "host", fromUrl: true },
-      { flag: "--port", key: "port", fromUrl: true },
-      { flag: "--socket", key: "socket", fromUrl: true },
-      { flag: "--user", key: "username", fromUrl: true },
-      { flag: "--default-character-set", key: "encoding" },
-      { flag: "--ssl-ca", key: "sslca" },
-      { flag: "--ssl-cert", key: "sslcert" },
-      { flag: "--ssl-capath", key: "sslcapath" },
-      { flag: "--ssl-cipher", key: "sslcipher" },
-      { flag: "--ssl-key", key: "sslkey" },
-      { flag: "--ssl-mode", key: "ssl_mode" },
-    ];
-    for (const { flag, key, fromUrl } of flagMap) {
-      const value = fromUrl
-        ? this.resolvedField(key as keyof UrlParts)
-        : (this.configurationHash[key] as string | number | undefined);
-      if (value !== undefined && value !== null && value !== "") {
-        args.push(`${flag}=${String(value)}`);
-      }
-    }
-    return args;
-  }
+    const args = Object.entries({
+      host: "--host",
+      port: "--port",
+      socket: "--socket",
+      username: "--user",
+      password: "--password",
+      encoding: "--default-character-set",
+      sslca: "--ssl-ca",
+      sslcert: "--ssl-cert",
+      sslcapath: "--ssl-capath",
+      sslcipher: "--ssl-cipher",
+      sslkey: "--ssl-key",
+      ssl_mode: "--ssl-mode",
+    }).flatMap(([opt, arg]) => {
+      const value = this.configurationHash[opt];
+      return value != null && value !== false ? [`${arg}=${String(value)}`] : [];
+    });
 
-  private commandEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = {
-      ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
-    };
-    const password = this.resolvedField("password");
-    if (password !== undefined) env.MYSQL_PWD = password;
-    return env;
+    return args;
   }
 
   private async connection(): Promise<Mysql2Adapter> {
@@ -278,7 +229,6 @@ export class MySQLDatabaseTasks {
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       encoding: "utf8",
       input: stdin,
-      env: this.commandEnv(),
     });
     if (result.error || result.status !== 0 || result.signal) {
       const details: string[] = [];

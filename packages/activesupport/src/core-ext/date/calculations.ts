@@ -7,6 +7,9 @@
  * `Date` — always an instant — and is that `Time` arm; this file is the `Date`
  * one, keyed on `Temporal.PlainDate`, the calendar-day analogue.
  *
+ * `in_time_zone` comes from `DateAndTime::Zones`, which `core_ext/date/zones.rb`
+ * mixes into `Date`, so it is imported rather than redefined here.
+ *
  * Mirrors: `class Date` (`core_ext/date/calculations.rb`)
  */
 
@@ -14,9 +17,8 @@ import { Temporal } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
-import { TimeZone } from "../../values/time-zone.js";
-import { ArgumentError, findZoneBang, getZone } from "../../time-zone-config.js";
-import { toTime } from "./conversions.js";
+import { ArgumentError, getZone } from "../../time-zone-config.js";
+import { inTimeZone } from "../date-and-time/zones.js";
 
 /**
  * Mirrors: `DateAndTime::Calculations::DAYS_INTO_WEEK`
@@ -85,36 +87,6 @@ export function current(): Temporal.PlainDate {
     return new Temporal.PlainDate(today.year, today.month, today.day);
   }
   return Temporal.Now.plainDateISO();
-}
-
-/**
- * TODO(converge-time-zone-reader-names): the mixin this specialises now lives
- * at its Rails path, `core-ext/date-and-time/zones.ts`. This Date-only copy
- * stays only because its `else` arm returns a `TimeWithZone` where the mixin
- * returns the `Temporal.Instant` Ruby's `to_time` gives, so folding the two
- * changes the return type of every caller (`ago`, `since`, …). Route them
- * through the mixin and delete this pair; do not add a third copy.
- *
- * Mirrors: `DateAndTime::Zones#in_time_zone` (`date_and_time/zones.rb:20-28`)
- * for the `Date` receiver (`core_ext/date/zones.rb` mixes it in). A Date never
- * `acts_like?(:time)`, so Rails' `time` local is always nil here and
- * `time_with_zone` takes its `TimeWithZone.new(nil, zone, to_time(:utc))` arm —
- * the day's midnight read in `zone`.
- *
- * Rails' `time` local is `nil` for a `Date` receiver, so the `else` arm is
- * `to_time` — see `core-ext/date/conversions.ts` for the receiver equivalence.
- */
-export function inTimeZone(date: Temporal.PlainDate, zone: unknown = getZone()): TimeWithZone {
-  const timeZone = findZoneBang(zone);
-  if (timeZone) {
-    return timeWithZone(date, timeZone);
-  }
-  return toTime(date);
-}
-
-/** Mirrors: `DateAndTime::Zones#time_with_zone` (`date_and_time/zones.rb:32-38`) */
-function timeWithZone(date: Temporal.PlainDate, zone: TimeZone): TimeWithZone {
-  return zone.local(date.year, date.month, date.day);
 }
 
 /** Mirrors: `Date#ago` (`date/calculations.rb:55-57`) */
