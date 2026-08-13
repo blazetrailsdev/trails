@@ -437,7 +437,7 @@ export class Deprecation {
   allow<T>(
     allowedWarnings: AllowMatcher[] | "all" = "all",
     options: { if?: unknown } = {},
-    block: () => T = (() => undefined) as () => T,
+    block: () => T,
   ): T {
     let conditional = "if" in options ? options.if : true;
     if (typeof conditional === "function") conditional = (conditional as () => unknown)();

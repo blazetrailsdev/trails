@@ -532,36 +532,32 @@ export class PredicateBuilder {
   }
 
   private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
-    for (const [klass, handler] of this.handlers) {
-      if (this.caseEquals(klass, object)) return handler;
-    }
-    throw new Error("no handler registered for value");
-  }
-
-  /**
-   * Ruby's `klass === object`, the test `handler_for` runs over the registry.
-   * Two of the five classes Rails registers have no `instanceof`-able TS
-   * counterpart: `BasicObject` (the root of Ruby's hierarchy, so `===` is true
-   * for every value) and `Relation` (importing `relation.js` here would close a
-   * module cycle — relation.ts constructs a PredicateBuilder — so it is matched
-   * structurally, as everywhere else in this file).
-   */
-  private caseEquals(klass: any, object: unknown): boolean {
-    if (klass === BasicObject) return true;
-    if (klass === Relation) return this.isRelation(object);
-    return object instanceof klass;
+    // Rails: `@handlers.detect { |klass, _| klass === object }.last` — BasicObject
+    // matches every value, so the detect never comes back nil.
+    return this.handlers.find(([klass]) =>
+      klass === BasicObject
+        ? true
+        : klass === Relation
+          ? this.isRelation(object)
+          : object instanceof klass,
+    )![1];
   }
 }
 
 /**
  * Stand-in for Ruby's `BasicObject` as a `register_handler` key
- * (predicate_builder.rb:16). See {@link PredicateBuilder#caseEquals}.
+ * (predicate_builder.rb:16): the root of Ruby's class hierarchy, so `===` holds
+ * for every value. TypeScript has no such class — `Object` misses primitives —
+ * so `handler_for`'s case-equality answers `true` for this marker.
  */
 class BasicObject {}
 
 /**
  * Stand-in for `ActiveRecord::Relation` as a `register_handler` key
- * (predicate_builder.rb:18). See {@link PredicateBuilder#caseEquals}.
+ * (predicate_builder.rb:18). Importing `relation.js` here would close a module
+ * cycle — relation.ts constructs a PredicateBuilder — so `handler_for`'s
+ * case-equality answers this marker structurally, via `isRelation`, as the rest
+ * of this file already does.
  */
 class Relation {}
 

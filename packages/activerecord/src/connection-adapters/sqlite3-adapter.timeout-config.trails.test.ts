@@ -32,7 +32,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
   });
 
   it("treats a false timeout and a false retries as unset", async () => {
-    const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => undefined);
     adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: false, retries: false });
     await adapter.execute("SELECT 1");
     expect(warn).not.toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
   });
 
   it("deprecates the retries option", async () => {
-    const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => undefined);
     adapter = new BetterSQLite3Adapter({ database: ":memory:", retries: 3 });
     await adapter.execute("SELECT 1");
     expect(warn).toHaveBeenCalledWith(

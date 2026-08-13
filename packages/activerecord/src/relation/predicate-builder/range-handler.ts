@@ -74,12 +74,8 @@ export class RangeHandler {
     const skipCast = (v: unknown): boolean =>
       v === null || v === undefined || v === Infinity || v === -Infinity;
     // Rails wraps each bound in `predicate_builder.build_bind_attribute`
-    // (range_handler.rb:13-14) and lets `QueryAttribute#unboundable?` answer for
-    // out-of-range bounds. We build the same bind, but keep the plain cast value
-    // for in-range bounds (see UnboundableBound above): the bind's
-    // `isUnboundable()` is the byte-for-byte port of
-    // `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
-    // so detection and sign come from the same type as the cast.
+    // (range_handler.rb:13-14) and lets `QueryAttribute#unboundable?` answer;
+    // trails keeps the cast value for in-range bounds — see UnboundableBound.
     const cast = (v: unknown): unknown => {
       const bind = this.predicateBuilder.buildBindAttribute(attribute.name, v);
       const sign = bind.isUnboundable();
