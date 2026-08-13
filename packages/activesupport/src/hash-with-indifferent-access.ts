@@ -7,7 +7,7 @@
  * slice, except, and deepMerge support.
  */
 
-import { deepMerge as deepMergeObj } from "./hash-utils.js";
+import { deepMerge as deepMergeObj, symbolizeKeysBang } from "./hash-utils.js";
 
 type AnyObject = Record<string, unknown>;
 
@@ -153,14 +153,16 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Return a new HashWithIndifferentAccess without the specified keys.
    */
   except(...keys: string[]): HashWithIndifferentAccess<V> {
-    const keySet = new Set(keys);
-    const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this.data) {
-      if (!keySet.has(k)) {
-        result.set(k, v);
-      }
-    }
-    return result;
+    return new HashWithIndifferentAccess<V>(this.toHash()).exceptBang(...keys);
+  }
+
+  /**
+   * Removes the given keys from the hash and returns it — the `Hash#except!`
+   * (core_ext/hash/except.rb:8-11) `except` delegates to.
+   */
+  exceptBang(...keys: string[]): HashWithIndifferentAccess<V> {
+    keys.forEach((key) => this.delete(key));
+    return this;
   }
 
   /**
@@ -438,7 +440,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * In TS all keys are already strings; returns a plain object.
    */
   symbolizeKeys(): AnyObject {
-    return this.toHash();
+    return symbolizeKeysBang(this.toHash());
   }
 
   /**

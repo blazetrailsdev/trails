@@ -12,7 +12,22 @@ import {
   ArgumentError,
   slice,
   except,
-  extractKeys,
+  extractBang,
+  sliceBang,
+  exceptBang,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaults,
+  withDefaultsBang,
+  stringifyKeysBang,
+  symbolizeKeysBang,
+  toOptions,
+  toOptionsBang,
+  deepTransformKeysBang,
+  deepStringifyKeysBang,
+  deepSymbolizeKeysBang,
+  nestedUnderIndifferentAccess,
+  withIndifferentAccess,
   toParam,
   compact,
   compactBlankObj,
@@ -173,14 +188,14 @@ describe("HashExtTest", () => {
 
   it("extract — removes and returns specified keys", () => {
     const original: Record<string, unknown> = { a: 1, b: 2, c: 3, d: 4 };
-    const extracted = extractKeys(original, "a", "b");
+    const extracted = extractBang(original, "a", "b");
     expect(extracted).toEqual({ a: 1, b: 2 });
     expect(original).toEqual({ c: 3, d: 4 });
   });
 
   it("extract nils — handles null values", () => {
     const original: Record<string, unknown> = { a: null, b: null };
-    const extracted = extractKeys(original, "a", "x");
+    const extracted = extractBang(original, "a", "x");
     expect(extracted).toEqual({ a: null });
     expect(original).toEqual({ b: null });
   });
@@ -468,27 +483,100 @@ describe("HashExtTest", () => {
     expect(r).toEqual({ x: 1, z: 3 });
   });
 
+  it("slice inplace", () => {
+    const original: Record<string, unknown> = { a: "x", b: "y", c: 10 };
+    expect(sliceBang(original, "a", "b")).toEqual({ c: 10 });
+    expect(original).toEqual({ a: "x", b: "y" });
+  });
+
   it("slice bang does not override default", () => {
-    const r = slice({ a: 1, b: 2 }, "a");
-    expect(r).toEqual({ a: 1 });
-    expect((r as any).b).toBeUndefined();
+    const hash: Record<string, unknown> = { a: 1, b: 2 };
+    sliceBang(hash, "a");
+    expect(hash).toEqual({ a: 1 });
   });
 
   it("slice bang does not override default proc", () => {
-    const r = slice({ key: "val", other: "nope" }, "key");
-    expect(r.key).toBe("val");
+    const hash: Record<string, unknown> = { key: "val", other: "nope" };
+    sliceBang(hash, "key");
+    expect(hash).toEqual({ key: "val" });
+  });
+
+  it("reverse merge", () => {
+    const defaults = { d: 0, a: "x", b: "y", c: 10 };
+    const options: Record<string, unknown> = { a: 1, b: 2 };
+    const expected = { d: 0, a: 1, b: 2, c: 10 };
+
+    expect(reverseMerge(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    let merged: Record<string, unknown> = { ...options };
+    expect(reverseMergeBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+    expect(Object.keys(merged)).toEqual(Object.keys(expected));
+
+    merged = { ...options };
+    expect(reverseUpdate(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("with defaults aliases reverse merge", () => {
+    const defaults = { a: "x", b: "y", c: 10 };
+    const options: Record<string, unknown> = { a: 1, b: 2 };
+    const expected = { a: 1, b: 2, c: 10 };
+
+    expect(withDefaults(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    const merged: Record<string, unknown> = { ...options };
+    expect(withDefaultsBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("except bang", () => {
+    const original: Record<string, unknown> = { a: true, b: false, c: null };
+    expect(exceptBang(original, "c")).toEqual({ a: true, b: false });
+    expect(original).toEqual({ a: true, b: false });
+  });
+
+  it("stringify keys bang", () => {
+    const hash: Record<string, unknown> = { a: 1, b: 2 };
+    expect(stringifyKeysBang(hash)).toBe(hash);
+    expect(hash).toEqual({ a: 1, b: 2 });
+  });
+
+  it("symbolize keys bang", () => {
+    const hash: Record<string, unknown> = { a: 1 };
+    expect(symbolizeKeysBang(hash)).toBe(hash);
+    expect(toOptionsBang).toBe(symbolizeKeysBang);
+    expect(toOptions).toBe(symbolizeKeys);
+  });
+
+  it("deep transform keys bang", () => {
+    const hash: Record<string, unknown> = { person: { name: "Rob", age: "28" } };
+    const nested = hash.person;
+    expect(deepTransformKeysBang(hash, (k) => k.toUpperCase())).toBe(hash);
+    expect(hash).toEqual({ PERSON: { NAME: "Rob", AGE: "28" } });
+    expect(hash.PERSON).toBe(nested);
+  });
+
+  it("deep stringify keys bang", () => {
+    const hash: Record<string, unknown> = { a: [{ b: 1 }, 2] };
+    expect(deepStringifyKeysBang(hash)).toBe(hash);
+    expect(hash).toEqual({ a: [{ b: 1 }, 2] });
+    expect(deepSymbolizeKeysBang(hash)).toBe(hash);
+    expect(nestedUnderIndifferentAccess).toBe(withIndifferentAccess);
   });
 
   it("extract", () => {
     const h: Record<string, unknown> = { a: 1, b: 2, c: 3 };
-    const extracted = extractKeys(h, "a", "c");
+    const extracted = extractBang(h, "a", "c");
     expect(extracted).toEqual({ a: 1, c: 3 });
     expect(h).toEqual({ b: 2 });
   });
 
   it("extract nils", () => {
     const h: Record<string, unknown> = { a: null, b: 2 };
-    const extracted = extractKeys(h, "a");
+    const extracted = extractBang(h, "a");
     expect(extracted).toEqual({ a: null });
     expect(h).toEqual({ b: 2 });
   });

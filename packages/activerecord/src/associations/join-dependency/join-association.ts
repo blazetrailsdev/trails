@@ -296,23 +296,26 @@ function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | 
   // Arel join node fields are readonly — return a new join with updated On constraint.
   void Nodes.StringJoin;
   if (!join || !constraints.length) return join as Nodes.Node | null;
-  const arelConstraints = constraints.filter((c): c is Nodes.Node => c instanceof Nodes.Node);
-  if (!arelConstraints.length) return join as Nodes.Node | null;
+  // `constraints` can still hold non-Arel residue here, which Ruby's
+  // `unshift`-into-`And` would carry into the visitor; narrow to nodes while
+  // keeping the Rails identifier so the call reads as Rails' does.
+  constraints = constraints.filter((c): c is Nodes.Node => c instanceof Nodes.Node);
+  if (!constraints.length) return join as Nodes.Node | null;
   const joinAny = join as any;
   if (join instanceof Nodes.StringJoin) {
-    const existing = joinAny.left;
-    const allExprs: Nodes.Node[] =
-      existing instanceof Nodes.Node ? [existing, ...arelConstraints] : arelConstraints;
-    const newLeft = allExprs.length === 1 ? allExprs[0] : new Nodes.And(allExprs);
-    return new Nodes.StringJoin(newLeft);
+    const joinString = new Nodes.And([joinAny.left, ...constraints]);
+    return new Nodes.StringJoin(joinString);
   } else if (joinAny.right?.expr instanceof Nodes.Node) {
-    // Rails `append_constraints`: `right.expr = And.new([right.expr, *constraints])`
+    // Rails `append_constraints`: `right.expr = And.new(constraints.unshift right.expr)`
     // — `right.expr` is nested as the first element rather than flattened, so an
     // existing And stays nested (`And([And([...]), ...new])`). Matches Rails
-    // structurally (SQL-equivalent either way).
-    const existing = joinAny.right.expr as Nodes.Node;
-    const newExpr = new Nodes.And([existing, ...arelConstraints]);
-    return new (join as any).constructor(joinAny.left, new Nodes.On(newExpr));
+    // structurally (SQL-equivalent either way). Arel join node fields are
+    // readonly in trails, so we rebuild the join rather than assign to it.
+    const right = joinAny.right;
+    return new (join as any).constructor(
+      joinAny.left,
+      new Nodes.On(new Nodes.And([right.expr, ...constraints])),
+    );
   }
   return join as Nodes.Node | null;
 }

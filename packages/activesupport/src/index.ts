@@ -178,6 +178,10 @@ export {
   parameterize,
   ordinal,
   ordinalize,
+  upcaseFirst,
+  downcaseFirst,
+  camelcase,
+  titlecase,
 } from "./inflector.js";
 
 export { Inflections, loadDefaults } from "./inflector/inflections.js";
@@ -203,8 +207,6 @@ export {
   remove,
   ord,
   stripHeredoc,
-  downcaseFirst,
-  upcaseFirst,
   at,
   first,
   last,
@@ -233,7 +235,23 @@ export {
   assertValidKeys,
   withIndifferentAccess,
   deepTransformValues,
-  extractKeys,
+  extractBang,
+  stringifyKeysBang,
+  symbolizeKeysBang,
+  toOptions,
+  toOptionsBang,
+  deepTransformKeysBang,
+  deepStringifyKeysBang,
+  deepSymbolizeKeysBang,
+  _deepTransformKeysInObject,
+  _deepTransformKeysInObjectBang,
+  withDefaults,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaultsBang,
+  sliceBang,
+  exceptBang,
+  nestedUnderIndifferentAccess,
   toParam,
   toQuery,
   isPlainObject,
@@ -261,6 +279,7 @@ export {
 export {
   sum,
   indexBy,
+  indexWith,
   groupBy,
   pluck,
   maximum,
@@ -569,6 +588,14 @@ export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // Rails users reach them through `require "active_support/core_ext/range/..."`.
 // Re-exporting them here would collide with `time-ext.ts`'s `Date#to_fs` and the
 // enumerable `each`/`step`. Mirrors the pattern used by glob, digest, etc.
+//
+// Same for core-ext/date's calculations
+// (`@blazetrails/activesupport/core-ext/date/calculations`), the `Date` arm of
+// `active_support/core_ext/date/calculations.rb`: in Ruby its `ago`/`since`/
+// `beginning_of_day`/`middle_of_day`/`end_of_day`/`advance`/`change`/`current`
+// are methods on `Date`, so they never collide with the `Time` arm's
+// same-named methods; in a flat ESM namespace they would, and `time-ext.js`
+// below owns those spellings.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

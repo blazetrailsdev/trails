@@ -436,11 +436,11 @@ async function updateCounter(
 function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
   const reflection = this.reflection;
   if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
-  const column = reflection.counterCacheColumn?.() as string;
+  const counter = reflection.counterCacheColumn?.() as string;
   const owner = this.owner as any;
-  const current = Number(owner.readAttribute?.(column) ?? 0);
-  owner.writeAttribute?.(column, current + difference);
-  owner.clearAttributeChange?.(column);
+  const current = Number(owner.readAttribute?.(counter) ?? 0);
+  owner.writeAttribute?.(counter, current + difference);
+  owner.clearAttributeChange?.(counter);
 }
 
 /**

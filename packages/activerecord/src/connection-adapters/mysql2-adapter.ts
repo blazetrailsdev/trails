@@ -471,7 +471,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...mysqlConfig
     } = config as mysql.PoolOptions & MysqlAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (preparedStatements !== undefined) this.preparedStatements = preparedStatements;
+    // abstract_adapter.rb:159 — the global toggle is folded in at the single
+    // config-reading site, as Rails' `initialize` does.
+    this.preparedStatements =
+      !ActiveRecord.disablePreparedStatements &&
+      (Mysql2Adapter.typeCastConfigToBoolean(
+        preparedStatements !== undefined ? preparedStatements : this.defaultPreparedStatements(),
+      ) as boolean);
     if (advisoryLocks !== undefined) {
       this._advisoryLocksEnabled = Mysql2Adapter.typeCastConfigToBoolean(advisoryLocks) !== false;
     }

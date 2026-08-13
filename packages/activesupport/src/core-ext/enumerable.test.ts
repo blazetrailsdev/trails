@@ -5,6 +5,7 @@ import {
   without,
   sum,
   indexBy,
+  indexWith,
   many,
   pluck,
   pick,
@@ -163,6 +164,12 @@ describe("EnumerableTests", () => {
     expect(sole([42])).toBe(42);
     expect(() => sole([])).toThrow();
     expect(() => sole([1, 2])).toThrow();
+  });
+
+  it("index with", () => {
+    expect(indexWith([5, 15, 10], (price) => price)).toEqual({ 5: 5, 15: 15, 10: 10 });
+    expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
+    expect(indexWith(["title", "body"], [])).toEqual({ title: [], body: [] });
   });
 
   it("doesnt bust constant cache", () => {

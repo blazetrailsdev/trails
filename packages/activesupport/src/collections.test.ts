@@ -15,7 +15,7 @@ import {
   reverseMerge,
   assertValidKeys,
   deepTransformValues,
-  extractKeys,
+  extractBang,
   wrap,
   inGroupsOf,
   toSentence,
@@ -262,24 +262,24 @@ describe("deepTransformValues", () => {
   });
 });
 
-describe("extractKeys", () => {
+describe("extractBang", () => {
   it("extracts specified keys and removes them from original", () => {
     const original: Record<string, number> = { a: 1, b: 2, c: 3, d: 4 };
-    const extracted = extractKeys(original, "a", "b");
+    const extracted = extractBang(original, "a", "b");
     expect(extracted).toEqual({ a: 1, b: 2 });
     expect(original).toEqual({ c: 3, d: 4 });
   });
 
   it("ignores keys not in original", () => {
     const original: Record<string, unknown> = { a: 1, b: 2 };
-    const extracted = extractKeys(original, "a", "x");
+    const extracted = extractBang(original, "a", "x");
     expect(extracted).toEqual({ a: 1 });
     expect(original).toEqual({ b: 2 });
   });
 
   it("handles nil values", () => {
     const original: Record<string, unknown> = { a: null, b: null };
-    const extracted = extractKeys(original, "a", "x");
+    const extracted = extractBang(original, "a", "x");
     expect(extracted).toEqual({ a: null });
     expect(original).toEqual({ b: null });
   });

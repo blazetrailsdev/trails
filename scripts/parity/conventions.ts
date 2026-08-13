@@ -546,6 +546,67 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "Ruby method-(re)definition machinery: `silence_redefinition_of_method` " +
+      "exists to suppress MRI's method-redefined warning, `redefine_singleton_method` " +
+      "wraps `define_singleton_method` in that suppression, and `method_visibility` " +
+      "reports the public/protected/private state MRI stores per method " +
+      "(core_ext/module/redefine_method.rb:5-22). JS has no redefinition warning " +
+      "to silence — reassigning a prototype property is silent — and no runtime " +
+      "visibility state to query, so all three collapse to a plain assignment " +
+      "the port already does inline at every call site.",
+    names: ["silence_redefinition_of_method", "redefine_singleton_method", "method_visibility"],
+    rubyFiles: ["core_ext/module/redefine_method.rb"],
+  },
+  {
+    reason:
+      "Ruby module-body metaprogramming DSLs. `alias_attribute` " +
+      "(core_ext/module/aliasing.rb) defines reader/writer/predicate methods by " +
+      "`module_eval`ing generated source; `concerning`/`concern` " +
+      "(core_ext/module/concerning.rb:104-114) create an anonymous nested " +
+      "`Module` from a block, name it as a constant on the host and `include` it. " +
+      "Both need runtime source evaluation and constant assignment into a module " +
+      "namespace, neither of which exists in TypeScript; trails' equivalent is " +
+      "`Concern` + the `include()`/`Included<>` mixin idiom, which the callers " +
+      "already use directly. (ActiveRecord's own `alias_attribute` is a separate " +
+      "method on ActiveRecord::Base and is ported there.)",
+    names: ["concerning", "concern"],
+    rubyFiles: ["core_ext/module/aliasing.rb", "core_ext/module/concerning.rb"],
+  },
+  {
+    reason:
+      "`attr_internal_define` (core_ext/module/attr_internal.rb:26-31) is the " +
+      "shared `define_method` back end for `attr_internal_reader`/`_writer`, and " +
+      "`attr_internal_naming_format` is the `attr_accessor`-generated pair for the " +
+      "`@_%s` template it interpolates. trails' `attrInternal*` helpers assign the " +
+      "underlying property directly rather than generating methods from a name " +
+      "template, so there is no format string to expose and no define_method " +
+      "back end to name; the naming format is reachable as " +
+      "`getAttrInternalNamingFormat`/`setAttrInternalNamingFormat`.",
+    names: ["attr_internal_define", "attr_internal_naming_format"],
+    rubyFiles: ["core_ext/module/attr_internal.rb"],
+  },
+  {
+    reason:
+      "`String#squish!` and `String#remove!` (core_ext/string/filters.rb:21-25,40-46) " +
+      "mutate the receiver via `gsub!`/`strip!`. A JS string is an immutable " +
+      "primitive — there is no receiver to mutate and no way to hand the caller " +
+      "back a changed one — so the bang forms cannot exist; `squish` and `remove` " +
+      "are the whole surface.",
+    names: ["squish!", "remove!"],
+    rubyFiles: ["core_ext/string/filters.rb"],
+  },
+  {
+    reason:
+      "`ActiveSupport::EnumerableCoreExt::Constants#const_missing` " +
+      "(core_ext/enumerable.rb:14-22) exists only to keep the deprecated " +
+      "`Enumerable::SoleItemExpectedError` constant resolvable through Ruby's " +
+      "constant-lookup hook. JS has no const_missing hook and trails exports the " +
+      "error class directly, so there is nothing to intercept.",
+    names: ["const_missing"],
+    rubyFiles: ["core_ext/enumerable.rb"],
+  },
+  {
+    reason:
       "PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a " +
       "live `SELECT '<type>'::regtype::oid` query, so trails' port is async and " +
       "diverges from the sync abstract signature it overrides; it is tracked by " +

@@ -1,4 +1,4 @@
-import { extractKeys, isPlainObject } from "../hash-utils.js";
+import { extractBang, isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
 // The `messages/` ports raise through the Ruby builtins declared in
 // serializer-with-fallback.ts; activesupport has no separate errors module, and
@@ -115,7 +115,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     normalized.secretGenerator ??= this.#secretGenerator;
 
     const secretGeneratorKwargs = (normalized.secretGenerator as SecretGenerator).parameters ?? [];
-    normalized.secretGeneratorOptions = extractKeys(normalized, ...secretGeneratorKwargs);
+    normalized.secretGeneratorOptions = extractBang(normalized, ...secretGeneratorKwargs);
 
     normalized.onRotation = this.#onRotation;
 

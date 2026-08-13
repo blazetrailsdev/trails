@@ -151,8 +151,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#difference
    */
   protected override difference(a: Base[], b: Base[]): Base[] {
-    const dist = distribution(b);
-    return a.filter((record) => !markOccurrence(dist, record));
+    const distribution = this.distribution(b);
+    return a.filter((record) => !this.markOccurrence(distribution, record));
   }
 
   /**
@@ -161,8 +161,24 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#intersection
    */
   protected override intersection(a: Base[], b: Base[]): Base[] {
-    const dist = distribution(b);
-    return a.filter((record) => markOccurrence(dist, record));
+    const distribution = this.distribution(b);
+    return a.filter((record) => this.markOccurrence(distribution, record));
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#mark_occurrence
+   * (has_many_through_association.rb:189-191).
+   */
+  protected markOccurrence(distribution: Occurrences, record: Base): boolean {
+    return markOccurrence(distribution, record);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Associations::HasManyThroughAssociation#distribution
+   * (has_many_through_association.rb:193-197).
+   */
+  protected distribution(array: Base[]): Occurrences {
+    return distribution(array);
   }
 
   /**
@@ -474,8 +490,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     // for every method except `:destroy` (whose per-record callbacks handle it).
     // `klass` is the ASSOCIATION's klass (the target model), not the source
     // reflection's — a polymorphic source belongs_to has none, and taggings'
-    // `taggable` is exactly such a source. `safeKlass` + the id null-filter stay
-    // defensive (null PKs).
+    // `taggable` is exactly such a source. `safeKlass` stays defensive
+    // (a polymorphic source has no klass at all).
     const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
       ?.sourceReflection;
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
@@ -483,9 +499,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       const klass = safeKlass({ klass: this.klass }) as {
         decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
       } | null;
-      const ids = records.map((r) => (r as any).id).filter((id: unknown) => id != null);
-      if (typeof counter === "string" && klass?.decrementCounter && ids.length > 0) {
-        await klass.decrementCounter(counter, ids);
+      if (typeof counter === "string" && klass?.decrementCounter) {
+        await klass.decrementCounter(
+          counter,
+          records.map((record) => (record as any).id),
+        );
       }
     }
 
@@ -869,25 +887,31 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
 }
 
 /**
+ * The occurrence buckets Ruby gets from `Hash.new(0)` keyed by the record.
+ * @internal
+ */
+type Occurrences = Array<{ record: Base; count: number }>;
+
+/**
  * `distribution` + `mark_occurrence` (has_many_through_association.rb:187-195)
  * as one occurrence counter. Ruby keys the hash by the record, hashing on
  * AR::Core `hash`/`eql?` (class + id), so the buckets are matched with the same
  * record equality rather than JS identity.
  * @internal
  */
-function distribution(records: Base[]): Array<{ record: Base; count: number }> {
-  const buckets: Array<{ record: Base; count: number }> = [];
-  for (const record of records) {
-    const bucket = buckets.find((b) => b.record.equals(record));
+function distribution(array: Base[]): Occurrences {
+  const distribution: Occurrences = [];
+  for (const record of array) {
+    const bucket = distribution.find((b) => b.record.equals(record));
     if (bucket) bucket.count += 1;
-    else buckets.push({ record, count: 1 });
+    else distribution.push({ record, count: 1 });
   }
-  return buckets;
+  return distribution;
 }
 
 /** @internal */
-function markOccurrence(buckets: Array<{ record: Base; count: number }>, record: Base): boolean {
-  const bucket = buckets.find((b) => b.record.equals(record));
+function markOccurrence(distribution: Occurrences, record: Base): boolean {
+  const bucket = distribution.find((b) => b.record.equals(record));
   if (!bucket || bucket.count <= 0) return false;
   bucket.count -= 1;
   return true;
@@ -900,14 +924,14 @@ function markOccurrence(buckets: Array<{ record: Base; count: number }>, record:
  * @internal
  */
 export function multisetDifference(a: Base[], b: Base[]): Base[] {
-  const dist = distribution(b);
-  return a.filter((record) => !markOccurrence(dist, record));
+  const buckets = distribution(b);
+  return a.filter((record) => !markOccurrence(buckets, record));
 }
 
 /** @internal */
 export function multisetIntersection(a: Base[], b: Base[]): Base[] {
-  const dist = distribution(b);
-  return a.filter((record) => markOccurrence(dist, record));
+  const buckets = distribution(b);
+  return a.filter((record) => markOccurrence(buckets, record));
 }
 
 /**

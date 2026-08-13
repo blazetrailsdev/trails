@@ -30,6 +30,28 @@ export function indexBy<T, K extends string | number>(
 }
 
 /**
+ * Convert an enumerable to a hash keyed by its elements, with the value
+ * produced by the block (or the given `default` when there is no block).
+ *
+ * Mirrors: Enumerable#index_with (core_ext/enumerable.rb:75-87). Ruby's
+ * no-block/no-default arm returns an Enumerator; there is no trails analogue,
+ * so `indexWith` requires one of the two.
+ */
+export function indexWith<T extends string | number, V>(
+  collection: T[],
+  defaultOrBlock: V | ((elem: T) => V),
+): Record<T, V> {
+  const result = {} as Record<T, V>;
+  if (typeof defaultOrBlock === "function") {
+    const block = defaultOrBlock as (elem: T) => V;
+    for (const elem of collection) result[elem] = block(elem);
+  } else {
+    for (const elem of collection) result[elem] = defaultOrBlock;
+  }
+  return result;
+}
+
+/**
  * Group a collection by a key function. The result is a `Map` because Ruby's
  * `group_by` returns a Hash keyed by VALUE — the keys are arbitrary objects
  * (Integer, String, nil), which a JS object would collapse by string coercion.
