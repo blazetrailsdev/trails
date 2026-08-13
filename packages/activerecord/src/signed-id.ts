@@ -12,6 +12,13 @@ import { UnknownPrimaryKey } from "./errors.js";
  * Mirrors: ActiveRecord::SignedId
  */
 
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
 
 /** Mirrors: ActiveRecord::SignedId::ClassMethods */
@@ -43,8 +50,8 @@ export class ClassMethods {
       | null
       | undefined;
     if (typeof secret === "function") secret = secret();
-    if (!secret) {
-      throw new Error(
+    if (secret == null) {
+      throw new ArgumentError(
         "You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids",
       );
     }
