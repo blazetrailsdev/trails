@@ -1788,6 +1788,10 @@ export function association<T extends Base = Base>(
         existing._hydrateFromPreload(records as T[]);
       }
     }
+    // collection_association.rb:41 — `reader` ends in `@proxy.reset_scope`,
+    // including on the cached-proxy path. Called for effect: `reset_scope`
+    // returns the raw proxy, and callers must keep holding the JS Proxy wrapper.
+    (existing as unknown as { resetScope(): unknown }).resetScope();
     return existing;
   }
 

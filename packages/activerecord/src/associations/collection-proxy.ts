@@ -8,11 +8,7 @@ import {
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
-import {
-  wrapWithScopeProxy,
-  associationRelationClassFor,
-  collectionProxyClassFor,
-} from "../relation/delegation.js";
+import { associationRelationClassFor, collectionProxyClassFor } from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
@@ -205,6 +201,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // without re-querying, until `reset`/`reload`/mutation clears it (finder_methods.rb,
   // collection_proxy.rb#reset). Keyed "first"/"last"/"take".
   private _offsetMemo = new Map<string, T | null>();
+  // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
+  // by `reset_scope` (collection_proxy.rb:1113-1117).
+  private _scope: unknown;
   // Mirrors Rails' `CollectionAssociation#@replaced_or_added_targets` (a
   // `Set.new.compare_by_identity`): records that have been added to or
   // replaced on the in-memory target. `replace_on_target` consults it to
@@ -2776,8 +2775,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
-    this._offsetMemo.clear();
     await this.load();
+    this.resetScope();
     return stripThenable(this);
   }
 
@@ -2791,7 +2790,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = false;
     this._target = [];
     this._replacedOrAddedTargets.clear();
-    this._offsetMemo.clear();
     // Drop the OO association's memoized named-scope relations (Rails'
     // `reset_scope`) so the next `things.someScope()` rebuilds. Only an
     // already-built instance can hold a cache, so don't construct one here.
@@ -2799,6 +2797,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       | { _namedScopeRelations?: Map<string, unknown> }
       | undefined;
     if (assoc) assoc._namedScopeRelations = undefined;
+    this.resetScope();
     return this;
   }
 
@@ -2835,59 +2834,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    if (this._isThrough) {
-      return this._wrapAsAssociationRelation(this._buildThroughScope());
-    }
-
-    const rel = hasManyScope(this._record, this._assocName, this._assocDef.options);
-    if (rel === null) {
-      const targetModel = this.model;
-      let emptyRel = (targetModel as any).all();
-      if (this._assocDef.options.scope) {
-        emptyRel = this._assocDef.options.scope(emptyRel);
-      }
-      return this._wrapAsAssociationRelation(emptyRel.none());
-    }
-    return this._wrapAsAssociationRelation(rel);
-  }
-
-  /**
-   * Promote a plain Relation produced by the `scope()` seam /
-   * `_buildThroughScope` into an AssociationRelation bound to this proxy.
-   * Matching Rails' CollectionAssociation#scope — writes on the returned
-   * relation (build / create / create!) route back through the owning
-   * association so FK, inverse, and loaded target stay in sync.
-   */
-  private _wrapAsAssociationRelation(rel: any): any {
-    if (!_AssociationRelationCtor) {
-      // Defensive: only reachable if a consumer deep-imports this file
-      // without loading the @blazetrails/activerecord package entry,
-      // which re-exports association-relation.ts (where the ctor
-      // self-registers). A direct side-effect import here would
-      // reintroduce the Base↔Relation↔AssociationRelation evaluation
-      // cycle we used late-binding to break in the first place.
-      throw new Error(
-        "AssociationRelation constructor has not been registered. Import " +
-          "from '@blazetrails/activerecord' (the package entry) rather than " +
-          "deep-importing './associations/collection-proxy.js'.",
-      );
-    }
-    const Ctor = associationRelationClassFor(rel.model as typeof Base);
-    const ar = new Ctor(rel.model, this);
-    ar._copyStateFrom(rel);
-    // Re-apply the association's `extend:` modules — mirrors Rails
-    // `CollectionAssociation#scope`, which extends the freshly built scope
-    // with `reflection.extensions`. Without this, an extension method
-    // (`posts(:welcome).comments.find_most_recent`) is lost the moment the
-    // proxy delegates a named scope through `scope()` (`comments.not_again`),
-    // since the scope is built off the `scope()` seam, not cloned off the
-    // proxy that carries `_extending`.
-    const ext = this._assocDef.options.extend;
-    if (ext) {
-      const extensions = Array.isArray(ext) ? ext : [ext];
-      ar.extendingBang(...extensions);
-    }
-    return wrapWithScopeProxy(ar);
+    return (this._scope ??= (
+      this._record.association(this._assocName) as { scope(): unknown }
+    ).scope());
   }
 
   private _buildThroughScope(): any {
@@ -3373,8 +3322,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#reset_scope
    */
   resetScope(): this {
-    // No-op: scope() rebuilds the relation each call, so there's nothing
-    // cached to clear. Rails resets @scope/@offsets/@take here.
+    this._offsetMemo.clear();
+    this._scope = undefined;
     return this;
   }
 
