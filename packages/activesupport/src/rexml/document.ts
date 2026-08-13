@@ -348,7 +348,7 @@ export class Document {
       attribute.lastIndex = pos;
       const match = attribute.exec(source);
       if (!match) fail(`Malformed attribute at ${pos}`);
-      element.attributes.set(match[1], unescapeXml(match[3] ?? match[4]));
+      element.attributes.set(match[1], unescapeXml(match[3] ?? match[4], this.entities));
       pos = attribute.lastIndex;
     }
   }

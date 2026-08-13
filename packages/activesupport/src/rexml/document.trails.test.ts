@@ -46,6 +46,13 @@ describe("REXML::Document", () => {
     expect(doc.root!.texts.map((t) => t.value)).toEqual(["aaa"]);
   });
 
+  it("expands the internal DTD subset entities in attribute values", () => {
+    const doc = new Document(`<!DOCTYPE root [<!ENTITY a "aaa">]><root attr="&a;"/>`);
+    const attrs: Array<[string, string]> = [];
+    doc.root!.attributes.each((n, v) => attrs.push([n, v]));
+    expect(attrs).toEqual([["attr", "aaa"]]);
+  });
+
   it("raises RuntimeError when an entity expands past REXML's text limit", () => {
     const doc = new Document(`<?xml version="1.0" encoding="UTF-8"?>
       <!DOCTYPE member [
