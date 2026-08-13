@@ -4,7 +4,8 @@
 import { Temporal } from "@blazetrails/date";
 
 import { Duration } from "../duration.js";
-import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
+import { clock, currentTimeInstant } from "../time-travel.js";
+import { getZone } from "../time-zone-config.js";
 
 /** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
 class RuntimeError extends Error {
@@ -86,20 +87,6 @@ export class SimpleStubs {
     (stub.object as Record<string, unknown>)[stub.methodName] = stub.originalMethod;
   }
 }
-
-/**
- * The seam the trails clock is stubbed through. Rails redefines `Time.now`,
- * `Time.new`, `Date.today` and `DateTime.now` as singleton methods; trails
- * production code reads the clock through `time-travel.ts`'s module state
- * (`currentTimeInstant`), which no singleton-method stub can reach, so the one
- * stubbed method is this holder's `now` and `stubObject`/`unstubAllBang` push
- * its value into that module state.
- */
-const clock = {
-  now(): Temporal.Instant {
-    return currentTimeInstant();
-  },
-};
 
 let _simpleStubs: SimpleStubs | undefined;
 let _inBlock = false;
@@ -184,7 +171,11 @@ export function travelTo(
 
   let now: Temporal.Instant;
   if (typeof dateOrTime === "string") {
-    now = Temporal.Instant.from(dateOrTime);
+    // Rails' String arm is `Time.zone.parse(date_or_time)`; without a zone set
+    // there is no `Time.zone` to parse through, so the ISO string is read
+    // directly.
+    const zone = getZone();
+    now = zone ? zone.parse(dateOrTime).toTime() : Temporal.Instant.from(dateOrTime);
   } else if (dateOrTime instanceof Date) {
     now = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());
   } else {
@@ -198,7 +189,6 @@ export function travelTo(
   const stubs = simpleStubs();
   const stubbedTime = stubs.stubbing(clock, "now") ? currentTimeInstant() : undefined;
   stubs.stubObject(clock, "now", () => now);
-  setFrozenInstant(now);
 
   if (block) {
     try {
@@ -227,7 +217,6 @@ export function travelBack(block?: () => void): void {
 
   try {
     simpleStubs().unstubAllBang();
-    setFrozenInstant(null);
     if (block) block();
   } finally {
     if (stubbedTime) travelTo(stubbedTime);
@@ -268,7 +257,7 @@ function setInBlock(value: boolean): void {
 
 /**
  * Returns the current time, honouring any active travel. Rails reads
- * `Time.now`; the trails clock seam is the module-level `clock` holder above.
+ * `Time.now`; the trails clock method is `time-travel.ts`'s `clock.now`.
  */
 function currentTime(): Date {
   return new Date(clock.now().epochMilliseconds);

@@ -25,7 +25,16 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
   });
 
   function withInstrumentation(method: string, block: () => void): Event[] {
-    return Notifications.collectEvents(`cache_${method}.active_support`, block);
+    const eventName = `cache_${method}.active_support`;
+
+    const events: Event[] = [];
+    try {
+      Notifications.subscribe(eventName, (event) => events.push(event));
+      block();
+      return events;
+    } finally {
+      Notifications.unsubscribe(eventName);
+    }
   }
 
   function normalizedKey(key: string, options?: StoreOptions): string {

@@ -1,4 +1,5 @@
-import { extractBang, isPlainObject } from "../hash-utils.js";
+import { extractBang } from "../core-ext/hash/slice.js";
+import { isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
 // The `messages/` ports raise through the Ruby builtins declared in
 // serializer-with-fallback.ts; activesupport has no separate errors module, and

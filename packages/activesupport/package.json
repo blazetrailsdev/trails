@@ -66,6 +66,10 @@
       "types": "./dist/core-ext/date/calculations.d.ts",
       "default": "./dist/core-ext/date/calculations.js"
     },
+    "./core-ext/hash/slice": {
+      "types": "./dist/core-ext/hash/slice.d.ts",
+      "default": "./dist/core-ext/hash/slice.js"
+    },
     "./core-ext/range/conversions": {
       "types": "./dist/core-ext/range/conversions.d.ts",
       "default": "./dist/core-ext/range/conversions.js"

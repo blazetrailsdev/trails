@@ -37,7 +37,6 @@ export class Merger {
     const rel = this.relation;
     this.mergeUnscope(rel);
     this.mergeExtending(rel);
-    this.mergeWhereClause(rel);
     this.mergeSelectValues(rel);
     this.mergeMultiValues(rel);
     this.mergeSingleValues(rel);
@@ -75,12 +74,6 @@ export class Merger {
   private mergeExtending(rel: any): void {
     const extendingValues = this.other._extending ?? [];
     if (extendingValues.length > 0) rel.extendingBang(...extendingValues);
-  }
-
-  private mergeWhereClause(rel: any): void {
-    if (!this.other._whereClause.isEmpty()) {
-      rel._whereClause = rel._whereClause.merge(this.other._whereClause);
-    }
   }
 
   private mergeSelectValues(rel: any): void {
@@ -280,12 +273,15 @@ export class Merger {
   }
 
   private mergeClauses(rel: any): void {
-    if (!this.other._havingClause.isEmpty()) {
-      rel._havingClause = rel._havingClause.merge(this.other._havingClause);
-    }
     if (this.isReplaceFromClause() && this.other._fromClause) {
       rel._fromClause = this.other._fromClause;
     }
+
+    const whereClause = rel._whereClause.merge(this.other._whereClause);
+    if (!whereClause.isEmpty()) rel._whereClause = whereClause;
+
+    const havingClause = rel._havingClause.merge(this.other._havingClause);
+    if (!havingClause.isEmpty()) rel._havingClause = havingClause;
   }
 
   private isReplaceFromClause(): boolean {

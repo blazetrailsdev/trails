@@ -10,10 +10,16 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
-import { afterAll, expect } from "vitest";
+import { afterAll, afterEach, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
-import { getZone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
+import {
+  afterTeardown,
+  getZone,
+  setZone,
+  resetZone,
+  isZoneExplicit,
+} from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
@@ -171,6 +177,14 @@ export function writingPoolsLeakedSinceBaseline(): string[] {
   }
   return leaked;
 }
+
+// Mirror `ActiveSupport::Testing::TimeHelpers#after_teardown`
+// (activesupport/lib/active_support/testing/time_helpers.rb:70-73), which Rails
+// gets on every test case through the `super` chain: travel is unwound after
+// each test whether or not the case remembered to call `travel_back`.
+afterEach(() => {
+  afterTeardown();
+});
 
 afterAll(() => {
   expect(

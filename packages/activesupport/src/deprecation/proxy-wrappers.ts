@@ -200,6 +200,23 @@ export class DeprecatedConstantProxy extends Module {
     return (this.target as { name: string }).name;
   }
 
+  // Ruby's `Object#hash` and `Object#respond_to?` are universal; TypeScript has
+  // no such members, so each delegation calls the target's own port when it has
+  // one and answers from the object itself otherwise. Either way the probe is
+  // answered here rather than falling through to `methodMissing`, which is the
+  // whole point of Rails' delegate line.
+  hash(): unknown {
+    const target = this.target as { hash?: () => unknown };
+    return typeof target.hash === "function" ? target.hash() : undefined;
+  }
+
+  respondTo(method: string): boolean {
+    const target = this.target as { respondTo?: (m: string) => boolean };
+    return typeof target.respondTo === "function"
+      ? target.respondTo(method)
+      : method in (target as object);
+  }
+
   /** Returns the class of the new constant. Mirrors: proxy_wrappers.rb:152-154. */
   class(): unknown {
     return (this.target as object).constructor;

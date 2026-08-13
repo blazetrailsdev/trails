@@ -18,6 +18,28 @@ import { Temporal } from "@blazetrails/date";
 let _frozenInstant: Temporal.Instant | null = null;
 let _timeOffsetNs: bigint = 0n;
 
+/**
+ * The named clock method `travel_to` stubs. Rails redefines the `Time.now`,
+ * `Time.new`, `Date.today` and `DateTime.now` singleton methods, so production
+ * code reading any of them sees the traveled time; trails production code reads
+ * the clock through `currentTimeInstant()`, so this holder's `now` is the
+ * method that plays that role and `SimpleStubs` (testing/time-helpers.ts)
+ * replaces it exactly the way Rails replaces `Time.now`.
+ *
+ * @noRailsEquivalent Ruby's stub target is the `Time.now` singleton method
+ * itself; TypeScript's clock seam is this module, so the method that plays that
+ * role has to live here.
+ */
+export const clock = {
+  now(): Temporal.Instant {
+    if (_frozenInstant) return _frozenInstant;
+    if (_timeOffsetNs === 0n) return Temporal.Now.instant();
+    return Temporal.Instant.fromEpochNanoseconds(
+      Temporal.Now.instant().epochNanoseconds + _timeOffsetNs,
+    );
+  },
+};
+
 export function setFrozenTime(time: Date | null): void {
   if (time === null) {
     _frozenInstant = null;
@@ -49,11 +71,7 @@ export function setTimeOffsetNs(offsetNs: bigint): void {
  * offset paths.
  */
 export function currentTimeInstant(): Temporal.Instant {
-  if (_frozenInstant) return _frozenInstant;
-  if (_timeOffsetNs === 0n) return Temporal.Now.instant();
-  return Temporal.Instant.fromEpochNanoseconds(
-    Temporal.Now.instant().epochNanoseconds + _timeOffsetNs,
-  );
+  return clock.now();
 }
 
 /**

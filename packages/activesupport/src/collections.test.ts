@@ -30,7 +30,7 @@ import {
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
-import { extractBang } from "./hash-utils.js";
+import { extractBang } from "./core-ext/hash/slice.js";
 
 // ── Hash utilities ──────────────────────────────────────────────────
 

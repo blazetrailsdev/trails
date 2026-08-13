@@ -7,7 +7,7 @@ import {
 } from "./proxy-wrappers.js";
 import { extend, include, prepend } from "../include.js";
 import { registerConstant } from "../inflector.js";
-import { assertDeprecated } from "../testing/deprecation.js";
+import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 
 describe("ProxyWrappersTest", () => {
   const Waffles = false;
@@ -61,6 +61,18 @@ describe("ProxyWrappersTest", () => {
       prepend(klass, proxy as never);
     });
     expect(new klass().isWaffle()).toBe(true);
+  });
+
+  it("proxy delegates respond_to? and hash to target without warning", async () => {
+    const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator) as {
+      respondTo(method: string): boolean;
+      hash(): unknown;
+    };
+    await assertNotDeprecated(deprecator, () => {
+      expect(proxy.respondTo("isWaffle")).toBe(true);
+      expect(proxy.respondTo("isPancake")).toBe(false);
+      proxy.hash();
+    });
   });
 
   it("extending proxy module", async () => {

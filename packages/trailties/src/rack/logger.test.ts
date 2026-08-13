@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Logger } from "./logger.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { NotificationEvent as Event } from "@blazetrails/activesupport";
 import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
 
 const emptyBody = (): RackBody => ({
@@ -17,11 +18,16 @@ const closeBody = (body: RackBody): void => {
 
 describe("Rack::Logger", () => {
   it("notification", async () => {
-    const events = await Notifications.collectEventsAsync("request.action_dispatch", async () => {
-      const middleware = new Logger(okApp);
-      const [, , body] = await middleware.call({ REQUEST_METHOD: "GET" });
-      closeBody(body);
-    });
+    const events: Event[] = [];
+    await Notifications.subscribed(
+      (event: Event) => events.push(event),
+      "request.action_dispatch",
+      async () => {
+        const middleware = new Logger(okApp);
+        const [, , body] = await middleware.call({ REQUEST_METHOD: "GET" });
+        closeBody(body);
+      },
+    );
     expect(events).toHaveLength(1);
   });
 
@@ -31,23 +37,28 @@ describe("Rack::Logger", () => {
     };
     const popped: number[] = [];
     let captured: unknown;
-    const events = await Notifications.collectEventsAsync("request.action_dispatch", async () => {
-      const middleware = new Logger(failingApp, {
-        logger: {
-          pushTags: (...tags) => tags,
-          popTags: (n = 1) => {
-            popped.push(n);
-            return [];
+    const events: Event[] = [];
+    await Notifications.subscribed(
+      (event: Event) => events.push(event),
+      "request.action_dispatch",
+      async () => {
+        const middleware = new Logger(failingApp, {
+          logger: {
+            pushTags: (...tags) => tags,
+            popTags: (n = 1) => {
+              popped.push(n);
+              return [];
+            },
           },
-        },
-        taggers: ["t"],
-      });
-      try {
-        await middleware.call({ REQUEST_METHOD: "GET" });
-      } catch (e) {
-        captured = e;
-      }
-    });
+          taggers: ["t"],
+        });
+        try {
+          await middleware.call({ REQUEST_METHOD: "GET" });
+        } catch (e) {
+          captured = e;
+        }
+      },
+    );
     expect((captured as Error).message).toBe("boom");
     expect(events).toHaveLength(1);
     expect(popped).toEqual([1]);
