@@ -36,6 +36,7 @@ export class Merger {
   merge(): any {
     const rel = this.relation;
     this.mergeUnscope(rel);
+    this.mergeExtending(rel);
     this.mergeWhereClause(rel);
     this.mergeSelectValues(rel);
     this.mergeMultiValues(rel);
@@ -64,6 +65,16 @@ export class Merger {
   private mergeUnscope(rel: any): void {
     const unscopeValues = this.other._unscopeValues ?? [];
     if (unscopeValues.length > 0) rel.unscopeBang(...unscopeValues);
+  }
+
+  // Rails merges :extending through the NORMAL_VALUES loop
+  // (`relation.extending!(*value)`, merger.rb:58-67). This is how
+  // `target_scope.merge!(association_scope)` (association.rb:307) carries the
+  // reflection's extension modules — mixed in at association_scope.rb:28 —
+  // onto the association's own scope.
+  private mergeExtending(rel: any): void {
+    const extendingValues = this.other._extending ?? [];
+    if (extendingValues.length > 0) rel.extendingBang(...extendingValues);
   }
 
   private mergeWhereClause(rel: any): void {
