@@ -219,14 +219,12 @@ export class RelationQueries {
     this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
   ): Record<string, unknown> {
-    const relation = this;
-    const model = relation.model ?? relation;
+    const model = this.model ?? this;
     const encryptedAttrs = model._encryptedAttributes as Set<string> | undefined;
-    if (!encryptedAttrs?.size)
-      return originalScopeForCreate.call(relation) as Record<string, unknown>;
+    if (!encryptedAttrs?.size) return originalScopeForCreate.call(this) as Record<string, unknown>;
 
-    const scopeAttrs = originalScopeForCreate.call(relation) as Record<string, unknown>;
-    const wheres = relation.whereValuesHash();
+    const scopeAttrs = originalScopeForCreate.call(this) as Record<string, unknown>;
+    const wheres = this.whereValuesHash();
     for (const attrName of encryptedAttrs) {
       const type = encryptedTypeOf(getAttributeType(model, attrName));
       if (!type?.deterministic) continue;
