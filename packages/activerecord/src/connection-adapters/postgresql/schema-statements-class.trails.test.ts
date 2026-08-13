@@ -64,6 +64,12 @@ function makeAdapter(options: FakeOptions = {}) {
       return options.queryValue ? await options.queryValue(text) : null;
     }),
     getDatabaseVersion: vi.fn(async () => 160000),
+    // `database_version` is `pool.server_version(self)` (`abstract_adapter.rb:854-856`),
+    // so the shim carries the pool that memo lives on.
+    pool: {
+      serverVersion: (connection: { getDatabaseVersion(): Promise<number> }) =>
+        connection.getDatabaseVersion(),
+    },
     maxIdentifierLength: () => options.maxIdentifierLength ?? 63,
   };
   return { adapter: adapter as unknown as DatabaseAdapter, sql };
