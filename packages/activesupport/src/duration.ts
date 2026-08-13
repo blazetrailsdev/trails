@@ -130,6 +130,52 @@ export class Duration {
     return new Duration({ years: n }, true);
   }
 
+  // Numeric/Integer singular aliases (core_ext/numeric/time.rb, core_ext/integer/time.rb):
+  // Ruby reopens Numeric so `2.second` reads as an alias of `2.seconds`; here the
+  // receiver is the argument, so the aliases sit beside the factories they forward to.
+  /** Alias of {@link Duration.seconds}. */
+  static second(n: number): Duration {
+    return Duration.seconds(n);
+  }
+  /** Alias of {@link Duration.minutes}. */
+  static minute(n: number): Duration {
+    return Duration.minutes(n);
+  }
+  /** Alias of {@link Duration.hours}. */
+  static hour(n: number): Duration {
+    return Duration.hours(n);
+  }
+  /** Alias of {@link Duration.days}. */
+  static day(n: number): Duration {
+    return Duration.days(n);
+  }
+  /** Alias of {@link Duration.weeks}. */
+  static week(n: number): Duration {
+    return Duration.weeks(n);
+  }
+
+  /**
+   * Returns a Duration instance matching the number of fortnights provided.
+   *
+   *   2.fortnights # => 4 weeks
+   */
+  static fortnights(n: number): Duration {
+    return Duration.weeks(n * 2);
+  }
+  /** Alias of {@link Duration.fortnights}. */
+  static fortnight(n: number): Duration {
+    return Duration.fortnights(n);
+  }
+
+  /** Alias of {@link Duration.months}. */
+  static month(n: number): Duration {
+    return Duration.months(n);
+  }
+  /** Alias of {@link Duration.years}. */
+  static year(n: number): Duration {
+    return Duration.years(n);
+  }
+
   // ---------------------------------------------------------------------------
   // Arithmetic
   // ---------------------------------------------------------------------------

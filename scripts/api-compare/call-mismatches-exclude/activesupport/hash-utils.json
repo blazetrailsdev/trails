@@ -18,6 +18,22 @@
   {
     "package": "activesupport",
     "tsFile": "hash-utils.ts",
+    "rubyName": "extract_options!",
+    "call": "extractable_options?",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby calls `last.extractable_options?` on the receiver; TS cannot reopen Hash, so `isExtractableOptions(last)` takes the receiver as its first argument (the `core-ext/array/access.ts` idiom) — one argument where Ruby passes none."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "hash-utils.ts",
+    "rubyName": "extract_options!",
+    "call": "last",
+    "reason": "`last` is Ruby's Array#last; `args[args.length - 1]` is an index expression, not a call node, so the read has no call to match."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "hash-utils.ts",
     "rubyName": "stringify_keys",
     "call": "transform_keys",
     "reason": "Rails routes both key casts through `transform_keys` (keys.rb:11), the Hash primitive JS lacks: trails builds the result with an `Object.keys` loop (hash-utils.ts:145-148). Converging needs a ported `transformKeys` for plain objects to delegate to — filed as its own work, not resolvable inside the measurement fix that surfaced it."

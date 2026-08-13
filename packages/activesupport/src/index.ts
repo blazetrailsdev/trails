@@ -223,7 +223,8 @@ export {
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,
-  extractOptions,
+  extractOptionsBang,
+  isExtractableOptions,
   stringifyKeys,
   deepStringifyKeys,
   symbolizeKeys,
@@ -252,8 +253,8 @@ export {
   kernelArray,
   inGroupsOf,
   inGroups,
-  splitArray,
-  extract,
+  split,
+  extractBang,
   toSentence,
 } from "./array-utils.js";
 
@@ -532,13 +533,31 @@ export {
   travelBack,
   travel,
   freezeTime,
-  currentTime,
+  unfreezeTime,
+  afterTeardown,
+  SimpleStubs,
+} from "./testing/time-helpers.js";
+export {
   assertCalled,
+  assertCalledWith,
   assertNotCalled,
+  expectCalledWith,
   assertCalledOnInstanceOf,
   assertNotCalledOnInstanceOf,
-} from "./testing-helpers.js";
-export type { AssertCalledOptions, CallRecord } from "./testing-helpers.js";
+  stubAnyInstance,
+} from "./testing/method-call-assertions.js";
+export {
+  assertNot,
+  assertRaises,
+  assertRaise,
+  assertNothingRaised,
+  assertDifference,
+  assertNoDifference,
+  assertChanges,
+  assertNoChanges,
+  UNTRACKED,
+} from "./testing/assertions.js";
+export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
 export { Range } from "./range-ext.js";

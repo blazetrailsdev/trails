@@ -38,6 +38,13 @@
     "package": "activesupport",
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
+    "call": "day",
+    "reason": "`day` here is Date#day, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.day` — Numeric#day — newly joined the ported-name population.)"
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
     "call": "getlocal",
     "reason": "`getlocal` re-zones a Ruby Time to the system offset. A JS `Date` is already an absolute instant with no attached zone, so `toTime` has nothing to re-zone."
   },
@@ -45,8 +52,22 @@
     "package": "activesupport",
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
+    "call": "month",
+    "reason": "`month` here is Date#month, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.month` — Integer#month — newly joined the ported-name population.)"
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
     "call": "new",
     "reason": "`::Time.new(...)` builds the Time from the parsed parts; trails routes string parsing through `@blazetrails/date` and returns the instant it produces."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "year",
+    "reason": "`year` here is Date#year, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.year` — Integer#year — newly joined the ported-name population.)"
   },
   {
     "package": "activesupport",

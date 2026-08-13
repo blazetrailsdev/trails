@@ -99,13 +99,13 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected get options(): Record<string, unknown> {
     if (!this._options) {
-      this._options = this.formatOptions();
+      this._options = { ...this.formatOptions(), ...this.opts };
     }
     return this._options;
   }
 
   protected formatOptions(): Record<string, unknown> {
-    return { ...this.defaultFormatOptions(), ...this.i18nFormatOptions(), ...this.opts };
+    return { ...this.defaultFormatOptions(), ...this.i18nFormatOptions() };
   }
 
   protected defaultFormatOptions(): Record<string, unknown> {

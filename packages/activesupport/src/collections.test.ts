@@ -7,7 +7,7 @@ import {
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,
-  extractOptions,
+  extractOptionsBang,
   stringifyKeys,
   deepStringifyKeys,
   symbolizeKeys,
@@ -285,21 +285,21 @@ describe("extractKeys", () => {
   });
 });
 
-describe("extractOptions", () => {
+describe("extractOptionsBang", () => {
   it("extracts trailing hash from args", () => {
-    const [args, opts] = extractOptions(["a", "b", { limit: 10 }]);
+    const [args, opts] = extractOptionsBang(["a", "b", { limit: 10 }]);
     expect(args).toEqual(["a", "b"]);
     expect(opts).toEqual({ limit: 10 });
   });
 
   it("returns empty object when no trailing hash", () => {
-    const [args, opts] = extractOptions(["a", "b"]);
+    const [args, opts] = extractOptionsBang(["a", "b"]);
     expect(args).toEqual(["a", "b"]);
     expect(opts).toEqual({});
   });
 
   it("returns empty object for empty args", () => {
-    const [args, opts] = extractOptions([]);
+    const [args, opts] = extractOptionsBang([]);
     expect(args).toEqual([]);
     expect(opts).toEqual({});
   });

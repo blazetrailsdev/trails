@@ -19,7 +19,7 @@ import {
   inGroups,
   inGroupsOf,
   singularize,
-  splitArray,
+  split,
   toSentence,
 } from "@blazetrails/activesupport";
 import { ScopeRegistry } from "../scoping.js";
@@ -938,7 +938,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records.slice(shift).concat(records.slice(0, shift));
   },
   shuffle: (records) => shuffleInPlace([...records]),
-  split: (records, valueOrFn: Base | ((record: Base) => boolean)) => splitArray(records, valueOrFn),
+  split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
   inGroups: (records, number: number, fillWith: Base | null | false = null) =>
     inGroups(records, number, fillWith),
   inGroupsOf: (records, number: number, fillWith: Base | null | false = null) =>

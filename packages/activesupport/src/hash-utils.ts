@@ -147,14 +147,40 @@ export function deepUnderscoreKeys(obj: unknown): unknown {
 }
 
 /**
- * Pop an options hash from the end of an arguments array (Rails convention).
- * If the last element is a plain object, it is removed and returned.
- * Otherwise returns an empty object.
+ * By default, only instances of Hash itself are extractable.
+ * Subclasses of Hash may implement this method and return
+ * true to declare themselves as extractable. If a Hash
+ * is extractable, `Array#extract_options!` pops it from
+ * the Array when it is the last element of the Array.
+ *
+ * Ruby reopens `Hash`; the receiver is the first parameter here, and the
+ * subclass override is a method on the subclass (see
+ * {@link HashWithIndifferentAccess.isExtractableOptions}), which this function
+ * dispatches to the way Ruby's method lookup would.
  */
-export function extractOptions<T>(args: T[]): [T[], AnyObject] {
-  if (args.length > 0 && isPlainObject(args[args.length - 1])) {
-    const options = args[args.length - 1] as unknown as AnyObject;
-    return [args.slice(0, -1), options];
+export function isExtractableOptions(self: unknown): boolean {
+  if (self !== null && typeof self === "object" && "isExtractableOptions" in self) {
+    return (self as { isExtractableOptions(): boolean }).isExtractableOptions();
+  }
+  return isPlainObject(self);
+}
+
+/**
+ * Extracts options from a set of arguments. Removes and returns the last
+ * element in the array if it's a hash, otherwise returns a blank hash.
+ *
+ *   options(1, 2)        # => {}
+ *   options(1, 2, a: :b) # => {:a=>:b}
+ *
+ * Ruby's `extract_options!` mutates the receiver and returns only the options;
+ * the args array is returned alongside it here because a TS caller has no
+ * `pop`-in-place idiom for a rest parameter.
+ */
+export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
+  const last = args[args.length - 1];
+  const isHash = isPlainObject(last) || last instanceof HashWithIndifferentAccess;
+  if (args.length > 0 && isHash && isExtractableOptions(last)) {
+    return [args.slice(0, -1), last as unknown as AnyObject];
   }
   return [args, {}];
 }

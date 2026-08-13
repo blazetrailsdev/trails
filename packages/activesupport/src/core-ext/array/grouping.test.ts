@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inGroups, inGroupsOf, splitArray } from "../../index.js";
+import { inGroups, inGroupsOf, split } from "../../index.js";
 
 describe("GroupingTest", () => {
   it("in groups of with perfect fit", () => {
@@ -72,26 +72,26 @@ describe("GroupingTest", () => {
 
 describe("SplitTest", () => {
   it("split with empty array", () => {
-    expect(splitArray([], 1)).toEqual([[]]);
+    expect(split([], 1)).toEqual([[]]);
   });
 
   it("split with argument", () => {
-    expect(splitArray([1, 2, 3, 4, 5], 3)).toEqual([
+    expect(split([1, 2, 3, 4, 5], 3)).toEqual([
       [1, 2],
       [4, 5],
     ]);
   });
 
   it("split with block", () => {
-    expect(splitArray([1, 2, 3, 4, 5], (x: number) => x % 2 === 0)).toEqual([[1], [3], [5]]);
+    expect(split([1, 2, 3, 4, 5], (x: number) => x % 2 === 0)).toEqual([[1], [3], [5]]);
   });
 
   it("split with edge values", () => {
-    expect(splitArray([1, 2, 3], 1)).toEqual([[], [2, 3]]);
-    expect(splitArray([1, 2, 3], 3)).toEqual([[1, 2], []]);
+    expect(split([1, 2, 3], 1)).toEqual([[], [2, 3]]);
+    expect(split([1, 2, 3], 3)).toEqual([[1, 2], []]);
   });
 
   it("split with repeated values", () => {
-    expect(splitArray([1, 2, 1, 3, 1], 1)).toEqual([[], [2], [3], []]);
+    expect(split([1, 2, 1, 3, 1], 1)).toEqual([[], [2], [3], []]);
   });
 });
