@@ -49,6 +49,7 @@ const MAPPING: Record<string, string> = {
   "Buenos Aires": "America/Argentina/Buenos_Aires",
   Montevideo: "America/Montevideo",
   Georgetown: "America/Guyana",
+  "Puerto Rico": "America/Puerto_Rico",
   Greenland: "America/Godthab",
   "Mid-Atlantic": "Atlantic/South_Georgia",
   Azores: "Atlantic/Azores",
@@ -120,10 +121,10 @@ const MAPPING: Record<string, string> = {
   Mumbai: "Asia/Kolkata",
   "New Delhi": "Asia/Kolkata",
   Kathmandu: "Asia/Kathmandu",
-  Astana: "Asia/Dhaka",
   Dhaka: "Asia/Dhaka",
   "Sri Jayawardenepura": "Asia/Colombo",
   Almaty: "Asia/Almaty",
+  Astana: "Asia/Almaty",
   Novosibirsk: "Asia/Novosibirsk",
   Rangoon: "Asia/Rangoon",
   Bangkok: "Asia/Bangkok",
@@ -147,7 +148,7 @@ const MAPPING: Record<string, string> = {
   Yakutsk: "Asia/Yakutsk",
   Darwin: "Australia/Darwin",
   Adelaide: "Australia/Adelaide",
-  Canberra: "Australia/Melbourne",
+  Canberra: "Australia/Canberra",
   Melbourne: "Australia/Melbourne",
   Sydney: "Australia/Sydney",
   Brisbane: "Australia/Brisbane",
@@ -157,7 +158,7 @@ const MAPPING: Record<string, string> = {
   "Port Moresby": "Pacific/Port_Moresby",
   Magadan: "Asia/Magadan",
   Srednekolymsk: "Asia/Srednekolymsk",
-  Solomon: "Pacific/Guadalcanal",
+  "Solomon Is.": "Pacific/Guadalcanal",
   "New Caledonia": "Pacific/Noumea",
   Fiji: "Pacific/Fiji",
   Kamchatka: "Asia/Kamchatka",
@@ -186,6 +187,7 @@ const MAPPING: Record<string, string> = {
  * `Intl.DateTimeFormat#resolvedOptions().timeZone` echoes the link name back
  * unchanged on node 24 — so it is carried here rather than derived.
  */
+
 const CANONICAL_ZONE_IDENTIFIERS: Record<string, string> = {
   "Africa/Accra": "Africa/Abidjan",
   "Africa/Addis_Ababa": "Africa/Nairobi",
@@ -308,6 +310,38 @@ const CANONICAL_ZONE_IDENTIFIERS: Record<string, string> = {
   "Pacific/Truk": "Pacific/Port_Moresby",
   "Pacific/Wake": "Pacific/Tarawa",
   "Pacific/Wallis": "Pacific/Tarawa",
+};
+
+/**
+ * Per-country membership tzdata's `zone1970.tab` records and ECMA-402's
+ * country table does not, keyed by Alpha2 code.
+ *
+ * `TZInfo::Country#zone_identifiers` — what `load_country_zones`
+ * (time_zone.rb:275) reads — is `zone1970.tab`, which lists a zone under every
+ * country that observes it: `Asia/Singapore` is Antarctica's summer zone,
+ * `Asia/Tokyo` covers Australia's Antarctic bases, `Asia/Bangkok` covers
+ * northwestern Vietnam. CLDR's table names one country per zone, so
+ * `Intl.Locale#getTimeZones` omits these five and `countryZones` would answer a
+ * SHORTER list than Rails for `aq`/`au`/`ru`/`tf`/`vn`. Unlike
+ * {@link CANONICAL_ZONE_IDENTIFIERS} this is not a link-resolution gap — the
+ * two tables genuinely disagree about membership — so no runtime lookup can
+ * reconcile it and the rows are carried here, each confirmed against
+ * `TZInfo::Country.get(code).zone_identifiers` on tzinfo 2.x.
+ *
+ * `BV` and `HM` carry an EMPTY list: `zone1970.tab` knows both codes and files
+ * no zone under either, so `TZInfo::Country.get("bv").zone_identifiers` is `[]`
+ * and Rails answers `[]`. `getTimeZones` reports them the same way it reports a
+ * code it does not know, so a row here is also what separates "known, zoneless"
+ * from the `Country.get` raise.
+ */
+const COUNTRY_ZONE_IDENTIFIER_ADDITIONS: Record<string, string[]> = {
+  AQ: ["Asia/Singapore"],
+  AU: ["Asia/Tokyo"],
+  BV: [],
+  HM: [],
+  RU: ["Europe/Simferopol"],
+  TF: ["Asia/Dubai"],
+  VN: ["Asia/Bangkok"],
 };
 
 /**
@@ -1127,11 +1161,15 @@ export class TimeZone {
     } catch {
       country = undefined;
     }
-    if (country === undefined || country.length === 0) {
+    const additions = COUNTRY_ZONE_IDENTIFIER_ADDITIONS[code];
+    if (country === undefined || (country.length === 0 && additions === undefined)) {
       throw new Error(`Invalid country code: ${code}`);
     }
-    return country
-      .map((tzId) => CANONICAL_ZONE_IDENTIFIERS[tzId] ?? tzId)
+    const identifiers = country.map((tzId) => CANONICAL_ZONE_IDENTIFIERS[tzId] ?? tzId);
+    for (const tzId of additions ?? []) {
+      if (!identifiers.includes(tzId)) identifiers.push(tzId);
+    }
+    return identifiers
       .flatMap((tzId) => {
         if (Object.values(MAPPING).includes(tzId)) {
           const memo: TimeZone[] = [];

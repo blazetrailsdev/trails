@@ -51,13 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "table_exists?",
-    "call": "order:dataSourceExists,tableName",
-    "reason": "Order artifact of a TS-only capability guard: `typeof cache.dataSourceExists !== \"function\"` (model-schema.ts:1574) credits dataSourceExists before the tableName argument Rails evaluates first."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "table_name=",
     "call": "connected?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

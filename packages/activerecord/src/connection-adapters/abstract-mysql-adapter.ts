@@ -705,12 +705,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
+    const quotedTableName = this.quoteTableName(tableName);
     const fragment = await this.changeColumnDefaultForAlter(
       tableName,
       columnName,
       defaultOrChanges,
     );
-    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
+    await this.execute(`ALTER TABLE ${quotedTableName} ${fragment}`);
   }
 
   /**
@@ -779,9 +780,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ != null) {
-      const colId = this.quoteColumnName(columnName);
       await this.execute(
-        `UPDATE ${this.quoteTableName(tableName)} SET ${colId}=${this.quote(default_)} WHERE ${colId} IS NULL`,
+        `UPDATE ${this.quoteTableName(tableName)} SET ${this.quoteColumnName(columnName)}=${this.quote(default_)} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
       );
     }
     await this.changeColumn(tableName, columnName, null, { null: null_ });
@@ -848,8 +848,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    const quotedTableName = this.quoteTableName(tableName);
     const fragment = await this.renameColumnForAlter(tableName, columnName, newColumnName);
-    await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragment}`);
+    await this.execute(`ALTER TABLE ${quotedTableName} ${fragment}`);
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
