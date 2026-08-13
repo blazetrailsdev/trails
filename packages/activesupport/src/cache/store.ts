@@ -75,6 +75,13 @@ function Integer(value: unknown): number {
  * {@link Integer} plus a fraction and exponent (including Ruby's hexadecimal
  * float literals); an empty or whitespace-only String is an ArgumentError, not
  * `0`.
+ *
+ * The accepted grammar was differential-tested against MRI 3.3.11 rather than
+ * derived: a leading-dot mantissa (`".5"`, `".5e2"`) and a hexadecimal float
+ * (`"0x1p4"`, `"0x1.8p1"`) convert, while a trailing-dot one (`"1."`,
+ * `"1.e3"`, `"1_0."`) and a hexadecimal float with no integer part
+ * (`"0x.8p1"`) raise — the trailing-dot form is `String#to_f`, not
+ * `Kernel#Float`.
  */
 function Float(value: unknown): number {
   if (typeof value === "number") return value;
