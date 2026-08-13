@@ -44,11 +44,9 @@ export class UnboundableBound {
  * builds bind attributes for both bounds and hands a `RangeWithBinds` to
  * `attribute.between`; the open-ended / infinity logic lives in Arel.
  *
- * TS deviation: there is no `QueryAttribute`-wrapping bind step here;
- * `_castBound` runs the attribute's type cast on the raw bound (so e.g.
- * an integer column coerces `"1-meowmeow"` → 1). ±Infinity bounds are
- * passed through uncast — mirroring Rails RangeHandler's reliance on
- * `infinity?` recognizing ±Float::INFINITY at the Arel layer.
+ * TS deviation: `call` builds a bind per bound as Rails does, but hands
+ * `between` the bound's cast value (or an {@link UnboundableBound}) instead of
+ * the bind itself — see `buildBoundAttribute`.
  */
 export class RangeHandler {
   private _predicateBuilder: PredicateBuilder;
@@ -58,34 +56,33 @@ export class RangeHandler {
   }
 
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const [beginVal, endVal] = this._castBounds(attribute, value);
-    return attribute.between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd });
+    const beginBind = this.buildBoundAttribute(attribute, value.begin);
+    const endBind = this.buildBoundAttribute(attribute, value.end);
+    return attribute.between({ begin: beginBind, end: endBind, excludeEnd: value.excludeEnd });
   }
 
-  private _castBounds(attribute: Nodes.Attribute, value: Range): [unknown, unknown] {
-    // Rails RangeHandler skips no bounds: `build_bind_attribute` wraps even
-    // nil / Float::INFINITY. We mirror the intent by passing those through
-    // uncast — type.cast on null/undefined / Infinity would be a no-op or
-    // worse (numeric types may coerce Infinity into something finite).
-    // Rails open_ended? recognizes ±Infinity (via Float#infinite?) but not
-    // NaN (`NaN.infinite?` returns nil); pass only nil/undefined/±Infinity
-    // through uncast so a NaN bound still flows through type.cast as a
-    // regular numeric value.
-    const skipCast = (v: unknown): boolean =>
-      v === null || v === undefined || v === Infinity || v === -Infinity;
-    // Rails wraps each bound in `predicate_builder.build_bind_attribute`
-    // (range_handler.rb:13-14) and lets `QueryAttribute#unboundable?` answer;
-    // trails keeps the cast value for in-range bounds — see UnboundableBound.
-    const cast = (v: unknown): unknown => {
-      const bind = this.predicateBuilder.buildBindAttribute(attribute.name, v);
-      const sign = bind.isUnboundable();
-      if (sign !== false) return new UnboundableBound(sign);
-      return this.predicateBuilder.table.type(attribute.name).cast(v);
-    };
-    return [
-      skipCast(value.begin) ? value.begin : cast(value.begin),
-      skipCast(value.end) ? value.end : cast(value.end),
-    ];
+  /**
+   * The one bound of Rails' `predicate_builder.build_bind_attribute(attribute.name, ...)`
+   * (range_handler.rb:13-14). The bind IS built — its `isUnboundable()` is what
+   * decides an out-of-range bound, exactly as Rails' `QueryAttribute#unboundable?`
+   * does — but an in-range bound is handed on as its cast value rather than as
+   * the bind itself, which is the deviation {@link UnboundableBound} documents
+   * and story `0023-surfaced-deviations/converge-range-handler-bind-attribute-bounds`
+   * removes.
+   *
+   * nil and ±Float::INFINITY bounds pass through uncast: Arel's `open_ended?` /
+   * `infinity?` recognise them at the visitor, and a numeric type's cast would
+   * turn Infinity into something finite. NaN is not infinite in Ruby
+   * (`NaN.infinite?` is nil), so it still casts.
+   */
+  private buildBoundAttribute(attribute: Nodes.Attribute, bound: unknown): unknown {
+    if (bound === null || bound === undefined || bound === Infinity || bound === -Infinity) {
+      return bound;
+    }
+    const bind = this.predicateBuilder.buildBindAttribute(attribute.name, bound);
+    const sign = bind.isUnboundable();
+    if (sign !== false) return new UnboundableBound(sign);
+    return this.predicateBuilder.table.type(attribute.name).cast(bound);
   }
 
   private get predicateBuilder(): PredicateBuilder {
