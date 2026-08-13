@@ -131,7 +131,17 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       Array.from(byIndex.entries()).map(
         async ([
           name,
-          { table, columns, unique, using, type, comment, lengths, orders, expressions },
+          {
+            table,
+            columns: indexColumns,
+            unique,
+            using,
+            type,
+            comment,
+            lengths,
+            orders,
+            expressions,
+          },
         ]) => {
           // Mirrors Rails' final `.map`: a functional (expression) index collapses
           // its columns array into a single SQL string via addOptionsForIndexColumns,
@@ -139,19 +149,23 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
           // are quoted; expression columns pass through their parenthesized form.
           // The separate lengths/orders Records are consumed here and dropped.
           if (Object.keys(expressions).length > 0) {
-            const quotedColumns = new Map<string, string>(
-              columns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
+            const columns = new Map<string, string>(
+              indexColumns.map((name) => [name, expressions[name] ?? quoteColumnName(name)]),
             );
-            await this.addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
+            await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths });
             return new IndexDefinition(
               table,
               name,
               unique,
-              Array.from(quotedColumns.values()).join(", "),
-              { using, type, comment },
+              Array.from(columns.values()).join(", "),
+              {
+                using,
+                type,
+                comment,
+              },
             );
           }
-          return new IndexDefinition(table, name, unique, columns, {
+          return new IndexDefinition(table, name, unique, indexColumns, {
             lengths,
             orders,
             using,

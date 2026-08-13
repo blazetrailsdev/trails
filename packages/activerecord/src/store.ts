@@ -77,8 +77,8 @@ export class IndifferentCoder {
   }
 
   dump(obj: unknown): unknown {
-    const plain = asRegularHash(obj);
-    return this.coder ? this.coder.dump(plain) : JSON.stringify(plain);
+    if (this.coder) return this.coder.dump(asRegularHash(obj));
+    return JSON.stringify(asRegularHash(obj));
   }
 
   load(value: unknown): HashWithIndifferentAccess<unknown> {

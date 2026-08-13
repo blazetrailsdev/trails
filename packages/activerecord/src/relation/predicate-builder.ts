@@ -240,8 +240,8 @@ export class PredicateBuilder {
     // pairwise reduce, not a flat n-ary `And`. SQL is identical either way
     // (the And visitor joins children without parens), but the AST shape
     // matches Rails for anything walking the tree.
-    const reduced = queryGroups.map((inner) => inner.reduce((left, right) => left.and(right)));
-    return [new Nodes.Grouping(new Nodes.Or(reduced))];
+    const queries = queryGroups.map((query) => query.reduce((left, right) => left.and(right)));
+    return [new Nodes.Grouping(new Nodes.Or(queries))];
   }
 
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
