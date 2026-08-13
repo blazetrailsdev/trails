@@ -63,12 +63,10 @@ function toS(value: unknown): string {
  * declaration for them would collide with it — `PostgreSQLAdapter` narrows many
  * (`adapterName` to `AdapterName`, `createAlterTable` to `PgAlterTable`), which is
  * legal on a class and is what Ruby's untyped override translates to, but
- * declaration merging demands identical types. `getDatabaseVersion` is the one
- * exception: a declaration-only `declare` field in the class body does outrank
- * the inherited method (see the class), which is what removed
- * `resetPkSequenceBang`'s cast.
+ * declaration merging demands identical types.
  *
- * The same trick cannot reach `typeMap`: `AbstractAdapter` declares it as an
+ * A declaration-only `declare` field in the class body outranks an inherited
+ * method, but that trick cannot reach `typeMap`: `AbstractAdapter` declares it as an
  * accessor (`abstract-adapter.ts:2543`), and TypeScript refuses to narrow an
  * inherited accessor from either a merged-interface member or a `declare` field
  * (TS2610). A real accessor override here would shadow `PostgreSQLAdapter`'s own
@@ -110,11 +108,6 @@ export interface SchemaStatements
 
 export class SchemaStatements extends AbstractSchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
-
-  // Rails gets PostgreSQLAdapter's `get_database_version` (`server_version_num`)
-  // by ordinary method lookup; TS picks the inherited generic-adapter method
-  // ahead of a merged-interface one, so restate it declaration-only.
-  declare getDatabaseVersion: () => Promise<number>;
 
   /** Mirrors: PostgreSQL::SchemaStatements#update_table_definition */
   override updateTableDefinition(tableName: string, base?: unknown): PgTable {
@@ -1857,7 +1850,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      const dbVersion = await this.getDatabaseVersion();
+      // Rails reads `database_version` (`postgresql/schema_statements.rb:347`),
+      // the pool memo; the inherited accessor is typed for every adapter, so PG
+      // narrows it here the same way `columns` does.
+      const dbVersion = (await this.databaseVersion) as number;
       minvalue =
         dbVersion >= 100000
           ? await this.queryValue(

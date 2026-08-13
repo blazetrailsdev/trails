@@ -2,6 +2,7 @@ import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import { StringIO } from "./string-io.js";
 import { Temporal } from "@blazetrails/date";
 
 /**
@@ -480,21 +481,19 @@ export function _parseBinary(bin: string, entity: Record<string, string | undefi
  * Decode a `type="file"` value into an IO decorated with the element's `name`
  * and `content_type` attributes.
  *
- * Mirrors: ActiveSupport::XmlMini._parse_file (xml_mini.rb:180-186) — `Blob` is
- * the platform's in-memory, readable byte container, so it stands in for
- * `StringIO.new`; the Latin-1 round-trip hands it {@link decode64}'s bytes
- * unchanged rather than re-encoding them as UTF-8. Copying {@link FileLike}'s
- * descriptors onto it is `f.extend(FileLike)`.
+ * Mirrors: ActiveSupport::XmlMini._parse_file (xml_mini.rb:180-186). Copying
+ * {@link FileLike}'s descriptors onto the instance is `f.extend(FileLike)` —
+ * Ruby's `extend` decorates the object, not its class.
  *
  * @internal
  */
 export function _parseFile(
   file: string,
   entity: Record<string, string | undefined>,
-): Blob & typeof FileLike {
-  const f = new Blob([Uint8Array.from(decode64(file), (c) => c.charCodeAt(0))]);
+): StringIO & typeof FileLike {
+  const f = new StringIO(decode64(file));
   Object.defineProperties(f, Object.getOwnPropertyDescriptors(FileLike));
-  const fileLike = f as Blob & typeof FileLike;
+  const fileLike = f as StringIO & typeof FileLike;
   fileLike.originalFilename = entity["name"];
   fileLike.contentType = entity["content_type"];
   return fileLike;
