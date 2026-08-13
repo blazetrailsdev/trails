@@ -895,43 +895,48 @@ export class ConnectionPool implements ReapablePool {
   // 0023-surfaced-deviations / converge-connection-pool-checkout-lease-async.
   async checkout(timeout?: number): Promise<DatabaseAdapter> {
     const pinned = this._resolvePinnedConnection();
-    if (pinned) {
-      // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
-      // unconditionally, ensure membership in @connections, and return — no
-      // checkout_and_verify / QueryCache wiring on the pinned connection.
-      // verifyBang is async in trails (Rails' verify! is sync); await it on the
-      // async path so verification completes before the connection is handed out
-      // and a rejection surfaces here rather than as an unhandled rejection.
-      await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
-      if (this._connections && !this._connections.includes(pinned)) {
-        this._connections.push(pinned);
+    // Rails' guard clause: `return checkout_and_verify(acquire_connection(
+    // checkout_timeout)) unless @pinned_connection` (connection_pool.rb:551).
+    // The acquire is inlined here rather than living on `acquire_connection`,
+    // which in trails does not block on the queue.
+    if (!pinned) {
+      const conn = this._tryAcquire();
+      if (conn) {
+        return checkoutAndVerify(this, conn);
       }
-      return pinned;
-    }
-    const conn = this._tryAcquire();
-    if (conn) {
-      return checkoutAndVerify(this, conn);
+
+      const t = timeout ?? this.checkoutTimeout;
+      if (!this._available) {
+        throw new ConnectionNotEstablished("Connection pool has been discarded");
+      }
+      let c: DatabaseAdapter;
+      try {
+        const result = this._available.poll(t);
+        c = result instanceof Promise ? await result : result;
+      } catch (err) {
+        if (err instanceof ConnectionTimeoutError) {
+          err.setPool(this);
+        }
+        throw err;
+      }
+      if (this.isDiscarded()) {
+        throw new ConnectionNotEstablished("Connection pool has been discarded");
+      }
+      this._checkedOut.add(c);
+      return checkoutAndVerify(this, c);
     }
 
-    const t = timeout ?? this.checkoutTimeout;
-    if (!this._available) {
-      throw new ConnectionNotEstablished("Connection pool has been discarded");
+    // Mirrors Rails' pinned branch (connection_pool.rb:553-559): verify!
+    // unconditionally, ensure membership in @connections, and return — no
+    // checkout_and_verify / QueryCache wiring on the pinned connection.
+    // verifyBang is async in trails (Rails' verify! is sync); await it on the
+    // async path so verification completes before the connection is handed out
+    // and a rejection surfaces here rather than as an unhandled rejection.
+    await (pinned as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
+    if (this._connections && !this._connections.includes(pinned)) {
+      this._connections.push(pinned);
     }
-    let c: DatabaseAdapter;
-    try {
-      const result = this._available.poll(t);
-      c = result instanceof Promise ? await result : result;
-    } catch (err) {
-      if (err instanceof ConnectionTimeoutError) {
-        err.setPool(this);
-      }
-      throw err;
-    }
-    if (this.isDiscarded()) {
-      throw new ConnectionNotEstablished("Connection pool has been discarded");
-    }
-    this._checkedOut.add(c);
-    return checkoutAndVerify(this, c);
+    return pinned;
   }
 
   private _acquireConnection(): DatabaseAdapter {

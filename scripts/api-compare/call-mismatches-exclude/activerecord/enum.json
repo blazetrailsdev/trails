@@ -59,7 +59,7 @@
     "package": "activerecord",
     "tsFile": "enum.ts",
     "rubyName": "_enum",
-    "call": "order:detectEnumConflictBang,constructor",
-    "reason": "ORDER-only divergence, un-hidden (not introduced) by the raise-position `new` filter (RFC 0084 extractor-throw-new-constructor-credit-order): the port runs its conflict detection before the value hash Rails builds first. Converge by restoring enum.rb:225-247's statement order."
+    "call": "order:detectNegativeEnumConditionsBang,defineEnumMethods",
+    "reason": "Un-masked (not introduced) by converging the `constructor` inversion ahead of it in the same body: enum.rb:249-262 detects and defines in ONE loop and runs detect_negative_enum_conditions! after it, where the port uses a conflict pass then a generation pass. Convergence has to preserve the enum.ts:663-676 `notActive` warn-not-raise invariant — tracked by 0084 converge-enum-two-pass-method-generation."
   }
 ]

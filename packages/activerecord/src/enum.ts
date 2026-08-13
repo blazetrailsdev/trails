@@ -529,16 +529,6 @@ export function _enum(
   assertValidEnumDefinitionValues(values);
   assertValidEnumOptions(options ?? {});
 
-  // Rails guards the enum *name* itself against reserved Active Record methods
-  // before generating any value methods: the pluralized mapping accessor
-  // (`name.pluralize`, e.g. `column` → `columns`) as a class method, and the
-  // reader/writer (`name`, `name=`) as instance methods.
-  // Mirrors enum.rb `detect_enum_conflict!(name, name.pluralize, true)` and the
-  // two `detect_enum_conflict!(name, name)` / `detect_enum_conflict!(name, "#{name}=")` calls.
-  detectEnumConflictBang.call(this, name, pluralize(name), true);
-  detectEnumConflictBang.call(this, name, name);
-  detectEnumConflictBang.call(this, name, `${name}=`);
-
   const attribute = name;
   const mapping = Array.isArray(values)
     ? Object.fromEntries(values.map((v, i) => [v, i]))
@@ -569,10 +559,24 @@ export function _enum(
       attribute
     ] ?? attribute;
 
+  // Rails guards the enum *name* itself against reserved Active Record methods
+  // before generating any value methods: the pluralized mapping accessor
+  // (`name.pluralize`, e.g. `column` → `columns`) as a class method, and the
+  // reader/writer (`name`, `name=`) as instance methods. The store the mapping
+  // lands in is built first (`enum_values = HashWithIndifferentAccess.new`,
+  // enum.rb:227) and `defined_enums[name] = enum_values` lands between the
+  // guards (enum.rb:231-236), so a conflict on the reader/writer leaves the
+  // mapping registered, as it does in Rails.
   if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
     this._enums = new Map(this._enums);
   }
+
+  detectEnumConflictBang.call(this, name, pluralize(name), true);
+
   this._enums.set(attrName, mapping);
+
+  detectEnumConflictBang.call(this, name, name);
+  detectEnumConflictBang.call(this, name, `${name}=`);
 
   const prefixStr =
     options?.prefix === true

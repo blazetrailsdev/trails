@@ -68,12 +68,5 @@
     "rubyName": "stat",
     "call": "count",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/connection-pool.ts",
-    "rubyName": "checkout",
-    "call": "order:includes,checkoutAndVerify",
-    "reason": "ORDER-only divergence, un-hidden (not introduced) by the raise-position `new` filter (RFC 0084 extractor-throw-new-constructor-credit-order): connection_pool.rb:551 makes the unpinned `checkout_and_verify` its guard clause, ahead of the pinned branch's `@connections.include?`; the port tests the pinned connection first."
   }
 ]
