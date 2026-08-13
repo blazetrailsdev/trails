@@ -493,7 +493,6 @@ export abstract class SchemaDumper {
     // into dumps.
     if (isDatabaseAdapter(pool)) {
       const source = new AdapterSchemaSource(pool);
-      const dumperOptions = options;
       // Instantiate the adapter-specific subclass when the adapter exposes
       // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
       // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
@@ -504,11 +503,8 @@ export abstract class SchemaDumper {
       const createDialectDumper = (pool as { createSchemaDumper?: unknown }).createSchemaDumper;
       const dumper =
         (typeof createDialectDumper === "function"
-          ? (createDialectDumper.call(pool, source, dumperOptions) as
-              | SchemaDumper
-              | undefined
-              | null)
-          : undefined) ?? this.create(source, dumperOptions);
+          ? (createDialectDumper.call(pool, source, options) as SchemaDumper | undefined | null)
+          : undefined) ?? this.create(source, options);
       return dumper.dump(stream) as Promise<string[]>;
     }
     if (isConnectionPool(pool)) {
@@ -1165,15 +1161,6 @@ export abstract class SchemaDumper {
 }
 
 /**
- * Duck-type check so `dump()` can branch on adapter vs SchemaSource.
- * `DatabaseAdapter` IS a SchemaSource at the duck level (it has
- * `tables`/`columns`/`indexes`), so we identify adapters by their
- * adapter-specific surface (`execute`/`executeMutation`/
- * `adapterName`). If that matches, we route through
- * `AdapterSchemaSource` even though the raw adapter would duck-type
- * as a SchemaSource.
- */
-/**
  * `pool.with_connection` is all `SchemaDumper.dump` asks of its pool
  * (`schema_dumper.rb:44`); typing the parameter structurally keeps
  * schema-dumper.ts off connection-pool.ts's import graph, exactly as the
@@ -1191,6 +1178,15 @@ function isConnectionPool(v: unknown): v is ConnectionPoolLike {
   );
 }
 
+/**
+ * Duck-type check so `dump()` can branch on adapter vs SchemaSource.
+ * `DatabaseAdapter` IS a SchemaSource at the duck level (it has
+ * `tables`/`columns`/`indexes`), so we identify adapters by their
+ * adapter-specific surface (`execute`/`executeMutation`/
+ * `adapterName`). If that matches, we route through
+ * `AdapterSchemaSource` even though the raw adapter would duck-type
+ * as a SchemaSource.
+ */
 function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
   if (v === null || typeof v !== "object") return false;
   const obj = v as {
