@@ -2,13 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
-    "rubyName": "in?",
-    "call": "new",
-    "reason": "`new` here is `ArgumentError.new` in Rails' `rescue NoMethodError` arm (object/inclusion.rb:22). `isIn` type-switches on the collection instead of rescuing, so no argument can reach a receiver without `include?` and the arm has nothing to raise from."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "enumerable-utils.ts",
     "rubyName": "in_order_of",
     "call": "compact",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

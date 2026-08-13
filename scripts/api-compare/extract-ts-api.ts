@@ -2785,6 +2785,26 @@ function recordCallSite(
 }
 
 /**
+ * `throw new Foo(msg)` — the operand of a `throw`, which Rails spells EITHER
+ * `raise Foo, msg` (no `.new` call, and `raise` itself is filtered as noise on
+ * the Ruby side) or `raise Foo.new(msg)` (a `new` call in that position). The
+ * position is therefore ambiguous, exactly as a hoisted closure's calls are:
+ * the ORDER stream drops the name rather than picking a side, since a
+ * `throw` in an early guard would otherwise pin `constructor` at the front of
+ * the sequence — deduplicated at first occurrence — ahead of the real `X.new`
+ * the Rails body makes later, which is what the `order:constructor,…` rows
+ * #6404 baselined actually were. The call SET is unaffected: whichever way
+ * Rails spells the raise, an instantiation happens.
+ *
+ * Only the throw's own operand is ambiguous: a `new` nested inside one
+ * (`throw wrap(new Foo())`) has an unambiguous position.
+ */
+function isThrownConstruction(call: ts.NewExpression): boolean {
+  const parent = call.parent;
+  return parent !== undefined && ts.isThrowStatement(parent) && parent.expression === call;
+}
+
+/**
  * The site name, under the SAME filter extract-ruby-api.rb#call_site_name
  * applies (`:2385-2396`): a name starting with `_`, or with anything other than
  * a lowercase letter, is dropped. Ruby never emits such a site, so recording one
@@ -2951,7 +2971,7 @@ function collectCalls(
       // constructor arguments (`new Foo(typeCast(x))`) are credited regardless
       // of body shape.
       ts.forEachChild(n, visit);
-      names.add("constructor");
+      if (!(skipHoistedClosures && isThrownConstruction(n))) names.add("constructor");
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION

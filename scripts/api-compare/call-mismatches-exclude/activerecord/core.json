@@ -44,13 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "find",
-    "call": "order:constructor,unsupportedValue",
-    "reason": "Order artifact: the port constructs before it reaches StatementCache.unsupportedValue (core.ts:975), where Rails checks unsupported_value? before RecordNotFound.new."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "find_by",
     "call": "cached_find_by",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

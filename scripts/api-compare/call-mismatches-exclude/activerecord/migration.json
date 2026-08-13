@@ -96,12 +96,5 @@
     "rubyName": "validate",
     "call": "find",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "with_advisory_lock",
-    "call": "order:constructor,releaseAdvisoryLock",
-    "reason": "Ruby `raise ConcurrentMigrationError` names the class without constructing it (migration.rb:1604), so Rails' only `.new` is the RELEASE_LOCK_FAILED one after `release_advisory_lock`; TypeScript has no `throw SomeError` spelling, so the port's first `throw new` necessarily precedes it."
   }
 ]

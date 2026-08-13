@@ -1913,11 +1913,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * the association keeps membership, loaded-ness, `@replaced_or_added_targets`
    * dedup, and the before/after_add callbacks coherent across both handles.
    *
-   * `skipCallbacks` is the `create!` path, whose caller already fires
-   * before/after_add around the whole build+save; it mirrors Rails'
-   * `_create_record` — `add_to_target(record) { insert_record(record, true,
-   * true) }` (collection_association.rb:363-371) — rather than going through
-   * `concat`, which would fire the callbacks a second time.
+   * The `create!` path does NOT come through here: it is
+   * `@association.create!(...)` (collection_proxy.rb:319-321) onto
+   * `CollectionAssociation#_create_record` (collection_association.rb:354-372),
+   * which owns the `transaction`, the `add_to_target { insert_record }` funnel,
+   * the `raise ActiveRecord::Rollback unless result` guard and — through
+   * `HasManyAssociation#_create_record` (has_many_association.rb:143-149) — the
+   * in-memory counter bump.
    *
    * `throughScope` is Rails' `@through_scope`
    * (has_many_through_association.rb:93), which `construct_join_attributes`
@@ -1929,37 +1931,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
   }
 
-  /**
-   * @internal Rails' `CollectionAssociation#transaction`, which
-   * `ThroughAssociation` overrides to the *through* model's — the join-row
-   * writes are what has to be atomic, not the target model's.
-   */
-  private _throughTransaction<R>(block: () => Promise<R>): Promise<R | undefined> {
-    return this._throughAssociation().transaction(block);
-  }
-
-  private async _pushThrough(
-    records: T[],
-    skipCallbacks = false,
-    throughScope?: unknown,
-  ): Promise<void> {
+  private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
     const assoc = this._throughAssociation();
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
-      if (skipCallbacks) {
-        await this._throughTransaction(async () => {
-          for (const record of records) {
-            await (assoc as unknown as CollectionAssociation).addToTarget(
-              record,
-              { skipCallbacks: true, replace: this.distinctValue },
-              () => assoc.insertRecord(record, true, true) as unknown as Promise<void>,
-            );
-          }
-        });
-      } else {
-        await assoc.concat(...records);
-      }
+      await assoc.concat(...records);
     } finally {
       assoc._throughScope = previousThroughScope;
     }

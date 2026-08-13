@@ -7468,7 +7468,12 @@ export class Date {
     return (
       `#<${this.constructor.name}: ${this.toS()} ` +
       `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf.inspect()}n),` +
-      `${of < 0 ? "" : "+"}${of}s,${this.start.toFixed(0)}j)>`
+      `${of < 0 ? "" : "+"}${of}s,${
+        // `%.0f` over a non-finite double prints `inf`/`-inf` in C; MRI's
+        // capitalised spelling is what `Date::JULIAN` / `Date::GREGORIAN`
+        // inspect as. JS `toFixed` would answer "Infinity"/"-Infinity".
+        Number.isFinite(this.start) ? this.start.toFixed(0) : this.start > 0 ? "Inf" : "-Inf"
+      }j)>`
     );
   }
 

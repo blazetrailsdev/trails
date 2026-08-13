@@ -2315,3 +2315,22 @@ describe("initialize_copy", () => {
     expect(d.initializeCopy(d)).toBe(d);
   });
 });
+
+describe("Date#inspect", () => {
+  it("spells a non-finite reform start Inf/-Inf, as mk_inspect's %.0f does", () => {
+    // ruby 3.3.11 -rdate:
+    //   Date.new(2001,2,3,Date::JULIAN).inspect
+    //     #=> "#<Date: 2001-02-03 ((2451957j,0s,0n),+0s,Infj)>"
+    //   Date.new(2001,2,3,Date::GREGORIAN).inspect
+    //     #=> "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,-Infj)>"
+    expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).inspect()).toBe(
+      "#<Date: 2001-02-03 ((2451957j,0s,0n),+0s,Infj)>",
+    );
+    expect(new RubyDate(2001, 2, 3, RubyDate.GREGORIAN).inspect()).toBe(
+      "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,-Infj)>",
+    );
+    expect(new RubyDate(2001, 2, 3).inspect()).toBe(
+      "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
+    );
+  });
+});

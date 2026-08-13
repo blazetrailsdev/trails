@@ -260,7 +260,10 @@ describe("body call capture", () => {
 
   it("records `constructor` for an instantiation but not for a class reference", () => {
     // Shape from persistence.rb:949-955: `self.class.primary_key` first,
-    // `RecordNotDestroyed.new` last — the sequence must not invert.
+    // `RecordNotDestroyed.new` last. The instantiation is the operand of a
+    // `throw`, which Rails spells either `raise Foo, msg` (no `new` at all) or
+    // `raise Foo.new(msg)` — an ambiguous position both extractors drop from
+    // the ORDER stream, keeping it in the call SET.
     const cls = extractFromSource(
       `class Foo {
         raiseNotDestroyed() {
@@ -270,8 +273,24 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((x) => x.name === "raiseNotDestroyed")!;
-    expect(m.callSeq).toEqual(["primaryKey", "name", "constructor"]);
+    expect(m.callSeq).toEqual(["primaryKey", "name"]);
+    expect(m.calls).toContain("constructor");
     expect(m.calls).not.toContain("class");
+  });
+
+  it("keeps a non-thrown instantiation's position in the sequence", () => {
+    // Only the `throw` operand is ambiguous: a plain `new` has one spelling in
+    // Ruby (`Foo.new`) and one position.
+    const cls = extractFromSource(
+      `class Foo {
+        build() {
+          const scope = this.scope();
+          return new Preloader(scope);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "build")!;
+    expect(m.callSeq).toEqual(["scope", "constructor"]);
   });
 
   it("records a callback argument after the call it is passed to, as Ruby records a block", () => {
@@ -345,7 +364,7 @@ describe("body call capture", () => {
       }`,
     );
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
-    expect(create.callSeq).toEqual(["dirty", "constructor", "save", "rollback"]);
+    expect(create.callSeq).toEqual(["dirty", "save", "rollback"]);
     expect(create.skeleton).toEqual([
       "if",
       "ref:dirty",
