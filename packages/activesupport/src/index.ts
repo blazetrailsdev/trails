@@ -235,7 +235,6 @@ export {
   assertValidKeys,
   withIndifferentAccess,
   deepTransformValues,
-  extractBang,
   stringifyKeysBang,
   symbolizeKeysBang,
   toOptions,
@@ -304,6 +303,13 @@ export {
   isIn,
   presenceIn,
 } from "./enumerable-utils.js";
+
+// Note: hash-utils' `extractBang` is intentionally kept off this flat index and
+// reached from "./hash-utils.js" directly. `Hash#extract!`
+// (core_ext/hash/slice.rb:24-26) and `Array#extract!` (core_ext/array/extract.rb)
+// are distinct Ruby methods on distinct receivers, so they never collide there;
+// in a flat ESM namespace they do, and array-utils' `extractBang` owns the
+// spelling here. Same shape as the core-ext/range and core-ext/date notes above.
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 

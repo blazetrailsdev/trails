@@ -15,7 +15,6 @@ import {
   reverseMerge,
   assertValidKeys,
   deepTransformValues,
-  extractBang,
   wrap,
   inGroupsOf,
   toSentence,
@@ -31,6 +30,7 @@ import {
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
+import { extractBang } from "./hash-utils.js";
 
 // ── Hash utilities ──────────────────────────────────────────────────
 
