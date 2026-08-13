@@ -35,4 +35,14 @@ describe("a leading-colon association spec", () => {
       Post.joins({ comments: "post" }).toSql(),
     );
   });
+
+  it("joins a nested spec whose key is a colon string", async () => {
+    // Rails `joins(comments: :post)` — both halves of the hash are Symbols.
+    expect(Post.joins({ ":comments": ":post" }).toSql()).toBe(
+      Post.joins({ comments: "post" }).toSql(),
+    );
+    expect(await Post.joins({ ":comments": ":post" }).count()).toBe(
+      await Post.joins({ comments: "post" }).count(),
+    );
+  });
 });
