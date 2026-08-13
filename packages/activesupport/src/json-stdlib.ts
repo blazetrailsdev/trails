@@ -12,9 +12,14 @@ const globalJSON = globalThis.JSON;
  * `generate`.
  */
 export namespace JSON {
-  /** `JSON.dump(obj)` — the json gem's `generate`, with no ActiveSupport escaping. */
+  /**
+   * `JSON.dump(obj)` — the json gem's `generate`, with no ActiveSupport
+   * escaping. `JSON.dump(nil)` is `"null"` in MRI, where `globalThis.JSON`
+   * returns `undefined` for the values Ruby has no counterpart for (`undefined`
+   * itself, functions, symbols), so those fall back to the `nil` dump.
+   */
   export function dump(value: unknown): string {
-    return globalJSON.stringify(value);
+    return globalJSON.stringify(value) ?? "null";
   }
 
   /** `JSON.load(source)` — the json gem's parser. */
