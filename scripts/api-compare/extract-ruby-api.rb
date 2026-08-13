@@ -2519,7 +2519,13 @@ class ApiExtractor
     case node[0]
     when :arg_paren then describe_args(node[1], flags)
     when :args_add_block
-      flags << "blockpass" if node[2].is_a?(Array)
+      if node[2].is_a?(Array)
+        flags << "blockpass"
+        # What was block-passed, so call-args.ts#tsBlockArgIndex can find it in
+        # the TS list the port forwards it through. Described against a scratch
+        # flag list: the block itself must not flag the call.
+        flags << "blockarg=#{describe_arg(node[2], [])}"
+      end
       describe_args(node[1], flags)
     when :args_add_star
       flags << "splat"

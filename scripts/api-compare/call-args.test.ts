@@ -650,6 +650,40 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:name", "?", "id:seed_type"]]);
   });
 
+  it("pairs a block-passing Ruby site against the TS site that carries the block", () => {
+    // predicate_builder.rb:100 `associated_table(key, &block)` and :108
+    // `associated_table(key)` both describe as `(key)`, so only the block tells
+    // them apart — and the port mirrors both (predicate-builder.ts:79, :91).
+    const pairs = pairCallSites(
+      [
+        site("associated_table", ["id:key"], ["blockpass", "blockarg=id:block"]),
+        site("associated_table", ["id:key"]),
+      ],
+      [site("associatedTable", ["id:key", "id:block"]), site("associatedTable", ["id:key"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["id:key", "id:block"], ["id:key"]]);
+  });
+
+  it("leaves a block-passing Ruby site alone when no TS site passes that block", () => {
+    // type_map_initializer.rb:98 `register_type(oid, &block)` against a port
+    // that pads the skipped optional parameter — the block is not simply the
+    // trailing argument, so the block-less :100 site keeps its own counterpart.
+    const pairs = pairCallSites(
+      [
+        site("register_type", ["id:oid"], ["blockpass", "blockarg=id:block"]),
+        site("register_type", ["id:oid", "id:oid_type"]),
+      ],
+      [
+        site("registerType", ["id:oid", "nil", "id:oidType"]),
+        site("registerType", ["id:oid", "id:oidType"]),
+      ],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([
+      ["id:oid", "nil", "id:oidType"],
+      ["id:oid", "id:oidType"],
+    ]);
+  });
+
   it("camelizes the Ruby call name to find its TS site", () => {
     const pairs = pairCallSites(
       [site("inject_join", ["id:list"])],

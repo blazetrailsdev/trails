@@ -1739,7 +1739,11 @@ describe("Ruby extractor call-argument capture", () => {
       flags: ["splat"],
     });
     // `xs` is a local, so both sites are also weak-receiver ones.
-    expect(sites.find((s) => s.name === "map")?.flags).toEqual(["weak", "blockpass"]);
+    expect(sites.find((s) => s.name === "map")?.flags).toEqual([
+      "weak",
+      "blockpass",
+      "blockarg=sym:to_s",
+    ]);
     expect(sites.find((s) => s.name === "each")?.flags).toEqual(["block", "weak"]);
     expect(argsOf(sites, "save")).toEqual(["id:x"]);
   });
