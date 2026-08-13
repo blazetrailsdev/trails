@@ -1101,7 +1101,7 @@ export class CallbackChain {
   }
 
   prepend(...callbacks: Callback[]): void {
-    for (let i = callbacks.length - 1; i >= 0; i--) this.prependOne(callbacks[i]);
+    callbacks.forEach((c) => this.prependOne(c));
   }
 
   private appendOne(callback: Callback): void {
@@ -1181,17 +1181,24 @@ export function normalizeCallbackParams(
  * class — a trailing `Hash` is the options bag, anything else is a filter — but
  * in TS an options bag and a CallbackObject filter are both `typeof "object"`.
  * So: a **plain** object (prototype `Object.prototype` or `null`, hence a class
- * instance is always a filter) that implements none of the scoped callback
- * methods, i.e. has no function-valued key named `before`/`after`/`around` or
- * prefixed with one (`beforeSave`, … — the `currentScopes()` spelling an
- * ObjectCall dispatches to).
+ * instance is always a filter) whose only function-valued keys are `if` and
+ * `unless` — the two option values Rails lets be callable (callbacks.rb:747,
+ * 752). Any other callable key is the scoped method an ObjectCall would
+ * dispatch to (`before`/`after`, `beforeSave`, or under `scope: [:name]` a bare
+ * `save` — callbacks.rb:510, :890), so the object is a filter.
  */
+/** Ruby `Array(x)` over a condition option, which Rails accepts as one or many. */
+function arrayWrap(value: unknown): CallbackCondition[] {
+  if (value === undefined || value === null) return [];
+  return (Array.isArray(value) ? value : [value]) as CallbackCondition[];
+}
+
 function isCallbackOptions(value: unknown): boolean {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) return false;
   return !Object.entries(value as Record<string, unknown>).some(
-    ([k, v]) => typeof v === "function" && /^(before|after|around)/.test(k),
+    ([k, v]) => typeof v === "function" && k !== "if" && k !== "unless",
   );
 }
 
@@ -1387,7 +1394,7 @@ export namespace Callbacks {
     kind: CallbackKind,
     ...filterList: FilterListEntry<T>[]
   ): void {
-    const [type, filters] = normalizeCallbackParams(
+    const [type, filters, options] = normalizeCallbackParams(
       [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
       null,
     );
@@ -1399,7 +1406,18 @@ export namespace Callbacks {
       return;
     }
     for (const filter of filters) {
-      chain.remove(type, filter as AnyCallback | CallbackObject);
+      const callback = chain.entries.find((c) =>
+        c.matches(type, filter as AnyCallback | CallbackObject),
+      );
+      if (callback && ("if" in options || "unless" in options)) {
+        const newCallback = callback.mergeConditionalOptions(
+          chain,
+          arrayWrap(options.if),
+          arrayWrap(options.unless),
+        );
+        chain.insert(chain.index(callback), newCallback);
+      }
+      if (callback) chain.delete(callback);
     }
   }
 
