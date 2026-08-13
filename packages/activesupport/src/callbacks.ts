@@ -1,3 +1,5 @@
+import { ArgumentError } from "./hash-utils.js";
+
 export type CallbackKind = "before" | "after" | "around";
 
 /**
@@ -38,6 +40,8 @@ export interface CallbackOptions<T extends object = object> {
   if?: CallbackCondition<T> | CallbackCondition<T>[];
   unless?: CallbackCondition<T> | CallbackCondition<T>[];
   prepend?: boolean;
+  /** `skip_callback`'s `:raise` (callbacks.rb:788) — defaults to true. */
+  raise?: boolean;
 }
 
 export interface DefineCallbacksOptions<T extends object = object> {
@@ -1398,17 +1402,22 @@ export namespace Callbacks {
       [kind, ...filterList] as Parameters<typeof normalizeCallbackParams>[0],
       null,
     );
+    if (!("raise" in options)) options.raise = true;
+
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) return;
-    if (filters.length === 0) {
-      chain.remove(type, undefined);
-      return;
-    }
     for (const filter of filters) {
       const callback = chain.entries.find((c) =>
         c.matches(type, filter as AnyCallback | CallbackObject),
       );
+
+      if (!callback && options.raise) {
+        throw new ArgumentError(
+          `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
+        );
+      }
+
       if (callback && ("if" in options || "unless" in options)) {
         const newCallback = callback.mergeConditionalOptions(
           chain,

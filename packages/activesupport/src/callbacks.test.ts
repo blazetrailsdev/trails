@@ -1793,19 +1793,21 @@ describe("CallbackTypeTest", () => {
   it("skip undefined callback", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    const cb = (t: any) => t.log.push("cb");
-    // Skipping something that was never added should not throw
-    expect(() => skipCallback(target, "save", "before", cb)).not.toThrow();
+    setCallback(target, "save", "before", (t: any) => t.log.push("cb"));
+    expect(() => skipCallback(target, "save", "before", ":qux")).toThrow(
+      "Before save callback :qux has not been defined",
+    );
+    runCallbacks(target, "save");
+    expect(target.log.length).toBe(1);
   });
 
   it("skip without raise", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    const cb = (t: any) => t.log.push("cb");
-    setCallback(target, "save", "before", cb);
-    skipCallback(target, "save", "before", cb);
+    setCallback(target, "save", "before", (t: any) => t.log.push("cb"));
+    skipCallback(target, "save", "before", ":qux", { raise: false });
     runCallbacks(target, "save");
-    expect(target.log).toEqual([]);
+    expect(target.log.length).toBe(1);
   });
 });
 
