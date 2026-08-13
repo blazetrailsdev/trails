@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Assertions::QueryAssertions
  */
 
-import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface SqlPayload {
@@ -38,8 +38,14 @@ export class SQLCounter {
     return this.logFull.map(([sql]) => sql);
   }
 
-  /** @internal */
-  call(_name: unknown, _id: unknown, payload: SqlPayload): void {
+  /**
+   * Mirrors Ruby's `def call(*, payload)` — the payload is the last positional,
+   * whatever arity the notifier's subscriber hands it.
+   *
+   * @internal
+   */
+  call(...args: unknown[]): void {
+    const payload = args[args.length - 1] as SqlPayload;
     if (payload.cached) return;
 
     const sql = payload.sql ?? "";
@@ -64,25 +70,21 @@ export async function assertQueriesCount(
   fn: () => void | Promise<void>,
 ): Promise<void> {
   const counter = new SQLCounter();
-  await Notifications.subscribed(
-    (event: NotificationEvent) => {
-      counter.call(event.name, event.transactionId, event.payload as SqlPayload);
-    },
-    "sql.active_record",
-    fn,
-  );
-  const queries = includeSchema ? counter.logAll : counter.log;
-  if (count !== undefined) {
-    if (queries.length !== count) {
-      throw new Error(
-        `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
-      );
+  await Notifications.subscribed(counter, "sql.active_record", async () => {
+    await fn();
+    const queries = includeSchema ? counter.logAll : counter.log;
+    if (count !== undefined) {
+      if (queries.length !== count) {
+        throw new Error(
+          `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
+        );
+      }
+    } else {
+      if (queries.length < 1) {
+        throw new Error("1 or more queries expected, but none were executed.");
+      }
     }
-  } else {
-    if (queries.length < 1) {
-      throw new Error("1 or more queries expected, but none were executed.");
-    }
-  }
+  });
 }
 
 /**
@@ -110,34 +112,30 @@ export async function assertQueriesMatch(
   fn: () => void | Promise<void>,
 ): Promise<void> {
   const counter = new SQLCounter();
-  await Notifications.subscribed(
-    (event: NotificationEvent) => {
-      counter.call(event.name, event.transactionId, event.payload as SqlPayload);
-    },
-    "sql.active_record",
-    fn,
-  );
-  const queries = includeSchema ? counter.logAll : counter.log;
-  // Reset lastIndex before each test (and after) to mirror Ruby Regexp#=== (always stateless).
-  const matched = queries.filter((q) => {
+  await Notifications.subscribed(counter, "sql.active_record", async () => {
+    await fn();
+    const queries = includeSchema ? counter.logAll : counter.log;
+    // Reset lastIndex before each test (and after) to mirror Ruby Regexp#=== (always stateless).
+    const matchedQueries = queries.filter((query) => {
+      match.lastIndex = 0;
+      return match.test(query);
+    });
     match.lastIndex = 0;
-    return match.test(q);
-  });
-  match.lastIndex = 0;
 
-  if (count !== undefined) {
-    if (matched.length !== count) {
-      throw new Error(
-        `${matched.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
-      );
+    if (count !== undefined) {
+      if (matchedQueries.length !== count) {
+        throw new Error(
+          `${matchedQueries.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+        );
+      }
+    } else {
+      if (matchedQueries.length < 1) {
+        throw new Error(
+          `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+        );
+      }
     }
-  } else {
-    if (matched.length < 1) {
-      throw new Error(
-        `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
-      );
-    }
-  }
+  });
 }
 
 /**
