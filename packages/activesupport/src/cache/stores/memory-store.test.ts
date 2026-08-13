@@ -9,6 +9,7 @@ import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compress
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
+import type { Event } from "../../notifications/instrumenter.js";
 import { Notifications } from "../../notifications.js";
 
 // Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
@@ -157,14 +158,19 @@ describe("MemoryStore delete_matched namespacing", () => {
 });
 
 describe("MemoryStore increment instrumentation", () => {
-  it("instruments with the raw, unnormalized name under a namespace", () => {
+  it("instruments with the raw, unnormalized name under a namespace", async () => {
     // Rails MemoryStore#increment passes `name` (not the normalized key) to
     // instrument (memory_store.rb:149); FileStore passes the normalized key.
     const store = new MemoryStore({ namespace: "ns" });
     store.write("counter", 0);
-    const events = Notifications.collectEvents("cache_increment.active_support", () => {
-      store.increment("counter");
-    });
+    const events: Event[] = [];
+    await Notifications.subscribed(
+      (event: Event) => events.push(event),
+      "cache_increment.active_support",
+      () => {
+        store.increment("counter");
+      },
+    );
     expect(events[0].payload.key).toBe("counter");
     expect(store.read("counter")).toBe(1);
   });

@@ -193,7 +193,7 @@ export class Notifications {
   }
 
   /** Remove a previously registered subscriber. */
-  static unsubscribe(subscriberOrName: NotificationSubscriber): void {
+  static unsubscribe(subscriberOrName: NotificationSubscriber | string): void {
     this._notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
   }
 
@@ -288,38 +288,5 @@ export class Notifications {
   /** Mirrors `ActiveSupport::Notifications.instrumenter`. */
   static get instrumenter(): NotificationInstrumenter {
     return this._boundInstrumenter;
-  }
-
-  // -------------------------------------------------------------------------
-  // Monitoring helpers
-  // -------------------------------------------------------------------------
-
-  /**
-   * Collect all events matching pattern during the block, then return them.
-   * Useful in tests — mirrors Rails' AS::Notifications test helpers.
-   */
-  static collectEvents(pattern: string | RegExp | null | undefined, block: () => void): Event[] {
-    const events: Event[] = [];
-    const sub = this.subscribe(pattern, (e) => events.push(e));
-    try {
-      block();
-    } finally {
-      this.unsubscribe(sub);
-    }
-    return events;
-  }
-
-  static async collectEventsAsync(
-    pattern: string | RegExp | null | undefined,
-    block: () => Promise<void>,
-  ): Promise<Event[]> {
-    const events: Event[] = [];
-    const sub = this.subscribe(pattern, (e) => events.push(e));
-    try {
-      await block();
-    } finally {
-      this.unsubscribe(sub);
-    }
-    return events;
   }
 }

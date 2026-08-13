@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { extractBang } from "./core-ext/hash/slice.js";
 import {
   deepMerge,
   deepTransformKeys,
@@ -12,7 +13,6 @@ import {
   ArgumentError,
   slice,
   except,
-  extractBang,
   sliceBang,
   exceptBang,
   reverseMergeBang,

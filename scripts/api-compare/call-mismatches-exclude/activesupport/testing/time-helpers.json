@@ -4,20 +4,13 @@
     "tsFile": "testing/time-helpers.ts",
     "rubyName": "travel_to",
     "call": "at",
-    "reason": "`Time.at(now)` builds the stubbed Time; the trails clock seam takes a `Temporal.Instant` directly, so there is no `at` constructor to call."
+    "reason": "`Time.at(now)` builds the stubbed Time; the trails clock method takes a `Temporal.Instant` directly, so there is no `at` constructor to call."
   },
   {
     "package": "activesupport",
     "tsFile": "testing/time-helpers.ts",
     "rubyName": "travel_to",
-    "call": "parse",
-    "reason": "`Time.zone.parse` handles the String arm; `Temporal.Instant.from` parses the ISO string instead."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "testing/time-helpers.ts",
-    "rubyName": "travel_to",
-    "call": "to_time",
-    "reason": "`to_time` normalizes a Date/DateTime receiver to a Time; the TS arm converts a `Date` to a `Temporal.Instant` via `fromEpochMilliseconds`."
+    "call": "order:parse,toTime",
+    "reason": "Rails' first `to_time` is the Ruby Date arm's `date_or_time.midnight.to_time`; trails' Date arm takes a JS `Date` (a Ruby Time, not a Ruby Date), so the only `toTime` left is the one after `Time.zone.parse`, which inverts the pair's order."
   }
 ]

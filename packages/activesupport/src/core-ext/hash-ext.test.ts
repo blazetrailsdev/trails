@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { extractBang } from "./hash/slice.js";
 
 import {
   deepMerge,
@@ -12,7 +13,6 @@ import {
   assertValidKeys,
   slice,
   except,
-  extractBang,
 } from "../hash-utils.js";
 
 describe("HashExtTest", () => {

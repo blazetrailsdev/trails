@@ -310,8 +310,9 @@ export {
   presenceIn,
 } from "./enumerable-utils.js";
 
-// Note: hash-utils' `extractBang` is intentionally kept off this flat index and
-// reached from "./hash-utils.js" directly. `Hash#extract!`
+// Note: `Hash#extract!` is intentionally kept off this flat index and reached
+// through the "./core-ext/hash/slice" subpath, which mirrors its Rails require
+// path (`active_support/core_ext/hash/slice`). `Hash#extract!`
 // (core_ext/hash/slice.rb:24-26) and `Array#extract!` (core_ext/array/extract.rb)
 // are distinct Ruby methods on distinct receivers, so they never collide there;
 // in a flat ESM namespace they do, and array-utils' `extractBang` owns the

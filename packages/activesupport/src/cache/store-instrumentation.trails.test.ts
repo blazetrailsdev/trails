@@ -17,7 +17,16 @@ describe("Cache::Store instrumentation", () => {
   });
 
   function withInstrumentation(operation: string, block: () => void): Event[] {
-    return Notifications.collectEvents(`cache_${operation}.active_support`, block);
+    const eventName = `cache_${operation}.active_support`;
+
+    const events: Event[] = [];
+    try {
+      Notifications.subscribe(eventName, (event) => events.push(event));
+      block();
+      return events;
+    } finally {
+      Notifications.unsubscribe(eventName);
+    }
   }
 
   const normalizedKey = (key: string, options?: StoreOptions): string =>

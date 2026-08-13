@@ -30,7 +30,7 @@ import {
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
-import { extractBang } from "./hash-utils.js";
+import { extractBang } from "./core-ext/hash/slice.js";
 
 // ── Hash utilities ──────────────────────────────────────────────────
 
@@ -282,6 +282,15 @@ describe("extractBang", () => {
     const extracted = extractBang(original, "a", "x");
     expect(extracted).toEqual({ a: null });
     expect(original).toEqual({ b: null });
+  });
+
+  it("ignores inherited keys", () => {
+    const proto: Record<string, unknown> = { inherited: 1 };
+    const original: Record<string, unknown> = Object.create(proto);
+    original.a = 2;
+    const extracted = extractBang(original, "a", "inherited");
+    expect(extracted).toEqual({ a: 2 });
+    expect(proto.inherited).toBe(1);
   });
 });
 

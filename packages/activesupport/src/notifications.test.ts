@@ -149,18 +149,28 @@ describe("SubscribedTest", () => {
     expect(innerFired).toBe(true);
   });
 
-  it("timed subscribed", () => {
-    const events = Notifications.collectEvents("timed.subscribed", () => {
-      Notifications.instrument("timed.subscribed", { x: 1 });
-    });
+  it("timed subscribed", async () => {
+    const events: Event[] = [];
+    await Notifications.subscribed(
+      (event: Event) => events.push(event),
+      "timed.subscribed",
+      () => {
+        Notifications.instrument("timed.subscribed", { x: 1 });
+      },
+    );
     expect(events).toHaveLength(1);
     expect(events[0].duration).toBeGreaterThanOrEqual(0);
   });
 
-  it("monotonic timed subscribed", () => {
-    const events = Notifications.collectEvents("monotonic.timed.subscribed", () => {
-      Notifications.instrument("monotonic.timed.subscribed");
-    });
+  it("monotonic timed subscribed", async () => {
+    const events: Event[] = [];
+    await Notifications.subscribed(
+      (event: Event) => events.push(event),
+      "monotonic.timed.subscribed",
+      () => {
+        Notifications.instrument("monotonic.timed.subscribed");
+      },
+    );
     expect(events.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -514,29 +524,6 @@ describe("ActiveSupport::Notifications", () => {
       Notifications.publish("cache.miss", { key: "users/1" });
       expect(events).toHaveLength(1);
       expect(events[0].payload).toEqual({ key: "users/1" });
-    });
-  });
-
-  describe("collectEvents", () => {
-    it("returns all matching events fired during block", () => {
-      const events = Notifications.collectEvents("sql", () => {
-        Notifications.instrument("sql", { sql: "SELECT 1" });
-        Notifications.instrument("sql", { sql: "SELECT 2" });
-        Notifications.instrument("other");
-      });
-      expect(events).toHaveLength(2);
-      expect(events[0].payload.sql).toBe("SELECT 1");
-      expect(events[1].payload.sql).toBe("SELECT 2");
-    });
-
-    it("does not include events outside the block", () => {
-      Notifications.instrument("sql", { sql: "before" });
-      const events = Notifications.collectEvents("sql", () => {
-        Notifications.instrument("sql", { sql: "during" });
-      });
-      Notifications.instrument("sql", { sql: "after" });
-      expect(events).toHaveLength(1);
-      expect(events[0].payload.sql).toBe("during");
     });
   });
 
