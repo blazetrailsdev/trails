@@ -391,7 +391,13 @@ describe("empty-scope aggregate identities", () => {
   // SQLite3::SQLException: wrong number of arguments to function SUM()`.
   it("async sums the nil identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    await expect(Account.asyncSum()).rejects.toThrow();
+    const { captureSql } = await import("./testing/sql-capture.js");
+    const queries = await captureSql(async () => {
+      await expect(Account.asyncSum()).rejects.toThrow();
+      await expect(Account.group("firm_id").asyncSum()).rejects.toThrow();
+    });
+    expect(queries[0]).toMatch(/SELECT SUM\(\) FROM/);
+    expect(queries[1]).toMatch(/SELECT SUM\(\) AS "?sum"?/);
   });
 
   // `CollectionProxy < Relation` (collection_proxy.rb:31) inherits the same

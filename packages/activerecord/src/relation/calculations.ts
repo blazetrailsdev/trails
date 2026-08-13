@@ -276,9 +276,9 @@ function compileManagerWithBinds(rel: CalculationRelation, manager: any): [strin
 function isBigintColumn(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
 ): boolean {
-  if (fn === "count" || fn === "average" || column === "*") return false;
+  if (fn === "count" || fn === "average" || column == null || column === "*") return false;
   if (column instanceof Nodes.Node) return false;
   const table = rel._model.arelTable as {
     typeForAttribute?(col: string): unknown;
@@ -333,7 +333,7 @@ function buildGroupedSelectValues(
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
   distinct: boolean | null = rel._isDistinct,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
@@ -508,7 +508,7 @@ async function groupedCompositeAssoc(
   rel: CalculationRelation,
   association: any,
   fn: AggFn,
-  column: string | Nodes.Node | number,
+  column: string | Nodes.Node | number | null,
 ): Promise<Map<unknown, unknown>> {
   const table = rel._model.arelTable;
   const fkCols = association.foreignKey as string[];
@@ -831,16 +831,16 @@ export function hasInclude(
 
 /**
  * Narrows the resolved `column_name` to what `aggregate_column` accepts. Rails
- * hands its own resolved value straight through (calculations.rb:414-423), so a
- * composite `primary_key` reaches Arel as an array and emits broken SQL there
- * too; the join here picks one spelling for that already-degenerate case rather
- * than pretending trails supports it.
+ * hands its own resolved value straight through (calculations.rb:414-423) — nil
+ * included, which is how `async_sum`'s identity default reaches `arel_column`
+ * as `""` — so a composite `primary_key` reaches Arel as an array and emits
+ * broken SQL there too; the join here picks one spelling for that already-
+ * degenerate case rather than pretending trails supports it.
  * @internal
  */
 function aggregateTarget(
   columnName: string | string[] | Nodes.Node | number | null,
-): string | Nodes.Node | number {
-  if (columnName == null) return "*";
+): string | Nodes.Node | number | null {
   return Array.isArray(columnName) ? columnName.join(",") : columnName;
 }
 
