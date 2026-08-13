@@ -506,6 +506,46 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Rails' alias_method chains around Ruby's Time operators — `+`/`-`/`<=>`/" +
+      "`eql?` (time/calculations.rb:304-355) and `Time.at` (:59-60). Each pair " +
+      "exists only so the redefined operator can fall back to the original " +
+      "core-Ruby one under its `*_without_*` name. JS has no operator " +
+      "overloading and no way to reopen `Date`'s operators, so trails' ported " +
+      "arithmetic is the plain `since`/`ago`/`compare` functions and the chain " +
+      "halves have no receiver to attach to. Scoped to time/calculations.rb.",
+    names: [
+      "plus_with_duration",
+      "plus_without_duration",
+      "minus_with_duration",
+      "minus_without_duration",
+      "minus_with_coercion",
+      "minus_without_coercion",
+      "compare_with_coercion",
+      "compare_without_coercion",
+      "eql_with_coercion",
+      "eql_without_coercion",
+      "at_with_coercion",
+      "at_without_coercion",
+      "at",
+    ],
+    rubyFiles: ["core_ext/time/calculations.rb"],
+  },
+  {
+    reason:
+      "DateTime's offset-shifting conversions (date_time/calculations.rb:169-" +
+      "200): `localtime`/`getlocal`, `utc`/`getgm`/`getutc`/`gmtime`, `utc?` and " +
+      "`utc_offset`. A Ruby DateTime is a civil date paired with an offset, so " +
+      "each returns a `Time` at a different offset for the same instant. trails " +
+      "represents a time as a `Date`/`Temporal.Instant` — an absolute instant " +
+      "carrying no offset — so there is nothing for these to convert; the " +
+      "offset-carrying surface is TimeWithZone (`utc`, `utcOffset`, `isUtc` in " +
+      "time-with-zone.ts). Scoped to date_time/calculations.rb so it cannot " +
+      "silence the genuine Time/TimeWithZone members of the same names.",
+    names: ["localtime", "getlocal", "utc", "getgm", "getutc", "gmtime", "utc?", "utc_offset"],
+    rubyFiles: ["core_ext/date_time/calculations.rb"],
+  },
+  {
+    reason:
       "PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a " +
       "live `SELECT '<type>'::regtype::oid` query, so trails' port is async and " +
       "diverges from the sync abstract signature it overrides; it is tracked by " +

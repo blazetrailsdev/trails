@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ActiveSupport } from "./index.js";
-import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
+import { Deprecation, DeprecationError, deprecator, type CallerLocation } from "./deprecation.js";
 import { ErrorReporter } from "./error-reporter.js";
 import { ErrorSubscriber } from "./error-reporter/test-helper.js";
 import { Logger } from "./logger.js";
@@ -184,22 +184,15 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings matches all warnings when set to :all", () => {
-    dep.disallowedWarnings = ["all"];
-    dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("anything")).toThrow(DeprecationError);
+    dep.disallowedWarnings = "all";
+    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
   });
 
   it("different behaviors for allowed and disallowed warnings", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.behavior = "stderr";
-    dep.disallowedWarnings = ["bad"];
-    dep.disallowedBehavior = "raise";
-    // allowed warning should write to stderr
-    dep.warn("good warning");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("good warning"));
-    // disallowed warning should raise
-    expect(() => dep.warn("bad warning")).toThrow(DeprecationError);
-    spy.mockRestore();
+    dep.disallowedWarnings = "all";
+    dep.behavior = () => expect.unreachable("the allowed behavior must not run");
+
+    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
   });
 
   it("disallowed_behavior callbacks", () => {
@@ -211,61 +204,78 @@ describe("DeprecationTest", () => {
   });
 
   it("allow", () => {
-    dep.behavior = "raise";
-    expect(() => {
-      dep.allow(["old API"], {}, () => {
-        dep.warn("old API");
-      });
-    }).not.toThrow();
+    dep.disallowedWarnings = "all";
+
+    expect(() => dep.warn()).toThrow(DeprecationError);
+
+    dep.allow("all", {}, () => {
+      expect(() => dep.warn()).not.toThrow();
+    });
   });
 
   it("allow only allows matching warnings using a substring", () => {
-    dep.behavior = "raise";
-    dep.allow(["specific"], {}, () => {
-      expect(() => dep.warn("specific warning")).not.toThrow();
-      expect(() => dep.warn("other warning")).toThrow(DeprecationError);
+    dep.disallowedWarnings = "all";
+
+    dep.allow(["foo bar", "baz qux"], {}, () => {
+      expect(() => dep.warn("foo bar")).not.toThrow();
+      expect(() => dep.warn("baz qux")).not.toThrow();
+      expect(() => dep.warn("fubar")).toThrow(/fubar/);
     });
   });
 
   it("allow only allows matching warnings using a regexp", () => {
-    dep.behavior = "raise";
-    dep.allow([/spec.*/], {}, () => {
-      expect(() => dep.warn("specific warning")).not.toThrow();
-      expect(() => dep.warn("other warning")).toThrow(DeprecationError);
+    dep.disallowedWarnings = "all";
+
+    dep.allow([/(foo|baz) (bar|qux)/], {}, () => {
+      expect(() => dep.warn("foo bar")).not.toThrow();
+      expect(() => dep.warn("baz qux")).not.toThrow();
+      expect(() => dep.warn("fubar")).toThrow(/fubar/);
     });
   });
 
   it("allow only affects its block", () => {
-    dep.behavior = "raise";
-    dep.allow(["allowed"], {}, () => {
-      dep.warn("allowed"); // should not throw
+    dep.disallowedWarnings = "all";
+
+    dep.allow("all", {}, () => {
+      expect(() => dep.warn()).not.toThrow();
     });
-    // outside the block, the allow is gone
-    expect(() => dep.warn("allowed")).toThrow(DeprecationError);
+
+    expect(() => dep.warn()).toThrow(DeprecationError);
   });
 
   it("allow with :if option", () => {
-    dep.behavior = "raise";
-    dep.allow(["old"], { if: () => false }, () => {
-      // if returns false, allow should not apply
-      expect(() => dep.warn("old API")).toThrow(DeprecationError);
+    dep.disallowedWarnings = "all";
+
+    dep.allow(["fubar"], { if: true }, () => {
+      expect(() => dep.warn("fubar")).not.toThrow();
+    });
+
+    dep.allow(["fubar"], { if: false }, () => {
+      expect(() => dep.warn("fubar")).toThrow(/fubar/);
     });
   });
 
   it("allow with :if option as a proc", () => {
-    dep.behavior = "raise";
-    let condition = true;
-    dep.allow(["old"], { if: () => condition }, () => {
-      expect(() => dep.warn("old API")).not.toThrow();
-      condition = false;
-      expect(() => dep.warn("old API")).toThrow(DeprecationError);
+    dep.disallowedWarnings = "all";
+
+    dep.allow(["fubar"], { if: () => true }, () => {
+      expect(() => dep.warn("fubar")).not.toThrow();
+    });
+
+    dep.allow(["fubar"], { if: () => false }, () => {
+      expect(() => dep.warn("fubar")).toThrow(/fubar/);
     });
   });
 
   it("allow with the default warning message", () => {
-    dep.behavior = "raise";
-    dep.allow(["DEPRECATION WARNING"], {}, () => {
+    dep.disallowedWarnings = "all";
+
+    dep.allow("all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
+    });
+
+    dep.allow(["fubar"], {}, () => {
+      expect(() => dep.warn()).toThrow(DeprecationError);
     });
   });
 
@@ -287,9 +297,11 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings with the default warning message", () => {
-    dep.disallowedWarnings = ["DEPRECATION WARNING"];
-    dep.disallowedBehavior = "raise";
+    dep.disallowedWarnings = "all";
     expect(() => dep.warn()).toThrow(DeprecationError);
+
+    dep.disallowedWarnings = ["fubar"];
+    expect(() => dep.warn()).not.toThrow();
   });
 
   it("assert_deprecated without match argument", () => {
@@ -412,19 +424,36 @@ describe("DeprecationTest", () => {
   });
 
   it("allow only allows matching warnings using a substring as a symbol", () => {
-    dep.behavior = "raise";
-    dep.allow(["specific"], {}, () => {
-      expect(() => dep.warn("specific warning")).not.toThrow();
+    dep.disallowedWarnings = "all";
+
+    // A Ruby Symbol value is a colon-prefixed string in trails; `explicitly_allowed?`
+    // compares with `rule.to_s`, i.e. without the colon.
+    dep.allow(["foo bar", "baz qux"], {}, () => {
+      expect(() => dep.warn("foo bar")).not.toThrow();
+      expect(() => dep.warn("baz qux")).not.toThrow();
+      expect(() => dep.warn("fubar")).toThrow(/fubar/);
     });
   });
 
   it("allow only affects the current thread", () => {
-    dep.behavior = "raise";
-    dep.allow(["allowed"], {}, () => {
-      expect(() => dep.warn("allowed")).not.toThrow();
+    // JS has one thread of execution, so the "other thread still disallowed"
+    // half of the Rails case has no analogue; what remains is that the
+    // allowance ends with its block.
+    dep.disallowedWarnings = "all";
+
+    dep.allow("all", {}, () => {
+      expect(() => dep.warn()).not.toThrow();
     });
-    // Outside block, allow is gone
-    expect(() => dep.warn("allowed")).toThrow(DeprecationError);
+
+    expect(() => dep.warn()).toThrow(DeprecationError);
+  });
+
+  // A `Thread::Backtrace::Location` stand-in — see CallerLocation.
+  const frame = (path: string, lineno = 1, label = "block"): CallerLocation => ({
+    path,
+    lineno,
+    label,
+    toString: () => `${path}:${lineno}:in '${label}'`,
   });
 
   it("warn deprecation skips the internal caller locations", () => {
@@ -436,14 +465,14 @@ describe("DeprecationTest", () => {
 
   it("warn deprecation can blame code generated with eval", () => {
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("eval blame message", ["eval:1"]);
+    dep.warn("eval blame message", [frame("(eval)")]);
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("eval blame message"));
     spy.mockRestore();
   });
 
   it("warn deprecation can blame code from internal methods", () => {
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("internal method blame", ["internal:1"]);
+    dep.warn("internal method blame", [frame("<internal:kernel>")]);
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("internal method blame"));
     spy.mockRestore();
   });

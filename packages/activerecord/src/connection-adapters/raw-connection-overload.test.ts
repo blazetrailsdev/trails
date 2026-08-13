@@ -19,8 +19,9 @@ class FakeRawConnection {
 // `spy.mockRestore()` instead of an `afterEach(restoreAllMocks)`.
 function captureDeprecations<T>(fn: () => T): { result: T; messages: string[] } {
   const messages: string[] = [];
-  const spy = vi.spyOn(deprecator(), "warn").mockImplementation((message?: string): void => {
+  const spy = vi.spyOn(deprecator(), "warn").mockImplementation((message?: string) => {
     messages.push(String(message));
+    return undefined;
   });
   try {
     return { result: fn(), messages };

@@ -197,7 +197,9 @@ describe("PredicateBuilderTest", () => {
     it("builds BETWEEN for ranges", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65) });
-      expect(compile(node)).toMatch(/BETWEEN 18 AND 65/);
+      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      expect(sql).toMatch(/BETWEEN \? AND \?/);
+      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
 
     // No verbatim Rails test exists for the plain-object-not-a-record case (it is
@@ -240,9 +242,10 @@ describe("PredicateBuilderTest", () => {
     it("handles exclusive ranges", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65, true) });
-      const sql = compile(node);
-      expect(sql).toMatch(/>= 18/);
-      expect(sql).toMatch(/< 65/);
+      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
+      expect(sql).toMatch(/>= \?/);
+      expect(sql).toMatch(/< \?/);
+      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
 
     // No verbatim Rails test for this in isolation: it pins the trails
@@ -303,10 +306,11 @@ describe("PredicateBuilderTest", () => {
       // `NOT (age >= 18 AND age < 65)` (And has no invert override).
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = buildInverted(builder, { age: new Range(18, 65, true) });
-      const sql = compile(node);
+      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
       expect(sql).toMatch(/^NOT \(/);
-      expect(sql).toMatch(/>= 18/);
-      expect(sql).toMatch(/< 65/);
+      expect(sql).toMatch(/>= \?/);
+      expect(sql).toMatch(/< \?/);
+      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
     });
 
     it("does not dereference a plain object literal to its id when negated", () => {

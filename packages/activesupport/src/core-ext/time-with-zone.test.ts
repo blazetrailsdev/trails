@@ -14,10 +14,10 @@ import {
   useZone,
   findZone,
   findZoneBang,
-  current,
   dateInTimeZone,
   ArgumentError,
 } from "../time-zone-config.js";
+import { current } from "../time-ext.js";
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;

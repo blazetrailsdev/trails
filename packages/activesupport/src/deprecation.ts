@@ -1,4 +1,5 @@
 import { wrap } from "./array-utils.js";
+import { deprecateMethods } from "./deprecation/method-wrappers.js";
 import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
 import { ActiveSupport } from "./index.js";
@@ -144,12 +145,66 @@ function arityOfCallable(callable: Function): number {
 
 type AllowMatcher = string | RegExp;
 
-interface AllowContext {
-  matchers: AllowMatcher[];
-  ifFn?: (...args: unknown[]) => boolean;
+/**
+ * One frame of a callstack, as `warn` and `deprecation_warning` receive it.
+ *
+ * @noRailsEquivalent PERMANENT. Ruby's `Thread::Backtrace::Location`, which
+ * `caller_locations` answers and `extract_callstack` reads `path` / `lineno` /
+ * `label` / `absolute_path` off. JS has no such value, so trails parses the
+ * same four fields out of a V8 stack line.
+ */
+export interface CallerLocation {
+  path: string;
+  absolutePath?: string;
+  lineno: number;
+  label: string;
+  toString(): string;
 }
 
+/**
+ * @noRailsEquivalent Ruby's `Kernel#caller_locations(start)`. V8 exposes the
+ * same information only as the pre-rendered `Error#stack` text, so the frames
+ * are parsed back out of it; `start` counts frames the same way, past this
+ * function and its caller.
+ */
+function callerLocations(start: number): CallerLocation[] {
+  const stack = new Error().stack;
+  if (stack == null) return [];
+  return stack
+    .split("\n")
+    .slice(1 + start)
+    .flatMap((line) => {
+      const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
+      if (!m) return [];
+      const path = m[1] ?? m[3];
+      const lineno = Number(m[2] ?? m[4]);
+      const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
+      return [{ path, lineno, label, toString: () => `${path}:${lineno}:in '${label}'` }];
+    });
+}
+
+/**
+ * Rails: `RAILS_GEM_ROOT` (deprecation/reporting.rb:150) — the directory the
+ * framework itself lives in, so its own frames never get blamed for a
+ * deprecation. Here that is the directory this module was loaded from.
+ */
+const TRAILS_GEM_ROOT = new URL(".", import.meta.url).pathname;
+
 export class Deprecation {
+  /**
+   * Mirrors: deprecation.rb:60-62. Ruby double-checks under a Mutex because
+   * two threads can race the memo; JS runs one turn at a time, so the memo is
+   * the whole method.
+   */
+  static _instance(): Deprecation {
+    return (Deprecation.__instance ??= new Deprecation());
+  }
+
+  private static __instance?: Deprecation;
+
+  /** Rails: `include MethodWrapper` (deprecation.rb:55). */
+  deprecateMethods = deprecateMethods;
+
   private _behavior?: DeprecationBehaviorCallable[];
   private _disallowedBehavior?: DeprecationBehaviorCallable[];
   private _silenced = false;
@@ -159,11 +214,18 @@ export class Deprecation {
   deprecationHorizon: string;
   // Rails: `self.debug = false` (deprecation.rb:76).
   debug = false;
-  disallowedWarnings: (string | RegExp | "all")[] = [];
+  /**
+   * Rails: `disallowed_warnings` (deprecation/disallowed.rb:22), which is an
+   * array of substrings/Regexps, or the scalar `:all`.
+   */
+  disallowedWarnings: AllowMatcher[] | "all" = [];
 
   // Rails: `@silence_counter = Concurrent::ThreadLocalVar.new(0)` (deprecation.rb:78).
   private _silenceCounter = 0;
-  private _allowContexts: AllowContext[] = [];
+  // Rails: `@explicitly_allowed_warnings = Concurrent::ThreadLocalVar.new(nil)`
+  // (deprecation.rb:77); JS is single-threaded, so the bound value is a plain
+  // field saved and restored around the block, as `ThreadLocalVar#bind` does.
+  private _explicitlyAllowedWarnings: AllowMatcher[] | "all" | null = null;
 
   /**
    * Returns the current behavior or if one isn't set, defaults to `:stderr`.
@@ -223,43 +285,127 @@ export class Deprecation {
     this.debug = false;
   }
 
-  private _matchesDisallowed(msg: string): boolean {
-    if (this.disallowedWarnings.length === 0) return false;
-    for (const w of this.disallowedWarnings) {
-      if (w === "all") return true;
-      if (w instanceof RegExp && w.test(msg)) return true;
-      if (typeof w === "string" && msg.includes(w)) return true;
-    }
-    return false;
-  }
-
-  private _matchesAllow(msg: string): boolean {
-    for (const ctx of this._allowContexts) {
-      if (ctx.ifFn && !ctx.ifFn()) continue;
-      for (const m of ctx.matchers) {
-        if (m instanceof RegExp && m.test(msg)) return true;
-        if (typeof m === "string" && msg.includes(m)) return true;
-      }
-    }
-    return false;
-  }
-
-  warn(message?: string, callstack?: unknown[]): void {
-    // Rails: `return if silenced` (deprecation/reporting.rb:19).
+  /**
+   * Outputs a deprecation warning to the output configured by
+   * `Deprecation#behavior`.
+   *
+   * Mirrors: deprecation/reporting.rb:18-28.
+   */
+  warn(message?: string, callstack?: CallerLocation[]): string | undefined {
     if (this.silenced) return;
 
-    const msg = message ?? "DEPRECATION WARNING";
-    const fullMessage = `DEPRECATION WARNING: ${msg}`;
-    const stack = callstack ?? [];
-
-    if (this._matchesAllow(msg)) return;
-
-    if (this._matchesDisallowed(msg)) {
-      for (const b of this.disallowedBehavior) b(fullMessage, stack, this);
-      return;
+    callstack ??= callerLocations(2);
+    const fullMessage = this.deprecationMessage(callstack, message);
+    if (this.isDeprecationDisallowed(message)) {
+      for (const b of this.disallowedBehavior) b(fullMessage, callstack, this);
+    } else {
+      for (const b of this.behavior) b(fullMessage, callstack, this);
     }
+    return fullMessage;
+  }
 
-    for (const b of this.behavior) b(fullMessage, stack, this);
+  /** Mirrors: deprecation/reporting.rb:96-101. */
+  deprecationWarning(
+    deprecatedMethodName: string,
+    message?: string,
+    callerBacktrace?: CallerLocation[],
+  ): string {
+    callerBacktrace ??= callerLocations(2);
+    const msg = this.deprecatedMethodWarning(deprecatedMethodName, message);
+    this.warn(msg, callerBacktrace);
+    return msg;
+  }
+
+  /**
+   * Outputs a deprecation warning message.
+   *
+   *   deprecatedMethodWarning("methodName")
+   *   // => "methodName is deprecated and will be removed from Rails 8.1"
+   *   deprecatedMethodWarning("methodName", ":anotherMethod")
+   *   // => "... (use anotherMethod instead)"
+   *   deprecatedMethodWarning("methodName", "Optional message")
+   *   // => "... (Optional message)"
+   *
+   * Mirrors: deprecation/reporting.rb:112-119. Ruby's Symbol arm is a name to
+   * point at, its String arm free text; a Symbol value keeps its leading colon
+   * in trails, which is also what `inspect` prints, so the colon is the
+   * discriminator and is stripped from the interpolation.
+   */
+  private deprecatedMethodWarning(methodName: string, message?: string): string {
+    const warning = `${methodName} is deprecated and will be removed from ${this.gemName} ${this.deprecationHorizon}`;
+    if (message == null) return warning;
+    if (message.startsWith(":")) return `${warning} (use ${message.slice(1)} instead)`;
+    return `${warning} (${message})`;
+  }
+
+  /** Mirrors: deprecation/reporting.rb:121-124. */
+  private deprecationMessage(callstack: CallerLocation[], message?: string): string {
+    message ??=
+      "You are using deprecated behavior which will be removed from the next major or minor release.";
+    // Ruby interpolates a nil caller message as the empty string.
+    return `DEPRECATION WARNING: ${message} ${this.deprecationCallerMessage(callstack) ?? ""}`;
+  }
+
+  /** Mirrors: deprecation/reporting.rb:126-135. */
+  private deprecationCallerMessage(callstack: CallerLocation[]): string | undefined {
+    const [file, line, method] = this.extractCallstack(callstack);
+    if (file != null) {
+      if (line != null && method != null) {
+        return `(called from ${method} at ${file}:${line})`;
+      } else {
+        return `(called from ${file}:${line})`;
+      }
+    }
+  }
+
+  /** Mirrors: deprecation/reporting.rb:137-148. */
+  private extractCallstack(callstack: CallerLocation[]): [string, number, string] | [] {
+    if (callstack.length === 0) return [];
+
+    const offendingLine =
+      callstack.find((frame) => {
+        // Code generated with `eval` doesn't have an `absolute_path`, e.g. templates.
+        const path = frame.absolutePath ?? frame.path;
+        return path != null && !this.isIgnoredCallstack(path);
+      }) ?? callstack[0];
+
+    return [offendingLine.path, offendingLine.lineno, offendingLine.label];
+  }
+
+  /**
+   * Mirrors: deprecation/reporting.rb:153-155. Rails tests the gem root and
+   * `RbConfig::CONFIG["libdir"]`; the trails analogues are this package's own
+   * directory and the runtime's built-in modules, which V8 spells `node:`.
+   */
+  private isIgnoredCallstack(path: string): boolean {
+    return (
+      path.startsWith(TRAILS_GEM_ROOT) || path.startsWith("node:") || path.includes("<internal:")
+    );
+  }
+
+  /** Mirrors: deprecation/disallowed.rb:25-36. */
+  private isDeprecationDisallowed(message?: string): boolean {
+    if (this.isExplicitlyAllowed(message)) return false;
+    if (this.disallowedWarnings === "all") return true;
+    return (
+      message != null &&
+      this.disallowedWarnings.some((rule) =>
+        rule instanceof RegExp ? rule.test(message) : message.includes(rule),
+      )
+    );
+  }
+
+  /** Mirrors: deprecation/disallowed.rb:38-49. */
+  private isExplicitlyAllowed(message?: string): boolean {
+    const allowances = this._explicitlyAllowedWarnings;
+    if (allowances == null) return false;
+    if (allowances === "all") return true;
+    return (
+      message != null &&
+      wrap(allowances).some((rule) =>
+        rule instanceof RegExp ? rule.test(message) : message.includes(rule),
+      )
+    );
   }
 
   // Rails: deprecation/reporting.rb:41-46.
@@ -282,17 +428,29 @@ export class Deprecation {
     this._silenceCounter -= 1;
   }
 
+  /**
+   * Allow previously disallowed deprecation warnings within the block.
+   *
+   * Mirrors: deprecation/reporting.rb:87-94. The optional `if:` accepts a
+   * truthy/falsy value or something callable; falsy yields without allowing.
+   */
   allow<T>(
-    matchers: AllowMatcher[],
-    options: { if?: (...args: unknown[]) => boolean } = {},
-    fn: () => T,
+    allowedWarnings: AllowMatcher[] | "all" = "all",
+    options: { if?: unknown } = {},
+    block: () => T,
   ): T {
-    const ctx: AllowContext = { matchers, ifFn: options.if };
-    this._allowContexts.push(ctx);
-    try {
-      return fn();
-    } finally {
-      this._allowContexts.splice(this._allowContexts.indexOf(ctx), 1);
+    let conditional = "if" in options ? options.if : true;
+    if (typeof conditional === "function") conditional = (conditional as () => unknown)();
+    if (conditional != null && conditional !== false) {
+      const previous = this._explicitlyAllowedWarnings;
+      this._explicitlyAllowedWarnings = allowedWarnings;
+      try {
+        return block();
+      } finally {
+        this._explicitlyAllowedWarnings = previous;
+      }
+    } else {
+      return block();
     }
   }
 

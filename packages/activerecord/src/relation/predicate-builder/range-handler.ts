@@ -1,88 +1,36 @@
 import { Nodes } from "@blazetrails/arel";
 import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
-
-/**
- * Stand-in for a range bound that is out of range for its column type.
- *
- * Rails' RangeHandler wraps every bound in a QueryAttribute, whose
- * `unboundable?` reports the signed distance from zero for out-of-range values
- * (`+1` past the max, `-1` past the min) so Arel's `Predications#between` can
- * collapse the comparison (`in([])` / `not_in([])` / a single-sided bound)
- * instead of emitting a bind that would raise ActiveModelRangeError.
- *
- * Trails threads only the out-of-range bounds through this sentinel — in-range
- * bounds stay as their plain cast values so ordinary ranges emit unchanged
- * SQL. `arel`'s `unboundableSign` recognises it via `isUnboundable()` (reached
- * through `Predications#unboundable?` / `open_ended?`, which `between`
- * dispatches on self); it never reaches the visitor as a bind.
- *
- * This class has no Rails counterpart: range_handler.rb:12-16 wraps BOTH bounds
- * in `build_bind_attribute` and lets `QueryAttribute#unboundable?` answer.
- * Converging is tracked by story
- * `0023-surfaced-deviations/converge-range-handler-bind-attribute-bounds`, which
- * deletes this class.
- */
-export class UnboundableBound {
-  constructor(readonly sign: 1 | -1) {}
-
-  isUnboundable(): 1 | -1 {
-    return this.sign;
-  }
-
-  isInfinite(): false {
-    return false;
-  }
-}
+import type { PredicateBuilder } from "../predicate-builder.js";
 
 /**
  * Handles Range values in where conditions by delegating to
  * `attribute.between`, which encodes Rails' Arel `Predications#between`
  * decision tree (open-ended, ±Infinity, exclude-end).
  *
- * Mirrors: ActiveRecord::PredicateBuilder::RangeHandler — Rails' `call`
- * builds bind attributes for both bounds and hands a `RangeWithBinds` to
- * `attribute.between`; the open-ended / infinity logic lives in Arel.
- *
- * TS deviation: there is no `QueryAttribute`-wrapping bind step here;
- * `_castBound` runs the attribute's type cast on the raw bound (so e.g.
- * an integer column coerces `"1-meowmeow"` → 1). ±Infinity bounds are
- * passed through uncast — mirroring Rails RangeHandler's reliance on
- * `infinity?` recognizing ±Float::INFINITY at the Arel layer.
+ * Mirrors: ActiveRecord::PredicateBuilder::RangeHandler (range_handler.rb).
+ * Rails' `RangeWithBinds` struct is an object literal here: `between` reads
+ * `begin` / `end` / `excludeEnd` off it and nothing else.
  */
 export class RangeHandler {
-  private _castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown;
-  private _predicateBuilder: unknown = undefined;
+  private _predicateBuilder: PredicateBuilder;
 
-  constructor(castBound?: (attribute: Nodes.Attribute, value: unknown) => unknown) {
-    this._castBound = castBound;
+  constructor(predicateBuilder: PredicateBuilder) {
+    this._predicateBuilder = predicateBuilder;
   }
 
+  /**
+   * @missingRailsCall new — `RangeWithBinds.new(begin_bind, end_bind, exclude_end?)`
+   * (range_handler.rb:6, 15). The Struct exists in Ruby because `between` needs a
+   * Range-shaped object and a real Range would re-coerce its bounds; a TS object
+   * literal is that shape, and `between` reads nothing else off it.
+   */
   call(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const [beginVal, endVal] = this._castBounds(attribute, value);
-    return attribute.between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd });
+    const beginBind = this.predicateBuilder.buildBindAttribute(attribute.name, value.begin);
+    const endBind = this.predicateBuilder.buildBindAttribute(attribute.name, value.end);
+    return attribute.between({ begin: beginBind, end: endBind, excludeEnd: value.excludeEnd });
   }
 
-  private _castBounds(attribute: Nodes.Attribute, value: Range): [unknown, unknown] {
-    // Rails RangeHandler skips no bounds: `build_bind_attribute` wraps even
-    // nil / Float::INFINITY. We mirror the intent by passing those through
-    // uncast — type.cast on null/undefined / Infinity would be a no-op or
-    // worse (numeric types may coerce Infinity into something finite).
-    // Rails open_ended? recognizes ±Infinity (via Float#infinite?) but not
-    // NaN (`NaN.infinite?` returns nil); pass only nil/undefined/±Infinity
-    // through uncast so a NaN bound still flows through type.cast as a
-    // regular numeric value.
-    const skipCast = (v: unknown): boolean =>
-      v === null || v === undefined || v === Infinity || v === -Infinity;
-    const cast = this._castBound
-      ? (v: unknown) => this._castBound!(attribute, v)
-      : (v: unknown) => v;
-    return [
-      skipCast(value.begin) ? value.begin : cast(value.begin),
-      skipCast(value.end) ? value.end : cast(value.end),
-    ];
-  }
-
-  private get predicateBuilder(): unknown {
+  private get predicateBuilder(): PredicateBuilder {
     return this._predicateBuilder;
   }
 }

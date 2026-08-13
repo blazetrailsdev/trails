@@ -45,8 +45,8 @@ import { Between } from "./nodes/binary.js";
  *   `1 | -1 | 0` and callers test `!== 0`, because Ruby's `0` is truthy and so
  *   could not double as "absent" — `0` is unreachable anyway (see the note on
  *   `unboundableSign`). The VALUE PROTOCOL (`Quoted#isInfinite`,
- *   `BindParam#isInfinite` / `#isUnboundable`, `QueryAttribute`,
- *   `UnboundableBound`) returns `1 | -1 | false`, mirroring the shape of Ruby's
+ *   `BindParam#isInfinite` / `#isUnboundable`, `QueryAttribute`) returns
+ *   `1 | -1 | false`, mirroring the shape of Ruby's
  *   `respond_to?(:x) && value.x` — `false` is the `&&` short-circuit, `nil` the
  *   predicate's own miss. Do not "unify" them: the helper's `0` means no bound
  *   answered, the producer's `false` means this value has no opinion.
