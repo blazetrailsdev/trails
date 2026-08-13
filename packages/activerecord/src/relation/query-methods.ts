@@ -2221,8 +2221,8 @@ export function arelColumnAliasesFromHash(
       });
     }
     if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as unknown[]).map((col) =>
-        arelColumnWithTable.call(this, tableName, String(col)),
+      return (columnsAliases as string[]).map((col) =>
+        arelColumnWithTable.call(this, tableName, col),
       );
     }
     if (typeof columnsAliases === "string" || typeof columnsAliases === "symbol") {
