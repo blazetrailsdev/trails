@@ -171,10 +171,9 @@ describe("FileStoreTest", () => {
   // Mirrors `include CacheStoreBehavior` (file_store_test.rb:32).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
 
-  // Mirrors `include CacheInstrumentationBehavior` (file_store_test.rb:40).
-  cacheInstrumentationBehavior({
+  // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
+  cacheStoreCompressionBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
-    storeName: "FileStore",
   });
 
   // Mirrors `include CacheStoreSerializerBehavior` (file_store_test.rb:36).
@@ -182,9 +181,10 @@ describe("FileStoreTest", () => {
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
-  cacheStoreCompressionBehavior({
+  // Mirrors `include CacheInstrumentationBehavior` (file_store_test.rb:40).
+  cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+    storeName: "FileStore",
   });
 });
 

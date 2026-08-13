@@ -78,6 +78,14 @@ describe("MemoryStoreTest", () => {
   // Mirrors `include CacheStoreBehavior` (memory_store_test.rb:16).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
+  // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
+  // MemoryStore overrides `compression_always_disabled_by_default?`
+  // (memory_store_test.rb:93-96).
+  cacheStoreCompressionBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
+    compressionAlwaysDisabledByDefault: true,
+  });
+
   // Mirrors `include CacheStoreSerializerBehavior` (memory_store_test.rb:20).
   cacheStoreSerializerBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
@@ -87,14 +95,6 @@ describe("MemoryStoreTest", () => {
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
     storeName: "MemoryStore",
-  });
-
-  // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
-  // MemoryStore overrides `compression_always_disabled_by_default?`
-  // (memory_store_test.rb:93-96).
-  cacheStoreCompressionBehavior({
-    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
-    compressionAlwaysDisabledByDefault: true,
   });
 });
 

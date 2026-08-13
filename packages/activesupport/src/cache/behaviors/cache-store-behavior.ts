@@ -36,30 +36,6 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     expect(cache.read(key)).toBe("baz");
   });
 
-  it("should read and write hash", () => {
-    const key = crypto.randomUUID();
-    expect(cache.write(key, { a: "b" })).toBe(true);
-    expect(cache.read(key)).toEqual({ a: "b" });
-  });
-
-  it("should read and write integer", () => {
-    const key = crypto.randomUUID();
-    expect(cache.write(key, 1)).toBe(true);
-    expect(cache.read(key)).toBe(1);
-  });
-
-  it("should read and write nil", () => {
-    const key = crypto.randomUUID();
-    expect(cache.write(key, null)).toBe(true);
-    expect(cache.read(key)).toBeNull();
-  });
-
-  it("should read and write false", () => {
-    const key = crypto.randomUUID();
-    expect(cache.write(key, false)).toBe(true);
-    expect(cache.read(key)).toBe(false);
-  });
-
   it("fetch without cache miss", () => {
     const key = crypto.randomUUID();
     cache.write(key, "bar");
@@ -135,6 +111,30 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     cache.write(key, "bar");
     expect(() => cache.fetch(key, { force: true })).toThrow(ArgumentError);
     expect(cache.read(key)).toBe("bar");
+  });
+
+  it("should read and write hash", () => {
+    const key = crypto.randomUUID();
+    expect(cache.write(key, { a: "b" })).toBe(true);
+    expect(cache.read(key)).toEqual({ a: "b" });
+  });
+
+  it("should read and write integer", () => {
+    const key = crypto.randomUUID();
+    expect(cache.write(key, 1)).toBe(true);
+    expect(cache.read(key)).toBe(1);
+  });
+
+  it("should read and write nil", () => {
+    const key = crypto.randomUUID();
+    expect(cache.write(key, null)).toBe(true);
+    expect(cache.read(key)).toBeNull();
+  });
+
+  it("should read and write false", () => {
+    const key = crypto.randomUUID();
+    expect(cache.write(key, false)).toBe(true);
+    expect(cache.read(key)).toBe(false);
   });
 
   it("read multi", () => {
