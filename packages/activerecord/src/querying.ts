@@ -11,6 +11,7 @@ import { threadedConnectionFor, withQueryConnection } from "./connection-handlin
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
+import type { SumBlock } from "./relation/calculations.js";
 
 /**
  * Rails: find_by_sql(sql, binds = [], preparable: nil, allow_retry: false, &block)
@@ -509,13 +510,28 @@ export function average<T extends typeof Base>(
 }
 
 /** Mirrors: ActiveRecord::Querying#sum — params/return derived from Relation#sum. */
+export function sum<T extends typeof Base>(this: T, block: SumBlock): Promise<number | bigint>;
 export function sum<T extends typeof Base>(
   this: T,
-  column?: Parameters<ReturnType<T["all"]>["sum"]>[0],
-  block?: Parameters<ReturnType<T["all"]>["sum"]>[1],
-): ReturnType<ReturnType<T["all"]>["sum"]> {
+  initialValue: number,
+  block: SumBlock,
+): Promise<number | bigint>;
+export function sum<T extends typeof Base>(
+  this: T,
+  column?: string | import("@blazetrails/arel").Nodes.Node | number,
+): Promise<number | bigint | Map<unknown, number | bigint>>;
+export function sum<T extends typeof Base>(
+  this: T,
+  column?: string | import("@blazetrails/arel").Nodes.Node | number | SumBlock,
+  block?: SumBlock,
+): Promise<number | bigint | Map<unknown, number | bigint>> {
   const rel = this.all() as ReturnType<T["all"]>;
-  return rel.sum(column, block) as ReturnType<ReturnType<T["all"]>["sum"]>;
+  return (
+    rel.sum as (
+      c?: unknown,
+      b?: unknown,
+    ) => Promise<number | bigint | Map<unknown, number | bigint>>
+  )(column, block);
 }
 
 /**

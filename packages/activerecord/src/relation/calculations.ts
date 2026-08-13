@@ -192,6 +192,18 @@ type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 /** The `&block` of `Calculations#sum` (calculations.rb:172): one record in, a summable out. */
 export type SumBlock = (record: any) => number | bigint;
 
+/**
+ * Mirror of Ruby's `TypeError`, as `attribute-assignment.ts` and `cache/store.ts`
+ * carry it — what `Array#sum` raises when its initial value cannot be added to
+ * the block results.
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
+
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;
   // Rails maps :integer + :decimal to value&.to_d. BigInteger inherits
@@ -706,6 +718,17 @@ export async function performSum(
     initialValueOrColumn = 0;
   }
   if (block !== undefined) {
+    // `Array#sum` folds a non-numeric seed with `String#+` (or the object's own
+    // `+`) and raises there — `[1].sum("age")` is a TypeError, not a
+    // concatenation.
+    if (typeof initialValueOrColumn !== "number") {
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(
+        `no implicit conversion of Integer into ${
+          typeof initialValueOrColumn === "string" ? "String" : "Arel::Nodes::Node"
+        }`,
+      );
+    }
     const records = await this.toArray();
     return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
   }
@@ -764,9 +787,12 @@ export interface CalculationMethods {
   ): Promise<unknown | null | Map<unknown, unknown>>;
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  /** `sum { |record| … }` — the block arm on the default identity. */
+  sum(block: SumBlock): Promise<number | bigint>;
+  /** `sum(1000) { |record| … }` — the block arm on an explicit initial value. */
+  sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
   sum(
-    initialValueOrColumn?: string | Nodes.Node | number | null | SumBlock,
-    block?: SumBlock,
+    initialValueOrColumn?: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;

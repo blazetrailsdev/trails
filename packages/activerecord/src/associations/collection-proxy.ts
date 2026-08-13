@@ -1485,6 +1485,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // treatment as pluck/pick/count. Without overriding, cp.sum('x') /
   // cp.whereBang({...}); cp.average('y') would both bypass the gate
   // and drop in-place mutations.
+  sum(block: SumBlock): Promise<number | bigint>;
+  sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
+  sum(
+    initialValueOrColumn?: string | Nodes.Node | number,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
   async sum(
     initialValueOrColumn?: string | Nodes.Node | number | SumBlock,
     block?: SumBlock,
