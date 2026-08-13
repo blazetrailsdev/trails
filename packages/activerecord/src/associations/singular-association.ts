@@ -308,9 +308,20 @@ export class SingularAssociation extends Association {
         validateThroughReflection(ctor, assocName);
       }
 
-      // Rails `Association#find_target`'s first statement. Gated by `find_target?`:
-      // a new-record owner without the key present never reaches `find_target` and
-      // so never raises.
+      // `SingularAssociation#find_target` (singular_association.rb:47-55) answers
+      // a `disable_joins` association from `scope.first` and never calls `super`,
+      // so that route never reaches the base body's strict-loading raise.
+      if (
+        !isBelongsTo &&
+        options.through &&
+        _canRouteThroughViaDisableJoinsAssociationScope(reflection, options)
+      ) {
+        return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
+      }
+
+      // `Association#find_target`'s first statement (association.rb:248-250).
+      // Gated by `find_target?`: a new-record owner without the key present never
+      // reaches `find_target` and so never raises.
       if (
         this.isViolatesStrictLoading() &&
         _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
@@ -325,9 +336,6 @@ export class SingularAssociation extends Association {
       // still routes the shapes AssociationScope cannot build through the two-step
       // `HasOneThroughAssociation#findTarget`.
       if (!isBelongsTo && options.through) {
-        if (_canRouteThroughViaDisableJoinsAssociationScope(reflection, options)) {
-          return _loadSingularThroughViaDisableJoinsScope(owner, reflection, options);
-        }
         if (!_routeThroughViaAssociationScope(owner, reflection, options)) {
           return (
             this as unknown as { loadHasOneThrough(): Promise<Base | null> }

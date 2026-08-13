@@ -590,8 +590,21 @@ async function findTarget(
     }
   }
 
-  // Strict loading check. Gated by `find_target?`: a new-record owner without
-  // the FK present never reaches `find_target` and so never raises.
+  // `HasManyThroughAssociation#find_target` (has_many_through_association.rb
+  // :225-229) returns `scope.to_a if disable_joins` BEFORE `super`, so that
+  // route never reaches the base body's strict-loading raise. The scope-override
+  // executor below still wins, as it did when this branch sat under it.
+  const reflEarly =
+    options.through && !queryExecutor
+      ? (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)
+      : undefined;
+  if (reflEarly && _canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
+    return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
+  }
+
+  // `Association#find_target`'s first statement (association.rb:248-250). Gated
+  // by `find_target?`: a new-record owner without the FK present never reaches
+  // `find_target` and so never raises.
   if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
     strictLoadingViolationBang(record, assocName, {
       className: options.className ?? camelize(singularize(assocName)),
@@ -609,17 +622,14 @@ async function findTarget(
   // 2-step loadHasManyThrough.
   if (options.through) {
     const ctorEarly = record.constructor as typeof Base;
-    const reflEarly = ctorEarly._reflectOnAssociation?.(assocName);
-    if (_canRouteThroughViaDisableJoinsAssociationScope(reflEarly, options)) {
-      return _loadThroughViaDisableJoinsScope(record, reflEarly, options);
-    }
+    const reflThrough = ctorEarly._reflectOnAssociation?.(assocName);
     // Nested-through shapes flatten their whole `reflection.chain` into the
     // JOIN-based AssociationScope path below, sharing its inverse-wiring and
     // null-FK short-circuit. An unsaved owner resolves its through step from
     // the in-memory association target (e.g. `post.author = mary` before save),
     // which the SQL JOIN cannot see — `_routeThroughViaAssociationScope` keeps
     // those on the 2-step loader.
-    if (!_routeThroughViaAssociationScope(record, reflEarly, options)) {
+    if (!_routeThroughViaAssociationScope(record, reflThrough, options)) {
       const { _buildAssociationInstance } = await import("./instance-methods.js");
       const through = _buildAssociationInstance.call(record, {
         name: assocName,
