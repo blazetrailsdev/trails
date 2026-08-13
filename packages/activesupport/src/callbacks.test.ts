@@ -1423,14 +1423,11 @@ describe("ExcludingDuplicatesCallbackTest", () => {
   });
 
   it("excludes duplicates in one call", () => {
-    const target = { count: 0 };
-    defineCallbacks(target, "save");
-    const cb = (t: any) => {
-      t.count++;
-    };
-    setCallback(target, "save", "before", cb);
-    runCallbacks(target, "save");
-    expect(target.count).toBe(1);
+    const model = oneTwoThreeSave();
+    setCallback(model, "save", "before", ":first", ":second", ":first", ":third");
+
+    model.save();
+    expect(model.record).toEqual(["two", "one", "three", "yielded"]);
   });
 });
 
