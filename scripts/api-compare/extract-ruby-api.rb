@@ -2507,12 +2507,9 @@ class ApiExtractor
     when :args_add_block
       if node[2].is_a?(Array)
         flags << "blockpass"
-        # The block-pass is not an argument, but the port has no `&` so it
-        # forwards it as an ordinary trailing one. Record what was passed —
-        # `&block` is `blockarg=ref:block` — so the comparator can tell the TS
-        # site that carries the block from the one that does not (call-args.ts
-        # #tsCarriesBlock). Described against a scratch flag list: the block
-        # itself must not flag the call.
+        # What was block-passed, so call-args.ts#tsBlockArgIndex can find it in
+        # the TS list the port forwards it through. Described against a scratch
+        # flag list: the block itself must not flag the call.
         flags << "blockarg=#{describe_arg(node[2], [])}"
       end
       describe_args(node[1], flags)
