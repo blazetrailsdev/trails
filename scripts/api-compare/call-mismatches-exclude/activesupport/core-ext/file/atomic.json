@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/file/atomic.ts",
+    "rubyName": "atomic_write",
+    "call": "exist?",
+    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/file/atomic.ts",
+    "rubyName": "atomic_write",
+    "call": "stat",
+    "reason": "trails has no Ruby File: the fs-adapter's statSync is the File.stat analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/file/atomic.ts",
+    "rubyName": "atomic_write",
+    "call": "rename",
+    "reason": "trails has no Ruby File: the fs-adapter's renameSync is the File.rename analogue and carries no matching Ruby name."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/file/atomic.ts",
+    "rubyName": "probe_stat_in",
+    "call": "stat",
+    "reason": "trails has no Ruby File: the fs-adapter's statSync is the File.stat analogue and carries no matching Ruby name."
+  }
+]

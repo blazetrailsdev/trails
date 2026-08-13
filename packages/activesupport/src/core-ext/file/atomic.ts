@@ -20,13 +20,6 @@ import { getFs, getPath, type FsStatResult } from "../../fs-adapter.js";
  * Mirrors Ruby `File.atomic_write` (core_ext/file/atomic.rb:20-52). The
  * yielded object stands in for the `Tempfile` the Ruby block writes to; only
  * `write` is used by callers, and `binmode`/`close` are the adapter's job.
- *
- * @missingRailsCall exist? — spelled `existsSync`, the fs adapter's name for
- * the sync existence check (atomic.rb:28).
- * @missingRailsCall stat — spelled `statSync`, the fs adapter's name for the
- * sync stat (atomic.rb:30).
- * @missingRailsCall rename — spelled `renameSync`, the fs adapter's name for
- * the sync rename every other trails caller uses (atomic.rb:48).
  */
 export function atomicWrite<T>(
   fileName: string,
@@ -93,9 +86,6 @@ export function atomicWrite<T>(
  * The basename's uniqueness components in Rails are the thread id and pid
  * (atomic.rb:59-60); neither exists here (single thread, no `process.*`), so
  * two random draws stand in for them.
- *
- * @missingRailsCall stat — spelled `statSync`, the fs adapter's name for the
- * sync stat (atomic.rb:66).
  */
 export function probeStatIn(dir: string): FsStatResult | null {
   const basename = [
