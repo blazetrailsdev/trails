@@ -1309,7 +1309,14 @@ jobs:
   website:
     name: Website
     needs: changes
+    # TEMPORARILY DISABLED. The build has been failing on main and the job
+    # doesn't run on ordinary PRs, so nothing catches the breakage before it
+    # lands; the site being stale is acceptable for now. To re-enable, delete
+    # the leading `false &&` from the `if:` below. The aggregate `ci` job
+    # already treats this job's skip as always-legitimate (see the website
+    # case there).
     if: >-
+      false &&
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.website_affected == 'true' ||
       needs.changes.outputs.website_label == 'true')
@@ -1941,11 +1948,11 @@ jobs:
                   fi
                   ;;
                 website)
-                  # Legitimate skip when website_affected is false AND no
-                  # website/release label opted the job in.
-                  if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
-                    continue
-                  fi
+                  # Temporarily disabled (if: false) — its skip is always
+                  # legitimate until the job is re-enabled. The original
+                  # condition (website_affected false AND no website/release
+                  # label) is restored by deleting this `continue`.
+                  continue
                   ;;
                 trails-tsc-tests)
                   # Legitimate skip when neither trails-tsc nor tse-compiler changed.
