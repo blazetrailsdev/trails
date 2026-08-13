@@ -1949,9 +1949,11 @@ jobs:
                   ;;
                 website)
                   # Temporarily disabled (if: false) — its skip is always
-                  # legitimate until the job is re-enabled. The original
-                  # condition (website_affected false AND no website/release
-                  # label) is restored by deleting this `continue`.
+                  # legitimate until the job is re-enabled. On re-enable,
+                  # replace this `continue` with the original guard:
+                  #   if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
+                  #     continue
+                  #   fi
                   continue
                   ;;
                 trails-tsc-tests)
