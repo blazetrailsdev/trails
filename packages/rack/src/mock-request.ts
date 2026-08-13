@@ -18,6 +18,7 @@ import {
   HEAD,
   OPTIONS,
 } from "./constants.js";
+import { StringIO } from "@blazetrails/activesupport";
 import { MockResponse } from "./mock-response.js";
 import { buildNestedQuery, parseNestedQuery } from "./utils.js";
 
@@ -38,32 +39,6 @@ class FatalWarner {
   flush(): void {}
   string(): string {
     return "";
-  }
-}
-
-class StringIO {
-  private _data: string;
-  private _closed = false;
-  constructor(data = "") {
-    this._data = data;
-  }
-  read(): string {
-    return this._data;
-  }
-  write(s: string): void {
-    this._data += s;
-  }
-  string(): string {
-    return this._data;
-  }
-  get size(): number {
-    return Buffer.byteLength(this._data);
-  }
-  close(): void {
-    this._closed = true;
-  }
-  get closed(): boolean {
-    return this._closed;
   }
 }
 

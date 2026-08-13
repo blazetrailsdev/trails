@@ -16,9 +16,11 @@ describe("XmlMini", () => {
     expect(_parseBinary("IGNORED INPUT", {})).toBe("IGNORED INPUT");
   });
 
-  it("_parse_file returns the decoded content decorated with FileLike", async () => {
+  it("_parse_file returns the decoded content decorated with FileLike", () => {
     const file = _parseFile("SGVsbG8=", { name: "logo.png", content_type: "image/png" });
-    expect(await file.text()).toBe("Hello");
+    expect(file.read()).toBe("Hello");
+    file.rewind();
+    expect(file.string()).toBe("Hello");
     expect(file.originalFilename).toBe("logo.png");
     expect(file.contentType).toBe("image/png");
   });

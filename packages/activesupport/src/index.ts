@@ -477,6 +477,7 @@ export {
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { StringIO } from "./string-io.js";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { getEnv } from "./environment.js";
 export { ExecutionContext } from "./execution-context.js";

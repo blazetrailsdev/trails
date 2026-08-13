@@ -188,7 +188,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       const extra = ((f["Extra"] as string | null) ?? "").trim();
       const sqlType = ((f["Type"] as string | null) ?? "").toLowerCase();
       if (def == null || /^\d/.test(def) || def.startsWith("'")) return false;
-      if (extra.toUpperCase().startsWith("DEFAULT_GENERATED")) return false;
+      if (extra === "DEFAULT_GENERATED") return false;
       // newColumnFromField's datetime+CURRENT_TIMESTAMP short-circuit only fires when the
       // semantic type is "datetime" (sqlType startsWith "datetime"/"timestamp"); for
       // non-datetime columns with a CURRENT_TIMESTAMP default we still need SHOW CREATE TABLE

@@ -373,21 +373,12 @@ export function newColumnFromField(
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
-  const extraRaw = field["Extra"] ?? "";
-  const onUpdateMatch = extraRaw.match(/on update (.+)$/i);
-
   if (meta.type === "datetime" && /^CURRENT_TIMESTAMP(\([0-6]?\))?$/i.test(def ?? "")) {
-    if (/on update CURRENT_TIMESTAMP/i.test(extraRaw)) def = `${def} ON UPDATE ${def}`;
+    if (/on update CURRENT_TIMESTAMP/i.test(field["Extra"] ?? "")) def = `${def} ON UPDATE ${def}`;
     [def, defFn] = [null, def];
-  } else if (meta.extra.toUpperCase().startsWith("DEFAULT_GENERATED")) {
-    // MySQL 8 emits "DEFAULT_GENERATED" alone (function default) or compound
-    // "DEFAULT_GENERATED on update CURRENT_TIMESTAMP". Both flow through the
-    // function-default path; fold on_update into the function expression so
-    // renameColumnForAlter can rebuild the column from defaultFunction alone.
+  } else if (meta.extra === "DEFAULT_GENERATED") {
     if (def != null && !def.startsWith("(")) def = `(${def})`;
-    let folded = def?.replace(/\\'/g, "'") ?? null;
-    if (folded != null && onUpdateMatch) folded = `${folded} ON UPDATE ${onUpdateMatch[1]}`;
-    [def, defFn] = [null, folded];
+    [def, defFn] = [null, def?.replace(/\\'/g, "'") ?? null];
   } else if (meta.type === "text" && def?.startsWith("'")) {
     def = def.slice(1, -1).replace(/\\'/g, "'");
   } else if (def != null && !/^\d/.test(def)) {
@@ -404,7 +395,7 @@ export function newColumnFromField(
     unsigned: /\bunsigned(?: zerofill)?$/.test(field["Type"] ?? ""),
     autoIncrement: /auto_increment/i.test(field["Extra"] ?? ""),
     virtual: /(virtual|stored|persistent)\s+generated/i.test(field["Extra"] ?? ""),
-    extra: extraRaw,
+    extra: field["Extra"] ?? "",
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });
 }
