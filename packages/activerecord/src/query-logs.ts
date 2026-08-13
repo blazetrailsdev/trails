@@ -335,7 +335,7 @@ export function rebuildHandlers(
         handlers.push([k, buildHandler(k, v)]);
       }
     } else {
-      handlers.push([String(i), buildHandler(String(i))]);
+      handlers.push([i, buildHandler(i)]);
     }
   }
   handlers.sort((a, b) => a[0].localeCompare(b[0]));
