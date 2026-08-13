@@ -11,6 +11,24 @@ function pkgAlias(name: string, entry: string) {
   };
 }
 
+// `@blazetrails/activesupport/yaml` is also reached from inside activesupport
+// itself (`xml-mini.ts` resolves the optional `yaml` package through a
+// call-time `import("./yaml.js")`), and a relative specifier never hits the
+// subpath alias below. Redirect that one edge to the same stub so the
+// top-level await in `yaml.ts` stays out of the IIFE bundle.
+function stubActivesupportYaml() {
+  return {
+    name: "stub-activesupport-yaml",
+    enforce: "pre" as const,
+    resolveId(source: string, importer: string | undefined) {
+      if (source === "./yaml.js" && importer?.includes("/activesupport/src/")) {
+        return path.resolve(__dirname, "src/stubs/yaml-stub.ts");
+      }
+      return null;
+    },
+  };
+}
+
 function prependImportScripts() {
   return {
     name: "prepend-importscripts",
@@ -25,7 +43,7 @@ function prependImportScripts() {
 }
 
 export default defineConfig({
-  plugins: [prependImportScripts()],
+  plugins: [stubActivesupportYaml(), prependImportScripts()],
   resolve: {
     alias: [
       // Subpath imports must come before the base alias. The activerecord
