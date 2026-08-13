@@ -4267,12 +4267,12 @@ export class PostgreSQLAdapter
    *
    * Awaiting `set` puts any eviction's DEALLOCATE before the caller's
    * Bind+Execute, so it lands on an idle client (statement_pool.rb:31).
+   *
+   * `conn` is unused: Rails calls `conn.prepare nextkey, sql` on it (see below),
+   * while node-pg Parses under the name on first Execute. It stays in the
+   * signature because Rails' `prepare_statement(sql, binds, conn)` has it.
    * @internal
    */
-  // `conn` is unused: Rails calls `conn.prepare nextkey, sql` on it (see below),
-  // while node-pg Parses under the name on first Execute. It stays in the
-  // signature because Rails' `prepare_statement(sql, binds, conn)` has it.
-  /** @internal */
   async prepareStatement(sql: string, _binds: unknown[], _conn: pg.Client): Promise<string> {
     const pool = this._statements;
     const key = this.sqlKey(sql);

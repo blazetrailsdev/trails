@@ -47,7 +47,7 @@ export async function runWithoutConnection<T>(
  * itself is the point: Rails uses it "to drop all cache query plans in tests".
  *
  * That holds here because the prepared-statement cache is per-adapter private
- * state (`_statementPool`, postgresql-adapter.ts:476; the MySQL and SQLite
+ * state (`_statements`, postgresql-adapter.ts; the MySQL and SQLite
  * adapters carry their own), so a new pool hands out new adapter instances with
  * empty caches. What does NOT carry over from Rails is the teardown half:
  * `removeConnectionPool` drops the old pool from the manager and then leaves

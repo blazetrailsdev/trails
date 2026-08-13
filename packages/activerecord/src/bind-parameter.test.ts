@@ -108,7 +108,9 @@ describe("BindParameterTest", () => {
   //                      @connection.respond_to?(:sql_key) ? sql_key(sql) : sql
   // statement_cache → the connection statement pool's keys (`StatementPool#cache`).
   function statementCacheKeys(conn: any): string[] {
-    return conn._statementPool.keys;
+    // PG's pool is `@statements` (abstract_adapter.rb:156); the MySQL and SQLite
+    // adapters still carry the pre-convergence `_statementPool` name.
+    return (conn._statements ?? conn._statementPool).keys;
   }
   // Deliberate deviation: trails' `to_sql` inlines bind values (see the
   // `bindParams` note below), so an arel can't be recompiled into the
