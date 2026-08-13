@@ -2355,4 +2355,15 @@ describe("Date#inspect", () => {
       Object.defineProperty(RubyDate, "name", { value: "Date", configurable: true });
     }
   });
+
+  it("names a subclass the way rb_obj_class(self) does", () => {
+    // ruby 3.3.11 -rdate:
+    //   class MyDate < Date; end
+    //   MyDate.new(2001,2,3).inspect
+    //     #=> "#<MyDate: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>"
+    class MyDate extends RubyDate {}
+    expect(new MyDate(2001, 2, 3).inspect()).toBe(
+      "#<MyDate: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
+    );
+  });
 });

@@ -54,6 +54,17 @@ const ABBR_MONTH_NAMES = [
   "Dec",
 ];
 
+/**
+ * `rb_obj_class(self)`'s name (`date_core.c:7028`): the class's own
+ * `_railsClassName` literal, which pins `Date` and `DateTime` against a
+ * class-renaming bundler, falling back to the runtime name for a subclass that
+ * declares none — MRI inspects `class MyDate < Date; end` as `#<MyDate: ...>`.
+ */
+function objClassName(obj: object): string {
+  const klass = obj.constructor as typeof Date;
+  return Object.hasOwn(klass, "_railsClassName") ? klass._railsClassName : klass.name;
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -5566,13 +5577,12 @@ function deconstructKeys(
 
 export class Date {
   /**
-   * The class name `rb_obj_class(self)` supplies to `mk_inspect`
-   * (`date_core.c:7032-7041`) and to the `rb_obj_classname` in
-   * `d_lite_initialize_copy`'s frozen check. Read through `this` so a subclass
-   * answers its own name, and spelled as a literal rather than
+   * The name `rb_obj_class(self)` answers for this class itself
+   * (`date_core.c:7028`), spelled as a literal rather than read off
    * `constructor.name` because `inspect`'s output is asserted byte-for-byte
    * against MRI and quoted inside `FrozenError` messages, which a bundler that
-   * renames classes would corrupt.
+   * renames classes would corrupt. Only a class that declares its own is read
+   * — see {@link objClassName}.
    */
   static _railsClassName = "Date";
 
@@ -6642,9 +6652,7 @@ export class Date {
    */
   initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
-      throw new FrozenError(
-        `can't modify frozen ${(this.constructor as typeof Date)._railsClassName}: ${this.inspect()}`,
-      );
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
     }
     if ((this as Date) === date) return this;
     const bdat = date.dat();
@@ -7482,7 +7490,7 @@ export class Date {
     const of = this.mOf();
     const sf = this.mSf();
     return (
-      `#<${(this.constructor as typeof Date)._railsClassName}: ${this.toS()} ` +
+      `#<${objClassName(this)}: ${this.toS()} ` +
       `((${this.mRealJd()}j,${this.mDf()}s,${sf.denominator === 1n ? sf.numerator : sf.inspect()}n),` +
       `${of < 0 ? "" : "+"}${of}s,${
         Number.isFinite(this.start) ? this.start.toFixed(0) : this.start > 0 ? "Inf" : "-Inf"
@@ -8594,9 +8602,7 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override initializeCopy(date: Date): this {
     if (Object.isFrozen(this)) {
-      throw new FrozenError(
-        `can't modify frozen ${(this.constructor as typeof Date)._railsClassName}: ${this.inspect()}`,
-      );
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
     }
     if ((this as Date) === date) return this;
     const bdat = date.dat();
