@@ -1573,8 +1573,6 @@ export class Migration {
         // Build a fresh migration factory that imports the NEW path — spreading
         // `source` would carry over a closure pinned to the old engine file.
         const proxyName = source.name;
-        // `@migration ||= load_migration` (`migration.rb:1191`) — the proxy loads
-        // once and every delegated call sees the same instance.
         let loaded: Promise<Migration> | undefined;
         const copy: MigrationProxy = {
           name: source.name,
@@ -1856,6 +1854,11 @@ export interface MigrationProxy {
   filename?: string;
   /** Mirrors: ActiveRecord::MigrationProxy#scope — engine name for copied engine migrations */
   scope?: string;
+  /**
+   * Mirrors: ActiveRecord::MigrationProxy#migration — `@migration ||=
+   * load_migration` (`migration.rb:1190-1192`). Memoized by the implementer, so
+   * every member Rails delegates through the proxy sees the same instance.
+   */
   migration: () => Migration | Promise<Migration>;
   /** @internal Mirrors: ActiveRecord::MigrationProxy#basename */
   basename?(): string;
@@ -2216,8 +2219,6 @@ export class MigrationContext<
       }
       const version = toInteger(rawVersion);
       const name = camelize(rawName);
-      // `@migration ||= load_migration` (`migration.rb:1191`) — the proxy loads
-      // once and every delegated call sees the same instance.
       let loaded: Promise<Migration> | undefined;
       return {
         version,
@@ -2568,10 +2569,9 @@ export class Migrator {
         _base.logger.info?.(`Migrating to ${migration.name} (${migration.version})`);
 
       await this.ddlTransaction(migration, async () => {
-        // `delegate :migrate, ..., to: :migration` (`migration.rb:1187`). The
-        // proxy's own `migration()` is async — an ESM `import()` where Ruby's
-        // `load` is synchronous — so the delegating members cannot be plain
-        // methods on the proxy and the await lands here instead.
+        // Rails delegates `migrate` through the proxy (`migration.rb:1187`);
+        // trails resolves it here because the proxy's loader is an async ESM
+        // `import()` where Ruby's `load` is synchronous.
         await (await migration.migration()).migrate(this._direction);
         await this.recordVersionStateAfterMigrating(migration.version);
       });

@@ -35,9 +35,10 @@ const warnedKeys = new Set<string>();
 /**
  * Mirrors: ActiveModel::AttributeSet::YAMLEncoder
  *
- * Rails takes the model's `attribute_types` as `default_types` and drops the
- * type from any attribute whose type is that default (`yaml_encoder.rb:13-19`),
- * restoring it on the way back in (`:23-33`). trails keeps that contract.
+ * Rails takes the model's `attribute_types` as `default_types` and encodes an
+ * attribute whose type is that default as `attr.with_type(nil)`
+ * (`yaml_encoder.rb:14-18`), restoring the default type on the way back in
+ * (`:27-29`). trails writes that missing type as a `null` envelope key.
  *
  * Two things Rails gets from Psych and trails has to carry itself, both
  * consequences of the wire format rather than choices:
@@ -80,8 +81,6 @@ export class AttributeSetCoder {
         defaultAttributes.push(name);
         return;
       }
-      // `attr.type.equal?(default_types[attr.name]) ? attr.with_type(nil) : attr`
-      // (`yaml_encoder.rb:14-18`).
       types[name] = attr.type === this.defaultTypes[name] ? null : attr.type.name;
       values[name] = attr.valueBeforeTypeCast;
     });
@@ -101,9 +100,22 @@ export class AttributeSetCoder {
     const attributesHash = new Map<string, Attribute>();
 
     for (const [name, typeKey] of Object.entries(envelope.types)) {
-      // `attr = attr.with_type(default_types[attr.name]) if attr.type.nil?`
-      // (`yaml_encoder.rb:27-29`).
-      const type = typeKey == null ? this.defaultTypes[name] : this.lookupType(typeKey);
+      let type: Type;
+      if (typeKey == null) {
+        type = this.defaultTypes[name];
+      } else {
+        try {
+          type = this.registry.lookup(typeKey);
+        } catch {
+          if (!this.silenceDriftWarnings && !warnedKeys.has(typeKey)) {
+            warnedKeys.add(typeKey);
+            console.warn(
+              `AttributeSetCoder: unknown type key "${typeKey}" — falling back to "value" type`,
+            );
+          }
+          type = this.registry.lookup("value");
+        }
+      }
       attributesHash.set(name, Attribute.fromUser(name, envelope.values[name], type));
     }
 
@@ -112,19 +124,5 @@ export class AttributeSetCoder {
     }
 
     return new AttributeSet(attributesHash);
-  }
-
-  private lookupType(typeKey: string): Type {
-    try {
-      return this.registry.lookup(typeKey);
-    } catch {
-      if (!this.silenceDriftWarnings && !warnedKeys.has(typeKey)) {
-        warnedKeys.add(typeKey);
-        console.warn(
-          `AttributeSetCoder: unknown type key "${typeKey}" — falling back to "value" type`,
-        );
-      }
-      return this.registry.lookup("value");
-    }
   }
 }
