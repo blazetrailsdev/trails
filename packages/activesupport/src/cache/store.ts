@@ -11,8 +11,129 @@ import type { EventPayload } from "../notifications/instrumenter.js";
 /** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
+/** Mirrors Rails `Cache::Store::DEFAULT_POOL_OPTIONS` (cache.rb:197). */
+const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
+
+/** Mirrors Ruby `Object#inspect` for the values `retrieve_pool_options` reports. */
+function inspect(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (value === null || value === undefined) return "nil";
+  return String(value);
+}
+
+/** The class name Ruby's conversion errors name the offending value by. */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (value === true) return "true";
+  if (value === false) return "false";
+  if (Array.isArray(value)) return "Array";
+  if (typeof value === "string") return "String";
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  return (value as object)?.constructor?.name ?? "Object";
+}
+
+/**
+ * Mirrors Ruby's `Kernel#Integer` — the conversion `retrieve_pool_options`
+ * applies to `pool_options[:size]` (cache.rb:213). Numerics truncate, Strings
+ * are parsed with Ruby's literal grammar (leading/trailing whitespace and
+ * underscore separators allowed, `0x`/`0b`/`0o`/`0` radix prefixes honoured, a
+ * fractional or empty String rejected), and anything else is a TypeError.
+ */
+function Integer(value: unknown): number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new FloatDomainError(String(value));
+    return Math.trunc(value);
+  }
+  if (typeof value !== "string") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(`can't convert ${rubyClassName(value)} into Integer`);
+  }
+  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
+  const body = digits.replace(/^[+-]/, "");
+  let magnitude: number;
+  if (/^0[xX][0-9a-fA-F]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 16);
+  } else if (/^0[bB][01]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 2);
+  } else if (/^0[oO][0-7]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 8);
+  } else if (/^0[dD][0-9]+$/.test(body)) {
+    magnitude = parseInt(body.slice(2), 10);
+  } else if (/^0[0-7]*$/.test(body)) {
+    magnitude = parseInt(body, 8);
+  } else if (/^[1-9][0-9]*$/.test(body)) {
+    magnitude = parseInt(body, 10);
+  } else {
+    throw new ArgumentError(`invalid value for Integer(): ${inspect(value)}`);
+  }
+  return digits.startsWith("-") ? -magnitude : magnitude;
+}
+
+/**
+ * Mirrors Ruby's `Kernel#Float` — the conversion `retrieve_pool_options`
+ * applies to `pool_options[:timeout]` (cache.rb:214). Same String grammar as
+ * {@link Integer} plus a fraction and exponent (including Ruby's hexadecimal
+ * float literals); an empty or whitespace-only String is an ArgumentError, not
+ * `0`.
+ *
+ * The accepted grammar was differential-tested against MRI 3.3.11 rather than
+ * derived: a leading-dot mantissa (`".5"`, `".5e2"`) and a hexadecimal float
+ * (`"0x1p4"`, `"0x1.8p1"`) convert, while a trailing-dot one (`"1."`,
+ * `"1.e3"`, `"1_0."`) and a hexadecimal float with no integer part
+ * (`"0x.8p1"`) raise — the trailing-dot form is `String#to_f`, not
+ * `Kernel#Float`.
+ */
+function Float(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new TypeError(`can't convert ${rubyClassName(value)} into Float`);
+  }
+  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
+  const decimal = /^[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/;
+  if (decimal.test(digits)) return Number(digits);
+
+  // Ruby's Float literal grammar also admits hexadecimal floats — `0x1p4`,
+  // `0x1.8p1` — which `Number()` cannot read, so the mantissa and binary
+  // exponent are assembled here.
+  const hexadecimal =
+    /^([+-]?)0[xX]([0-9a-fA-F]+)(?:\.([0-9a-fA-F]+))?(?:[pP]([+-]?[0-9]+))?$/.exec(digits);
+  if (!hexadecimal) throw new ArgumentError(`invalid value for Float(): ${inspect(value)}`);
+  const [, sign, whole, fraction, exponent] = hexadecimal;
+  let magnitude = parseInt(whole, 16);
+  if (fraction !== undefined) {
+    for (let i = 0; i < fraction.length; i++) {
+      magnitude += parseInt(fraction[i], 16) * Math.pow(16, -(i + 1));
+    }
+  }
+  if (exponent !== undefined) magnitude *= Math.pow(2, parseInt(exponent, 10));
+  return sign === "-" ? -magnitude : magnitude;
+}
+
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
+
+/**
+ * Mirror of Ruby's `TypeError` — what `retrieve_pool_options` raises for a
+ * non-Hash `:pool` (cache.rb:217), and what `Integer()`/`Float()` raise for a
+ * value they cannot convert (cache.rb:213-214). Its throw sites carry an
+ * eslint-disable because `rails-error-parity` matches on the native name.
+ * @internal
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
+
+/** Mirror of Ruby's `FloatDomainError` — `Integer(Float::INFINITY)`. @internal */
+class FloatDomainError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
+  }
+}
 
 /** Mirrors Ruby ArgumentError. @internal */
 export class ArgumentError extends Error {
@@ -101,6 +222,45 @@ export abstract class Store {
     } finally {
       Store.logger = prev;
     }
+  }
+
+  /**
+   * Mirrors Rails `Cache::Store.retrieve_pool_options` (cache.rb:200-220), a
+   * private class method the pooled stores call on their own options hash.
+   * `options.key?(:pool)` distinguishes an explicit `pool: nil` from an absent
+   * key, so the read is `"pool" in options`, not `?? true`. Ruby's
+   * `Integer()`/`Float()` (cache.rb:213-214) raise on a value they cannot
+   * convert rather than yielding NaN the way `Number()` does.
+   *
+   * @missingRailsCall merge — `DEFAULT_POOL_OPTIONS.merge(pool_options)`
+   * (cache.rb:215) is the object spread here; a plain Hash#merge has no named
+   * counterpart in the package.
+   */
+  static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
+    let poolOptions: unknown;
+    if ("pool" in options) {
+      poolOptions = options["pool"];
+      delete options["pool"];
+    } else {
+      poolOptions = true;
+    }
+
+    if (poolOptions === false || poolOptions == null) {
+      return false;
+    } else if (poolOptions === true) {
+      poolOptions = DEFAULT_POOL_OPTIONS;
+    } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
+      const hash = poolOptions as StoreOptions;
+      if ("size" in hash) hash["size"] = Integer(hash["size"]);
+      if ("timeout" in hash) hash["timeout"] = Float(hash["timeout"]);
+      poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
+    } else {
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`Invalid :pool argument, expected Hash, got: ${inspect(poolOptions)}`);
+    }
+
+    const result = poolOptions as StoreOptions;
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   silence = false;

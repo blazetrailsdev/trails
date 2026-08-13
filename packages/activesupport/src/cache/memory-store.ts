@@ -283,7 +283,7 @@ export namespace DupCoder {
    * Ruby's `value.dup` guards against the caller mutating the stored String;
    * JS strings are immutable, so the String arm returns it as-is.
    */
-  function dumpValue(value: unknown): string {
+  export function dumpValue(value: unknown): string {
     if (typeof value === "string" && !value.startsWith(MARSHAL_SIGNATURE)) {
       return value;
     } else {
@@ -292,7 +292,7 @@ export namespace DupCoder {
   }
 
   /** Mirrors Rails MemoryStore::DupCoder#load_value (memory_store.rb:64-70). */
-  function loadValue(string: string): unknown {
+  export function loadValue(string: string): unknown {
     if (string.startsWith(MARSHAL_SIGNATURE)) {
       return coder.load(string.slice(MARSHAL_SIGNATURE.length));
     } else {
