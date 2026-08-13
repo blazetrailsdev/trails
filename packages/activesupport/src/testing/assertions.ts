@@ -7,6 +7,7 @@
  * be async (trails' `count` is), so each assertion returns a Promise and awaits
  * both the expression and the block.
  */
+import { indexWith } from "../enumerable-utils.js";
 
 /** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
 class Assertion extends Error {
@@ -98,6 +99,11 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
  * is a Hash, and the difference (with `args[1]` the message) otherwise. The
  * rest parameter here carries the same positions, with the block last — Ruby
  * takes it as a block rather than in `*args`.
+ *
+ * @missingRailsCall map — `expressions.keys.map` (assertions.rb:112-114) exists
+ * only to turn a String expression into `lambda { eval(e, block.binding) }`.
+ * Every expression here is already a callable (see this file's header), so the
+ * block is the identity and Rails' `map` has nothing left to do.
  */
 export async function assertDifference<T>(
   expression: Map<Expression<number>, number>,
@@ -122,9 +128,7 @@ export async function assertDifference<T>(
   } else {
     const difference = (args[0] as number | undefined) ?? 1;
     message = args[1] as string | null | undefined;
-    expressions = new Map(
-      (Array.isArray(expression) ? expression : [expression]).map((e) => [e, difference]),
-    );
+    expressions = indexWith(Array.isArray(expression) ? expression : [expression], difference);
   }
 
   const exps = [...expressions.keys()];

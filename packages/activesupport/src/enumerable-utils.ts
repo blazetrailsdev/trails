@@ -35,18 +35,18 @@ export function indexBy<T, K extends string | number>(
  *
  * Mirrors: Enumerable#index_with (core_ext/enumerable.rb:75-87). Ruby's
  * no-block/no-default arm returns an Enumerator; there is no trails analogue,
- * so `indexWith` requires one of the two.
+ * so `indexWith` requires one of the two. The result is a `Map` for the same
+ * reason `groupBy` below returns one: Ruby keys the Hash by the ELEMENT, which
+ * is an arbitrary object (a callable, in `assert_difference`'s case) that a JS
+ * object would collapse by string coercion.
  */
-export function indexWith<T extends string | number, V>(
-  collection: T[],
-  defaultOrBlock: V | ((elem: T) => V),
-): Record<T, V> {
-  const result = {} as Record<T, V>;
+export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) => V)): Map<T, V> {
+  const result = new Map<T, V>();
   if (typeof defaultOrBlock === "function") {
     const block = defaultOrBlock as (elem: T) => V;
-    for (const elem of collection) result[elem] = block(elem);
+    for (const elem of collection) result.set(elem, block(elem));
   } else {
-    for (const elem of collection) result[elem] = defaultOrBlock;
+    for (const elem of collection) result.set(elem, defaultOrBlock);
   }
   return result;
 }
