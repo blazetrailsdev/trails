@@ -1,9 +1,12 @@
 import { describe, it } from "vitest";
+import { localCacheBehavior } from "../behaviors/local-cache-behavior.js";
 
 describe("MemCacheStoreTest", () => {
+  // Mirrors `include LocalCacheBehavior` (mem_cache_store_test.rb:85).
+  localCacheBehavior();
+
   it.skip("validate pool arguments");
   it.skip("instantiating the store doesn't connect to Memcache");
-  it.skip("clear also clears local cache");
   it.skip("short key normalization");
   it.skip("long key normalization");
   it.skip("namespaced key normalization");
