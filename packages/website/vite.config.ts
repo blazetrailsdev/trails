@@ -13,8 +13,21 @@ function pkgAlias(name: string, entry: string) {
   };
 }
 
+function stubActivesupportYaml() {
+  return {
+    name: "stub-activesupport-yaml",
+    enforce: "pre" as const,
+    resolveId(source: string, importer: string | undefined) {
+      if (source === "./yaml.js" && importer?.includes("/activesupport/src/")) {
+        return path.resolve(__dirname, "src/stubs/yaml-stub.ts");
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
+  plugins: [stubActivesupportYaml(), tailwindcss(), sveltekit()],
   resolve: {
     alias: [
       pkgAlias("@blazetrails/activesupport", "../activesupport/src/index.ts"),
