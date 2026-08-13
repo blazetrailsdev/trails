@@ -1355,7 +1355,8 @@ writers (\`_reflections=\`) are \`class_attribute\` storage slots, never blockin
 writers, so they get no \`set*\` candidate. The ordering flips when the Ruby
 surface defines the matching *reader* too (\`beginning_of_week\` alongside
 \`beginning_of_week=\`): the reader has claimed the bare camel name, so the writer
-is offered \`set#{Name}\` first.
+is offered \`set#{Name}\` first — unless Ruby also defines \`set_#{base}\`, whose
+own port already owns that spelling.
 
 ## Operators
 

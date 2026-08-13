@@ -204,6 +204,13 @@ describe("rubyMethodToTs", () => {
       "tableName",
       "setTableName",
     ]);
+    // A Ruby `set_#{base}` of its own already owns the `setX` spelling.
+    expect(
+      rubyMethodToTs(
+        "content_type=",
+        new Set(["content_type", "content_type=", "set_content_type"]),
+      ),
+    ).toEqual(["contentType", "setContentType"]);
     // A paired reader does not conjure a `setX` for a storage slot.
     expect(rubyMethodToTs("_load_from=", new Set(["_load_from", "_load_from="]))).toEqual([
       "_loadFrom",
