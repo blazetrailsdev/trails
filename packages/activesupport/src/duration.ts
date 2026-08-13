@@ -204,7 +204,7 @@ export class Duration {
       );
     }
     return new Duration(
-      mergeParts(this.parts, this._partKeys, other._givenParts()),
+      mergeParts(this.parts, this._partKeys, other._parts()),
       this._variable || other._variable,
     );
   }
@@ -233,11 +233,6 @@ export class Duration {
       this._transformValues((number) => number / n),
       this._variable,
     );
-  }
-
-  /** @internal Rails' `@parts` itself — the sparse hash `+` and `-` merge. */
-  private _givenParts(): Partial<DurationParts> {
-    return this._transformValues((number) => number);
   }
 
   /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
@@ -411,9 +406,14 @@ export class Duration {
    * Mirrors: ActiveSupport::Duration#_parts (duration.rb:481-483) — the
    * `:nodoc:` reader `@parts` is exposed through, which `Duration#sum` and
    * `TimeWithZone#advance` read off another Duration.
+   *
+   * `@parts` is sparse: `initialize` runs `@parts.reject! { |k, v| v.zero? }`
+   * unless the whole value is zero (duration.rb:228), so a zero-valued unit is
+   * absent rather than present-and-zero. `parts` here is a total record, so the
+   * sparseness lives in `_partKeys` and is applied on the way out.
    */
-  _parts(): DurationParts {
-    return this.parts;
+  _parts(): Partial<DurationParts> {
+    return this._transformValues((number) => number);
   }
 
   /**
