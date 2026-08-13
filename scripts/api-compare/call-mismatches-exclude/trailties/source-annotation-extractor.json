@@ -2,6 +2,18 @@
   {
     "package": "trailties",
     "tsFile": "source-annotation-extractor.ts",
+    "rubyName": "enumerate",
+    "call": "display",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:find",
+      "ref:options"
+    ],
+    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): Rails passes `display(find(...), options)` while the port passes the results plus a `{ tag }` kwargs bag. Tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "source-annotation-extractor.ts",
     "rubyName": "find_in",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -34,17 +46,5 @@
     "rubyName": "find_in",
     "call": "order:constructor,isDirectory",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "source-annotation-extractor.ts",
-    "rubyName": "enumerate",
-    "call": "display",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:find",
-      "ref:options"
-    ],
-    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): Rails passes `display(find(...), options)` while the port passes the results plus a `{ tag }` kwargs bag. Tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
   }
 ]

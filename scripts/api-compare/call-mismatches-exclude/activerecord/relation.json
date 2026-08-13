@@ -720,6 +720,30 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "update",
+    "call": "update",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
+    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:621 is `update(id = :all, attributes)` and dispatches on the `:all` sentinel, while relation.ts:5791 branches on an omitted/object `id` and forwards a single `updates` hash. Converging the signature is tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update!",
+    "call": "update!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:id",
+      "ref:attributes"
+    ],
+    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:629's `:all` sentinel, as for `update` above. Tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
@@ -772,29 +796,5 @@
     "rubyName": "values_for_queries",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update",
-    "call": "update",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:id",
-      "ref:attributes"
-    ],
-    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:621 is `update(id = :all, attributes)` and dispatches on the `:all` sentinel, while relation.ts:5791 branches on an omitted/object `id` and forwards a single `updates` hash. Converging the signature is tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update!",
-    "call": "update!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:id",
-      "ref:attributes"
-    ],
-    "reason": "Pre-existing divergence, newly COMPARED (RFC 0099): relation.rb:629's `:all` sentinel, as for `update` above. Tracked by 0099/converge-weak-receiver-surfaced-call-arg-rows."
   }
 ]

@@ -46,13 +46,6 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
-    "rubyName": "result",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
     "rubyName": "read_data",
     "call": "read",
     "kind": "args",
@@ -61,5 +54,12 @@
       "ref:outbuf"
     ],
     "reason": "TS language shortcoming: parser.rb:259 passes `outbuf` to `IO#read` to reuse one mutable String buffer across reads. JS strings are immutable and the port's `io.read(n)` has no such parameter (parser.ts:327), so the argument cannot be spelled."
+  },
+  {
+    "package": "rack",
+    "tsFile": "multipart/parser.ts",
+    "rubyName": "result",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
