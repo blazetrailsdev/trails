@@ -27,6 +27,13 @@ describe("StringIO", () => {
     expect(io.size).toBe(3);
   });
 
+  it("counts bytes, not code points, in a binary string", () => {
+    // MRI: StringIO.new("\xFF".b).size == 1
+    const io = new StringIO("\xff");
+    expect(io.size).toBe(1);
+    expect(io.read()).toBe("\xff");
+  });
+
   it("writes from the current position", () => {
     const io = new StringIO("ab");
     expect(io.write("cd")).toBe(2);

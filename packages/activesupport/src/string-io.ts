@@ -4,10 +4,11 @@
  * and `Rack::MockRequest` hand to their callers. Only the members Ruby code in
  * this repo sends are ported.
  *
- * Read positions are counted in characters, where Ruby counts bytes: the
- * payloads that reach here (`Base64.decode64`'s binary string, a request body)
- * are one character per byte. `size` is Ruby's bytesize, which callers send to
- * fill a `CONTENT_LENGTH`.
+ * The buffer is a Ruby binary String — one character per byte — which is what
+ * `Base64.decode64` returns (`xml_mini.rb:180-181`) and what a request body
+ * already is, so `size`, `read`'s length and `write`'s return value count bytes
+ * exactly as Ruby's do. A caller holding text encodes it before writing, as
+ * Ruby does.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO` ships with
  * the interpreter, so no Rails file defines it and no port can remove the need
@@ -29,7 +30,7 @@ export class StringIO {
 
   /** Ruby: `StringIO#size` (aliased `length`) — the buffer's bytesize. */
   get size(): number {
-    return new TextEncoder().encode(this._string).length;
+    return this._string.length;
   }
 
   /**
