@@ -8,7 +8,7 @@
 
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Template } from "../template.js";
-import { Resolver, type TemplateResolver } from "./resolver.js";
+import { ANY_VARIANT, Resolver, type TemplateResolver } from "./resolver.js";
 
 export class FileSystemResolver extends Resolver implements TemplateResolver {
   constructor(protected basePath: string) {
@@ -33,6 +33,11 @@ export class FileSystemResolver extends Resolver implements TemplateResolver {
       // Rails orders a variant match ahead of the plain format match:
       // `show.html+phone.erb` beats `show.html.erb` when `:phone` is active.
       for (const variant of variants) {
+        if (variant === ANY_VARIANT) {
+          const match = this.findAnyVariant(dir, name, format, ext);
+          if (match) return this.buildTemplate(match, name, prefix, format, ext);
+          continue;
+        }
         const variantPath = getPath().join(dir, `${name}.${format}+${variant}.${ext}`);
         if (getFs().existsSync(variantPath)) {
           return this.buildTemplate(variantPath, name, prefix, format, ext);
@@ -49,6 +54,26 @@ export class FileSystemResolver extends Resolver implements TemplateResolver {
     }
 
     return null;
+  }
+
+  /**
+   * First template on disk named `<name>.<format>+<any variant>.<ext>`.
+   * Backs Rails' `variants: :any`, which asks whether a template exists at
+   * all rather than whether a specific variant does.
+   *
+   * @internal
+   */
+  protected findAnyVariant(dir: string, name: string, format: string, ext: string): string | null {
+    let entries: string[];
+    try {
+      entries = getFs().readdirSync(dir);
+    } catch {
+      return null;
+    }
+    const prefix = `${name}.${format}+`;
+    const suffix = `.${ext}`;
+    const hit = entries.find((e) => e.startsWith(prefix) && e.endsWith(suffix));
+    return hit ? getPath().join(dir, hit) : null;
   }
 
   /** @internal */

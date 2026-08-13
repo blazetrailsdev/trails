@@ -1,7 +1,9 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { getFsAsync, getOsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MissingTemplate, LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
+import { FileSystemResolver } from "./resolver/file-system-resolver.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 
 describe("MissingTemplate#corrections", () => {
@@ -158,5 +160,38 @@ describe("LookupContext variant propagation", () => {
 
     const output = await ctx.render("posts", "index", "html", {}, {});
     expect(output).toBe("plain-row");
+  });
+});
+
+describe("LookupContext addResolver and any?", () => {
+  let dir: string | undefined;
+
+  beforeEach(async () => {
+    const fs = await getFsAsync();
+    const path = await getPathAsync();
+    const os = await getOsAsync();
+    dir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}lc-any-`);
+    await fs.mkdir!(path.join(dir, "posts"), { recursive: true });
+    // Only a variant exists — no plain `show.html.tse`.
+    await fs.writeFile!(path.join(dir, "posts", "show.html+phone.tse"), "phone only");
+  });
+
+  afterEach(async () => {
+    if (!dir) return;
+    const fs = await getFsAsync();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("makes a resolver added with addResolver visible to the Rails-shaped lookups", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir!));
+    expect(ctx.isExists("show", ["posts"], false, [], { variants: ["phone"] })).toBe(true);
+  });
+
+  it("any? finds a variant-only template, so the UnknownFormat branch is reachable", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir!));
+    expect(ctx.isExists("show", ["posts"])).toBe(false);
+    expect(ctx.isAny("show", ["posts"])).toBe(true);
   });
 });

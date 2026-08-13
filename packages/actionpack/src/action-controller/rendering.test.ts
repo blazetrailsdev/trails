@@ -704,6 +704,12 @@ describe("ActionController::ImplicitRender", () => {
       formats: ["html", "text", "js"],
       variants: [] as string[],
       findTemplate: lookup,
+      /** `any?` — any format, any variant, as `detail_args_for_any` asks. */
+      isAny(name: string, prefixes: ReadonlyArray<string> = []) {
+        return prefixes.some((prefix) =>
+          Object.keys(templates).some((key) => key.startsWith(`${prefix}/${name}.`)),
+        );
+      },
       async render(
         prefix: string,
         action: string,
@@ -821,5 +827,16 @@ describe("ActionController::ImplicitRender", () => {
     const c = new WithAction();
     await c.dispatch("show", makeRequest(), makeResponse());
     expect(c.body).toBe("<h1>desktop</h1>");
+  });
+
+  it("raises UnknownFormat when only another variant has a template", async () => {
+    const C = controllerClass({ "implicit/only.html+phone": "phone only" });
+    class WithAction extends C {
+      only(): void {}
+    }
+    const c = new WithAction();
+    await expect(c.dispatch("only", makeRequest(), makeResponse())).rejects.toThrow(
+      /missing a template for this request format and variant/,
+    );
   });
 });

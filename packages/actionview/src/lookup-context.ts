@@ -532,6 +532,17 @@ export class LookupContext {
   /** Add a resolver to the lookup chain. First added = highest priority. */
   addResolver(resolver: TemplateResolver): void {
     this.resolvers.push(resolver);
+    // Rails has one backing `@view_paths` behind `find` / `find_all` /
+    // `exists?` (`lookup_context.rb:128-141`), so a resolver that satisfies
+    // the `PathSetResolver` protocol joins it too — otherwise the
+    // Rails-shaped lookups cannot see anything added here.
+    const pathSetResolver = resolver as TemplateResolver & Partial<PathSetResolver>;
+    if (typeof pathSetResolver.findAll === "function") {
+      this._viewPaths = this.buildViewPaths([
+        ...this._viewPaths.toArray(),
+        pathSetResolver as PathSetResolver,
+      ]);
+    }
   }
 
   /** Set the layout to use. Pass false to disable layout. */

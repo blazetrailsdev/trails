@@ -42,6 +42,12 @@ export interface TemplateResolver {
   allTemplatePaths?(): readonly string[];
 }
 
+/**
+ * Stands in for Rails' `variants: :any`. A resolver seeing this matches a
+ * template with any variant suffix, not one named `*`.
+ */
+export const ANY_VARIANT = "*";
+
 export abstract class Resolver implements TemplateResolver, PathSetResolver {
   abstract find(
     name: string,
@@ -65,7 +71,12 @@ export abstract class Resolver implements TemplateResolver, PathSetResolver {
     const bare = typeof path === "string" ? path : path.name;
     const name = partial ? `_${bare}` : bare;
 
-    const variants = requestedVariants(details);
+    // `detail_args_for_any` sets `variants: :any` (lookup_context.rb:188-198);
+    // trails carries that sentinel on the Requested key rather than in the
+    // details hash, so read it from there and widen to the glob.
+    const anyVariant =
+      (_detailsKey as { variantsIdx?: unknown } | undefined)?.variantsIdx === "any";
+    const variants = anyVariant ? [ANY_VARIANT] : requestedVariants(details);
     for (const format of requestedFormats(details)) {
       const template = this.find(name, prefix, format, extensions, variants);
       if (template) return [template];

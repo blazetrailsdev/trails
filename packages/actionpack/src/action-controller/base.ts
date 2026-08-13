@@ -347,19 +347,15 @@ export class Base extends Metal {
   }
 
   /**
-   * Mirrors `ActionView::ViewPaths#any_templates?` — is there a template for
-   * this action under *any* format? Rails delegates to `LookupContext#any?`,
-   * which reuses `detail_args_for_any` to drop the format/locale/variant
-   * constraints; the controller's LookupContext resolves through the
-   * single-format `TemplateResolver` protocol, so the widening is a sweep of
-   * the registered formats.
+   * Mirrors `ActionView::ViewPaths#any_templates?` — delegates to
+   * `LookupContext#any?`, which reuses `detail_args_for_any` to drop the
+   * format/locale constraints and widen variants to `:any`
+   * (`actionview/lib/action_view/lookup_context.rb:148-153, 188-198`).
    */
   anyTemplates(action: string, prefixes: string[] = this._prefixes()): boolean {
     const ctx = (this.constructor as typeof Base).lookupContext;
     if (!ctx) return false;
-    return prefixes.some((prefix) =>
-      ctx.formats.some((format) => ctx.findTemplate(action, prefix, String(format)) !== null),
-    );
+    return ctx.isAny(action, prefixes);
   }
 
   /**
