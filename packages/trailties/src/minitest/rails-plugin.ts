@@ -11,7 +11,8 @@ import { Trails } from "../rails.js";
  * the preferred filter and falls back to the previous one when it silences
  * everything.
  *
- * @noRailsEquivalent Ports a real Rails class, but `railties/lib/minitest/` sits
+ * @noRailsEquivalent CONVERGEABLE — comparator gap, not a deviation. Ports a
+ * real Rails class, but `railties/lib/minitest/` sits
  * outside the trailties libPath the API comparator scans
  * (`railties/lib/rails`, vendor/sources.ts:128), so it cannot be matched —
  * the same reason `Minitest::BacktraceFilter` carries one in
@@ -48,8 +49,10 @@ export class BacktraceFilterWithFallback {
  * Minitest reporter surface to swap — vitest owns reporting — so only the
  * backtrace-filter arm (:115-120) is ported.
  *
- * @noRailsEquivalent Ports `Minitest.plugin_rails_init`, which the comparator
- * cannot see for the libPath reason on {@link BacktraceFilterWithFallback}.
+ * @noRailsEquivalent CONVERGEABLE — comparator gap, not a deviation. Ports
+ * `Minitest.plugin_rails_init`, which the comparator cannot see for the libPath
+ * reason on {@link BacktraceFilterWithFallback}; same story,
+ * `widen-trailties-libpath-to-cover-lib-minitest`.
  */
 export function pluginRailsInit(options: { fullBacktrace?: boolean }): void {
   if (env.RAILS_ENV == null && env.RAILS_MINITEST_PLUGIN == null) return;
