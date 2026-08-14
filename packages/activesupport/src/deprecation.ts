@@ -17,10 +17,17 @@ export type DeprecationBehaviorCallable = (
   deprecator: Deprecation,
 ) => void;
 
-export class DeprecationError extends Error {
+/**
+ * Raised when ActiveSupport::Deprecation::Behavior#behavior is set with
+ * `:raise`. You would set `:raise`, as a behavior to raise errors and
+ * proactively report exceptions from deprecations.
+ *
+ * Mirrors: `ActiveSupport::DeprecationException` (deprecation/behaviors.rb:8).
+ */
+export class DeprecationException extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "DeprecationError";
+    this.name = "DeprecationException";
   }
 }
 
@@ -44,7 +51,7 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
     [
       "raise",
       (message, callstack) => {
-        const e = new DeprecationError(message);
+        const e = new DeprecationException(message);
         e.stack = callstack.map((l) => String(l)).join("\n");
         throw e;
       },
@@ -87,7 +94,7 @@ export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBeha
     [
       "report",
       (message, callstack) => {
-        const error = new DeprecationError(message);
+        const error = new DeprecationException(message);
         error.stack = callstack.map((l) => String(l)).join("\n");
         currentErrorReporter.report(error);
       },

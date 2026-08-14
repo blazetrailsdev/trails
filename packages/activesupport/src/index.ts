@@ -400,7 +400,7 @@ export { NullStore } from "./cache/null-store.js";
 // FileStore uses getFs()/getPath() adapters but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
-export { Deprecation, DeprecationError, DEFAULT_BEHAVIORS, deprecator } from "./deprecation.js";
+export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS, deprecator } from "./deprecation.js";
 export type {
   DeprecationBehavior,
   DeprecationBehaviorCallable,
