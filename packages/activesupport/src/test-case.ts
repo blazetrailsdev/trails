@@ -28,7 +28,6 @@ import {
   taggedLogger,
 } from "./testing/tagged-logging.js";
 import {
-  failures,
   prepended as setupAndTeardownPrepended,
   setup,
   teardown,
@@ -96,20 +95,18 @@ export class TestCase {
    * last.
    */
   static afterTeardown(test: RunningTest): void {
-    const recordedBefore = failures.length;
-    setupAndTeardownAfterTeardown.call(TestCase);
+    setupAndTeardownAfterTeardown.call(TestCase, test);
     timeHelpersAfterTeardown();
-    const recorded = failures.splice(recordedBefore);
     testsWithoutAssertionsAfterTeardown({
       ...test,
       // Minitest's `error?` is `failures.any? { UnexpectedError === _1 }`, so a
       // teardown that raised suppresses the missing-assertion warning.
-      error: test.error || recorded.some((f) => f instanceof UnexpectedError),
+      error: test.error || test.failures.some((f) => f instanceof UnexpectedError),
     });
     // `self.failures` is the list Minitest reports the test on; vitest has no
     // per-test failure list, so what makes the runner see the failure is the
     // hook raising it.
-    if (recorded.length > 0) throw recorded[0];
+    if (test.failures.length > 0) throw test.failures[0];
   }
 
   // include ActiveSupport::Testing::Assertions (test_case.rb:147)
@@ -177,5 +174,7 @@ function _runningTest(context: TestContext): RunningTest {
     error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
     name: task.name,
     sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
+    // `Minitest::Runnable#initialize` starts every test on an empty list.
+    failures: [],
   };
 }

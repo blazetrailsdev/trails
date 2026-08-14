@@ -12,12 +12,15 @@ import { describe, expect, it } from "vitest";
 
 import { resetCallbacks } from "../callbacks.js";
 import { Assertion } from "./assertions.js";
-import { afterTeardown, failures, prepended, teardown } from "./setup-and-teardown.js";
+import { afterTeardown, prepended, teardown } from "./setup-and-teardown.js";
+import type { RunningTest } from "./tests-without-assertions.js";
 
 describe("AfterTeardownAssertionTest", () => {
   it("teardown raise but all after teardown method are called", () => {
     const klass = {};
     prepended(klass);
+    // The `self` Ruby's `self.failures` resolves against — one list per test.
+    const test: Pick<RunningTest, "failures"> = { failures: [] };
     let witness = false;
 
     const flunked = new Assertion(
@@ -28,19 +31,18 @@ describe("AfterTeardownAssertionTest", () => {
     });
 
     const otherAfterTeardown = () => {
-      afterTeardown.call(klass);
+      afterTeardown.call(klass, test);
       witness = true;
     };
 
     try {
-      expect(failures.length).toBe(0);
+      expect(test.failures.length).toBe(0);
       otherAfterTeardown();
-      expect(failures.length).toBe(1);
-      expect(failures[0]).toBe(flunked);
+      expect(test.failures.length).toBe(1);
+      expect(test.failures[0]).toBe(flunked);
 
       expect(witness).toBe(true);
     } finally {
-      failures.length = 0;
       resetCallbacks(klass, "teardown");
     }
   });
