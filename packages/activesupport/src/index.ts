@@ -603,6 +603,8 @@ export {
   assertNoChanges,
   UnexpectedError,
   UNTRACKED,
+  BacktraceFilter,
+  Minitest,
 } from "./testing/assertions.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
