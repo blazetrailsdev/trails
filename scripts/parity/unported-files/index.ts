@@ -15,6 +15,7 @@ import { DATE_UNPORTED_FILES } from "./date.js";
 import { DID_YOU_MEAN_UNPORTED_FILES } from "./did-you-mean.js";
 import { GLOBALID_UNPORTED_FILES } from "./globalid.js";
 import { I18N_UNPORTED_FILES } from "./i18n.js";
+import { MINITEST_UNPORTED_FILES } from "./minitest.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
 
@@ -28,6 +29,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...DID_YOU_MEAN_UNPORTED_FILES,
   ...GLOBALID_UNPORTED_FILES,
   ...I18N_UNPORTED_FILES,
+  ...MINITEST_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,
 ];

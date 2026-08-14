@@ -316,7 +316,12 @@ DEPENDENCY_PATTERNS = {
 # and its siblings are autoload manifests whose only method bodies are
 # `def self.` boot helpers no trails file ports, and walking them attributes
 # those to the umbrella module's junk-drawer entity file as false-missing.
-UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n].to_set
+# `vendor/minitest/lib/minitest.rb` is likewise the gem's real seat: the
+# `Minitest` module facade plus the whole reporter stack
+# (minitest.rb:44,51,350-354,596-1030,1065-1238). The config-only scan sees
+# none of it, and trails' port of that surface lives in
+# `activesupport/src/testing/assertions.ts`.
+UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n minitest].to_set
 
 # ---- AST walker ----
 

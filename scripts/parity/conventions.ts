@@ -152,6 +152,12 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // umbrella files it owns real surface. trails ports it to `src/i18n.ts`;
   // without this the default rule would expect `../i18n.ts`, outside src.
   "i18n:../i18n.rb": "i18n.ts",
+  // The minitest gem's seat (`lib/minitest.rb`, scanned one level above
+  // libPath) and its assertion module are both ported into the one file
+  // activesupport carries them in — `Minitest::Assertion` and friends are
+  // raised and rescued by ActiveSupport's own assertions.
+  "minitest:../minitest.rb": "testing/assertions.ts",
+  "minitest:assertions.rb": "testing/assertions.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
   // defines first — so without an entry here its `interpolate` /
   // `interpolate_hash` are measured against `backend/cache.ts` and, since

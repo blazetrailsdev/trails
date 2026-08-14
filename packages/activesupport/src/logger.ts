@@ -7,6 +7,7 @@ import { Temporal } from "@blazetrails/date";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { getFs } from "./fs-adapter.js";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
+import { NameError } from "./core-ext/name-error.js";
 
 /**
  * Mirror of Ruby's `ArgumentError`, raised by `local_level=` on an
@@ -175,9 +176,16 @@ export class Logger {
     if (typeof level === "number") {
       value = level;
     } else if (typeof level === "string") {
-      value = LOG_LEVELS[level];
+      // `Logger::Severity.const_get(level.to_s.upcase)` — `const_get` raises
+      // NameError for an unknown name, so only the `else` arm below reaches
+      // ArgumentError.
+      const constantName = level.toUpperCase();
+      value = LOG_LEVELS[level.toLowerCase() as LogLevel];
       if (value === undefined) {
-        throw new ArgumentError(`Invalid log level: ${inspect(level)}`);
+        throw new NameError(
+          `uninitialized constant Logger::Severity::${constantName}`,
+          constantName,
+        );
       }
     } else if (level == null) {
       value = null;
@@ -254,22 +262,6 @@ export class Logger {
     return this.level <= Logger.ERROR;
   }
   get "fatal?"(): boolean {
-    return this.level <= Logger.FATAL;
-  }
-
-  get debugEnabled(): boolean {
-    return this.level <= Logger.DEBUG;
-  }
-  get infoEnabled(): boolean {
-    return this.level <= Logger.INFO;
-  }
-  get warnEnabled(): boolean {
-    return this.level <= Logger.WARN;
-  }
-  get errorEnabled(): boolean {
-    return this.level <= Logger.ERROR;
-  }
-  get fatalEnabled(): boolean {
     return this.level <= Logger.FATAL;
   }
 

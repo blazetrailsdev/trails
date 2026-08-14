@@ -6,7 +6,7 @@
  *
  * `add` / `log` short-circuit to avoid formatter calls and
  * `Temporal.Now.instant()` allocations on the boot hot path; level
- * predicates (`debugEnabled`, `warnEnabled`, …) still reflect `this.level`.
+ * predicates (`debug?`, `warn?`, …) still reflect `this.level`.
  */
 import { Logger } from "./logger.js";
 

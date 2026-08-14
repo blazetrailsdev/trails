@@ -237,15 +237,16 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "minitest",
         libPath: "lib/minitest",
         testPath: "test/minitest",
-        // Vendored as a read-anchor only. api-compare/test-compare derive their
-        // package list from this file and key each package to a TS workspace
-        // dir (`packages/<name>/src`); minitest has no such package — the port
-        // is a slice of `packages/activesupport/src/testing/assertions.ts` —
-        // so enrolling it would compare against a directory that does not
-        // exist. Whether the comparator can be taught to map a non-Rails gem
-        // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on
-        // those members then dropped, is its own story (RFC 0098).
-        compareApi: false,
+        // The port is a slice of `packages/activesupport/src/testing/`, so
+        // api-compare keys this package to that dir the way it already keys
+        // `activerecord-test-support` to `packages/activerecord/src/support`
+        // (`scripts/api-compare/config.ts` PACKAGE_DIR_OVERRIDES), and
+        // `RUBY_FILE_TS_OVERRIDES` maps `minitest.rb` / `assertions.rb` onto
+        // `testing/assertions.ts`. Everything else under `lib/minitest` is
+        // registered unported.
+        //
+        // `test/minitest` stays out: those are the gem's own test cases, and
+        // trails ports minitest's assertion surface, not its suite.
         compareTests: false,
       },
     ],

@@ -28,11 +28,6 @@ import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /**
  * Mirrors `Minitest::Assertion` — the error a failed assertion raises.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
- * (assertions.rb, error_reporter_assertions.rb:45) but the class is defined in
- * the minitest gem, which has no vendored Rails file for the comparator to map
- * onto. Exported so `testing/error-reporter-assertions.ts` raises the same one.
  */
 export class Assertion extends Error {
   override name = "Assertion";
@@ -42,8 +37,6 @@ export class Assertion extends Error {
  * Mirrors `Minitest::Skip` (minitest.rb:1065-1069) — the assertion raised when
  * skipping a run, and the class {@link StatisticsReporter#report} counts the
  * skips of a run by.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class Skip extends Assertion {
   override name = "Skip";
@@ -57,13 +50,6 @@ export class Skip extends Assertion {
  * Mirrors `Minitest::UnexpectedError` (minitest.rb:1074-1108) — the wrapper
  * `assert_nothing_raised` re-raises an unexpected error in, and the class
  * {@link _assertNothingRaisedOrWarn} rescues to warn about it.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails names the class
- * (assertions.rb:52, 283) but defines it in the minitest gem
- * (minitest.rb:1074-1108), which is a test-framework dependency with no
- * vendored Rails file for the comparator to map onto. Porting it here is what
- * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
- * rescue, the class Rails names.
  *
  * `message` and `backtrace` are METHODS in minitest (minitest.rb:1093-1103),
  * reading the wrapped error when called. TypeScript cannot declare an accessor
@@ -90,8 +76,6 @@ export class UnexpectedError extends Assertion {
 /**
  * Mirrors `Minitest::UnexpectedWarning` (minitest.rb:1113-1117) — the assertion
  * raised on a warning under `-Werror`.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class UnexpectedWarning extends Assertion {
   override name = "UnexpectedWarning";
@@ -117,11 +101,6 @@ function classNameOf(e: Error): string {
 
 /**
  * Mirrors `Minitest::BacktraceFilter` (minitest.rb:1190-1218).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails reassigns
- * `Minitest.backtrace_filter` but the class lives in the minitest gem, which
- * has no vendored Rails file for the comparator to map onto. Ported here for
- * the same reason {@link UnexpectedError} is.
  */
 export class BacktraceFilter {
   /**
@@ -129,9 +108,6 @@ export class BacktraceFilter {
    * `%r%lib/minitest|internal:warning%`. The frames trails filters are
    * vitest's and node's, not minitest's, so the pattern names those instead —
    * the only part of this class that cannot be transcribed literally.
-   *
-   * @noRailsEquivalent PERMANENT — minitest's constant, not Rails'; see
-   * {@link BacktraceFilter}.
    */
   static MT_RE = /node_modules[/\\]@?vitest|node:internal/;
 
@@ -175,8 +151,11 @@ export class BacktraceFilter {
  * method alone because Ruby's is duck-typed: `rails_plugin.rb:118` assigns a
  * `BacktraceFilterWithFallback`, which is not a `BacktraceFilter`.
  *
- * @noRailsEquivalent PERMANENT — minitest's module surface; see
- * {@link BacktraceFilter}.
+ * @noRailsEquivalent PERMANENT — TS has no reopenable module, so the `Minitest`
+ * module's own surface sits on a const object; the comparator scores a const's
+ * members against classes and modules, so `filterBacktrace` and `clockTime`
+ * are measured here rather than against `Minitest.filter_backtrace` /
+ * `Minitest.clock_time`, which they do port.
  */
 export const Minitest: {
   backtraceFilter: { filter(bt: string[] | null): string[] };
@@ -186,6 +165,12 @@ export const Minitest: {
 } = {
   backtraceFilter: new BacktraceFilter(),
 
+  /**
+   * Mirrors `Minitest.filter_backtrace` (minitest.rb:350-354).
+   *
+   * @noRailsEquivalent PERMANENT — a member of the `Minitest` const seat; see
+   * the tag on {@link Minitest}.
+   */
   filterBacktrace(bt: string[] | null): string[] {
     let result = Minitest.backtraceFilter.filter(bt);
     if (result.length === 0 && bt) result = [...bt];
@@ -205,6 +190,9 @@ export const Minitest: {
    * where one exists, `Time.now` otherwise. `performance.now()` is JS'
    * monotonic clock and reads in milliseconds, so it is divided to the seconds
    * both Ruby arms return.
+   *
+   * @noRailsEquivalent PERMANENT — a member of the `Minitest` const seat; see
+   * the tag on {@link Minitest}.
    */
   clockTime(): number {
     if (typeof performance !== "undefined") return performance.now() / 1000;
@@ -559,21 +547,18 @@ function _callableToSourceString(callable: unknown): string {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Minitest's `assert`, which every assertion in
- * `testing/assertions.rb` and `testing/deprecation.rb` calls. Rails inherits it
- * from Minitest, so there is no Ruby counterpart in a mapped file; exported so
- * both testing modules raise the same `Assertion`.
+ * Mirrors `Minitest::Assertions#assert` (minitest/assertions.rb:171) — the
+ * assertion every assertion in `testing/assertions.rb` and
+ * `testing/deprecation.rb` calls. Exported so both testing modules raise the
+ * same `Assertion`.
  */
 export function assert(value: boolean, message: string | (() => string) = ""): void {
   if (!value) throw new Assertion(typeof message === "function" ? message() : message);
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_predicate` (minitest/assertions.rb).
- * Rails inherits it from Minitest, so there is no Ruby counterpart in a mapped
- * file. Ported tests call it where the Rails test does; a vitest matcher can
- * express the underlying check but not that it is a *predicate* assertion, which
- * is what `parity:test --assertions` compares.
+ * Mirrors `Minitest::Assertions#assert_predicate`
+ * (minitest/assertions.rb:394).
  *
  * Ruby names the predicate with a method Symbol (`assert_predicate x, :nil?`);
  * JS has no universal `nil?`/`empty?` protocol to send, so the predicate is a
@@ -592,8 +577,8 @@ export function assertPredicate<T>(
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_same`
- * (minitest/assertions.rb), object identity rather than value equality.
+ * Mirrors `Minitest::Assertions#assert_same` (minitest/assertions.rb:463) —
+ * object identity rather than value equality.
  */
 export function assertSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
@@ -602,7 +587,14 @@ export function assertSame(expected: unknown, actual: unknown, message?: string)
   );
 }
 
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_same` / `refute_same`. */
+/**
+ * Mirrors `Minitest::Assertions#refute_same` (minitest/assertions.rb:812),
+ * which trails spells with the `assert_not_` prefix Rails' aliases use.
+ *
+ * @noRailsEquivalent PERMANENT — the `refute_*` half of minitest's naming: the
+ * Ruby name is `refute_same`, so nothing matches the `assert_not_` spelling
+ * Rails' own assertions established for the port.
+ */
 export function assertNotSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
     !Object.is(expected, actual),
@@ -715,8 +707,9 @@ const $stdout: IO = {
  * `:show_skips` / `:Werror` spellings camelCase per docs/ruby-ts-conventions.md
  * (`Werror` is already a single token).
  *
- * @noRailsEquivalent PERMANENT — a type for minitest's untyped options hash;
- * see {@link Assertion}.
+ * @noRailsEquivalent PERMANENT — the keys are Symbols in a Ruby Hash
+ * (`options[:verbose]`), not methods, so no Ruby member maps onto the type
+ * that carries them.
  */
 export interface Options {
   io?: IO;
@@ -736,8 +729,6 @@ export interface Options {
  * under vitest, which owns the run lifecycle, so the runnable half of the gem
  * is not ported — this is the shape a reporter reads off whatever the runner
  * records.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export interface Reportable {
   name: string;
@@ -754,8 +745,6 @@ export interface Reportable {
  * Mirrors `Minitest::AbstractReporter` (minitest.rb:702-746) — the API a
  * reporter overrides. Ruby's `@mutex` guards a parallel run; JS has no threads,
  * so {@link AbstractReporter#synchronize} just calls the block.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class AbstractReporter {
   /** Starts reporting on the run. */
@@ -782,8 +771,6 @@ export class AbstractReporter {
 
 /**
  * Mirrors `Minitest::Reporter` (minitest.rb:748-764).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class Reporter extends AbstractReporter {
   /** The IO used to report. */
@@ -804,8 +791,6 @@ export class Reporter extends AbstractReporter {
  * that prints the "dots" during the run, and the one
  * `Minitest.plugin_rails_init` swaps for `Rails::TestUnitReporter`
  * (rails_plugin.rb:129-131).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class ProgressReporter extends Reporter {
   override prerecord(klass: { name: string }, name: string): void {
@@ -825,8 +810,6 @@ export class ProgressReporter extends Reporter {
 /**
  * Mirrors `Minitest::StatisticsReporter` (minitest.rb:810-901) — gathers
  * statistics about a test run, does no IO of its own.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class StatisticsReporter extends Reporter {
   /** Total number of assertions. */
@@ -894,8 +877,6 @@ export class StatisticsReporter extends Reporter {
  * header, summary, and failure details at the end of the run, and the reporter
  * `Minitest.plugin_rails_init` swaps for `SuppressedSummaryReporter`
  * (rails_plugin.rb:126-128).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class SummaryReporter extends StatisticsReporter {
   sync: boolean | null = null;
@@ -982,8 +963,6 @@ export class SummaryReporter extends StatisticsReporter {
  * multiple reporters as one. This is the receiver
  * `Minitest.plugin_rails_init` rejects from and appends to
  * (rails_plugin.rb:122-135).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
 export class CompositeReporter extends AbstractReporter {
   /** The list of reporters to dispatch to. */
@@ -1002,6 +981,9 @@ export class CompositeReporter extends AbstractReporter {
    * Mirrors `Minitest::CompositeReporter#<<` (minitest.rb:1002-1004). TypeScript
    * has no `<<` to overload, so the operator keeps its Ruby name spelled out —
    * `Array#<<` is `push` on both sides of the port.
+   *
+   * @noRailsEquivalent PERMANENT — the port of an operator method: Ruby's `<<`
+   * has no TS spelling, so the name is `push` and no Ruby name matches it.
    */
   push(reporter: AbstractReporter): void {
     this.reporters.push(reporter);

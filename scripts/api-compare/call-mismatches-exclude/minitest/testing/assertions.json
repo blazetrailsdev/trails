@@ -1,0 +1,16 @@
+[
+  {
+    "package": "minitest",
+    "tsFile": "testing/assertions.ts",
+    "rubyName": "to_s",
+    "call": "join",
+    "reason": "`Minitest::Result#to_s` (minitest.rb:689-695) maps its failures and joins them; trails does not port `Minitest::Result` at all — vitest owns the run — so the name matches the `toString()` member of the `Reportable` shape a reporter reads off whatever the runner records, which is a declaration with no body to make the calls in."
+  },
+  {
+    "package": "minitest",
+    "tsFile": "testing/assertions.ts",
+    "rubyName": "to_s",
+    "call": "map",
+    "reason": "`Minitest::Result#to_s` (minitest.rb:689-695) maps its failures and joins them; trails does not port `Minitest::Result` at all — vitest owns the run — so the name matches the `toString()` member of the `Reportable` shape a reporter reads off whatever the runner records, which is a declaration with no body to make the calls in."
+  }
+]

@@ -21,8 +21,8 @@ describe("NullLogger", () => {
   it("still honors level filtering", () => {
     const log = nullLogger();
     log.level = Logger.WARN;
-    expect(log.warnEnabled).toBe(true);
-    expect(log.debugEnabled).toBe(false);
+    expect(log["warn?"]).toBe(true);
+    expect(log["debug?"]).toBe(false);
   });
 
   it("short-circuits add/log without invoking the formatter", () => {
