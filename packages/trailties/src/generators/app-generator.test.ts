@@ -293,6 +293,20 @@ describe("AppGenerator", () => {
     expect(configRu).toContain("export default Trails.application;");
   });
 
+  it("invalid application name is fixed", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "things-43",
+      database: "sqlite",
+    });
+    await gen.run();
+    const read = (...segs: string[]) =>
+      fs.readFileSync(path.join(tmpDir, "things-43", ...segs), "utf-8");
+    expect(read("src/config/environment.ts")).toMatch(/Trails\.initialize\(\)/);
+    expect(read("src/config/application.ts")).toMatch(/^export class Things43 /m);
+  });
+
   it("types drawRoutes against Mapper", async () => {
     await makeGen().run();
 
