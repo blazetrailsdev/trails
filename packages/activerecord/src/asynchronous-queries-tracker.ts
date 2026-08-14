@@ -1,6 +1,19 @@
 import { Executor } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
-import { asynchronousQueriesTracker } from "./core.js";
+import type { Base } from "./base.js";
+
+/** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
+let _base: typeof Base | undefined;
+
+/** @internal */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 
 /**
  * Tracks the async-query sessions opened around a unit of work.
@@ -30,7 +43,7 @@ export class AsynchronousQueriesTracker {
   }
 
   static run(): AsynchronousQueriesTracker {
-    const tracker = asynchronousQueriesTracker();
+    const tracker = baseClass().asynchronousQueriesTracker();
     tracker.startSession();
     return tracker;
   }
