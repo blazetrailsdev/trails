@@ -31,7 +31,9 @@ export class EngineConfiguration extends RailtieConfiguration {
   autoloadOncePaths: string[] = [];
   eagerLoadPaths: string[] = [];
 
-  private _generators: Record<string, unknown> = {};
+  /** Rails seeds `Rails::Configuration::Generators` with an empty
+   * `templates` array (`rails/configuration.rb:112`). */
+  private _generators: Record<string, unknown> = { templates: [] };
 
   constructor(root: string | null = null) {
     super();

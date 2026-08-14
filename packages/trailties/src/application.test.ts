@@ -32,6 +32,7 @@ import {
   Static,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
+import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
@@ -371,7 +372,11 @@ describe("Application::Configuration", () => {
 });
 
 describe("Application::DefaultMiddlewareStack", () => {
-  const paths = { public: () => "/public" };
+  const paths = (() => {
+    const root = new Root("/app");
+    root.add("public");
+    return root;
+  })();
   const buildApp = () => ({ config: new Configuration() });
 
   const build = (mutate: (c: Configuration) => void = () => {}) => {

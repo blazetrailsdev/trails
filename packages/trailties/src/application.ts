@@ -168,11 +168,11 @@ export class Application extends Engine {
     return (env) => routes.call(env);
   }
 
-  /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`). */
+  /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`).
+   * Rails passes `paths`; `Engine#paths()` is async in trails (it resolves the
+   * root first), so the sync `config.paths()` it delegates to is passed here. */
   defaultMiddlewareStack(): MiddlewareStack {
-    const defaultStack = new DefaultMiddlewareStack(this, this.config, {
-      public: () => this.config.paths().get("public")?.toAry()[0],
-    });
+    const defaultStack = new DefaultMiddlewareStack(this, this.config, this.config.paths());
     return defaultStack.buildStack();
   }
 
@@ -180,14 +180,15 @@ export class Application extends Engine {
    * Mirrors `Application#ensure_generator_templates_added`
    * (`application.rb:631-634`).
    *
-   * Rails also unshifts the existent `paths["lib/templates"]` directories
-   * ahead of the configured ones. `Path#existent` is async in trails (`paths.ts:147`) and initializers run
-   * synchronously (`initializable.ts:runInitializers`), so the filesystem
-   * scan is skipped; see the `generator-templates-existent-paths` story.
+   * Rails filters `paths["lib/templates"]` through `existent`;
+   * `Path#existent` is async in trails (`paths.ts:147`) while initializers run
+   * synchronously (`Initializable#runInitializers`), so the declared paths are
+   * unshifted unfiltered — see the `generator-templates-existent-paths` story.
    */
   ensureGeneratorTemplatesAdded(): void {
-    const generators = this.config.generators();
-    generators.templates ??= [];
+    const configuredPaths = this.config.generators().templates as string[];
+    const libTemplates = this.config.paths().get("lib/templates")?.toAry() ?? [];
+    configuredPaths.unshift(...libTemplates.filter((p) => !configuredPaths.includes(p)));
   }
 
   routesReloader(): RoutesReloader {

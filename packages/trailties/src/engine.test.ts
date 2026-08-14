@@ -232,7 +232,7 @@ describe("Engine", () => {
     cfg.generators((g) => {
       g.orm = "active_record";
     });
-    expect(cfg.generators()).toEqual({ orm: "active_record" });
+    expect(cfg.generators()).toEqual({ orm: "active_record", templates: [] });
   });
 
   it("railties returns a Trailties collection over registered subclasses", () => {

@@ -13,6 +13,11 @@
  * is already the host. The blocks here use `this: FinisherHost` and
  * skip the redundant argument.
  *
+ * `Rails.env.development?` in `add_internal_routes` reads through a cast:
+ * `Trails.env` is an `EnvironmentInquirer` whose per-environment predicates
+ * are Proxy-generated (`string-inquirer.ts:12-28`) and so are absent from its
+ * static type.
+ *
  * The Rails initializers tied to Zeitwerk, eager loading, the
  * reloader/executor concurrency hooks, default session store, the
  * routes-reloader hook, dependency clearing, and YJIT are intentionally
@@ -53,9 +58,6 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  // `Trails.env` is an `EnvironmentInquirer`, whose per-environment
-  // predicates are Proxy-generated (`string-inquirer.ts:12-28`) and so are
-  // absent from its static type; Rails reads `Rails.env.development?`.
   if (!(Trails.env as unknown as { isDevelopment(): boolean }).isDevelopment()) return;
   this.routes().prepend((mapper) => {
     mapper.get("/rails/info/properties", "rails/info#properties");

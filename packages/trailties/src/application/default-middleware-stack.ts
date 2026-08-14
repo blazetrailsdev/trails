@@ -17,26 +17,29 @@ import {
   Static,
 } from "@blazetrails/actionpack";
 import type { Configuration } from "./configuration.js";
+import type { Root } from "../paths.js";
 
 export interface DefaultStackHostApp {
   config: Configuration;
 }
 
-export interface DefaultStackPaths {
-  public(): string | undefined;
-}
-
 export class DefaultMiddlewareStack {
   readonly app: DefaultStackHostApp;
   readonly config: Configuration;
-  readonly paths: DefaultStackPaths;
+  readonly paths: Root;
 
-  constructor(app: DefaultStackHostApp, config: Configuration, paths: DefaultStackPaths) {
+  constructor(app: DefaultStackHostApp, config: Configuration, paths: Root) {
     this.app = app;
     this.config = config;
     this.paths = paths;
   }
 
+  /**
+   * Mirrors `DefaultMiddlewareStack#build_stack`
+   * (`application/default_middleware_stack.rb:11`). `ActionDispatch::Static`
+   * takes `path` positionally in Rails (`static.rb:21`); trails' `Static`
+   * takes it as the `root` option key (`middleware/static.ts:47`).
+   */
   buildStack(): MiddlewareStack {
     const stack = new MiddlewareStack();
     const config = this.config;
@@ -54,17 +57,12 @@ export class DefaultMiddlewareStack {
     }
 
     if (config.publicFileServer.enabled) {
-      const root = this.paths.public();
-      if (root) {
-        // Rails passes `root` positionally (`default_middleware_stack.rb:32`);
-        // trails' `Static` takes it as an option key
-        // (`actionpack/.../middleware/static.ts:47`).
-        stack.use(Static as never, {
-          root,
-          index: config.publicFileServer.indexName,
-          headers: config.publicFileServer.headers ?? {},
-        });
-      }
+      const headers = config.publicFileServer.headers ?? {};
+      stack.use(Static as never, {
+        root: this.paths.get("public")?.toAry()[0],
+        index: config.publicFileServer.indexName,
+        headers,
+      });
     }
 
     if (config.serverTiming) stack.use(ServerTiming as never);
@@ -103,6 +101,9 @@ export class DefaultMiddlewareStack {
 
   /** @internal Rails' `exceptions_app || PublicExceptions.new(Rails.public_path)`. */
   private _showExceptionsApp(): unknown {
-    return this.config.exceptionsApp ?? new PublicExceptions(this.paths.public() ?? "/public");
+    return (
+      this.config.exceptionsApp ??
+      new PublicExceptions(this.paths.get("public")?.toAry()[0] ?? "/public")
+    );
   }
 }
