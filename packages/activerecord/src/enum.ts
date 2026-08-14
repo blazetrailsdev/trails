@@ -634,8 +634,8 @@ export function _enum(
   // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
   // defaults; `scopes: false` suppresses per-value scope generation and
   // `instance_methods: false` suppresses predicate/bang generation.
-  const scopesEnabled = options?.scopes !== false;
-  const instanceMethodsEnabled = options?.instanceMethods !== false;
+  const scopes = options?.scopes !== false;
+  const instanceMethods = options?.instanceMethods !== false;
 
   // Conflict-detection pass, then the generation pass — both ported from the
   // former standalone `defineEnum`, now folded in so `_enum` is the single enum
@@ -680,9 +680,9 @@ export function _enum(
   // `EnumMethods.defineEnumMethods` is the single generator.
   const methodsModule = this._enumMethodsModule();
   for (const [n, value] of Object.entries(mapping)) {
-    const fullName = toCamel(methodName(n));
-    const { predicateName, bangName, notScopeName } = enumMethodNamesFor(fullName);
-    const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
+    const valueMethodName = toCamel(methodName(n));
+    const { predicateName, bangName, notScopeName } = enumMethodNamesFor(valueMethodName);
+    const valueMethodAlias = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
     // Rails feeds both the value method name and its special-char-stripped
     // friendly alias into detect_negative_enum_conditions! (enum.rb:266-279),
@@ -692,10 +692,11 @@ export function _enum(
     // a conflict — the alias sticks to the first label and the second label
     // simply doesn't get one, and its `define_enum_methods` call is skipped
     // with it.
-    valueMethodNames.push(fullName);
-    const aliasIsNew = friendlyName !== fullName && !valueMethodNames.includes(friendlyName);
+    valueMethodNames.push(valueMethodName);
+    const aliasIsNew =
+      valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias);
     if (aliasIsNew) {
-      valueMethodNames.push(friendlyName);
+      valueMethodNames.push(valueMethodAlias);
     }
 
     // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
@@ -704,7 +705,7 @@ export function _enum(
     // opting out of a surface also opts out of its conflict checks — e.g.
     // `instance_methods: false` must not raise on a predicate-name collision it
     // will never generate.
-    if (instanceMethodsEnabled) {
+    if (instanceMethods) {
       // `definedNames` models Rails' `_enum_methods_module`: every
       // `define_enum_methods` call within a single `_enum` defines into that one
       // module, so an intra-enum collision (a later label reusing an earlier
@@ -730,10 +731,10 @@ export function _enum(
       if (enumMethodNames.has(bangName))
         raiseConflictError.call(this, name, bangName, { source: "another enum" });
     }
-    if (scopesEnabled) {
-      if (definedNames.has(fullName))
-        raiseConflictError.call(this, name, fullName, { type: "class" });
-      definedNames.add(fullName);
+    if (scopes) {
+      if (definedNames.has(valueMethodName))
+        raiseConflictError.call(this, name, valueMethodName, { type: "class" });
+      definedNames.add(valueMethodName);
       // The value/`not*` scope names are class methods, so route them through
       // the class-method conflict detector, which consults all three Rails
       // sub-branches (a *dangerous* class method — RESTRICTED_CLASS_METHODS plus
@@ -741,7 +742,7 @@ export function _enum(
       // special-case), each raising with the correct type/source rather than the
       // generic scope error. A scope inherited from a parent enum or a plain
       // user static on the model/an ancestor is NOT a conflict.
-      detectEnumConflictBang.call(this, name, fullName, true);
+      detectEnumConflictBang.call(this, name, valueMethodName, true);
       detectEnumConflictBang.call(this, name, notScopeName, true);
     }
     if (aliasIsNew) {
@@ -749,8 +750,8 @@ export function _enum(
         predicateName: fp,
         bangName: friendlyBang,
         notScopeName: notFriendlyName,
-      } = enumMethodNamesFor(friendlyName);
-      if (instanceMethodsEnabled) {
+      } = enumMethodNamesFor(valueMethodAlias);
+      if (instanceMethods) {
         // Rails defines each friendly alias immediately through
         // `_enum_methods_module`, so `detect_enum_conflict!` catches an
         // already-defined method within the *same* enum (enum.rb:273-275,
@@ -771,8 +772,8 @@ export function _enum(
         if (enumMethodNames.has(friendlyBang))
           raiseConflictError.call(this, name, friendlyBang, { source: "another enum" });
       }
-      if (scopesEnabled) {
-        detectEnumConflictBang.call(this, name, friendlyName, true);
+      if (scopes) {
+        detectEnumConflictBang.call(this, name, valueMethodAlias, true);
         detectEnumConflictBang.call(this, name, notFriendlyName, true);
       }
     }
@@ -782,22 +783,16 @@ export function _enum(
     // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
-    methodsModule.defineEnumMethods(name, fullName, value, scopesEnabled, instanceMethodsEnabled);
+    methodsModule.defineEnumMethods(name, valueMethodName, value, scopes, instanceMethods);
     if (aliasIsNew) {
-      methodsModule.defineEnumMethods(
-        name,
-        friendlyName,
-        value,
-        scopesEnabled,
-        instanceMethodsEnabled,
-      );
+      methodsModule.defineEnumMethods(name, valueMethodAlias, value, scopes, instanceMethods);
     }
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
     // bracket notation only.
     const originalName = methodName(n);
-    if (instanceMethodsEnabled && /[^\w\x80-\uffff]/.test(originalName)) {
+    if (instanceMethods && /[^\w\x80-\uffff]/.test(originalName)) {
       const carrier = methodsModule.carrier();
       Object.defineProperty(carrier, `is${originalName}`, {
         value: function (this: Base) {
@@ -821,14 +816,14 @@ export function _enum(
     // `_enum_methods_module`. Only record when the predicate/bang were actually
     // defined (`instance_methods: false` defines neither, so a later enum reusing
     // the name must not conflict).
-    if (instanceMethodsEnabled) {
-      const names = enumMethodNamesFor(fullName);
+    if (instanceMethods) {
+      const names = enumMethodNamesFor(valueMethodName);
       enumMethodNames.add(names.predicateName);
       enumMethodNames.add(names.bangName);
       if (aliasIsNew) {
-        const friendlyNames = enumMethodNamesFor(friendlyName);
-        enumMethodNames.add(friendlyNames.predicateName);
-        enumMethodNames.add(friendlyNames.bangName);
+        const valueMethodAliasNames = enumMethodNamesFor(valueMethodAlias);
+        enumMethodNames.add(valueMethodAliasNames.predicateName);
+        enumMethodNames.add(valueMethodAliasNames.bangName);
       }
     }
   }
@@ -838,7 +833,7 @@ export function _enum(
   // skips the check entirely when scopes are disabled.
   // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`
   // (enum.rb:262), after the generation loop.
-  if (scopesEnabled) {
+  if (scopes) {
     detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
