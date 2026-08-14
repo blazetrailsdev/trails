@@ -448,10 +448,14 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
         // Rails: `result = lookup_sql_cache(sql, name, binds) || super(...)`,
         // then `FutureResult.wrap(result)` (query_cache.rb:244-247). A miss is
         // NOT written back to the cache on this arm — Rails doesn't either.
+        // No per-row copy: Rails' async arm hands `lookup_sql_cache`'s result
+        // back undup'd (query_cache.rb:244 — only `cache_sql`'s write path
+        // dups, :283), and `fromRowHashes` reads each hash into fresh column
+        // arrays, so the Result never aliases the stored rows anyway.
         const cached = this.lookupSqlCache(sql, name, binds ?? []);
         const result =
           cached !== undefined
-            ? Result.fromRowHashes(cached.map((r) => ({ ...r })))
+            ? Result.fromRowHashes(cached)
             : original.call(this, sql, name, binds, forwardOpts);
         // Ruby's `super` here is either a FutureResult or a Result; trails'
         // base hands back a promise whenever the async arm isn't live (e.g.

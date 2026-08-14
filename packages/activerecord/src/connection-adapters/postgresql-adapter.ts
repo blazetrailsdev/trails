@@ -1620,6 +1620,35 @@ export class PostgreSQLAdapter
   private _performQuery = pgPerformQuery;
 
   /**
+   * `raw_execute` reaches `perform_query` through `this`
+   * (abstract/database_statements.rb:552-558), and `raw_exec_query` casts what
+   * it returns (`:541-543`) — the path `FutureResult#exec_query` runs on
+   * (future_result.rb:169-171). Rails needs no seam here because a `PG::Result`
+   * exposes both the hash and the positional view of a row, so its
+   * `cast_result` can read columns off the one object `perform_query` returns.
+   * node-pg does not: positional rows come only from `rowMode: "array"` (see
+   * the extracted `performQuery`'s note), which every trails path that builds a
+   * `Result` therefore has to ask for. This supplies it for the `raw_execute`
+   * entry; `_performQuery`'s direct callers pass their own.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+   * @internal
+   */
+  performQuery(
+    rawConnection: pg.Client,
+    sql: string,
+    binds: unknown[],
+    typeCastedBinds: unknown[],
+    options: { prepare?: boolean; notificationPayload?: Record<string, unknown> },
+  ): Promise<pg.QueryResult> {
+    return this._performQuery(rawConnection, sql, binds, typeCastedBinds, {
+      prepare: options.prepare ?? false,
+      notificationPayload: options.notificationPayload ?? {},
+      rowMode: "array",
+    });
+  }
+
+  /**
    * Dispatch the notices PG raised during the last statement, wired from the
    * extracted module below.
    *

@@ -2509,10 +2509,21 @@ export class Relation<T extends Base> {
       ]),
     ];
 
+    // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
+    // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
+    // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
+    // the eager-loading `select_all(relation.arel, "SQL", async: async)`
+    // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
+    // querying.rb:67-68). This method is that `exec_main_query`, so the value
+    // is computed once here and threaded into both.
+    const c = this._conn();
+    const async =
+      this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+
     let loadedRecords: T[];
     if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
       const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
-      await this._executeEagerLoad(allEager);
+      await this._executeEagerLoad(allEager, { async });
       if (token !== this._loadToken) return [];
       loadedRecords = this._records;
       this.loadRecords(loadedRecords);
@@ -2523,16 +2534,8 @@ export class Relation<T extends Base> {
       // visitor's collector here would be wrong: from(ArelNode) recompiles and
       // resets it.
       const allowRetry = this._lastSelectRetryable;
-      const c = this._conn();
-      // Rails' load_async bails to a plain `load` unless `c.async_enabled?`
-      // and passes `async: !c.current_transaction.joinable?`
-      // (relation.rb:1140-1142), which `exec_main_query` hands to
-      // `_query_by_sql` (relation.rb:1449) and that forwards to `select_all`
-      // (querying.rb:67-68) — this call. Awaiting the
-      // FutureResult here is trails' `future.result` in `exec_queries`
-      // (relation.rb:1408).
-      const async =
-        this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+      // Awaiting the FutureResult here is trails' `future.result` in
+      // `exec_queries` (relation.rb:1408).
       const result = await c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
         allowRetry,
         preparable: this._lastSelectPreparable,
@@ -2740,13 +2743,19 @@ export class Relation<T extends Base> {
     return new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
   }
 
-  private async _executeEagerLoad(eagerAssocs?: AssociationSpec[]): Promise<void> {
+  private async _executeEagerLoad(
+    eagerAssocs?: AssociationSpec[],
+    // `exec_main_query`'s `async:` (relation.rb:1423), which its eager arm
+    // hands to `select_all` (relation.rb:1436).
+    { async = false }: { async?: boolean } = {},
+  ): Promise<void> {
     const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
     const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
       const result = await this._conn().selectAll(sql, "Eager Load", this._lastSelectBinds, {
         preparable: this._lastSelectPreparable,
+        async,
       });
       this._records = this._instrumentInstantiation(
         result.toArray(),
@@ -2784,7 +2793,7 @@ export class Relation<T extends Base> {
     // column_types are available to type-cast extra/computed `select` columns
     // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
     // which slices `result_set.column_types`.
-    const result = await this._conn().selectAll(sql, "SQL", eagerBinds);
+    const result = await this._conn().selectAll(sql, "SQL", eagerBinds, { async });
     const rows = result.toArray();
 
     // Mirrors JoinDependency#instantiate: record_count is the raw JOIN

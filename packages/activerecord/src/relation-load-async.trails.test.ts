@@ -10,15 +10,21 @@
  * FutureResult path rather than in the foreground.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { Base } from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { ActiveRecord } from "./ar-config.js";
 import { FutureResult } from "./future-result.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
 
 fixtures({ topics: [Topic, {}] });
 
 describe("Relation#load_async", () => {
+  // Register by Rails name so the STI Reply rows behind Topic#replies resolve
+  // before the first query warms the model registry.
+  registerModel("Topic", Topic);
+  registerModel("Reply", Reply);
+
   let restoreExecutor: (() => void) | undefined;
 
   beforeEach(async () => {
@@ -72,6 +78,21 @@ describe("Relation#load_async", () => {
 
     expect(spy).toHaveBeenCalled();
     expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+  });
+
+  it("issues an eager-loaded relation's join query with async on", async () => {
+    // Rails' exec_main_query forwards `async:` to its eager_loading? arm too —
+    // `c.select_all(relation.arel, "SQL", async: async)` (relation.rb:1436).
+    const connection = Base.connection as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    await Topic.eagerLoad("replies").loadAsync();
+
+    const joinCall = spy.mock.calls.find((call) => call[1] === "SQL");
+    expect(joinCall).toBeDefined();
+    expect((joinCall![3] as { async?: boolean }).async).toBe(true);
   });
 
   it("returns the records the scheduled query loaded", async () => {
