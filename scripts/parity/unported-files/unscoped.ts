@@ -13,6 +13,22 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason: "Pre-1.0: legacy Rails version migration compatibility shims.",
   },
   {
+    package: "activerecord",
+    testFile: "/migration/compatibility_test.rb",
+    reason:
+      "Won't-do, by maintainer decision rather than technical limitation: " +
+      "`ActiveRecord::Migration[x.y]` / `Migration::Compatibility::V*` exists so " +
+      "migrations written under an older Rails keep behaving as written, and trails has " +
+      "no older versions. PR #5070 shipped a complete, CI-green `Migration[6.1]` / " +
+      '`Compatibility::V6_1` and was closed unmerged on 2026-07-22 — "the premise of ' +
+      "this pr is not the goal of trails. We have no backwards compatibility necessary " +
+      "since there never were previous versions of trails.\" RFC 0030's story " +
+      "`c1-schema-dumper-migration-version-compat` was closed on the same grounds. The " +
+      "thin registry at packages/activerecord/src/migration/compatibility.ts (version " +
+      '"1.0" only) stays; nothing is added to it. Source side is already excluded by the ' +
+      "`migration/compatibility` pattern above.",
+  },
+  {
     pattern: "promise.rb",
     reason:
       "Rails Promise wraps a thread-backed FutureResult with a blocking #value. " +
@@ -75,12 +91,15 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "test cases stay Ruby-only.",
   },
   {
-    pattern: "fixtures.rb",
+    pattern: "/fixtures.rb",
     testFile: "/fixtures_test.rb",
     reason:
       "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB " +
       "with named-row references and ERB preprocessing). The JS/TS ecosystem uses " +
-      "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures.",
+      "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures. " +
+      "Anchored: unanchored, this pattern also swallowed test_fixtures.rb, " +
+      "encryption/encrypted_fixtures.rb and activesupport's testing/file_fixtures.rb, " +
+      "which carry (or need) their own rows.",
   },
   {
     pattern: "fixture_set",

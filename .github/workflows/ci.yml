@@ -1576,6 +1576,12 @@ jobs:
         # extraction twice. Reseed after convergence with
         # `pnpm parity:test:assertions:reseed`.
         run: pnpm exec tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
+      - name: AR-closure test manifest guard
+        # Fails when a file under vendor/rails/activesupport/test/ is neither
+        # derived by R1/R2 nor aliased nor listed out-of-closure, so a vendor
+        # bump cannot land a new Rails test file silently on either side of the
+        # boundary (RFC 0105). Manifest only — it moves no denominator.
+        run: pnpm exec tsx scripts/test-compare/closure-cli.ts --check
       - name: Fixtures comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
       - name: Models comparison
