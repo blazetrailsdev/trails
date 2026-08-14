@@ -2,7 +2,7 @@
   {
     "pattern": "i18n_railtie.rb",
     "package": "activesupport",
-    "reason": "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. No JS equivalent \u2014 I18n is configured directly in user code."
+    "reason": "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. No JS equivalent — I18n is configured directly in user code."
   },
   {
     "pattern": "migration/compatibility",
@@ -15,7 +15,7 @@
   {
     "pattern": "future_result.rb",
     "testFile": "relation/load_async_test.rb",
-    "reason": "Thread-pool scheduled query with mutex + EventBuffer bridging Ruby's threaded async. Marked :nodoc: in Rails. Collapses to the Promise returned by the adapter's async exec. Test file fully excluded \u2014 all live test classes exercise FutureResult/scheduled? semantics that don't port to single-threaded JS where `await relation.toArray()` is the async surface."
+    "reason": "Thread-pool scheduled query with mutex + EventBuffer bridging Ruby's threaded async. Marked :nodoc: in Rails. Collapses to the Promise returned by the adapter's async exec. Test file fully excluded — all live test classes exercise FutureResult/scheduled? semantics that don't port to single-threaded JS where `await relation.toArray()` is the async surface."
   },
   {
     "pattern": "asynchronous_queries_tracker.rb",
@@ -38,12 +38,12 @@
   },
   {
     "pattern": "attribute_set/yaml_encoder.rb",
-    "reason": "Rails' Psych-specific YAML round-trip class for AttributeSet. Replaced by the pluggable AttributeSetCoder architecture in #1173 (P24a) / #1176 (P24b) \u2014 see packages/activemodel/src/attribute-set/{coder.ts,codecs/json.ts,codecs/yaml.ts}. Functional capability is shipped; the Rails class hierarchy doesn't map to the TS codec-injection pattern (no Psych, JSON is the default)."
+    "reason": "Rails' Psych-specific YAML round-trip class for AttributeSet. Replaced by the pluggable AttributeSetCoder architecture in #1173 (P24a) / #1176 (P24b) — see packages/activemodel/src/attribute-set/{coder.ts,codecs/json.ts,codecs/yaml.ts}. Functional capability is shipped; the Rails class hierarchy doesn't map to the TS codec-injection pattern (no Psych, JSON is the default)."
   },
   {
     "pattern": "coders/yaml_column.rb",
     "testFile": "coders/yaml_column_test.rb",
-    "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package \u2014 `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."
+    "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."
   },
   {
     "pattern": "/fixtures.rb",
@@ -70,7 +70,7 @@
   },
   {
     "pattern": "dynamic_matchers.rb",
-    "reason": "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` at call time. No TS analog \u2014 Proxy-based dispatch can't infer attribute lists at compile time, and `findBy({ ... })` already covers the use case idiomatically. `respond_to_missing?` alone is ported, in dynamic-matchers.ts."
+    "reason": "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at compile time, and `findBy({ ... })` already covers the use case idiomatically. `respond_to_missing?` alone is ported, in dynamic-matchers.ts."
   },
   {
     "pattern": "railties/controller_runtime.rb",
@@ -103,7 +103,7 @@
       "active transaction is restored after remote disconnection",
       "dirty transaction cannot be restored after remote disconnection"
     ],
-    "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy \u2014 its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
+    "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
   },
   {
     "testFile": "adapter_test.rb",
@@ -151,7 +151,7 @@
       "compute type on undefined method",
       "compute type argument error"
     ],
-    "reason": "Registers an Object.autoload for a model whose file raises during require, so the exception surfaces from constantize inside compute_type. JS has no autoload/require hook \u2014 a module either resolves at import time or the constant simply doesn't exist."
+    "reason": "Registers an Object.autoload for a model whose file raises during require, so the exception surfaces from constantize inside compute_type. JS has no autoload/require hook — a module either resolves at import time or the constant simply doesn't exist."
   },
   {
     "testFile": "inheritance_test.rb",
@@ -190,7 +190,7 @@
       "swapping shards and roles in a multi threaded environment",
       "swapping granular shards and roles in a multi threaded environment"
     ],
-    "reason": "GVL / Ruby Thread semantics \u2014 concurrent shard-swapping tests cannot translate to single-threaded Node.js."
+    "reason": "GVL / Ruby Thread semantics — concurrent shard-swapping tests cannot translate to single-threaded Node.js."
   },
   {
     "testFile": "connection_pool_test.rb",
@@ -214,7 +214,7 @@
       "pin connection nesting lock",
       "pin connection nesting lock inverse"
     ],
-    "reason": "GVL / Ruby Thread semantics \u2014 concurrent connection tests cannot translate to single-threaded Node.js."
+    "reason": "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js."
   },
   {
     "testFile": "connection_pool_test.rb",
@@ -232,7 +232,7 @@
       "connections are cleared even if inside a non-joinable transaction",
       "cancel asynchronous queries if an exception is raised"
     ],
-    "reason": "GVL / Ruby Thread semantics \u2014 first test pins across threads; second uses FutureResult (thread-based async queries)."
+    "reason": "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries)."
   },
   {
     "testFile": "query_cache_test.rb",
@@ -244,17 +244,17 @@
       "query cache is cleared for all thread when a connection is shared",
       "threads use the same connection"
     ],
-    "reason": "GVL / Ruby Thread + fork() semantics \u2014 per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
+    "reason": "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
   },
   {
     "testFile": "connection_adapters/connection_handlers_multi_db_test.rb",
     "tests": ["multiple connections works in a threaded environment"],
-    "reason": "GVL / Ruby Thread semantics \u2014 concurrent multi-db connection access on shared objects has no single-threaded Node.js equivalent."
+    "reason": "GVL / Ruby Thread semantics — concurrent multi-db connection access on shared objects has no single-threaded Node.js equivalent."
   },
   {
     "testFile": "relations_test.rb",
     "tests": ["where id with delegated ar object", "where relation with delegated ar object"],
-    "reason": "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched by a plain-object trails test, so it stays counted \u2014 its delegation behavior is untested.)"
+    "reason": "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched by a plain-object trails test, so it stays counted — its delegation behavior is untested.)"
   },
   {
     "testFile": "associations/has_one_associations_test.rb",
@@ -305,7 +305,7 @@
   {
     "testFile": "tasks/database_tasks_test.rb",
     "tests": ["raises an error when called with protected environment which name is a symbol"],
-    "reason": "Ruby Symbol env names (symbol\u2192string coercion in protected_environments); env names are plain strings in TS."
+    "reason": "Ruby Symbol env names (symbol→string coercion in protected_environments); env names are plain strings in TS."
   },
   {
     "testFile": "scoping/named_scoping_test.rb",
@@ -361,7 +361,7 @@
       "serialized time attribute",
       "supports permitted classes for default column serializer"
     ],
-    "reason": "YAML/Psych column serialization and class-constrained serializers \u2014 Ruby-only format with no Node.js equivalent."
+    "reason": "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent."
   },
   {
     "testFile": "base_test.rb",
@@ -383,7 +383,7 @@
       "generated association methods module name",
       "generated relation methods module name"
     ],
-    "reason": "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, with_env_tz (process-level ENV[\"TZ\"] reload), and Ruby Module#inspect for namespaced generated-method modules \u2014 all Ruby-only with no Node.js equivalent."
+    "reason": "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, with_env_tz (process-level ENV[\"TZ\"] reload), and Ruby Module#inspect for namespaced generated-method modules — all Ruby-only with no Node.js equivalent."
   },
   {
     "testFile": "hstore_test.rb",
@@ -398,17 +398,17 @@
   {
     "testFile": "has_and_belongs_to_many_associations_test.rb",
     "tests": ["marshal dump"],
-    "reason": "Ruby Marshal binary serialization \u2014 no Node.js equivalent."
+    "reason": "Ruby Marshal binary serialization — no Node.js equivalent."
   },
   {
     "testFile": "belongs_to_associations_test.rb",
     "tests": ["belongs to proxy should not respond to private methods"],
-    "reason": "Probes Ruby method visibility: `private_method` must raise NoMethodError on a direct call but succeed via `send` (the via-send sibling IS ported). JS has no runtime-enforced private dispatch \u2014 a method is either callable or absent."
+    "reason": "Probes Ruby method visibility: `private_method` must raise NoMethodError on a direct call but succeed via `send` (the via-send sibling IS ported). JS has no runtime-enforced private dispatch — a method is either callable or absent."
   },
   {
     "testFile": "reaper_test.rb",
     "tests": ["connection pool starts reaper in fork"],
-    "reason": "GVL / Ruby fork() semantics \u2014 process forking has no Node.js equivalent."
+    "reason": "GVL / Ruby fork() semantics — process forking has no Node.js equivalent."
   },
   {
     "testFile": "connection_adapters/connection_handler_test.rb",
@@ -419,7 +419,7 @@
       "retrieve connection pool copies schema cache from ancestor pool",
       "pool from any process for uses most recent spec"
     ],
-    "reason": "Ruby fork() + Marshal \u2014 process forking and binary serialization have no Node.js equivalent."
+    "reason": "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent."
   },
   {
     "testFile": "yaml_serialization_test.rb",
@@ -438,7 +438,7 @@
   {
     "testFile": "/railtie_test.rb",
     "package": "globalid",
-    "reason": "Exercises the `global_id` Railtie initializer through a full `Rails::Application` boot (`@app.initialize!`) under `ActiveSupport::Testing::Isolation` \u2014 GlobalID.app defaulting, `config.global_id.app`/`expires_in` injection, and verifier key derivation from `app.key_generator`. Unlike activemodel/trailties, globalid has not yet ported its railtie to a `Trailtie` (activesupport's `BaseRailtie`); its wiring is a `wire.ts` side-effect plus explicit `setApp`/verifier setters, and there is no `Rails::Application` boot harness for these tests to drive. Porting globalid's railtie to a `Trailtie` would let this file re-enter accounting \u2014 tracked as a follow-up story."
+    "reason": "Exercises the `global_id` Railtie initializer through a full `Rails::Application` boot (`@app.initialize!`) under `ActiveSupport::Testing::Isolation` — GlobalID.app defaulting, `config.global_id.app`/`expires_in` injection, and verifier key derivation from `app.key_generator`. Unlike activemodel/trailties, globalid has not yet ported its railtie to a `Trailtie` (activesupport's `BaseRailtie`); its wiring is a `wire.ts` side-effect plus explicit `setApp`/verifier setters, and there is no `Rails::Application` boot harness for these tests to drive. Porting globalid's railtie to a `Trailtie` would let this file re-enter accounting — tracked as a follow-up story."
   },
   {
     "testFile": "global_locator_test.rb",
@@ -496,7 +496,7 @@
   {
     "package": "did-you-mean",
     "pattern": "formatter.rb",
-    "reason": "Formats `Did you mean? \u2026` suffix for Ruby's Exception#detailed_message integration. JS error stringification is per-error, not via a stdlib hook."
+    "reason": "Formats `Did you mean? …` suffix for Ruby's Exception#detailed_message integration. JS error stringification is per-error, not via a stdlib hook."
   },
   {
     "package": "did-you-mean",
@@ -519,7 +519,7 @@
     "package": "did-you-mean",
     "pattern": "spell_checkers/name_error_checkers/class_name_checker.rb",
     "testFile": "spell_checking/test_class_name_check.rb",
-    "reason": "Suggests constant/class names by walking Module#constants + ancestor scopes. Ruby-only \u2014 JS has no equivalent constant introspection."
+    "reason": "Suggests constant/class names by walking Module#constants + ancestor scopes. Ruby-only — JS has no equivalent constant introspection."
   },
   {
     "package": "did-you-mean",
@@ -553,15 +553,15 @@
   },
   {
     "testFile": "tree_spell/test_change_word.rb",
-    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "tree_spell/test_explore.rb",
-    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "tree_spell/test_human_typo.rb",
-    "reason": "tree_spell helper test \u2014 excluded transitively with tree_spell_checker.rb."
+    "reason": "tree_spell helper test — excluded transitively with tree_spell_checker.rb."
   },
   {
     "testFile": "test_ractor_compatibility.rb",
@@ -571,12 +571,12 @@
     "testFile": "verifier_test.rb",
     "className": "VerifierTest",
     "tests": ["generates URL-safe messages"],
-    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally \u2014 the same input produces a different (but equivalent) token. The behavioral guarantee this test cares about (urlsafe encoding, no +/=/ chars) is covered by packages/globalid/src/verifier.test.ts asserting char-class absence rather than exact bytes."
+    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally — the same input produces a different (but equivalent) token. The behavioral guarantee this test cares about (urlsafe encoding, no +/=/ chars) is covered by packages/globalid/src/verifier.test.ts asserting char-class absence rather than exact bytes."
   },
   {
     "testFile": "message_encryptor_test.rb",
     "tests": ["backwards compatibility decrypt previously encrypted messages without metadata"],
-    "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` \u2014 an ivar-wrapped Ruby String \u2014 so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
+    "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped Ruby String — so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
   },
   {
     "testFile": "associations/extension_test.rb",
@@ -596,7 +596,7 @@
   {
     "testFile": "associations/inverse_associations_test.rb",
     "tests": ["has many and belongs to should find inverse automatically for model in module"],
-    "reason": "Asserts automatic inverse_of detection for namespaced models (Admin::Account / Admin::User). Ruby modules (`::`) have no TypeScript equivalent \u2014 JS class names cannot contain `::`, so the demodulized automatic-inverse scenario isn't representable."
+    "reason": "Asserts automatic inverse_of detection for namespaced models (Admin::Account / Admin::User). Ruby modules (`::`) have no TypeScript equivalent — JS class names cannot contain `::`, so the demodulized automatic-inverse scenario isn't representable."
   },
   {
     "testFile": "associations_test.rb",
@@ -614,7 +614,7 @@
       "yaml loads 5 1 dump",
       "yaml loads 5 1 dump without indexes still queries for indexes"
     ],
-    "reason": "Loads the fixed Rails-5.1-era schema-cache dump asset (test/assets/schema_dump_5_1.yml) and deserializes it via Psych (schema_cache_test.rb:124-142). Note this is NOT covered by our YAML syntax support (the `yaml` package backing coders/yaml-column.ts): the asset is a Psych object graph of `!ruby/object:ActiveRecord::ConnectionAdapters::{SchemaCache,Column,SqlTypeMetadata}` tags with Ruby symbol values and anchors. Loading it requires (a) unsafe-load reconstruction of Ruby class instances from `!ruby/object:` tags \u2014 the same Psych machinery already documented as having no JS analog in the coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries \u2014 and (b) the 5.1\u2192current legacy-format migration handled by legacy_yaml_adapter.rb (itself unported above). Our `yaml` parser yields plain tagged nodes, not SchemaCache instances. The live schema-cache round-trip is exercised by the portable tests in the same file (test_yaml_dump_and_load[_with_gzip], which use our own dump path)."
+    "reason": "Loads the fixed Rails-5.1-era schema-cache dump asset (test/assets/schema_dump_5_1.yml) and deserializes it via Psych (schema_cache_test.rb:124-142). Note this is NOT covered by our YAML syntax support (the `yaml` package backing coders/yaml-column.ts): the asset is a Psych object graph of `!ruby/object:ActiveRecord::ConnectionAdapters::{SchemaCache,Column,SqlTypeMetadata}` tags with Ruby symbol values and anchors. Loading it requires (a) unsafe-load reconstruction of Ruby class instances from `!ruby/object:` tags — the same Psych machinery already documented as having no JS analog in the coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries — and (b) the 5.1→current legacy-format migration handled by legacy_yaml_adapter.rb (itself unported above). Our `yaml` parser yields plain tagged nodes, not SchemaCache instances. The live schema-cache round-trip is exercised by the portable tests in the same file (test_yaml_dump_and_load[_with_gzip], which use our own dump path)."
   },
   {
     "testFile": "prepared_statement_status_test.rb",
@@ -642,7 +642,7 @@
   {
     "testFile": "transactions_test.rb",
     "tests": ["after current transaction commit multidb nested transactions"],
-    "reason": "Requires the ARUnit2Model secondary database connection (multi-database setup). The test asserts afterAllTransactionsCommit fires only after the outermost cross-database transaction commits \u2014 not available in the single-database test environment."
+    "reason": "Requires the ARUnit2Model secondary database connection (multi-database setup). The test asserts afterAllTransactionsCommit fires only after the outermost cross-database transaction commits — not available in the single-database test environment."
   },
   {
     "testFile": "dirty_test.rb",
@@ -656,12 +656,12 @@
       "in place mutation for binary",
       "mutating and then assigning doesn't remove the change"
     ],
-    "reason": "All three mutate a string in place (`catchphrase << \" matey!\"`, `data << \"bar\"` on a serialized binary; dirty_test.rb:668/689/799). JS strings are immutable \u2014 there is no in-place string mutation to detect."
+    "reason": "All three mutate a string in place (`catchphrase << \" matey!\"`, `data << \"bar\"` on a serialized binary; dirty_test.rb:668/689/799). JS strings are immutable — there is no in-place string mutation to detect."
   },
   {
     "testFile": "dirty_test.rb",
     "tests": ["getters with side effects are allowed"],
-    "reason": "The overridden reader persists as a side effect (`update_attribute` inside `def catchphrase`, dirty_test.rb:807) and the assertion relies on that write completing before the reader returns. trails persistence is async; a JS getter cannot await, so the persist would float as an unawaited promise \u2014 no faithful sync equivalent."
+    "reason": "The overridden reader persists as a side effect (`update_attribute` inside `def catchphrase`, dirty_test.rb:807) and the assertion relies on that write completing before the reader returns. trails persistence is async; a JS getter cannot await, so the persist would float as an unawaited promise — no faithful sync equivalent."
   },
   {
     "testFile": "database_selector_test.rb",
@@ -708,101 +708,101 @@
   {
     "pattern": "tools.rb",
     "package": "activerecord-test-support",
-    "reason": "Rails' rake/minitest test-runner plumbing: prepends adapter globbing onto Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in trails \u2014 no port intended."
+    "reason": "Rails' rake/minitest test-runner plumbing: prepends adapter globbing onto Rails::TestUnit::Runner and invokes it with ARGV. vitest fills that role in trails — no port intended."
   },
   {
     "pattern": "backend/cache.rb",
     "testFile": "backend/cache_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 caches lookups through ActiveSupport::Cache."
+    "reason": "Pre-1.0: optional backend mixin — caches lookups through ActiveSupport::Cache."
   },
   {
     "pattern": "backend/cache_file.rb",
     "testFile": "backend/cache_file_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 caches parsed translation files on disk."
+    "reason": "Pre-1.0: optional backend mixin — caches parsed translation files on disk."
   },
   {
     "pattern": "backend/cascade.rb",
     "testFile": "backend/cascade_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 cascading key lookup (`foo.bar.baz` \u2192 `foo.baz`)."
+    "reason": "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`)."
   },
   {
     "pattern": "backend/interpolation_compiler.rb",
     "testFile": "backend/interpolation_compiler_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 compiles interpolations into Ruby procs via `eval`/`instance_eval`, which has no trails counterpart."
+    "reason": "Pre-1.0: optional backend mixin — compiles interpolations into Ruby procs via `eval`/`instance_eval`, which has no trails counterpart."
   },
   {
     "pattern": "backend/lazy_loadable.rb",
     "testFile": "backend/lazy_loadable_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 defers translation-file loading until first lookup."
+    "reason": "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup."
   },
   {
     "pattern": "backend/memoize.rb",
     "testFile": "backend/memoize_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 memoizes lookups per locale."
+    "reason": "Pre-1.0: optional backend mixin — memoizes lookups per locale."
   },
   {
     "pattern": "backend/metadata.rb",
     "testFile": "backend/metadata_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 attaches lookup metadata onto the translated String's singleton class. JS strings take no per-instance state."
+    "reason": "Pre-1.0: optional backend mixin — attaches lookup metadata onto the translated String's singleton class. JS strings take no per-instance state."
   },
   {
     "pattern": "backend/pluralization.rb",
     "testFile": "backend/pluralization_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data."
+    "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data."
   },
   {
     "testFile": "backend/pluralization_fallback_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data. Suite for the deferred `backend/pluralization.rb` composed with Fallbacks."
+    "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. Suite for the deferred `backend/pluralization.rb` composed with Fallbacks."
   },
   {
     "testFile": "backend/pluralization_scope_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data. Suite for the deferred `backend/pluralization.rb` looked up under a scope."
+    "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data. Suite for the deferred `backend/pluralization.rb` looked up under a scope."
   },
   {
     "testFile": "api/all_features_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixins \u2014 a Chain of every deferred mixin (Cascade, Memoize, Metadata, Pluralization, Fallbacks) at once."
+    "reason": "Pre-1.0: optional backend mixins — a Chain of every deferred mixin (Cascade, Memoize, Metadata, Pluralization, Fallbacks) at once."
   },
   {
     "testFile": "api/cascade_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 cascading key lookup (`foo.bar.baz` \u2192 `foo.baz`)."
+    "reason": "Pre-1.0: optional backend mixin — cascading key lookup (`foo.bar.baz` → `foo.baz`)."
   },
   {
     "testFile": "api/lazy_loadable_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 defers translation-file loading until first lookup."
+    "reason": "Pre-1.0: optional backend mixin — defers translation-file loading until first lookup."
   },
   {
     "testFile": "api/memoize_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 memoizes lookups per locale."
+    "reason": "Pre-1.0: optional backend mixin — memoizes lookups per locale."
   },
   {
     "testFile": "api/pluralization_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin \u2014 pluralization via per-locale rule procs in the data."
+    "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data."
   },
   {
     "pattern": "gettext",
     "testFile": "gettext/",
     "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support \u2014 the catalogue parser, the `_`/`n_`/`s_` helpers, and the backend mixin that loads .po files. A Ruby toolchain concern with no trails consumer; Rails' own I18n usage never touches it."
+    "reason": "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` helpers, and the backend mixin that loads .po files. A Ruby toolchain concern with no trails consumer; Rails' own I18n usage never touches it."
   },
   {
     "testFile": "gettext_plural_keys_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support \u2014 exercises `I18n::Gettext.plural_keys`. Sits at test/i18n/, outside the `gettext/` prefix above."
+    "reason": "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. Sits at test/i18n/, outside the `gettext/` prefix above."
   },
   {
     "pattern": "middleware.rb",
@@ -813,7 +813,7 @@
   {
     "testFile": "i18n_test.rb",
     "tests": ["exposes its VERSION constant"],
-    "reason": "Asserts `I18n::VERSION`, which lives in the `version.rb` excluded above \u2014 trails carries the version in package.json, so there is no constant."
+    "reason": "Asserts `I18n::VERSION`, which lives in the `version.rb` excluded above — trails carries the version in package.json, so there is no constant."
   },
   {
     "testFile": "i18n_test.rb",
@@ -831,22 +831,22 @@
   {
     "pattern": "tests/",
     "package": "i18n",
-    "reason": "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party backends can run its conformance suite. Test-support scaffolding, not library surface \u2014 trails' backend tests are vitest files instead."
+    "reason": "`lib/i18n/tests/*` are minitest mixins the gem ships so third-party backends can run its conformance suite. Test-support scaffolding, not library surface — trails' backend tests are vitest files instead."
   },
   {
     "pattern": "tests.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` conformance mixins excluded above \u2014 a file that sits beside the directory the pattern above reaches."
+    "reason": "Pre-1.0: the `I18n::Tests` namespace's autoload shim for the `tests/` conformance mixins excluded above — a file that sits beside the directory the pattern above reaches."
   },
   {
     "testFile": "test_date_ractor.rb",
     "package": "date",
-    "reason": "Ractor is Ruby's actor-based parallelism primitive \u2014 the file exercises `Ractor.make_shareable`/`Ractor.new` round-tripping of a Date across isolated interpreter states. JS is single-threaded and has no analogue, same reason `promise.rb` is excluded above."
+    "reason": "Ractor is Ruby's actor-based parallelism primitive — the file exercises `Ractor.make_shareable`/`Ractor.new` round-tripping of a Date across isolated interpreter states. JS is single-threaded and has no analogue, same reason `promise.rb` is excluded above."
   },
   {
     "testFile": "test_date_marshal.rb",
     "package": "date",
-    "reason": "Ruby's Marshal binary object format \u2014 `Marshal.dump`/`Marshal.load` of a Date, including the frozen-string and instance-variable round trip. Not applicable: JS has no Marshal, and the wire format is Ruby-only."
+    "reason": "Ruby's Marshal binary object format — `Marshal.dump`/`Marshal.load` of a Date, including the frozen-string and instance-variable round trip. Not applicable: JS has no Marshal, and the wire format is Ruby-only."
   },
   {
     "testFile": "test_date_new.rb",
