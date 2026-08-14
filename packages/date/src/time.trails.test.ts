@@ -132,6 +132,18 @@ describe("Time", () => {
     );
   });
 
+  it("a usec positional truncates sec to a whole second, as MRI's does", () => {
+    // ruby 3.3.11:
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec                #=> 5000
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec              #=> 500
+    //   Time.utc(2008, 3, 1, 6, 0, Rational(1, 3), 0).nsec     #=> 0
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3).nsec                   #=> 299999999
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec).toBe(5000);
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec).toBe(500);
+    expect(Time.utc(2008, 3, 1, 6, 0, new Rational(1, 3), 0).nsec).toBe(0);
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3).nsec).toBe(299999999);
+  });
+
   it("Time.new takes a Rational second, as MRI's does", () => {
     // ruby 3.3.11:
     //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).nsec           #=> 333333333
