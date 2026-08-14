@@ -4,7 +4,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "current",
     "call": "to_datetime",
-    "reason": "`DateTime.current` is `Time.zone.now.to_datetime` (date_time/calculations.rb:11); trails' `current` returns the Time/TimeWithZone arm only. A pre-existing gap in this body, newly visible because `String#to_datetime` put `toDatetime` in this file's population. Tracked by 0098-activesupport-ar-closure-port/converge-date-time-current-since-to-datetime."
+    "reason": "Homonym across two Ruby receivers: `Time.current` (time/calculations.rb:39-41) has no `to_datetime`, `DateTime.current` (date_time/calculations.rb:10-12) is that same expression plus `.to_datetime`, and trails has one `current()` here serving both — one function cannot return both a Time and a DateTime. Converging it means giving DateTime its own receiver file; tracked by 0098-activesupport-ar-closure-port/split-date-time-current-onto-its-own-receiver."
   },
   {
     "package": "activesupport",
@@ -18,7 +18,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "since",
     "call": "to_datetime",
-    "reason": "Same body-level gap: `DateTime#since` ends in `.to_datetime` (date_time/calculations.rb:87); tracked by the same story."
+    "reason": "`DateTime#since` (date_time/calculations.rb:116-118) is `self + Rational(seconds, 86400)` and makes no such call; the only `to_datetime` under this name is `Time#since`'s `rescue TypeError` arm (time/calculations.rb:227-233), which exists only to deprecate passing a non-numeric and is documented to raise `TypeError` in Rails 8.1. `since(date, seconds: number)` cannot reach it — the same unrepresentable arm as this file's `since` → `warn` row."
   },
   {
     "package": "activesupport",
