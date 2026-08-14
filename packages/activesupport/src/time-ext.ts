@@ -328,6 +328,12 @@ export function advance(
 // Seconds calculations
 // ---------------------------------------------------------------------------
 
+/**
+ * `DateTime#seconds_since_midnight` (`core_ext/date_time/calculations.rb:20-22`)
+ * is `sec + (min * 60) + (hour * 3600)` — a whole-second count, with none of
+ * the sub-second arithmetic `Time#seconds_since_midnight`
+ * (`core_ext/time/calculations.rb:64-66`) does.
+ */
 export function secondsSinceMidnight(
   datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
 ): number;
@@ -335,9 +341,6 @@ export function secondsSinceMidnight(date: Date): number;
 export function secondsSinceMidnight(
   receiver: Date | Temporal.PlainDateTime | Temporal.ZonedDateTime,
 ): number {
-  // `DateTime#seconds_since_midnight` (`core_ext/date_time/calculations.rb:20-22`)
-  // — `sec + (min * 60) + (hour * 3600)`, a whole-second count with none of the
-  // sub-second arithmetic the `Time` arm below does.
   if (!(receiver instanceof Date)) {
     return receiver.second + receiver.minute * 60 + receiver.hour * 3600;
   }
@@ -643,7 +646,7 @@ export function ceil(date: Date, ms: number): Temporal.Instant {
 }
 
 /**
- * secFraction — returns the sub-second fraction of a Date as a float.
+ * secFraction — returns the sub-second fraction of the receiver as a float.
  */
 export function secFraction(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number;
 export function secFraction(date: Date): number;
@@ -773,6 +776,9 @@ export function civilFromFormat(
   } else {
     offset = 0;
   }
+  const offsetHours = String(Math.trunc(Math.abs(offset) / 3600)).padStart(2, "0");
+  const offsetMinutes = String(Math.trunc((Math.abs(offset) % 3600) / 60)).padStart(2, "0");
+  const offsetId = `${offset < 0 ? "-" : "+"}${offsetHours}:${offsetMinutes}`;
   return Temporal.PlainDateTime.from({
     year,
     month,
@@ -780,11 +786,7 @@ export function civilFromFormat(
     hour,
     minute: min,
     second: sec,
-  }).toZonedDateTime(
-    `${offset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(offset) / 3600)).padStart(2, "0")}:${String(
-      Math.floor((Math.abs(offset) % 3600) / 60),
-    ).padStart(2, "0")}`,
-  );
+  }).toZonedDateTime(offsetId);
 }
 
 /**
@@ -815,7 +817,7 @@ export function nsec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime):
  */
 export function offsetInSeconds(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
   if (datetime instanceof Temporal.PlainDateTime) return 0;
-  return Math.trunc(Number(datetime.offsetNanoseconds) / 1_000_000_000);
+  return Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
 }
 
 /**
