@@ -4,6 +4,13 @@ import { Command } from "commander";
 import { Trails } from "../rails.js";
 import { DevServer } from "../server/dev-server.js";
 
+/**
+ * Rails' `rails server` (`commands/server/server_command.rb`). Loading
+ * `config/application` is Rails' `require APP_PATH` — it is what registers
+ * the Application subclass, so `Trails.application` is nil until it has been
+ * imported — and handing `app.app()` to the dev server is `config.ru`'s
+ * `run Rails.application`.
+ */
 export function serverCommand(): Command {
   const cmd = new Command("server");
   cmd.alias("s");
@@ -13,16 +20,12 @@ export function serverCommand(): Command {
     .option("-b, --binding <host>", "Host to bind to", "127.0.0.1")
     .action(async (options) => {
       const root = cwd();
-      // Rails: `require APP_PATH` (`commands/server/server_command.rb:340`)
-      // — loading `config/application` is what registers the Application
-      // subclass, so `Trails.application` is nil until it has been imported.
       await requireApplication(root);
       const app = await Trails.initialize();
       const server = new DevServer({
         port: parseInt(options.port, 10),
         host: options.binding,
         cwd: root,
-        // Rails: `config.ru`'s `run Rails.application`.
         app: app.app(),
       });
       await server.start();

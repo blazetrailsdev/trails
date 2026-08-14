@@ -174,12 +174,13 @@ export interface EngineInitializerApp {
  * onto `routes.draw_paths` and `app.routes.draw_paths` so `draw` can resolve
  * partial route files relatively. `RouteSet#draw_paths` is not ported, so the
  * external paths are only recorded on the reloader.
+ *
+ * Rails reads `paths["config/routes.rb"]`; the trails path set declares the
+ * same entry under its TypeScript name (`engine/configuration.ts:84`).
  */
 Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   const paths = await this.paths();
-  // Rails reads `paths["config/routes.rb"]`; the trails path set declares
-  // the same entry under its TypeScript name (`engine/configuration.ts:84`).
   const routingPaths = (await paths.get("config/routes.ts")?.existent()) ?? [];
   const externalPaths = paths.get("config/routes")?.toAry() ?? [];
 

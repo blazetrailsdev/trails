@@ -117,6 +117,13 @@ export class Application extends Engine {
   /**
    * Run the initializer chain — Rails' `initialize!`. Idempotency mirrors
    * Rails: re-entry raises rather than silently returning.
+   *
+   * `config.root` is pinned to the resolved root before the chain runs:
+   * Rails' `Application::Configuration#root` is `@root ||= find_root(...)`
+   * and so is never nil once the app boots, which is what lets
+   * `add_routing_paths` and `add_view_paths` read `paths[...]`. Trails'
+   * `Configuration#root` is a plain reader and its resolution is async, so
+   * it is pinned here rather than lazily in the getter.
    */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
@@ -127,10 +134,6 @@ export class Application extends Engine {
     // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
     // is the discovered/cwd fallback for before any explicit override.
     const bootRoot = await this.resolvedRoot();
-    // Rails' `Application::Configuration#root` is `@root ||= find_root(...)`
-    // (`application/configuration.rb:88`) — it is never nil once the app
-    // boots, which is what lets the initializers below read `paths[...]`.
-    // `Configuration#setRoot` is async-free, so it is pinned here instead.
     if (this.config.root === null) this.config.setRoot(bootRoot);
     setTrailsRoot(() => this.config.root ?? bootRoot);
     await this.runInitializers(group, this);

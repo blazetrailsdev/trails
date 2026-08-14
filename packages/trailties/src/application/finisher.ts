@@ -34,13 +34,17 @@ import { ActionController, Request, Response } from "@blazetrails/actionpack";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
+  append(block: DrawCallback): void;
   defineMountedHelper(name: string): void;
   /**
-   * @noRailsEquivalent Rails builds an
-   * `ActionDispatch::Routing::RouteSet::Dispatcher` per route in the mapper
-   * and resolves the controller constant inside it; trails' `RouteSet` takes
-   * one dispatcher callback for the whole set (`route-set.ts:952`), so the
-   * autoloader hands it over through this pre-existing seam.
+   * @noRailsEquivalent CONVERGEABLE — story
+   * `converge-routeset-setdispatcher-to-per-route-dispatcher`. Rails builds
+   * an `ActionDispatch::Routing::RouteSet::Dispatcher` per route in the
+   * mapper (`mapper.rb:297`) and resolves the controller constant inside it;
+   * trails' `RouteSet#call` still branches on one whole-set callback
+   * (`route-set.ts:952`, marked legacy in-file) because
+   * `Request#controllerClassFor` has no constant table to resolve against,
+   * so the autoloader hands the table over through that seam.
    */
   setDispatcher(dispatcher: DispatcherCallback): void;
 }
@@ -57,6 +61,7 @@ export interface FinisherConfig {
 
 export interface FinisherRoutesReloader {
   eagerLoad: boolean;
+  runAfterLoadPaths: () => void | Promise<void>;
   executeUnlessLoaded(application: unknown): Promise<boolean>;
 }
 
@@ -79,36 +84,35 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
 /**
  * Mirrors `Finisher`'s `setup_main_autoloader` initializer
  * (`finisher.rb:17-46`), which pushes every autoload path into
- * `Rails.autoloaders.main` so `Request#controller_class_for`'s
- * `"#{name.camelize}Controller".constantize` finds a constant at dispatch
- * time.
+ * `Rails.autoloaders.main` so that `Request#controller_class_for`'s
+ * `"#{name.camelize}Controller".constantize` (`http/request.rb:94-110`)
+ * resolves a constant at dispatch time.
  *
  * ESM has no `const_missing` seam, so a constant cannot be materialised
- * lazily from a name — the modules under the autoload paths are imported
- * here instead, and the classes they export become the controller constant
- * table the dispatcher reads. That table is handed to the route set as the
- * `ActionDispatch::Routing::RouteSet::Dispatcher` body below
- * (`action_dispatch/routing/route_set.rb:48-56`).
+ * lazily from a name; {@link loadControllers} imports the modules under the
+ * autoload paths instead, and the classes they export become the constant
+ * table the dispatcher reads.
+ *
+ * The callback body is `ActionDispatch::Routing::RouteSet::Dispatcher#serve`
+ * (`route_set.rb:48-62`): resolve the controller class, raise
+ * `ActionController::RoutingError` when the constant is missing,
+ * `make_response!`, then `Dispatcher#dispatch`'s
+ * `controller.dispatch(action, req, res)`. It is installed here rather than
+ * per route because trails' `RouteSet` takes one dispatcher for the whole
+ * set — see `FinisherRoutes#setDispatcher`.
  */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const controllers = await loadControllers(await this.paths());
 
   this.routes().setDispatcher(async (controllerName, action, _params, env) => {
-    // Rails: `controller = controller(req)` → `req.controller_class` →
-    // `controller_class_for(name)` (`http/request.rb:94-110`).
     const controllerClass = controllers.get(controllerName);
     if (!controllerClass) {
-      // Rails raises `ActionController::RoutingError` from
-      // `Dispatcher#controller` when the constant is missing
-      // (`route_set.rb:58-62`).
       throw new ActionController.RoutingError(
         `uninitialized constant ${camelize(underscore(controllerName))}Controller`,
       );
     }
-    // Rails: `res = controller.make_response! req` then
-    // `controller.dispatch(action, req, res)`.
     const req = new Request(env);
-    const res = new Response();
+    const res = controllerClass.makeResponseBang(req);
     const controller = new controllerClass();
     await controller.dispatch(action, req, res);
     return controller.toRackResponse();
@@ -123,6 +127,12 @@ Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
     mapper.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
     mapper.get("/rails/info", { to: "rails/info#index", internal: true });
   });
+
+  this.routesReloader().runAfterLoadPaths = () => {
+    this.routes().append((mapper) => {
+      mapper.get("/", { to: "rails/welcome#index", internal: true });
+    });
+  };
 });
 
 Finisher.initializer("build_middleware_stack", function (this: FinisherHost) {
@@ -161,7 +171,7 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
 });
 
 /**
- * @noRailsEquivalent Zeitwerk's directory scan. Rails' `push_dir` hands a
+ * @noRailsEquivalent PERMANENT — Zeitwerk's directory scan. Rails' `push_dir` hands a
  * directory to Zeitwerk, which maps `app/controllers/posts_controller.rb` to
  * the `PostsController` constant on demand; ESM resolves nothing from a name,
  * so the same mapping is computed eagerly here. Keyed by Rails' controller
@@ -193,4 +203,6 @@ async function loadControllers(paths: Root): Promise<Map<string, ControllerClass
   return out;
 }
 
-type ControllerClass = new () => ActionController.Base;
+type ControllerClass = (new () => ActionController.Base) & {
+  makeResponseBang(request: Request): Response;
+};

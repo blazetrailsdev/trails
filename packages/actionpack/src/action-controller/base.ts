@@ -947,9 +947,7 @@ export class Base extends Metal {
   }
 }
 
-// Rails: `base.rb:293-294` — fires at the bottom of the class body so
-// `ActiveSupport.on_load(:action_controller)` blocks (e.g. the engine's
-// `add_view_paths` initializer) get `Base` as their receiver.
+// Rails: `base.rb:293-294`.
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
 

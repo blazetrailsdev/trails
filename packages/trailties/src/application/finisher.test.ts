@@ -29,6 +29,13 @@ class TestApp extends Finisher {
             `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
           ),
       } as unknown as Mapper),
+    append: (block) =>
+      block({
+        get: (path: string, options: { to: string; internal?: boolean }) =>
+          this.internalRoutes.push(
+            `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
+          ),
+      } as unknown as Mapper),
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
     setDispatcher: () => this.calls.push("dispatcher"),
   };
@@ -36,6 +43,7 @@ class TestApp extends Finisher {
   routesReloaderCalls: string[] = [];
   private _routesReloader: FinisherRoutesReloader = {
     eagerLoad: false,
+    runAfterLoadPaths: () => {},
     executeUnlessLoaded: async () => {
       this.routesReloaderCalls.push("execute_unless_loaded");
       return true;
@@ -144,6 +152,15 @@ describe("Finisher", () => {
       "get /rails/info/notes -> rails/info#notes (internal)",
       "get /rails/info -> rails/info#index (internal)",
     ]);
+  });
+
+  it("add_internal_routes appends the welcome route via run_after_load_paths", async () => {
+    Trails.env = "development";
+    const app = new TestApp();
+    await run(app, "add_internal_routes");
+    app.internalRoutes.length = 0;
+    await app.routesReloader().runAfterLoadPaths();
+    expect(app.internalRoutes).toEqual(["get / -> rails/welcome#index (internal)"]);
   });
 
   it("add_internal_routes is a no-op outside development", async () => {
