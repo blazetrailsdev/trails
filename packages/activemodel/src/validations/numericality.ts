@@ -268,16 +268,17 @@ export function parseAsNumber(num: number, precision: number, scale?: number): n
  *   end
  *
  * Ruby Float#round defaults to half-away-from-zero (NOT banker's
- * rounding): 2.5.round == 3, (-2.5).round == -3. Matches the existing
- * repo helper at activesupport/src/number-helper/rounding-helper.ts
- * (rubyRound).
+ * rounding): 2.5.round == 3, (-2.5).round == -3.
+ *
+ * DEVIATION: Rails calls `Float#round`/`BigDecimal#round` on the value
+ * itself; this routes through `RoundingHelper`, which shares the half-up
+ * default but is a different object. Tracked by story
+ * 0023-surfaced-deviations/numericality-round-calls-rounding-helper.
  *
  * @internal Rails-private helper.
  */
 export function round(num: number, scale?: number): number {
   if (scale === undefined || scale === null) return num;
-  // Reuse the shared half-away-from-zero rounder so numericality
-  // coercion stays consistent with the rest of the codebase.
   return Number((new RoundingHelper({ precision: scale }).round(num) as BigDecimal).toString("F"));
 }
 

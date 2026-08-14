@@ -5,6 +5,10 @@ class ArgumentError extends Error {
   override name = "ArgumentError";
 }
 
+class NoMethodError extends Error {
+  override name = "NoMethodError";
+}
+
 /**
  * Mirrors: ActiveSupport::NumberHelper::RoundingHelper
  * (activesupport/lib/active_support/number_helper/rounding_helper.rb).
@@ -12,7 +16,7 @@ class ArgumentError extends Error {
 export class RoundingHelper {
   readonly options: Record<string, unknown>;
 
-  constructor(options: Record<string, unknown> = {}) {
+  constructor(options: Record<string, unknown>) {
     this.options = options;
   }
 
@@ -55,8 +59,14 @@ export class RoundingHelper {
       precision?: number;
       significant?: unknown;
     };
-    if (significant != null && significant !== false && (precision as number) > 0) {
-      return (precision as number) - this.digitCount(this.convertToDecimal(number));
+    if (significant != null && significant !== false) {
+      // Ruby evaluates `options[:precision] > 0` here, which raises on a nil
+      // precision rather than falling through to the else arm.
+      if (precision == null) throw new NoMethodError("undefined method '>' for nil");
+      if (precision > 0) {
+        return precision - this.digitCount(this.convertToDecimal(number));
+      }
+      return precision;
     } else {
       return precision ?? undefined;
     }
