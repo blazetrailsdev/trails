@@ -6,7 +6,7 @@ import { isBlank, isPresent, presence, TimeWithZone, TimeZone } from "../../inde
 // trails analogue is the whole Temporal family plus `TimeWithZone`.
 const NOW = new Temporal.Instant(1_700_000_000_000_000_000n);
 const TIMES = [
-  new Date(),
+  new Date(NOW.epochMilliseconds),
   new TimeWithZone(NOW, TimeZone.create("UTC")),
   NOW,
   NOW.toZonedDateTimeISO("UTC"),
