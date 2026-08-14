@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { Temporal } from "@blazetrails/date";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, sep } from "node:path";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -199,13 +202,25 @@ describe("LoggerTest", () => {
   });
 
   it("log outputs to with a filename", () => {
-    const broadcast = new BroadcastLogger(
-      new Logger({ filename: "development.log", write: () => {} }),
-    );
+    const dir = mkdtempSync(join(tmpdir(), "logger-test-"));
+    const path = join(dir, "development.log");
+    writeFileSync(path, "");
+    const broadcast = new BroadcastLogger(new Logger({ filename: path, write: () => {} }));
 
-    expect(Logger.isLoggerOutputsTo(broadcast, "development.log")).toBe(true);
-    expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBe(false);
-    expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBe(false);
+    try {
+      expect(Logger.isLoggerOutputsTo(broadcast, path)).toBe(true);
+      // Ruby's File.join concatenates without normalizing, so Rails' third
+      // assertion (logger_test.rb:48) is what drives `normalize_sources`'
+      // File.realpath branch — `join()` would collapse the dot segment first.
+      expect(
+        Logger.isLoggerOutputsTo(broadcast, `${dirname(path)}${sep}.${sep}${basename(path)}`),
+      ).toBe(true);
+      expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBe(false);
+      expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBe(false);
+    } finally {
+      broadcast.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("defaults to simple formatter", () => {

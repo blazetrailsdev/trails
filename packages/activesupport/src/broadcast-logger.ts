@@ -65,14 +65,18 @@ export class BroadcastLogger extends Logger {
     return super.localLevel;
   }
 
-  set formatter(value: any) {
+  /** `broadcast_logger.rb:145` — dispatches, then keeps its own `@formatter`. */
+  set formatter(value: Logger["formatter"]) {
     this.dispatch((logger) => {
-      (logger as any).formatter = value;
+      logger.formatter = value;
     });
+
+    this._formatter = value;
   }
 
-  get formatter(): any {
-    return null;
+  /** `broadcast_logger.rb:79` — `attr_reader :formatter`. */
+  get formatter(): Logger["formatter"] {
+    return this._formatter;
   }
 
   add(severity: number, message?: string | null, progname?: string): boolean {
