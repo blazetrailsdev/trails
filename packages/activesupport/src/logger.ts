@@ -174,8 +174,21 @@ export class Logger {
   /**
    * `logger_thread_safe_level.rb:14-22`. Ruby has three non-raising arms and
    * one raise: a Symbol goes through `Logger::Severity.const_get`, which raises
-   * NameError for an unknown name, so only the `else` arm — a String or any
-   * other value — reaches ArgumentError.
+   * NameError for an unknown name; the `else` arm raises ArgumentError with the
+   * inspected value.
+   *
+   * A JS string is the Symbol arm here, and Ruby's String — which reaches the
+   * `else` arm — has no distinct spelling on this parameter. CLAUDE.md keeps a
+   * Symbol's leading colon only where a method's control flow turns on
+   * `Symbol === x` with BOTH arms live; this parameter's String arm is dead in
+   * trails: `LogLevel` is the closed set of level names, it is the same
+   * spelling `level=` takes, and no caller passes a string here meaning
+   * anything but a level (`logAt`, `broadcast-logger.ts:60-66`, and the tests
+   * pass a `LogLevel` name or a `Logger.*` Integer). Spelling it `":debug"`
+   * on this one writer would put a colon in front of a level nowhere else in
+   * the logger surface carries. The `else` arm therefore stays reachable for
+   * every non-string, non-Integer, non-null value, which is what the cover
+   * exercises.
    */
   set localLevel(level: number | LogLevel | null) {
     let value: number | null;
