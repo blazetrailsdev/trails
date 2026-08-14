@@ -422,16 +422,15 @@ export { TimeZone, ZONES_MAP, InvalidTimezoneIdentifier } from "./values/time-zo
 export { TimeWithZone } from "./time-with-zone.js";
 export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 export {
-  getZone,
+  zone,
   setZone,
   resetZone,
   isZoneExplicit,
-  getZoneDefault,
+  zoneDefault,
   setZoneDefault,
   useZone,
   findZone,
   findZoneBang,
-  dateInTimeZone,
   ArgumentError,
 } from "./time-zone-config.js";
 

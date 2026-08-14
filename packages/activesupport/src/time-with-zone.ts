@@ -8,7 +8,7 @@
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { getZone, findZoneBang } from "./time-zone-config.js";
+import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Rational, cCivilToJd, strftime } from "@blazetrails/date";
@@ -353,7 +353,7 @@ export class TimeWithZone {
    */
   inTimeZone(zone?: unknown): TimeWithZone {
     if (zone == null) {
-      const currentZone = getZone();
+      const currentZone = timeZone();
       if (!currentZone) return this;
       zone = currentZone;
     }

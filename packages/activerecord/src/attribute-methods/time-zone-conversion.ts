@@ -3,7 +3,7 @@
  */
 import type { Type } from "@blazetrails/activemodel";
 import { ValueType } from "@blazetrails/activemodel";
-import { TimeWithZone, TimeZone, getZone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, zone as timeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { isUtc } from "../type/internal/timezone.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
@@ -80,7 +80,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
     // convertTimeToTimeZone would only shift display — wrong underlying instant.
     // Parse inline (not via zone.parse()) to preserve full nanosecond precision.
     if (typeof value === "string") {
-      const zone = getZone();
+      const zone = timeZone();
       if (zone) {
         // Mirrors Rails' `super(user_input_in_time_zone(value)) || super`:
         // parse in the current zone; fall back to subtype cast if the format
@@ -202,7 +202,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
     // acts_like?(:time)
     if (value instanceof TimeWithZone || value instanceof Temporal.Instant) {
-      const zone = getZone();
+      const zone = timeZone();
       if (!zone) return value;
       return value instanceof TimeWithZone ? value.inTimeZone(zone) : new TimeWithZone(value, zone);
     }
@@ -240,7 +240,7 @@ function resolveIsUtc(type: unknown): boolean | undefined {
 /** @internal */
 function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): unknown {
   if (value == null) return null;
-  const zone = getZone();
+  const zone = timeZone();
   if (!zone) return value;
   if (value instanceof Temporal.Instant) {
     // AcceptsMultiparameterTime builds the instant by interpreting components

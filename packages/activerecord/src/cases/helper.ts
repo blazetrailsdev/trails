@@ -15,7 +15,7 @@ import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
 import {
   afterTeardown,
-  getZone,
+  zone as timeZone,
   setZone,
   resetZone,
   isZoneExplicit,
@@ -223,7 +223,7 @@ export async function inTimeZone(
   fn: () => Promise<void> | void,
 ): Promise<void> {
   const wasExplicit = isZoneExplicit();
-  const oldZone = getZone();
+  const oldZone = timeZone();
   const oldAware = Base.timeZoneAwareAttributes;
 
   if (zone != null) setZone(zone);

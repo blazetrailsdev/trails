@@ -6,17 +6,17 @@ import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { Temporal } from "@blazetrails/date";
 import {
-  getZone,
+  zone as timeZone,
   setZone,
   resetZone,
-  getZoneDefault,
+  zoneDefault,
   setZoneDefault,
   useZone,
   findZone,
   findZoneBang,
-  dateInTimeZone,
   ArgumentError,
 } from "../time-zone-config.js";
+import { inTimeZone } from "./date-and-time/zones.js";
 import { current } from "../time-ext.js";
 
 describe("TimeWithZoneTest", () => {
@@ -1166,7 +1166,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("nil time zone", () => {
     setZone(null);
-    const zone = getZone();
+    const zone = timeZone();
     expect(zone).toBeNull();
   });
 
@@ -1200,9 +1200,9 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   it("use zone", () => {
     setZone("Alaska");
     useZone("Hawaii", () => {
-      expect(getZone()!.name).toBe("Hawaii");
+      expect(timeZone()!.name).toBe("Hawaii");
     });
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
   });
 
   it("use zone with exception raised", () => {
@@ -1212,7 +1212,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
         throw new Error("test");
       });
     }).toThrow("test");
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
   });
 
   it("use zone raises on invalid timezone", () => {
@@ -1220,7 +1220,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     expect(() => {
       useZone("No such timezone exists", () => {});
     }).toThrow();
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
   });
 
   it("time at precision", () => {
@@ -1232,24 +1232,24 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time zone getter and setter", () => {
     setZone(TimeZone.find("Alaska"));
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
     setZone("Alaska");
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
     setZone(Duration.hours(-9));
-    expect(getZone()!.name).toBe("Alaska");
+    expect(timeZone()!.name).toBe("Alaska");
     setZone(null);
-    expect(getZone()).toBeNull();
+    expect(timeZone()).toBeNull();
   });
 
   it("time zone getter and setter with zone default set", () => {
-    const oldDefault = getZoneDefault();
+    const oldDefault = zoneDefault();
     try {
       setZoneDefault(TimeZone.find("Alaska"));
-      expect(getZone()!.name).toBe("Alaska");
+      expect(timeZone()!.name).toBe("Alaska");
       setZone(TimeZone.find("Hawaii"));
-      expect(getZone()!.name).toBe("Hawaii");
+      expect(timeZone()!.name).toBe("Hawaii");
       setZone(null);
-      expect(getZone()!.name).toBe("Alaska");
+      expect(timeZone()!.name).toBe("Alaska");
     } finally {
       setZoneDefault(oldDefault);
     }
@@ -1258,18 +1258,18 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   it("time zone setter is thread safe", () => {
     // In JS single-threaded, just verify use_zone scoping works
     useZone("Paris", () => {
-      expect(getZone()!.name).toBe("Paris");
+      expect(timeZone()!.name).toBe("Paris");
       // Simulate what threads would do — nested useZone
       useZone("Alaska", () => {
-        expect(getZone()!.name).toBe("Alaska");
+        expect(timeZone()!.name).toBe("Alaska");
       });
-      expect(getZone()!.name).toBe("Paris");
+      expect(timeZone()!.name).toBe("Paris");
     });
   });
 
   it("time zone setter with tzinfo timezone object wraps in rails time zone", () => {
     setZone("America/New_York");
-    const zone = getZone()!;
+    const zone = timeZone()!;
     expect(zone).toBeInstanceOf(TimeZone);
     expect(zone.tzinfo).toBe("America/New_York");
     expect(zone.name).toBe("America/New_York");
@@ -1277,7 +1277,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time zone setter with tzinfo timezone identifier does lookup and wraps in rails time zone", () => {
     setZone("America/New_York");
-    const zone = getZone()!;
+    const zone = timeZone()!;
     expect(zone).toBeInstanceOf(TimeZone);
     expect(zone.tzinfo).toBe("America/New_York");
     expect(zone.name).toBe("America/New_York");
@@ -1312,7 +1312,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     const result = findZone("No such timezone exists");
     expect(result).toBeNull();
     setZone(result);
-    expect(getZone()).toBeNull();
+    expect(timeZone()).toBeNull();
   });
 
   it("current returns time now when zone not set", () => {
@@ -1352,36 +1352,36 @@ describe("TimeWithZoneMethodsForDate", () => {
 
   it("in time zone", () => {
     useZone("Alaska", () => {
-      const result = dateInTimeZone(new Date(2000, 0, 1), getZone()!);
+      const result = inTimeZone(new Temporal.PlainDate(2000, 1, 1), timeZone()!);
       expect(result.inspect()).toBe("2000-01-01 00:00:00.000000000 AKST -09:00");
     });
     useZone("Hawaii", () => {
-      const result = dateInTimeZone(new Date(2000, 0, 1), getZone()!);
+      const result = inTimeZone(new Temporal.PlainDate(2000, 1, 1), timeZone()!);
       expect(result.inspect()).toBe("2000-01-01 00:00:00.000000000 HST -10:00");
     });
   });
 
   it("nil time zone", () => {
     setZone(null);
-    expect(getZone()).toBeNull();
+    expect(timeZone()).toBeNull();
   });
 
   it("in time zone with argument", () => {
     useZone("Eastern Time (US & Canada)", () => {
-      const alaska = dateInTimeZone(new Date(2000, 0, 1), "Alaska");
+      const alaska = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "Alaska");
       expect(alaska.inspect()).toBe("2000-01-01 00:00:00.000000000 AKST -09:00");
-      const hawaii = dateInTimeZone(new Date(2000, 0, 1), "Hawaii");
+      const hawaii = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "Hawaii");
       expect(hawaii.inspect()).toBe("2000-01-01 00:00:00.000000000 HST -10:00");
-      const utcTwz = dateInTimeZone(new Date(2000, 0, 1), "UTC");
+      const utcTwz = inTimeZone(new Temporal.PlainDate(2000, 1, 1), "UTC");
       expect(utcTwz.inspect()).toBe("2000-01-01 00:00:00.000000000 UTC +00:00");
     });
   });
 
   it("in time zone with invalid argument", () => {
-    const d = new Date(2000, 0, 1);
-    expect(() => dateInTimeZone(d, "No such timezone exists")).toThrow(ArgumentError);
-    expect(() => dateInTimeZone(d, Duration.hours(-15))).toThrow(ArgumentError);
-    expect(() => dateInTimeZone(d, {})).toThrow(ArgumentError);
+    const d = new Temporal.PlainDate(2000, 1, 1);
+    expect(() => inTimeZone(d, "No such timezone exists")).toThrow(ArgumentError);
+    expect(() => inTimeZone(d, Duration.hours(-15))).toThrow(ArgumentError);
+    expect(() => inTimeZone(d, {})).toThrow(ArgumentError);
   });
 });
 
@@ -1402,7 +1402,7 @@ describe("TimeWithZoneMethodsForString", () => {
 
   it("nil time zone", () => {
     setZone(null);
-    expect(getZone()).toBeNull();
+    expect(timeZone()).toBeNull();
   });
 
   it("in time zone with argument", () => {

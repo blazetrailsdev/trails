@@ -12,7 +12,7 @@
 import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
-import { getZone } from "./time-zone-config.js";
+import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
 
@@ -34,7 +34,7 @@ function clone(date: Date): Date {
  * `current` (date_time/calculations.rb:10-12) is the same value.
  */
 export function current(): TimeWithZone | Date {
-  const zone = getZone();
+  const zone = timeZone();
   if (zone) {
     return new TimeWithZone(instantFrom(currentTime()), zone);
   }

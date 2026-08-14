@@ -15,7 +15,7 @@
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
-import { findZoneBang, getZone } from "../../time-zone-config.js";
+import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
 import { instantFrom } from "../../temporal.js";
 import { toTime } from "../date/conversions.js";
 
@@ -51,7 +51,7 @@ export function inTimeZone(
 ): TimeWithZone | Temporal.Instant;
 export function inTimeZone(
   dateOrTime: DateOrTime,
-  zone: unknown = getZone(),
+  zone: unknown = currentZone(),
 ): TimeWithZone | Temporal.Instant {
   const timeZone = findZoneBang(zone);
   const time = actsLikeTime(dateOrTime) ? dateOrTime : null;

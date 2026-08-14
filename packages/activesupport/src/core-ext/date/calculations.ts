@@ -17,7 +17,7 @@ import { Temporal } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
-import { ArgumentError, getZone } from "../../time-zone-config.js";
+import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
 /**
@@ -81,7 +81,7 @@ export function tomorrow(): Temporal.PlainDate {
 
 /** Mirrors: `Date.current` (`date/calculations.rb:48-50`) */
 export function current(): Temporal.PlainDate {
-  const zone = getZone();
+  const zone = timeZone();
   if (zone) {
     const today = zone.today();
     return new Temporal.PlainDate(today.year, today.month, today.day);
