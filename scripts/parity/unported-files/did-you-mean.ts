@@ -27,7 +27,7 @@ export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     package: "did-you-mean",
-    pattern: "formatter.rb",
+    pattern: "/formatter.rb",
     reason:
       "Formats `Did you mean? …` suffix for Ruby's Exception#detailed_message " +
       "integration. JS error stringification is per-error, not via a stdlib hook.",

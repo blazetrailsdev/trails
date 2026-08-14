@@ -594,7 +594,11 @@ export {
   stubAnyInstance,
 } from "./testing/method-call-assertions.js";
 export {
+  assert,
   assertNot,
+  assertPredicate,
+  assertSame,
+  assertNotSame,
   assertRaises,
   assertRaise,
   assertNothingRaised,

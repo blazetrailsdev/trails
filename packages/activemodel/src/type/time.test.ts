@@ -21,17 +21,28 @@ describe("TimeTest", () => {
   const type = new Types.TimeType();
 
   it("type cast time", () => {
-    expect(type.cast(null)).toBe(null);
-    expect(type.cast("")).toBe(null);
-    expect(type.cast("ABC")).toBe(null);
-    expect(type.cast(" ".repeat(129))).toBe(null);
+    expect(type.cast(null)).toBeNull();
+    expect(type.cast("")).toBeNull();
+    expect(type.cast("ABC")).toBeNull();
+    expect(type.cast(" ".repeat(129))).toBeNull();
+
+    // Ruby `::Time.now.utc.strftime("%T")` — the zero-padded HH:MM:SS clock time.
+    const timeString = Temporal.Now.instant()
+      .toZonedDateTimeISO("UTC")
+      .toPlainTime()
+      .round("second")
+      .toString();
+    expect(
+      (type.cast(timeString) as Temporal.Instant)
+        .toZonedDateTimeISO("UTC")
+        .toPlainTime()
+        .toString(),
+    ).toEqual(timeString);
 
     expect(type.cast("2015-06-13T19:45:54+03:00")).toEqual(timeUtc(2000, 1, 1, 16, 45, 54));
     expect(type.cast("06:07:08+09:00")).toEqual(timeUtc(1999, 12, 31, 21, 7, 8));
     expect(type.cast({ "4": 16, "5": 45, "6": 54 })).toEqual(timeUtc(2000, 1, 1, 16, 45, 54));
     expect(type.cast("2023-01-01T00:00:00-03:30")).toEqual(timeUtc(2000, 1, 1, 3, 30, 0));
-
-    expect(type.cast("19:45:54")).toEqual(timeUtc(2000, 1, 1, 19, 45, 54));
   });
 
   it("extracts time from full datetime string", () => {
@@ -146,6 +157,12 @@ describe("TimeTest", () => {
     const value = type.cast("1999-12-31T12:34:56.789-10:00");
 
     expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
+  });
+
+  it("serialize_cast_value applies the declared precision", () => {
+    const type = new Types.TimeType({ precision: 1 });
+    const value = type.cast("1999-12-31T12:34:56.789-10:00");
+
     expect(String(type.serializeCastValue(value))).toBe("2000-01-01T22:34:56.7Z");
   });
 

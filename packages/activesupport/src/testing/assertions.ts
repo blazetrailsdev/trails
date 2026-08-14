@@ -518,6 +518,48 @@ export function assert(value: boolean, message: string | (() => string) = ""): v
   if (!value) throw new Assertion(typeof message === "function" ? message() : message);
 }
 
+/**
+ * @noRailsEquivalent PERMANENT — Minitest's `assert_predicate` (minitest/assertions.rb).
+ * Rails inherits it from Minitest, so there is no Ruby counterpart in a mapped
+ * file. Ported tests call it where the Rails test does; a vitest matcher can
+ * express the underlying check but not that it is a *predicate* assertion, which
+ * is what `parity:test --assertions` compares.
+ *
+ * Ruby names the predicate with a method Symbol (`assert_predicate x, :nil?`);
+ * JS has no universal `nil?`/`empty?` protocol to send, so the predicate is a
+ * function applied to `actual`.
+ */
+export function assertPredicate<T>(
+  actual: T,
+  predicate: (value: T) => unknown,
+  message?: string,
+): void {
+  const result = predicate(actual);
+  assert(
+    result != null && result !== false,
+    message ?? `Expected ${inspect(actual)} to satisfy the predicate`,
+  );
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Minitest's `assert_same`
+ * (minitest/assertions.rb), object identity rather than value equality.
+ */
+export function assertSame(expected: unknown, actual: unknown, message?: string): void {
+  assert(
+    Object.is(expected, actual),
+    message ?? `Expected ${inspect(actual)} to be the same as ${inspect(expected)}`,
+  );
+}
+
+/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_same` / `refute_same`. */
+export function assertNotSame(expected: unknown, actual: unknown, message?: string): void {
+  assert(
+    !Object.is(expected, actual),
+    message ?? `Expected ${inspect(actual)} to not be the same as ${inspect(expected)}`,
+  );
+}
+
 function assertEqual(expected: unknown, actual: unknown, message: () => string): void {
   assert(deepEqual(expected, actual), message);
 }
