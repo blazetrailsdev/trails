@@ -535,6 +535,14 @@ export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { Reloader, type PrepareCallback } from "./reloader.js";
 export { getEnv } from "./environment.js";
 export { ExecutionContext } from "./execution-context.js";
+export {
+  ExecutionWrapper,
+  RunHook,
+  CompleteHook,
+  type ExecutionHook,
+  type CompletableExecution,
+} from "./execution-wrapper.js";
+export { Executor } from "./executor.js";
 export { objectWith } from "./core-ext/object/with.js";
 export { withOptions } from "./core-ext/object/with-options.js";
 export { OptionMerger } from "./option-merger.js";

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
@@ -6,6 +6,7 @@ import { ActiveRecord } from "./ar-config.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { Executor, type CompletableExecution } from "@blazetrails/activesupport";
 
 // Rails' own load_async_test.rb / asynchronous_queries_test.rb stay excluded
 // (scripts/parity/unported-files/unscoped.ts): every live test class there
@@ -146,7 +147,17 @@ describe("AsynchronousQueriesTracker", () => {
 });
 
 describe("DatabaseStatements#select", () => {
+  class TestExecutor extends Executor {}
+  AsynchronousQueriesTracker.installExecutorHooks(TestExecutor);
+
+  let execution: CompletableExecution;
+
+  beforeEach(() => {
+    execution = TestExecutor.runBang();
+  });
+
   afterEach(() => {
+    execution.completeBang();
     ActiveRecord.asyncQueryExecutor = null;
   });
 

@@ -655,16 +655,7 @@ export function connectionClassForSelf(this: CoreHost): CoreHost {
 export function asynchronousQueriesTracker(): AsynchronousQueriesTracker {
   return IsolatedExecutionState.fetch<AsynchronousQueriesTracker>(
     ASYNCHRONOUS_QUERIES_TRACKER_KEY,
-    () => {
-      const tracker = new AsynchronousQueriesTracker();
-      // Rails returns the bare tracker and lets the ActiveSupport::Executor hook
-      // (`AsynchronousQueriesTracker.run`, asynchronous_queries_tracker.rb:32-40)
-      // push the session. trails has no Executor to register with, so nothing
-      // would ever open one — story
-      // install-executor-hooks-for-async-queries-tracker retires this line.
-      tracker.startSession();
-      return tracker;
-    },
+    () => new AsynchronousQueriesTracker(),
   );
 }
 

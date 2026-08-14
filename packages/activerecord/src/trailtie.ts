@@ -16,7 +16,7 @@
  *
  * Unported targets (rake tasks, console/runner hooks, migration_error
  * middleware insertion, set_configs setter-dispatch loop, set_reloader_hooks,
- * set_executor_hooks, watchable_files, log_runtime subscriber,
+ * watchable_files, log_runtime subscriber,
  * clear_active_connections, set_filter_attributes,
  * set_signed_id_verifier_secret, logger, backtrace_cleaner) are intentionally
  * left out for now — they each depend on either an Application-instance
@@ -24,8 +24,16 @@
  * supply) or on Trails-level infrastructure that has not yet been ported.
  * See docs/trailties-plan.md PR 2.7 follow-ups.
  */
-import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import {
+  Executor,
+  onLoad,
+  Railtie as BaseRailtie,
+  registerRailtie,
+} from "@blazetrails/activesupport";
+import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Base } from "./base.js";
+import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { QueryCache } from "./query-cache.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -234,6 +242,16 @@ export class Trailtie extends BaseRailtie {
       ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
       ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
       ActiveRecord.queues = cfg.queues;
+    });
+
+    this.initializer("active_record.set_executor_hooks", () => {
+      QueryCache.installExecutorHooks(Executor, () => {
+        const pools: ConnectionPool[] = [];
+        Base.connectionHandler.eachConnectionPool((pool) => pools.push(pool));
+        return pools;
+      });
+      AsynchronousQueriesTracker.installExecutorHooks();
+      ConnectionPool.installExecutorHooks();
     });
 
     this.initializer("active_record_encryption.configuration", () => {

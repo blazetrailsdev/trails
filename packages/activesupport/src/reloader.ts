@@ -4,11 +4,10 @@
  *
  * Only the `:prepare` callback surface is ported — `to_prepare` /
  * `prepare!` (reloader.rb:34-36, :95-97) are what `Rails::Application`'s
- * finisher initializers drive. The `ExecutionWrapper` superclass and the
- * `:class_unload` callbacks, `wrap`, `run!`, `complete!`, `check!`,
- * `reload!` and the interlock locking depend on
- * `ActiveSupport::ExecutionWrapper` / `Dependencies::Interlock`, neither of
- * which is ported yet.
+ * finisher initializers drive. The `:class_unload` callbacks, `wrap`, `run!`,
+ * `complete!`, `check!`, `reload!` and the interlock locking are still
+ * unported; `ActiveSupport::ExecutionWrapper` now is, so extending it is
+ * tracked by `converge-reloader-onto-execution-wrapper`.
  */
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 

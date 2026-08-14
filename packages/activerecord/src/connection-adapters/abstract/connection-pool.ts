@@ -6,7 +6,7 @@
 
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
-import { synchronize, type MonitorMixin } from "@blazetrails/activesupport";
+import { Executor, synchronize, type MonitorMixin } from "@blazetrails/activesupport";
 import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { DatabaseConfig } from "../../database-configurations/database-config.js";
@@ -680,10 +680,10 @@ export class ConnectionPool implements ReapablePool {
 
   // --- Install executor hooks ---
 
-  static installExecutorHooks(executor?: {
-    registerHook(hooks: typeof ExecutorHooks): void;
-  }): void {
-    executor?.registerHook(ExecutorHooks);
+  static installExecutorHooks(
+    executor: { registerHook(hooks: typeof ExecutorHooks): void } = Executor,
+  ): void {
+    executor.registerHook(ExecutorHooks);
   }
 
   // --- Lease management ---

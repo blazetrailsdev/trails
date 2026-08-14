@@ -11,6 +11,8 @@ import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import { UniquenessValidator } from "./validations.js";
 import { deprecator } from "./deprecator.js";
 import { ActiveRecord } from "./ar-config.js";
+import { Executor } from "@blazetrails/activesupport";
+import { asynchronousQueriesTracker } from "./core.js";
 
 const { deprecators } = BaseRailtie;
 
@@ -173,6 +175,22 @@ describe("RailtieTest", () => {
     runLoadHooks("active_record", Base);
 
     expect(ExtendedDeterministicUniquenessValidator.installed).toBe(false);
+  });
+
+  it("runInitializers installs the executor hooks that open an async query session", () => {
+    Trailtie.runInitializers();
+
+    expect(() => asynchronousQueriesTracker().currentSession).toThrow(
+      "Can't perform asynchronous queries without a query session",
+    );
+
+    Executor.wrap(() => {
+      expect(asynchronousQueriesTracker().currentSession.active()).toBe(true);
+    });
+
+    expect(() => asynchronousQueriesTracker().currentSession).toThrow(
+      "Can't perform asynchronous queries without a query session",
+    );
   });
 
   it("load_defaults: partial_inserts is true without any version load", () => {
