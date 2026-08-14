@@ -883,7 +883,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
    * the abstract DatabaseStatements and funnels into `internal_exec_query`. We
-   * mirror that by delegating to our `internalExecQuery`.
+   * mirror that by delegating to `internalExecQuery`.
    */
   override async execQuery(
     sql: string,
