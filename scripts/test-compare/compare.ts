@@ -40,8 +40,8 @@
  *                 --gates so the CI log carries the per-test breakdown too.
  *   --assertions  Print the assertion-count-mismatch report — matched,
  *                 implemented tests whose trails port has a different assertion-
- *                 call count than its Rails counterpart. Scoped to activerecord
- *                 for now (see ASSERTION_REPORT_PACKAGES); other packages never
+ *                 call count than its Rails counterpart. Scoped to the in-scope
+ *                 closure (see ASSERTION_REPORT_PACKAGES); other packages never
  *                 contribute the metric. Report-only: no CI gate, no exclude.json.
  *                 Prints per-file counts by default; add --missing for per-test
  *                 `rails N vs trails M` detail. The same section also reports
@@ -73,11 +73,20 @@ import { testPathsManifest } from "../../vendor/sources.js";
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-// Packages the assertion-count comparison is reported for. Scoped to
-// activerecord for now (RFC follow-up may widen it): both extractors populate
-// `assertionCount` everywhere, but we only surface the mismatch metric (summary
-// tokens, `--assertions` section, JSON) here so it can't leak into other totals.
-const ASSERTION_REPORT_PACKAGES = new Set(["activerecord"]);
+// Packages the assertion-count comparison is reported for: the full in-scope
+// closure of RFC 0105. A 100% name-parity claim for a package outside this set
+// would be a strictly weaker claim than the same number for one inside it,
+// because nothing about its assertions is measured at all.
+const ASSERTION_REPORT_PACKAGES = new Set([
+  "activerecord",
+  "activesupport",
+  "activemodel",
+  "date",
+  "i18n",
+  "arel",
+  "globalid",
+  "did-you-mean",
+]);
 
 export const GATE_ENFORCED_PACKAGES = new Set(["activerecord"]);
 

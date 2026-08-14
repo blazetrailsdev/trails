@@ -221,6 +221,56 @@ and exits 0; the arm closes itself the moment the first row lands, and it cannot
 swallow a converged dimension (nothing baselined AND nothing flagged is a real
 green).
 
+### What 100% test compare means
+
+"100% on `parity:test`" is **name parity _and_ assertion parity, with
+`skipped = 0`** — all three, per package. A package whose names all match but
+whose assertion counters are non-zero is not done: the matched tests assert
+something other than what Rails asserts. Since RFC 0105 the assertion counters
+are measured for the whole in-scope closure (`ASSERTION_REPORT_PACKAGES` in
+`scripts/test-compare/compare.ts`), so the number means the same thing for
+activesupport, activemodel, arel, date, i18n, globalid and did-you-mean as it
+does for activerecord; before that widening a 100% claim outside activerecord
+was strictly the weaker claim, because nothing about its assertions was
+measured at all.
+
+Two things that look like a pass and are not:
+
+- **A `pending` / `it.skip` stub.** It counts as matched-and-skipped and
+  subtracts from the implemented total (`compare.ts:1196`, `matched -
+matchedSkipped`), so a file full
+  of stubs cannot reach 100%. Stubs are scaffolding for a port, never its end
+  state.
+- **A whole-file `unported-files` row written because "users won't use this."**
+  The only admissible reason for a new row is that **the trails surface does not
+  exist and is not intended to**. The test is about the surface, not about
+  demand for it.
+
+The two worked examples:
+
+- **Admissible** — `migration/compatibility_test.rb`: `Migration[7.0]` version
+  compatibility is a Rails surface trails deliberately does not ship (PR #5070,
+  closed unmerged). No surface, no denominator.
+- **Not admissible** — the `fixtures.rb` / `fixture_set` / `test_fixtures.rb`
+  rows (`scripts/parity/unported-files/unscoped.ts:77-99`, 172 AR tests), whose
+  reason is that "Trails users won't ship YAML fixtures". The surface exists:
+  `packages/activerecord/src/fixtures.ts` ships, and [CLAUDE.md](CLAUDE.md)
+  names `fixtures({ … })` the canonical test surface. The row went stale and the
+  tests stayed out of the denominator anyway. That is the failure mode this
+  section exists to prevent — the registry grew from 18 entries in May 2026 to
+  ~200 in August (`docs/infrastructure/parity-convergence-forecast.md`, Part 1).
+
+When a _specific_ Rails case is genuinely unportable — it exercises a Ruby-only
+mechanism inside an otherwise ported file — exclude that case with a
+case-level `tests:` entry and a reason, never a whole-file row. A whole-file row
+takes every future test in that file out of the denominator too.
+
+For an activesupport file, whether it is in the AR closure at all is a separate
+question from whether it is ported: `pnpm parity:test:closure [<test file>]`
+prints in/out (RFC 0105, `derive-ar-closure-test-manifest`). Out-of-closure is
+not a licence to add an `unported-files` row — it changes which denominator the
+file belongs to, not whether the surface exists.
+
 ### Assertion-mismatch ratchet
 
 `pnpm parity:test` measures three assertion-level divergences _inside_
