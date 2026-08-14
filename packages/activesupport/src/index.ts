@@ -532,7 +532,7 @@ export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
 export { StringIO } from "./string-io.js";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
-export { Reloader, type PrepareCallback } from "./reloader.js";
+export { Reloader } from "./reloader.js";
 export { getEnv } from "./environment.js";
 export { ExecutionContext } from "./execution-context.js";
 export {

@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   fsAdapterConfig,
   NullLogger,
+  Executor,
   NullStore,
   onLoad,
+  Reloader,
   registerFsAdapter,
   resetLoadHooks,
   setTrailsRoot,
@@ -24,7 +26,9 @@ import {
   ContentSecurityPolicyMiddleware,
   Cookies,
   DebugExceptions,
+  Executor as ActionDispatchExecutor,
   HostAuthorization,
+  Reloader as ActionDispatchReloader,
   RequestId,
   ServerTiming,
   ShowExceptions,
@@ -423,7 +427,11 @@ describe("Application::DefaultMiddlewareStack", () => {
     root.add("public");
     return root;
   })();
-  const buildApp = () => ({ config: new Configuration() });
+  const buildApp = () => ({
+    config: new Configuration(),
+    executor: class extends Executor {},
+    reloader: class extends Reloader {},
+  });
 
   const build = (mutate: (c: Configuration) => void = () => {}) => {
     const app = buildApp();
@@ -438,6 +446,23 @@ describe("Application::DefaultMiddlewareStack", () => {
     expect(k).toEqual(
       expect.arrayContaining([RequestId, ShowExceptions, DebugExceptions, Callbacks, Static]),
     );
+  });
+
+  it("always includes ActionDispatch::Executor, wired to app.executor", () => {
+    const app = buildApp();
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    const entry = stack.middlewares.find((m) => m.klass === ActionDispatchExecutor);
+    expect(entry?.args[0]).toBe(app.executor);
+  });
+
+  it("includes ActionDispatch::Reloader, wired to app.reloader, only when reloading is enabled", () => {
+    const app = buildApp();
+    app.config.enableReloading = true;
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(stack.middlewares.find((m) => m.klass === ActionDispatchReloader)?.args[0]).toBe(
+      app.reloader,
+    );
+    expect(build((c) => (c.enableReloading = false))).not.toContain(ActionDispatchReloader);
   });
 
   it("includes HostAuthorization only when config.hosts is non-empty", () => {

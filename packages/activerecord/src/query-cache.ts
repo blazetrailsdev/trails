@@ -13,6 +13,7 @@
 // generic `Store` symbol into the generated `.d.ts`.
 import { Executor } from "@blazetrails/activesupport";
 import { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
+import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 
 // Deep-import convenience: consumers doing
@@ -44,19 +45,24 @@ export interface QueryCacheCompleteTarget {
   clearQueryCache(): void;
 }
 
+/** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
+let _base: typeof Base | undefined;
+
+/** @internal */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
+
 export class QueryCache {
   /**
-   * Enable query cache on all provided pools/adapters that are not already
-   * enabled, skipping (without enabling) those disabled by configuration.
-   * Returns the not-already-enabled targets — the receiver of Rails' `each`,
-   * config-disabled pools included — so the executor can thread that exact list
-   * into `complete`.
-   * Called at the start of a request/execution context.
+   * Mirrors: ActiveRecord::QueryCache.run (query_cache.rb:37-42).
    *
-   * Mirrors: ActiveRecord::QueryCache.run
-   * (`each_connection_pool.reject(&:query_cache_enabled).each { next if
-   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`). Ruby's
-   * `Array#each` returns its receiver, so `run` returns the whole
+   * Ruby's `Array#each` returns its receiver, so `run` returns the whole
    * `reject(&:query_cache_enabled)` array (including the config-disabled pools
    * `next` skips over), and the executor threads it into `complete(pools)`.
    * `complete` disabling/clearing a config-disabled pool is inert in Rails
@@ -64,20 +70,19 @@ export class QueryCache {
    * cache and `clear_query_cache` only bumps the version when pinned
    * (query_cache.rb:164-190) — so we mirror Rails rather than pre-filter.
    */
-  static run<T extends QueryCacheRunTarget>(targets: T[]): T[] {
-    const notAlreadyEnabled = targets.filter((target) => !target.queryCacheEnabled);
-    for (const target of notAlreadyEnabled) {
-      if (target.dbConfig?.queryCache === false) continue;
-      target.enableQueryCacheBang();
+  static run(): QueryCacheRunTarget[] {
+    const allPools: QueryCacheRunTarget[] = [];
+    baseClass().connectionHandler.eachConnectionPool((pool) => allPools.push(pool));
+    const pools = allPools.filter((pool) => !pool.queryCacheEnabled);
+    for (const pool of pools) {
+      if (pool.dbConfig?.queryCache === false) continue;
+      pool.enableQueryCacheBang();
     }
-    return notAlreadyEnabled;
+    return pools;
   }
 
   /**
-   * Disable and clear query cache on all provided targets.
-   * Called at the end of a request/execution context.
-   *
-   * Mirrors: ActiveRecord::QueryCache::ExecutorHooks.complete
+   * Mirrors: ActiveRecord::QueryCache.complete (query_cache.rb:44-48).
    */
   static complete(targets: QueryCacheCompleteTarget[]): void {
     for (const target of targets) {
@@ -87,40 +92,10 @@ export class QueryCache {
   }
 
   /**
-   * Register query cache hooks with an executor-like object.
-   *
-   * Mirrors: ActiveRecord::QueryCache.install_executor_hooks
+   * Mirrors: ActiveRecord::QueryCache.install_executor_hooks (query_cache.rb:51-53).
    */
-  static installExecutorHooks(
-    executor: {
-      registerHook(hook: {
-        run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[];
-        complete(pools: QueryCacheCompleteTarget[]): void;
-      }): void;
-    } = Executor,
-    targets:
-      | (QueryCacheRunTarget & QueryCacheCompleteTarget)[]
-      | (() => (QueryCacheRunTarget & QueryCacheCompleteTarget)[]) = [],
-  ): void {
-    const resolve = typeof targets === "function" ? targets : () => targets;
-
-    // Mirrors Rails' ExecutorHooks module with static run/complete. Rails'
-    // executor keeps per-execution `hook_state` and passes `run`'s return value
-    // as the argument to `complete` (execution_wrapper.rb:25-37, :145-148), so
-    // `run` returns its not-already-enabled receiver and `complete` receives
-    // that exact list — no shared state a nested/overlapping execution could
-    // clobber, and `complete` acts only on the pools this execution's `run`
-    // observed rather than re-resolving the list independently.
-    class ExecutorHooks {
-      static run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[] {
-        return QueryCache.run(resolve());
-      }
-      static complete(pools: QueryCacheCompleteTarget[]): void {
-        QueryCache.complete(pools);
-      }
-    }
-
-    executor.registerHook(ExecutorHooks);
+  static installExecutorHooks(executor: typeof Executor = Executor): void {
+    executor.registerHook(this);
   }
 }
 

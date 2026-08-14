@@ -51,6 +51,7 @@ import {
   relationClassFor,
   generatedRelationMethods as _generatedRelationMethods,
 } from "./relation/delegation.js";
+import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
@@ -256,6 +257,7 @@ import {
   filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
+import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
 import {
@@ -1046,6 +1048,16 @@ export class Base extends Model {
    */
   static primaryClassQ(): boolean {
     return this === Base || this.applicationRecordClassQ();
+  }
+
+  // Mirrors: ActiveRecord::Core.asynchronous_queries_session (core.rb:141-143).
+  static asynchronousQueriesSession(): Session {
+    return _Core.asynchronousQueriesSession();
+  }
+
+  // Mirrors: ActiveRecord::Core.asynchronous_queries_tracker (core.rb:145-148).
+  static asynchronousQueriesTracker(): AsynchronousQueriesTracker {
+    return _Core.asynchronousQueriesTracker();
   }
 
   static currentPreventingWrites(): boolean {
@@ -4989,6 +5001,7 @@ Table.engine = {
 // initialized bindings or hits a TDZ ReferenceError. Consumers that only need
 // `Base` at call time take it from here instead.
 
+_registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);

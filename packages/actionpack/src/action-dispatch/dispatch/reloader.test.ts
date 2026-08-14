@@ -25,9 +25,9 @@ class StubReloader implements ExecutorLike {
     };
   }
 
-  errorReporter = {
-    report() {},
-  };
+  errorReporter(): { report(): void } {
+    return { report() {} };
+  }
 }
 
 async function callAndReturnBody(reloader: StubReloader, app?: RackApp): Promise<any> {

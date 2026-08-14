@@ -86,15 +86,10 @@ export class ExecutionWrapper {
    * after the work has been performed.
    *
    * Where possible, prefer +wrap+.
-   *
-   * Ruby's `IsolatedExecutionState.delete` returns the deleted value; trails'
-   * returns a boolean, so the `reset:` arm reads the lost instance before
-   * deleting it rather than in one call.
    */
   static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
     if (reset) {
-      const lostInstance = IsolatedExecutionState.get<CompletableExecution>(this.activeKey());
-      IsolatedExecutionState.delete(this.activeKey());
+      const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
       lostInstance?.completeBang();
     } else {
       if (this.active()) return this.Null;

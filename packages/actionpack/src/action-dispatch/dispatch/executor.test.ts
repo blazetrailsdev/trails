@@ -19,11 +19,15 @@ class StubExecutor implements ExecutorLike {
     return { completeBang: () => this.completeHooks.forEach((h) => h()) };
   }
 
-  errorReporter = {
-    report: (error: unknown, opts: { handled: boolean; source: string }) => {
-      this.reports.push({ error, ...opts });
-    },
-  };
+  errorReporter(): {
+    report: (error: unknown, opts: { handled: boolean; source: string }) => void;
+  } {
+    return {
+      report: (error: unknown, opts: { handled: boolean; source: string }) => {
+        this.reports.push({ error, ...opts });
+      },
+    };
+  }
 }
 
 async function callAndReturnBody(

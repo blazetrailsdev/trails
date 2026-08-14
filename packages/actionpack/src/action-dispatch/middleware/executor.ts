@@ -19,7 +19,7 @@ export interface ErrorReporterLike {
 
 export interface ExecutorLike {
   runBang(opts?: { reset?: boolean }): ExecutorState;
-  errorReporter: ErrorReporterLike;
+  errorReporter(): ErrorReporterLike;
 }
 
 export class Executor {
@@ -39,7 +39,7 @@ export class Executor {
 
       if (env["action_dispatch.report_exception"]) {
         const error = env["action_dispatch.exception"];
-        this.executor.errorReporter.report(error, {
+        this.executor.errorReporter().report(error, {
           handled: false,
           source: "application.action_dispatch",
         });
@@ -52,7 +52,7 @@ export class Executor {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       const wrapper = new ExceptionWrapper(err);
-      this.executor.errorReporter.report(wrapper.unwrappedException, {
+      this.executor.errorReporter().report(wrapper.unwrappedException, {
         handled: false,
         source: "application.action_dispatch",
       });
