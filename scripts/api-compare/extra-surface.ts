@@ -251,13 +251,16 @@ function skipMirrorCandidates(rubyName: string): string[] | null {
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
  * (`connected?` → `isConnectedQ`). The base mapper only emits the is-prefix
  * and plain forms, so without the `Q` variants every ported predicate is
- * mis-flagged as novel. Append `Q` to each candidate of a `?` method.
+ * mis-flagged as novel. Append `Q` to each candidate of a `?` method, plus the
+ * quoted-literal spelling (`get "debug?"`) — the most faithful port, which the
+ * base mapper offers only when it can see the Ruby siblings.
  */
 function rubyMethodCandidates(rubyName: string): string[] | null {
   const base = rubyMethodToTs(rubyName) ?? skipMirrorCandidates(rubyName);
   if (!base) return null;
   if (!rubyName.endsWith("?")) return base;
-  return [...base, ...base.map((c) => c + "Q")];
+  const literal = snakeToCamel(rubyName.slice(0, -1)) + "?";
+  return [...base, ...base.map((c) => c + "Q"), literal];
 }
 
 /**
