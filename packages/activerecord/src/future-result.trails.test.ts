@@ -147,11 +147,6 @@ describe("AsynchronousQueriesTracker", () => {
 });
 
 describe("DatabaseStatements#select", () => {
-  // The async arm reads `Base.asynchronous_queries_session`, which only exists
-  // inside an execution — Rails' railtie installs the tracker's hooks on
-  // `ActiveSupport::Executor` (railtie.rb) and every request runs inside one.
-  // `run!`/`complete!` rather than `wrap` because the bodies below are async and
-  // `wrap`'s ensure would finalize the session before they resolve.
   class TestExecutor extends Executor {}
   AsynchronousQueriesTracker.installExecutorHooks(TestExecutor);
 

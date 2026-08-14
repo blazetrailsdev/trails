@@ -26,6 +26,12 @@ export interface CompletableExecution {
 }
 
 export class ExecutionWrapper {
+  /** Mirrors Ruby's nested `ExecutionWrapper::RunHook`. */
+  static RunHook: typeof RunHook;
+
+  /** Mirrors Ruby's nested `ExecutionWrapper::CompleteHook`. */
+  static CompleteHook: typeof CompleteHook;
+
   /** Mirrors: `Null = Object.new` / `def Null.complete!` (execution_wrapper.rb:9-11). */
   static Null: CompletableExecution = {
     completeBang(): void {},
@@ -37,8 +43,9 @@ export class ExecutionWrapper {
   }
 
   /**
-   * `@active_key ||= :"active_execution_wrapper_#{object_id}"` keys the store
-   * per class; a fresh Symbol is the TS spelling of an object-id-derived key.
+   * Backs {@link ExecutionWrapper.activeKey}. Ruby memoizes
+   * `:"active_execution_wrapper_#{object_id}"` per class; a fresh Symbol is the
+   * TS spelling of an object-id-derived key.
    */
   static _activeKey?: symbol;
 
@@ -79,11 +86,13 @@ export class ExecutionWrapper {
    * after the work has been performed.
    *
    * Where possible, prefer +wrap+.
+   *
+   * Ruby's `IsolatedExecutionState.delete` returns the deleted value; trails'
+   * returns a boolean, so the `reset:` arm reads the lost instance before
+   * deleting it rather than in one call.
    */
   static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
     if (reset) {
-      // Ruby's `Hash#delete` returns the deleted value; trails' returns a
-      // boolean, so the read has to precede the delete.
       const lostInstance = IsolatedExecutionState.get<CompletableExecution>(this.activeKey());
       IsolatedExecutionState.delete(this.activeKey());
       lostInstance?.completeBang();
@@ -102,7 +111,12 @@ export class ExecutionWrapper {
     return instance;
   }
 
-  /** Perform the work in the supplied block as an execution. */
+  /**
+   * Perform the work in the supplied block as an execution.
+   *
+   * Ruby takes `source:` as a keyword and the work as a trailing block; TS has
+   * no block argument, so the block leads and the keywords follow it.
+   */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
@@ -182,7 +196,7 @@ export class ExecutionWrapper {
 
 /** Mirrors: `RunHook = Struct.new(:hook)` (execution_wrapper.rb:25-30). */
 export class RunHook {
-  /** Lets an instance satisfy {@link CallbackObject}, the ObjectCall filter shape. */
+  /** Lets an instance satisfy `CallbackObject`, the ObjectCall filter shape. */
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}
@@ -195,7 +209,7 @@ export class RunHook {
 
 /** Mirrors: `CompleteHook = Struct.new(:hook)` (execution_wrapper.rb:32-39). */
 export class CompleteHook {
-  /** Lets an instance satisfy {@link CallbackObject}, the ObjectCall filter shape. */
+  /** Lets an instance satisfy `CallbackObject`, the ObjectCall filter shape. */
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}
@@ -211,3 +225,6 @@ export class CompleteHook {
     this.before(target);
   }
 }
+
+ExecutionWrapper.RunHook = RunHook;
+ExecutionWrapper.CompleteHook = CompleteHook;
