@@ -597,6 +597,16 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
   });
 
+  it("does not pair a Ruby proc call against a TS Function.prototype.call mixin dispatch", () => {
+    // parameters.rb:95 `strategy.call(raw_post)` vs request.ts:1008
+    // `_parseFormattedParameters.call(this._paramsHost, parsers, fallback)`.
+    const pairs = pairCallSites(
+      [site("call", ["id:raw_post"])],
+      [site("call", ["id:this._paramsHost", "id:parsers", "id:fallback"])],
+    );
+    expect(pairs).toEqual([]);
+  });
+
   it("pairs same-named sites by argument agreement, not source order", () => {
     const pairs = pairCallSites(
       [site("new", ["id:table_name", "id:options"])],

@@ -10,7 +10,7 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "../sqlite/better-sqlite3.js";
-import { afterAll, afterEach, beforeEach, expect } from "vitest";
+import { afterAll, afterEach, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
 import {
@@ -19,7 +19,6 @@ import {
   setZone,
   resetZone,
   isZoneExplicit,
-  beforeSetup as taggedLoggingBeforeSetup,
 } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -36,14 +35,6 @@ import {
 // for the whole suite, before any model calls establish_connection(adapter:
 // "fake") at load time (test/models/contact.rb:6).
 registerFakeAdapter();
-
-// Mirror ActiveSupport::Testing::TaggedLogging#before_setup
-// (activesupport/lib/active_support/testing/tagged_logging.rb:10-19) — Rails
-// mixes the module into every test case so the heading precedes each test.
-// vitest's per-test hook is the receiver-less equivalent.
-beforeEach(() => {
-  taggedLoggingBeforeSetup();
-});
 
 // Mirror Rails activerecord/test/cases/helper.rb:29 — ban delegating a
 // relation/collection-proxy call into an `ActiveRecord::Base` method suite-wide
