@@ -19,7 +19,7 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
     let formattedString: string;
     let precision = options.precision as number | null | undefined;
     if (precision != null) {
-      if (options.significant === true && precision > 0) {
+      if (options.significant != null && options.significant !== false && precision > 0) {
         const digits = helper.digitCount(roundedNumber);
         precision -= digits;
         if (precision < 0) precision = 0; // don't let it be negative
@@ -43,12 +43,12 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
     return this.formatNumber(delimitedNumber);
   }
 
-  private get stripInsignificantZeros(): boolean {
-    return this.options.stripInsignificantZeros === true;
+  private get stripInsignificantZeros(): unknown {
+    return this.options.stripInsignificantZeros;
   }
 
   private formatNumber(number: string): string {
-    if (this.stripInsignificantZeros) {
+    if (this.stripInsignificantZeros != null && this.stripInsignificantZeros !== false) {
       const escapedSeparator = escapeRegExp(this.options.separator as string);
       return number
         .replace(new RegExp(`(${escapedSeparator})(\\d*[1-9])?0+$`), "$1$2")

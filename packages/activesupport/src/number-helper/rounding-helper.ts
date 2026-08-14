@@ -51,8 +51,11 @@ export class RoundingHelper {
   }
 
   private absolutePrecision(number: unknown): number | undefined {
-    const precision = this.options.precision as number | undefined;
-    if (this.options.significant === true && (precision as number) > 0) {
+    const { precision, significant } = this.options as {
+      precision?: number;
+      significant?: unknown;
+    };
+    if (significant != null && significant !== false && (precision as number) > 0) {
       return (precision as number) - this.digitCount(this.convertToDecimal(number));
     } else {
       return precision ?? undefined;
