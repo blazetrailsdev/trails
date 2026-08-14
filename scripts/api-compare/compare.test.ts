@@ -370,11 +370,6 @@ describe("significantMissingCalls", () => {
     });
 
     it("does not walk into a same-file `constructor` a `new X()` recorded", () => {
-      // `new Requested({...})` in LookupContext#detailArgsForAny records the
-      // call as `constructor`, and every class in the file declares one — so
-      // resolving it credits the body with an unrelated constructor's calls,
-      // and editing that constructor changes a byte-identical body's missing
-      // set (RFC 0025 extractor-missing-set-perturbed-by-unrelated-edits).
       const sameFile = new Map<string, string[]>([
         ["constructor", ["initializeDetails", "buildViewPaths", "detailsKey"]],
         ["detailsKey", ["detailsCacheKey"]],
