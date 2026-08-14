@@ -51,8 +51,15 @@ export const IsolatedExecutionState = {
   has(key: IsolatedKey): boolean {
     return store().has(key);
   },
-  delete(key: IsolatedKey): boolean {
-    return store().delete(key);
+  /**
+   * Ruby's `state.delete(key)` is `Hash#delete` — it returns the *deleted
+   * value*, not a boolean (isolated_execution_state.rb:47-49).
+   */
+  delete<T = unknown>(key: IsolatedKey): T | undefined {
+    const s = store();
+    const value = s.get(key) as T | undefined;
+    s.delete(key);
+    return value;
   },
   clear(): void {
     store().clear();

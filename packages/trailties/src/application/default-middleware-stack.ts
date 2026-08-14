@@ -6,21 +6,28 @@ import {
   ContentSecurityPolicyMiddleware,
   Cookies,
   DebugExceptions,
+  Executor,
   HostAuthorization,
   MiddlewareStack,
   PublicExceptions,
   RemoteIp,
+  Reloader,
   RequestId,
   ServerTiming,
   ShowExceptions,
   SSL,
   Static,
 } from "@blazetrails/actionpack";
+import type { ExecutorLike } from "@blazetrails/actionpack";
 import type { Configuration } from "./configuration.js";
 import type { Root } from "../paths.js";
 
 export interface DefaultStackHostApp {
   config: Configuration;
+  /** `app.executor` (`default_middleware_stack.rb:49`). */
+  executor: ExecutorLike;
+  /** `app.reloader` (`default_middleware_stack.rb:70`). */
+  reloader: ExecutorLike;
 }
 
 export class DefaultMiddlewareStack {
@@ -65,6 +72,8 @@ export class DefaultMiddlewareStack {
       });
     }
 
+    stack.use(Executor as never, this.app.executor);
+
     if (config.serverTiming) stack.use(ServerTiming as never);
     stack.use(RequestId as never);
     stack.use(RemoteIp as never);
@@ -73,6 +82,10 @@ export class DefaultMiddlewareStack {
 
     if (config.considerAllRequestsLocal) {
       stack.use(ActionableExceptions as never);
+    }
+
+    if (config.reloadingEnabled()) {
+      stack.use(Reloader as never, this.app.reloader);
     }
 
     stack.use(Callbacks as never);

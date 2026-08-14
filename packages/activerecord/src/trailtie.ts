@@ -24,12 +24,7 @@
  * supply) or on Trails-level infrastructure that has not yet been ported.
  * See docs/trailties-plan.md PR 2.7 follow-ups.
  */
-import {
-  Executor,
-  onLoad,
-  Railtie as BaseRailtie,
-  registerRailtie,
-} from "@blazetrails/activesupport";
+import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Base } from "./base.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -245,11 +240,7 @@ export class Trailtie extends BaseRailtie {
     });
 
     this.initializer("active_record.set_executor_hooks", () => {
-      QueryCache.installExecutorHooks(Executor, () => {
-        const pools: ConnectionPool[] = [];
-        Base.connectionHandler.eachConnectionPool((pool) => pools.push(pool));
-        return pools;
-      });
+      QueryCache.installExecutorHooks();
       AsynchronousQueriesTracker.installExecutorHooks();
       ConnectionPool.installExecutorHooks();
     });

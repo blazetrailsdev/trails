@@ -11,7 +11,7 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { Reloader } from "@blazetrails/activesupport";
+import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Engine } from "./engine.js";
@@ -36,12 +36,20 @@ export class Application extends Engine {
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
   private _app?: RackApp;
+  /** Rails: `@executor = Class.new(ActiveSupport::Executor)` (`application.rb:122`). */
+  readonly executor = class extends Executor {};
   /** Rails: `@reloader = Class.new(ActiveSupport::Reloader)` (`application.rb:123`) —
    * a per-application subclass so one app's prepare callbacks don't leak into
    * another's. */
   readonly reloader = class extends Reloader {};
   logger: Logger | null = null;
   cache: CacheStore | null = null;
+
+  constructor() {
+    super();
+    // Rails: `@reloader.executor = @executor` (`application.rb:124`).
+    this.reloader.executor = this.executor;
+  }
 
   /** Mirrors Rails' `Rails.app_class`. Set by {@link Application.register}. */
   static get appClass(): typeof Application | null {

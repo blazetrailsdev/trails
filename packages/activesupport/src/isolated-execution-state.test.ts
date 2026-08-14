@@ -27,6 +27,13 @@ describe("IsolatedExecutionStateTest", () => {
     expect(IsolatedExecutionState.has("k")).toBe(false);
   });
 
+  it("delete returns the deleted value", () => {
+    IsolatedExecutionState.set("gone", 42);
+    expect(IsolatedExecutionState.delete<number>("gone")).toBe(42);
+    expect(IsolatedExecutionState.delete<number>("gone")).toBeUndefined();
+    expect(IsolatedExecutionState.delete("never-set")).toBeUndefined();
+  });
+
   it("fetch initializes once", () => {
     let n = 0;
     const a = IsolatedExecutionState.fetch("singleton", () => ++n);
