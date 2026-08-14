@@ -206,8 +206,11 @@ export class LazyAttributeHash {
     return copy;
   }
 
-  // builder.rb:129-132 unions `types | values | delegate_hash` and yields every
-  // key — unlike `keys`, it does NOT drop uninitialized attributes.
+  /**
+   * Mirrors: LazyAttributeHash#each_key (builder.rb:129-132) — unions
+   * `types | values | delegate_hash` and yields every key. Unlike `keys`, it
+   * does not drop uninitialized attributes.
+   */
   eachKey(fn: (key: string) => void): void {
     const keys = new Set([
       ...this.types.keys(),

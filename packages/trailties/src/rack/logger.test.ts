@@ -103,8 +103,6 @@ describe("Rack::Logger", () => {
           return [];
         },
       },
-      // A Proc tagger gets the request; a Symbol tagger (":remoteIp") is sent
-      // to it; a plain string is the literal tag (logger.rb `compute_tags`).
       taggers: ["tag1", (request) => request.requestMethod, ":remoteIp"],
     });
     const [, , body] = await middleware.call({ REQUEST_METHOD: "GET", REMOTE_ADDR: "127.0.0.1" });

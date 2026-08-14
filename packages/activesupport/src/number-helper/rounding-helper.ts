@@ -21,12 +21,12 @@ export class RoundingHelper {
    * `BigDecimal#round` (rounding_helper.rb:16), so every mode Ruby's
    * BigDecimal understands is reachable from every number helper. This is that
    * dispatch. A Ruby Symbol option value is a `":name"` string in trails, and
-   * the camelCased spelling is accepted alongside the Ruby one.
+   * the camelCased spelling is accepted alongside the Ruby one. `:up` is
+   * BigDecimal's ROUND_UP — away from zero — not "half up".
    */
   private applyRound(value: number): number {
     switch (this.roundMode.replace(/^:/, "")) {
       case "up":
-        // BigDecimal ROUND_UP — away from zero, not "half up".
         return value < 0 ? Math.floor(value) : Math.ceil(value);
       case "down":
       case "truncate":

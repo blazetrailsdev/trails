@@ -56,6 +56,15 @@ export abstract class CurrentAttributes {
    */
   private static readonly RESTRICTED_NAMES = new Set(["reset", "set"]);
 
+  /**
+   * Mirrors: CurrentAttributes.attribute (current_attributes.rb:114-140).
+   *
+   * current_attributes.rb:128 makes a second
+   * `define_cached_method("#{name}=")` call for the writer. A TS attribute is
+   * one accessor pair, not two methods, so the writer has no separate
+   * descriptor to cache or to copy onto the owner; both Rails definitions land
+   * on the reader's entry.
+   */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
   static attribute(name: string, ...rest: unknown[]): void {
@@ -81,11 +90,6 @@ export abstract class CurrentAttributes {
 
     CodeGenerator.batch(generatedAttributeMethods.call(ctor), __FILE__, __LINE__, (owner) => {
       for (const name of allNames) {
-        // @missingRailsCall current_attributes.rb:128 makes a second
-        // `define_cached_method("#{name}=")` call for the writer. A TS
-        // attribute is one accessor pair, not two methods, so the writer has
-        // no separate descriptor to cache or to copy onto the owner — both
-        // Rails definitions land on this one entry.
         owner.defineCachedMethod(name, { namespace: "current_attributes" }, (batch) => {
           batch.push((mod) =>
             Object.defineProperty(mod, name, {

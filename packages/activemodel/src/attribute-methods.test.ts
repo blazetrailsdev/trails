@@ -48,7 +48,7 @@ describe("AttributeMethodsTest", () => {
         configurable: true,
       });
     });
-    defineAttributeMethod(Person, "name");
+    defineAttributeMethod.call(Person, "name");
 
     expect((new Person({ name: "Alice" }) as unknown as { nameShort(): string }).nameShort()).toBe(
       "<3",
@@ -389,6 +389,9 @@ describe("attribute method prefix/suffix/affix", () => {
         this.attribute("name", "string");
         this.attributeMethodPrefix("clear_");
       }
+      clear_attribute(attr: string): unknown {
+        return this.readAttribute(attr);
+      }
     }
     const u = new User({ name: "Alice" });
     expect((u as any)["clear_name"]()).toBe("Alice");
@@ -400,6 +403,9 @@ describe("attribute method prefix/suffix/affix", () => {
         this.attribute("name", "string");
         this.attributeMethodSuffix("_before_type_cast");
       }
+      attribute_before_type_cast(attr: string): unknown {
+        return this.readAttribute(attr);
+      }
     }
     const u = new User({ name: "Alice" });
     expect((u as any)["name_before_type_cast"]()).toBe("Alice");
@@ -410,6 +416,9 @@ describe("attribute method prefix/suffix/affix", () => {
       static {
         this.attribute("name", "string");
         this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
+      }
+      reset_attribute_to_default(attr: string): unknown {
+        return this.readAttribute(attr);
       }
     }
     const u = new User({ name: "Alice" });
