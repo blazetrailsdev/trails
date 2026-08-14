@@ -41,8 +41,21 @@ export class User extends ApplicationRecord {
       className: "User",
     });
 
-    this.validates("handle", { presence: true });
-    this.validates("display_name", { presence: true });
+    this.validates("handle", {
+      presence: true,
+      length: { minimum: 2, maximum: 20 },
+      // `multiline: true` is the trails opt-in for a JS regex spelled with
+      // ^/$. Rails inspects the source for those anchors regardless of the
+      // engine's flag state (format.rb:42); without the `m` flag these are
+      // already whole-string anchors, i.e. Ruby's \A/\z.
+      format: {
+        with: /^[a-z0-9_]+$/,
+        multiline: true,
+        message: "may only contain letters, numbers and underscores",
+      },
+    });
+    this.validates("display_name", { presence: true, length: { maximum: 50 } });
+    this.validates("bio", { length: { maximum: 160 } });
     this.validatesUniqueness("handle");
 
     this.scope("chatty", (q: Relation<User>) => q.order({ tweets_count: "desc" }));

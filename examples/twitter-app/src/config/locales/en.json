@@ -1,5 +1,29 @@
 {
   "en": {
-    "hello": "Hello world"
+    "errors": {
+      "messages": {
+        "blank": "can't be blank"
+      }
+    },
+    "activerecord": {
+      "errors": {
+        "models": {
+          "tweet": {
+            "attributes": {
+              "body": {
+                "too_long": "is too long \u2014 keep it under %{count} characters"
+              }
+            }
+          },
+          "user": {
+            "attributes": {
+              "handle": {
+                "taken": "is already someone else's handle"
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

@@ -1,6 +1,8 @@
 <h1>What's happening?</h1>
 
+<%= render({ partial: "shared/errors", locals: { errors: errors } }) %>
+
 <form method="post" action="/tweets">
-  <textarea name="tweet[body]" rows="4" cols="60" placeholder="Say something"></textarea>
+  <textarea name="tweet[body]" rows="4" cols="60" placeholder="Say something"><%= tweet.body || "" %></textarea>
   <button type="submit">Tweet</button>
 </form>

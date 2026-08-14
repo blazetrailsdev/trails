@@ -1,4 +1,5 @@
 import { ActionController, FlashHash } from "@blazetrails/actionpack";
+import { timeAgoInWords } from "@blazetrails/actionview";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { User } from "../models/user.js";
 
@@ -46,11 +47,28 @@ export class ApplicationController extends ActionController.Base {
    * `helper_method` is invisible to a `.tse` template and they have to be
    * passed by hand.
    */
+  /**
+   * `ActionView::Helpers::DateHelper#time_ago_in_words`, passed as a local
+   * because helpers are not in a `.tse` template's scope yet — see the
+   * helper-methods story.
+   */
+  protected timeAgo(value: unknown): string {
+    if (value == null) return "";
+    // TODO(0104-twitter-app-full-stack-integration/date-helpers-reject-temporal-instant):
+    // ActiveRecord hands back a `Temporal.Instant` for a datetime column, and
+    // `DistanceOfTimeInput` accepts only `Date | number | {toDate} | {toTime}`,
+    // so the two halves need converting by hand.
+    const epochMs = (value as { epochMilliseconds?: number }).epochMilliseconds;
+    const date = epochMs != null ? new Date(epochMs) : new Date(String(value));
+    return timeAgoInWords(date);
+  }
+
   protected async layoutLocals(): Promise<Record<string, unknown>> {
     const user = await this.currentUser();
     return {
       currentUser: user,
       isLoggedIn: user != null,
+      timeAgo: (value: unknown) => this.timeAgo(value),
       notice: this.readFlash().get("notice") ?? null,
       alert: this.readFlash().get("alert") ?? null,
     };

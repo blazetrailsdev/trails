@@ -32,7 +32,10 @@ export class Tweet extends ApplicationRecord {
 
     this.enum("visibility", { everyone: 0, followers: 1 });
 
-    this.validates("body", { presence: true });
+    this.validates("body", {
+      presence: true,
+      length: { maximum: 280 },
+    });
 
     this.scope("recent", (q: Relation<Tweet>) => q.order({ created_at: "desc" }));
     this.scope("popular", (q: Relation<Tweet>) => q.order({ likes_count: "desc" }));

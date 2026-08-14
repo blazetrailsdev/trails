@@ -1,9 +1,11 @@
 <h1>Sign up</h1>
 
+<%= render({ partial: "shared/errors", locals: { errors: errors } }) %>
+
 <form method="post" action="/users">
-  <label>Handle <input type="text" name="user[handle]"></label>
-  <label>Display name <input type="text" name="user[display_name]"></label>
-  <label>Bio <input type="text" name="user[bio]"></label>
+  <label>Handle <input type="text" name="user[handle]" value="<%= user.handle || "" %>"></label>
+  <label>Display name <input type="text" name="user[display_name]" value="<%= user.display_name || "" %>"></label>
+  <label>Bio <input type="text" name="user[bio]" value="<%= user.bio || "" %>"></label>
   <label>Password <input type="password" name="user[password]"></label>
   <button type="submit">Create account</button>
 </form>

@@ -1,6 +1,9 @@
+import * as nodePath from "node:path";
+import { fileURLToPath } from "node:url";
 import { Base, registerModel } from "@blazetrails/activerecord";
 import { getCryptoAsync } from "@blazetrails/activesupport/crypto-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { backend } from "@blazetrails/i18n";
 import { Application as ServerApplication } from "@blazetrails/trailties/server";
 import { User } from "../app/models/user.js";
 import { Tweet } from "../app/models/tweet.js";
@@ -28,10 +31,31 @@ export async function connect(): Promise<void> {
   // sync accessor: crypto for the signed session cookie, fs and path for
   // `ActionDispatch::Static`.
   await Promise.all([getCryptoAsync(), getFsAsync(), getPathAsync()]);
+  await loadLocales();
   await Base.establishConnection();
   for (const m of MODELS) registerModel(m);
   await Promise.all(MODELS.map((m) => m.loadSchema()));
   connected = true;
+}
+
+/**
+ * Load `config/locales/*.json` into the I18n backend.
+ *
+ * Rails does this from an initializer over `config.i18n.load_path`; trails has
+ * no such initializer yet, so the app loads its own.
+ */
+async function loadLocales(): Promise<void> {
+  const fs = await getFsAsync();
+  const path = await getPathAsync();
+  const here = nodePath.dirname(fileURLToPath(import.meta.url));
+  const dir = path.resolve(here, "locales");
+  for (const entry of fs.readdirSync(dir)) {
+    if (!entry.endsWith(".json")) continue;
+    const data = JSON.parse(fs.readFileSync(path.join(dir, entry), "utf-8"));
+    for (const [locale, translations] of Object.entries(data)) {
+      backend().storeTranslations(locale, translations as Record<string, unknown>);
+    }
+  }
 }
 
 /**

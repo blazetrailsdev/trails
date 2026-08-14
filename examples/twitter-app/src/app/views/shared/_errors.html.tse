@@ -1,0 +1,10 @@
+<% if (errors.length > 0) { %>
+  <div class="errors">
+    <p><%= errors.length %> error<%= errors.length === 1 ? "" : "s" %> prevented this from being saved:</p>
+    <ul>
+      <% for (const message of errors) { %>
+        <li><%= message %></li>
+      <% } %>
+    </ul>
+  </div>
+<% } %>

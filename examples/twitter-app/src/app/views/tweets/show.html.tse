@@ -1,6 +1,6 @@
 <h1>Tweet</h1>
 
-<%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+<%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser, timeAgo: timeAgo } }) %>
 
 <% if (likers.length > 0) { %>
   <p class="muted">Liked by
@@ -19,7 +19,7 @@
 <% } %>
 
 <% for (const reply of replies) { %>
-  <%= render({ partial: "tweets/tweet", locals: { tweet: reply, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+  <%= render({ partial: "tweets/tweet", locals: { tweet: reply, isLoggedIn: isLoggedIn, currentUser: currentUser, timeAgo: timeAgo } }) %>
 <% } %>
 
 <p><a href="/">&larr; Back to the timeline</a></p>

@@ -123,6 +123,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../../packages/date
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack

@@ -15,7 +15,10 @@ export function digestPassword(password: string): string {
 
 export class UsersController extends ApplicationController {
   async new(): Promise<void> {
-    this.render({ action: "new", locals: await this.layoutLocals() });
+    this.render({
+      action: "new",
+      locals: { ...(await this.layoutLocals()), user: User.new(), errors: [] },
+    });
   }
 
   async create(): Promise<void> {
@@ -28,14 +31,24 @@ export class UsersController extends ApplicationController {
       password_digest: digestPassword(password),
     });
 
-    if (password.length >= 6 && (await user.save())) {
+    // Validate the record first so its own errors are collected, then add the
+    // password error, so the form shows every problem at once rather than one
+    // at a time. Rails gets this for free from `has_secure_password`.
+    const valid = await user.isValid();
+    if (password.length < 6) {
+      user.errors.add("password", "must be at least 6 characters");
+    } else if (valid && (await user.save())) {
       this.logIn(user);
       this.setFlash("notice", `Welcome, @${user.handle}!`);
       this.redirectTo("/");
-    } else {
-      this.setFlash("alert", "That handle is taken, or your details are incomplete.");
-      this.redirectTo("/signup");
+      return;
     }
+
+    this.render({
+      action: "new",
+      status: 422,
+      locals: { ...(await this.layoutLocals()), user, errors: user.errors.fullMessages },
+    });
   }
 
   async show(): Promise<void> {

@@ -124,9 +124,13 @@ async function main(): Promise<void> {
     );
     check(!afterTweet.includes("Welcome, @dean!"), "the previous flash is single-use");
 
-    // --- A validation failure ---
-    const afterBlank = await client.submit("/tweets", { "tweet[body]": "" });
-    check(afterBlank.includes("can&#39;t be blank"), "a blank tweet is rejected by the model");
+    // --- A validation failure re-renders the form, Rails-style ---
+    const afterBlank = await client.post("/tweets", { "tweet[body]": "" });
+    check(afterBlank.status === 422, "a blank tweet is rejected with 422");
+    check(
+      (await afterBlank.text()).includes("can&#39;t be blank"),
+      "a blank tweet is rejected by the model",
+    );
 
     // --- Profiles ---
     const profile = await client.get("/@ada");
@@ -250,6 +254,63 @@ async function main(): Promise<void> {
     check(
       (await Tweet.roots().count()) < (await Tweet.count()),
       "the roots scope excludes replies",
+    );
+
+    // --- Validations, errors, and i18n ---
+    const tooLong = await client.post("/tweets", { "tweet[body]": "x".repeat(300) });
+    check(tooLong.status === 422, "an invalid tweet re-renders the form with 422");
+    const tooLongHtml = await tooLong.text();
+    check(
+      tooLongHtml.includes("is too long — keep it under 280 characters"),
+      "the length error uses the model-scoped i18n override with %{count}",
+    );
+    check(
+      tooLongHtml.includes('name="tweet[body]"'),
+      "the invalid form is re-rendered, not redirected away from",
+    );
+
+    const badSignup = await client.post("/users", {
+      "user[handle]": "Bad Handle!",
+      "user[display_name]": "",
+      "user[password]": "x",
+    });
+    const badSignupHtml = await badSignup.text();
+    check(
+      badSignupHtml.includes("may only contain letters, numbers and underscores"),
+      "the format validator reports its custom message",
+    );
+    check(
+      badSignupHtml.includes("Display name can&#39;t be blank"),
+      "errors.fullMessages humanizes the attribute name",
+    );
+    check(
+      badSignupHtml.includes("3 errors prevented"),
+      "every validation error is reported at once, not one at a time",
+    );
+
+    const dupe = await client.post("/users", {
+      "user[handle]": "dean",
+      "user[display_name]": "Dean",
+      "user[password]": "swordfish",
+    });
+    check(
+      (await dupe.text()).includes("is already someone else&#39;s handle"),
+      "the uniqueness error uses the model-scoped i18n override",
+    );
+
+    const doubleLike = await Like.createBang({ user_id: dean.id, tweet_id: tweet.id });
+    const second = Like.new({ user_id: dean.id, tweet_id: tweet.id });
+    check(!(await second.isValid()), "validatesUniqueness with a scope rejects a duplicate like");
+    check(
+      second.errors.fullMessagesFor("user_id").length > 0,
+      "the scoped uniqueness error is attached to its attribute",
+    );
+    await doubleLike.destroy();
+
+    // --- ActionView date helper over an ActiveRecord timestamp ---
+    check(
+      (await (await client.get("/")).text()).includes(" ago"),
+      "time_ago_in_words renders against the record's created_at",
     );
 
     const explore = await client.get("/explore");

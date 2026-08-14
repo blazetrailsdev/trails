@@ -26,6 +26,6 @@
 <section>
   <h2>Most liked</h2>
   <% for (const tweet of popular) { %>
-    <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+    <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser, timeAgo: timeAgo } }) %>
   <% } %>
 </section>

@@ -2,5 +2,5 @@
 <p class="muted"><%= tweets.length %> tweets</p>
 
 <% for (const tweet of tweets) { %>
-  <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser } }) %>
+  <%= render({ partial: "tweets/tweet", locals: { tweet: tweet, isLoggedIn: isLoggedIn, currentUser: currentUser, timeAgo: timeAgo } }) %>
 <% } %>

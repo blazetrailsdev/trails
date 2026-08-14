@@ -31,7 +31,8 @@
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "better-sqlite3": "^12.6.2",
-    "@blazetrails/date": "workspace:*"
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/i18n": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*",

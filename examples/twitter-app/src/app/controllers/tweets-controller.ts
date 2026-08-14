@@ -51,7 +51,10 @@ export class TweetsController extends ApplicationController {
   }
 
   async new(): Promise<void> {
-    this.render({ action: "new", locals: await this.layoutLocals() });
+    this.render({
+      action: "new",
+      locals: { ...(await this.layoutLocals()), tweet: Tweet.new(), errors: [] },
+    });
   }
 
   async create(): Promise<void> {
@@ -61,10 +64,20 @@ export class TweetsController extends ApplicationController {
     if (await tweet.save()) {
       this.setFlash("notice", tweet.reply_to_id ? "Reply posted." : "Tweet posted.");
       this.redirectTo(tweet.reply_to_id ? `/tweets/${tweet.reply_to_id}` : "/");
-    } else {
-      this.setFlash("alert", "Your tweet can't be blank.");
-      this.redirectTo("/tweets/new");
+      return;
     }
+
+    // Rails re-renders the form with the invalid record so the errors are
+    // visible next to the input, rather than redirecting and losing them.
+    this.render({
+      action: "new",
+      status: 422,
+      locals: {
+        ...(await this.layoutLocals()),
+        tweet,
+        errors: tweet.errors.fullMessages,
+      },
+    });
   }
 
   async destroy(): Promise<void> {
