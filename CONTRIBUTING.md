@@ -267,7 +267,8 @@ takes every future test in that file out of the denominator too.
 
 For an activesupport file, whether it is in the AR closure at all is a separate
 question from whether it is ported: `pnpm parity:test:closure [<test file>]`
-prints in/out (RFC 0105, `derive-ar-closure-test-manifest`). Out-of-closure is
+prints in/out — the command ships with RFC 0105's
+`derive-ar-closure-test-manifest` story. Out-of-closure is
 not a licence to add an `unported-files` row — it changes which denominator the
 file belongs to, not whether the surface exists.
 
