@@ -684,13 +684,31 @@ export function isDelegatingWrapper(tsName: string, tsCalls: Set<string>): boole
 export const SAME_FILE_CLOSURE_DEPTH = 3;
 
 /**
+ * Call names the extractor synthesizes from a syntactic form instead of reading
+ * them off a named callee, so a same-file member carrying the name is NOT what
+ * the body called and must not be walked into.
+ *
+ * `new Requested({...})` records the call as `constructor` — the name every
+ * class in the file declares, whichever class was constructed. Resolving it in
+ * the same-file closure unions an unrelated constructor's call-set (and, three
+ * hops out, everything that constructor reaches) into this body's effective
+ * calls, so editing that constructor changes THIS body's `missing` set with its
+ * own body byte-identical: `lookup_context.rb`'s `detail_args_for_any` stopped
+ * flagging `details_cache_key` because `LookupContext`'s constructor was edited
+ * to reach `detailsKey` (RFC 0025
+ * `extractor-missing-set-perturbed-by-unrelated-edits`).
+ */
+const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
+
+/**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.
  *
  * `sameFileCalls` resolves a method name to its call-set ONLY when that method
  * is defined in the same TS file as the body under comparison — that scoping is
  * what makes the closure sound (unlike the package-wide `delegateCalls` map,
  * which an unrelated same-named method can satisfy). `tsName` seeds the visited
- * set, so self-recursion and longer cycles terminate.
+ * set, so self-recursion and longer cycles terminate. Names in
+ * SYNTHETIC_CALL_NAMES are never resolved or expanded.
  */
 export function reachedSameFileMethods(
   tsName: string,
@@ -704,6 +722,7 @@ export function reachedSameFileMethods(
   for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
     const next: string[] = [];
     for (const name of frontier) {
+      if (SYNTHETIC_CALL_NAMES.has(name)) continue;
       if (visited.has(name)) continue;
       visited.add(name);
       const calls = sameFileCalls(name);
