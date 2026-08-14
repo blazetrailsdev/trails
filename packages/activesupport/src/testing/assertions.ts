@@ -944,10 +944,10 @@ export class SummaryReporter extends StatisticsReporter {
     if (this.options.Werror === true) extra.push(`, ${this.warnings} warnings`);
 
     if (
+      this.results.some((r) => r.skipped()) &&
       this.options.verbose !== true &&
       this.options.showSkips !== true &&
-      env.MT_NO_SKIP_MSG == null &&
-      this.results.some((r) => r.skipped())
+      env.MT_NO_SKIP_MSG == null
     )
       extra.push("\n\nYou have skipped tests. Run with --verbose for details.");
 
@@ -996,6 +996,13 @@ export class CompositeReporter extends AbstractReporter {
     this.reporters.forEach((r) => r.start());
   }
 
+  /**
+   * Mirrors `Minitest::CompositeReporter#prerecord` (minitest.rb:1000-1005).
+   * Ruby guards each dispatch with `if reporter.respond_to? :prerecord` — its
+   * own `# TODO: remove conditional for minitest 6` — which a
+   * {@link AbstractReporter}-typed element cannot fail, so the guard has no
+   * arm to port.
+   */
   override prerecord(klass: { name: string }, name: string): void {
     this.reporters.forEach((reporter) => {
       reporter.prerecord(klass, name);
