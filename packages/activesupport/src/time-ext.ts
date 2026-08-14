@@ -9,11 +9,13 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
-import { zone as timeZone } from "./time-zone-config.js";
+import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
+import { TimeZone } from "./values/time-zone.js";
+import { isBlank } from "./core-ext/object/blank.js";
 import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -724,6 +726,40 @@ export function toDate(date: Date): Temporal.PlainDate {
  */
 export function toTime(date: Date): Temporal.Instant {
   return instantFrom(date);
+}
+
+/**
+ * toDatetime — Rails `String#to_datetime`. Converts a string to a DateTime
+ * value.
+ *
+ * Mirrors: String#to_datetime (`core_ext/string/conversions.rb:57-59`).
+ */
+export function toDatetime(
+  str: string,
+): Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined {
+  if (!isBlank(str)) return DateTime.parse(str, false);
+  return undefined;
+}
+
+/**
+ * inTimeZone — Rails `String#in_time_zone`. Converts a String to a
+ * TimeWithZone in the current zone if `Time.zone` or `Time.zone_default` is
+ * set, otherwise converts the String to a Time.
+ *
+ * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`). trails has
+ * no `String#to_time` port yet, so the fallback arm parses the string through
+ * the host `Date` — the same instant Ruby's `Time.parse` would land on for an
+ * ISO-8601 string.
+ */
+export function inTimeZone(
+  str: string,
+  zone: unknown = timeZone(),
+): TimeWithZone | Temporal.Instant {
+  if (zone != null && zone !== false) {
+    return (findZoneBang(zone) as TimeZone).parse(str);
+  } else {
+    return toTime(new globalThis.Date(str));
+  }
 }
 
 /**

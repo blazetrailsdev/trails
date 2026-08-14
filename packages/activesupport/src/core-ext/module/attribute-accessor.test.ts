@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { mattrAccessor } from "../../module-ext.js";
+import {
+  cattrReader,
+  cattrWriter,
+  mattrAccessor,
+  mattrReader,
+  mattrWriter,
+} from "../../module-ext.js";
 
 describe("ModuleAttributeAccessorTest", () => {
   it("should use mattr default", () => {
@@ -12,7 +18,11 @@ describe("ModuleAttributeAccessorTest", () => {
   it("mattr default keyword arguments", () => {
     class MyModule {}
     mattrAccessor(MyModule, "size", { default: 42 });
+    cattrReader(MyModule, "defReader", { default: "default_reader_value" });
+    cattrWriter(MyModule, "defWriter", { default: "default_writer_value" });
     expect((MyModule as any).size).toBe(42);
+    expect((MyModule as any).defReader).toBe("default_reader_value");
+    expect((MyModule as any).__mattr_defWriter__).toBe("default_writer_value");
   });
 
   it("mattr can default to false", () => {
@@ -53,13 +63,19 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("should not create instance reader", () => {
     class MyModule {}
-    mattrAccessor(MyModule, "secret", { instanceReader: false });
+    mattrReader(MyModule, "shaq", { instanceReader: false });
+    expect((MyModule as any).shaq).toBeUndefined();
     const inst = new (MyModule as any)();
-    expect(inst.secret).toBeUndefined();
+    expect(inst.shaq).toBeUndefined();
   });
 
   it("should not create instance accessors", () => {
     class MyModule {}
+    mattrWriter(MyModule, "camp", { instanceAccessor: false });
+    (MyModule as any).camp = "set";
+    expect((MyModule as any).camp).toBeUndefined();
+    expect((MyModule as any).__mattr_camp__).toBe("set");
+
     mattrAccessor(MyModule, "hidden", { instanceReader: false, instanceWriter: false });
     const inst = new (MyModule as any)();
     expect(inst.hidden).toBeUndefined();

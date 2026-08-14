@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/digest/uuid.ts",
+    "rubyName": "uuid_from_hash",
+    "call": "unpack",
+    "reason": "Rails' `hash.digest.unpack(\"NnnnnN\")` (digest/uuid.rb:34) reads six big-endian fields out of a byte String; a JS string cannot hold bytes, so trails reads the same six fields off a `DataView` over the digest's `Uint8Array`. There is no `unpack` to call."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/digest/uuid.ts",
+    "rubyName": "pack_uuid_namespace",
+    "call": "map",
+    "reason": "Rails' `match_data.captures.map { |s| s.to_i(16) }.pack(\"NnnnnN\")` (digest/uuid.rb:70) round-trips the hex captures back through a packed String; trails parses the joined hex straight to a `Uint8Array`, so neither `map` nor `pack` has a caller."
+  }
+]

@@ -268,6 +268,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/class/subclasses.rb": "module-ext.ts",
   "activesupport:core_ext/kernel/reporting.rb": "module-ext.ts",
   "activesupport:core_ext/module/redefine_method.rb": "class-attribute.ts",
+  // `class_attribute` and the `redefine_method` / `redefine_singleton_method`
+  // it generates with live in one file here, so the reopening follows
+  // redefine_method.rb's entry above rather than claiming its own path.
+  "activesupport:core_ext/class/attribute.rb": "class-attribute.ts",
   "activesupport:core_ext/array/inquiry.rb": "array-inquirer.ts",
   "activesupport:core_ext/string/inquiry.rb": "string-inquirer.ts",
   "activesupport:inflector/transliterate.rb": "transliterate.ts",

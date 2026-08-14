@@ -1,42 +1,89 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "../../hash-utils.js";
+import {
+  DNS_NAMESPACE,
+  OID_NAMESPACE,
+  URL_NAMESPACE,
+  X500_NAMESPACE,
+  nilUuid,
+  uuidFromHash,
+  uuidV3,
+  uuidV5,
+} from "./uuid.js";
+
+/** Rails' `"%08x-%04x-%04x-%04x-%04x%08x" % namespace.unpack("NnnnnN")`. */
+function formatNamespace(namespace: Uint8Array): string {
+  const hex = Array.from(namespace, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 describe("DigestUUIDExt", () => {
-  // UUID namespace constants (RFC 4122)
-  const DNS_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-  const URL_NAMESPACE = "6ba7b811-9dad-11d1-80b4-00c04fd430c8";
-  const NIL_UUID = "00000000-0000-0000-0000-000000000000";
-
   it("constants", () => {
-    expect(DNS_NAMESPACE).toMatch(/^[0-9a-f-]+$/i);
-    expect(URL_NAMESPACE).toMatch(/^[0-9a-f-]+$/i);
-    expect(NIL_UUID).toBe("00000000-0000-0000-0000-000000000000");
+    expect(formatNamespace(DNS_NAMESPACE)).toEqual("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+    expect(formatNamespace(URL_NAMESPACE)).toEqual("6ba7b811-9dad-11d1-80b4-00c04fd430c8");
+    expect(formatNamespace(OID_NAMESPACE)).toEqual("6ba7b812-9dad-11d1-80b4-00c04fd430c8");
+    expect(formatNamespace(X500_NAMESPACE)).toEqual("6ba7b814-9dad-11d1-80b4-00c04fd430c8");
   });
 
   it("v3 uuids with rfc4122 namespaced uuids enabled", () => {
-    // V3 UUID = MD5 of namespace + name
-    // We test the format: 8-4-4-4-12 hex digits
-    const uuidV3Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-3[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    // Since we don't have full UUID v3 implementation, just test the format concept
-    const exampleV3 = "a3bb189e-8bf9-3888-9912-ace4e6543002";
-    expect(exampleV3).toMatch(uuidV3Pattern);
+    expect(uuidV3("6BA7B810-9DAD-11D1-80B4-00C04FD430C8", "www.widgets.com")).toEqual(
+      "3d813cbb-47fb-32ba-91df-831e1593ac29",
+    );
+    expect(uuidV3("6ba7b810-9dad-11d1-80b4-00c04fd430c8", "www.widgets.com")).toEqual(
+      "3d813cbb-47fb-32ba-91df-831e1593ac29",
+    );
+    expect(uuidV3(DNS_NAMESPACE, "www.widgets.com")).toEqual(
+      "3d813cbb-47fb-32ba-91df-831e1593ac29",
+    );
+
+    expect(uuidV3("6BA7B811-9DAD-11D1-80B4-00C04FD430C8", "http://www.widgets.com")).toEqual(
+      "86df55fb-428e-3843-8583-ba3c05f290bc",
+    );
+    expect(uuidV3(URL_NAMESPACE, "http://www.widgets.com")).toEqual(
+      "86df55fb-428e-3843-8583-ba3c05f290bc",
+    );
+
+    expect(uuidV3("6BA7B812-9DAD-11D1-80B4-00C04FD430C8", "1.2.3")).toEqual(
+      "8c29ab0e-a2dc-3482-b5eb-20cb2e2387a1",
+    );
+    expect(uuidV3(OID_NAMESPACE, "1.2.3")).toEqual("8c29ab0e-a2dc-3482-b5eb-20cb2e2387a1");
+
+    expect(uuidV3(X500_NAMESPACE, "cn=John Doe, ou=People, o=Acme, Inc., c=US")).toEqual(
+      "ee49149d-53a4-304a-890b-468229f6afc3",
+    );
+
+    expect(() => uuidV3("A non-UUID string", "some value")).toThrow(ArgumentError);
   });
 
   it("v5 uuids with rfc4122 namespaced uuids enabled", () => {
-    // V5 UUID = SHA1 of namespace + name
-    const uuidV5Pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    const exampleV5 = "886313e1-3b8a-5372-9b90-0c9aee199e5d";
-    expect(exampleV5).toMatch(uuidV5Pattern);
+    expect(uuidV5("6BA7B810-9DAD-11D1-80B4-00C04FD430C8", "www.widgets.com")).toEqual(
+      "21f7f8de-8051-5b89-8680-0195ef798b6a",
+    );
+    expect(uuidV5(DNS_NAMESPACE, "www.widgets.com")).toEqual(
+      "21f7f8de-8051-5b89-8680-0195ef798b6a",
+    );
+
+    expect(uuidV5("6ba7b811-9dad-11d1-80b4-00c04fd430c8", "http://www.widgets.com")).toEqual(
+      "4e570fd8-186d-5a74-90f0-4d28e34673a1",
+    );
+    expect(uuidV5(URL_NAMESPACE, "http://www.widgets.com")).toEqual(
+      "4e570fd8-186d-5a74-90f0-4d28e34673a1",
+    );
+
+    expect(uuidV5(OID_NAMESPACE, "1.2.3")).toEqual("42d5e23b-3a02-5135-85c6-52d1102f1f00");
+
+    expect(uuidV5(X500_NAMESPACE, "cn=John Doe, ou=People, o=Acme, Inc., c=US")).toEqual(
+      "fd5b2ddf-bcfe-58b6-90d6-db50f74db527",
+    );
+
+    expect(() => uuidV5("A non-UUID string", "some value")).toThrow(ArgumentError);
   });
 
   it("nil uuid", () => {
-    expect(NIL_UUID).toBe("00000000-0000-0000-0000-000000000000");
-    expect(NIL_UUID.split("-").join("")).toBe("0".repeat(32));
+    expect(nilUuid()).toEqual("00000000-0000-0000-0000-000000000000");
   });
 
   it("invalid hash class", () => {
-    // Invalid hash class would throw an error
-    expect(() => {
-      throw new TypeError("Invalid hash class");
-    }).toThrow(TypeError);
+    expect(() => uuidFromHash("sha256", OID_NAMESPACE, "1.2.3")).toThrow(ArgumentError);
   });
 });

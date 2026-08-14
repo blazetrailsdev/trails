@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   attrInternal,
+  attrInternalAccessor,
   attrInternalReader,
   attrInternalWriter,
   getAttrInternalNamingFormat,
@@ -46,7 +47,7 @@ describe("AttrInternalTest", () => {
 
   it("accessor", () => {
     class Target {}
-    attrInternal(Target.prototype, "foo");
+    attrInternalAccessor(Target.prototype, "foo");
     const instance = new Target() as any;
 
     expect(instance._foo_).toBeUndefined();
@@ -73,5 +74,14 @@ describe("AttrInternalTest", () => {
     instance.foo = 1;
     expect(instance._foo_).toBeUndefined();
     expect(instance.abcfoodef).toBe(1);
+  });
+
+  /**
+   * trails-only: `attr_internal` is an `alias_method` of
+   * `attr_internal_accessor` (`module/attr_internal.rb:20`), so the two names
+   * have to be the same function.
+   */
+  it("attrInternal is an alias of attrInternalAccessor", () => {
+    expect(attrInternal).toBe(attrInternalAccessor);
   });
 });

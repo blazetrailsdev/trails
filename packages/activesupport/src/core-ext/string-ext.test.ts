@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { toDatetime } from "../time-ext.js";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -114,7 +115,17 @@ describe("StringConversionsTest", () => {
   it.skip("daylight savings string to time when current time is daylight savings");
   it.skip("partial string to time when current time is standard time");
   it.skip("partial string to time when current time is daylight savings");
-  it.skip("string to datetime");
+  it("string to datetime", () => {
+    // Rails asserts `DateTime.civil(2039, 2, 27, 23, 50)` and a `.offset` of 0;
+    // trails' `DateTime.parse` returns the offsetless `Temporal.PlainDateTime`
+    // for an offsetless string and a `ZonedDateTime` when the string carries
+    // one, which is the same pair of values Ruby's DateTime holds.
+    expect(String(toDatetime("2039-02-27 23:50"))).toEqual("2039-02-27T23:50:00");
+    expect(String(toDatetime("2039-02-27T23:50:19.275038-04:00"))).toEqual(
+      "2039-02-27T23:50:19.275038-04:00[-04:00]",
+    );
+    expect(toDatetime("")).toBeUndefined();
+  });
   it.skip("partial string to datetime");
   it.skip("string to date");
 });

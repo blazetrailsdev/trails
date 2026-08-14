@@ -1,49 +1,76 @@
-import { describe, expect, it } from "vitest";
-import { moduleParentName } from "../../module-ext.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import { registerConstant, unregisterConstant } from "../../inflector.js";
+import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
+
+/**
+ * Ruby's nested `module ParentA; module B; module C; end; end; end`. A JS class
+ * has no enclosing lexical namespace, so the `::` path lives in its `name` and
+ * the constant registry is what `constantize` resolves it through — the same
+ * two facts `module_parent_name` and `module_parent` read in Ruby.
+ */
+function namedModule(name: string): { name: string } {
+  const mod = {};
+  Object.defineProperty(mod, "name", { value: name, configurable: true });
+  registerConstant(name, mod);
+  return mod as { name: string };
+}
 
 describe("IntrospectionTest", () => {
-  function namedFn(name: string): { name: string } {
-    const f = function () {};
-    Object.defineProperty(f, "name", { value: name, configurable: true });
-    return f as unknown as { name: string };
-  }
+  let ParentA: { name: string };
+  let ParentAB: { name: string };
+  let ParentABC: { name: string };
+  let ParentAFrozenB: { name: string };
+  let ParentABFrozenC: { name: string };
+
+  beforeAll(() => {
+    ParentA = namedModule("ParentA");
+    ParentAB = namedModule("ParentA::B");
+    ParentABC = namedModule("ParentA::B::C");
+    ParentAFrozenB = Object.freeze(namedModule("ParentA::FrozenB"));
+    ParentABFrozenC = Object.freeze(namedModule("ParentA::B::FrozenC"));
+  });
 
   it("module parent name", () => {
-    expect(moduleParentName(class FooBar {})).toBeNull(); // no ::
-    expect(moduleParentName(namedFn("Foo::Bar"))).toBe("Foo");
+    expect(moduleParentName(ParentAB)).toEqual("ParentA");
+    expect(moduleParentName(ParentABC)).toEqual("ParentA::B");
+    expect(moduleParentName(ParentA)).toBeNull();
   });
 
   it("module parent name when frozen", () => {
-    expect(moduleParentName(namedFn("Foo::Bar::Baz"))).toBe("Foo::Bar");
+    expect(moduleParentName(ParentAFrozenB)).toEqual("ParentA");
+    expect(moduleParentName(ParentABFrozenC)).toEqual("ParentA::B");
   });
 
   it("module parent name notice changes", () => {
-    expect(moduleParentName(namedFn("A::B::C"))).toBe("A::B");
-    expect(moduleParentName(namedFn("A::B"))).toBe("A");
-    expect(moduleParentName(namedFn("A"))).toBeNull();
+    const klass = class {};
+    expect(moduleParentName(klass)).toBeNull();
+    const newClass = namedModule("ParentA::NewClass");
+    try {
+      expect(moduleParentName(newClass)).toEqual("ParentA");
+    } finally {
+      unregisterConstant("ParentA::NewClass", newClass);
+    }
   });
 
   it("module parent", () => {
-    class Animal {}
-    class Dog extends Animal {}
-    expect(Object.getPrototypeOf(Dog)).toBe(Animal);
+    expect(moduleParent(ParentABC)).toBe(ParentAB);
+    expect(moduleParent(ParentAB)).toBe(ParentA);
+    expect(moduleParent(ParentA)).toBe(Object);
   });
 
   it("module parents", () => {
-    class A {}
-    class B extends A {}
-    class C extends B {}
-    const chain: unknown[] = [];
-    let proto = Object.getPrototypeOf(C);
-    while (proto && proto !== Function.prototype) {
-      chain.push(proto);
-      proto = Object.getPrototypeOf(proto);
-    }
-    expect(chain).toContain(B);
-    expect(chain).toContain(A);
+    expect(moduleParents(ParentABC)).toEqual([ParentAB, ParentA, Object]);
+    expect(moduleParents(ParentAB)).toEqual([ParentA, Object]);
   });
 
   it("module parent notice changes", () => {
-    expect(moduleParentName(namedFn("Outer::Inner"))).toBe("Outer");
+    const klass = class {};
+    expect(moduleParent(klass)).toBe(Object);
+    const newClass = namedModule("ParentA::NewClass");
+    try {
+      expect(moduleParent(newClass)).toBe(ParentA);
+    } finally {
+      unregisterConstant("ParentA::NewClass", newClass);
+    }
   });
 });
