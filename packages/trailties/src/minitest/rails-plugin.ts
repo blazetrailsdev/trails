@@ -3,12 +3,8 @@
  * `railties/lib/minitest/rails_plugin.rb`.
  */
 
-import { env, Minitest, type BacktraceFilter } from "@blazetrails/activesupport";
+import { env, Minitest } from "@blazetrails/activesupport";
 import { Trails } from "../rails.js";
-
-interface BacktraceFilterLike {
-  filter(backtrace: string[]): string[];
-}
 
 /**
  * Mirrors `Minitest::BacktraceFilterWithFallback` (rails_plugin.rb:8-19) — runs
@@ -23,10 +19,13 @@ interface BacktraceFilterLike {
  * `widen-trailties-libpath-to-cover-lib-minitest`.
  */
 export class BacktraceFilterWithFallback {
-  private preferred: BacktraceFilterLike;
-  private fallback: BacktraceFilterLike;
+  private preferred: { filter(backtrace: string[]): string[] };
+  private fallback: { filter(backtrace: string[]): string[] };
 
-  constructor(preferred: BacktraceFilterLike, fallback: BacktraceFilterLike) {
+  constructor(
+    preferred: { filter(backtrace: string[]): string[] },
+    fallback: { filter(backtrace: string[]): string[] },
+  ) {
     this.preferred = preferred;
     this.fallback = fallback;
   }
@@ -40,7 +39,9 @@ export class BacktraceFilterWithFallback {
 
 /**
  * Mirrors `Minitest.plugin_rails_init` (rails_plugin.rb:111-136) — replaces
- * `Minitest.backtrace_filter` with one that silences gem lines.
+ * `Minitest.backtrace_filter` with one that silences gem lines. Rails guards the
+ * assignment with `::Rails.respond_to?(:backtrace_cleaner)` because the plugin
+ * can run without Rails loaded; `Trails.backtraceCleaner` is the trails seat.
  *
  * @missingRailsCall rails_plugin.rb:122-135 swaps three Minitest reporters
  * (`SummaryReporter`, `ProgressReporter`, `ProfileReporter`). trails has no
@@ -50,17 +51,15 @@ export class BacktraceFilterWithFallback {
  * @noRailsEquivalent Ports `Minitest.plugin_rails_init`, which the comparator
  * cannot see for the libPath reason on {@link BacktraceFilterWithFallback}.
  */
-export function pluginRailsInit(options: { fullBacktrace?: boolean } = {}): void {
+export function pluginRailsInit(options: { fullBacktrace?: boolean }): void {
   if (env.RAILS_ENV == null && env.RAILS_MINITEST_PLUGIN == null) return;
 
   if (options.fullBacktrace !== true) {
-    // Rails guards with `::Rails.respond_to?(:backtrace_cleaner)` because the
-    // plugin can run without Rails loaded.
     if (Trails.backtraceCleaner != null) {
       Minitest.backtraceFilter = new BacktraceFilterWithFallback(
         Trails.backtraceCleaner,
         Minitest.backtraceFilter,
-      ) as unknown as BacktraceFilter;
+      );
     }
   }
 }

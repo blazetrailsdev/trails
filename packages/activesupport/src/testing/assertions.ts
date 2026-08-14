@@ -135,12 +135,17 @@ export class BacktraceFilter {
  * assigned at :1204) and `Minitest.filter_backtrace` (minitest.rb:365-369).
  * Held on an object so the accessor is reassignable at the Ruby spelling
  * (`Minitest.backtraceFilter = ...`), which `filterBacktrace` reads on every
- * call the way the `cattr_accessor` does.
+ * call the way the `cattr_accessor` does. The seat is typed by the `filter`
+ * method alone because Ruby's is duck-typed: `rails_plugin.rb:118` assigns a
+ * `BacktraceFilterWithFallback`, which is not a `BacktraceFilter`.
  *
  * @noRailsEquivalent PERMANENT — minitest's module surface; see
  * {@link BacktraceFilter}.
  */
-export const Minitest = {
+export const Minitest: {
+  backtraceFilter: { filter(bt: string[] | null): string[] };
+  filterBacktrace(bt: string[] | null): string[];
+} = {
   backtraceFilter: new BacktraceFilter(),
 
   filterBacktrace(bt: string[] | null): string[] {
