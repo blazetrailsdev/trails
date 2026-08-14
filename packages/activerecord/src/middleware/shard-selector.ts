@@ -6,14 +6,13 @@
 
 import { Base } from "../base.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
 
 export interface ShardRequest {
   method: string;
   [key: string]: unknown;
 }
 
-type ShardResolverFn = (request: ShardRequest) => string | symbol;
+type ShardResolverFn = (request: ShardRequest) => string;
 
 export class ShardSelector {
   /** @internal */
@@ -33,6 +32,11 @@ export class ShardSelector {
     this.options = options;
   }
 
+  /**
+   * @missingRailsCall new — shard_selector.rb:41 wraps env in
+   * ActionDispatch::Request.new(env); trails has no ActionDispatch, so call()
+   * receives the request itself and constructs nothing.
+   */
   async call(request: ShardRequest): Promise<unknown> {
     const shard = this.selectedShard(request);
     return this.setShard(shard, () => this.app(request));
@@ -54,20 +58,12 @@ export class ShardSelector {
   }
 
   /** @internal */
-  selectedShard(request: ShardRequest): string | symbol {
+  selectedShard(request: ShardRequest): string {
     return this.resolver(request);
   }
 
-  private async setShard<T>(shard: string | symbol, block: () => T | Promise<T>): Promise<T> {
-    let shardKey: string;
-    if (typeof shard === "string") {
-      shardKey = shard;
-    } else {
-      const name = Symbol.keyFor(shard) ?? shard.description;
-      if (!name) throw new ArgumentError(`Cannot convert symbol to shard key: ${String(shard)}`);
-      shardKey = name;
-    }
-    return Base.connectedTo({ shard: shardKey }, () =>
+  private async setShard<T>(shard: string, block: () => T | Promise<T>): Promise<T> {
+    return Base.connectedTo({ shard }, () =>
       Base.prohibitShardSwapping(() => block(), this.options.lock ?? true),
     ) as Promise<T>;
   }
