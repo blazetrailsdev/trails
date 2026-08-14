@@ -268,7 +268,14 @@ export class Time {
       day,
       hour,
       min,
-      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+      sec instanceof Rational
+        ? sec.add(new Rational(usec, 1_000_000))
+        : Number.isInteger(sec)
+          ? // MRI keeps the sub-second as a Rational (`time.c`, `time_new_timew`),
+            // so an integer `sec` never touches a double and the last nanosecond
+            // of `usec` survives.
+            new Rational(sec, 1).add(new Rational(usec, 1_000_000))
+          : sec + usec / 1_000_000,
       "UTC",
     );
   }
@@ -293,7 +300,14 @@ export class Time {
       day,
       hour,
       min,
-      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+      sec instanceof Rational
+        ? sec.add(new Rational(usec, 1_000_000))
+        : Number.isInteger(sec)
+          ? // MRI keeps the sub-second as a Rational (`time.c`, `time_new_timew`),
+            // so an integer `sec` never touches a double and the last nanosecond
+            // of `usec` survives.
+            new Rational(sec, 1).add(new Rational(usec, 1_000_000))
+          : sec + usec / 1_000_000,
     );
   }
 

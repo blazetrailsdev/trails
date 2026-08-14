@@ -51,7 +51,7 @@ export const FileLike = {
  * dynamic import — see `xml-mini/nokogirisax.ts:55` and `xml-mini/nokogiri.ts:99`.
  */
 export interface XmlMiniBackend {
-  parse(data: string | Blob | null | undefined): Promise<Record<string, unknown>>;
+  parse(data: string | StringIO | null | undefined): Promise<Record<string, unknown>>;
 }
 
 /** The name of a backend, or the backend module itself. */
@@ -305,7 +305,9 @@ let _backend: XmlMiniBackend | null | undefined;
  * every backend's `parse` is (see {@link XmlMiniBackend}); the delegation itself
  * still forwards straight to the selected backend.
  */
-export function parse(data: string | Blob | null | undefined): Promise<Record<string, unknown>> {
+export function parse(
+  data: string | StringIO | null | undefined,
+): Promise<Record<string, unknown>> {
   return backend()!.parse(data);
 }
 

@@ -4,11 +4,14 @@
 // (`default_middleware_stack.rb:49`). Rails covers the two halves separately
 // (`dispatch/executor_test.rb`, `asynchronous_queries_test.rb`); the wiring
 // between them has no single Rails counterpart.
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Base, Trailtie } from "@blazetrails/activerecord";
 import { Application } from "../application.js";
+import { Configuration } from "./configuration.js";
+import { DefaultMiddlewareStack } from "./default-middleware-stack.js";
+import { Root } from "../paths.js";
 
 const SESSION_ERROR = "Can't perform asynchronous queries without a query session";
 
@@ -22,8 +25,13 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   class TestApplication extends Application {}
   let app: TestApplication;
 
-  beforeEach(async () => {
+  // The initializers register the executor hooks on `ActiveSupport::Executor`
+  // itself, so running them per-test would stack a second copy of every hook.
+  beforeAll(() => {
     Trailtie.runInitializers();
+  });
+
+  beforeEach(async () => {
     app = new TestApplication();
     await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
   });
@@ -52,6 +60,55 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
     // (`executor.rb:23`), so the session outlives `call` and dies with the body.
     expect(Base.asynchronousQueriesSession().active()).toBe(true);
     (body as unknown as { close(): void }).close();
+    expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
+  });
+
+  it("enables the query cache for the request body and clears it on close", async () => {
+    const pool = Base.connectionPool();
+    expect(pool.queryCacheEnabled).toBe(false);
+
+    let enabledInRequest: boolean | null = null;
+    const middleware = new ActionDispatchExecutor(async () => {
+      const connection = await Base.leaseConnection();
+      await connection.selectAll("SELECT 1 AS one", null, []);
+      enabledInRequest = Base.connectionPool().queryCacheEnabled;
+      return [200, {}, []] as unknown as RackResponse;
+    }, app.executor);
+
+    const [, , body] = await middleware.call({} as RackEnv);
+    expect(enabledInRequest).toBe(true);
+
+    (body as unknown as { close(): void }).close();
+    expect(Base.connectionPool().queryCacheEnabled).toBe(false);
+    expect(Base.connectionPool().queryCache.empty).toBe(true);
+  });
+
+  it("opens the session through the built default middleware stack", async () => {
+    const paths = new Root("/app");
+    paths.add("public");
+    const config = new Configuration();
+    config.publicFileServer.enabled = false;
+    const stack = new DefaultMiddlewareStack(
+      { config, executor: app.executor, reloader: app.reloader },
+      config,
+      paths,
+    ).buildStack();
+
+    let rows: unknown[] | null = null;
+    const stackApp = stack.build(async () => {
+      rows = await selectOneAsync();
+      return [200, {}, []] as unknown as RackResponse;
+    });
+
+    const [status, , stackBody] = await stackApp({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    } as unknown as RackEnv);
+
+    expect(status).toBe(200);
+    expect(rows).toEqual([{ one: 1 }]);
+
+    (stackBody as unknown as { close(): void }).close();
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
   });
 

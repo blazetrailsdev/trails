@@ -1,4 +1,5 @@
 import { isBlank } from "../string-utils.js";
+import { StringIO } from "../string-io.js";
 
 function isModuleNotFound(e: unknown, pkg: string): boolean {
   if (!(e instanceof Error)) return false;
@@ -141,23 +142,22 @@ export function setDocumentClass(klass: new () => HashBuilder): void {
 
 /**
  * Mirrors: ActiveSupport::XmlMini_NokogiriSAX#parse (nokogirisax.rb:69-80) —
- * `Blob` is the platform's in-memory readable byte container, so it stands in
- * for the `StringIO` Rails wraps a non-readable `data` in (the same stand-in
- * `XmlMini._parse_file` makes), and `instanceof Blob` for `respond_to?(:read)`.
- * Reading the blob out is the `eof?` test: an empty read is Ruby's `eof?`.
+ * `StringIO` is the shim for Ruby's stdlib `StringIO`, and `instanceof
+ * StringIO` stands in for `respond_to?(:read)`.
  */
-export async function parse(data: string | Blob | null | undefined): Promise<XmlHash> {
-  if (!(data instanceof Blob)) {
-    data = new Blob([data ?? ""]);
+export async function parse(data: string | StringIO | null | undefined): Promise<XmlHash> {
+  if (!(data instanceof StringIO)) {
+    data = new StringIO(data ?? "");
   }
 
-  const text = await data.text();
-  if (text.length === 0) return {};
+  if (data.isEof()) {
+    return {};
+  } else {
+    const { SAX } = await loadNokogiri();
 
-  const { SAX } = await loadNokogiri();
-
-  const document = new (documentClass())();
-  const parser = new SAX.Parser(document);
-  parser.parse(text);
-  return document.hash;
+    const document = new (documentClass())();
+    const parser = new SAX.Parser(document);
+    parser.parse(data.read() ?? "");
+    return document.hash;
+  }
 }

@@ -1,3 +1,5 @@
+import { StringIO } from "../string-io.js";
+
 const CONTENT_ROOT = "__content__";
 
 function isModuleNotFound(e: unknown, pkg: string): boolean {
@@ -97,28 +99,27 @@ function nodeToHash(node: XmlNode): XmlHash {
 }
 
 /**
- * Mirrors: ActiveSupport::XmlMini_Nokogiri#parse (nokogiri.rb:19-31) — `Blob`
- * is the platform's in-memory readable byte container, so it stands in for the
- * `StringIO` Rails wraps a non-readable `data` in (the same stand-in
- * `XmlMini._parse_file` makes), and `instanceof Blob` for `respond_to?(:read)`.
- * Reading the blob out is the `eof?` test: an empty read is Ruby's `eof?`.
+ * Mirrors: ActiveSupport::XmlMini_Nokogiri#parse (nokogiri.rb:19-31) —
+ * `StringIO` is the shim for Ruby's stdlib `StringIO`, and `instanceof
+ * StringIO` stands in for `respond_to?(:read)`.
  */
-export async function parse(data: string | Blob | null | undefined): Promise<XmlHash> {
-  if (!(data instanceof Blob)) {
-    data = new Blob([data ?? ""]);
+export async function parse(data: string | StringIO | null | undefined): Promise<XmlHash> {
+  if (!(data instanceof StringIO)) {
+    data = new StringIO(data ?? "");
   }
 
-  const text = await data.text();
-  if (text.length === 0) return {};
-
-  const { parseXml } = await loadNokogiri();
-  const doc = parseXml(text);
-  try {
-    if (doc.errors.length > 0) {
-      throw new Error(doc.errors[0].message);
+  if (data.isEof()) {
+    return {};
+  } else {
+    const { parseXml } = await loadNokogiri();
+    const doc = parseXml(data.read() ?? "");
+    try {
+      if (doc.errors.length > 0) {
+        throw new Error(doc.errors[0].message);
+      }
+      return { [doc.root.name]: nodeToHash(doc.root) };
+    } finally {
+      doc.dispose();
     }
-    return { [doc.root.name]: nodeToHash(doc.root) };
-  } finally {
-    doc.dispose();
   }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toDate, toDatetime, toTime } from "./string/conversions.js";
-import { ArgumentError, Rational, Temporal, Time } from "@blazetrails/date";
+import { ArgumentError, Temporal, Time } from "@blazetrails/date";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -134,14 +134,11 @@ describe("StringConversionsTest", () => {
         epochNs(Time.utc(2005, 2, 27, 23, 50)),
       );
       expect(epochNs(toTime("2005-02-27 23:50"))).toBe(epochNs(Time.mktime(2005, 2, 27, 23, 50)));
-      // Rails passes the microsecond as `Time.utc`'s seventh positional; trails'
-      // folds it into `sec` as a float there, which loses the last nanosecond,
-      // so the exact `Rational` MRI holds is spelled out instead.
       expect(epochNs(toTime("2005-02-27T23:50:19.275038", "utc"))).toBe(
-        epochNs(Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000))),
+        epochNs(Time.utc(2005, 2, 27, 23, 50, 19, 275038)),
       );
       expect(epochNs(toTime("2005-02-27T23:50:19.275038"))).toBe(
-        epochNs(Time.mktime(2005, 2, 27, 23, 50, new Rational(19275038, 1000000))),
+        epochNs(Time.mktime(2005, 2, 27, 23, 50, 19, 275038)),
       );
       expect(epochNs(toTime("2039-02-27 23:50", "utc"))).toBe(
         epochNs(Time.utc(2039, 2, 27, 23, 50)),
