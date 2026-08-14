@@ -5,9 +5,10 @@
  * test.log easier to search and follow along with.
  *
  * `before_setup` (tagged_logging.rb:10-19) is Minitest lifecycle: Ruby mixes
- * the module into the test case and `super`s up the hook chain. There is no
- * such receiver here, so the ported `beforeSetup` is installed from the suite's
- * `beforeEach` (activerecord/src/cases/helper.ts, the port of helper.rb).
+ * the module into the test case and `super`s up the hook chain. The receiver
+ * here is `TestCase` (test-case.ts, the port of test_case.rb), whose
+ * `include` of this module — test_case.rb:144 — installs `beforeSetup` as the
+ * suite's `beforeEach`.
  */
 import { trailsLogger } from "../trails-logger-slot.js";
 

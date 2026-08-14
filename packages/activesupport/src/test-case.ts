@@ -14,6 +14,11 @@
  * installation for vitest. It is registered once, as a setup file of every
  * vitest project, in place of the per-project TaggedLogging wiring that stood
  * in for the receiver before.
+ *
+ * `test_case.rb` requires minitest, and `active_support.rb:92` reaches it
+ * through `autoload :TestCase`, so a booting app never loads the runner. An
+ * ESM re-export is eager, so this file is deliberately absent from `index.ts`
+ * — importing it there would pull vitest into every consumer of the package.
  */
 import { beforeEach } from "vitest";
 import { setTaggedLogger, beforeSetup, taggedLogger } from "./testing/tagged-logging.js";
