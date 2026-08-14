@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
-import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
 beforeAll(() => {
@@ -547,7 +547,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(after[0].utc().epochMilliseconds).toBe(instant.epochMilliseconds);
         expect(after[0].timeZone.name).toBe(zone.name);
       } finally {
-        resetZone();
+        setZone(null);
       }
     });
     it("assigning non array value", async () => {

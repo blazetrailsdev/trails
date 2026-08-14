@@ -6,6 +6,7 @@ import { Temporal } from "@blazetrails/date";
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
+import { midnight } from "../core-ext/date/calculations.js";
 
 /** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
 class RuntimeError extends Error {
@@ -138,7 +139,7 @@ export function travel(
  * to `true`.
  */
 export function travelTo(
-  dateOrTime: Date | Temporal.Instant | string,
+  dateOrTime: Temporal.PlainDate | Date | Temporal.Instant | string,
   { withUsec = false }: { withUsec?: boolean } = {},
   block?: () => void,
 ): void {
@@ -170,7 +171,9 @@ export function travelTo(
   }
 
   let now: Temporal.Instant;
-  if (typeof dateOrTime === "string") {
+  if (dateOrTime instanceof Temporal.PlainDate) {
+    now = midnight(dateOrTime).toTime();
+  } else if (typeof dateOrTime === "string") {
     // Without a `Time.zone` set there is no zone to parse through.
     const zone = timeZone();
     now = zone ? zone.parse(dateOrTime).toTime() : Temporal.Instant.from(dateOrTime);

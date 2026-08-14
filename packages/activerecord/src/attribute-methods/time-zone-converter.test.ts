@@ -3,12 +3,12 @@ import { TimeZoneConverter } from "./time-zone-conversion.js";
 import { DateTime } from "../type/date-time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
     vi.restoreAllMocks();
   });
 
@@ -98,7 +98,7 @@ describe("TimeZoneConverterTest", () => {
   });
 
   it("cast returns raw subtype result when no zone is configured", () => {
-    resetZone();
+    setZone(null);
     const converter = new TimeZoneConverter(new DateTime());
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const result = converter.cast(instant);

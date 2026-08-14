@@ -24,7 +24,7 @@ import {
   isToday,
 } from "../time-ext.js";
 import * as DateExt from "./date/calculations.js";
-import { setZone, resetZone } from "../time-zone-config.js";
+import { setZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -212,7 +212,7 @@ describe("DateExtCalculationsTest", () => {
       );
       expect(DateExt.since(pd(2005, 2, 21), 45).timeZone).toBe(zone);
     } finally {
-      resetZone();
+      setZone(null);
     }
   });
 
@@ -233,7 +233,7 @@ describe("DateExtCalculationsTest", () => {
       );
       expect(DateExt.ago(pd(2005, 2, 21), 45).timeZone).toBe(zone);
     } finally {
-      resetZone();
+      setZone(null);
     }
   });
 
@@ -252,7 +252,7 @@ describe("DateExtCalculationsTest", () => {
       );
       expect(DateExt.beginningOfDay(pd(2005, 2, 21)).timeZone).toBe(zone);
     } finally {
-      resetZone();
+      setZone(null);
     }
   });
 
@@ -266,7 +266,7 @@ describe("DateExtCalculationsTest", () => {
       expect(endOfDayInZone.sec).toBe(59);
       expect(endOfDayInZone.timeZone).toBe(zone);
     } finally {
-      resetZone();
+      setZone(null);
     }
   });
 

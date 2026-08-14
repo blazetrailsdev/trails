@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import * as DateExt from "./date/calculations.js";
-import { resetZone } from "../time-zone-config.js";
+import { setZone } from "../time-zone-config.js";
 import { Duration } from "../duration.js";
 import { TimeZone } from "../values/time-zone.js";
 import { TimeWithZone } from "../time-with-zone.js";
@@ -17,7 +17,7 @@ const pd = (year: number, month: number, day: number) => new Temporal.PlainDate(
 
 describe("date calculations aliases", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
   });
 
   it("beginning_of_day aliases", () => {

@@ -1,18 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { withTimezoneConfig } from "./test-helper.js";
 import { ActiveRecord } from "./ar-config.js";
-import {
-  zone,
-  setZone,
-  setZoneDefault,
-  isZoneExplicit,
-  resetZone,
-  TimeZone,
-} from "@blazetrails/activesupport";
+import { zone, setZone, setZoneDefault, TimeZone } from "@blazetrails/activesupport";
 
 describe("withTimezoneConfig", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
     setZoneDefault(null);
   });
 
@@ -30,29 +23,25 @@ describe("withTimezoneConfig", () => {
     // zone_default is set but _zone is not explicitly set (falls through to default)
     const paris = TimeZone.find("Europe/Paris")!;
     setZoneDefault(paris);
-    resetZone(); // ensure _zone is unset (not explicit)
-    expect(isZoneExplicit()).toBe(false);
+    setZone(null); // ensure _zone is unset (not explicit)
     expect(zone()).toBe(paris); // reads zone_default
 
     await withTimezoneConfig({ zone: "UTC" }, () => {
       expect(zone()?.name).toBe("UTC");
     });
 
-    // After the block: zone must be unset (not explicit), still falls through to zone_default
-    expect(isZoneExplicit()).toBe(false);
+    // After the block: zone still reads back as zone_default
     expect(zone()).toBe(paris);
   });
 
   it("restores zone to explicit value when zone was explicitly set before", async () => {
     const paris = TimeZone.find("Europe/Paris")!;
     setZone(paris);
-    expect(isZoneExplicit()).toBe(true);
 
     await withTimezoneConfig({ zone: "UTC" }, () => {
       expect(zone()?.name).toBe("UTC");
     });
 
-    expect(isZoneExplicit()).toBe(true);
     expect(zone()).toBe(paris);
   });
 

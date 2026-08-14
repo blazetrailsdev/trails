@@ -37,13 +37,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "subsec",
-    "call": "sec_fraction",
-    "reason": "See the `sec_fraction` → `subsec` row: one `secFraction` function is exported under both names, so neither delegates to the other."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "to_fs",
     "call": "strftime",
     "reason": "`strftime` is Ruby's C-level time formatter. JS has no strftime; each named DATE_FORMATS entry is expanded with `Intl`/`toISOString` in `toFs`."
@@ -82,5 +75,12 @@
     "rubyName": "xmlschema",
     "call": "in_time_zone",
     "reason": "Rails' `Date#xmlschema` goes through `in_time_zone.xmlschema` to pick up `Time.zone`; trails' is the zoneless arm, and `TimeWithZone#xmlschema` is the zone-aware one."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "offset_in_seconds",
+    "call": "offset",
+    "reason": "Ruby's `DateTime#offset` is a Rational fraction of a day; Temporal's `offset` on the same receiver is a `+HH:MM` string, so the seconds come from `offsetNanoseconds` instead of a same-named reader."
   }
 ]

@@ -121,6 +121,8 @@ parity:api never expects a TS counterpart for these Ruby methods:
   - `target`, `start`, `finish`
 - Underscore-prefixed `class_attribute` storage slots whose camelCased name IS the dynamically-assigned class field trails reads/writes directly (`Model._reflections`, `Model._counterCacheColumns`). Exposing a same-named reader method would clobber the storage slot, so the field IS the accessor; there is no separate method to match. `_attr_readonly` is likewise trails' private `_readonlyAttributes` set — its public reader is `readonlyAttributes` (Rails: `readonly_attributes` reads `_attr_readonly`), which is ported. `_destroy_association_async_job` is likewise the underscore storage slot (trails' `_destroyAssociationAsyncJob` field) behind the ported public accessor `destroyAssociationAsyncJob` (Rails aliases `destroy_association_async_job=` to `_destroy_association_async_job=`).
   - `_reflections`, `_reflections=`, `_reflections?`, `_counter_cache_columns`, `_counter_cache_columns=`, `_counter_cache_columns?`, `_attr_readonly`, `_attr_readonly=`, `_attr_readonly?`, `_destroy_association_async_job`, `_destroy_association_async_job=`, `_destroy_association_async_job?`
+- Ruby's `Marshal` serialization protocol — `Marshal.dump` / `Marshal.load` walk an object's instance variables through a binary format the VM owns. JS has no counterpart (`structuredClone` neither consults nor dispatches to a per-class hook), so there is no slot for these to fill.
+  - `marshal_dump`, `marshal_load`
 
 ## Scoped skipped methods
 

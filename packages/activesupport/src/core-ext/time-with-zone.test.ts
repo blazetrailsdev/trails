@@ -8,7 +8,6 @@ import { Temporal } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
-  resetZone,
   zoneDefault,
   setZoneDefault,
   useZone,
@@ -1148,7 +1147,7 @@ describe("TimeWithZoneTest", () => {
 
 describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
   });
 
   const t = new Date(Date.UTC(2000, 0, 1));
@@ -1347,7 +1346,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
 describe("TimeWithZoneMethodsForDate", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
   });
 
   it("in time zone", () => {
@@ -1387,7 +1386,7 @@ describe("TimeWithZoneMethodsForDate", () => {
 
 describe("TimeWithZoneMethodsForString", () => {
   afterEach(() => {
-    resetZone();
+    setZone(null);
   });
 
   it("in time zone", () => {
