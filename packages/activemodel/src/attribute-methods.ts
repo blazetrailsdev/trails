@@ -440,6 +440,12 @@ export function defineAttributeMethod(
  * ActiveRecord's override of that predicate, which also rejects a name the
  * class itself defines; trails has one host interface for both, so the arm
  * lives at this call site.
+ *
+ * Rails' only `override: true` caller is `alias_attribute_method_definition`
+ * (activerecord/attribute_methods.rb:94). trails' alias path defines its
+ * accessors directly instead of routing through here, so that arm has no
+ * caller yet — story `alias-attribute-definition-through-pattern` (RFC 0096)
+ * converges it.
  */
 export function defineAttributeMethodPattern(
   this: AttributeMethodHost,

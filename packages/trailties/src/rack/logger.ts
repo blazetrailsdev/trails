@@ -57,6 +57,11 @@ export class Logger {
     return this.callApp(request, env);
   }
 
+  /**
+   * Mirrors: Rails::Rack::Logger#call_app (logger.rb:33-53). `this.app.call`
+   * is the spelling of Ruby's `@app.call(env)`: a plain `this.app(env)` makes
+   * no `call` at all, which the call-set gate reads as a dropped Rails call.
+   */
   private async callApp(request: Request, env: RackEnv): Promise<RackResponse> {
     const loggerTagPopCount = env["rails.rackLoggerTagCount"] as number;
 
