@@ -5,29 +5,25 @@
  * falls through to the Rack app — just like Puma sits behind Rack in Rails.
  */
 
-import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
 import type { Plugin, ViteDevServer } from "vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv } from "@blazetrails/rack";
-import { Application } from "./application.js";
+import type { RackApp } from "@blazetrails/actionpack";
 
 export interface TrailsPluginOptions {
-  cwd?: string;
+  /** The booted `Trails.application` Rack endpoint — `run Rails.application`. */
+  app: RackApp;
 }
 
-export function trailsPlugin(options: TrailsPluginOptions = {}): Plugin {
-  const cwd = options.cwd || getCwd();
-  let app: Application;
+export function trailsPlugin(options: TrailsPluginOptions): Plugin {
+  const app = options.app;
 
   return {
     name: "trails",
     enforce: "post",
 
-    async configureServer(server: ViteDevServer) {
-      app = new Application({ cwd });
-      await app.initialize();
-
+    configureServer(server: ViteDevServer) {
       // Return a function so this middleware runs *after* Vite's built-in
       // middleware (static files, HMR, etc.) — unhandled requests hit Rack.
       return () => {
@@ -40,7 +36,7 @@ export function trailsPlugin(options: TrailsPluginOptions = {}): Plugin {
                   ? address.port
                   : (server.config.server.port ?? 3000);
               const env = await buildRackEnv(req, actualPort);
-              const [status, headers, body] = await app.call(env);
+              const [status, headers, body] = await app(env);
 
               res.writeHead(status, headers);
               res.end(await bodyToString(body));

@@ -1,7 +1,16 @@
+import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
+import { Trails } from "../rails.js";
 import { DevServer } from "../server/dev-server.js";
 
+/**
+ * Rails' `rails server` (`commands/server/server_command.rb`). Loading
+ * `config/application` is Rails' `require APP_PATH` — it is what registers
+ * the Application subclass, so `Trails.application` is nil until it has been
+ * imported — and handing `app.app()` to the dev server is `config.ru`'s
+ * `run Rails.application`.
+ */
 export function serverCommand(): Command {
   const cmd = new Command("server");
   cmd.alias("s");
@@ -10,13 +19,43 @@ export function serverCommand(): Command {
     .option("-p, --port <port>", "Port to listen on", "3000")
     .option("-b, --binding <host>", "Host to bind to", "127.0.0.1")
     .action(async (options) => {
+      const root = cwd();
+      await requireApplication(root);
+      const app = await Trails.initialize();
       const server = new DevServer({
         port: parseInt(options.port, 10),
         host: options.binding,
-        cwd: cwd(),
+        cwd: root,
+        app: app.app(),
       });
       await server.start();
     });
 
   return cmd;
+}
+
+/**
+ * Rails' `APP_PATH` require. Trails apps ship TypeScript sources and a
+ * compiled `dist/`, so every spelling of `config/application` is probed —
+ * the built one first, mirroring how `bin/rails` prefers the loaded app,
+ * then the Rails-layout root and the `src/`-prefixed layout `trails new`
+ * currently generates.
+ */
+async function requireApplication(root: string): Promise<void> {
+  const fs = await getFsAsync();
+  const p = await getPathAsync();
+  if (!p.pathToFileURL) {
+    throw new Error("PathAdapter.pathToFileURL() is required to boot an application.");
+  }
+  for (const candidate of [
+    p.join(root, "dist", "config", "application.js"),
+    p.join(root, "config", "application.ts"),
+    p.join(root, "src", "config", "application.ts"),
+  ]) {
+    if (await fs.exists(candidate)) {
+      await import(p.pathToFileURL(candidate).href);
+      return;
+    }
+  }
+  throw new Error(`No config/application.ts found in ${root}.`);
 }

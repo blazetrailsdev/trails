@@ -166,10 +166,18 @@ export class Initializable {
     return this._initializers;
   }
 
-  runInitializers(group: InitializerGroup = "default", ...args: unknown[]): void {
+  /**
+   * Rails' `run_initializers` is synchronous because Ruby's `File`,
+   * `require` and `load` are. Trails' filesystem seam is async-only
+   * (`getFsAsync`) and module loading goes through `import()`, so an
+   * initializer body that reads `paths[...].existent` or loads a routes
+   * file can only be a promise. Each initializer is therefore awaited in
+   * declaration order — the sequencing Rails gets for free.
+   */
+  async runInitializers(group: InitializerGroup = "default", ...args: unknown[]): Promise<void> {
     if (this._ran) return;
     for (const init of this.initializers.tsort()) {
-      if (init.belongsTo(group)) init.run(...args);
+      if (init.belongsTo(group)) await init.run(...args);
     }
     this._ran = true;
   }

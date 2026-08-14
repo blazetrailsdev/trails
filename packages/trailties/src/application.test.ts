@@ -282,13 +282,15 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-6)).toEqual([
+      expect(names.slice(-8)).toEqual([
         "add_generator_templates",
+        "setup_main_autoloader",
         "add_internal_routes",
         "build_middleware_stack",
         "define_main_app_helper",
         "add_to_prepare_blocks",
         "run_prepare_callbacks",
+        "set_routes_reloader_hook",
       ]);
     });
 
@@ -324,6 +326,50 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
     });
     expect(status).toBe(200);
     expect(await bodyToString(body)).toBe("hello world");
+  });
+});
+
+describe("Trails.application integration (boot-app fixture)", () => {
+  afterEach(() => {
+    Trails.application = null;
+    Application.appClass = null;
+  });
+
+  it("boots the app through the initializer chain and serves a controller action", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    expect(app).toBeInstanceOf(BootApp);
+    expect(app.routesReloader().loaded).toBe(true);
+    const [status, , body] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts",
+    });
+    expect(status).toBe(200);
+    expect(JSON.parse(await bodyToString(body))).toEqual({ posts: [] });
+
+    const [nestedStatus, , nestedBody] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/admin/sessions",
+    });
+    expect(nestedStatus).toBe(200);
+    expect(JSON.parse(await bodyToString(nestedBody))).toEqual({ scope: "admin" });
+  });
+
+  it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppDebug extends BootApp {}
+    Application.register(BootAppDebug);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.considerAllRequestsLocal = true;
+    await Trails.initialize();
+
+    const [status] = await app.app()({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
+    expect(status).toBe(500);
   });
 });
 

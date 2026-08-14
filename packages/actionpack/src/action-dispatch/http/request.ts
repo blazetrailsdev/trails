@@ -1125,7 +1125,13 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
  * `call` short-circuits to a `404` with the `X-Cascade: pass` header so the
  * router falls through to the next matching route.
  */
-async function* emptyRackBody(): RackBody {}
+/**
+ * Ruby's empty array body (`[]`) — a body that yields no chunks at all, not
+ * one empty chunk.
+ *
+ * @internal
+ */
+export async function* emptyRackBody(): RackBody {}
 
 export class PassNotFound {
   /** @internal */

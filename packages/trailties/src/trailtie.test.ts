@@ -40,14 +40,14 @@ describe("Trailtie", () => {
     expect(PrepTrailtie.config.toPrepareBlocks).toContain(block);
   });
 
-  it("railtie can add initializers", () => {
+  it("railtie can add initializers", async () => {
     const calls: string[] = [];
     class InitTrailtie extends Trailtie {}
     Trailtie.register(InitTrailtie);
     InitTrailtie.initializer("init.one", function () {
       calls.push("one");
     });
-    InitTrailtie.instance().runInitializers();
+    await InitTrailtie.instance().runInitializers();
     expect(calls).toEqual(["one"]);
   });
 

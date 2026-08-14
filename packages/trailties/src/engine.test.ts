@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   fsAdapterConfig,
   registerFsAdapter,
+  resetLoadHooks,
+  runLoadHooks,
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
@@ -243,5 +245,39 @@ describe("Engine", () => {
     expect(collection).toBeInstanceOf(Trailties);
     expect(Array.from(collection)).toContain(inst);
     expect(collection.minus([inst])).not.toContain(inst);
+  });
+
+  it("add_routing_paths registers the routes file and route set on the reloader", async () => {
+    class RoutingEngine extends Engine {}
+    Trailtie.register(RoutingEngine);
+    const engine = RoutingEngine.instance();
+    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    const reloader = { paths: [] as string[], routeSets: [] as unknown[], externalRoutes: [] };
+
+    await engine.initializers
+      .find((i) => i.name === "add_routing_paths")!
+      .run({ routesReloader: () => reloader });
+
+    expect(reloader.paths).toHaveLength(1);
+    expect(reloader.paths[0]).toMatch(/config\/routes\.ts$/);
+    expect(reloader.routeSets).toEqual([engine.routes()]);
+  });
+
+  it("add_view_paths prepends app/views onto the action_controller load hook", async () => {
+    resetLoadHooks();
+    class ViewEngine extends Engine {}
+    Trailtie.register(ViewEngine);
+    const engine = ViewEngine.instance();
+    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
+
+    const prepended: string[][] = [];
+    runLoadHooks("action_controller", {
+      prependViewPath: (views: string[]) => prepended.push(views),
+    });
+    expect(prepended).toHaveLength(1);
+    expect(prepended[0][0]).toMatch(/app\/views$/);
+    resetLoadHooks();
   });
 });
