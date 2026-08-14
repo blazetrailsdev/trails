@@ -598,7 +598,7 @@ export interface AbstractAdapter {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: { prepare?: boolean },
   ): Promise<Result>;
   execInsertAll(sql: string, name: string): Promise<Result>;
   execInsert(
@@ -2921,13 +2921,14 @@ function ensureAbstractAdapterMixinsApplied(): void {
   // by a concrete adapter here — they're only defined on AbstractAdapter, and a
   // subclass prototype doesn't yet inherit them when the per-adapter module runs
   // (circular-import load order), so they must be wired on AbstractAdapter. The
-  // OVERRIDDEN write methods (`execInsert`, `execQuery`, `execute`,
+  // OVERRIDDEN write methods (`execInsert`, `execute`,
   // `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's `truncate`) are
   // wired on each concrete adapter instead — wiring them here too would leave the
   // override unwrapped. Reads route through `internalExecQuery` and never trip
   // the wrapper.
   dirtiesQueryCache(
     AbstractAdapter,
+    "execQuery",
     "execUpdate",
     "execDelete",
     "execInsertAll",

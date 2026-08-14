@@ -585,13 +585,14 @@ export function execQuery(
   sql: string,
   name: string | null = "SQL",
   binds: unknown[] = [],
+  { prepare = false }: { prepare?: boolean } = {},
 ): Promise<Result> {
   // Dispatch through the instance so an adapter's internalExecQuery override
   // wins, as Ruby's virtual call does.
   const run = ((this as DatabaseStatementsHost).internalExecQuery ?? internalExecQuery).bind(
     this as DatabaseStatementsHost,
   );
-  return run(sql, name, binds);
+  return run(sql, name, binds, { prepare });
 }
 
 /**
@@ -1540,7 +1541,7 @@ interface DatabaseStatementsDefaultsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    options?: { prepare?: boolean },
   ): Promise<Result>;
   internalExecQuery(
     sql: string,
@@ -1721,15 +1722,12 @@ export const DatabaseStatements = {
     this: DatabaseStatementsDefaultsHost,
     sql: string,
     name: string | null = "SQL",
-    binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+    binds: unknown[] = [],
+    { prepare = false }: { prepare?: boolean } = {},
   ): Promise<Result> {
-    // options.allowRetry is captured here and will flow to withRawConnection
-    // once pool integration lands (connection-pool track). Real adapters that
-    // override execQuery should forward allowRetry to their execute path.
-    void options;
-    const rows = await this.execute(sql, binds, name);
-    return Result.fromRowHashes(rows);
+    // Mirrors: abstract/database_statements.rb:147-149 — exec_query forwards to
+    // internal_exec_query, which each adapter overrides.
+    return this.internalExecQuery(sql, name, binds, { prepare });
   },
 
   async execInsert(

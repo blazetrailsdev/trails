@@ -124,14 +124,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     await expect(PostForRetryTest.findBySql("SELECT * FROM posts", [], null)).resolves.toEqual([]);
   });
 
-  it("execQuery options type accepts allowRetry alongside prepare", () => {
-    const opts: NonNullable<Parameters<DatabaseAdapter["execQuery"]>[3]> = {
-      prepare: true,
-      allowRetry: true,
-    };
-    expect(opts.allowRetry).toBe(true);
-  });
-
   it("withRawConnection is reentrant", async () => {
     // Rails' with_raw_connection runs under a reentrant Monitor and is
     // documented to re-enter (abstract_adapter.rb:972-981): materialize_
