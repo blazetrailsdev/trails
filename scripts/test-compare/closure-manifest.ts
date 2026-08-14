@@ -16,7 +16,7 @@
  *             `core_ext/numeric_ext_test.rb` → `core_ext/numeric.rb`
  *   R2 dir  — the same stem names a directory holding at least one closure file.
  *             `core_ext/hash_ext_test.rb` → `core_ext/hash/*`
- *   alias   — CLOSURE_ALIASES in ./aliases.ts, one reviewed reason per row.
+ *   alias   — CLOSURE_ALIASES in ./closure-aliases.ts, one reviewed reason per row.
  *
  * This is a manifest, not an exclusion registry: it removes nothing from any
  * denominator and touches no baseline.
@@ -58,7 +58,7 @@ export interface ClosurePartition {
  * them.
  */
 export function closureFiles(): string[] {
-  return deriveArClosure().files.activesupport.map((file) => `active_support/${file}`);
+  return (deriveArClosure().files.activesupport ?? []).map((file) => `active_support/${file}`);
 }
 
 /**
