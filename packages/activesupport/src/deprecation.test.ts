@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ActiveSupport } from "./index.js";
-import { Deprecation, DeprecationError, deprecator, type CallerLocation } from "./deprecation.js";
+import {
+  Deprecation,
+  DeprecationException,
+  deprecator,
+  type CallerLocation,
+} from "./deprecation.js";
 import { ErrorReporter } from "./error-reporter.js";
 import { ErrorSubscriber } from "./error-reporter/test-helper.js";
 import { Logger } from "./logger.js";
@@ -39,7 +44,7 @@ describe("DeprecationTest", () => {
 
   it(":raise behavior", () => {
     dep.behavior = "raise";
-    expect(() => dep.warn("old API")).toThrow(DeprecationError);
+    expect(() => dep.warn("old API")).toThrow(DeprecationException);
     expect(() => dep.warn("old API")).toThrow("old API");
   });
 
@@ -187,13 +192,13 @@ describe("DeprecationTest", () => {
   it("disallowed_warnings can match using a substring", () => {
     dep.disallowedWarnings = ["old"];
     dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("using old API")).toThrow(DeprecationError);
+    expect(() => dep.warn("using old API")).toThrow(DeprecationException);
   });
 
   it("disallowed_warnings can match using a regexp", () => {
     dep.disallowedWarnings = [/old.*/];
     dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("old API is gone")).toThrow(DeprecationError);
+    expect(() => dep.warn("old API is gone")).toThrow(DeprecationException);
   });
 
   it("disallowed_warnings matches all warnings when set to :all", () => {
@@ -219,7 +224,7 @@ describe("DeprecationTest", () => {
   it("allow", () => {
     dep.disallowedWarnings = "all";
 
-    expect(() => dep.warn()).toThrow(DeprecationError);
+    expect(() => dep.warn()).toThrow(DeprecationException);
 
     dep.allow("all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
@@ -253,7 +258,7 @@ describe("DeprecationTest", () => {
       expect(() => dep.warn()).not.toThrow();
     });
 
-    expect(() => dep.warn()).toThrow(DeprecationError);
+    expect(() => dep.warn()).toThrow(DeprecationException);
   });
 
   it("allow with :if option", () => {
@@ -288,7 +293,7 @@ describe("DeprecationTest", () => {
     });
 
     dep.allow(["fubar"], {}, () => {
-      expect(() => dep.warn()).toThrow(DeprecationError);
+      expect(() => dep.warn()).toThrow(DeprecationException);
     });
   });
 
@@ -323,7 +328,7 @@ describe("DeprecationTest", () => {
 
   it("disallowed_warnings with the default warning message", () => {
     dep.disallowedWarnings = "all";
-    expect(() => dep.warn()).toThrow(DeprecationError);
+    expect(() => dep.warn()).toThrow(DeprecationException);
 
     dep.disallowedWarnings = ["fubar"];
     expect(() => dep.warn()).not.toThrow();
@@ -445,7 +450,7 @@ describe("DeprecationTest", () => {
     // In JS, symbols don't match strings, so use string equivalent
     dep.disallowedWarnings = ["old"];
     dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("old API")).toThrow(DeprecationError);
+    expect(() => dep.warn("old API")).toThrow(DeprecationException);
   });
 
   it("allow only allows matching warnings using a substring as a symbol", () => {
@@ -470,7 +475,7 @@ describe("DeprecationTest", () => {
       expect(() => dep.warn()).not.toThrow();
     });
 
-    expect(() => dep.warn()).toThrow(DeprecationError);
+    expect(() => dep.warn()).toThrow(DeprecationException);
   });
 
   // A `Thread::Backtrace::Location` stand-in — see CallerLocation.
@@ -505,13 +510,13 @@ describe("DeprecationTest", () => {
   it("assert_deprecated", () => {
     // assert_deprecated is a testing helper; verify warn triggers the behavior
     dep.behavior = "raise";
-    expect(() => dep.warn("deprecated!")).toThrow(DeprecationError);
+    expect(() => dep.warn("deprecated!")).toThrow(DeprecationException);
   });
 
   it("assert_deprecated requires a deprecator", () => {
     const customDep = new Deprecation();
     customDep.behavior = "raise";
-    expect(() => customDep.warn("x")).toThrow(DeprecationError);
+    expect(() => customDep.warn("x")).toThrow(DeprecationException);
   });
 
   it("assert_not_deprecated", () => {
@@ -701,7 +706,7 @@ describe("DeprecationTest", () => {
       ActiveSupport.errorReporter = previousReporter;
     }
     const [error, handled, severity, source] = subscriber.events[0];
-    expect(error).toBeInstanceOf(DeprecationError);
+    expect(error).toBeInstanceOf(DeprecationException);
     expect(handled).toBe(true);
     expect(severity).toBe("warning");
     expect(source).toBe("application");
@@ -754,7 +759,7 @@ describe("DeprecationTest", () => {
   it("deprecate_constant", () => {
     // Not directly supported; verify deprecation system works
     dep.behavior = "raise";
-    expect(() => dep.warn("constant deprecated")).toThrow(DeprecationError);
+    expect(() => dep.warn("constant deprecated")).toThrow(DeprecationException);
   });
 
   it("deprecate_constant when rescuing a deprecated error", () => {
@@ -763,7 +768,7 @@ describe("DeprecationTest", () => {
     try {
       dep.warn("constant deprecated");
     } catch (e) {
-      caught = e instanceof DeprecationError;
+      caught = e instanceof DeprecationException;
     }
     expect(caught).toBe(true);
   });
@@ -771,7 +776,7 @@ describe("DeprecationTest", () => {
   it("deprecate_constant requires a deprecator", () => {
     const customDep = new Deprecation();
     customDep.behavior = "raise";
-    expect(() => customDep.warn("x")).toThrow(DeprecationError);
+    expect(() => customDep.warn("x")).toThrow(DeprecationException);
   });
 
   it("assert_deprecated raises when no deprecation warning", () => {
@@ -782,6 +787,6 @@ describe("DeprecationTest", () => {
 
   it("assert_not_deprecated raises when some deprecation warning", () => {
     dep.behavior = "raise";
-    expect(() => dep.warn("unexpected deprecation")).toThrow(DeprecationError);
+    expect(() => dep.warn("unexpected deprecation")).toThrow(DeprecationException);
   });
 });

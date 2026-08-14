@@ -12,7 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { Deprecation, DeprecationError, deprecator } from "./deprecation.js";
+import { Deprecation, DeprecationException, deprecator } from "./deprecation.js";
 import {
   delegate,
   mattrAccessor,
@@ -71,7 +71,7 @@ describe("DeprecationTest", () => {
 
   it(":raise behavior", () => {
     dep.behavior = "raise";
-    expect(() => dep.warn("old API")).toThrow(DeprecationError);
+    expect(() => dep.warn("old API")).toThrow(DeprecationException);
     expect(() => dep.warn("old API")).toThrow("old API");
   });
 
