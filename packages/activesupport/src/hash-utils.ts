@@ -92,7 +92,7 @@ export function deepDup<T>(obj: T): T {
 export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
-    if (key in obj) {
+    if (Object.hasOwn(obj, key as string)) {
       result[key] = obj[key];
     }
   }
@@ -387,18 +387,6 @@ export const reverseUpdate = reverseMergeBang;
  * (core_ext/hash/reverse_merge.rb:23).
  */
 export const withDefaultsBang = reverseMergeBang;
-
-/**
- * Replaces the hash with only the given keys, returning the removed
- * key/value pairs — Ruby's `Hash#slice!` (core_ext/hash/slice.rb:10-17).
- */
-export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T> {
-  const omit = slice(hash, ...(Object.keys(hash).filter((k) => !keys.includes(k)) as (keyof T)[]));
-  const result = slice(hash, ...(keys as (keyof T)[]));
-  for (const key of Object.keys(hash)) delete hash[key];
-  Object.assign(hash, result);
-  return omit as Partial<T>;
-}
 
 /**
  * Removes the given keys from the hash and returns it — Ruby's `Hash#except!`

@@ -1,6 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
 
@@ -72,15 +73,6 @@ function isPermittedScalar(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const t = typeof value;
   return t === "string" || t === "number" || t === "boolean";
-}
-
-function isBlank(value: unknown): boolean {
-  if (value === null || value === undefined || value === false) return true;
-  if (typeof value === "string" && value.trim() === "") return true;
-  if (Array.isArray(value) && value.length === 0) return true;
-  if (value instanceof Parameters) return value.empty;
-  if (isPlainObject(value) && Object.keys(value).length === 0) return true;
-  return false;
 }
 
 // --- Parameters ---

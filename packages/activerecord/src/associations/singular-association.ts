@@ -215,10 +215,10 @@ export class SingularAssociation extends Association {
     // A DB load would be required to answer.
     if (this.findTargetNeeded()) {
       if (this.isViolatesStrictLoading()) {
-        strictLoadingViolationBang(this.owner, this.reflection.name, {
-          polymorphic: this.reflection.options?.polymorphic,
-          className: this.reflection.options?.className,
-        });
+        const ctor = this.owner.constructor as typeof Base;
+        const reflection = ctor._reflectOnAssociation?.(this.reflection.name);
+        if (!reflection) throw new AssociationNotFoundError(this.owner, this.reflection.name);
+        strictLoadingViolationBang({ owner: ctor, reflection });
       }
       // Rails loads synchronously; Node.js requires async I/O. The union
       // return type now forces callers to `await` — TypeScript enforces it
@@ -326,10 +326,7 @@ export class SingularAssociation extends Association {
         this.isViolatesStrictLoading() &&
         _findTargetReachable(owner, assocName, options, isBelongsTo ? "belongsTo" : "foreign")
       ) {
-        strictLoadingViolationBang(owner, assocName, {
-          polymorphic: isBelongsTo ? options.polymorphic : undefined,
-          className: options.className,
-        });
+        strictLoadingViolationBang({ owner: owner.constructor, reflection });
       }
 
       // has_one :through. Rails expresses `:through` inside the scope chain; trails

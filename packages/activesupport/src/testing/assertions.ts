@@ -23,7 +23,7 @@
  */
 import { indexWith } from "../enumerable-utils.js";
 
-import { cwd } from "../process-adapter.js";
+import { cwd, env } from "../process-adapter.js";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
@@ -106,13 +106,20 @@ export class BacktraceFilter {
   }
 
   /**
-   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1190-1198): the
-   * frames before the first framework frame, else every non-framework frame,
-   * else the whole trace. Ruby's `$DEBUG`/`MT_DEBUG` escape hatch reads the
-   * process, which this repo's rules keep out of runtime code.
+   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1191-1201): the
+   * whole trace under debug, else the frames before the first framework frame,
+   * else every non-framework frame, else the whole trace.
+   *
+   * Ruby's `$DEBUG` half of the minitest.rb:1194 guard has no JS analogue —
+   * there is no interpreter-wide debug global to read — so only the
+   * `ENV["MT_DEBUG"]` half is ported, through `process-adapter`. Ruby
+   * truthiness makes a set-but-empty `MT_DEBUG` count, hence the `!= null`
+   * rather than a bare truthiness test.
    */
   filter(bt: string[] | null): string[] {
     if (!bt) return ["No backtrace"];
+
+    if (env.MT_DEBUG != null) return [...bt];
 
     const framework = bt.findIndex((line) => this.regexp.test(line));
     let newBt = framework === -1 ? [...bt] : bt.slice(0, framework);

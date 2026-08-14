@@ -1,4 +1,22 @@
+import { slice } from "../../hash-utils.js";
+
 type AnyObject = Record<string, unknown>;
+
+/**
+ * Replaces the hash with only the given keys, returning the removed
+ * key/value pairs — Ruby's `Hash#slice!` (core_ext/hash/slice.rb:10-17).
+ *
+ * `hash.default` / `hash.default_proc` have no JS analogue: a plain object has
+ * no default-value seat, so slice.rb:13-14 has nothing to copy over.
+ */
+export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T> {
+  const omit = slice(hash, ...(Object.keys(hash).filter((k) => !keys.includes(k)) as (keyof T)[]));
+  const result = slice(hash, ...(keys as (keyof T)[]));
+  // `replace(hash)`: empty the receiver, then take the sliced pairs.
+  for (const key of Object.keys(hash)) delete hash[key];
+  Object.assign(hash, result);
+  return omit as Partial<T>;
+}
 
 /**
  * Removes and returns the key/value pairs matching the given keys, mutating

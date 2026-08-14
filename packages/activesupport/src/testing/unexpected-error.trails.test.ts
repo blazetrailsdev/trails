@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cwd } from "../process-adapter.js";
+import { cwd, env, setEnv } from "../process-adapter.js";
 import { BacktraceFilter, Minitest, UnexpectedError } from "./assertions.js";
 
 describe("UnexpectedErrorTest", () => {
@@ -40,6 +40,23 @@ describe("UnexpectedErrorTest", () => {
     expect(new UnexpectedError(raised).message).toBe(
       "Error: boom\n    at doThing (packages/activesupport/src/thing.ts:1:1)",
     );
+  });
+
+  it("filter returns the whole trace under MT_DEBUG", () => {
+    const bt = [
+      "at doThing (thing.ts:1:1)",
+      "at runTest (/node_modules/vitest/dist/runner.js:2:2)",
+    ];
+    const filter = new BacktraceFilter();
+    expect(filter.filter(bt)).toEqual(["at doThing (thing.ts:1:1)"]);
+
+    const original = env.MT_DEBUG;
+    setEnv("MT_DEBUG", "1");
+    try {
+      expect(filter.filter(bt)).toEqual(bt);
+    } finally {
+      setEnv("MT_DEBUG", original);
+    }
   });
 
   it("the rendered backtrace follows a swapped Minitest.backtraceFilter", () => {

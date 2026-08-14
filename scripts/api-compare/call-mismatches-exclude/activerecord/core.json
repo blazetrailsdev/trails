@@ -110,17 +110,5 @@
     "rubyName": "preventing_writes?",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "strict_loading_violation!",
-    "call": "instrument",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:name",
-      "kwargs{owner=ref:owner,reflection=ref:reflection}"
-    ],
-    "reason": "core.rb:253-262 takes `owner:`/`reflection:` kwargs and instruments them verbatim; trails takes positional `(owner, reflection: string)` and synthesizes `ownerClass`/`reflectionLike`, so the values converge only with the signature — tracked by story `converge-strict-loading-violation-signature`."
   }
 ]

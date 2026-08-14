@@ -606,9 +606,9 @@ async function findTarget(
   // by `find_target?`: a new-record owner without the FK present never reaches
   // `find_target` and so never raises.
   if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
-    strictLoadingViolationBang(record, assocName, {
-      className: options.className ?? camelize(singularize(assocName)),
-    });
+    const ctor = record.constructor as typeof Base;
+    const reflection = ctor._reflectOnAssociation?.(assocName);
+    if (reflection) strictLoadingViolationBang({ owner: ctor, reflection });
   }
 
   // Scope-override path: CollectionProxy passes this when its Relation state

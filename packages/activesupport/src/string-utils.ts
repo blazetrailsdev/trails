@@ -2,22 +2,10 @@
  * String utilities mirroring Rails ActiveSupport string extensions.
  */
 
-export function isBlank(value: unknown): boolean {
-  if (value === null || value === undefined) return true;
-  if (typeof value === "string") return /^\s*$/.test(value);
-  if (typeof value === "boolean") return !value;
-  if (typeof value === "number") return false;
-  if (Array.isArray(value)) return value.length === 0;
-  // `Object.keys` reports none for a Set or Map, where Ruby's
-  // `respond_to?(:empty?)` arm answers by size.
-  if (value instanceof Set || value instanceof Map) return value.size === 0;
-  if (typeof value === "object") return Object.keys(value).length === 0;
-  return false;
-}
-
-export function isPresent(value: unknown): boolean {
-  return !isBlank(value);
-}
+// `blank?` / `present?` are `core_ext/object/blank.rb`'s, not a string
+// extension — they live at the Rails path and are re-exported here so this
+// file's long-standing importers keep reaching them.
+export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
 export function squish(str: string): string {
   return str.trim().replace(/\s+/g, " ");

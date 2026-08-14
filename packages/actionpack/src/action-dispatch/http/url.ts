@@ -8,7 +8,7 @@
  * instance methods (url, host, port, ...) live on {@link Request}.
  */
 
-import { toParam, toQuery } from "@blazetrails/activesupport";
+import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment, rackEscape } from "../journey/router/utils.js";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -39,10 +39,6 @@ export interface UrlOptions {
   tldLength?: number;
   subdomain?: string | boolean | { toParam(): string };
   domain?: string;
-}
-
-function isBlank(s: string): boolean {
-  return s.length === 0 || /^\s*$/.test(s);
 }
 
 function namedHost(host: string): boolean {
