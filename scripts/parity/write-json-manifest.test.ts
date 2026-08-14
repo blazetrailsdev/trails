@@ -18,9 +18,13 @@ function tmpManifest(): string {
   return path.join(dir, "manifest.json");
 }
 
+// Same --ignore-path bypass the helper spawns with: these manifests live in an
+// os.tmpdir() scratch dir, i.e. outside the repo root prettier runs from, and a
+// path prettier considers ignored is reported as formatted with exit 0 — so
+// without the bypass every check here returns true regardless of the bytes.
 function prettierCheck(file: string): boolean {
   try {
-    execFileSync(PRETTIER_BIN, ["--check", file], { stdio: "pipe" });
+    execFileSync(PRETTIER_BIN, ["--ignore-path", "/dev/null", "--check", file], { stdio: "pipe" });
     return true;
   } catch {
     return false;
