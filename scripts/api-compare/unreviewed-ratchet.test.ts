@@ -19,6 +19,7 @@ import {
   renderSlack,
   renderWriteSummary,
   slackByPath,
+  tightenMarks,
   totalMark,
   unreviewedCounts,
   unreviewedEntries,
@@ -377,6 +378,73 @@ describe("renderSlack", () => {
     expect(msg).toContain("1 file(s)");
     expect(msg).toContain("50 of slack");
     expect(msg).toContain(`  - ${REL}  mark 2837, only 2787 unreviewed`);
-    expect(msg).toContain("pnpm parity:api:calls:reseed");
+  });
+
+  // The remedy printed here is the NARROW one. Advising the whole-tree reseed
+  // told an agent who had just converged a row and retired it by hand to run
+  // the exact operation CLAUDE.md forbids.
+  it("advises the narrow tighten, never the whole-tree reseed", () => {
+    const msg = renderSlack([{ file: REL, count: 2787, mark: 2837 }], "scripts/api-compare/marks");
+    expect(msg).toContain("pnpm parity:api:calls:tighten");
+    expect(msg).not.toContain("pnpm parity:api:calls:reseed");
+  });
+});
+
+describe("tightenMarks", () => {
+  // Omitting the list tightens every slack shard; naming one leaves the rest
+  // byte-identical, which is the whole point of the narrow remedy.
+  it("leaves every other shard byte-identical when one file is named", () => {
+    expect([...tightenMarks(marks({ [REL]: 5 }), marks({ [REL]: 7, [MODEL]: 4 }))]).toEqual([
+      [REL, 5],
+      [MODEL, 0],
+    ]);
+    const next = tightenMarks(marks({ [REL]: 5, [MODEL]: 1 }), marks({ [REL]: 7, [MODEL]: 4 }), [
+      REL,
+    ]);
+    expect([...next]).toEqual([
+      [REL, 5],
+      [MODEL, 4],
+    ]);
+  });
+
+  // A count ABOVE its mark is the excess arm's job (unreviewed debt that grew,
+  // which no write may clear), and a source with no mark is not this mode's
+  // business either — its first unreviewed row reds the excess arm instead.
+  it("never raises a mark, and never adds a shard for a source that has none", () => {
+    expect(tightenMarks(marks({ [REL]: 9 }), marks({ [REL]: 7 })).get(REL)).toBe(7);
+    expect(tightenMarks(marks({ [MODEL]: 3 }), marks({ [REL]: 7 })).has(MODEL)).toBe(false);
+  });
+});
+
+// The regression the narrow remedy exists for: converge a call, delete its ONE
+// baseline row by hand, and the gate goes green without any other file on disk
+// being rewritten.
+describe("tighten after a hand-retired baseline row", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "unreviewed-tighten-"));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("writes only the converged source's shard, and leaves the gate green", async () => {
+    const baseline = [entry("a"), entry("b"), entry("c", SEED, "model.ts")];
+    await writeMarks(dir, unreviewedCounts(baseline, SEED, pathFor));
+    const before = await fs.readFile(path.join(dir, MODEL), "utf-8");
+
+    // The convergence: relation.ts stops omitting `b`, so its row is deleted.
+    const converged = baseline.filter((e) => e.call !== "b");
+    const counts = unreviewedCounts(converged, SEED, pathFor);
+    expect(slackByPath(counts, await loadMarks(dir))).toEqual([{ file: REL, count: 1, mark: 2 }]);
+
+    await writeMarks(dir, tightenMarks(counts, await loadMarks(dir), [REL]));
+
+    expect(slackByPath(counts, await loadMarks(dir))).toEqual([]);
+    expect(excessByPath(counts, await loadMarks(dir))).toEqual([]);
+    expect(await fs.readFile(path.join(dir, MODEL), "utf-8")).toBe(before);
+    expect((await loadMarks(dir)).get(REL)).toBe(1);
   });
 });

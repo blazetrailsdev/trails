@@ -253,6 +253,36 @@ export function nextMarks(counts: MarkSet, marks: MarkSet): MarkSet {
   return next;
 }
 
+export const TIGHTEN_ARG = "--tighten";
+
+/**
+ * The narrow remedy for a STALE high-water mark (RFC 0084).
+ *
+ * Converging a real divergence retires its baseline row by hand, which lowers
+ * that ONE source's count below its shard and reds {@link slackByPath}. The
+ * whole-tree `--write` reseed clears it, but it also rewrites every other shard
+ * and every exclude row — the operation CLAUDE.md forbids, because the row you
+ * meant to retire disappears into an unreviewable diff and any concurrent drift
+ * gets swept into your PR.
+ *
+ * A mark only shrinks, so tightening one file is always safe on its own. This
+ * lowers the selected shards to their current counts and leaves every other one
+ * byte-identical, so {@link writeMarks} rewrites only what moved. `only` selects
+ * by `<package>/<tsFile .ts→.json>` path; omitted, every slack shard tightens.
+ * It never RAISES a mark, and never touches a file at or above its mark — that
+ * is the excess arm's job, and no write can clear it.
+ */
+export function tightenMarks(counts: MarkSet, marks: MarkSet, only?: string[]): MarkSet {
+  const selected = only === undefined ? undefined : new Set(only);
+  const next: MarkSet = new Map(marks);
+  for (const [file, mark] of marks) {
+    if (selected !== undefined && !selected.has(file)) continue;
+    const count = counts.get(file) ?? 0;
+    if (count < mark) next.set(file, count);
+  }
+  return next;
+}
+
 /**
  * Write the sharded mark under `dir`: one `{"max": N}` per source, deleting the
  * shards of sources that reached 0 and pruning the directories those deletions
@@ -342,8 +372,11 @@ export function renderSlack(slack: MarkDelta[], markDir: string): string {
     `(${total} of slack).\n` +
     "A mark is a measurement of remaining unreviewed debt; left high it hands the next " +
     "story a “before” value no clean tree produces, and the drift is discovered only " +
-    "when someone reseeds. A mark only shrinks, so tightening is always safe:\n" +
-    "  pnpm parity:api:calls:reseed\n" +
+    "when someone reseeds. A mark only shrinks, so tightening is always safe — and it is " +
+    "narrow: this writes ONLY the shards below, never the exclude tree (converging a row and " +
+    "retiring it by hand is exactly what lands you here, and a whole-tree reseed would bury " +
+    "it):\n" +
+    "  pnpm parity:api:calls:tighten [<shard>...]   (no shard named = every stale one)\n" +
     slack.map((d) => `  - ${d.file}  mark ${d.mark}, only ${d.count} unreviewed`).join("\n")
   );
 }

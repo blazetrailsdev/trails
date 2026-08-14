@@ -403,7 +403,10 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
 /**
  * Thrown when a collection association (`has_many` / HABTM) is assigned by
  * mass assignment — `owner.assignAttributes({ items: [...] })`, `new Owner({
- * items: [...] })` — on a *persisted* owner. (RFC 0087 §1 removed the native
+ * items: [...] })` — where Rails' `replace` would do DB I/O: a *persisted*
+ * owner, or a new owner whose replace still owes a query (the unconditional
+ * `load_target` once its primary key is set, or removing an already-persisted
+ * record). (RFC 0087 §1 removed the native
  * `=` setter that also raised this; the mass-assignment arm is retired by that
  * RFC's `retire-sync-association-mass-assignment-arms`.) The collection analogue of
  * {@link HasOnePersistedAssignmentError}, and a deliberate trails-only
@@ -421,8 +424,8 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
 
   constructor(association: string) {
     super(
-      `Cannot assign collection association \`${association}\` by mass assignment on a ` +
-        `persisted record: Rails replaces the collection at assignment time, ` +
+      `Cannot assign collection association \`${association}\` by mass assignment when the ` +
+        `replace needs the database: Rails replaces the collection at assignment time, ` +
         `which requires \`await\` in JS. Use \`await owner.${association}.replace([...])\` ` +
         `(or \`.concat(...)\` / \`.destroy(...)\`).`,
     );

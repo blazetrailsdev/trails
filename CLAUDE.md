@@ -317,6 +317,19 @@ write.
    exclude tree and buries the one row you meant to retire in an unreviewable
    diff.
 
+   Deleting the row lowers that source's unreviewed count below its committed
+   high-water mark, so the gate then reports a **STALE high-water mark**. The
+   remedy for that is narrow, not a reseed:
+
+   ```bash
+   pnpm parity:api:calls:tighten <package>/<tsFile .ts→.json>   # e.g. activerecord/insert-all.json
+   pnpm parity:api:calls:tighten                                # every stale shard
+   ```
+
+   It rewrites only the named mark shards — never the exclude tree, never a
+   shard you did not converge. `parity:api:calls:reseed` remains for a genuine
+   reseed and is not the answer here.
+
    **Also run the call-ARGUMENT gate**, which the call-set one cannot see past
    — a body that calls what Rails calls, with a different argument list, is
    green on `parity:api:calls`:

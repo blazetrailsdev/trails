@@ -14,6 +14,7 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
+import { CollectionPersistedAssignmentError } from "./errors.js";
 import { Reader } from "../test-helpers/models/reader.js";
 
 registerModel(Author);
@@ -92,5 +93,38 @@ describe("collection replace diffs instead of clearing", () => {
 
     const after = await Firm.find(companies("first_firm").id);
     expect((await after.clientsOfFirm).map((c) => c.id)).toEqual(before.map((c) => c.id));
+  });
+
+  // Rails' `replace` opens with `original_target = skip_strict_loading {
+  // load_target }.dup` (collection_association.rb:244) and that load is
+  // unconditional. A NEW owner whose primary key is already set makes
+  // `find_target?` true (association.rb:190), so the baseline the diff runs
+  // against is the persisted collection, not an empty in-memory target — the
+  // one case a synchronous shortcut around the load would get wrong.
+  it("loads the baseline for a new owner whose primary key is already set", async () => {
+    const persisted = await Firm.find(companies("first_firm").id);
+    const existing = await persisted.clients;
+    expect(existing.length).toBeGreaterThan(0);
+
+    const firm = new Firm({ id: companies("first_firm").id });
+    expect(firm.isNewRecord()).toBe(true);
+    await firm.clients.replace([]);
+
+    expect((await firm.clients).length).toBe(0);
+    expect(await Client.where({ client_of: companies("first_firm").id })).toEqual([]);
+  });
+
+  // The non-awaitable path (mass assignment / constructor form) must never
+  // schedule that load: Rails runs it inline, JS cannot, so it throws and names
+  // the awaitable form rather than dropping a promise nobody holds.
+  it("refuses a mass-assigned replace that owes the database", async () => {
+    const id = companies("first_firm").id;
+    expect(() => new Firm({ id, clients: [] })).toThrow(CollectionPersistedAssignmentError);
+    // The persisted rows are untouched: it threw before mutating anything.
+    expect((await Client.where({ client_of: id })).length).toBeGreaterThan(0);
+
+    // A new owner with no primary key owes nothing, so it still assigns inline.
+    const fresh = new Firm({ name: "fresh" });
+    expect(() => fresh.assignAttributes({ clients: [] })).not.toThrow();
   });
 });

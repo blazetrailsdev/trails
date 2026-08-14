@@ -118,6 +118,15 @@ cross-package reordering that used to make this worse is fixed — #5183 pinned
 emission to the code-unit `compareKeys` order, so a reseed now leaves untouched
 packages byte-identical.)
 
+Deleting the row also drops that source's unreviewed count below its committed
+high-water mark, which the gate reports as a **STALE high-water mark**. The
+remedy is the narrow one — `pnpm parity:api:calls:tighten [<shard>...]`, where a
+shard is the mark's `<package>/<tsFile .ts→.json>` path. It lowers only the
+named shards (all stale ones when none are named) and writes nothing else, so
+the "delete the row by hand, never reseed" rule and the gate's own advice agree.
+A mark is a measurement that only shrinks, so tightening one file is always safe
+on its own; `parity:api:calls:reseed` stays for a genuine reseed.
+
 Any PR that converges a visitor or method body toward Rails can trip this, so
 run the ratchet locally whenever you change a ported method body.
 

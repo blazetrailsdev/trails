@@ -15,6 +15,14 @@
 
 const BLANK_RE = /^\s*$/;
 
+function isAsyncFunction(fn: object): boolean {
+  return Object.prototype.toString.call(fn) === "[object AsyncFunction]";
+}
+
+function isThenable(v: unknown): v is PromiseLike<unknown> {
+  return typeof (v as { then?: unknown } | null | undefined)?.then === "function";
+}
+
 export class NilClass {
   static isBlank(_value: null | undefined): true {
     return true;
@@ -85,11 +93,29 @@ export class Time {
  * genuine JS `symbol`; the string spelling falls through to `String`.
  *
  * `Object#blank?`'s `respond_to?(:empty?)` arm answers for `Set` and `Map`,
- * which `Object.keys` reports as empty, and for any other object carrying a
- * boolean `isEmpty` (the conventions-table spelling of `empty?`) or `empty`
- * (the getter actionpack's Hash-like wrappers carry). A method-shaped
- * `isEmpty()` is deliberately not invoked: trails has async ones
- * (`Relation#isEmpty` runs a query) and Ruby's `blank?` issues no I/O.
+ * which `Object.keys` reports as empty, and for any other object carrying an
+ * `isEmpty` (the conventions-table spelling of `empty?`) or `empty` (the getter
+ * actionpack's Hash-like wrappers carry) — as a boolean reader, or as a method
+ * invoked the way blank.rb:19 invokes `empty?`.
+ *
+ * An `async` one is held out: Ruby's `blank?` issues no I/O, and trails has
+ * querying `isEmpty`s (`Relation`, `CollectionAssociation`, `Preloader`,
+ * `Querying`). They are excluded BEFORE the call, which is the only point at
+ * which exclusion is worth anything — invoking to find out would already have
+ * issued the query. `Object.prototype.toString` reads the function object's
+ * `AsyncFunction` tag, which a bound method keeps (`Function.prototype.bind`
+ * copies the target's prototype), where a `Promise<boolean>` return type is
+ * erased by the time this runs.
+ *
+ * A NON-`async` function that returns a promise anyway defeats any pre-call
+ * test, so the answer is also checked after the fact: a thenable result is
+ * discarded (with its rejection swallowed, since nobody can await it) and the
+ * own-key arm answers instead. That keeps a mis-declared querying `empty?` from
+ * reporting a promise as present — the contract stays "a querying `empty?` is
+ * spelled `async`", and this is what happens when it is not.
+ *
+ * blank.rb:19 is `!!empty?`, and Ruby's `!!` is false only for `nil`/`false`,
+ * so a predicate answering a value rather than a boolean still answers.
  */
 export function isBlank(value: unknown): boolean {
   if (value === null || value === undefined) return NilClass.isBlank(value);
@@ -104,6 +130,11 @@ export function isBlank(value: unknown): boolean {
   if (value instanceof Set || value instanceof Map) return value.size === 0;
   const empty = (value as { isEmpty?: unknown }).isEmpty ?? (value as { empty?: unknown }).empty;
   if (typeof empty === "boolean") return empty;
+  if (typeof empty === "function" && !isAsyncFunction(empty)) {
+    const result: unknown = (empty as () => unknown).call(value);
+    if (isThenable(result)) void Promise.resolve(result).catch(() => undefined);
+    else return result != null && result !== false;
+  }
   if (typeof value === "object") return Object.keys(value).length === 0;
   return false;
 }

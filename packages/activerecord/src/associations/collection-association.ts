@@ -26,6 +26,13 @@ export interface ReplacePlan {
   newTarget: Base[];
   originalTarget: Base[];
   wasLoaded: boolean;
+  /**
+   * The new-owner arm's own DB work, when it had any. That arm is I/O-free —
+   * a new owner's `concat` never inserts and `remove_records` skips
+   * `delete_records` — except when the records being REMOVED are persisted,
+   * which Rails deletes in a transaction (`delete_or_destroy`, :393-397).
+   */
+  pending?: Promise<unknown>;
 }
 
 /** @internal */
@@ -183,14 +190,23 @@ export class CollectionAssociation extends Association {
    * builder/collection-association.ts `defineWriters`) and mass-assignment,
    * neither of which can `await`.
    *
-   * - **Unpersisted owner:** in-memory `replace`, exactly as Rails does no I/O
-   *   for a new-record owner (the FK isn't known yet); autosave persists at the
-   *   owner's first `save()`.
-   * - **Persisted owner:** THROW. Rails replaces inline at assignment; JS
-   *   cannot do synchronous DB I/O from a property setter, so rather than
-   *   deferring the writes to the owner's next `save()` (where a deferred
-   *   delete can race an interim insert) we throw and name the awaitable
-   *   Rails-named replacement (`await owner.items.replace([...])`).
+   * - **Unpersisted owner, no I/O owed:** in-memory `replace`, exactly as Rails
+   *   does no I/O for such an owner (the FK isn't known yet); autosave persists
+   *   at the owner's first `save()`.
+   * - **Persisted owner, or any replace that owes I/O:** THROW. Rails replaces
+   *   inline at assignment; JS cannot do synchronous DB I/O from a property
+   *   setter, so rather than deferring the writes to the owner's next `save()`
+   *   (where a deferred delete can race an interim insert) we throw and name
+   *   the awaitable Rails-named replacement (`await owner.items.replace([...])`).
+   *
+   * A NEW owner can owe I/O too, which is why the second arm is not just the
+   * persisted one: Rails loads the target before diffing even for a new owner
+   * (`skip_strict_loading { load_target }`, collection_association.rb:244), and
+   * that load is a query once the owner's primary key is set (`find_target?`,
+   * association.rb:190). Removing an already-persisted record is the other
+   * case — Rails deletes it in a transaction (`delete_or_destroy`, :393-397).
+   * Both are refused BEFORE `replace` mutates anything, so this path never
+   * schedules DB work nobody can await.
    *
    * RFC 0087 §1 listed this for deletion with the property setter it backed.
    * The setter is gone; this survives deliberately, because Rails'
@@ -209,7 +225,11 @@ export class CollectionAssociation extends Association {
     // `nil.each`; here: TypeError from iterating null) on BOTH owner arms,
     // ahead of the persisted-owner throw.
     for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+    if (
+      (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ||
+      this.findTargetNeeded() ||
+      this.difference(this.target, records).some((r) => !r.isNewRecord())
+    ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
     }
     this.replace(records);
@@ -565,15 +585,6 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Build any in-memory join rows for `records` on a new (unsaved) owner.
-   * No-op for non-through collections; HMT overrides it to pre-build the
-   * through-rows (mirrors the `build_through_record` loop reached via
-   * `concat_records` on a new owner).
-   * @internal
-   */
-  protected buildThroughRecordsInMemory(_records: Base[]): void {}
-
-  /**
    * Removes all records from the association. Honors the :dependent
    * option. If :dependent is :destroy, uses :delete_all strategy instead.
    */
@@ -686,9 +697,13 @@ export class CollectionAssociation extends Association {
    * Replace this collection with other_array. Performs a diff and
    * delete/add only records that have changed.
    *
-   * In-memory only. For a *new* owner that is the whole of Rails' behaviour
-   * (`replace_records` without a save — the FK isn't known yet), so the
-   * owner's first `save()` autosaves the target and nothing else is needed.
+   * The new-owner arm is Rails' own — `replace_records(other_array,
+   * original_target)` (collection_association.rb:247) — so removal goes through
+   * `delete` → `delete_or_destroy` → `remove_records` and addition through
+   * `concat` → `concat_records`, each with its single `catch(:abort)` and (for
+   * HMT) its own `build_through_record` loop. It is I/O-free, so the owner's
+   * first `save()` autosaves the target.
+   *
    * For a *persisted* owner Rails additionally runs the diffed deletes +
    * inserts in a transaction; that DB work cannot happen here (this is
    * synchronous, and reached from the property setter), so it is returned as a
@@ -705,50 +720,34 @@ export class CollectionAssociation extends Association {
     this.raiseIfLoadInFlight();
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const wasLoaded = this.isLoaded();
-    const originalTarget = [...this.target];
     if (this.owner.isNewRecord()) {
-      // Rails routes a new-owner replace through replace_records → concat →
-      // concat_records (collection_association.rb): delete(difference(target,
-      // new_target)) then concat(difference(new_target, target)). The concat
-      // runs the build path — for HMT it constructs through-rows in memory that
-      // the owner's save autosaves alongside it. Mirror that here rather than
-      // setting _target directly, which would skip the through-row build.
-      //
-      // delete(difference(...)) → delete_or_destroy → remove_records: fire
-      // before_remove (an abort halts removal), prune the target and clear the
-      // inverse, then after_remove. delete_records (the DB delete) is skipped —
-      // a new owner has no persisted join rows yet, so existing_records is
-      // empty (the owner's save is what creates them).
-      const toRemove = this.difference(this.target, otherArray);
-      let removable = true;
-      try {
-        for (const r of toRemove) this.callback("beforeRemove", r);
-      } catch (e) {
-        if (!isAbortSignal(e)) throw e;
-        removable = false;
+      // Rails: `original_target = skip_strict_loading { load_target }.dup`
+      // (collection_association.rb:244) — run unconditionally, so a new owner
+      // whose primary key is already set (`find_target?`, association.rb:190)
+      // diffs against the loaded baseline, not against an unloaded target.
+      const loaded = this.skipStrictLoading(() => this.loadTarget());
+      // Deviation (language-forced): that load is the one I/O in Rails' body and
+      // this one is synchronous — it is reached from the property setter — so
+      // when it owes a query the whole Rails body goes to the awaitable caller.
+      if (isThenable(loaded)) {
+        const pending = loaded.then((target) =>
+          replaceRecords(this, otherArray, [...(target ?? [])]),
+        );
+        return { newTarget: [...otherArray], originalTarget: [...this.target], wasLoaded, pending };
       }
-      if (removable) {
-        for (const r of toRemove) {
-          const idx = this.target.indexOf(r);
-          if (idx !== -1) this.target.splice(idx, 1);
-          this.removeInverseInstance(r);
-        }
-        for (const r of toRemove) this.callback("afterRemove", r);
+      const originalTarget = [...(loaded ?? [])];
+      const replaced = replaceRecords(this, otherArray, originalTarget);
+      if (isThenable(replaced)) {
+        return { newTarget: [...otherArray], originalTarget, wasLoaded, pending: replaced };
       }
-      // concat(difference(new_target, target)): add_to_target per record.
-      // `added` is that difference — Rails' concat_records returns the full
-      // input array (before_add aborts affect @target membership but not the
-      // returned set), and HMT#concat_records builds a through-row for each, so
-      // we build for the whole difference rather than filtering on addToTarget.
-      const added = this.difference(otherArray, this.target);
-      for (const r of added) this.addToTarget(r);
-      this.loadedBang();
-      this.buildThroughRecordsInMemory(added);
     } else {
-      // Persisted owner: Rails calls replace_common_records_in_memory before
-      // diffing (collection_association.rb). For a new owner Rails skips it —
-      // replace_records leaves common records in place untouched — so it lives
-      // here, not above the branch.
+      // Persisted owner: `load_target` here is DB I/O this synchronous body
+      // cannot run, so the in-memory baseline stands in and `persistReplacePlan`
+      // re-reads the real `original_target` before diffing. Rails also calls
+      // replace_common_records_in_memory before diffing; for a new owner it
+      // skips it (replace_records leaves common records untouched), so it lives
+      // here rather than above the branch.
+      const originalTarget = [...this.target];
       replaceCommonRecordsInMemory(this, otherArray, originalTarget);
       if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
         for (const r of this.difference(originalTarget, otherArray)) {
@@ -774,6 +773,7 @@ export class CollectionAssociation extends Association {
    * the captured baseline for the duration of the diff.
    */
   protected async persistReplacePlan(pending: ReplacePlan): Promise<void> {
+    if (pending.pending) await pending.pending;
     if (this.owner.isNewRecord()) return;
     // If the association wasn't loaded at assignment time, fetch the persisted
     // baseline directly rather than via findTarget, to avoid the loadedBang short-circuit
@@ -1543,33 +1543,50 @@ export function includesRecord(records: Base[], record: Base): boolean {
   return records.some((r) => (r as unknown as { equals(o: unknown): boolean }).equals(record));
 }
 
-/** @internal */
-async function replaceRecords(
+/**
+ * Mirrors: ActiveRecord::Associations::CollectionAssociation#replace_records
+ * (collection_association.rb:414-424).
+ *
+ * `Promise<Base[]> | Base[]` because both arms of `replace` reach it: the
+ * persisted one from the awaitable {@link CollectionAssociation.persistReplacePlan},
+ * the new-owner one from the synchronous `replace` body, where `delete` and
+ * `concat` are I/O-free and this runs inline start to finish.
+ *
+ * Rails' `unless concat(...)` reads the nil `concat_records` answers when a
+ * failed `insert_record` raised Rollback inside the transaction (:127-135);
+ * ours can also surface that Rollback directly, so both spellings of the same
+ * failure restore `original_target` and raise. Anything else re-throws as-is.
+ * @internal
+ */
+function replaceRecords(
   assoc: CollectionAssociation,
   newTarget: Base[],
   originalTarget: Base[],
-): Promise<Base[]> {
-  // Rails: delete(difference(target, new_target)); concat(difference(new_target, target))
+): Promise<Base[]> | Base[] {
   const diff = diffHooks(assoc);
-  const toDelete = diff.difference(assoc.target, newTarget);
-  if (toDelete.length > 0) await assoc.delete(...toDelete);
-  const toAdd = diff.difference(newTarget, assoc.target);
-  if (toAdd.length > 0) {
+  const deleted = assoc.delete(...diff.difference(assoc.target, newTarget));
+  const restoreAndRaise = (e?: unknown): never => {
+    if (e !== undefined && !(e instanceof Rollback)) throw e;
+    (assoc as any).target = originalTarget;
+    throw new RecordNotSaved(
+      `Failed to replace ${assoc.reflection.name} because one or more of the new records ` +
+        `could not be saved.`,
+      assoc.owner,
+    );
+  };
+  const check = (records: Base[] | undefined): Base[] =>
+    records ? assoc.target : restoreAndRaise();
+  const concatenate = (): Promise<Base[]> | Base[] => {
     try {
-      await assoc.concat(...toAdd);
+      const concatenated = assoc.concat(...diff.difference(newTarget, assoc.target));
+      return isThenable(concatenated)
+        ? concatenated.then(check, restoreAndRaise)
+        : check(concatenated);
     } catch (e) {
-      // Only translate validation/rollback failures; re-throw adapter/query errors as-is
-      if (e instanceof Rollback) {
-        (assoc as any).target = originalTarget;
-        throw new RecordNotSaved(
-          `Failed to replace ${assoc.reflection.name} because one or more records could not be saved.`,
-          assoc.owner,
-        );
-      }
-      throw e;
+      return restoreAndRaise(e);
     }
-  }
-  return assoc.target;
+  };
+  return isThenable(deleted) ? deleted.then(concatenate) : concatenate();
 }
 
 /** @internal */
