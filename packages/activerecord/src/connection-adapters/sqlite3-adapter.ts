@@ -1849,8 +1849,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async removeColumns(tableName: string, ...columnNames: string[]): Promise<void> {
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      for (const col of columnNames) {
-        definition.removeColumn(col);
+      for (const columnName of columnNames) {
+        definition.removeColumn(columnName);
       }
       deleteForeignKeysForColumns(definition, columnNames);
     });

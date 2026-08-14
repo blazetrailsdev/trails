@@ -10,16 +10,13 @@ import { ValueType } from "../value.js";
 const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /**
- * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan?
+ * Mirrors: ActiveModel::Type::Helpers::Numeric#equal_nan? (numeric.rb:37-42).
  *
  * Trails' BigDecimal carries no non-finite state, so `DecimalType#cast`
  * represents a NaN decimal as the sentinel string `"NaN"` — that sentinel is
- * this port's BigDecimal NaN. Requiring the same representation on both sides
- * is how Rails' `old_value.instance_of?(new_value.class)` guard lands here.
- *
- * Deviation: the second argument is the CAST new value, not Rails'
- * `new_value_before_type_cast` — pre-existing, pinned by `float.test.ts`
- * ("equal_nan? uses cast value") and five `dirty.test.ts` cases.
+ * this port's BigDecimal NaN, and `decimal_test.rb:69-70` is what pins it.
+ * Requiring the same representation on both sides is how Rails'
+ * `old_value.instance_of?(new_value.class)` guard lands here.
  *
  * @internal Rails-private helper.
  */
@@ -118,13 +115,15 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       newValueBeforeTypeCast?: unknown,
     ): boolean {
       // `super` is Value#changed? — Ruby `!=` on BigDecimal is value equality,
-      // JS `!==` is object identity, so normalize before comparing.
-      const old = normalizeBigDecimal(oldValue);
-      const fresh = normalizeBigDecimal(newValue);
+      // JS `!==` is object identity, so it alone takes normalized operands.
       return (
-        (super.isChanged(old, fresh, newValueBeforeTypeCast) ||
-          isNumberToNonNumber(old, newValueBeforeTypeCast)) &&
-        !isEqualNan(old, fresh)
+        (super.isChanged(
+          normalizeBigDecimal(oldValue),
+          normalizeBigDecimal(newValue),
+          newValueBeforeTypeCast,
+        ) ||
+          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
+        !isEqualNan(oldValue, newValueBeforeTypeCast)
       );
     }
   }

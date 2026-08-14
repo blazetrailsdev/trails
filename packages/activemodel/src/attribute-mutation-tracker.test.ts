@@ -202,9 +202,7 @@ describe("forceChange and type.isChanged independence", () => {
     const set = new AttributeSet(attrs);
     const tracker = new AttributeMutationTracker(set);
 
-    // Write via "NaN" string so valueBeforeTypeCast is a string — exercises
-    // the fixed isEqualNan(oldValue, newValue) path, not the trivial NaN===NaN case.
-    set.writeFromUser("ratio", "NaN");
+    set.writeFromUser("ratio", NaN);
     expect(tracker.changedAttributeNames()).not.toContain("ratio");
 
     // forceChange overrides type — must appear as changed regardless

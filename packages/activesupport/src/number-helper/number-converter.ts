@@ -1,5 +1,9 @@
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
+import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+
+/** What `BigDecimal(str, exception: false)` accepts (number_converter.rb:183). */
+const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 
 export type NumberFormatOptions = object;
 
@@ -89,12 +93,47 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   }
 
   protected isValidFloat(): boolean {
+    if (this.number instanceof BigDecimal) return true;
     const n = Number(this.number);
     return !isNaN(n) && isFinite(n);
   }
 
   protected numberAsFloat(): number {
-    return Number(this.number);
+    return this.number instanceof BigDecimal
+      ? Number(this.number.toString("F"))
+      : Number(this.number);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::NumberHelper::NumberConverter#valid_bigdecimal
+   * (number_converter.rb:178-187).
+   *
+   * The String arm reproduces `BigDecimal(number, exception: false)` — the
+   * whole string must parse, so `"1,11"` and `"12.5abc"` are `null`, while
+   * surrounding whitespace and an exponent are accepted. The final arm is
+   * Ruby's `number.to_d rescue nil`: a `BigDecimal` is already converted, and
+   * anything else answering `to_d` is converted through it.
+   */
+  protected validBigdecimal(): BigDecimal | null {
+    const number = this.number;
+    if (typeof number === "number" && !Number.isFinite(number)) return null;
+    if (typeof number === "number" || typeof number === "bigint") {
+      return new BigDecimal(number);
+    }
+    if (typeof number === "string") {
+      return BIGDECIMAL_STRING.test(number) ? new BigDecimal(number.trim()) : null;
+    }
+    if (number instanceof BigDecimal) return number;
+    const toD = (number as { toD?: () => unknown } | null | undefined)?.toD;
+    if (typeof toD !== "function") return null;
+    try {
+      const converted = toD.call(number);
+      return converted instanceof BigDecimal
+        ? converted
+        : new BigDecimal(converted as string | number | bigint);
+    } catch {
+      return null;
+    }
   }
 
   protected get options(): Record<string, unknown> {

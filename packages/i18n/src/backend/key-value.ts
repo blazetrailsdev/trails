@@ -117,7 +117,7 @@ export interface KeyValue extends Base {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class KeyValue {
   store: Store | null;
-  private subtreesFlag: boolean;
+  private _subtrees: boolean;
 
   /** @internal Ruby's `@links` ivar, which `Flatten#links` memoizes into. */
   linksCache?: Map<string, Map<string, string>>;
@@ -137,7 +137,7 @@ export class KeyValue {
 
   constructor(store: Store | null, subtrees = true) {
     this.store = store;
-    this.subtreesFlag = subtrees;
+    this._subtrees = subtrees;
   }
 
   /** Mirrors: `initialized?` */
@@ -151,13 +151,13 @@ export class KeyValue {
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     const escape = "escape" in options ? options.escape : true;
-    const flattened = this.flattenTranslations(locale, data, escape as boolean, this.subtreesFlag);
+    const flattened = this.flattenTranslations(locale, data, escape as boolean, this._subtrees);
     for (let [key, value] of Object.entries(flattened)) {
       key = `${locale}.${key}`;
 
       if (isHash(value)) {
         let oldValue: unknown;
-        if (this.subtreesFlag && (oldValue = this.store!.get(key)) != null) {
+        if (this._subtrees && (oldValue = this.store!.get(key)) != null) {
           oldValue = JSON.parse(oldValue as string);
           if (isHash(oldValue)) {
             value = deepMergeBang(deepSymbolizeKeys(oldValue), value);
@@ -213,7 +213,7 @@ export class KeyValue {
 
   /** Mirrors: `subtrees?` */
   protected subtrees(): boolean {
-    return this.subtreesFlag;
+    return this._subtrees;
   }
 
   protected lookup(
@@ -235,7 +235,7 @@ export class KeyValue {
       return deepSymbolizeKeys(value);
     } else if (value != null) {
       return value;
-    } else if (!this.subtreesFlag) {
+    } else if (!this._subtrees) {
       return new SubtreeProxy(`${locale}.${key}`, this.store!);
     }
     return undefined;

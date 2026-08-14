@@ -4,6 +4,7 @@ import {
   singularize,
   humanize,
   Inflections,
+  Uncountables,
   include,
   ToJsonWithActiveSupportEncoder,
   type Included,
@@ -307,7 +308,7 @@ export class ModelName {
     // result. (`_singularize` is exposed below for parity with Rails.)
     this.singular = [...segmentsUnderscored, bareUnderscored].join("_");
     // Rails `@plural = pluralize(@singular)`.
-    this.plural = ModelName._uncountables(locale).has(this.singular)
+    this.plural = ModelName._uncountables(locale).isUncountable(this.singular)
       ? this.singular
       : pluralize(this.singular, locale);
     const uncountable = this.plural === this.singular;
@@ -408,7 +409,7 @@ export class ModelName {
   // maintained a local 6-word set that ignored user-added inflections
   // and diverged from activesupport's own pluralize() which uses the
   // shared store.
-  private static _uncountables(locale: string): Set<string> {
+  private static _uncountables(locale: string): Uncountables {
     return Inflections.instance(locale).uncountables;
   }
 

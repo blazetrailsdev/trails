@@ -8,6 +8,20 @@ import {
   numberToHumanSize,
   numberToHuman,
 } from "./number-helper.js";
+import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+
+/** Mirrors: number_helper_test.rb:18-25's `NumberWithToD`. */
+class NumberWithToD {
+  readonly #number: number;
+
+  constructor(number: number) {
+    this.#number = number;
+  }
+
+  toD(): BigDecimal {
+    return new BigDecimal(this.#number);
+  }
+}
 
 describe("NumberHelperTest", () => {
   it("number to phone", () => {
@@ -20,14 +34,46 @@ describe("NumberHelperTest", () => {
   });
 
   it("number to currency", () => {
+    expect(numberToCurrency("123456789012345678.91")).toBe("$123,456,789,012,345,678.91");
     expect(numberToCurrency(1234567890.5)).toBe("$1,234,567,890.50");
     expect(numberToCurrency(1234567890.506)).toBe("$1,234,567,890.51");
-    expect(numberToCurrency("1234567890.50")).toBe("$1,234,567,890.50");
-    expect(numberToCurrency(1234567890.5, { unit: "Kroner", format: "%n %u" })).toBe(
-      "1,234,567,890.50 Kroner",
-    );
     expect(numberToCurrency(-1234567890.5)).toBe("-$1,234,567,890.50");
-    expect(numberToCurrency(-1234567890.5, { format: "%u%n" })).toBe("-$1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5, { format: "%u %n" })).toBe("-$ 1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5, { negativeFormat: "(%u%n)" })).toBe(
+      "($1,234,567,890.50)",
+    );
+    expect(numberToCurrency(1234567891.5, { precision: 0 })).toBe("$1,234,567,892");
+    // number_helper_test.rb:88 is held back on `RoundingHelper`'s round-mode
+    // coverage — see the `rounding-helper-round-mode-coverage` story.
+    expect(numberToCurrency(1234567890.5, { precision: 1 })).toBe("$1,234,567,890.5");
+    expect(numberToCurrency(1234567890.5, { unit: "&pound;", separator: ",", delimiter: "" })).toBe(
+      "&pound;1234567890,50",
+    );
+    expect(numberToCurrency("1234567890.50")).toBe("$1,234,567,890.50");
+    expect(numberToCurrency("1234567890.50", { unit: "K&#269;", format: "%n %u" })).toBe(
+      "1,234,567,890.50 K&#269;",
+    );
+    expect(
+      numberToCurrency("-1234567890.50", {
+        unit: "K&#269;",
+        format: "%n %u",
+        negativeFormat: "%n - %u",
+      }),
+    ).toBe("1,234,567,890.50 - K&#269;");
+    expect(numberToCurrency(+0.0, { unit: "", negativeFormat: "(%n)" })).toBe("0.00");
+    expect(numberToCurrency(-0.456789, { precision: 0 })).toBe("$0");
+    expect(numberToCurrency(-0.0456789, { precision: 1 })).toBe("$0.0");
+    expect(numberToCurrency(-0.00456789, { precision: 2 })).toBe("$0.00");
+    expect(numberToCurrency(-0.5, { precision: 0 })).toBe("-$1");
+    expect(numberToCurrency("1,11")).toBe("$1,11");
+    expect(numberToCurrency("0,11")).toBe("$0,11");
+    expect(numberToCurrency(",11")).toBe("$,11");
+    expect(numberToCurrency("-1,11")).toBe("-$1,11");
+    expect(numberToCurrency("-0,11")).toBe("-$0,11");
+    expect(numberToCurrency("-,11")).toBe("-$,11");
+    expect(numberToCurrency(-0.0)).toBe("$0.00");
+    expect(numberToCurrency("-0.0")).toBe("$0.00");
+    expect(numberToCurrency(new NumberWithToD(1.23))).toBe("$1.23");
   });
 
   it("number to percentage", () => {
@@ -169,6 +215,13 @@ describe("NumberHelperTest", () => {
 });
 
 describe("NumberConverter subclasses", () => {
+  it("valid_bigdecimal takes a BigDecimal through the rounded branch, not the string fallback", () => {
+    expect(numberToCurrency(new BigDecimal("123456789012345678.91"))).toBe(
+      "$123,456,789,012,345,678.91",
+    );
+    expect(numberToCurrency(new BigDecimal("-1234.5"), { precision: 1 })).toBe("-$1,234.5");
+  });
+
   it("NumberToPhoneConverter.convert works", async () => {
     const { NumberToPhoneConverter } = await import("./number-helper/number-to-phone-converter.js");
     expect(NumberToPhoneConverter.convert(5551234567, { areaCode: true })).toBe("(555) 123-4567");

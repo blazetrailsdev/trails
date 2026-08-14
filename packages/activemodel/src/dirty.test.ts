@@ -484,7 +484,7 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
     m.clearAttributeChanges(["ratio"]);
     // After clearAttributeChanges, _forcedNames must also be cleared so a
     // subsequent type-equal write does not re-appear as dirty.
-    m.writeAttribute("ratio", "NaN");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 });
@@ -761,7 +761,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.restoreAttributes();
     // After restoreAttributes(), _forcedNames must be cleared so a subsequent
     // type-equal write does not re-appear as dirty.
-    m.writeAttribute("ratio", "NaN");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 
@@ -781,7 +781,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.changesApplied();
     // After changesApplied(), _forcedNames must be cleared so the next
     // type-equal write does not appear dirty.
-    m.writeAttribute("ratio", "NaN");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 
@@ -798,7 +798,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio", NaN); // mirrors attribute_will_change!
-    m.writeAttribute("ratio", "NaN"); // type-equal write
+    m.writeAttribute("ratio", NaN); // type-equal write
     expect(m.changedAttributeNamesToSave).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,
     // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
@@ -815,10 +815,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    // Write via the string "NaN" so valueBeforeTypeCast is a string — this
-    // exercises the fixed isEqualNan path (now compares against the cast value,
-    // not the raw string).
-    m.writeAttribute("ratio", "NaN");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
     expect(m.changes).not.toHaveProperty("ratio");
   });
@@ -852,7 +849,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.changesApplied();
     m.writeAttribute("ratio", 1.0);
     expect(m.changedAttributeNamesToSave).toContain("ratio");
-    m.writeAttribute("ratio", "NaN");
+    m.writeAttribute("ratio", NaN);
     expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 });

@@ -228,11 +228,11 @@ export class FileStore extends Store implements CacheStore {
 
   // Translate a key into a file path (file_store.rb:158-181).
   protected override normalizeKey(key: unknown, options?: StoreOptions): string {
-    const normalizedKey = super.normalizeKey(key, options);
-    let fname = encodeWwwFormComponent(normalizedKey);
+    key = super.normalizeKey(key, options);
+    let fname = encodeWwwFormComponent(key as string);
 
     if (fname.length > FILEPATH_MAX_SIZE) {
-      fname = hexdigest(normalizedKey);
+      fname = hexdigest(key as string);
     }
 
     let hash = adler32(fname);

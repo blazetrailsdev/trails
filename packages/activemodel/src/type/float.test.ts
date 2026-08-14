@@ -42,9 +42,9 @@ describe("FloatTest", () => {
     expect(type.isChanged(NaN, NaN, NaN)).toBe(false);
   });
 
-  it('isChanged returns false for NaN-to-NaN when raw is "NaN" string — equal_nan? uses cast value', () => {
+  it('isChanged returns true for NaN-to-NaN when raw is a "NaN" string — equal_nan? takes value_before_type_cast', () => {
     const type = new Types.FloatType();
-    expect(type.isChanged(NaN, NaN, "NaN")).toBe(false);
+    expect(type.isChanged(NaN, NaN, "NaN")).toBe(true);
   });
 
   it("isChanged returns true for a genuine float change", () => {

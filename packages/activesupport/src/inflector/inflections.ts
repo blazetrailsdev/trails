@@ -13,10 +13,51 @@ export interface HumanRule {
   replacement: string;
 }
 
+/**
+ * Mirrors: ActiveSupport::Inflector::Inflections::Uncountables
+ * (inflector/inflections.rb:35-63) — an Array of downcased words plus the
+ * parallel `@regex_array` that `uncountable?` matches against. The downcasing
+ * lives here, in `add`, exactly as it does in Ruby; call sites pass the word
+ * through untouched.
+ */
+export class Uncountables extends Array<string> {
+  private _regexArray: RegExp[] = [];
+
+  delete(entry: string): void {
+    // Ruby's Array#delete removes every equal element, not just the first.
+    let index: number;
+    while ((index = this.indexOf(entry)) !== -1) this.splice(index, 1);
+    const regex = this.toRegex(entry);
+    while ((index = this._regexArray.findIndex((r) => r.source === regex.source)) !== -1) {
+      this._regexArray.splice(index, 1);
+    }
+  }
+
+  add(words: (string | string[])[]): this {
+    words = words.flat().map((word) => word.toLowerCase());
+    this.push(...(words as string[]));
+    this._regexArray.push(...(words as string[]).map((word) => this.toRegex(word)));
+    return this;
+  }
+
+  isUncountable(str: string): boolean {
+    return this._regexArray.some((regex) => regex.test(str));
+  }
+
+  // Ruby's `/\b…\Z/i` boundary is Unicode-aware, so it fires before a
+  // non-ASCII word like "猫"; JS `\b` is ASCII-only.
+  private toRegex(string: string): RegExp {
+    return new RegExp(
+      `(?<![\\p{L}\\p{N}_])${string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      "iu",
+    );
+  }
+}
+
 export class Inflections {
   plurals: InflectionRule[] = [];
   singulars: InflectionRule[] = [];
-  uncountables: Set<string> = new Set();
+  uncountables: Uncountables = new Uncountables();
   humans: HumanRule[] = [];
   acronyms: Map<string, string> = new Map();
   acronymRegex: RegExp = /(?=a)b/; // matches nothing by default
@@ -38,25 +79,25 @@ export class Inflections {
 
   plural(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
-      this.uncountables.delete(rule.toLowerCase());
+      this.uncountables.delete(rule);
       rule = new RegExp(rule, "i");
     }
-    this.uncountables.delete(replacement.toLowerCase());
+    this.uncountables.delete(replacement);
     this.plurals.unshift({ rule, replacement });
   }
 
   singular(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
-      this.uncountables.delete(rule.toLowerCase());
+      this.uncountables.delete(rule);
       rule = new RegExp(rule, "i");
     }
-    this.uncountables.delete(replacement.toLowerCase());
+    this.uncountables.delete(replacement);
     this.singulars.unshift({ rule, replacement });
   }
 
   irregular(singular: string, plural: string): void {
-    this.uncountables.delete(singular.toLowerCase());
-    this.uncountables.delete(plural.toLowerCase());
+    this.uncountables.delete(singular);
+    this.uncountables.delete(plural);
 
     const s0 = singular[0];
     const sRest = singular.slice(1);
@@ -78,10 +119,7 @@ export class Inflections {
   }
 
   uncountable(...words: (string | string[])[]): void {
-    const flat = words.flat();
-    for (const word of flat) {
-      this.uncountables.add(word.toLowerCase());
-    }
+    this.uncountables.add(words);
   }
 
   acronym(word: string): void {
@@ -118,7 +156,7 @@ export class Inflections {
     if (scope === "all") {
       this.plurals = [];
       this.singulars = [];
-      this.uncountables = new Set();
+      this.uncountables = new Uncountables();
       this.humans = [];
       this.acronyms = new Map();
       this.defineAcronymRegexPatterns();
@@ -127,7 +165,7 @@ export class Inflections {
     } else if (scope === "singulars") {
       this.singulars = [];
     } else if (scope === "uncountables") {
-      this.uncountables = new Set();
+      this.uncountables = new Uncountables();
     } else if (scope === "humans") {
       this.humans = [];
     } else if (scope === "acronyms") {
