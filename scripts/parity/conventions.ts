@@ -488,14 +488,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "_destroy_association_async_job?",
     ],
   },
-  {
-    reason:
-      "Ruby's `Marshal` serialization protocol — `Marshal.dump` / `Marshal.load` " +
-      "walk an object's instance variables through a binary format the VM owns. " +
-      "JS has no counterpart (`structuredClone` neither consults nor dispatches " +
-      "to a per-class hook), so there is no slot for these to fill.",
-    names: ["marshal_dump", "marshal_load"],
-  },
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
