@@ -163,10 +163,16 @@ export interface AssociationDefinition {
   name: string;
   options: AssociationOptions & { joinTable?: string };
   /**
-   * Rails' `MacroReflection#scope` — the macro's second POSITIONAL argument
-   * (`associations/builder/association.rb:48-49`, `associations.rb:1871`).
-   * Rails keeps it on the reflection and never in the options hash, which
-   * `assert_valid_keys` would reject (`association.rb:21,70`).
+   * Rails' `MacroReflection#scope` (`attr_reader :scope`, reflection.rb:376),
+   * assigned from the macro's second POSITIONAL argument beside — never
+   * inside — the options hash: `initialize(name, scope, options,
+   * active_record)` sets `@scope` and `@options` separately
+   * (reflection.rb:388-392), which is the object
+   * `Reflection.create(macro, name, scope, options, model)`
+   * (`associations/builder/association.rb:48-49`) and
+   * `HasAndBelongsToManyReflection.new(name, scope, options, ...)`
+   * (`associations.rb:1871`) build. A scope inside `options` is what
+   * `assert_valid_keys` rejects (`association.rb:21,70`).
    */
   scope?: ((...args: any[]) => any) | null;
   /**
