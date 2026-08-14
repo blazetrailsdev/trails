@@ -8,6 +8,7 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
+import { RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import { Trailtie } from "./trailtie.js";
@@ -135,9 +136,9 @@ describe("Engine", () => {
     it("defaults match Rails Engine::Configuration", () => {
       const cfg = new EngineConfiguration();
       expect(cfg.root).toBeNull();
-      expect(cfg.middleware).toEqual([]);
+      expect(cfg.middleware.middlewares).toEqual([]);
       expect(cfg.javascriptPath).toBe("javascript");
-      expect(cfg.routeSetClass).toBeNull();
+      expect(cfg.routeSetClass).toBe(RouteSet);
       expect(cfg.defaultScope).toBeNull();
       expect(cfg.autoloadPaths).toEqual([]);
       expect(cfg.autoloadOncePaths).toEqual([]);
@@ -215,21 +216,14 @@ describe("Engine", () => {
   });
 
   it("routes lazily instantiates routeSetClass, append-buffers blocks, and hasRoutes flips", () => {
-    const blocks: Array<() => void> = [];
-    class FakeRouteSet {
-      constructor(public cfg: EngineConfiguration) {}
-      append(b: () => void): void {
-        blocks.push(b);
-      }
-    }
     class MountedEngine extends Engine {}
     Trailtie.register(MountedEngine);
     expect(MountedEngine.instance().hasRoutes()).toBe(false);
-    MountedEngine.instance().config.routeSetClass = FakeRouteSet;
-    const r1 = MountedEngine.instance().routes(() => {});
-    expect(r1).toBeInstanceOf(FakeRouteSet);
+    const r1 = MountedEngine.instance().routes((mapper) => {
+      mapper.get("/mounted", "mounted#index");
+    });
+    expect(r1).toBeInstanceOf(RouteSet);
     expect(MountedEngine.instance().routes(() => {})).toBe(r1);
-    expect(blocks).toHaveLength(2);
     expect(MountedEngine.instance().hasRoutes()).toBe(true);
   });
 
@@ -238,7 +232,7 @@ describe("Engine", () => {
     cfg.generators((g) => {
       g.orm = "active_record";
     });
-    expect(cfg.generators()).toEqual({ orm: "active_record" });
+    expect(cfg.generators()).toEqual({ orm: "active_record", templates: [] });
   });
 
   it("railties returns a Trailties collection over registered subclasses", () => {

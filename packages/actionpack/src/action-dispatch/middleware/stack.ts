@@ -6,7 +6,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
-type RackApp = (env: RackEnv) => Promise<RackResponse>;
+export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 type MiddlewareFactory = new (
   app: RackApp,
   ...args: any[]

@@ -32,6 +32,7 @@ import {
   Static,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
+import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
@@ -276,6 +277,34 @@ describe("Application", () => {
       expect(names).toContain("initialize_cache");
       expect(names).toContain("bootstrap_hook");
     });
+
+    it("splices Finisher initializers after the inherited Engine ones", () => {
+      class IApp6 extends Application {}
+      Application.register(IApp6);
+      const names = IApp6.instance().initializers.map((i) => i.name);
+      expect(names.slice(-6)).toEqual([
+        "add_generator_templates",
+        "add_internal_routes",
+        "build_middleware_stack",
+        "define_main_app_helper",
+        "add_to_prepare_blocks",
+        "run_prepare_callbacks",
+      ]);
+    });
+
+    it("builds the middleware stack and draws routes when booted", async () => {
+      class IApp7 extends Application {}
+      Application.register(IApp7);
+      const app = IApp7.instance();
+      await app.initialize();
+      expect(app.config.middleware.middlewares.length).toBeGreaterThan(0);
+      expect(app.config.middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
+      expect(app.routes().isEmpty()).toBe(true);
+      app.routes().draw((mapper) => {
+        mapper.get("/hello", "hello#index");
+      });
+      expect(app.routes().isEmpty()).toBe(false);
+    });
   });
 });
 
@@ -343,7 +372,11 @@ describe("Application::Configuration", () => {
 });
 
 describe("Application::DefaultMiddlewareStack", () => {
-  const paths = { public: () => "/public" };
+  const paths = (() => {
+    const root = new Root("/app");
+    root.add("public");
+    return root;
+  })();
   const buildApp = () => ({ config: new Configuration() });
 
   const build = (mutate: (c: Configuration) => void = () => {}) => {
