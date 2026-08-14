@@ -136,7 +136,16 @@ export interface DatabaseStatementsHost {
   /** @internal */
   dirtyCurrentTransaction?(): void;
   /** @internal */
-  rawExecute?(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  rawExecute?(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    prepare?: boolean,
+    isAsync?: boolean,
+    allowRetry?: boolean,
+    materializeTransactions?: boolean,
+    batch?: boolean,
+  ): Promise<unknown>;
   /** @internal */
   castResult?(rawResult: unknown): Result;
   /** @internal */
@@ -1350,6 +1359,17 @@ export async function rawExecQuery(
   sql: string,
   name: string | null = null,
   binds?: unknown[],
+  // Ruby's `raw_exec_query(...)` forwards EVERY argument, so `raw_execute`'s
+  // kwargs reach it (database_statements.rb:541-542,552). trails' `rawExecute`
+  // spells those kwargs positionally, so they are collected here and spread
+  // there — a caller that omits the bag gets Rails' defaults.
+  opts?: {
+    prepare?: boolean;
+    async?: boolean;
+    allowRetry?: boolean;
+    materializeTransactions?: boolean;
+    batch?: boolean;
+  },
 ): Promise<Result> {
   if (!this.rawExecute) {
     throw new Error("rawExecQuery requires rawExecute on the adapter");
@@ -1359,7 +1379,16 @@ export async function rawExecQuery(
   // logging site (`:553`) and materializes through `with_raw_connection`
   // (`:555`), so wrapping it again here would emit two `sql.active_record`
   // events for one query.
-  const rawResult = await this.rawExecute(sql, name, binds);
+  const rawResult = await this.rawExecute(
+    sql,
+    name,
+    binds,
+    opts?.prepare ?? false,
+    opts?.async ?? false,
+    opts?.allowRetry ?? false,
+    opts?.materializeTransactions ?? true,
+    opts?.batch ?? false,
+  );
   return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
 }
 

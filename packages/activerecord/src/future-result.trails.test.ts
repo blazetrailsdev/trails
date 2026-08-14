@@ -176,6 +176,33 @@ describe("DatabaseStatements#select", () => {
     ).toBe(result);
   });
 
+  it("forwards prepare and async through to the connection's rawExecQuery", async () => {
+    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    const result = new Result(["id"], [[1]]);
+    const pool = fakePool(result);
+    const host = {
+      pool,
+      asyncEnabled: () => true,
+      supportsConcurrentConnections: () => true,
+      currentTransaction: () => ({ open: false, joinable: false }),
+    };
+
+    await select.call(host as never, "SELECT 1", "SQL", [], {
+      prepare: true,
+      async: FutureResult.SelectAll,
+    });
+
+    // Ruby's `raw_exec_query(...)` forwards the whole argument list, so the
+    // `prepare:` select() chose and the `async: true` execute_or_skip passes both
+    // reach `raw_execute` (future_result.rb:159, database_statements.rb:541-552).
+    expect(pool.lastArgs).toEqual({
+      sql: "SELECT 1",
+      name: "SQL",
+      binds: [],
+      kwargs: { prepare: true, async: true },
+    });
+  });
+
   it("schedules a FutureResult through the pool when async is enabled", async () => {
     ActiveRecord.asyncQueryExecutor = "global_thread_pool";
     const result = new Result(["id"], [[1]]);
@@ -203,10 +230,16 @@ describe("DatabaseStatements#select", () => {
   });
 });
 
-/** A pool whose `withConnection` yields a connection returning (or raising) `outcome`. */
+/**
+ * A pool whose `withConnection` yields a connection returning (or raising)
+ * `outcome`, recording the arguments each `rawExecQuery` was issued with.
+ */
 function fakePool(outcome: Result | Error) {
   const pool = {
     calls: 0,
+    lastArgs: undefined as
+      | { sql: string; name?: string | null; binds?: unknown[]; kwargs?: unknown }
+      | undefined,
     scheduleQuery(futureResult: { executeOrSkip(): void }) {
       futureResult.executeOrSkip();
     },
@@ -214,8 +247,9 @@ function fakePool(outcome: Result | Error) {
       fn: (connection: FutureResultConnection) => Promise<T> | T,
     ): Promise<T> {
       return fn({
-        rawExecQuery: async () => {
+        rawExecQuery: async (sql, name, binds, kwargs) => {
           pool.calls += 1;
+          pool.lastArgs = { sql, name, binds, kwargs };
           if (outcome instanceof Error) throw outcome;
           return outcome;
         },

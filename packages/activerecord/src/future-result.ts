@@ -18,7 +18,12 @@ export interface FutureResultPool {
  * @internal
  */
 export interface FutureResultConnection {
-  rawExecQuery(...args: unknown[]): Promise<Result>;
+  rawExecQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    kwargs?: { prepare?: boolean; async?: boolean },
+  ): Promise<Result>;
 }
 
 /**
@@ -252,7 +257,8 @@ export class FutureResult {
     args: unknown[],
     kwargs: Record<string, unknown>,
   ): Promise<Result> {
-    return connection.rawExecQuery(...args, kwargs);
+    const [sql, name, binds] = args as [string, string | null, unknown[]];
+    return connection.rawExecQuery(sql, name, binds, kwargs);
   }
 }
 

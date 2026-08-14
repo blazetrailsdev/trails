@@ -338,6 +338,51 @@ describe("DatabaseStatements", () => {
       expect(payloads[0].row_count).toBe(2);
     });
 
+    it("forwards prepare and async on to raw_execute", async () => {
+      // Ruby's `raw_exec_query(...)` forwards EVERY argument, so `raw_execute`'s
+      // `prepare:`/`async:` kwargs reach it (database_statements.rb:541-542,552)
+      // — a FutureResult scheduled with `prepare: true` must not silently run
+      // unprepared, nor lose the async flag off the instrumentation payload.
+      const { rawExecute, rawExecQuery } = await import("./database-statements.js");
+      let loggedAsync: boolean | undefined;
+      let preparedWith: boolean | undefined;
+      const host = {
+        typeCastedBinds,
+        log: async (
+          _sql: string,
+          _name: string | null | undefined,
+          _binds: unknown[],
+          _tcBinds: unknown[],
+          isAsync: boolean,
+          block: (payload: any) => Promise<unknown>,
+        ) => {
+          loggedAsync = isAsync;
+          return block({ row_count: 0 });
+        },
+        withRawConnection: async (_opts: unknown, block: (conn: unknown) => Promise<unknown>) =>
+          block(null),
+        performQuery: (
+          _conn: unknown,
+          _sql: string,
+          _binds: unknown[],
+          _tcBinds: unknown[],
+          options: { prepare?: boolean },
+        ) => {
+          preparedWith = options.prepare;
+          return { rows: [[1]], columns: ["id"] };
+        },
+        castResult: (raw: any) => new Result(raw.columns, raw.rows),
+      } as unknown as DatabaseStatementsHost;
+      host.rawExecute = rawExecute.bind(host) as DatabaseStatementsHost["rawExecute"];
+
+      await rawExecQuery.call(host, "SELECT id FROM t", "SQL", [], {
+        prepare: true,
+        async: true,
+      });
+      expect(preparedWith).toBe(true);
+      expect(loggedAsync).toBe(true);
+    });
+
     it("attaches sql and binds to a translated StatementInvalid via set_query", async () => {
       const { internalExecQuery } = await import("./database-statements.js");
       // Mirror internal_execute → raw_execute: with_raw_connection rejects with
