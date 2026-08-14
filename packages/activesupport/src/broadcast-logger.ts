@@ -124,10 +124,6 @@ export class BroadcastLogger extends Logger {
     return this.broadcasts.some((logger) => logger["debug?"]);
   }
 
-  get debugEnabled(): boolean {
-    return this["debug?"];
-  }
-
   /** `broadcast_logger.rb:173` — sets the log level to +DEBUG+ for the whole broadcast. */
   debugBang(): void {
     this.dispatch((logger) => logger.debugBang());
@@ -139,10 +135,6 @@ export class BroadcastLogger extends Logger {
    */
   get "info?"(): boolean {
     return this.broadcasts.some((logger) => logger["info?"]);
-  }
-
-  get infoEnabled(): boolean {
-    return this["info?"];
   }
 
   /** `broadcast_logger.rb:184` — sets the log level to +INFO+ for the whole broadcast. */
@@ -158,10 +150,6 @@ export class BroadcastLogger extends Logger {
     return this.broadcasts.some((logger) => logger["warn?"]);
   }
 
-  get warnEnabled(): boolean {
-    return this["warn?"];
-  }
-
   /** `broadcast_logger.rb:195` — sets the log level to +WARN+ for the whole broadcast. */
   warnBang(): void {
     this.dispatch((logger) => logger.warnBang());
@@ -175,10 +163,6 @@ export class BroadcastLogger extends Logger {
     return this.broadcasts.some((logger) => logger["error?"]);
   }
 
-  get errorEnabled(): boolean {
-    return this["error?"];
-  }
-
   /** `broadcast_logger.rb:206` — sets the log level to +ERROR+ for the whole broadcast. */
   errorBang(): void {
     this.dispatch((logger) => logger.errorBang());
@@ -190,10 +174,6 @@ export class BroadcastLogger extends Logger {
    */
   get "fatal?"(): boolean {
     return this.broadcasts.some((logger) => logger["fatal?"]);
-  }
-
-  get fatalEnabled(): boolean {
-    return this["fatal?"];
   }
 
   /** `broadcast_logger.rb:217` — sets the log level to +FATAL+ for the whole broadcast. */

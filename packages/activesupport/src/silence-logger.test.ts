@@ -19,10 +19,10 @@ describe("LoggerSilenceTest", () => {
   it("#debug? is true when setting the temporary level to Logger::DEBUG", () => {
     const logger = new Logger(null);
     logger.level = Logger.WARN;
-    expect(logger.debugEnabled).toBe(false);
+    expect(logger["debug?"]).toBe(false);
     logger.logAt(Logger.DEBUG, () => {
-      expect(logger.debugEnabled).toBe(true);
+      expect(logger["debug?"]).toBe(true);
     });
-    expect(logger.debugEnabled).toBe(false);
+    expect(logger["debug?"]).toBe(false);
   });
 });

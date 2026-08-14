@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Logger } from "./logger.js";
+import { NameError } from "./core-ext/name-error.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   registerProcessAdapter,
@@ -95,7 +96,18 @@ describe("LoggerThreadSafeLevel", () => {
 
     expect(() => {
       logger.localLevel = "nope" as never;
-    }).toThrowError('Invalid log level: "nope"');
+    }).toThrowError(NameError);
+    expect(() => {
+      logger.localLevel = "nope" as never;
+    }).toThrowError("uninitialized constant Logger::Severity::NOPE");
+  });
+
+  it("raises ArgumentError on a level that is neither an Integer nor a Symbol", () => {
+    const logger = new Logger({ write: () => {} });
+
+    expect(() => {
+      logger.localLevel = true as never;
+    }).toThrowError("Invalid log level: true");
   });
 
   it("clears the local level when assigned null", () => {
