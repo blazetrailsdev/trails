@@ -22,11 +22,11 @@ describe("BigIntegerTest", () => {
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    const cast = type.cast("123");
-    const serialized = type.serialize(cast);
-    expect(cast).toBe(123);
-    expect(String(serialized)).toBe(String(cast));
+    const type = new BigIntegerType();
+    const value = type.cast(9999999999999999999999999999999n);
+
+    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
+    expect(type.serializeCastValue(-value!)).toEqual(type.serialize(-value!));
   });
 
   it("small values", () => {
