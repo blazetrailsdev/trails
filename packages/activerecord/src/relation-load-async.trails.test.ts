@@ -17,6 +17,7 @@ import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
+import { itIfSupports } from "./support/supports.js";
 
 fixtures({ topics: [Topic, {}] });
 
@@ -69,6 +70,7 @@ describe("Relation#load_async", () => {
     // own property and would shadow a prototype spy so it never fires.
     const connection = Base.connection as unknown as {
       selectAll: (...args: unknown[]) => unknown;
+      supportsConcurrentConnections(): boolean;
     };
     const spy = vi.spyOn(connection, "selectAll");
 
@@ -76,30 +78,42 @@ describe("Relation#load_async", () => {
     await relation;
 
     expect(spy).toHaveBeenCalled();
-    expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(true);
+    // Rails asserts the adapter-dependent value rather than a literal `true`:
+    // `assert_equal Post.lease_connection.supports_concurrent_connections?,
+    // status[:async]` (load_async_test.rb:111). A SQLite `:memory:` database
+    // answers false (sqlite3_adapter.rb:198-200), so `async_enabled?` is false
+    // (abstract_adapter.rb:562-565) and `load_async` loads in the foreground.
+    expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(
+      connection.supportsConcurrentConnections(),
+    );
   });
 
-  it("schedules a FutureResult::SelectAll on the pool", async () => {
-    const pool = (await Base.connectionPool()) as unknown as {
-      scheduleQuery(futureResult: { executeOrSkip(): void }): void;
-    };
-    const scheduled: unknown[] = [];
-    const spy = vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
-      scheduled.push(futureResult);
-      futureResult.executeOrSkip();
-    });
+  itIfSupports(
+    "concurrent_connections",
+    "schedules a FutureResult::SelectAll on the pool",
+    async () => {
+      const pool = (await Base.connectionPool()) as unknown as {
+        scheduleQuery(futureResult: { executeOrSkip(): void }): void;
+      };
+      const scheduled: unknown[] = [];
+      const spy = vi.spyOn(pool, "scheduleQuery").mockImplementation((futureResult) => {
+        scheduled.push(futureResult);
+        futureResult.executeOrSkip();
+      });
 
-    await Topic.all().loadAsync();
+      await Topic.all().loadAsync();
 
-    expect(spy).toHaveBeenCalled();
-    expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
-  });
+      expect(spy).toHaveBeenCalled();
+      expect(scheduled[0]).toBeInstanceOf(FutureResult.SelectAll);
+    },
+  );
 
   it("issues an eager-loaded relation's join query with async on", async () => {
     // Rails' exec_main_query forwards `async:` to its eager_loading? arm too —
     // `c.select_all(relation.arel, "SQL", async: async)` (relation.rb:1436).
     const connection = Base.connection as unknown as {
       selectAll: (...args: unknown[]) => unknown;
+      supportsConcurrentConnections(): boolean;
     };
     const spy = vi.spyOn(connection, "selectAll");
 
@@ -107,7 +121,9 @@ describe("Relation#load_async", () => {
 
     const joinCall = spy.mock.calls.find((call) => call[1] === "SQL");
     expect(joinCall).toBeDefined();
-    expect((joinCall![3] as { async?: boolean }).async).toBe(true);
+    expect((joinCall![3] as { async?: boolean }).async).toBe(
+      connection.supportsConcurrentConnections(),
+    );
   });
 
   it("returns the records the scheduled query loaded", async () => {
