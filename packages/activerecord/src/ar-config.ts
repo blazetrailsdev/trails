@@ -49,6 +49,21 @@ let _schemaCacheIgnoredTables: ReadonlyArray<string | RegExp> = [];
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _defaultTimezone: "utc" | "local" = "utc";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
+let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
+
+/**
+ * @noRailsEquivalent PERMANENT — Rails posts async queries to a `Concurrent::ThreadPoolExecutor`
+ *   (active_record.rb:288, connection_pool.rb:717). Concurrent-ruby is a gem, not
+ *   a Rails class, so there is no Ruby file to mirror. JS has one thread: the
+ *   only thing a pool can do here is defer work off the caller's stack, which is
+ *   what `post` does. Sizing knobs (min/max threads, max queue, fallback policy)
+ *   have no meaning without threads and are deliberately absent.
+ */
+export class AsyncExecutor {
+  post(task: () => void): void {
+    queueMicrotask(task);
+  }
+}
 let _queues: Record<string, unknown> = {};
 let _maintainTestSchema: boolean | null = null;
 let _queryTransformers: QueryTransformer[] = [];
@@ -245,6 +260,14 @@ export const ActiveRecord = {
 
   set asyncQueryExecutor(value: "global_thread_pool" | "multi_thread_pool" | null) {
     _asyncQueryExecutor = value;
+  },
+
+  /**
+   * Mirrors: ActiveRecord.global_thread_pool_async_query_executor
+   * (active_record.rb:286-294)
+   */
+  globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
+    return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor());
   },
 
   /**

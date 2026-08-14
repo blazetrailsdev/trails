@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_reader",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
     "rubyName": "ids_writer",
     "call": "index_by",
     "kind": "args",

@@ -2,9 +2,23 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
+    "rubyName": "all_attributes?",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
     "rubyName": "calculate",
     "call": "apply_join_dependency",
     "reason": "Per-entry verified: Rails calculations.rb:232 `relation = apply_join_dependency`. Rails' apply_join_dependency EXECUTES `distinct_relation_for_primary_key` for a limited collection join, which a synchronous TS method cannot do, so `calculate` calls the awaitable block-form sibling `Relation#_applyJoinDependencyAsync` (finder_methods.rb:456-488, block arm) instead; the leading underscore keeps it off the compare population."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "table",
+    "reason": "Per-entry verified: Rails calculations.rb:238 `Array(model.primary_key || table[Arel.star])` reads `table` only for the no-primary-key fallback; the port spells that fallback as the `*` literal it compiles to, so no table read happens on the branch."
   },
   {
     "package": "activerecord",
@@ -20,16 +34,16 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "calculate",
-    "call": "table",
-    "reason": "Per-entry verified: Rails calculations.rb:238 `Array(model.primary_key || table[Arel.star])` reads `table` only for the no-primary-key fallback; the port spells that fallback as the `*` literal it compiles to, so no table read happens on the branch."
+    "rubyName": "execute_grouped_calculation",
+    "call": "distinct!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
-    "call": "distinct!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",
@@ -156,6 +170,13 @@
     "rubyName": "lookup_cast_type_from_join_dependencies",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "select_for_count",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",

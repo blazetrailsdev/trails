@@ -107,24 +107,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "empty",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{async=ref:async}"
-    ],
-    "reason": "database_statements.rb:79 `ActiveRecord::Result.empty(async: async)` returns EMPTY_ASYNC, a `FutureResult.wrap(EMPTY)` (result.rb:247). FutureResult and the whole load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so there is no async Result to select — story call-args-ar-select-async-kwarg."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_all",
-    "call": "select",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "select_value",
     "call": "single_value_from_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

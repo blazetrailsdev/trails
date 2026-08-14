@@ -5,6 +5,7 @@
  */
 
 import { NoMethodError } from "@blazetrails/activemodel";
+import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import { synchronize, type MonitorMixin } from "@blazetrails/activesupport";
 import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -382,7 +383,7 @@ export class ConnectionPool implements ReapablePool {
   readonly shard: string;
   readonly size: number;
   readonly reaper: Reaper;
-  readonly asyncExecutor: null = null;
+  readonly asyncExecutor: AsyncExecutor | null;
 
   automaticReconnect = true;
   checkoutTimeout: number;
@@ -442,6 +443,8 @@ export class ConnectionPool implements ReapablePool {
     this._idleTimeout = this.dbConfig.idleTimeout;
     this._available = new ConnectionLeasingQueue();
     this._cacheConfig = new ConnectionPoolConfiguration(this.dbConfig.queryCache);
+
+    this.asyncExecutor = this.buildAsyncExecutor();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     this.reaper.run();
@@ -1535,7 +1538,27 @@ export class ConnectionPool implements ReapablePool {
   }
 
   scheduleQuery(futureResult: { executeOrSkip(): void }): void {
-    futureResult.executeOrSkip();
+    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
+  }
+
+  /**
+   * Rails builds a `Concurrent::ThreadPoolExecutor` here, sized from the
+   * database config for `:multi_thread_pool` and shared process-wide for
+   * `:global_thread_pool` (connection_pool.rb:714-728). JS has one thread, so
+   * both arms resolve to the same thing: a queue that defers the query off the
+   * caller's stack. The config value still selects between "async enabled" and
+   * "run everything inline", which is the behavioral distinction
+   * `async_enabled?` reads (abstract_adapter.rb:562).
+   */
+  private buildAsyncExecutor(): AsyncExecutor | null {
+    switch (ActiveRecord.asyncQueryExecutor) {
+      case "multi_thread_pool":
+        return this.dbConfig.maxThreads > 0 ? new AsyncExecutor() : null;
+      case "global_thread_pool":
+        return ActiveRecord.globalThreadPoolAsyncQueryExecutor();
+      default:
+        return null;
+    }
   }
 
   // --- Private ---

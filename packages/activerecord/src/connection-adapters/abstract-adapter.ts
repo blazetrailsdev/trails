@@ -1985,6 +1985,15 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
+  /** @internal */
+  asyncEnabled(): boolean {
+    return (
+      this.supportsConcurrentConnections() &&
+      ActiveRecord.asyncQueryExecutor != null &&
+      this.pool?.asyncExecutor != null
+    );
+  }
+
   async supportsCommonTableExpressions(): Promise<boolean> {
     return false;
   }

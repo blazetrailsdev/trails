@@ -27,6 +27,7 @@ import {
   constantize,
   pluralize,
 } from "@blazetrails/activesupport";
+import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -651,20 +652,23 @@ export function connectionClassForSelf(this: CoreHost): CoreHost {
 /**
  * Mirrors: ActiveRecord::Core.asynchronous_queries_tracker
  */
-export function asynchronousQueriesTracker(): {
-  currentSession: any;
-  finalize(): void;
-} {
-  return {
-    currentSession: null,
-    finalize() {},
-  };
+export function asynchronousQueriesTracker(): AsynchronousQueriesTracker {
+  return IsolatedExecutionState.fetch<AsynchronousQueriesTracker>(
+    ASYNCHRONOUS_QUERIES_TRACKER_KEY,
+    // Rails opens the session from an ActiveSupport::Executor hook around each
+    // unit of work (asynchronous_queries_tracker.rb:32-40). trails has no
+    // executor to hook, so the tracker opens its first session on creation —
+    // `AsynchronousQueriesTracker.run` is exactly that hook body.
+    () => AsynchronousQueriesTracker.run(new AsynchronousQueriesTracker()),
+  );
 }
+
+const ASYNCHRONOUS_QUERIES_TRACKER_KEY = "active_record_asynchronous_queries_tracker";
 
 /**
  * Mirrors: ActiveRecord::Core.asynchronous_queries_session
  */
-export function asynchronousQueriesSession(): any {
+export function asynchronousQueriesSession(): Session {
   return asynchronousQueriesTracker().currentSession;
 }
 
