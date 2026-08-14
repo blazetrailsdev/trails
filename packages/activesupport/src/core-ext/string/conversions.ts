@@ -10,6 +10,7 @@
 
 import { Date as RubyDate, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
 import { isBlank } from "../object/blank.js";
+import { preserveTimezone } from "../../time-ext.js";
 
 /**
  * The keys `to_time` reads out of `Date._parse`, in Ruby's spelling
@@ -54,7 +55,13 @@ export function toTime(str: string, form: string = "local"): Temporal.ZonedDateT
     offset instanceof Rational ? offset.toF() : offset,
   );
 
-  return form === "utc" ? time.getutc().toTime() : time.toTime();
+  // conversions.rb:38's `time.to_time` is ActiveSupport's own reopening
+  // (`core_ext/time/compatibility.rb:13-15`), `preserve_timezone ? self :
+  // getlocal` — not ruby/date's `Time#to_time`, which always answers `self`.
+  // `getlocal` re-reads the same instant in the system zone.
+  if (form === "utc") return time.getutc().toTime();
+  const local = time.toTime();
+  return preserveTimezone(time) ? local : local.withTimeZone(Temporal.Now.timeZoneId());
 }
 
 /**

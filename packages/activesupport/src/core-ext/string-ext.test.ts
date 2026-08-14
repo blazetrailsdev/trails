@@ -168,10 +168,14 @@ describe("StringConversionsTest", () => {
 
   it("string to time utc offset", () => {
     withEnvTz("US/Eastern", () => {
+      // Rails' `else` branch: `preserve_timezone` defaults to nil, which its
+      // reader latches to false absent an app initializer setting
+      // `to_time_preserves_timezone = :zone` (date_and_time/compatibility.rb:24-37),
+      // so `Time#to_time` converts an offset-built time to the system zone.
       expect(toTime("2005-02-27 23:50", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
       expect(toTime("2005-02-27 23:50")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
       expect(toTime("2005-02-27 22:50 -0100", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
-      expect(toTime("2005-02-27 22:50 -0100")!.offsetNanoseconds / 1_000_000_000).toBe(-3600);
+      expect(toTime("2005-02-27 22:50 -0100")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
     });
   });
 

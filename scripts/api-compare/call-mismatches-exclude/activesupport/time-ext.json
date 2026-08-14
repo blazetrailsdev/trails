@@ -2,6 +2,13 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
+    "rubyName": "active_support_local_zone",
+    "call": "new",
+    "reason": "`Time.new.zone` (compatibility.rb:36) reads the zone off a Time built for the current moment — MRI's `Time.new` with no arguments IS `Time.now`. trails' `Time` constructor requires the calendar fields, so the no-argument form is spelled `Time.now()`, the same value."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
     "rubyName": "current",
     "call": "to_datetime",
     "reason": "Homonym across two Ruby receivers: `Time.current` (time/calculations.rb:39-41) has no `to_datetime`, `DateTime.current` (date_time/calculations.rb:10-12) is that same expression plus `.to_datetime`, and trails has one `current()` here serving both — one function cannot return both a Time and a DateTime. Converging it means giving DateTime its own receiver file; tracked by 0098-activesupport-ar-closure-port/split-date-time-current-onto-its-own-receiver."

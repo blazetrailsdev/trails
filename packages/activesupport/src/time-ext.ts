@@ -9,13 +9,14 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
 import { toTime as stringToTime } from "./core-ext/string/conversions.js";
+import { preserveTimezone as compatibilityPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -723,9 +724,60 @@ export function toDate(date: Date): Temporal.PlainDate {
 
 /**
  * toTime — Rails `Time#to_time`. Returns the instant the Date refers to.
+ *
+ * @missingRailsCall preserve_timezone — `Time#to_time` is `preserve_timezone ?
+ * self : getlocal` (`core_ext/time/compatibility.rb:13-15`) and `DateTime#to_time`
+ * the same switch over two `getlocal` forms (`date_time/compatibility.rb:15-17`).
+ * Both arms answer one value for this receiver: a JS `Date` is an absolute
+ * instant carrying no offset of its own, so there is no receiver offset to
+ * preserve and nothing for `getlocal` to convert. The switch is consulted where
+ * the receiver does carry one — `preserveTimezone` below, over a ruby/date
+ * `Time`, which `String#to_time` reads.
  */
 export function toTime(date: Date): Temporal.Instant {
   return instantFrom(date);
+}
+
+/**
+ * Either return `self` or the time in the local system timezone depending on
+ * the setting of `ActiveSupport.to_time_preserves_timezone`.
+ *
+ * Mirrors: `Time#preserve_timezone` (`core_ext/time/compatibility.rb:17-19`) —
+ * `system_local_time? || super`, where `super` is the module-level switch
+ * `DateAndTime::Compatibility` mixes in.
+ */
+export function preserveTimezone(time: RubyTime): boolean | string {
+  return isSystemLocalTime(time) || compatibilityPreserveTimezone();
+}
+
+/**
+ * Mirrors: `Time#system_local_time?` (`core_ext/time/compatibility.rb:22-27`).
+ * Ruby's `::Time.equal?(self.class)` guard is what keeps `DateTime` and
+ * `TimeWithZone` — which reach the method through the same include — out; the
+ * `RubyTime` parameter is that guard, since neither is one.
+ */
+export function isSystemLocalTime(time: RubyTime): boolean {
+  const zone = time.zone;
+  return typeof zone === "string" && (zone !== "UTC" || activeSupportLocalZone() === "UTC");
+}
+
+let _activeSupportLocalTz: string | null = null;
+let _activeSupportLocalZone: string | null = null;
+
+/**
+ * Mirrors: `Time#active_support_local_zone` (`core_ext/time/compatibility.rb:31-38`)
+ * — `Time.new.zone`, memoized and dropped again when the zone the process runs
+ * in changes. Ruby keys that memo on `ENV["TZ"]`; the environment is not
+ * readable here, and `Temporal.Now.timeZoneId()` is the zone `TZ` selects, so
+ * it is both the key and where the zone is read from.
+ */
+export function activeSupportLocalZone(): string | null {
+  if (_activeSupportLocalTz !== Temporal.Now.timeZoneId()) _activeSupportLocalZone = null;
+  if (_activeSupportLocalZone == null) {
+    _activeSupportLocalTz = Temporal.Now.timeZoneId();
+    _activeSupportLocalZone = RubyTime.now().zone;
+  }
+  return _activeSupportLocalZone;
 }
 
 /**
