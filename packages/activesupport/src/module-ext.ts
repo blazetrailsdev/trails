@@ -1,4 +1,5 @@
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
+import { constantize } from "./inflector.js";
 
 /**
  * Module extensions mirroring Rails ActiveSupport module/class extensions.
@@ -95,10 +96,135 @@ function assertValidAttrName(name: string): void {
   }
 }
 
+function popMattrOptions(namesAndOptions: (string | MattrOptions)[]): MattrOptions {
+  return typeof namesAndOptions[namesAndOptions.length - 1] === "object" &&
+    namesAndOptions[namesAndOptions.length - 1] !== null
+    ? (namesAndOptions.pop() as MattrOptions)
+    : {};
+}
+
 /**
- * mattrAccessor — defines class-level attribute accessors (mattr_accessor).
- * Also adds instance-level delegates by default (like Rails).
- * Supports: default, instanceWriter, instanceReader, instanceAccessor options.
+ * Ruby defines the reader and the writer as two independent methods; JS holds
+ * both halves of an accessor in one property descriptor, so defining one half
+ * has to preserve whichever half is already there.
+ */
+function defineAccessorHalf(
+  target: object,
+  name: string,
+  half: { get?: () => unknown; set?: (value: unknown) => void },
+): void {
+  const existing = Object.getOwnPropertyDescriptor(target, name);
+  Object.defineProperty(target, name, {
+    configurable: true,
+    enumerable: false,
+    get: half.get ?? existing?.get,
+    set: half.set ?? existing?.set,
+  });
+}
+
+/**
+ * Resolves and stores the attribute's default. Rails' `sym_default_value` is
+ * the block's return when a block was given and `default` is nil; trails spells
+ * a Ruby block as a function-valued `default`.
+ *
+ * Mirrors: the shared tail of `mattr_reader` / `mattr_writer`
+ * (module/attribute_accessors.rb:68-69, 134-135).
+ */
+function setMattrDefault(
+  target: any,
+  name: string,
+  storageKey: string,
+  options: MattrOptions,
+): void {
+  const rawDefault = options.default;
+  const symDefaultValue = typeof rawDefault === "function" ? rawDefault() : rawDefault;
+  if (!(symDefaultValue == null && Object.hasOwn(target, storageKey))) {
+    target[storageKey] = symDefaultValue;
+  }
+}
+
+/**
+ * mattrReader — defines a class attribute and creates class and instance
+ * reader methods.
+ *
+ * Mirrors: Module#mattr_reader (`module/attribute_accessors.rb:54-73`).
+
+ */
+export function mattrReader(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
+  const options = popMattrOptions(namesAndOptions);
+  const syms = namesAndOptions as string[];
+  const instanceReader = options.instanceReader !== false;
+  const instanceAccessor = options.instanceAccessor !== false;
+
+  for (const sym of syms) {
+    assertValidAttrName(sym);
+    const storageKey = `__mattr_${sym}__`;
+
+    defineAccessorHalf(target, sym, { get: () => target[storageKey] });
+
+    if (instanceReader && instanceAccessor && target.prototype) {
+      defineAccessorHalf(target.prototype, sym, { get: () => target[sym] });
+    }
+
+    setMattrDefault(target, sym, storageKey, options);
+  }
+}
+
+/**
+ * cattrReader — alias for mattrReader (`module/attribute_accessors.rb:74`).
+ */
+export const cattrReader = mattrReader;
+
+/**
+ * mattrWriter — defines a class attribute and creates class and instance
+ * writer methods to allow assignment to the attribute.
+ *
+ * Mirrors: Module#mattr_writer (`module/attribute_accessors.rb:121-139`).
+ */
+export function mattrWriter(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
+  const options = popMattrOptions(namesAndOptions);
+  const syms = namesAndOptions as string[];
+  const instanceWriter = options.instanceWriter !== false;
+  const instanceAccessor = options.instanceAccessor !== false;
+
+  for (const sym of syms) {
+    assertValidAttrName(sym);
+    const storageKey = `__mattr_${sym}__`;
+
+    defineAccessorHalf(target, sym, {
+      set: (val: unknown) => {
+        target[storageKey] = val;
+      },
+    });
+
+    if (instanceWriter && instanceAccessor && target.prototype) {
+      defineAccessorHalf(target.prototype, sym, {
+        set: (val: unknown) => {
+          target[sym] = val;
+        },
+      });
+    }
+
+    setMattrDefault(target, sym, storageKey, options);
+  }
+}
+
+/**
+ * cattrWriter — alias for mattrWriter (`module/attribute_accessors.rb:140`).
+ */
+export const cattrWriter = mattrWriter;
+
+/**
+ * mattrAccessor — defines both class and instance accessors for class
+ * attributes.
+ *
+ * Mirrors: Module#mattr_accessor (`module/attribute_accessors.rb:208-212`).
+ * Rails passes `default: default` to BOTH calls and forwards the block (`&blk`)
+ * to `mattr_reader` only. The writer's `default:` never takes effect, because
+ * `mattr_writer`'s `unless sym_default_value.nil? && class_variable_defined?`
+ * guard (attribute_accessors.rb:135) sees the value the reader already stored;
+ * trails drops `default` before the writer call instead, which is the same
+ * no-op reached without evaluating a function-valued default a second time.
  *
  * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
  * into the generated definition (module/attribute_accessors.rb:208-211) so an error raised inside it points at the
@@ -107,77 +233,17 @@ function assertValidAttrName(name: string): void {
  * Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations.
  */
 export function mattrAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
-  const options: MattrOptions =
-    typeof namesAndOptions[namesAndOptions.length - 1] === "object" &&
-    namesAndOptions[namesAndOptions.length - 1] !== null
-      ? (namesAndOptions.pop() as MattrOptions)
-      : {};
+  const options = popMattrOptions(namesAndOptions);
+  const syms = namesAndOptions as string[];
+  const writerOptions: MattrOptions = { ...options };
+  delete writerOptions.default;
 
-  const names = namesAndOptions as string[];
-  const addInstanceReader = options.instanceAccessor !== false && options.instanceReader !== false;
-  const addInstanceWriter = options.instanceAccessor !== false && options.instanceWriter !== false;
-
-  for (const name of names) {
-    assertValidAttrName(name);
-    const storageKey = `__mattr_${name}__`;
-
-    // Resolve default value once at definition time
-    const rawDefault = options.default;
-    const resolvedDefault = typeof rawDefault === "function" ? rawDefault() : rawDefault;
-
-    if ("default" in options || typeof rawDefault === "function") {
-      (target as Record<string, unknown>)[storageKey] = resolvedDefault;
-    }
-
-    // Class-level getter/setter
-    Object.defineProperty(target, name, {
-      configurable: true,
-      enumerable: false,
-      get() {
-        return (target as Record<string, unknown>)[storageKey];
-      },
-      set(value: unknown) {
-        (target as Record<string, unknown>)[storageKey] = value;
-      },
-    });
-
-    // Instance-level delegates
-    if (target.prototype && (addInstanceReader || addInstanceWriter)) {
-      if (addInstanceReader && addInstanceWriter) {
-        Object.defineProperty(target.prototype, name, {
-          configurable: true,
-          enumerable: false,
-          get() {
-            return (target as Record<string, unknown>)[name];
-          },
-          set(value: unknown) {
-            (target as Record<string, unknown>)[name] = value;
-          },
-        });
-      } else if (addInstanceReader) {
-        Object.defineProperty(target.prototype, name, {
-          configurable: true,
-          enumerable: false,
-          get() {
-            return (target as Record<string, unknown>)[name];
-          },
-        });
-      } else if (addInstanceWriter) {
-        // Only writer — define a method, not a setter-only property (which would be odd)
-        Object.defineProperty(target.prototype, `${name}=`, {
-          configurable: true,
-          enumerable: false,
-          value(value: unknown) {
-            (target as Record<string, unknown>)[name] = value;
-          },
-        });
-      }
-    }
-  }
+  mattrReader(target, ...syms, options);
+  mattrWriter(target, ...syms, writerOptions);
 }
 
 /**
- * cattrAccessor — alias for mattrAccessor (cattr_accessor in Rails).
+ * cattrAccessor — alias for mattrAccessor (`module/attribute_accessors.rb:213`).
  */
 export const cattrAccessor = mattrAccessor;
 
@@ -219,9 +285,7 @@ export function attrInternalReader(target: object, ...names: string[]): void {
   for (const name of names) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
-    Object.defineProperty(target, name, {
-      configurable: true,
-      enumerable: false,
+    defineAccessorHalf(target, name, {
       get(this: Record<string, unknown>) {
         return this[storageKey];
       },
@@ -236,9 +300,7 @@ export function attrInternalWriter(target: object, ...names: string[]): void {
   for (const name of names) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
-    Object.defineProperty(target, name, {
-      configurable: true,
-      enumerable: false,
+    defineAccessorHalf(target, name, {
       set(this: Record<string, unknown>, value: unknown) {
         this[storageKey] = value;
       },
@@ -255,33 +317,21 @@ export function attrInternalWriter(target: object, ...names: string[]): void {
 }
 
 /**
- * attrInternal — defines instance-level attribute with underscore-prefixed storage.
- * Mirrors Rails Module#attr_internal_accessor.
+ * attrInternalAccessor — declares an attribute reader and writer backed by an
+ * internally-named instance variable.
+ *
+ * Mirrors: Module#attr_internal_accessor (`module/attr_internal.rb:16-19`).
  */
-export function attrInternal(target: object, ...names: string[]): void {
-  for (const name of names) {
-    assertValidAttrName(name);
-    const storageKey = internalStorageKey(name);
-    Object.defineProperty(target, name, {
-      configurable: true,
-      enumerable: false,
-      get(this: Record<string, unknown>) {
-        return this[storageKey];
-      },
-      set(this: Record<string, unknown>, value: unknown) {
-        this[storageKey] = value;
-      },
-    });
-
-    Object.defineProperty(target, `${name}=`, {
-      configurable: true,
-      enumerable: false,
-      value(this: Record<string, unknown>, value: unknown) {
-        this[storageKey] = value;
-      },
-    });
-  }
+export function attrInternalAccessor(target: object, ...attrs: string[]): void {
+  attrInternalReader(target, ...attrs);
+  attrInternalWriter(target, ...attrs);
 }
+
+/**
+ * attrInternal — alias for attrInternalAccessor
+ * (`module/attr_internal.rb:20`).
+ */
+export const attrInternal = attrInternalAccessor;
 
 /**
  * isAnonymous — returns true if a class/function has no name.
@@ -300,6 +350,38 @@ export function moduleParentName(klass: { name: string }): string | null {
   const parts = name.split("::");
   if (parts.length <= 1) return null;
   return parts.slice(0, -1).join("::");
+}
+
+/**
+ * moduleParent — returns the module which contains this one according to its
+ * name. The parent of top-level and anonymous modules is `Object`.
+ *
+ * Mirrors: Module#module_parent (`core_ext/module/introspection.rb:36-38`).
+ */
+export function moduleParent(klass: { name: string }): unknown {
+  const parentName = moduleParentName(klass);
+  return parentName != null ? constantize(parentName) : Object;
+}
+
+/**
+ * moduleParents — returns all the parents of this module according to its
+ * name, ordered from nested outwards. The receiver is not contained within the
+ * result.
+ *
+ * Mirrors: Module#module_parents (`core_ext/module/introspection.rb:54-64`).
+ */
+export function moduleParents(klass: { name: string }): unknown[] {
+  const parents: unknown[] = [];
+  const parentName = moduleParentName(klass);
+  if (parentName != null) {
+    const parts = parentName.split("::");
+    while (parts.length > 0) {
+      parents.push(constantize(parts.join("::")));
+      parts.pop();
+    }
+  }
+  if (!parents.includes(Object)) parents.push(Object);
+  return parents;
 }
 
 /**

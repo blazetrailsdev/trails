@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getCrypto } from "./crypto-adapter.js";
 import { ActiveSupportJSON } from "./json.js";
 import { Encoding } from "./json/encoding.js";
-import { secureRandomBase58 } from "./key-generator.js";
+import { base58 } from "./core-ext/securerandom.js";
 import { InvalidSignature, MessageVerifier } from "./message-verifier.js";
 import type { MessageSerializer } from "./messages/codec.js";
 import { ArgumentError } from "./messages/serializer-with-fallback.js";
@@ -100,7 +100,7 @@ describe("MessageVerifierTest", () => {
     expect(safeVerifier.verify(unsafeVerifier.generate(payload))).toEqual(payload);
 
     for (let i = 0; i < 50; i++) {
-      const random = secureRandomBase58(10 + Math.floor(Math.random() * 41));
+      const random = base58(10 + Math.floor(Math.random() * 41));
       expect(unsafeVerifier.verify(safeVerifier.generate(random))).toEqual(random);
       expect(safeVerifier.verify(unsafeVerifier.generate(random))).toEqual(random);
     }

@@ -60,29 +60,3 @@ export class CachingKeyGenerator {
     return this.cache.get(cacheKey)!;
   }
 }
-
-// ── SecureRandom extensions ───────────────────────────────────────────────────
-
-const BASE58_CHARS = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-const BASE36_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
-
-function randomCharFrom(chars: string): string {
-  const bytes = getCrypto().randomBytes(1);
-  return chars[bytes[0] % chars.length];
-}
-
-/**
- * secureRandomBase58 — generates a random base-58 string of given length.
- * Mirrors Ruby's SecureRandom.base58.
- */
-export function secureRandomBase58(n: number = 16): string {
-  return Array.from({ length: n }, () => randomCharFrom(BASE58_CHARS)).join("");
-}
-
-/**
- * secureRandomBase36 — generates a random base-36 (alphanumeric lowercase) string.
- * Mirrors Ruby's SecureRandom.base36.
- */
-export function secureRandomBase36(n: number = 16): string {
-  return Array.from({ length: n }, () => randomCharFrom(BASE36_CHARS)).join("");
-}

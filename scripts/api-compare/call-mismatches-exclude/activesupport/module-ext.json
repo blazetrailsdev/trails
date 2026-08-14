@@ -40,5 +40,79 @@
     "rubyName": "mattr_accessor",
     "call": "first",
     "reason": "Rails passes `location: caller_locations(1, 1).first` to `mattr_reader`/`mattr_writer` (attribute_accessors.rb:66) so a raised NameError points at the declaring line. trails generates the accessors directly with no location plumbing."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_reader",
+    "call": "caller_locations",
+    "reason": "Same generated-method-location omission as the `mattr_accessor` row above: Rails defaults `location` to `caller_locations(1, 1).first` (module/attribute_accessors.rb:56) purely so `module_eval` can attribute the definition."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_reader",
+    "call": "first",
+    "reason": "Part of the same omission — `first` only picks the `caller_locations(1, 1)` frame."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_reader",
+    "call": "match?",
+    "reason": "Rails inlines `/\\A[_A-Za-z]\\w*\\z/.match?(sym)` (module/attribute_accessors.rb:60); trails calls the file's shared `assertValidAttrName`, which spells the same regex as `.test()` — JS RegExp has no `match?`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_reader",
+    "call": "module_eval",
+    "reason": "Rails builds the reader as a source string and `module_eval`s it (module/attribute_accessors.rb:72); trails defines a real property descriptor, which is the settled trails idiom for a Ruby `def` generated at runtime."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_writer",
+    "call": "caller_locations",
+    "reason": "Same generated-method-location omission (module/attribute_accessors.rb:123)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_writer",
+    "call": "first",
+    "reason": "Part of the same omission — `first` only picks the `caller_locations(1, 1)` frame."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_writer",
+    "call": "match?",
+    "reason": "Same as `mattr_reader`: the regex check lives in `assertValidAttrName` and JS RegExp spells it `.test()`."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "mattr_writer",
+    "call": "module_eval",
+    "reason": "Same as `mattr_reader`: Rails `module_eval`s a source string (module/attribute_accessors.rb:138), trails defines a property descriptor."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "module_parent",
+    "call": "module_parent_name",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `module_parent_name` is an instance method on the reopened `Module`, so it takes its receiver implicitly; a trails core-ext port spells the receiver as the first parameter, which is why the call carries one argument Rails does not write."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "module-ext.ts",
+    "rubyName": "module_parents",
+    "call": "module_parent_name",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Rails' `module_parent_name` is an instance method on the reopened `Module`, so it takes its receiver implicitly; a trails core-ext port spells the receiver as the first parameter, which is why the call carries one argument Rails does not write."
   }
 ]

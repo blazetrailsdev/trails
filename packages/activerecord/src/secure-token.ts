@@ -1,4 +1,4 @@
-import { secureRandomBase58 } from "@blazetrails/activesupport/key-generator";
+import { base58 } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 /**
@@ -92,5 +92,5 @@ export function hasSecureToken(
 export function generateUniqueSecureToken({
   length = MINIMUM_TOKEN_LENGTH,
 }: { length?: number } = {}): string {
-  return secureRandomBase58(length);
+  return base58(length);
 }

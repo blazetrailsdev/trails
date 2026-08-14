@@ -200,8 +200,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should not create instance reader", () => {
     class MyModule {}
     mattrAccessor(MyModule, "secret", { instanceReader: false });
-    // Instance-level property should not be defined on prototype
-    expect(Object.getOwnPropertyDescriptor(MyModule.prototype, "secret")).toBeUndefined();
+    // Rails' `instance_reader: false` suppresses only the reader half —
+    // `mattr_writer` still runs with its default `instance_writer: true`
+    // (module/attribute_accessors.rb:210-211), so the prototype keeps a setter.
+    const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "secret");
+    expect(desc?.get).toBeUndefined();
+    expect(desc?.set).toBeDefined();
   });
 
   it("should not create instance accessors", () => {

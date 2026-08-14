@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 
-import { mattrAccessor } from "../../module-ext.js";
+import {
+  cattrAccessor,
+  cattrReader,
+  cattrWriter,
+  mattrAccessor,
+  mattrReader,
+  mattrWriter,
+} from "../../module-ext.js";
 
 describe("ModuleAttributeAccessorTest", () => {
   it("should use mattr default", () => {
@@ -11,8 +18,12 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("mattr default keyword arguments", () => {
     class MyModule {}
-    mattrAccessor(MyModule, "size", { default: 42 });
-    expect((MyModule as any).size).toBe(42);
+    cattrAccessor(MyModule, "defAccessor", { default: "default_accessor_value" });
+    cattrReader(MyModule, "defReader", { default: "default_reader_value" });
+    cattrWriter(MyModule, "defWriter", { default: "default_writer_value" });
+    expect((MyModule as any).defAccessor).toBe("default_accessor_value");
+    expect((MyModule as any).defReader).toBe("default_reader_value");
+    expect((MyModule as any).__mattr_defWriter__).toBe("default_writer_value");
   });
 
   it("mattr can default to false", () => {
@@ -53,13 +64,19 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("should not create instance reader", () => {
     class MyModule {}
-    mattrAccessor(MyModule, "secret", { instanceReader: false });
+    mattrReader(MyModule, "shaq", { instanceReader: false });
+    expect((MyModule as any).shaq).toBeUndefined();
     const inst = new (MyModule as any)();
-    expect(inst.secret).toBeUndefined();
+    expect(inst.shaq).toBeUndefined();
   });
 
   it("should not create instance accessors", () => {
     class MyModule {}
+    mattrWriter(MyModule, "camp", { instanceAccessor: false });
+    (MyModule as any).camp = "set";
+    expect((MyModule as any).camp).toBeUndefined();
+    expect((MyModule as any).__mattr_camp__).toBe("set");
+
     mattrAccessor(MyModule, "hidden", { instanceReader: false, instanceWriter: false });
     const inst = new (MyModule as any)();
     expect(inst.hidden).toBeUndefined();
@@ -111,5 +128,10 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
+  // Rails raises `TypeError, "module attributes should be defined directly on
+  // class, not singleton"` when the receiver is a singleton class
+  // (attribute_accessors.rb:52, :123). JS has no singleton class to be: a class
+  // object's own properties ARE where mattr stores, so there is no second
+  // receiver for the guard to reject.
   it.skip("declaring attributes on singleton errors");
 });
