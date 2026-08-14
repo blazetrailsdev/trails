@@ -36,6 +36,7 @@ export {
   type ToModel,
 } from "./polymorphic-routes.js";
 export { Endpoint } from "./endpoint.js";
+export { controllerDispatcher, type DispatchableControllerClass } from "./dispatcher.js";
 export {
   RoutesProxy,
   mergeScriptNames,

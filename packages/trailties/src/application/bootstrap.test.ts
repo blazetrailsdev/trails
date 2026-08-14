@@ -16,7 +16,7 @@ class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = {};
 }
 
-describe("Bootstrap", async () => {
+describe("Bootstrap", () => {
   beforeEach(() => {
     resetLoadHooks();
   });
@@ -30,7 +30,7 @@ describe("Bootstrap", async () => {
     });
   });
 
-  describe(":initialize_logger", async () => {
+  describe(":initialize_logger", () => {
     it("uses config.logger when provided", async () => {
       const app = new TestApp();
       const custom = new Logger(null);
@@ -61,7 +61,7 @@ describe("Bootstrap", async () => {
     });
   });
 
-  describe(":initialize_cache", async () => {
+  describe(":initialize_cache", () => {
     it("uses config.cacheStore when provided", async () => {
       const app = new TestApp();
       const store = new NullStore();
@@ -85,7 +85,7 @@ describe("Bootstrap", async () => {
     });
   });
 
-  describe(":bootstrap_hook", async () => {
+  describe(":bootstrap_hook", () => {
     it("runs the :before_initialize load hooks against the app", async () => {
       const app = new TestApp();
       let captured: unknown = null;

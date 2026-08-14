@@ -95,7 +95,7 @@ class InterdependentApplication extends Initializable {
   }
 }
 
-describe("Basic", async () => {
+describe("Basic", () => {
   test("initializers run", async () => {
     const foo = new Foo();
     await foo.runInitializers();
@@ -136,7 +136,7 @@ describe("Basic", async () => {
   });
 });
 
-describe("BeforeAfter", async () => {
+describe("BeforeAfter", () => {
   test("running on parent", async () => {
     arr = [];
     await new Parent().runInitializers();
@@ -154,7 +154,7 @@ describe("BeforeAfter", async () => {
   });
 });
 
-describe("InstanceTest", async () => {
+describe("InstanceTest", () => {
   test("running locals", async () => {
     arr = [];
     await new Instance().runInitializers();
@@ -167,7 +167,7 @@ describe("InstanceTest", async () => {
   });
 });
 
-describe("WithArgsTest", async () => {
+describe("WithArgsTest", () => {
   test("running initializers with args", async () => {
     withArg = null;
     await new WithArgs().runInitializers("default", "foo");
@@ -175,7 +175,7 @@ describe("WithArgsTest", async () => {
   });
 });
 
-describe("OverriddenInitializerTest", async () => {
+describe("OverriddenInitializerTest", () => {
   test("merges in the initializers from the parent in the right order", async () => {
     arr = [];
     await new OverriddenInitializer().runInitializers();

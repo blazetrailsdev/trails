@@ -40,7 +40,7 @@ export class DevServer {
       // defines its own root (e.g. "src/app/assets") which should win.
       ...(hasViteConfig ? {} : { root: this.cwd }),
       configFile,
-      plugins: hasViteConfig || !this.app ? [] : [trailsPlugin({ app: this.app })],
+      plugins: this.app ? [trailsPlugin({ app: this.app })] : [],
       server: {
         port: this.port,
         host: this.host,

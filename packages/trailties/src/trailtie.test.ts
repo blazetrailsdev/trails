@@ -5,7 +5,7 @@ import { Trailtie } from "./trailtie.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { sealAgainstInheritance } from "./trailtie/configurable.js";
 
-describe("Trailtie", async () => {
+describe("Trailtie", () => {
   it("cannot instantiate a Railtie object", () => {
     expect(() => new Trailtie()).toThrow(/abstract/);
   });

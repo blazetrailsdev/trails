@@ -23,14 +23,14 @@
  * clearing, and YJIT are intentionally not ported here — they depend on subsystems we don't have or are out
  * of scope per the trailties plan.
  */
-import { getFsAsync, getPathAsync, camelize, underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DispatcherCallback, DrawCallback } from "@blazetrails/actionpack";
-import { ActionController, Request, Response } from "@blazetrails/actionpack";
+import { controllerDispatcher, type DispatchableControllerClass } from "@blazetrails/actionpack";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
@@ -83,40 +83,21 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
 
 /**
  * Mirrors `Finisher`'s `setup_main_autoloader` initializer
- * (`finisher.rb:17-46`), which pushes every autoload path into
- * `Rails.autoloaders.main` so that `Request#controller_class_for`'s
- * `"#{name.camelize}Controller".constantize` (`http/request.rb:94-110`)
- * resolves a constant at dispatch time.
+ * (`finisher.rb:17-46`). Rails pushes every autoload path into
+ * `Rails.autoloaders.main` and calls `autoloader.setup`, which is what makes
+ * `"#{name.camelize}Controller"` resolvable when
+ * `Request#controller_class_for` (`http/request.rb:94-110`) constantizes it
+ * at dispatch time.
  *
  * ESM has no `const_missing` seam, so a constant cannot be materialised
  * lazily from a name; {@link loadControllers} imports the modules under the
- * autoload paths instead, and the classes they export become the constant
- * table the dispatcher reads.
- *
- * The callback body is `ActionDispatch::Routing::RouteSet::Dispatcher#serve`
- * (`route_set.rb:48-62`): resolve the controller class, raise
- * `ActionController::RoutingError` when the constant is missing,
- * `make_response!`, then `Dispatcher#dispatch`'s
- * `controller.dispatch(action, req, res)`. It is installed here rather than
- * per route because trails' `RouteSet` takes one dispatcher for the whole
- * set — see `FinisherRoutes#setDispatcher`.
+ * autoload paths instead, and the resulting constant table is handed to the
+ * routing layer — `ActionDispatch`'s {@link controllerDispatcher} is
+ * `Dispatcher#serve`'s body and lives in `action_dispatch`, where Rails
+ * keeps it.
  */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  const controllers = await loadControllers(await this.paths());
-
-  this.routes().setDispatcher(async (controllerName, action, _params, env) => {
-    const controllerClass = controllers.get(controllerName);
-    if (!controllerClass) {
-      throw new ActionController.RoutingError(
-        `uninitialized constant ${camelize(underscore(controllerName))}Controller`,
-      );
-    }
-    const req = new Request(env);
-    const res = controllerClass.makeResponseBang(req);
-    const controller = new controllerClass();
-    await controller.dispatch(action, req, res);
-    return controller.toRackResponse();
-  });
+  this.routes().setDispatcher(controllerDispatcher(await loadControllers(await this.paths())));
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
@@ -178,10 +159,10 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
  * path (`posts`, `admin/posts`) — the value `path_parameters[:controller]`
  * carries.
  */
-async function loadControllers(paths: Root): Promise<Map<string, ControllerClass>> {
+async function loadControllers(paths: Root): Promise<Map<string, DispatchableControllerClass>> {
   const fs = await getFsAsync();
   const p = await getPathAsync();
-  const out = new Map<string, ControllerClass>();
+  const out = new Map<string, DispatchableControllerClass>();
   const node = paths.get("app/controllers");
   if (!node || !fs.readdir || !p.pathToFileURL) return out;
 
@@ -195,14 +176,10 @@ async function loadControllers(paths: Root): Promise<Map<string, ControllerClass
       >;
       for (const value of Object.values(mod)) {
         if (typeof value === "function" && value.name.endsWith("Controller")) {
-          out.set(underscore(match[1].replace(/-/g, "_")), value as ControllerClass);
+          out.set(underscore(match[1].replace(/-/g, "_")), value as DispatchableControllerClass);
         }
       }
     }
   }
   return out;
 }
-
-type ControllerClass = (new () => ActionController.Base) & {
-  makeResponseBang(request: Request): Response;
-};

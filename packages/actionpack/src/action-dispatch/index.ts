@@ -21,6 +21,8 @@ export {
   Dispatcher,
   StaticDispatcher,
   type DispatcherCallback,
+  controllerDispatcher,
+  type DispatchableControllerClass,
   escapePath,
   escapeSegment,
   escapeFragment,

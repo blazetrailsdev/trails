@@ -337,15 +337,13 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
   it("boots the app through the initializer chain and serves a controller action", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
-    Application.register(BootApp);
     const app = Trails.application!;
     app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
-    // `add_routing_paths` + `set_routes_reloader_hook` loaded config/routes.ts.
+    expect(app).toBeInstanceOf(BootApp);
     expect(app.routesReloader().loaded).toBe(true);
-    // `setup_main_autoloader` resolved app/controllers/posts-controller.ts.
     const [status, , body] = await app.app()({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts",
@@ -356,8 +354,6 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
-    // A fresh subclass so this case gets its own instance — `instance()` is
-    // memoized per class and an Application may only be initialized once.
     class BootAppDebug extends BootApp {}
     Application.register(BootAppDebug);
     const app = Trails.application!;

@@ -5,3 +5,5 @@
 import { Application } from "../../../application.js";
 
 export class BootApp extends Application {}
+
+Application.register(BootApp);
