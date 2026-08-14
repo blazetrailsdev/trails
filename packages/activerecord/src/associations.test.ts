@@ -2485,8 +2485,9 @@ describe("AssociationsTest", () => {
       title: "wrongShard",
     });
     const rel = hasManyScope(post, "freshChildren", {
-      className: "ShardedBlogPost",
-      as: "parent",
+      type: "hasMany",
+      name: "freshChildren",
+      options: { className: "ShardedBlogPost", as: "parent" },
     });
     const rows: Base[] = await rel!.toArray();
     expect(rows.map((r) => (r as any).title)).toEqual(["match"]);

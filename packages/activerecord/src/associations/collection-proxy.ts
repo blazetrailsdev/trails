@@ -603,7 +603,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `findTarget` runs, and what `countHasMany()` counts) so CP
     // gets identical semantics: the relation starts from
     // `targetModel.all()` (default scope applied), is scope-proxied
-    // (so `options.scope` callbacks can call named scopes / generated
+    // (so the definition's scope callbacks can call named scopes / generated
     // methods on it), and composite-PK mismatches throw
     // `CompositePrimaryKeyMismatchError`. State is then copied onto
     // `this` so the inherited Relation methods observe the same scope.
@@ -648,7 +648,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Build via the `scope()` seam so CP's inherited Relation
       // state matches `scope()` / direct Relation callers: default
       // scope from `targetModel.all()` is applied, the relation is
-      // scope-proxied (so `options.scope` can call named scopes /
+      // scope-proxied (so the definition's scope can call named scopes /
       // generated methods on it), and composite-PK validation runs.
       // Then `_copyStateFrom` onto `this`. Missing owner PK →
       // `_isNone = true` (Rails' NullRelation fallback).
@@ -661,7 +661,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // surface eagerly — they are not part of Rails' lazy-FK contract.
       let seedRel: Relation<T> | null;
       try {
-        seedRel = hasManyScope(record, assocName, assocDef.options) as Relation<T> | null;
+        seedRel = hasManyScope(record, assocName, assocDef) as Relation<T> | null;
       } catch (err) {
         if (err instanceof ArgumentError) {
           this._deferredFkError = err;
@@ -2854,7 +2854,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // that fallback, where the composite guards remain as a loud backstop.
     const refl = this.reflection as any;
     if (_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
-      const joinRel = hasManyScope(this._record, this._assocName, this._assocDef.options);
+      const joinRel = hasManyScope(this._record, this._assocName, this._assocDef);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
     }
     // Below is the single-column IN-subquery fallback, reached only for shapes
@@ -2951,7 +2951,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const inNode = targetArelTable.get(targetPkCol).in(throughSubquery);
 
       let rel = (targetModel as any).all().where(inNode);
-      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      if (this._assocDef.scope) rel = this._assocDef.scope(rel);
       return rel;
     } else {
       const sourceAsName = sourceRefl?.options?.as;
@@ -2964,7 +2964,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // single-column IN-subquery can't express the tuple match, so route
         // through the JOIN-based AssociationScope, which builds the composite ON
         // clause. Falls back to a null scope only when the owner FK is absent.
-        const joinRel = hasManyScope(this._record, this._assocName, this._assocDef.options);
+        const joinRel = hasManyScope(this._record, this._assocName, this._assocDef);
         return joinRel ?? (targetModel as any).all().none();
       }
       // When the source reflection specifies a primaryKey option (e.g.
@@ -2992,7 +2992,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (sourceAsName) {
         rel = rel.where({ [`${underscore(sourceAsName)}_type`]: throughClassName });
       }
-      if (this._assocDef.options.scope) rel = this._assocDef.options.scope(rel);
+      if (this._assocDef.scope) rel = this._assocDef.scope(rel);
       return rel;
     }
   }

@@ -1015,7 +1015,7 @@ export class Association {
     // Rails: reflection.has_scope? || scope.eager_loading? ||
     //        klass.scope_attributes? || reflection.source_reflection.active_record.default_scopes.any?
     const refl = this.reflection as any;
-    const hasReflScope = !!(refl.hasScope?.() ?? refl.options?.scope);
+    const hasReflScope = !!(refl.hasScope?.() ?? refl.scope);
     const eagerLoading = !!scope?.eagerLoading?.();
     const scopeAttrs = !!(this.klass as any)?.hasScopeAttributes?.();
     const sourceDefaultScopes = !!refl.sourceReflection?.()?.activeRecord?.defaultScopes?.length;

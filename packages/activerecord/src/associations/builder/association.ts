@@ -68,7 +68,6 @@ export class Association {
     "foreignKey",
     "dependent",
     "validate",
-    "autosave",
     "inverseOf",
     "strictLoading",
     "queryConstraints",
@@ -139,12 +138,11 @@ export class Association {
     const reflection = Reflection.create(macro as any, name, scope, options, model);
 
     this._ensureOwnAssociations(model);
-    const assocOptions: Record<string, unknown> = { ...options };
-    if (scope) assocOptions.scope = scope;
     model._associations.push({
       type: macro,
       name,
-      options: assocOptions,
+      scope,
+      options: { ...options },
     });
 
     Reflection.addReflection(model, name, reflection as any);

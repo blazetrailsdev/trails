@@ -186,7 +186,7 @@ export async function resetCounters(
     ) as any;
     const counterName = reflection.counterCacheColumn();
 
-    const count = await countHasMany(object, countReflection.name, countReflection.options);
+    const count = await countHasMany(object, countReflection.name, countReflection);
     // Ruby's `!=` is type-coercing across Integer/Bignum; in TS the stored
     // attribute of a big_integer column is a bigint and needs an explicit widen.
     const countWas = (object as any).readAttribute?.(counterName) ?? (object as any)[counterName];

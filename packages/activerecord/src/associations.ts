@@ -105,7 +105,6 @@ export interface AssociationOptions {
   counterCache?: boolean | string;
   touch?: boolean | string | string[];
   autosave?: boolean;
-  scope?: (rel: any, owner?: any) => any;
   validate?: boolean;
   required?: boolean;
   optional?: boolean;
@@ -163,6 +162,13 @@ export interface AssociationDefinition {
   type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
   name: string;
   options: AssociationOptions & { joinTable?: string };
+  /**
+   * Rails' `MacroReflection#scope` — the macro's second POSITIONAL argument
+   * (`associations/builder/association.rb:48-49`, `associations.rb:1871`).
+   * Rails keeps it on the reflection and never in the options hash, which
+   * `assert_valid_keys` would reject (`association.rb:21,70`).
+   */
+  scope?: ((...args: any[]) => any) | null;
   /**
    * Rails' `MacroReflection#macro`. Present on the rich reflection an
    * `Association` resolves off the owner's class in its constructor
@@ -1118,7 +1124,7 @@ export function _builtAssociationScope(
  *
  * `scope.eager_loading?` is not a distinct check: on the singular load path the
  * scope's eager-loading can only come from a reflection/macro scope lambda
- * (subsumed by `reflection.has_scope?` / `options.scope`) or a target default
+ * (subsumed by `reflection.has_scope?` / the definition's scope) or a target default
  * scope carrying `includes` (subsumed by the `klass.scope_attributes?` arm
  * below), so the remaining arms cover it.
  *
@@ -1136,7 +1142,7 @@ export function _skipSingularStatementCache(
   // `reflection.has_scope?` — a caller-supplied `scope:` lambda (or the
   // reflection's own macro-time scope) is instance-dependent (it receives the
   // owner), so the compiled SQL can't be shared.
-  if (options.scope) return true;
+  if (reflection.scope) return true;
   const refl = reflection as {
     hasScope?(): boolean;
     sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
@@ -1285,7 +1291,6 @@ export function ownerHasUnresolvedThroughKey(
 async function _buildDisableJoinsScopeRelation(
   record: Base,
   reflection: ReflectionLike | null | undefined,
-  options?: AssociationOptions,
 ): Promise<{ rel: unknown } | null> {
   if (!reflection || ownerHasUnresolvedThroughKey(record, reflection)) return null;
   // Lazy-import to avoid an eager cycle: DJAS imports
@@ -1296,16 +1301,14 @@ async function _buildDisableJoinsScopeRelation(
   // DJAS.scope() now returns a sync deferred-chain Relation — the
   // async chain walk runs on first toArray(). No more Promise<{relation}>
   // boxing to unwrap.
-  let rel: unknown = DisableJoinsAssociationScope.create().scope({
+  const rel: unknown = DisableJoinsAssociationScope.create().scope({
     owner: record,
     reflection: reflection as never,
     klass,
   });
-  // Apply caller-supplied `options.scope` when it differs from the
-  // reflection's own scope — same rule the JOIN-based loaders use.
-  // Skipping when equal avoids double-application since DJAS already
-  // consumed the reflection's scope via constraints.
-  rel = applyAssociationScope(rel as never, options?.scope, record, reflection.scope);
+  // DJAS has already consumed `reflection.scope` through its constraints, so
+  // there is nothing left to apply — the scope reaches the reflection
+  // positionally and lives nowhere else (association.rb:48-49).
   return { rel };
 }
 
@@ -1315,7 +1318,7 @@ export async function _loadThroughViaDisableJoinsScope(
   reflection: ReflectionLike | null | undefined,
   options?: AssociationOptions,
 ): Promise<Base[]> {
-  const built = await _buildDisableJoinsScopeRelation(record, reflection, options);
+  const built = await _buildDisableJoinsScopeRelation(record, reflection);
   if (built == null) return [];
   return (built.rel as { toArray: () => Promise<Base[]> }).toArray();
 }
@@ -1338,7 +1341,7 @@ export async function _loadSingularThroughViaDisableJoinsScope(
   reflection: ReflectionLike | null | undefined,
   options?: AssociationOptions,
 ): Promise<Base | null> {
-  const built = await _buildDisableJoinsScopeRelation(record, reflection, options);
+  const built = await _buildDisableJoinsScopeRelation(record, reflection);
   if (built == null) return null;
   return (built.rel as { first: () => Promise<Base | null> }).first();
 }
@@ -1564,9 +1567,10 @@ export function _inlinePolymorphicKeys(
 export async function countHasMany(
   record: Base,
   assocName: string,
-  options: AssociationOptions,
+  assocDef: AssociationDefinition,
 ): Promise<number> {
   const { scope } = await import("./associations/has-many-association.js");
+  const options = assocDef.options;
   if (options.through) {
     // COUNT(*) over the JOIN — matching Rails' scope.count(:all) — instead of
     // materializing rows just to read their length. Temporarily disable strict
@@ -1581,7 +1585,7 @@ export async function countHasMany(
       if (!throughRegistered) {
         throw _hmtNotFound(ctor, assocName, options.through);
       }
-      const rel = scope(record, assocName, options);
+      const rel = scope(record, assocName, assocDef);
       if (!rel) return 0;
       // counter_cache.rb:57 `object.send(counter_association).count(:all)`: the
       // `:all` keeps a `select` declared on the association off the COUNT.
@@ -1597,7 +1601,7 @@ export async function countHasMany(
       record._strictLoadingBypassCount--;
     }
   }
-  const rel = scope(record, assocName, options);
+  const rel = scope(record, assocName, assocDef);
   if (!rel) return 0;
   // counter_cache.rb:57 `object.send(counter_association).count(:all)`.
   const result = await rel.count("all");

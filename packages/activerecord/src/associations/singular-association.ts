@@ -388,7 +388,7 @@ export class SingularAssociation extends Association {
         const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
         const baseRelation = _scopeForAssociation(targetModel);
         let rel = baseRelation.merge(built);
-        rel = applyAssociationScope(rel, options.scope, owner, reflection.scope);
+        rel = applyAssociationScope(rel, this.reflection.scope, owner, reflection.scope);
         // Rails returns the array and calls `Array#first` — no ORDER BY in SQL.
         // `take` (unordered LIMIT 1) matches; `first` would route through
         // `ordered_relation` and add one. See has_one_associations_test

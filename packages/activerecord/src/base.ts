@@ -84,7 +84,9 @@ import {
   flushPendingReplaces,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
+  _registerAssociationBuilderExtension,
 } from "./autosave-association.js";
+import { Association as AssociationBuilder } from "./associations/builder/association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
@@ -4678,6 +4680,7 @@ include(Base, TouchLater.InstanceMethods);
 };
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);
+_registerAssociationBuilderExtension(AssociationBuilder.extensions);
 // AutosaveAssociation#reload resets marked-for-destruction / destroyed-by-
 // association state, then calls super. Capture the inherited reload (Persistence)
 // at wire time and slot it BELOW Aggregations' lazy wrap, so the MRO is
