@@ -79,7 +79,6 @@ import {
   executeBatch as sqliteExecuteBatch,
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
-  acquireStatementLock,
   performQuery as sqlitePerformQuery,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
@@ -621,7 +620,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // at the row boundary so only bigint-declared columns keep the wide value, and
   // only where the value still fits a JS number (above that, a bigint is the
   // faithful reading and the alternative is silent precision loss).
-  private _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // sqlite3/database-statements.ts can reach it through PerformQueryHost —
+  // it is the one reader arm, so every path (`execQuery`, `execute`,
+  // `rawExecute`, `loadAsync`) narrows identically.
+  _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void {
     const wide = new Set(
       stmt
         .columns()
@@ -880,7 +883,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
    * the abstract DatabaseStatements and funnels into `internal_exec_query`. We
-   * mirror that by delegating to our `internalExecQuery`.
+   * mirror that by delegating to `internalExecQuery`.
    */
   override async execQuery(
     sql: string,
@@ -891,72 +894,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.internalExecQuery(sql, name, binds, options);
   }
 
-  /**
-   * Run a query and return an ActiveRecord::Result.
-   *
-   * Mirrors Rails' SQLite3Adapter#perform_query (then `cast_result`): a
-   * non-row-returning statement (INSERT/UPDATE/DELETE/DDL) yields an empty
-   * Result, while a row-returning statement reports its column set from the
-   * prepared statement even when it matches no rows — `Result.fromRowHashes`
-   * drops the columns on a zero-row result. Like Rails' `perform_query`, the
-   * statement is pooled only on the `prepare` branch; otherwise a fresh
-   * statement is used.
-   */
-  override async internalExecQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds: unknown[] = [],
-    options: { prepare?: boolean; allowRetry?: boolean } = {},
-  ): Promise<Result> {
-    const processed = this.preprocessQuery(sql);
-    await this.materializeTransactions();
-    const driverBinds = (binds ?? []).map(_driverBind, this) as SqliteBinds;
-    // Rails' SQLite `perform_query` pools the statement only when `prepare` is
-    // true (`@statements[sql] ||= ...`) and otherwise prepares a fresh one. The
-    // `exec_query` keyword defaults to `false` (database_statements.rb), so we
-    // default to a fresh statement and pool only on an explicit `prepare: true`;
-    // the preparable decision lives upstream, not here.
-    const prepare = options.prepare ?? false;
-    return this.log(
-      processed,
-      name,
-      binds ?? [],
-      this.typeCastedBinds(binds ?? []) ?? [],
-      false,
-      async (payload) => {
-        try {
-          const stmt = await (prepare
-            ? this._cachedStatement(processed)
-            : this._freshStatement(processed));
-          let result: Result;
-          const release = await acquireStatementLock(this);
-          try {
-            if (!stmt.reader) {
-              await stmt.run(driverBinds);
-              result = Result.empty();
-            } else {
-              const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-              this._narrowSpilledBigInts(stmt, rows);
-              payload.row_count = rows.length;
-              result =
-                rows.length > 0
-                  ? Result.fromRowHashes(rows)
-                  : new Result(
-                      stmt.columns().map((c) => c.name),
-                      [],
-                    );
-            }
-          } finally {
-            release();
-          }
-          return this.castResult(result);
-        } catch (e: any) {
-          const translated = this._translateException(e, processed, binds);
-          throw translated;
-        }
-      },
-    );
-  }
+  // Rails' SQLite3Adapter has no `internal_exec_query` override: the abstract
+  // `cast_result(internal_execute(...))`
+  // (abstract/database_statements.rb:546-548) funnels the whole read path
+  // through the one `perform_query` (sqlite3/database_statements.rb:78-113),
+  // so we inherit it too.
 
   // Mirrors: SQLite3::DatabaseStatements#begin_db_transaction
   async beginDbTransaction(): Promise<void> {
