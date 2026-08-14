@@ -11,6 +11,21 @@ is all you need. This one exercises the half that had never run:
 `ActionDispatch` routing, `ActionController::Base`, `ActionView`'s
 `LookupContext`, and the `.tse` template language.
 
+## What it looks like
+
+Every page below is rendered on the server by a `.tse` template — no client
+JavaScript is involved.
+
+| Timeline                                                                                                   | Explore                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| ![Timeline](docs/screenshots/timeline.png)                                                                 | ![Explore](docs/screenshots/explore.png)                                                                               |
+| The home timeline: hashtag links, `likes_count` / `replies_count` counter caches, and `time_ago_in_words`. | Trending hashtags from a `joins` + `group` + `count` query across the HABTM join table, who-to-follow, and most-liked. |
+
+| Conversation                                                                                   | Profile                                               |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| ![Tweet thread](docs/screenshots/thread.png)                                                   | ![Profile](docs/screenshots/profile.png)              |
+| A thread: self-referential `replies`, and "Liked by" through the `likers` `has_many :through`. | Follower and following counts, and the user's tweets. |
+
 ## Run it
 
 From the repo root, build the packages once (the example imports the compiled
