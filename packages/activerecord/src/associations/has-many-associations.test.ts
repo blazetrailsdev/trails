@@ -3101,11 +3101,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DcClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -3126,11 +3125,15 @@ describe("HasManyAssociationsTest", () => {
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(2);
-    const scoped = await findHasManyTarget(firm, "conditionalClients", {
-      className: "DcClient",
-      foreignKey: "firm_id",
-      scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
-    });
+    const scoped = await findHasManyTarget(
+      firm,
+      "conditionalClients",
+      (rel: any) => rel.where({ name: "BigShot Inc." }),
+      {
+        className: "DcClient",
+        foreignKey: "firm_id",
+      },
+    );
     expect(scoped.length).toBe(1);
     await firm.destroy();
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(1);
@@ -3143,11 +3146,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DsClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -3177,11 +3179,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DhClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -4055,11 +4056,10 @@ describe("HasManyAssociationsTest", () => {
           className: "HcPost",
           foreignKey: "author_id",
         });
-        this.hasMany("helloPostComments", {
+        this.hasMany("helloPostComments", (rel: any) => rel.where({ body: "hello" }), {
           className: "HcComment",
           through: "hcPosts",
           source: "hcComments",
-          scope: (rel: any) => rel.where({ body: "hello" }),
         });
       }
     }
@@ -4102,12 +4102,16 @@ describe("HasManyAssociationsTest", () => {
     await HcComment.create({ post_id: post.id, body: "hello" });
     await HcComment.create({ post_id: post.id, body: "goodbye" });
 
-    const comments = await findHasManyTarget(author, "helloPostComments", {
-      className: "HcComment",
-      through: "hcPosts",
-      source: "hcComments",
-      scope: (rel: any) => rel.where({ body: "hello" }),
-    });
+    const comments = await findHasManyTarget(
+      author,
+      "helloPostComments",
+      (rel: any) => rel.where({ body: "hello" }),
+      {
+        className: "HcComment",
+        through: "hcPosts",
+        source: "hcComments",
+      },
+    );
     expect(comments.length).toBe(1);
     expect(comments[0].body).toBe("hello");
   });

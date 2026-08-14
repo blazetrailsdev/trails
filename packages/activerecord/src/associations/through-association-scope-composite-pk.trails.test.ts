@@ -36,12 +36,15 @@ registerModel([CpkOrder, CpkOrderTag, CpkTag]);
 // preload stage (which never joins `cpk_order_tags`), the through-table column
 // would raise `no such column`. `order_1` is tagged both `Loyal customer` and
 // `Digital product`; the source-table half narrows the result to the latter.
-CpkOrder.hasMany("tagsWithMixedCondition", {
-  className: "CpkTag",
-  through: "orderTags",
-  source: "tag",
-  scope: (rel) => rel.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'"),
-});
+CpkOrder.hasMany(
+  "tagsWithMixedCondition",
+  (rel) => rel.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'"),
+  {
+    className: "CpkTag",
+    through: "orderTags",
+    source: "tag",
+  },
+);
 
 interface ThroughScopeProbe {
   throughScope(): { toSql(): string };

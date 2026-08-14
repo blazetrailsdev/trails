@@ -16,12 +16,24 @@ import { _buildAssociationInstance } from "../associations/instance-methods.js";
  * would otherwise repeat the same cast. `async` so `check_validity!` — run when
  * the holder is built, as in `Association#initialize` (`association.rb:41-45`) —
  * surfaces as a rejection like every other load failure.
+ *
+ * `scope` is positional ahead of `options`, as on the macros it stands in for
+ * (`has_many(name, scope = nil, **options)`, `associations.rb:1302`), and is
+ * folded into the holder's options the same way `Builder::Association.build`
+ * folds it into the reflection's (`builder/association.ts:151`) — which is what
+ * a caller forwarding a whole `reflection.options` is already passing.
  */
 export async function findCollectionTarget(
   record: Base,
   name: string,
+  scope: NonNullable<AssociationOptions["scope"]> | AssociationOptions | null = {},
   options: AssociationOptions = {},
 ): Promise<Base[]> {
+  if (typeof scope === "function") {
+    options = { ...options, scope };
+  } else if (scope !== null) {
+    options = scope;
+  }
   const assoc = _buildAssociationInstance.call(record, { name, type: "hasMany", options });
   return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }

@@ -45,68 +45,90 @@ type JoinWhere = {
   where: (sql: string) => JoinWhere;
 };
 type HasManyHost = {
-  hasMany: (name: string, options: Record<string, unknown>) => void;
+  hasMany: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
 };
 type HasOneHost = {
-  hasOne: (name: string, options: Record<string, unknown>) => void;
+  hasOne: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
 };
 
 // Nested through (source `members` on Club is itself a has_many-through, so this
 // takes the "twoStep"/nested branch) whose OUTER scope reaches `categories` via
 // a RAW string join + a `.where`. The flattened where_clause is non-empty, so
 // Rails raises ConfigurationError at the through-scope build.
-(Member as unknown as HasManyHost).hasMany("rawMembersOfClub", {
-  through: "club",
-  source: "members",
-  scope: (rel: JoinWhere) =>
+(Member as unknown as HasManyHost).hasMany(
+  "rawMembersOfClub",
+  (rel: JoinWhere) =>
     rel
       .joins("INNER JOIN categories ON categories.id = memberships.club_id")
       .where("categories.name = 'General'"),
-});
+  {
+    through: "club",
+    source: "members",
+  },
+);
 
 // Same nested branch, but the raw join is declared on the SUB-CHAIN only: Club's
 // own has_many-through `rawMembers` carries `.joins(...).where(...)`, and the
 // outer `membersViaRawClub` sources through it with a raw-join-free `.where`.
 // Rails still raises at the OUTER build because the flattened `values[:joins]`
 // includes the sub-chain's raw join and the flattened where_clause is non-empty.
-(Club as unknown as HasManyHost).hasMany("rawMembers", {
-  through: "memberships",
-  source: "member",
-  scope: (rel: JoinWhere) =>
+(Club as unknown as HasManyHost).hasMany(
+  "rawMembers",
+  (rel: JoinWhere) =>
     rel
       .joins("INNER JOIN categories ON categories.id = members.id")
       .where("categories.name = 'General'"),
-});
-(Member as unknown as HasManyHost).hasMany("membersViaRawClub", {
-  through: "club",
-  source: "rawMembers",
-  scope: (rel: JoinWhere) => rel.where("clubs.name IS NOT NULL"),
-});
+  {
+    through: "memberships",
+    source: "member",
+  },
+);
+(Member as unknown as HasManyHost).hasMany(
+  "membersViaRawClub",
+  (rel: JoinWhere) => rel.where("clubs.name IS NOT NULL"),
+  {
+    through: "club",
+    source: "rawMembers",
+  },
+);
 
 // Nested through whose OWN scope carries a raw join but NO `.where` anywhere in
 // the chain. The flattened where_clause is empty, so Rails skips the whole
 // `elsif` branch (through_association.rb:117) and NOTHING raises — the raw join
 // is never nested. Pins that the raise is gated on the where_clause, not on the
 // mere presence of a raw join.
-(Member as unknown as HasManyHost).hasMany("noWhereRawMembersOfClub", {
-  through: "club",
-  source: "members",
-  scope: (rel: JoinWhere) =>
-    rel.joins("INNER JOIN categories ON categories.id = memberships.club_id"),
-});
+(Member as unknown as HasManyHost).hasMany(
+  "noWhereRawMembersOfClub",
+  (rel: JoinWhere) => rel.joins("INNER JOIN categories ON categories.id = memberships.club_id"),
+  {
+    through: "club",
+    source: "members",
+  },
+);
 
 // Nested through (through reflection `club` is itself a has_one-through, so
 // `reflectionScope` is the flattened chain scope) whose has_ONE target's own
 // scope reaches `categorizations` via a RAW join + `.where`. Exercises the
 // "join" branch's flattened raw-join handling for a has_one nested through.
-(Member as unknown as HasOneHost).hasOne("rawCategoryOfClub", {
-  through: "club",
-  source: "category",
-  scope: (rel: JoinWhere) =>
+(Member as unknown as HasOneHost).hasOne(
+  "rawCategoryOfClub",
+  (rel: JoinWhere) =>
     rel
       .joins("INNER JOIN categorizations ON categorizations.category_id = categories.id")
       .where("categorizations.author_id = 1"),
-});
+  {
+    through: "club",
+    source: "category",
+  },
+);
 
 describe("Preloader::ThroughAssociation#through_scope nested raw-join handling", () => {
   const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);

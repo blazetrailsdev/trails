@@ -1488,8 +1488,7 @@ describe("WithAnnotationsTest", () => {
     static {
       this.tableName = "pirates";
       this.belongsTo("parrot", { className: "Parrot", foreignKey: "parrot_id" });
-      this.belongsTo("parrotWithAnnotation", {
-        scope: (q: any) => q.annotate("that tells jokes"),
+      this.belongsTo("parrotWithAnnotation", (q: any) => q.annotate("that tells jokes"), {
         className: "Parrot",
         foreignKey: "parrot_id",
       });
@@ -1503,21 +1502,18 @@ describe("WithAnnotationsTest", () => {
         },
       );
       this.hasOne("ship", { className: "Ship", foreignKey: "pirate_id" });
-      this.hasOne("shipWithAnnotation", {
-        scope: (q: any) => q.annotate("that is a rocket"),
+      this.hasOne("shipWithAnnotation", (q: any) => q.annotate("that is a rocket"), {
         className: "Ship",
         foreignKey: "pirate_id",
       });
       this.hasMany("birds", { className: "Bird", foreignKey: "pirate_id" });
-      this.hasMany("birdsWithAnnotation", {
-        scope: (q: any) => q.annotate("that are also parrots"),
+      this.hasMany("birdsWithAnnotation", (q: any) => q.annotate("that are also parrots"), {
         className: "Bird",
         foreignKey: "pirate_id",
       });
       this.hasMany("treasures", { as: "looter" });
       this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
-      this.hasMany("treasureEstimatesWithAnnotation", {
-        scope: (q: any) => q.annotate("yarrr"),
+      this.hasMany("treasureEstimatesWithAnnotation", (q: any) => q.annotate("yarrr"), {
         through: "treasures",
         source: "priceEstimates",
       });

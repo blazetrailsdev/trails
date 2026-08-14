@@ -44,10 +44,18 @@ type NestedRel = {
   where: (spec: Record<string, unknown>) => NestedRel;
 };
 type HasOneHost = {
-  hasOne: (name: string, options: Record<string, unknown>) => void;
+  hasOne: (
+    name: string,
+    scope: (rel: NestedRel) => NestedRel,
+    options: Record<string, unknown>,
+  ) => void;
 };
 type HasManyHost = {
-  hasMany: (name: string, options: Record<string, unknown>) => void;
+  hasMany: (
+    name: string,
+    scope: (rel: NestedRel) => NestedRel,
+    options: Record<string, unknown>,
+  ) => void;
 };
 
 // A has_one-through mirroring `general_club` (Member → current_membership →
@@ -55,40 +63,49 @@ type HasManyHost = {
 // source klass Club (club → category → categorizations) — and predicates on it.
 // `categorizations.author_id = 1` (david) matches category `general`, so
 // groucho's through row (boring_club, category general) survives.
-(Member as unknown as HasOneHost).hasOne("davidCategorizedClub", {
-  through: "currentMembership",
-  source: "club",
-  scope: (rel: NestedRel) =>
+(Member as unknown as HasOneHost).hasOne(
+  "davidCategorizedClub",
+  (rel: NestedRel) =>
     rel.leftJoins({ category: "categorizations" }).where({ categorizations: { author_id: 1 } }),
-});
+  {
+    through: "currentMembership",
+    source: "club",
+  },
+);
 
 // Same shape but reaching the deeper table via `.includes` instead of
 // `.leftJoins`. Rails' through_scope nests the scope's `values[:includes]` under
 // the source reflection (`includes!(source => includes)`), so `.includes` and
 // `.leftJoins` both realize the deeper join on the through query. Pins that a
 // has_one-through honors an explicit `.includes` in its scope.
-(Member as unknown as HasOneHost).hasOne("davidIncludedCategorizedClub", {
-  through: "currentMembership",
-  source: "club",
-  scope: (rel: NestedRel) =>
+(Member as unknown as HasOneHost).hasOne(
+  "davidIncludedCategorizedClub",
+  (rel: NestedRel) =>
     (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
       .includes({ category: "categorizations" })
       .where({ categorizations: { author_id: 1 } }),
-});
+  {
+    through: "currentMembership",
+    source: "club",
+  },
+);
 
 // A has_MANY-through whose scope carries a `.includes` reaching a belongs_to
 // association (`category` on Club) plus a predicate on it. A belongs_to join is
 // 1:1, so it does NOT fan the through rows out and IS nested onto the through
 // query even for a collection target — the predicate must resolve there, not
 // leak onto the source query where `categories` is unjoined.
-(Member as unknown as HasManyHost).hasMany("generalClubs", {
-  through: "favoriteMemberships",
-  source: "club",
-  scope: (rel: NestedRel) =>
+(Member as unknown as HasManyHost).hasMany(
+  "generalClubs",
+  (rel: NestedRel) =>
     (rel as unknown as { includes: (s: string) => NestedRel })
       .includes("category")
       .where({ categories: { name: "General" } }),
-});
+  {
+    through: "favoriteMemberships",
+    source: "club",
+  },
+);
 
 // A has_MANY-through whose scope includes a two-level nested path
 // (`categorizations`, a has_many via club → category → categorizations) AND
@@ -98,14 +115,17 @@ type HasManyHost = {
 // middle records out. The join and its `categorizations.author_id` predicate
 // are realized on the through query, resolving there instead of leaking onto
 // the source stage.
-(Member as unknown as HasManyHost).hasMany("categorizedClubs", {
-  through: "favoriteMemberships",
-  source: "club",
-  scope: (rel: NestedRel) =>
+(Member as unknown as HasManyHost).hasMany(
+  "categorizedClubs",
+  (rel: NestedRel) =>
     (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
       .includes({ category: "categorizations" })
       .where({ categorizations: { author_id: 1 } }),
-});
+  {
+    through: "favoriteMemberships",
+    source: "club",
+  },
+);
 
 describe("Preloader::ThroughAssociation#through_scope multi-level nested join carry", () => {
   const { members, clubs } = fixtures([

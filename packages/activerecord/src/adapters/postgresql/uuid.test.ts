@@ -978,10 +978,9 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.attribute("id", "uuid");
           // Rails: has_many :uuid_posts, -> { order("title DESC") } — the
           // ordering scope exercises the delegate-cache path the test name calls out.
-          this.hasMany("uuidPosts", {
+          this.hasMany("uuidPosts", (rel: any) => rel.order("title DESC"), {
             className: "UuidPostDj",
             foreignKey: "uuid_forum_id",
-            scope: (rel: any) => rel.order("title DESC"),
           });
           this.hasMany("uuidComments", {
             className: "UuidCommentDj",

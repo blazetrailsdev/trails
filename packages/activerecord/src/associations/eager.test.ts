@@ -871,10 +871,9 @@ describe("EagerAssociationTest", () => {
       static tableName = "authors";
       static {
         this.hasOne("post", { className: "PostWithDefaultScope", foreignKey: "author_id" });
-        this.hasOne("reorderedPost", {
+        this.hasOne("reorderedPost", (q: any) => q.reorder({ title: "desc" }), {
           className: "PostWithDefaultScope",
           foreignKey: "author_id",
-          scope: (q: any) => q.reorder({ title: "desc" }),
         });
       }
     }
