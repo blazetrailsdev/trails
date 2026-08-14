@@ -349,16 +349,6 @@ export class HasAndBelongsToMany {
     for (const callbackName of ["beforeAdd", "afterAdd", "beforeRemove", "afterRemove"] as const) {
       CollectionAssociationBuilder.defineCallback(model, callbackName, name, habtmOptions);
     }
-    // Pull `scope:` off the options bag and forward it as the dedicated
-    // scope arg on the reflection. Mirrors Rails' Builder::Association,
-    // which captures `scope` as a positional arg to `has_and_belongs_to_many`
-    // rather than treating it as a generic option. The through-routing loaders
-    // already check `options.scope` — keeping it there too means callers who
-    // don't go through reflection still see it.
-    const habtmScope =
-      typeof habtmOptions.scope === "function"
-        ? (habtmOptions.scope as (...args: any[]) => any)
-        : null;
     // Keep `through:` in the options passed to Reflection.create so it wraps
     // the HasAndBelongsToManyReflection in a ThroughReflection — mirrors
     // Rails' `Builder::HasAndBelongsToMany`, which builds an internal
@@ -367,7 +357,7 @@ export class HasAndBelongsToMany {
     const habtmReflection = Reflection.create(
       "hasAndBelongsToMany" as any,
       name,
-      habtmScope,
+      positionalScope,
       habtmReflectionOptions,
       model,
     );
