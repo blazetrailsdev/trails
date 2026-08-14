@@ -20,8 +20,26 @@
  * ESM re-export is eager, so this file is deliberately absent from `index.ts`
  * — importing it there would pull vitest into every consumer of the package.
  */
-import { beforeEach } from "vitest";
-import { setTaggedLogger, beforeSetup, taggedLogger } from "./testing/tagged-logging.js";
+import { afterEach, beforeEach, expect } from "vitest";
+import type { TestContext } from "vitest";
+import {
+  setTaggedLogger,
+  beforeSetup as taggedLoggingBeforeSetup,
+  taggedLogger,
+} from "./testing/tagged-logging.js";
+import {
+  failures,
+  prepended as setupAndTeardownPrepended,
+  setup,
+  teardown,
+  beforeSetup as setupAndTeardownBeforeSetup,
+  afterTeardown as setupAndTeardownAfterTeardown,
+} from "./testing/setup-and-teardown.js";
+import {
+  afterTeardown as testsWithoutAssertionsAfterTeardown,
+  type RunningTest,
+} from "./testing/tests-without-assertions.js";
+import { UnexpectedError } from "./testing/assertions.js";
 import {
   assertNot,
   assertRaises,
@@ -40,7 +58,7 @@ import {
   collectDeprecations,
 } from "./testing/deprecation.js";
 import {
-  afterTeardown,
+  afterTeardown as timeHelpersAfterTeardown,
   travel,
   travelTo,
   travelBack,
@@ -51,9 +69,48 @@ import {
 export class TestCase {
   // include ActiveSupport::Testing::TaggedLogging (test_case.rb:144)
   static setTaggedLogger = setTaggedLogger;
-  static beforeSetup = beforeSetup;
   /** @internal */
   static taggedLogger = taggedLogger;
+
+  // prepend ActiveSupport::Testing::SetupAndTeardown (test_case.rb:145)
+  static setup = setup;
+  static teardown = teardown;
+
+  /**
+   * The `before_setup` chain the two `prepend`s produce (test_case.rb:144-145):
+   * `SetupAndTeardown#before_setup` opens with `super`, which reaches
+   * `TaggedLogging#before_setup`, and only then runs the `:setup` callbacks.
+   * `TestsWithoutAssertions` defines no `before_setup`.
+   */
+  static beforeSetup(): void {
+    taggedLoggingBeforeSetup();
+    setupAndTeardownBeforeSetup.call(TestCase);
+  }
+
+  /**
+   * The `after_teardown` chain (test_case.rb:145-146, 151), in ancestor order:
+   * `TestsWithoutAssertions#after_teardown` — prepended last, so it comes
+   * first — opens with `super`, which reaches `SetupAndTeardown#after_teardown`
+   * (the `:teardown` callbacks), whose own trailing `super` reaches
+   * `TimeHelpers#after_teardown`. Its assertion check runs on the way back out,
+   * last.
+   */
+  static afterTeardown(test: RunningTest): void {
+    const recordedBefore = failures.length;
+    setupAndTeardownAfterTeardown.call(TestCase);
+    timeHelpersAfterTeardown();
+    const recorded = failures.splice(recordedBefore);
+    testsWithoutAssertionsAfterTeardown({
+      ...test,
+      // Minitest's `error?` is `failures.any? { UnexpectedError === _1 }`, so a
+      // teardown that raised suppresses the missing-assertion warning.
+      error: test.error || recorded.some((f) => f instanceof UnexpectedError),
+    });
+    // `self.failures` is the list Minitest reports the test on; vitest has no
+    // per-test failure list, so what makes the runner see the failure is the
+    // hook raising it.
+    if (recorded.length > 0) throw recorded[0];
+  }
 
   // include ActiveSupport::Testing::Assertions (test_case.rb:147)
   static assertNot = assertNot;
@@ -83,9 +140,42 @@ export class TestCase {
   static travelBack = travelBack;
   static freezeTime = freezeTime;
   static unfreezeTime = unfreezeTime;
-  static afterTeardown = afterTeardown;
 }
+
+// `prepend` runs `SetupAndTeardown.prepended` (setup_and_teardown.rb:21), which
+// is what defines the `:setup` / `:teardown` callback chains on the receiver.
+setupAndTeardownPrepended(TestCase);
 
 beforeEach(() => {
   TestCase.beforeSetup();
 });
+
+afterEach((context: TestContext) => {
+  TestCase.afterTeardown(_runningTest(context));
+});
+
+/**
+ * The Minitest instance Ruby reads `assertions` / `skipped?` / `error?` /
+ * `name` / `method(name).source_location` off, read from vitest's per-test
+ * context instead.
+ *
+ * @noRailsEquivalent PERMANENT — bridges the runner's task onto the `self` of
+ * `tests_without_assertions.rb`, a `Minitest::Test` that lives in the minitest
+ * gem and so has no file in the mapped Rails source.
+ */
+function _runningTest(context: TestContext): RunningTest {
+  const task = context.task as {
+    name: string;
+    mode?: string;
+    location?: { line?: number };
+    file?: { filepath?: string };
+    result?: { state?: string; errors?: unknown[] };
+  };
+  return {
+    assertions: expect.getState().assertionCalls ?? 0,
+    skipped: task.mode === "skip" || task.mode === "todo",
+    error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
+    name: task.name,
+    sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
+  };
+}

@@ -9,8 +9,21 @@ import type { UnportedFile } from "./types.js";
 
 export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
-    pattern: "migration/compatibility", // test excluded by extract-ruby-tests.rb SKIP_PATTERNS (/\/migration\//)
-    reason: "Pre-1.0: legacy Rails version migration compatibility shims.",
+    // Source side only (activerecord/lib/active_record/migration/compatibility.rb).
+    // The test file is excluded by the anchored `testFile` row below, not by any
+    // extract-ruby-tests.rb SKIP_PATTERNS rule.
+    pattern: "migration/compatibility",
+    reason:
+      "Won't-do, by maintainer decision rather than technical limitation: " +
+      "`ActiveRecord::Migration[x.y]` / `Migration::Compatibility::V*` exists so " +
+      "migrations written under an older Rails keep behaving as written, and trails has " +
+      "no older versions. PR #5070 shipped a complete, CI-green `Migration[6.1]` / " +
+      '`Compatibility::V6_1` and was closed unmerged on 2026-07-22 — "the premise of ' +
+      "this pr is not the goal of trails. We have no backwards compatibility necessary " +
+      "since there never were previous versions of trails.\" RFC 0030's story " +
+      "`c1-schema-dumper-migration-version-compat` was closed on the same grounds. The " +
+      "thin registry at packages/activerecord/src/migration/compatibility.ts (version " +
+      '"1.0" only) stays; nothing is added to it.',
   },
   {
     package: "activerecord",
