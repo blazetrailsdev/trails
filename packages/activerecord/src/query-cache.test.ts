@@ -28,16 +28,13 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
-// Mirrors the Rails private `middleware(&app)` helper: builds an executor,
-// installs the QueryCache run/complete hooks on it, and returns a callable that
-// wraps the block — enabling the query cache on every pool for the request and
-// disabling + clearing it afterward.
+// Mirrors the Rails private `middleware(&app)` helper (query_cache_test.rb:841-845).
+// Rails is `executor.wrap { app.call(env) }`; `app` is async here and `wrap` is
+// synchronous (Ruby's block is), so the bracket is spelled out the way
+// `ActionDispatch::Executor` spells it (executor.rb:13-31).
 function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> {
   const executor = class extends Executor {};
   QueryCache.installExecutorHooks(executor);
-  // Rails is `executor.wrap { app.call(env) }`; `app` is async here, and
-  // `wrap` is synchronous (it must be — Ruby's block is), so the bracket is
-  // spelled out as `ActionDispatch::Executor` spells it (executor.rb:13-31).
   return async () => {
     const state = executor.runBang();
     try {

@@ -13,7 +13,8 @@
 // generic `Store` symbol into the generated `.d.ts`.
 import { Executor } from "@blazetrails/activesupport";
 import { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
-import { Base } from "./base.js";
+import { ActiveRecordError } from "./errors.js";
+import type { Base } from "./base.js";
 
 // Deep-import convenience: consumers doing
 // `import { ... } from "@blazetrails/activerecord/query-cache.js"`
@@ -44,6 +45,19 @@ export interface QueryCacheCompleteTarget {
   clearQueryCache(): void;
 }
 
+/** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
+let _base: typeof Base | undefined;
+
+/** @internal */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
+
 export class QueryCache {
   /**
    * Mirrors: ActiveRecord::QueryCache.run (query_cache.rb:37-42).
@@ -58,7 +72,7 @@ export class QueryCache {
    */
   static run(): QueryCacheRunTarget[] {
     const allPools: QueryCacheRunTarget[] = [];
-    Base.connectionHandler.eachConnectionPool((pool) => allPools.push(pool));
+    baseClass().connectionHandler.eachConnectionPool((pool) => allPools.push(pool));
     const pools = allPools.filter((pool) => !pool.queryCacheEnabled);
     for (const pool of pools) {
       if (pool.dbConfig?.queryCache === false) continue;

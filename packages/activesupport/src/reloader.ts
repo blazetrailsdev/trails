@@ -30,8 +30,6 @@ import { ExecutionWrapper } from "./execution-wrapper.js";
 import type { CompletableExecution } from "./execution-wrapper.js";
 import { Executor } from "./executor.js";
 
-export type PrepareCallback = () => void;
-
 export class Reloader extends ExecutionWrapper {
   /** `class_attribute :executor, default: Executor` (reloader.rb:81). */
   declare static executor: typeof ExecutionWrapper;
@@ -47,7 +45,7 @@ export class Reloader extends ExecutionWrapper {
     defineCallbacks(this.prototype, "class_unload");
   }
 
-  #_locked = false;
+  #locked = false;
 
   /** Registers a callback that will run once at application startup and every time the code is reloaded. */
   static toPrepare(...args: FilterListEntry[]): void {
@@ -100,10 +98,11 @@ export class Reloader extends ExecutionWrapper {
     }, kwargs);
   }
 
-  /** @internal */
+  /**
+   * @internal `@should_reload` is a per-class ivar in Ruby, so a subclass never
+   * reads its parent's — hence the own-property guard (as in `activeKey`).
+   */
   static checkBang(): boolean {
-    // `@should_reload` is a per-class ivar in Ruby, so a subclass never reads
-    // its parent's — hence the own-property guard (as in `activeKey`).
     if (!Object.prototype.hasOwnProperty.call(this, "_shouldReload")) {
       this._shouldReload = false;
     }
@@ -124,27 +123,27 @@ export class Reloader extends ExecutionWrapper {
    * Acquire the ActiveSupport::Dependencies::Interlock unload lock,
    * ensuring it will be released automatically
    *
-   * @missingRailsCall ActiveSupport::Dependencies.interlock.start_unloading —
-   * ESM has no autoload, so there is no interlock to hold loads off across an
+   * `ActiveSupport::Dependencies.interlock.start_unloading` (reloader.rb:104) is
+   * not called: ESM has no autoload, so there is no interlock to hold loads off across an
    * unload (same reason `Concurrency::LoadInterlockAwareMonitor` is a bare
    * `Monitor`). The `@locked` bookkeeping is ported so the pairing with
    * {@link releaseUnloadLockBang} still holds.
    */
   requireUnloadLockBang(): void {
-    if (!this.#_locked) {
-      this.#_locked = true;
+    if (!this.#locked) {
+      this.#locked = true;
     }
   }
 
   /**
    * Release the unload lock if it has been previously obtained
    *
-   * @missingRailsCall ActiveSupport::Dependencies.interlock.done_unloading —
-   * see {@link requireUnloadLockBang}.
+   * `ActiveSupport::Dependencies.interlock.done_unloading` (reloader.rb:113) is
+   * not called — see {@link requireUnloadLockBang}.
    */
   releaseUnloadLockBang(): void {
-    if (this.#_locked) {
-      this.#_locked = false;
+    if (this.#locked) {
+      this.#locked = false;
     }
   }
 
@@ -171,7 +170,6 @@ export class Reloader extends ExecutionWrapper {
   }
 }
 
-// `to_run(:after) { self.class.prepare! }` (reloader.rb:47).
 Reloader.toRun("after", function (this: Reloader) {
   (this.constructor as typeof Reloader).prepareBang();
 });

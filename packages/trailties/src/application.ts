@@ -36,7 +36,8 @@ export class Application extends Engine {
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
   private _app?: RackApp;
-  /** Rails: `@executor = Class.new(ActiveSupport::Executor)` (`application.rb:122`). */
+  /** Rails: `@executor = Class.new(ActiveSupport::Executor)` (`application.rb:122`);
+   * `@reloader.executor = @executor` (`application.rb:124`) is the constructor. */
   readonly executor = class extends Executor {};
   /** Rails: `@reloader = Class.new(ActiveSupport::Reloader)` (`application.rb:123`) —
    * a per-application subclass so one app's prepare callbacks don't leak into
@@ -47,7 +48,6 @@ export class Application extends Engine {
 
   constructor() {
     super();
-    // Rails: `@reloader.executor = @executor` (`application.rb:124`).
     this.reloader.executor = this.executor;
   }
 

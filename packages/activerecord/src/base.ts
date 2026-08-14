@@ -51,6 +51,7 @@ import {
   relationClassFor,
   generatedRelationMethods as _generatedRelationMethods,
 } from "./relation/delegation.js";
+import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
@@ -4989,6 +4990,7 @@ Table.engine = {
 // initialized bindings or hits a TDZ ReferenceError. Consumers that only need
 // `Base` at call time take it from here instead.
 
+_registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
