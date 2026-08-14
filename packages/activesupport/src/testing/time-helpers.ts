@@ -5,7 +5,7 @@ import { Temporal } from "@blazetrails/date";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
-import { getZone } from "../time-zone-config.js";
+import { zone as timeZone } from "../time-zone-config.js";
 
 /** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
 class RuntimeError extends Error {
@@ -172,7 +172,7 @@ export function travelTo(
   let now: Temporal.Instant;
   if (typeof dateOrTime === "string") {
     // Without a `Time.zone` set there is no zone to parse through.
-    const zone = getZone();
+    const zone = timeZone();
     now = zone ? zone.parse(dateOrTime).toTime() : Temporal.Instant.from(dateOrTime);
   } else if (dateOrTime instanceof Date) {
     now = Temporal.Instant.fromEpochMilliseconds(dateOrTime.getTime());

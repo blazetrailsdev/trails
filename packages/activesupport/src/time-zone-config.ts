@@ -8,7 +8,6 @@
 
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
-import { TimeWithZone } from "./time-with-zone.js";
 import { ArgumentError } from "./hash-utils.js";
 
 // NOTE: Zone state is stored in module-level variables, mirroring Rails'
@@ -24,7 +23,7 @@ let _zone: TimeZone | null | false | undefined = undefined;
  * Mirrors `IsolatedExecutionState[:time_zone] || zone_default` (zones.rb:19-21),
  * so a stored `nil`/`false` falls through to zone_default just as it does in Rails.
  */
-export function getZone(): TimeZone | null {
+export function zone(): TimeZone | null {
   if (_zone != null && _zone !== false) return _zone;
   return _zoneDefault;
 }
@@ -56,7 +55,7 @@ export function isZoneExplicit(): boolean {
 /**
  * Get/set the zone_default (used when Time.zone is not explicitly set).
  */
-export function getZoneDefault(): TimeZone | null {
+export function zoneDefault(): TimeZone | null {
   return _zoneDefault;
 }
 
@@ -114,18 +113,6 @@ export function findZoneBang(zone: unknown): TimeZone | null | false {
   const found = TimeZone.find(zone);
   if (found == null) throw new ArgumentError(`Invalid Timezone: ${String(zone)}`);
   return found;
-}
-
-/**
- * Convert a Date (interpreted as a local date, i.e., year/month/day only)
- * into a TimeWithZone at midnight in the given zone.
- * Matches Rails' Date#in_time_zone, whose first act is `::Time.find_zone!`
- * (core_ext/date/zones.rb) — so a bad name, an unmatched offset and an argument
- * of the wrong class all raise there.
- */
-export function dateInTimeZone(date: Date, zone: unknown): TimeWithZone {
-  const tz = findZoneBang(zone) as TimeZone;
-  return tz.local(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
 /**

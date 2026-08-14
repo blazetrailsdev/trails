@@ -38,18 +38,6 @@ describe("Object#blank? respond_to?(:empty?) probe", () => {
     expect(called).toBe(false);
   });
 
-  // A non-`async` function returning a promise defeats any pre-call test, so
-  // the result is checked after the fact rather than reported as present.
-  it("discards a thenable result, answering from the own-key arm instead", async () => {
-    let rejected: PromiseLike<never> | undefined;
-    // A promise is neither blank nor present here: the own-key arm answers, so
-    // this object reads as present for its one key, not for its pending query.
-    expect(isBlank({ isEmpty: () => Promise.resolve(true) })).toBe(false);
-    expect(isBlank({ isEmpty: () => (rejected = Promise.reject(new Error("boom"))) })).toBe(false);
-    // Swallowed: nobody is left to await it, so it must not go unhandled.
-    await expect(Promise.resolve(rejected).catch(() => "handled")).resolves.toBe("handled");
-  });
-
   // Ruby's `!!` is false only for nil/false, so a predicate returning a value
   // rather than a boolean still answers; a boolean READER answers unchanged.
   it("takes Ruby truthiness from a value-returning empty?", () => {

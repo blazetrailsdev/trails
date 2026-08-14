@@ -4,7 +4,7 @@
  * Mirrors: ActiveModel::Type::Helpers::TimeValue
  */
 import { Rational, Temporal } from "@blazetrails/date";
-import { getZone } from "@blazetrails/activesupport";
+import { zone } from "@blazetrails/activesupport";
 
 import { isUtc } from "./timezone.js";
 
@@ -117,7 +117,7 @@ export function userInputInTimeZone(
     }
   }
   try {
-    const timeZone = getZone();
+    const timeZone = zone();
     const time = Temporal.PlainDateTime.from(str.replace(" ", "T"));
     if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
     return time;

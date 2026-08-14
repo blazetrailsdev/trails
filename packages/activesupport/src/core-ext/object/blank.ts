@@ -32,10 +32,6 @@ function isPlainObject(value: object): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-function isThenable(v: unknown): v is PromiseLike<unknown> {
-  return typeof (v as { then?: unknown } | null | undefined)?.then === "function";
-}
-
 /**
  * The values `blank?` reaches Ruby's `Time` arm (blank.rb:182-184) through.
  * Ruby has one `Time` class; trails' Time analogue is Temporal, so the arm is
@@ -138,12 +134,9 @@ export class Time {
  * copies the target's prototype), where a `Promise<boolean>` return type is
  * erased by the time this runs.
  *
- * A NON-`async` function that returns a promise anyway defeats any pre-call
- * test, so the answer is also checked after the fact: a thenable result is
- * discarded (with its rejection swallowed, since nobody can await it) and the
- * fallthrough arm answers instead. That keeps a mis-declared querying `empty?` from
- * reporting a promise as present — the contract stays "a querying `empty?` is
- * spelled `async`", and this is what happens when it is not.
+ * The contract that a querying `empty?` is spelled `async` is enforced by the
+ * `blazetrails/async-querying-empty` lint rule, so every non-`async` one
+ * reaching the probe is synchronous.
  *
  * blank.rb:19 is `!!empty?`, and Ruby's `!!` is false only for `nil`/`false`,
  * so a predicate answering a value rather than a boolean still answers.
@@ -172,8 +165,7 @@ export function isBlank(value: unknown): boolean {
   if (typeof empty === "boolean") return empty;
   if (typeof empty === "function" && !isAsyncFunction(empty)) {
     const result: unknown = (empty as () => unknown).call(value);
-    if (isThenable(result)) void Promise.resolve(result).catch(() => undefined);
-    else return result != null && result !== false;
+    return result != null && result !== false;
   }
   if (typeof value === "object" && isPlainObject(value)) return Object.keys(value).length === 0;
   return false;

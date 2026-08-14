@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { withTimezoneConfig } from "./test-helper.js";
 import { ActiveRecord } from "./ar-config.js";
 import {
-  getZone,
+  zone,
   setZone,
   setZoneDefault,
   isZoneExplicit,
@@ -32,15 +32,15 @@ describe("withTimezoneConfig", () => {
     setZoneDefault(paris);
     resetZone(); // ensure _zone is unset (not explicit)
     expect(isZoneExplicit()).toBe(false);
-    expect(getZone()).toBe(paris); // reads zone_default
+    expect(zone()).toBe(paris); // reads zone_default
 
     await withTimezoneConfig({ zone: "UTC" }, () => {
-      expect(getZone()?.name).toBe("UTC");
+      expect(zone()?.name).toBe("UTC");
     });
 
     // After the block: zone must be unset (not explicit), still falls through to zone_default
     expect(isZoneExplicit()).toBe(false);
-    expect(getZone()).toBe(paris);
+    expect(zone()).toBe(paris);
   });
 
   it("restores zone to explicit value when zone was explicitly set before", async () => {
@@ -49,11 +49,11 @@ describe("withTimezoneConfig", () => {
     expect(isZoneExplicit()).toBe(true);
 
     await withTimezoneConfig({ zone: "UTC" }, () => {
-      expect(getZone()?.name).toBe("UTC");
+      expect(zone()?.name).toBe("UTC");
     });
 
     expect(isZoneExplicit()).toBe(true);
-    expect(getZone()).toBe(paris);
+    expect(zone()).toBe(paris);
   });
 
   it("restores defaultTimezone even if fn throws", async () => {

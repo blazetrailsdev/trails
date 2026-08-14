@@ -1,8 +1,9 @@
-import { getZoneDefault } from "@blazetrails/activesupport";
+import { zoneDefault } from "@blazetrails/activesupport";
 
 export function isUtc(): boolean {
-  const zoneDefault = getZoneDefault();
-  if (zoneDefault) return zoneDefault.name === "UTC";
+  // Ruby's local is `default` (timezone.rb:10), which TS reserves.
+  const defaultZone = zoneDefault();
+  if (defaultZone) return defaultZone.name === "UTC";
   return true;
 }
 

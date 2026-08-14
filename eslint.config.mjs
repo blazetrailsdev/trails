@@ -15,6 +15,7 @@ import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
+import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder, {
@@ -239,6 +240,7 @@ export default defineConfig(
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
           "no-getter-called-as-method": noGetterCalledAsMethod,
+          "async-querying-empty": asyncQueryingEmpty,
           "sqlite-driver-await": sqliteDriverAwait,
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -323,6 +325,18 @@ export default defineConfig(
     files: ["packages/*/src/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
+    },
+  },
+
+  // ── async-querying-empty ──
+  // `Object#blank?`'s probe (core_ext/object/blank.rb:19) invokes every
+  // non-`async` `empty?`, holding out the querying ones by their
+  // `AsyncFunction` tag. A non-`async` promise-returning `isEmpty` carries no
+  // such tag, so its query would be issued before anything could see it.
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/async-querying-empty": "error",
     },
   },
 

@@ -4,7 +4,7 @@ import {
   Temporal,
   type DateParts,
 } from "@blazetrails/date";
-import { getZone, isBlank } from "@blazetrails/activesupport";
+import { zone, isBlank } from "@blazetrails/activesupport";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
 import { applySecondsPrecision, fastStringToTime, newTime } from "./helpers/time-value.js";
@@ -59,8 +59,8 @@ export class TimeType extends ValueType<Temporal.Instant> {
    *
    * `super` is `Helpers::TimeValue#user_input_in_time_zone`, `value.in_time_zone`
    * (time_value.rb:44-46). The zone is the thread-local `Time.zone`, read here
-   * through ActiveSupport's `getZone()` the way `isUtc()` reads
-   * `getZoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
+   * through ActiveSupport's `zone()` the way `isUtc()` reads
+   * `zoneDefault()`; with no zone set at all Ruby answers a bare `to_time`
    * (`date_and_time/zones.rb:20-27`), which is the zoneless
    * `Temporal.PlainDateTime` this returns in that arm, as the helper does.
    * `in_time_zone` is the tail below: the components
@@ -97,7 +97,7 @@ export class TimeType extends ValueType<Temporal.Instant> {
 
     const cast = this.cast(value);
     if (cast === null) return null;
-    const timeZone = getZone();
+    const timeZone = zone();
     const time = cast.toZonedDateTimeISO(this.#zoneId()).toPlainDateTime();
     if (timeZone) return time.toZonedDateTime(timeZone.tzinfo);
     return time;

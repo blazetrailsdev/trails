@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { TimeWithZone, getZone } from "@blazetrails/activesupport";
+import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";
@@ -181,7 +181,7 @@ describe("DirtyTest", () => {
           this.attribute("catchphrase", "string");
         }
       };
-      const zone = getZone()!;
+      const zone = timeZone()!;
 
       // New record - no changes.
       const pirate = new Target() as Rec;
@@ -826,7 +826,7 @@ describe("DirtyTest", () => {
       const Target = class extends Base {
         static tableName = "topics";
       };
-      const zone = getZone()!;
+      const zone = timeZone()!;
 
       const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
 
@@ -852,7 +852,7 @@ describe("DirtyTest", () => {
 
       const timeInParis = new TimeWithZone(
         Temporal.Instant.from("2014-01-01T12:00:00Z"),
-        getZone()!,
+        timeZone()!,
       );
       const pirate = (await Target.create({ catchphrase: "rrrr", created_on: timeInParis })) as Rec;
 
