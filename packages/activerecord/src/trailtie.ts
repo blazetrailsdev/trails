@@ -229,16 +229,6 @@ export class Trailtie extends BaseRailtie {
       }
     });
 
-    this.initializer("active_record.set_executor_hooks", () => {
-      QueryCache.installExecutorHooks(Executor, () => {
-        const pools: ConnectionPool[] = [];
-        Base.connectionHandler.eachConnectionPool((pool) => pools.push(pool));
-        return pools;
-      });
-      AsynchronousQueriesTracker.installExecutorHooks();
-      ConnectionPool.installExecutorHooks(Executor);
-    });
-
     this.initializer("active_record.set_configs", () => {
       // Rails' `active_record.set_configs` initializer copies each
       // `config.active_record.x` entry into the matching `ActiveRecord.x=`
@@ -252,6 +242,16 @@ export class Trailtie extends BaseRailtie {
       ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
       ActiveRecord.generateSecureTokenOn = cfg.generateSecureTokenOn;
       ActiveRecord.queues = cfg.queues;
+    });
+
+    this.initializer("active_record.set_executor_hooks", () => {
+      QueryCache.installExecutorHooks(Executor, () => {
+        const pools: ConnectionPool[] = [];
+        Base.connectionHandler.eachConnectionPool((pool) => pools.push(pool));
+        return pools;
+      });
+      AsynchronousQueriesTracker.installExecutorHooks();
+      ConnectionPool.installExecutorHooks();
     });
 
     this.initializer("active_record_encryption.configuration", () => {

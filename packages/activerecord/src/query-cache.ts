@@ -11,6 +11,7 @@
 
 // Import under the qualified TS name so the public surface doesn't leak the
 // generic `Store` symbol into the generated `.d.ts`.
+import { Executor } from "@blazetrails/activesupport";
 import { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
 import type { Base } from "./base.js";
 
@@ -91,17 +92,16 @@ export class QueryCache {
    * Mirrors: ActiveRecord::QueryCache.install_executor_hooks
    */
   static installExecutorHooks(
-    executor?: {
+    executor: {
       registerHook(hook: {
         run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[];
         complete(pools: QueryCacheCompleteTarget[]): void;
       }): void;
-    },
+    } = Executor,
     targets:
       | (QueryCacheRunTarget & QueryCacheCompleteTarget)[]
       | (() => (QueryCacheRunTarget & QueryCacheCompleteTarget)[]) = [],
   ): void {
-    if (!executor) return;
     const resolve = typeof targets === "function" ? targets : () => targets;
 
     // Mirrors Rails' ExecutorHooks module with static run/complete. Rails'
