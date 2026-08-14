@@ -9,6 +9,7 @@
  * @internal trails-private (no Rails counterpart as a standalone file)
  */
 
+import { camelize, underscore } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
@@ -81,7 +82,7 @@ export interface DispatchableControllerClass {
  * `req.path_parameters`, so {@link controllerClass}'s `params[:action] ||=
  * "index"` default (`http/request.rb:88-91`) is the one that applies.
  *
- * `make_response!` is called on whatever {@link controllerClass} returns,
+ * `make_response!` is called on whatever {@link controller} returns,
  * unconditionally, exactly as `route_set.rb:49` does.
  *
  * @internal
@@ -94,9 +95,9 @@ export function controllerDispatcher(
     const req = new Request(env);
     try {
       const params = req.pathParameters;
-      const controller = controllerClass(controllers, req);
-      const res = controller.makeResponseBang(req);
-      return await dispatch(controller, params["action"] as string, req, res);
+      const klass = controller(controllers, req);
+      const res = klass.makeResponseBang(req);
+      return await dispatch(klass, params["action"] as string, req, res);
     } catch (error) {
       if (error instanceof RoutingError) {
         if (raiseOnNameError) throw error;
@@ -108,18 +109,24 @@ export function controllerDispatcher(
 }
 
 /**
- * Rails: `Request#controller_class` (`http/request.rb:88-91`) followed by
- * `Dispatcher#controller`'s `NameError` → `ActionController::RoutingError`
- * conversion (`route_set.rb:60-63`). Trails has no global constant table, so
- * `controller_class_for`'s `constantize` is a lookup in the table
- * {@link controllerDispatcher} was handed; the absent-name arm still returns
- * `PASS_NOT_FOUND` (`http/request.rb:107`).
+ * Rails: `Dispatcher#controller` (`route_set.rb:60-63`) — `req.controller_class`,
+ * with the `NameError` it can raise converted to
+ * `ActionController::RoutingError`. Trails resolves against the table
+ * {@link controllerDispatcher} was handed rather than the global constant
+ * namespace, so {@link controllerClassFor} raises the `RoutingError` directly
+ * where Ruby would surface a `NameError` first.
  *
- * `PASS_NOT_FOUND` has no `make_response!`, so `Dispatcher#serve` raises
- * `NoMethodError` the moment it gets one — the arm is unreachable from
- * `serve`, which is only entered for a route that already pinned
- * `:controller`. The cast keeps that shape rather than inventing a graceful
- * 404 arm the Rails source does not have.
+ * @internal
+ */
+function controller(
+  controllers: Map<string, DispatchableControllerClass>,
+  req: Request,
+): DispatchableControllerClass {
+  return controllerClass(controllers, req);
+}
+
+/**
+ * Rails: `Request#controller_class` (`http/request.rb:88-91`).
  *
  * @internal
  */
@@ -129,13 +136,34 @@ function controllerClass(
 ): DispatchableControllerClass {
   const params = req.pathParameters;
   if (params["action"] == null) params["action"] = "index";
-  const name = params["controller"];
+  return controllerClassFor(controllers, params["controller"] as string | undefined);
+}
+
+/**
+ * Rails: `Request#controller_class_for` (`http/request.rb:94-108`). Trails has
+ * no global constant table, so `"#{controller_param.camelize}Controller"` is
+ * looked up in the table {@link controllerDispatcher} was handed instead of
+ * being `constantize`d; a miss is Rails' `MissingController` `NameError`,
+ * which {@link controller} converts to `ActionController::RoutingError`.
+ *
+ * The absent-name arm returns `PASS_NOT_FOUND` (`http/request.rb:107`), which
+ * has no `make_response!` — so `Dispatcher#serve` raises `NoMethodError` the
+ * moment it gets one. The arm is unreachable from `serve`, which is only
+ * entered for a route that already pinned `:controller`; the cast keeps that
+ * shape rather than inventing a graceful 404 arm the Rails source lacks.
+ *
+ * @internal
+ */
+function controllerClassFor(
+  controllers: Map<string, DispatchableControllerClass>,
+  name: string | undefined | null,
+): DispatchableControllerClass {
   if (name == null) return PassNotFound as unknown as DispatchableControllerClass;
-  const controller = controllers.get(String(name));
-  if (!controller) {
-    throw new RoutingError(`uninitialized constant ${String(name)}`);
-  }
-  return controller;
+  const controllerParam = underscore(name);
+  const constName = `${camelize(controllerParam)}Controller`;
+  const klass = controllers.get(controllerParam);
+  if (!klass) throw new RoutingError(`uninitialized constant ${constName}`);
+  return klass;
 }
 
 /** Rails: `Dispatcher#dispatch` (`route_set.rb:65-67`). @internal */

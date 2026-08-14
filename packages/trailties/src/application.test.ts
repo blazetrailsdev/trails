@@ -350,6 +350,13 @@ describe("Trails.application integration (boot-app fixture)", () => {
     });
     expect(status).toBe(200);
     expect(JSON.parse(await bodyToString(body))).toEqual({ posts: [] });
+
+    const [nestedStatus, , nestedBody] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/admin/sessions",
+    });
+    expect(nestedStatus).toBe(200);
+    expect(JSON.parse(await bodyToString(nestedBody))).toEqual({ scope: "admin" });
   });
 
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {

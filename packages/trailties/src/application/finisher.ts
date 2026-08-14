@@ -167,26 +167,47 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
  * carries.
  */
 async function loadControllers(paths: Root): Promise<Map<string, DispatchableControllerClass>> {
-  const fs = await getFsAsync();
-  const p = await getPathAsync();
   const out = new Map<string, DispatchableControllerClass>();
   const node = paths.get("app/controllers");
-  if (!node || !fs.readdir || !p.pathToFileURL) return out;
+  if (!node) return out;
 
   for (const dir of await node.existentDirectories()) {
-    for (const entry of await fs.readdir(dir)) {
-      const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
-      if (!match) continue;
-      const mod = (await import(p.pathToFileURL(p.join(dir, entry)).href)) as Record<
-        string,
-        unknown
-      >;
-      for (const value of Object.values(mod)) {
-        if (typeof value === "function" && value.name.endsWith("Controller")) {
-          out.set(underscore(match[1].replace(/-/g, "_")), value as DispatchableControllerClass);
-        }
+    await collectControllers(dir, "", out);
+  }
+  return out;
+}
+
+/**
+ * Walks one autoload root, keying each controller class by the Rails
+ * controller path its file spells — `posts`, `admin/posts` — which is the
+ * value `path_parameters[:controller]` carries. Zeitwerk derives the same
+ * mapping from the directory tree, so nested directories recurse.
+ *
+ * @internal
+ */
+async function collectControllers(
+  dir: string,
+  prefix: string,
+  out: Map<string, DispatchableControllerClass>,
+): Promise<void> {
+  const fs = await getFsAsync();
+  const p = await getPathAsync();
+  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
+
+  for (const entry of await fs.readdir(dir)) {
+    const full = p.join(dir, entry);
+    if ((await fs.stat(full)).isDirectory()) {
+      await collectControllers(full, `${prefix}${underscore(entry.replace(/-/g, "_"))}/`, out);
+      continue;
+    }
+    const match = entry.match(/^(.+)[-_]controller\.(?:ts|js)$/);
+    if (!match) continue;
+    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
+    for (const value of Object.values(mod)) {
+      if (typeof value === "function" && value.name.endsWith("Controller")) {
+        const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
+        out.set(name, value as DispatchableControllerClass);
       }
     }
   }
-  return out;
 }

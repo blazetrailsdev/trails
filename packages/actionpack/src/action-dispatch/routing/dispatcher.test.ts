@@ -163,7 +163,7 @@ describe("controllerDispatcher", () => {
     const dispatcher = controllerDispatcher(controllers, true);
     await expect(
       dispatcher("nope", "index", {}, envFor({ controller: "nope", action: "index" })),
-    ).rejects.toThrow(/uninitialized constant nope/);
+    ).rejects.toThrow(/uninitialized constant NopeController/);
   });
 
   it("cascades with a 404 pass when raise_on_name_error is false", async () => {
