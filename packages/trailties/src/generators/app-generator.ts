@@ -1,8 +1,11 @@
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
+
+// Rails' `Rails::Generators::AppName::RESERVED_NAMES` (`app_name.rb:6`).
+const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
 // CLI-friendly DB aliases — `trails new -d sqlite|postgres|mysql` maps
 // onto the canonical Rails `DatabaseName`. MariaDB is exposed via the
@@ -54,16 +57,48 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /**
-   * Rails' `Rails::Generators::AppName#app_const_base`
-   * (`railties/lib/rails/generators/app_name.rb:18`):
-   * `app_name.gsub(/\W/, "_").squeeze("_").camelize`. Rails names the app
-   * constant `<%= app_const_base %>::Application`; TypeScript has no module
-   * nesting, so the generated class is `app_const_base` itself — which is
-   * what `Application#name` dasherizes back into the Rails app name.
-   */
-  private appConstBase(name: string): string {
-    return camelize(name.replace(/\W/g, "_").replace(/_+/g, "_"));
+  /** Rails' `AppName#original_app_name` (`app_name.rb:12`). Trails has no
+   * `--name` option, so the `options[:name]` arm has nothing to read. */
+  private originalAppName(): string {
+    return this.path.basename(this.destinationRoot);
+  }
+
+  /** Rails' `AppName#app_name` (`app_name.rb:9`):
+   * `original_app_name.parameterize(preserve_case: true).underscore`. */
+  private appName(): string {
+    return underscore(parameterize(this.originalAppName(), { preserveCase: true }));
+  }
+
+  /** Rails' `AppName#app_const_base` (`app_name.rb:18`):
+   * `app_name.gsub(/\W/, "_").squeeze("_").camelize`. */
+  private appConstBase(): string {
+    return camelize(this.appName().replace(/\W/g, "_").replace(/_+/g, "_"));
+  }
+
+  /** Rails' `AppName#app_const` (`app_name.rb:22`) is
+   * `"#{app_const_base}::Application"`. TypeScript has no module nesting, so
+   * the generated class is `app_const_base` itself — which is what
+   * `Application#name` dasherizes back into the Rails app name. */
+  private appConst(): string {
+    return this.appConstBase();
+  }
+
+  /** Rails' `AppName#valid_const?` (`app_name.rb:26`), called from
+   * `AppBase#create_root` (`app_base.rb:258`). The third Rails arm,
+   * `Object.const_defined?(app_const_base)`, has no counterpart: JavaScript
+   * has no global constant table to probe. */
+  private isValidConst(): void {
+    if (/^\d/.test(this.appConst())) {
+      throw new GeneratorError(
+        `Invalid application name ${this.originalAppName()}. Please give a name which does not start with numbers.`,
+      );
+    } else if (RESERVED_NAMES.includes(this.originalAppName())) {
+      throw new GeneratorError(
+        `Invalid application name ${this.originalAppName()}. Please give a ` +
+          `name which does not match one of the reserved trails ` +
+          `words: ${RESERVED_NAMES.join(", ")}`,
+      );
+    }
   }
 
   private pmInstall(): string {
@@ -79,6 +114,7 @@ export class AppGenerator extends AppBase {
   }
 
   async run(): Promise<string[]> {
+    this.isValidConst();
     const name = this.path.basename(this.appPath);
 
     this.output(`Creating new trails application: ${name}`);
@@ -348,7 +384,7 @@ execSync("trails server", { stdio: "inherit" });
       "src/config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
-export class ${this.appConstBase(name)} extends Application {
+export class ${this.appConstBase()} extends Application {
   // Configuration for the application, engines, and trailties goes here.
   //
   // These settings can be overridden in specific environments using the files
@@ -359,14 +395,15 @@ export class ${this.appConstBase(name)} extends Application {
   // config
 }
 
-Application.register(${this.appConstBase(name)});
+Application.register(${this.appConstBase()});
 `,
     );
 
     this.createFile(
       "src/config/environment.ts",
-      `// Load the trails application.
-import { Trails } from "@blazetrails/trailties";
+      `import { Trails } from "@blazetrails/trailties";
+
+// Load the trails application.
 import "./application.js";
 
 // Initialize the trails application.

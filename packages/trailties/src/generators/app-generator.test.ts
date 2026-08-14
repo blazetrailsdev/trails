@@ -293,6 +293,18 @@ describe("AppGenerator", () => {
     expect(configRu).toContain("export default Trails.application;");
   });
 
+  it("invalid application name raises an error", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "43-things",
+      database: "sqlite",
+    });
+    await expect(gen.run()).rejects.toThrow(
+      "Invalid application name 43-things. Please give a name which does not start with numbers.",
+    );
+  });
+
   it("invalid application name is fixed", async () => {
     const gen = new AppGenerator({
       cwd: tmpDir,
