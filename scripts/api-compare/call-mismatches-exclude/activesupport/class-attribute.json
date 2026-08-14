@@ -12,12 +12,5 @@
     "rubyName": "class_attribute",
     "call": "first",
     "reason": "Part of the same omission — `first` is only there to pick the `caller_locations(1, 1)` frame."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "class-attribute.ts",
-    "rubyName": "class_attribute",
-    "call": "redefine",
-    "reason": "trails' `classAttribute` writes the default straight into its own attribute store instead of routing through `ActiveSupport::ClassAttribute.redefine` (class/attribute.rb:97). A pre-existing divergence in this body, surfaced (not introduced) by bucketing `core_ext/class/attribute.rb` on class-attribute.ts; converging the whole body is 0098-activesupport-ar-closure-port/converge-class-attribute-to-rails-shape."
   }
 ]
