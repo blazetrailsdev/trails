@@ -1,164 +1,265 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Executor } from "./executor.js";
+import { ActiveSupport } from "./index.js";
+import { ErrorReporter } from "./error-reporter.js";
+
+class DummyError extends Error {}
+
+class ErrorSubscriber {
+  readonly events: unknown[][] = [];
+
+  report(
+    error: Error,
+    {
+      handled,
+      severity,
+      source,
+      context,
+    }: { handled: boolean; severity: string; source: string; context: object },
+  ): void {
+    this.events.push([error, handled, severity, source, context]);
+  }
+}
 
 describe("ExecutorTest", () => {
-  // Simple Executor implementation for testing
-  class Executor {
-    private hooks: Array<{ run: () => unknown; complete?: (state: unknown) => void }> = [];
+  let executor: typeof Executor;
 
-    register(hook: { run: () => unknown; complete?: (state: unknown) => void }) {
-      this.hooks.push(hook);
-    }
-
-    wrap<T>(fn: () => T): T {
-      const states = this.hooks.map((h) => h.run());
-      try {
-        return fn();
-      } finally {
-        this.hooks.forEach((h, i) => h.complete?.(states[i]));
-      }
-    }
-  }
+  beforeEach(() => {
+    executor = class extends Executor {};
+  });
 
   it("wrap report errors", () => {
-    const executor = new Executor();
-    const errors: Error[] = [];
-    executor.register({
-      run: () => null,
-      complete: () => {},
-    });
-    expect(() =>
-      executor.wrap(() => {
-        throw new Error("test error");
-      }),
-    ).toThrow("test error");
+    const previousReporter = ActiveSupport.errorReporter;
+    ActiveSupport.errorReporter = new ErrorReporter();
+    try {
+      const subscriber = new ErrorSubscriber();
+      executor.errorReporter().subscribe(subscriber);
+      let error = new DummyError("Oops");
+      expect(() =>
+        executor.wrap(() => {
+          throw error;
+        }),
+      ).toThrow(DummyError);
+      expect(subscriber.events[subscriber.events.length - 1]).toEqual([
+        error,
+        false,
+        "error",
+        "application.active_support",
+        {},
+      ]);
+
+      error = new DummyError("Oops");
+      expect(() =>
+        executor.wrap(
+          () => {
+            throw error;
+          },
+          { source: "custom" },
+        ),
+      ).toThrow(DummyError);
+      expect(subscriber.events[subscriber.events.length - 1]).toEqual([
+        error,
+        false,
+        "error",
+        "custom",
+        {},
+      ]);
+    } finally {
+      ActiveSupport.errorReporter = previousReporter;
+    }
   });
 
   it("wrap invokes callbacks", () => {
-    const executor = new Executor();
-    const log: string[] = [];
-    executor.register({
-      run: () => {
-        log.push("run");
-      },
-      complete: () => {
-        log.push("complete");
-      },
+    const called: string[] = [];
+    executor.toRun(() => called.push("run"));
+    executor.toComplete(() => called.push("complete"));
+
+    executor.wrap(() => {
+      called.push("body");
     });
-    executor.wrap(() => {});
-    expect(log).toEqual(["run", "complete"]);
+
+    expect(called).toEqual(["run", "body", "complete"]);
   });
 
   it("callbacks share state", () => {
-    const executor = new Executor();
-    let shared = 0;
-    executor.register({
-      run: () => {
-        shared = 1;
-        return shared;
-      },
-      complete: (state) => {
-        shared = (state as number) + 1;
-      },
-    });
+    let result = false;
+    executor.toRun((target: object) => ((target as { foo?: boolean }).foo = true));
+    executor.toComplete((target: object) => (result = (target as { foo?: boolean }).foo === true));
+
     executor.wrap(() => {});
-    expect(shared).toBe(2);
+
+    expect(result).toBe(true);
   });
 
   it("separated calls invoke callbacks", () => {
-    const executor = new Executor();
-    const calls: string[] = [];
-    executor.register({ run: () => calls.push("run"), complete: () => calls.push("complete") });
-    executor.wrap(() => {});
-    executor.wrap(() => {});
-    expect(calls).toEqual(["run", "complete", "run", "complete"]);
+    const called: string[] = [];
+    executor.toRun(() => called.push("run"));
+    executor.toComplete(() => called.push("complete"));
+
+    const state = executor.runBang();
+    called.push("body");
+    state.completeBang();
+
+    expect(called).toEqual(["run", "body", "complete"]);
   });
 
   it("exceptions unwind", () => {
-    const executor = new Executor();
-    const log: string[] = [];
-    executor.register({ run: () => log.push("start"), complete: () => log.push("end") });
-    expect(() =>
-      executor.wrap(() => {
-        throw new Error("boom");
-      }),
-    ).toThrow();
-    expect(log).toEqual(["start", "end"]);
+    const called: string[] = [];
+    executor.toRun(() => called.push("run_1"));
+    executor.toRun(() => {
+      throw new DummyError();
+    });
+    executor.toRun(() => called.push("run_2"));
+    executor.toComplete(() => called.push("complete"));
+
+    expect(() => executor.wrap(() => called.push("body"))).toThrow(DummyError);
+
+    expect(called).toEqual(["run_1", "complete"]);
   });
 
   it("avoids double wrapping", () => {
-    const executor = new Executor();
-    let count = 0;
-    executor.register({ run: () => count++, complete: () => {} });
-    executor.wrap(() => {});
-    expect(count).toBe(1);
+    const called: string[] = [];
+    executor.toRun(() => called.push("run"));
+    executor.toComplete(() => called.push("complete"));
+
+    executor.wrap(() => {
+      called.push("early");
+      executor.wrap(() => {
+        called.push("body");
+      });
+      called.push("late");
+    });
+
+    expect(called).toEqual(["run", "early", "body", "late", "complete"]);
   });
 
   it("hooks carry state", () => {
-    const executor = new Executor();
-    const states: unknown[] = [];
-    executor.register({
-      run: () => ({ value: 42 }),
-      complete: (state) => states.push(state),
-    });
+    let suppliedState: unknown = "none";
+
+    const hook = {
+      run: () => "some_state",
+      complete: (state: unknown) => {
+        suppliedState = state;
+      },
+    };
+
+    executor.registerHook(hook);
+
     executor.wrap(() => {});
-    expect(states[0]).toEqual({ value: 42 });
+
+    expect(suppliedState).toBe("some_state");
   });
 
   it("nil state is sufficient", () => {
-    const executor = new Executor();
-    executor.register({ run: () => null, complete: () => {} });
-    expect(() => executor.wrap(() => {})).not.toThrow();
+    let suppliedState: unknown = "none";
+
+    const hook = {
+      run: () => null,
+      complete: (state: unknown) => {
+        suppliedState = state;
+      },
+    };
+
+    executor.registerHook(hook);
+
+    executor.wrap(() => {});
+
+    expect(suppliedState).toBeNull();
   });
 
   it("exception skips uninvoked hook", () => {
-    const executor = new Executor();
-    let completed = false;
-    executor.register({
-      run: () => {
-        throw new Error("hook failed");
+    let suppliedState: unknown = "none";
+
+    const hook = {
+      run: () => "some_state",
+      complete: (state: unknown) => {
+        suppliedState = state;
       },
-      complete: () => {
-        completed = true;
-      },
+    };
+
+    executor.toRun(() => {
+      throw new DummyError();
     });
-    expect(() => executor.wrap(() => {})).toThrow();
-    expect(completed).toBe(false);
+    executor.registerHook(hook);
+
+    expect(() => executor.wrap(() => {})).toThrow(DummyError);
+
+    expect(suppliedState).toBe("none");
   });
 
   it("exception unwinds invoked hook", () => {
-    const executor = new Executor();
-    let completedA = false;
-    executor.register({
-      run: () => {},
-      complete: () => {
-        completedA = true;
+    let suppliedState: unknown = "none";
+
+    const hook = {
+      run: () => "some_state",
+      complete: (state: unknown) => {
+        suppliedState = state;
       },
+    };
+
+    executor.registerHook(hook);
+    executor.toRun(() => {
+      throw new DummyError();
     });
-    expect(() =>
-      executor.wrap(() => {
-        throw new Error("work failed");
-      }),
-    ).toThrow();
-    expect(completedA).toBe(true);
+
+    expect(() => executor.wrap(() => {})).toThrow(DummyError);
+
+    expect(suppliedState).toBe("some_state");
   });
 
   it("hook insertion order", () => {
-    const executor = new Executor();
-    const log: string[] = [];
-    executor.register({ run: () => log.push("A"), complete: () => {} });
-    executor.register({ run: () => log.push("B"), complete: () => {} });
+    const invoked: string[] = [];
+    const suppliedState: unknown[] = [];
+
+    class HookClass {
+      constructor(readonly letter: string) {}
+
+      run(): string {
+        invoked.push(`run_${this.letter}`);
+        return `state_${this.letter}`;
+      }
+
+      complete(state: unknown): void {
+        invoked.push(`complete_${this.letter}`);
+        suppliedState.push(state);
+      }
+    }
+
+    executor.registerHook(new HookClass("a"));
+    executor.registerHook(new HookClass("b"));
+    executor.registerHook(new HookClass("c"), { outer: true });
+    executor.registerHook(new HookClass("d"));
+
     executor.wrap(() => {});
-    expect(log).toEqual(["A", "B"]);
+
+    expect(invoked).toEqual([
+      "run_c",
+      "run_a",
+      "run_b",
+      "run_d",
+      "complete_a",
+      "complete_b",
+      "complete_d",
+      "complete_c",
+    ]);
+    expect(suppliedState).toEqual(["state_a", "state_b", "state_d", "state_c"]);
   });
 
   it("separate classes can wrap", () => {
-    const e1 = new Executor();
-    const e2 = new Executor();
-    const log: string[] = [];
-    e1.register({ run: () => log.push("e1"), complete: () => {} });
-    e2.register({ run: () => log.push("e2"), complete: () => {} });
-    e1.wrap(() => {});
-    e2.wrap(() => {});
-    expect(log).toEqual(["e1", "e2"]);
+    const otherExecutor = class extends Executor {};
+
+    const called: string[] = [];
+    executor.toRun(() => called.push("run"));
+    executor.toComplete(() => called.push("complete"));
+    otherExecutor.toRun(() => called.push("other_run"));
+    otherExecutor.toComplete(() => called.push("other_complete"));
+
+    executor.wrap(() => {
+      otherExecutor.wrap(() => {
+        called.push("body");
+      });
+    });
+
+    expect(called).toEqual(["run", "other_run", "body", "other_complete", "complete"]);
   });
 });

@@ -1,3 +1,4 @@
+import { Executor } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import { asynchronousQueriesTracker } from "./core.js";
 
@@ -22,6 +23,10 @@ export class AsynchronousQueriesTracker {
 
   constructor() {
     this.#stack = [];
+  }
+
+  static installExecutorHooks(executor: typeof Executor = Executor): void {
+    executor.registerHook(this);
   }
 
   static run(): AsynchronousQueriesTracker {

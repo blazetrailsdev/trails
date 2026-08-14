@@ -130,12 +130,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
   },
   {
-    pattern: "execution_wrapper.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
     pattern: "/file_update_checker.rb",
     testFile: "/file_update_checker_test.rb",
     package: "activesupport",
