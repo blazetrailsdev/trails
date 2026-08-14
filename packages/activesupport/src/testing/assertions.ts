@@ -23,7 +23,7 @@
  */
 import { indexWith } from "../enumerable-utils.js";
 
-import { cwd, env } from "../process-adapter.js";
+import { cwd, env, stdout } from "../process-adapter.js";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /**
@@ -36,6 +36,21 @@ import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
  */
 export class Assertion extends Error {
   override name = "Assertion";
+}
+
+/**
+ * Mirrors `Minitest::Skip` (minitest.rb:1050-1054) — the assertion raised when
+ * skipping a run, and the class {@link StatisticsReporter#report} counts the
+ * skips of a run by.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class Skip extends Assertion {
+  override name = "Skip";
+
+  get resultLabel(): string {
+    return "Skipped";
+  }
 }
 
 /**
@@ -69,6 +84,20 @@ export class UnexpectedError extends Assertion {
 
   get resultLabel(): string {
     return "Error";
+  }
+}
+
+/**
+ * Mirrors `Minitest::UnexpectedWarning` (minitest.rb:1098-1102) — the assertion
+ * raised on a warning under `-Werror`.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class UnexpectedWarning extends Assertion {
+  override name = "UnexpectedWarning";
+
+  get resultLabel(): string {
+    return "Warning";
   }
 }
 
@@ -152,6 +181,8 @@ export class BacktraceFilter {
 export const Minitest: {
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
+  reporter: CompositeReporter | null;
+  clockTime(): number;
 } = {
   backtraceFilter: new BacktraceFilter(),
 
@@ -159,6 +190,25 @@ export const Minitest: {
     let result = Minitest.backtraceFilter.filter(bt);
     if (result.length === 0 && bt) result = [...bt];
     return result;
+  },
+
+  /**
+   * Mirrors the `cattr_accessor :reporter` (minitest.rb:51), which
+   * `Minitest.run` sets to the run's `CompositeReporter` around
+   * `init_plugins` and nils out again (minitest.rb:277-282) — hence the
+   * nullable seat rather than an eagerly-built composite.
+   */
+  reporter: null,
+
+  /**
+   * Mirrors `Minitest.clock_time` (minitest.rb:1214-1222): the monotonic clock
+   * where one exists, `Time.now` otherwise. `performance.now()` is JS'
+   * monotonic clock and reads in milliseconds, so it is divided to the seconds
+   * both Ruby arms return.
+   */
+  clockTime(): number {
+    if (typeof performance !== "undefined") return performance.now() / 1000;
+    return Date.now() / 1000;
   },
 };
 
@@ -594,4 +644,371 @@ function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (value === null || value === undefined) return "nil";
   return String(value);
+}
+
+/**
+ * The subset of Ruby's `IO` a reporter talks to (minitest.rb:733-747 types the
+ * seat as `$stdout`): `print`, `puts`, `flush`, and the `sync` flag
+ * `SummaryReporter#start` flips (minitest.rb:911-912).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's `IO`, from core, not from a Rails file
+ * the comparator maps; declared here so the reporters below can name the
+ * receiver Ruby leaves duck-typed. See {@link Assertion}.
+ */
+export interface IO {
+  print(str: string): void;
+  puts(str?: string): void;
+  flush?(): void;
+  sync?: boolean;
+}
+
+/**
+ * Ruby's `StringIO`, which {@link SummaryReporter#toString} renders into
+ * (minitest.rb:948).
+ */
+class StringIO implements IO {
+  string = "";
+
+  print(str: string): void {
+    this.string += str;
+  }
+
+  puts(str = ""): void {
+    this.string += str.endsWith("\n") ? str : `${str}\n`;
+  }
+}
+
+/** Ruby's `$stdout`, the `io` every reporter defaults to (minitest.rb:743). */
+const $stdout: IO = {
+  print(str: string): void {
+    stdout.write(str);
+  },
+  puts(str = ""): void {
+    stdout.write(str.endsWith("\n") ? str : `${str}\n`);
+  },
+  flush(): void {},
+  sync: true,
+};
+
+/**
+ * The options hash minitest builds in `Minitest.process_args`
+ * (minitest.rb:143-236) and hands every reporter. Ruby's keys are Symbols; the
+ * `:show_skips` / `:Werror` spellings camelCase per docs/ruby-ts-conventions.md
+ * (`Werror` is already a single token).
+ *
+ * @noRailsEquivalent PERMANENT — a type for minitest's untyped options hash;
+ * see {@link Assertion}.
+ */
+export interface Options {
+  io?: IO;
+  args?: string;
+  verbose?: boolean;
+  quiet?: boolean;
+  showSkips?: boolean;
+  skip?: string[];
+  Werror?: boolean;
+  profile?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * The `Minitest::Reportable` surface (minitest.rb:579-628) a reporter receives:
+ * `Minitest::Test` and `Minitest::Result` both mix it in. trails runs its tests
+ * under vitest, which owns the run lifecycle, so the runnable half of the gem
+ * is not ported — this is the shape a reporter reads off whatever the runner
+ * records.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export interface Reportable {
+  name: string;
+  assertions: number;
+  time: number;
+  failure: Assertion | null;
+  passed(): boolean;
+  skipped(): boolean;
+  resultCode(): string;
+  toString(): string;
+}
+
+/**
+ * Mirrors `Minitest::AbstractReporter` (minitest.rb:687-731) — the API a
+ * reporter overrides. Ruby's `@mutex` guards a parallel run; JS has no threads,
+ * so {@link AbstractReporter#synchronize} just calls the block.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class AbstractReporter {
+  /** Starts reporting on the run. */
+  start(): void {}
+
+  /** About to start running a test. */
+  prerecord(_klass: { name: string }, _name: string): void {}
+
+  /** Output and record the result of the test. */
+  record(_result: Reportable): void {}
+
+  /** Outputs the summary of the run. */
+  report(): void {}
+
+  /** Did this run pass? */
+  passed(): boolean {
+    return true;
+  }
+
+  synchronize<T>(block: () => T): T {
+    return block();
+  }
+}
+
+/**
+ * Mirrors `Minitest::Reporter` (minitest.rb:733-751).
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class Reporter extends AbstractReporter {
+  /** The IO used to report. */
+  io: IO;
+
+  /** Command-line options for this run. */
+  options: Options;
+
+  constructor(io: IO = $stdout, options: Options = {}) {
+    super();
+    this.io = io;
+    this.options = options;
+  }
+}
+
+/**
+ * Mirrors `Minitest::ProgressReporter` (minitest.rb:759-771) — the reporter
+ * that prints the "dots" during the run, and the one
+ * `Minitest.plugin_rails_init` swaps for `Rails::TestUnitReporter`
+ * (rails_plugin.rb:129-131).
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class ProgressReporter extends Reporter {
+  override prerecord(klass: { name: string }, name: string): void {
+    if (this.options.verbose !== true) return;
+
+    this.io.print(`${klass.name}#${name} = `);
+    this.io.flush?.();
+  }
+
+  override record(result: Reportable): void {
+    if (this.options.verbose === true) this.io.print(`${result.time.toFixed(2)} s = `);
+    this.io.print(result.resultCode());
+    if (this.options.verbose === true) this.io.puts();
+  }
+}
+
+/**
+ * Mirrors `Minitest::StatisticsReporter` (minitest.rb:795-878) — gathers
+ * statistics about a test run, does no IO of its own.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class StatisticsReporter extends Reporter {
+  /** Total number of assertions. */
+  assertions = 0;
+
+  /** Total number of test cases. */
+  count = 0;
+
+  /** Test cases that failed or were skipped. */
+  results: Reportable[] = [];
+
+  /** Time the test run started. */
+  startTime: number | null = null;
+
+  /** Test run time. */
+  totalTime: number | null = null;
+
+  /** Total number of tests that failed. */
+  failures: number | null = null;
+
+  /** Total number of tests that erred. */
+  errors: number | null = null;
+
+  /** Total number of tests that warned. */
+  warnings: number | null = null;
+
+  /** Total number of tests that were skipped. */
+  skips: number | null = null;
+
+  override passed(): boolean {
+    return this.results.every((r) => r.skipped());
+  }
+
+  override start(): void {
+    this.startTime = Minitest.clockTime();
+  }
+
+  override record(result: Reportable): void {
+    this.count += 1;
+    this.assertions += result.assertions;
+
+    if (!result.passed() || result.skipped()) this.results.push(result);
+  }
+
+  /** Report on the tracked statistics. */
+  override report(): void {
+    const aggregate = new Map<unknown, Reportable[]>();
+    for (const r of this.results) {
+      const klass = r.failure?.constructor;
+      const bucket = aggregate.get(klass);
+      if (bucket) bucket.push(r);
+      else aggregate.set(klass, [r]);
+    }
+
+    this.totalTime = Minitest.clockTime() - (this.startTime as number);
+    this.failures = (aggregate.get(Assertion) ?? []).length;
+    this.errors = (aggregate.get(UnexpectedError) ?? []).length;
+    this.warnings = (aggregate.get(UnexpectedWarning) ?? []).length;
+    this.skips = (aggregate.get(Skip) ?? []).length;
+  }
+}
+
+/**
+ * Mirrors `Minitest::SummaryReporter` (minitest.rb:897-967) — prints the
+ * header, summary, and failure details at the end of the run, and the reporter
+ * `Minitest.plugin_rails_init` swaps for `SuppressedSummaryReporter`
+ * (rails_plugin.rb:126-128).
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class SummaryReporter extends StatisticsReporter {
+  sync: boolean | null = null;
+  oldSync: boolean | null = null;
+
+  override start(): void {
+    super.start();
+
+    this.io.puts(`Run options: ${String(this.options.args ?? "")}`);
+    this.io.puts();
+    this.io.puts("# Running:");
+    this.io.puts();
+
+    this.sync = "sync" in this.io;
+    if (this.sync) {
+      this.oldSync = this.io.sync ?? null;
+      this.io.sync = true;
+    }
+  }
+
+  override report(): void {
+    super.report();
+
+    this.io.sync = this.oldSync ?? undefined;
+
+    if (this.options.verbose !== true) this.io.puts();
+    this.io.puts();
+    this.io.puts(this.statistics());
+    this.aggregatedResults(this.io);
+    this.io.puts(this.summary());
+  }
+
+  statistics(): string {
+    const totalTime = this.totalTime as number;
+    return (
+      `Finished in ${totalTime.toFixed(6)}s, ` +
+      `${(this.count / totalTime).toFixed(4)} runs/s, ` +
+      `${(this.assertions / totalTime).toFixed(4)} assertions/s.`
+    );
+  }
+
+  aggregatedResults(io: IO): IO {
+    let filteredResults = [...this.results];
+    if (this.options.verbose !== true && this.options.showSkips !== true)
+      filteredResults = filteredResults.filter((r) => !r.skipped());
+
+    const skip = this.options.skip ?? [];
+
+    filteredResults.forEach((result, i) => {
+      if (skip.includes(result.resultCode())) return;
+
+      io.puts(`\n${String(i + 1).padStart(3, " ")}) ${String(result)}`);
+    });
+    io.puts();
+    return io;
+  }
+
+  override toString(): string {
+    return (this.aggregatedResults(new StringIO()) as StringIO).string;
+  }
+
+  summary(): string {
+    const extra: string[] = [];
+
+    if (this.options.Werror === true) extra.push(`, ${this.warnings} warnings`);
+
+    if (
+      this.options.verbose !== true &&
+      this.options.showSkips !== true &&
+      env.MT_NO_SKIP_MSG == null &&
+      this.results.some((r) => r.skipped())
+    )
+      extra.push("\n\nYou have skipped tests. Run with --verbose for details.");
+
+    return (
+      `${this.count} runs, ${this.assertions} assertions, ${this.failures} failures, ` +
+      `${this.errors} errors, ${this.skips} skips${extra.join("")}`
+    );
+  }
+}
+
+/**
+ * Mirrors `Minitest::CompositeReporter` (minitest.rb:969-1024) — dispatch to
+ * multiple reporters as one. This is the receiver
+ * `Minitest.plugin_rails_init` rejects from and appends to
+ * (rails_plugin.rb:122-135).
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
+ */
+export class CompositeReporter extends AbstractReporter {
+  /** The list of reporters to dispatch to. */
+  reporters: AbstractReporter[];
+
+  constructor(...reporters: AbstractReporter[]) {
+    super();
+    this.reporters = reporters;
+  }
+
+  get io(): IO {
+    return (this.reporters[0] as Reporter).io;
+  }
+
+  /**
+   * Mirrors `Minitest::CompositeReporter#<<` (minitest.rb:988-990). TypeScript
+   * has no `<<` to overload, so the operator keeps its Ruby name spelled out —
+   * `Array#<<` is `push` on both sides of the port.
+   */
+  push(reporter: AbstractReporter): void {
+    this.reporters.push(reporter);
+  }
+
+  override passed(): boolean {
+    return this.reporters.every((r) => r.passed());
+  }
+
+  override start(): void {
+    this.reporters.forEach((r) => r.start());
+  }
+
+  override prerecord(klass: { name: string }, name: string): void {
+    this.reporters.forEach((reporter) => {
+      reporter.prerecord(klass, name);
+    });
+  }
+
+  override record(result: Reportable): void {
+    this.reporters.forEach((reporter) => {
+      reporter.record(result);
+    });
+  }
+
+  override report(): void {
+    this.reporters.forEach((r) => r.report());
+  }
 }
