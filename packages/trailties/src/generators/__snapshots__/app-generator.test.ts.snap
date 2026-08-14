@@ -48,26 +48,30 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > channel.ts 1`] = 
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
-"import { app } from "./src/config/application.js";
+"// This file is used by Rack-based servers to start the application.
+import { Trails } from "@blazetrails/trailties";
 
-export default app;
+import "./src/config/environment.js";
+
+export default Trails.application;
 "
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
-"import { ActiveRecord } from "@blazetrails/activerecord";
-import { ActiveSupport } from "@blazetrails/activesupport";
-import databaseConfig from "./database.js";
-import { drawRoutes } from "./routes.js";
+"import { Application } from "@blazetrails/trailties";
 
-export const app = {
-  name: "my-app",
-  config: {
-    database: databaseConfig,
-    // config
-  },
-  routes: drawRoutes,
-};
+export class MyApp extends Application {
+  // Configuration for the application, engines, and trailties goes here.
+  //
+  // These settings can be overridden in specific environments using the files
+  // in src/config/environments, which are processed later.
+  //
+  // config.timeZone = "Central Time (US & Canada)";
+  // config.eagerLoadPaths.push("extras");
+  // config
+}
+
+Application.register(MyApp);
 "
 `;
 
@@ -103,12 +107,15 @@ export default {
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/routes.ts 1`] = `
-"// Define your application routes here.
-// Example:
-//   router.resources("posts");
-//   router.get("/", "home#index");
+"import type { Mapper } from "@blazetrails/actionpack";
 
-export function drawRoutes(router: any): void {
+export function drawRoutes(mapper: Mapper): void {
+  // Define your application routes here.
+  // Example:
+  //   mapper.get("/posts", { to: "posts#index" });
+
+  // Defines the root path route ("/")
+  // mapper.root("posts#index");
   // routes
 }
 "

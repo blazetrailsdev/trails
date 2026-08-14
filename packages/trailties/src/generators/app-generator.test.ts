@@ -270,10 +270,62 @@ describe("AppGenerator", () => {
     expect(readme).toContain("my-app");
 
     const appConfig = fs.readFileSync(appPath("src/config/application.ts"), "utf-8");
-    expect(appConfig).toContain("my-app");
+    expect(appConfig).toContain("MyApp");
 
     const layout = fs.readFileSync(appPath("src/app/views/layouts/application.html.tse"), "utf-8");
     expect(layout).toContain("my-app");
+  });
+
+  it("generates an application class that subclasses Application", async () => {
+    await makeGen().run();
+
+    const appConfig = fs.readFileSync(appPath("src/config/application.ts"), "utf-8");
+    expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
+    expect(appConfig).toContain("export class MyApp extends Application {");
+    expect(appConfig).toContain("Application.register(MyApp);");
+
+    const environment = fs.readFileSync(appPath("src/config/environment.ts"), "utf-8");
+    expect(environment).toContain(`import "./application.js";`);
+    expect(environment).toContain("await Trails.initialize()");
+
+    const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
+    expect(configRu).toContain(`import "./src/config/environment.js";`);
+    expect(configRu).toContain("export default Trails.application;");
+  });
+
+  it("invalid application name raises an error", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "43-things",
+      database: "sqlite",
+    });
+    await expect(gen.run()).rejects.toThrow(
+      "Invalid application name 43-things. Please give a name which does not start with numbers.",
+    );
+  });
+
+  it("invalid application name is fixed", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "things-43",
+      database: "sqlite",
+    });
+    await gen.run();
+    const read = (...segs: string[]) =>
+      fs.readFileSync(path.join(tmpDir, "things-43", ...segs), "utf-8");
+    expect(read("src/config/environment.ts")).toMatch(/Trails\.initialize\(\)/);
+    expect(read("src/config/application.ts")).toMatch(/^export class Things43 /m);
+  });
+
+  it("types drawRoutes against Mapper", async () => {
+    await makeGen().run();
+
+    const routes = fs.readFileSync(appPath("src/config/routes.ts"), "utf-8");
+    expect(routes).toContain(`import type { Mapper } from "@blazetrails/actionpack";`);
+    expect(routes).toContain("export function drawRoutes(mapper: Mapper): void {");
+    expect(routes).not.toContain(": any");
   });
 
   it("snapshots emitted TypeScript sources", async () => {
