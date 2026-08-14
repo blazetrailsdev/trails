@@ -47,6 +47,7 @@
     "parity:test": "bash scripts/test-compare/run.sh",
     "parity:test:assertions": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts",
     "parity:test:assertions:reseed": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --write",
+    "parity:test:closure": "pnpm tsx scripts/test-compare/closure-cli.ts",
     "parity:test:stubs": "pnpm parity:test -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
     "parity:fixtures": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
     "parity:fixtures:models": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts --models",

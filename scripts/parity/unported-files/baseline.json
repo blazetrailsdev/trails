@@ -46,7 +46,7 @@
     "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."
   },
   {
-    "pattern": "fixtures.rb",
+    "pattern": "/fixtures.rb",
     "testFile": "/fixtures_test.rb",
     "reason": "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB with named-row references and ERB preprocessing). The JS/TS ecosystem uses factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures."
   },
