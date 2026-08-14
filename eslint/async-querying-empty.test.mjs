@@ -19,8 +19,8 @@ tester.run("async-querying-empty", rule, {
     "class Wrapper { empty(): boolean { return false; } }",
     "function isEmpty(): boolean { return true; }",
     "const isEmpty = (): boolean => true;",
-    // An unannotated body is out of scope — there is no declared promise here.
-    "class Relation { isEmpty() { return Promise.resolve(true); } }",
+    // A nested function's own promise return belongs to it, not to `isEmpty`.
+    "class Buffer { isEmpty(): boolean { const load = () => Promise.resolve(1); return !load; } }",
     // Not one of the probe's names.
     "class Relation { isBlank(): Promise<boolean> { return Promise.resolve(true); } }",
     // A signature cannot carry `async`; the implementor is what this rule gates.
@@ -44,6 +44,23 @@ tester.run("async-querying-empty", rule, {
     {
       code: "const obj = { isEmpty(): Promise<boolean> | boolean { return load(); } };",
       errors: [{ messageId: "missingAsync", data: { name: "isEmpty" } }],
+    },
+    // Unannotated, but promise-shaped on its face — the shape the story names.
+    {
+      code: "class Relation { isEmpty() { return this.count().then((c) => c === 0); } }",
+      errors: [{ messageId: "missingAsync", data: { name: "isEmpty" } }],
+    },
+    {
+      code: "class Relation { isEmpty() { return Promise.resolve(true); } }",
+      errors: [{ messageId: "missingAsync", data: { name: "isEmpty" } }],
+    },
+    {
+      code: "const isEmpty = () => new Promise((resolve) => resolve(true));",
+      errors: [{ messageId: "missingAsync", data: { name: "isEmpty" } }],
+    },
+    {
+      code: "class W { empty() { if (this.loaded) return false; return this.load().then((r) => r.size === 0); } }",
+      errors: [{ messageId: "missingAsync", data: { name: "empty" } }],
     },
     {
       code: "function isEmpty(): Promise<boolean> { return load(); }",
