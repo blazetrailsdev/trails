@@ -58,6 +58,17 @@ export class Module {
     });
   }
 
+  /**
+   * Mirrors: Ruby's Module#instance_method — the named method, detached from
+   * this module. Ruby returns an `UnboundMethod`, which `define_method` binds
+   * into another module; the TS carrier of that is the property descriptor,
+   * which `Object.defineProperty` re-installs and which — unlike a bare
+   * function — also carries an accessor pair.
+   */
+  instanceMethod(name: string): PropertyDescriptor | undefined {
+    return Object.getOwnPropertyDescriptor(carrierOf(this), name);
+  }
+
   /** Mirrors: Ruby's Module#instance_methods. */
   instanceMethods(): string[] {
     return Object.getOwnPropertyNames(carrierOf(this));

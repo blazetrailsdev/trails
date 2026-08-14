@@ -578,6 +578,8 @@ export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
 export { include, extend, included, extended, Module } from "./include.js";
 export type { Included, Extended } from "./include.js";
+export { CodeGenerator, MethodSet } from "./code-generator.js";
+export type { MethodSource } from "./code-generator.js";
 export { methodMissingProxy } from "./method-missing-proxy.js";
 export { prepend } from "./prepend.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";

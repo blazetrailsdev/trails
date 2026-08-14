@@ -10,6 +10,13 @@
     "package": "activesupport",
     "tsFile": "class-attribute.ts",
     "rubyName": "class_attribute",
+    "call": "class_eval",
+    "reason": "Homonym, not an omission: `class_eval` at class/attribute.rb:133 is Ruby's Module#class_eval over a joined source string, which trails has no equivalent for (it defines real JS accessors); the ported name the gate matches on is ActiveSupport::CodeGenerator#class_eval, a different method this body never calls."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "class-attribute.ts",
+    "rubyName": "class_attribute",
     "call": "first",
     "reason": "Part of the same omission — `first` is only there to pick the `caller_locations(1, 1)` frame."
   }

@@ -7,7 +7,7 @@
  * In TS, the exported functions use `this: AttributeMethodHost` so they can
  * be assigned directly to Model's static side — no delegation wrappers needed.
  */
-import { camelize, include, Module } from "@blazetrails/activesupport";
+import { camelize, CodeGenerator, include, Module } from "@blazetrails/activesupport";
 
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
@@ -27,6 +27,16 @@ export interface AttributeMethodMatch {
   proxyTarget: string;
   attrName: string;
 }
+
+/**
+ * Rails threads `__FILE__, __LINE__` into every `CodeGenerator.batch` so the
+ * `module_eval` it performs reports a real source location. The port defines
+ * methods directly instead of evaluating source, so the pair is inert — it is
+ * still passed, under the Ruby names, because `batch`'s signature is Rails'
+ * (code_generator.rb:39).
+ */
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 export class MissingAttributeError extends globalThis.Error {
   constructor(message?: string) {
@@ -275,7 +285,7 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
   // Generate pattern-based alias methods. The default bare pattern emits the
   // direct alias accessor (bare name → original); affix patterns (e.g.
   // `clear_fullName` if a `clear_` prefix exists) emit their proxy methods.
-  eagerlyGenerateAliasAttributeMethods(this, newName, oldName);
+  eagerlyGenerateAliasAttributeMethods.call(this, newName, oldName);
   // Generate dirty predicates (nameChanged, nameWas, etc.) for the alias name.
   // Rails generates these via attribute_method_suffix/affix declarations; we do
   // it explicitly so titleChanged? delegates to attributeChanged("title") which
@@ -284,29 +294,39 @@ export function aliasAttribute(this: AttributeMethodHost, newName: string, oldNa
 }
 
 export function eagerlyGenerateAliasAttributeMethods(
-  host: AttributeMethodHost,
+  this: AttributeMethodHost,
   newName: string,
   oldName: string,
 ): void {
-  generateAliasAttributeMethods(host, newName, oldName);
+  CodeGenerator.batch(generatedAttributeMethods.call(this), __FILE__, __LINE__, (codeGenerator) => {
+    generateAliasAttributeMethods(this, codeGenerator, newName, oldName);
+  });
 }
 
 export function generateAliasAttributeMethods(
   host: AttributeMethodHost,
+  codeGenerator: CodeGenerator,
   newName: string,
   oldName: string,
 ): void {
-  for (const pattern of host._attributeMethodPatterns) {
-    aliasAttributeMethodDefinition(host, pattern, newName, oldName);
-  }
+  CodeGenerator.batch(codeGenerator, __FILE__, __LINE__, () => {
+    for (const pattern of host._attributeMethodPatterns) {
+      aliasAttributeMethodDefinition(codeGenerator, pattern, newName, oldName);
+    }
+    attributeMethodPatternsCache.call(host).clear();
+  });
 }
 
 export function aliasAttributeMethodDefinition(
-  host: AttributeMethodHost,
+  codeGenerator: CodeGenerator,
   pattern: AttributeMethodPattern,
   newName: string,
   oldName: string,
 ): void {
+  const methodName = pattern.methodName(newName);
+  const targetName = pattern.methodName(oldName);
+  const mangledName = buildMangledName(targetName);
+
   // Rails' default bare pattern emits the direct alias reader
   // (`new_name → attribute(old_name)`, attribute_methods.rb:226-236). trails
   // exposes it as a real accessor property (getter/setter) rather than a plain
@@ -326,19 +346,23 @@ export function aliasAttributeMethodDefinition(
       }
       return this.readAttribute(oldName);
     };
-    generatedAttributeMethods.call(host).moduleEval((mod) => {
-      Object.defineProperty(mod, newName, {
-        get: getter,
-        set(this: ReadWriteHost, value: unknown) {
-          this.writeAttribute(oldName, value);
-        },
-        configurable: true,
-      });
-    });
+    codeGenerator.defineCachedMethod(
+      mangledName,
+      { namespace: "alias_attribute", as: methodName },
+      (sources) => {
+        sources.push((mod) => {
+          Object.defineProperty(mod, mangledName, {
+            get: getter,
+            set(this: ReadWriteHost, value: unknown) {
+              this.writeAttribute(oldName, value);
+            },
+            configurable: true,
+          });
+        });
+      },
+    );
     return;
   }
-  const methodName = pattern.methodName(newName);
-  const targetName = pattern.methodName(oldName);
   const fn = function (this: ReadWriteHost, ...args: unknown[]) {
     const target = this[targetName];
     if (typeof target === "function") {
@@ -346,7 +370,19 @@ export function aliasAttributeMethodDefinition(
     }
     return this.readAttribute(oldName);
   };
-  generatedAttributeMethods.call(host).defineMethod(methodName, fn);
+  codeGenerator.defineCachedMethod(
+    mangledName,
+    { namespace: "alias_attribute", as: methodName },
+    (sources) => {
+      sources.push((mod) => {
+        Object.defineProperty(mod, mangledName, {
+          value: fn,
+          writable: true,
+          configurable: true,
+        });
+      });
+    },
+  );
 }
 
 export function isAttributeAlias(host: AttributeMethodHost, name: string): boolean {
@@ -358,16 +394,18 @@ export function attributeAlias(host: AttributeMethodHost, name: string): string 
 }
 
 export function defineAttributeMethods(this: AttributeMethodHost, ...attrNames: string[]): void {
-  for (const attrName of attrNames) {
-    defineAttributeMethod(this, attrName);
-    const aliases = aliasesByAttributeName(this);
-    const attrAliases = aliases.get(attrName);
-    if (attrAliases) {
-      for (const aliasedName of attrAliases) {
-        generateAliasAttributeMethods(this, aliasedName, attrName);
+  CodeGenerator.batch(generatedAttributeMethods.call(this), __FILE__, __LINE__, (owner) => {
+    for (const attrName of attrNames) {
+      defineAttributeMethod(this, attrName);
+      const aliases = aliasesByAttributeName(this);
+      const attrAliases = aliases.get(attrName);
+      if (attrAliases) {
+        for (const aliasedName of attrAliases) {
+          generateAliasAttributeMethods(this, owner, aliasedName, attrName);
+        }
       }
     }
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -527,7 +565,7 @@ export function defineProxyCall(
  * @internal Rails-private helper. Mirrors: ClassMethods#build_mangled_name
  * Returns a compilable temp name for attributes with non-identifier characters.
  */
-export function buildMangledName(this: AttributeMethodHost, name: string): string {
+export function buildMangledName(name: string): string {
   if (NAME_COMPILABLE_REGEXP.test(name)) return name;
   const hex = Array.from(name)
     .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
