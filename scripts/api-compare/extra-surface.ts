@@ -87,12 +87,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
-import {
-  OUTPUT_DIR,
-  apiComparePackageRoots,
-  isGuestPackage,
-  srcDirSharingPackages,
-} from "./config.js";
+import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
@@ -556,10 +551,6 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
   const pushMethod = (pkg: string, tsFile: string, m: MethodInfo): void =>
     push(pkg, tsFile, m.name, m.noRailsEquivalent);
   for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
-    // A guest package re-reads its host's files, so every tag it would
-    // contribute is the same declaration the host already registered. The
-    // scoring loop looks tags up under the host's key too.
-    if (isGuestPackage(pkg)) continue;
     for (const container of [tsPkg.classes, tsPkg.modules]) {
       for (const c of Object.values(container)) {
         if (!c.file || c.reExportedFrom) continue;
@@ -1317,21 +1308,6 @@ export function uncoveredTsFiles(
     .sort((a, b) => a.localeCompare(b));
 }
 
-/** Key for {@link buildPackageReport}'s cross-package allowed-name union. */
-function sharedAllowedKey(pkg: string, tsFile: string): string {
-  return `${[pkg, ...srcDirSharingPackages(pkg)].sort().join(",")}\u0000${tsFile}`;
-}
-
-/** The union of every mapped Ruby file's allowed names for one port. */
-function collectAllowedNamesForFiles(
-  rubyFiles: string[],
-  namesFor: (rubyFile: string) => Set<string>,
-): Set<string> {
-  const out = new Set<string>();
-  for (const rubyFile of rubyFiles) for (const name of namesFor(rubyFile)) out.add(name);
-  return out;
-}
-
 function buildPackageReport(
   pkg: string,
   ruby: ApiManifest,
@@ -1344,11 +1320,9 @@ function buildPackageReport(
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
   fileTagRejections: FileTagRejection[],
-  sharedAllowed: Map<string, Set<string>>,
 ): PackageTotals {
   const rubyPkg = ruby.packages[pkg];
   const tsPkg = ts.packages[pkg];
-  const sharesSrcDir = srcDirSharingPackages(pkg).length > 0;
   const result: PackageTotals = {
     package: pkg,
     filesWithDrift: 0,
@@ -1453,25 +1427,14 @@ function buildPackageReport(
     }
   }
 
-  // `RUBY_FILE_TS_OVERRIDES` can point two Ruby files at one port
-  // (minitest's `minitest.rb` and `assertions.rb` both land in
-  // `testing/assertions.ts`); score the file once, against the union.
-  const rubyFilesByTs = new Map<string, string[]>();
-  for (const rubyFile of rubyFileNames)
-    pushTo(rubyFilesByTs, rubyFileToTs(rubyFile, pkg), rubyFile);
   const scoreTargets: { tsFile: string; rubyFile: string | null }[] = [
-    ...[...rubyFilesByTs.keys()].map((tsFile) => ({
-      tsFile,
-      rubyFile: (rubyFilesByTs.get(tsFile) ?? [])[0] ?? null,
+    ...[...rubyFileNames].map((rubyFile) => ({
+      tsFile: rubyFileToTs(rubyFile, pkg),
+      rubyFile,
     })),
-    // A guest package's uncovered files are its HOST's — activesupport scores
-    // them under its own key, and scoring them here would double-count the
-    // host's whole tree (`config.ts` isGuestPackage).
-    ...(isGuestPackage(pkg)
-      ? []
-      : uncoveredTsFiles(coveredTsFiles, tsClassesByFile, tsModulesByFile, tsFileFunctions).map(
-          (tsFile) => ({ tsFile, rubyFile: null }),
-        )),
+    ...uncoveredTsFiles(coveredTsFiles, tsClassesByFile, tsModulesByFile, tsFileFunctions).map(
+      (tsFile) => ({ tsFile, rubyFile: null }),
+    ),
   ];
 
   for (const { tsFile: expectedTs, rubyFile } of scoreTargets) {
@@ -1489,31 +1452,16 @@ function buildPackageReport(
     const allowed =
       rubyFile === null
         ? new Set<string>()
-        : collectAllowedNamesForFiles(rubyFilesByTs.get(expectedTs) ?? [rubyFile], (f) =>
-            collectAllowedNames(
-              rubyFiles.get(f) ?? [],
-              pkg,
-              rubyPkg.modules,
-              moduleFqnByShort,
-              crossPackageModules,
-              crossPackagePkgByFqn,
-              Object.keys(rubyPkg.fileConstants?.[f] ?? {}),
-              f,
-            ),
+        : collectAllowedNames(
+            rubyFiles.get(rubyFile) ?? [],
+            pkg,
+            rubyPkg.modules,
+            moduleFqnByShort,
+            crossPackageModules,
+            crossPackagePkgByFqn,
+            Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
+            rubyFile,
           );
-
-    // A src dir extracted by two packages (a guest and its host) yields the
-    // same TS file to both, with each Ruby side owning part of its names —
-    // `testing/assertions.ts` carries `ActiveSupport::Testing::Assertions` and
-    // the `Minitest` surface it raises. Union the other side's allowed names in
-    // so neither package scores the other's members as extra.
-    if (sharesSrcDir) {
-      const key = sharedAllowedKey(pkg, expectedTs);
-      for (const name of sharedAllowed.get(key) ?? []) allowed.add(name);
-      let recorded = sharedAllowed.get(key);
-      if (recorded === undefined) sharedAllowed.set(key, (recorded = new Set()));
-      for (const name of allowed) recorded.add(name);
-    }
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized
     // from the FILENAME is a name nobody wrote (see `synthesizedFileModule`).
@@ -1528,10 +1476,8 @@ function buildPackageReport(
     let interfaceExemptCount = 0;
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
-      const allowKey = [pkg, ...srcDirSharingPackages(pkg)]
-        .map((p) => allowKeyOf({ package: p, tsFile: expectedTs, name }))
-        .find((key) => tagKeys.has(key));
-      if (allowKey !== undefined) {
+      const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
+      if (tagKeys.has(allowKey)) {
         matchedTagKeys.add(allowKey);
         allowlistedCount++;
         continue;
@@ -1820,27 +1766,6 @@ export function buildReport(
   const packages: PackageTotals[] = [];
   const fileTagRejections: FileTagRejection[] = [];
   const scannedPkgs = new Set<string>();
-  // Collect pass: packages sharing a src dir need each other's allowed names
-  // before either is scored, and `--package` must not change what the other
-  // side contributes. Its results are thrown away.
-  const sharedAllowed = new Map<string, Set<string>>();
-  for (const pkg of Object.keys(ruby.packages)) {
-    if (!ts.packages[pkg] || srcDirSharingPackages(pkg).length === 0) continue;
-    buildPackageReport(
-      pkg,
-      ruby,
-      ts,
-      opts.excludeGlobs,
-      globalRubyCandidates,
-      crossPackageModules,
-      crossPackagePkgByFqn,
-      opts.novelOnly,
-      tagKeys,
-      new Set<string>(),
-      [],
-      sharedAllowed,
-    );
-  }
   for (const pkg of Object.keys(ruby.packages)) {
     if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
@@ -1858,7 +1783,6 @@ export function buildReport(
         tagKeys,
         matchedTagKeys,
         fileTagRejections,
-        sharedAllowed,
       ),
     );
   }

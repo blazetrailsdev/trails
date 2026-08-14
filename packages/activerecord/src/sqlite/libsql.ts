@@ -9,9 +9,8 @@
  * driver object literals and the connection/statement handles behind them —
  * and no name it declares has a Rails method to converge onto. Its sibling
  * subclass `connection-adapters/libsql-adapter.ts` carries the same reason.
- * MOVED-BY-SHORT-NAME: changes, close, databaseExists, isOpen, open, prepare,
- * sync.
- * Those seven score `moved` only because the oracle matches on bare camelized
+ * MOVED-BY-SHORT-NAME: changes, close, databaseExists, isOpen, open, prepare.
+ * Those six score `moved` only because the oracle matches on bare camelized
  * Ruby short names, and the owners it now reports are unrelated: `close`
  * credits `Rack::BodyProxy#close`, `prepare` to `Store::HashAccessor#prepare`,
  * `isOpen` to `Transaction#open?` (abstract/transaction.rb), `open` to
@@ -20,9 +19,7 @@
  * adapter, at its Rails name, one layer above this driver — and `changes` to
  * `ActiveModel::AttributeMutationTracker#changes`, where this one is
  * `sqlite3_changes()` off the handle, the sqlite3 gem's
- * `SQLite3::Database#changes` — and `sync` to
- * `Minitest::SummaryReporter#sync` (minitest.rb), the reporter's IO flag, where
- * this one flushes the libsql client's replica.
+ * `SQLite3::Database#changes`.
  */
 import Database from "libsql";
 import { getFs } from "@blazetrails/activesupport/fs-adapter";

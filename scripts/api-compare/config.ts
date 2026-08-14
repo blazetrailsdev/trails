@@ -21,7 +21,6 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   abstractcontroller: "actionpack",
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
-  minitest: "activesupport",
 };
 
 /**
@@ -52,7 +51,7 @@ export const DIR_TO_PACKAGES: Record<string, string[]> = Object.entries(
  * packages' entity index — a Rails lib method must never satisfy its
  * inheritance/arity lookup against a test helper.
  */
-export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support", "minitest"]);
+export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support"]);
 
 /** Override package → src subdirectory when package shares a dir */
 export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
@@ -109,32 +108,6 @@ export function apiComparePackageRoots(): PackageRoots[] {
       configPath: path.join(ROOT_DIR, "packages", dir, "tsconfig.json"),
     };
   });
-}
-
-/**
- * A package rooted in ANOTHER package's src dir with no subdir of its own.
- *
- * `minitest` is the only one: the gem's ported slice is a single file inside
- * `packages/activesupport/src`, so it cannot claim a subdir (that would take
- * `src/testing/` away from activesupport's own extraction) and its TS
- * population is therefore the host's whole tree. Only the files its Ruby files
- * map onto are its own; the host already scores every other file, so the guest
- * must not score them a second time.
- */
-export function isGuestPackage(pkg: string): boolean {
-  if (PACKAGE_SRC_SUBDIR[pkg] !== undefined) return false;
-  if (PACKAGE_DIR_OVERRIDES[pkg] === undefined) return false;
-  return srcDirSharingPackages(pkg).length > 0;
-}
-
-/**
- * The other packages extracted from the very same src dir as `pkg` — a guest
- * and its host. They see the same TS files, and each one's Ruby side owns only
- * part of each shared file's names.
- */
-export function srcDirSharingPackages(pkg: string): string[] {
-  const own = packageSrcDir(pkg);
-  return PACKAGES.filter((other) => other !== pkg && packageSrcDir(other) === own);
 }
 
 export function packageSrcDir(pkg: string): string {
