@@ -14,6 +14,7 @@ import { Base } from "../../base.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
+import { Result } from "../../result.js";
 import { acquireStatementLock } from "../../connection-adapters/sqlite3/database-statements.js";
 
 let adapter: SQLite3Adapter;
@@ -41,6 +42,28 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("execute still returns rows for a row-returning statement", async () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
     await expect(adapter.execute(`SELECT "nick" FROM "pq"`)).resolves.toEqual([{ nick: "a" }]);
+  });
+
+  it("rawExecute returns an ActiveRecord::Result carrying the statement's columns", async () => {
+    // `ActiveRecord::Result.new(stmt.columns, stmt.to_a)`
+    // (sqlite3/database_statements.rb:93) sources the columns from the
+    // statement, so a SELECT matching no rows still reports them — which is
+    // what makes cast_result (`:117-121`) the identity.
+    const empty = (await adapter.rawExecute(`SELECT "id", "nick" FROM "pq"`, "SQL")) as Result;
+    expect(empty).toBeInstanceOf(Result);
+    expect(empty.columns).toEqual(["id", "nick"]);
+    expect(empty.rows).toEqual([]);
+
+    // A non-row-returning statement takes `stmt.step; ActiveRecord::Result.empty`.
+    const written = (await adapter.rawExecute(
+      `INSERT INTO "pq" ("nick") VALUES ('a')`,
+      "SQL",
+    )) as Result;
+    expect(written.columns).toEqual([]);
+    expect(written.rows).toEqual([]);
+
+    const loaded = (await adapter.rawExecute(`SELECT "nick" FROM "pq"`, "SQL")) as Result;
+    expect(loaded.toArray()).toEqual([{ nick: "a" }]);
   });
 
   it("affectedRows reports the rows changed by the last write", async () => {

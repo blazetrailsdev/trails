@@ -525,7 +525,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
                 prepare: this.preparedStatements,
                 notificationPayload: payload,
               })
-            ).rows;
+            ).toArray();
           } catch (e: any) {
             const translated = this._translateException(e, sql, binds);
             throw translated;
@@ -679,16 +679,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         false,
         async (payload) => {
           try {
-            // Use the values RETURNED by performQuery, not this._last* — those
-            // fields are shared and a concurrent write can overwrite them before
-            // this post-await continuation reads them (the Promise.all insert race).
-            const { affectedRows, insertRowid } = await this.performQuery(
-              this.driver,
-              sql,
-              binds,
-              driverBinds,
-              { prepare: this.preparedStatements, notificationPayload: payload },
-            );
+            // performQuery fills this in the same synchronous turn it writes
+            // `this._last*`; reading those shared fields back here instead
+            // would race, since a concurrent write's performQuery can overwrite
+            // them before this post-await continuation runs (the Promise.all
+            // insert race). See the `counters` note on performQuery.
+            const counters = { affectedRows: 0, insertRowid: 0 as number | bigint };
+            await this.performQuery(this.driver, sql, binds, driverBinds, {
+              prepare: this.preparedStatements,
+              notificationPayload: payload,
+              counters,
+            });
+            const { affectedRows, insertRowid } = counters;
             // perform_query reports the returned-row count (0 for a write); this
             // path has always reported affected rows, and subscribers rely on it.
             payload.row_count = affectedRows;

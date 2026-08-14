@@ -235,15 +235,13 @@ export function acquireStatementLock(host: {
  * promise-returning, multi-driver) rather than better-sqlite3's native sync
  * API, so it is reachable from the adapter.
  *
- * Two deviations, both forced by that driver abstraction and by the
- * `execute`/`executeMutation` split (justified once at the `executeMutation`
- * declaration in abstract-adapter.ts):
+ * Like Rails (`:85-107`) it returns an `ActiveRecord::Result` — built from the
+ * statement's own columns, so a row-returning statement reports its column set
+ * even when it matches no rows — which is why `castResult` below is the
+ * identity, as it is in Rails (`:113-121`).
  *
- * - Rails returns an `ActiveRecord::Result` (`:82-107`); this returns the rows
- *   plus the two counters, because `executeMutation` needs the affected-row
- *   count and insert rowid as RETURNED locals — reading them back off the
- *   shared fields after its own await re-opens the concurrent-write race.
- *   `castResult` is the identity here either way, as it is in Rails (`:113`).
+ * One deviation, forced by that driver abstraction:
+ *
  * - Rails' unprepared arm guards `stmt.bind_params` with
  *   `unless binds.nil? || binds.empty?` (`:96-98`); binds reach this driver as
  *   a call argument rather than a separate `bind_params` round-trip, so an
@@ -263,13 +261,19 @@ export async function performQuery(
     prepare?: boolean;
     notificationPayload?: Record<string, unknown>;
     batch?: boolean;
+    // Out-parameter, filled in the same synchronous turn as
+    // `this._last*` below. Rails reads `@last_affected_rows` back through
+    // `affected_rows(result)` on the strength of `with_raw_connection`'s
+    // `@lock`, which one Ruby thread holds across the whole call; a JS caller
+    // resumes a microtask later, by which time an interleaving write's
+    // `perform_query` may already have overwritten the shared fields. Callers
+    // that need the counters (only `executeMutation` — itself the deviation
+    // justified at the `AbstractAdapter` declaration) pass this and read it
+    // instead. It carries no Rails behaviour of its own.
+    counters?: { affectedRows: number; insertRowid: number | bigint };
   } = {},
-): Promise<{
-  rows: Record<string, unknown>[];
-  affectedRows: number;
-  insertRowid: number | bigint;
-}> {
-  const { prepare = false, notificationPayload, batch = false } = options;
+): Promise<Result> {
+  const { prepare = false, notificationPayload, batch = false, counters } = options;
   // The lock is taken BEFORE the statement is prepared: Rails' `@lock` is held
   // by `with_raw_connection` (abstract/database_statements.rb:552-559) around
   // the whole of `perform_query`, preparation included, and `disconnect!` takes
@@ -283,7 +287,7 @@ export async function performQuery(
   const acquired = acquireStatementLock(this);
   const release = typeof acquired === "function" ? acquired : await acquired;
   let stmt: SqliteStatement | null = null;
-  let rows: Record<string, unknown>[];
+  let result: Result;
   let affectedRows: number;
   let insertRowid: number | bigint;
   try {
@@ -298,12 +302,23 @@ export async function performQuery(
         : await this._freshStatement(sql);
     if (stmt === null) {
       await rawConnection.exec(sql);
-      rows = [];
+      result = Result.empty();
     } else if (stmt.reader) {
-      rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
+      // `ActiveRecord::Result.new(stmt.columns, stmt.to_a)` (`:93`, `:104`) —
+      // the columns come off the statement, not off the rows, so a SELECT that
+      // matches nothing still reports them.
+      const rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
+      result =
+        rows.length > 0
+          ? Result.fromRowHashes(rows)
+          : new Result(
+              stmt.columns().map((c) => c.name),
+              [],
+            );
     } else {
+      // `stmt.step; ActiveRecord::Result.empty` (`:90-92`, `:101-103`).
       await stmt.run(typeCastedBinds);
-      rows = [];
+      result = Result.empty();
     }
     affectedRows = await rawConnection.changes();
     insertRowid = await rawConnection.lastInsertRowId();
@@ -314,33 +329,26 @@ export async function performQuery(
     // arm is the pool's to close. `finalize` is the driver's `close`.
     if (!prepare && stmt !== null) await stmt.finalize?.();
   }
-  // Persist for the affected_rows() port / public accessor. The RETURNED
-  // locals — not these fields — are what executeMutation uses for its return
-  // value: reading `this._lastInsertRowid` back after the caller's await
-  // would race, since a concurrent write's performQuery can overwrite it
-  // between this assignment and that read.
+  // `@last_affected_rows = raw_connection.changes` (`:108`). The insert rowid
+  // has no Rails field; it backs `executeMutation`'s INSERT return value.
   this._lastAffectedRows = affectedRows;
   this._lastInsertRowid = insertRowid;
+  if (counters) {
+    counters.affectedRows = affectedRows;
+    counters.insertRowid = insertRowid;
+  }
   // Rails' perform_query: `verified!` after @last_affected_rows, success
   // path only — a successful round-trip proves the connection is live.
   this.verifiedBang();
-  if (notificationPayload) notificationPayload.row_count = rows.length;
-  return { rows, affectedRows, insertRowid };
+  if (notificationPayload) notificationPayload.row_count = result.length;
+  return result;
 }
 
 /** @internal */
-export function castResult(result: Result | { rows: Record<string, unknown>[] }): Result {
-  // Rails' `cast_result` is the identity because its `perform_query` already
-  // returns an ActiveRecord::Result (sqlite3/database_statements.rb:110-121).
-  // trails' `performQuery` returns the raw `{ rows, affectedRows, insertRowid }`
-  // bag instead — `executeMutation` reads the last two off the RETURN value to
-  // avoid racing `this._last*` — so the identity arm only holds for the
-  // Result-shaped inputs, and the bag is built into a Result here, where Rails'
-  // perform_query builds it. Converging performQuery onto Rails' return shape
-  // (which also restores the column set of a zero-row SELECT) is story
-  // sqlite3-perform-query-returns-result.
-  if (result instanceof Result) return result;
-  return Result.fromRowHashes(result.rows);
+export function castResult(result: Result): Result {
+  // Given that SQLite3 doesn't really a Result type, raw_execute already return
+  // an ActiveRecord::Result and we have nothing to cast here.
+  return result;
 }
 
 /** @internal */
