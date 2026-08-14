@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import {
+  cattrAccessor,
   cattrReader,
   cattrWriter,
   mattrAccessor,
@@ -17,10 +18,10 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("mattr default keyword arguments", () => {
     class MyModule {}
-    mattrAccessor(MyModule, "size", { default: 42 });
+    cattrAccessor(MyModule, "defAccessor", { default: "default_accessor_value" });
     cattrReader(MyModule, "defReader", { default: "default_reader_value" });
     cattrWriter(MyModule, "defWriter", { default: "default_writer_value" });
-    expect((MyModule as any).size).toBe(42);
+    expect((MyModule as any).defAccessor).toBe("default_accessor_value");
     expect((MyModule as any).defReader).toBe("default_reader_value");
     expect((MyModule as any).__mattr_defWriter__).toBe("default_writer_value");
   });
