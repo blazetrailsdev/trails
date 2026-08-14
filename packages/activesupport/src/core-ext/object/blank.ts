@@ -13,6 +13,9 @@
  * blank.rb:167-169) are one expression each, applied inline at the switch.
  */
 
+import { Temporal } from "@blazetrails/date";
+import { TimeWithZone } from "../../time-with-zone.js";
+
 const BLANK_RE = /^\s*$/;
 
 function isAsyncFunction(fn: object): boolean {
@@ -22,6 +25,25 @@ function isAsyncFunction(fn: object): boolean {
 function isThenable(v: unknown): v is PromiseLike<unknown> {
   return typeof (v as { then?: unknown } | null | undefined)?.then === "function";
 }
+
+/**
+ * The values `blank?` reaches Ruby's `Time` arm (blank.rb:182-184) through.
+ * Ruby has one `Time` class; trails' Time analogue is Temporal, so the arm is
+ * typed on the whole family plus `TimeWithZone` — the same widening
+ * `core-ext/object/json.ts` applies to `Time#as_json`. `Temporal.PlainDate` /
+ * `PlainDateTime` stand for Ruby's `Date` / `DateTime`, which blank.rb does not
+ * reopen; they are `false` in Ruby through `Object#blank?`, which the object
+ * arm below cannot reproduce because it is trails' `Hash` arm and reports a
+ * slot-only Temporal value as empty.
+ */
+type TimeValue =
+  | Date
+  | TimeWithZone
+  | Temporal.Instant
+  | Temporal.ZonedDateTime
+  | Temporal.PlainDate
+  | Temporal.PlainDateTime
+  | Temporal.PlainTime;
 
 export class NilClass {
   static isBlank(_value: null | undefined): true {
@@ -72,10 +94,10 @@ export class String {
 }
 
 export class Time {
-  static isBlank(_value: Date): false {
+  static isBlank(_value: TimeValue): false {
     return false;
   }
-  static isPresent(_value: Date): true {
+  static isPresent(_value: TimeValue): true {
     return true;
   }
 }
@@ -85,9 +107,9 @@ export class Time {
  * overrides, dispatched on the value class in blank.rb's own order: `NilClass`
  * (:56), `FalseClass` (:69), `TrueClass` (:82), `Array` (:96), `Hash` (:111),
  * `Symbol` (:120), `String` (:145-153), `Numeric` (:167-169), `Time`
- * (:182-184). `Array`, `Hash` and `Numeric` get no class of their own here:
- * their arms are `alias_method :blank?, :empty?` and a bare `false`, applied at
- * the switch.
+ * (:182-184, over the whole {@link TimeValue} family). `Array`, `Hash` and
+ * `Numeric` get no class of their own here: their arms are
+ * `alias_method :blank?, :empty?` and a bare `false`, applied at the switch.
  *
  * A Ruby Symbol is a JS string, so the `Symbol` arm is reached only by a
  * genuine JS `symbol`; the string spelling falls through to `String`.
@@ -125,8 +147,17 @@ export function isBlank(value: unknown): boolean {
   if (typeof value === "symbol") return Symbol.isBlank(value);
   if (typeof value === "string") return String.isBlank(value);
   if (typeof value === "number" || typeof value === "bigint") return false;
-  // boundary: the `Time` arm is typed on the JS `Date` this dispatches to.
-  if (value instanceof Date) return Time.isBlank(value);
+  // boundary: a JS `Date` is one of the `TimeValue`s this arm answers for.
+  if (
+    value instanceof Date ||
+    value instanceof TimeWithZone ||
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainTime
+  )
+    return Time.isBlank(value);
   if (value instanceof Set || value instanceof Map) return value.size === 0;
   const empty = (value as { isEmpty?: unknown }).isEmpty ?? (value as { empty?: unknown }).empty;
   if (typeof empty === "boolean") return empty;
