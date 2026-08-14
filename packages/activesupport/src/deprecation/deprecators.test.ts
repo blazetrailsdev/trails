@@ -86,8 +86,8 @@ describe("DeprecationTest", () => {
   });
 
   it("#disallowed_warnings= applies to each deprecator", () => {
-    deprecators.setDisallowedWarnings(["all"]);
-    deprecators.each((deprecator) => expect(deprecator.disallowedWarnings).toEqual(["all"]));
+    deprecators.setDisallowedWarnings(":all");
+    deprecators.each((deprecator) => expect(deprecator.disallowedWarnings).toEqual(":all"));
   });
 
   it("#silence silences each deprecator", () => {
