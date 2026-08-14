@@ -150,6 +150,12 @@ function arityOfCallable(callable: Function): number {
   return callable.length;
 }
 
+/**
+ * A single disallowed/allowed warning rule: Rails' `String`, `Symbol`, or
+ * `Regexp` (deprecation/disallowed.rb:6-8). A Symbol rule keeps its leading
+ * colon per the trails Symbol convention — `:foo` is `":foo"` — and matches on
+ * `rule.to_s`, i.e. the name without the colon.
+ */
 type AllowMatcher = string | RegExp;
 
 /**
@@ -225,14 +231,14 @@ export class Deprecation {
    * Rails: `disallowed_warnings` (deprecation/disallowed.rb:22), which is an
    * array of substrings/Regexps, or the scalar `:all`.
    */
-  disallowedWarnings: AllowMatcher[] | "all" = [];
+  disallowedWarnings: AllowMatcher[] | ":all" = [];
 
   // Rails: `@silence_counter = Concurrent::ThreadLocalVar.new(0)` (deprecation.rb:78).
   private _silenceCounter = 0;
   // Rails: `@explicitly_allowed_warnings = Concurrent::ThreadLocalVar.new(nil)`
   // (deprecation.rb:77); JS is single-threaded, so the bound value is a plain
   // field saved and restored around the block, as `ThreadLocalVar#bind` does.
-  private _explicitlyAllowedWarnings: AllowMatcher[] | "all" | null = null;
+  private _explicitlyAllowedWarnings: AllowMatcher[] | ":all" | null = null;
 
   /**
    * Returns the current behavior or if one isn't set, defaults to `:stderr`.
@@ -393,11 +399,13 @@ export class Deprecation {
   /** Mirrors: deprecation/disallowed.rb:25-36. */
   private isDeprecationDisallowed(message?: string): boolean {
     if (this.isExplicitlyAllowed(message)) return false;
-    if (this.disallowedWarnings === "all") return true;
+    if (this.disallowedWarnings === ":all") return true;
     return (
       message != null &&
       this.disallowedWarnings.some((rule) =>
-        rule instanceof RegExp ? rule.test(message) : message.includes(rule),
+        rule instanceof RegExp
+          ? rule.test(message)
+          : message.includes(rule.startsWith(":") ? rule.slice(1) : rule),
       )
     );
   }
@@ -406,11 +414,13 @@ export class Deprecation {
   private isExplicitlyAllowed(message?: string): boolean {
     const allowances = this._explicitlyAllowedWarnings;
     if (allowances == null) return false;
-    if (allowances === "all") return true;
+    if (allowances === ":all") return true;
     return (
       message != null &&
       wrap(allowances).some((rule) =>
-        rule instanceof RegExp ? rule.test(message) : message.includes(rule),
+        rule instanceof RegExp
+          ? rule.test(message)
+          : message.includes(rule.startsWith(":") ? rule.slice(1) : rule),
       )
     );
   }
@@ -442,7 +452,7 @@ export class Deprecation {
    * truthy/falsy value or something callable; falsy yields without allowing.
    */
   allow<T>(
-    allowedWarnings: AllowMatcher[] | "all" = "all",
+    allowedWarnings: AllowMatcher[] | ":all" = ":all",
     options: { if?: unknown } = {},
     block: () => T,
   ): T {

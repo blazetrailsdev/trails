@@ -202,12 +202,12 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings matches all warnings when set to :all", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
     expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
   });
 
   it("different behaviors for allowed and disallowed warnings", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
     dep.behavior = () => expect.unreachable("the allowed behavior must not run");
 
     expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
@@ -222,17 +222,17 @@ describe("DeprecationTest", () => {
   });
 
   it("allow", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     expect(() => dep.warn()).toThrow(DeprecationException);
 
-    dep.allow("all", {}, () => {
+    dep.allow(":all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
     });
   });
 
   it("allow only allows matching warnings using a substring", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     dep.allow(["foo bar", "baz qux"], {}, () => {
       expect(() => dep.warn("foo bar")).not.toThrow();
@@ -242,7 +242,7 @@ describe("DeprecationTest", () => {
   });
 
   it("allow only allows matching warnings using a regexp", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     dep.allow([/(foo|baz) (bar|qux)/], {}, () => {
       expect(() => dep.warn("foo bar")).not.toThrow();
@@ -252,9 +252,9 @@ describe("DeprecationTest", () => {
   });
 
   it("allow only affects its block", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
-    dep.allow("all", {}, () => {
+    dep.allow(":all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
     });
 
@@ -262,7 +262,7 @@ describe("DeprecationTest", () => {
   });
 
   it("allow with :if option", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     dep.allow(["fubar"], { if: true }, () => {
       expect(() => dep.warn("fubar")).not.toThrow();
@@ -274,7 +274,7 @@ describe("DeprecationTest", () => {
   });
 
   it("allow with :if option as a proc", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     dep.allow(["fubar"], { if: () => true }, () => {
       expect(() => dep.warn("fubar")).not.toThrow();
@@ -286,9 +286,9 @@ describe("DeprecationTest", () => {
   });
 
   it("allow with the default warning message", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
-    dep.allow("all", {}, () => {
+    dep.allow(":all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
     });
 
@@ -327,7 +327,7 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings with the default warning message", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
     expect(() => dep.warn()).toThrow(DeprecationException);
 
     dep.disallowedWarnings = ["fubar"];
@@ -447,18 +447,19 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings can match using a substring as a symbol", () => {
-    // In JS, symbols don't match strings, so use string equivalent
-    dep.disallowedWarnings = ["old"];
-    dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("old API")).toThrow(DeprecationException);
+    // A Ruby Symbol value is a colon-prefixed string in trails;
+    // `deprecation_disallowed?` compares with `rule.to_s`, i.e. without the colon.
+    dep.disallowedWarnings = [":fubar"];
+
+    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
   });
 
   it("allow only allows matching warnings using a substring as a symbol", () => {
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
     // A Ruby Symbol value is a colon-prefixed string in trails; `explicitly_allowed?`
     // compares with `rule.to_s`, i.e. without the colon.
-    dep.allow(["foo bar", "baz qux"], {}, () => {
+    dep.allow([":foo bar", ":baz qux"], {}, () => {
       expect(() => dep.warn("foo bar")).not.toThrow();
       expect(() => dep.warn("baz qux")).not.toThrow();
       expect(() => dep.warn("fubar")).toThrow(/fubar/);
@@ -469,9 +470,9 @@ describe("DeprecationTest", () => {
     // JS has one thread of execution, so the "other thread still disallowed"
     // half of the Rails case has no analogue; what remains is that the
     // allowance ends with its block.
-    dep.disallowedWarnings = "all";
+    dep.disallowedWarnings = ":all";
 
-    dep.allow("all", {}, () => {
+    dep.allow(":all", {}, () => {
       expect(() => dep.warn()).not.toThrow();
     });
 

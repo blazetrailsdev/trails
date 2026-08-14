@@ -58,7 +58,7 @@ export interface ActiveSupportConfig {
   reportDeprecations?: boolean;
   deprecation?: BehaviorSetting;
   disallowedDeprecation?: DisallowedBehaviorSetting;
-  disallowedDeprecationWarnings?: (string | RegExp | "all")[];
+  disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
 }
 
 /**
