@@ -105,7 +105,7 @@ export interface DatabaseStatementsHost {
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result>;
   /** @internal */
   internalExecute?(
@@ -402,7 +402,12 @@ export function cacheableQuery(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_all
  */
-export function selectAll(sql: string, _name?: string | null, _binds?: unknown[]): Promise<Result> {
+export function selectAll(
+  sql: string,
+  _name?: string | null,
+  _binds?: unknown[],
+  _opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
+): Promise<Result> {
   throw new Error("selectAll must be implemented by adapter subclass");
 }
 
@@ -416,9 +421,10 @@ export async function selectOne(
   sql: string,
   name: string | null = null,
   binds?: unknown[],
+  { async = false }: { async?: boolean } = {},
 ): Promise<Record<string, unknown> | undefined> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  const result = await doSelect(sql, name, binds);
+  const result = await doSelect(sql, name, binds, { async });
   return result.first();
 }
 
@@ -432,8 +438,11 @@ export function selectValue(
   sql: string,
   name: string | null = null,
   binds?: unknown[],
+  { async = false }: { async?: boolean } = {},
 ): Promise<unknown> {
-  return selectRows.call(this, sql, name, binds).then((rows) => singleValueFromRows(rows));
+  return selectRows
+    .call(this, sql, name, binds, { async })
+    .then((rows) => singleValueFromRows(rows));
 }
 
 /**
@@ -460,9 +469,10 @@ export async function selectRows(
   sql: string,
   name: string | null = null,
   binds?: unknown[],
+  { async = false }: { async?: boolean } = {},
 ): Promise<unknown[][]> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  const result = await doSelect(sql, name, binds);
+  const result = await doSelect(sql, name, binds, { async });
   return result.rows;
 }
 
@@ -1464,9 +1474,14 @@ interface DatabaseStatementsDefaultsHost {
     arel: unknown,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result>;
-  selectRows(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  selectRows(
+    arel: unknown,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { async?: boolean },
+  ): Promise<unknown[][]>;
   execQuery(
     sql: string,
     name?: string | null,
@@ -1542,7 +1557,7 @@ export const DatabaseStatements = {
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result> {
     // Rails: `arel = arel_from_relation(arel)` then `sql, binds, preparable,
     // allow_retry = to_sql_and_binds(...)` (database_statements.rb:69-71) — a
@@ -1568,6 +1583,11 @@ export const DatabaseStatements = {
     // is correct for every shape that carries binds.
     const preparable = compiledPreparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
+    // Rails passes `async: async && FutureResult::SelectAll` into `select`
+    // (database_statements.rb:74) so the caller gets a FutureResult to resolve
+    // later; a trails select already returns that Promise, which is what the
+    // forwarded `async` collapses to here (future_result.rb is permanently
+    // unported — scripts/parity/unported-files/unscoped.ts:21).
     try {
       // Rails' select_all runs `internal_exec_query` (the private work method),
       // NOT the public `exec_query` — the latter is wrapped by
@@ -1595,8 +1615,9 @@ export const DatabaseStatements = {
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
+    { async = false }: { async?: boolean } = {},
   ): Promise<Record<string, unknown> | undefined> {
-    return (await this.selectAll(arel, name, binds)).first();
+    return (await this.selectAll(arel, name, binds, { async })).first();
   },
 
   async selectValue(
@@ -1604,8 +1625,9 @@ export const DatabaseStatements = {
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
+    { async = false }: { async?: boolean } = {},
   ): Promise<unknown> {
-    const rows = await this.selectRows(arel, name, binds);
+    const rows = await this.selectRows(arel, name, binds, { async });
     return rows.length > 0 ? rows[0][0] : undefined;
   },
 
@@ -1624,8 +1646,9 @@ export const DatabaseStatements = {
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
+    { async = false }: { async?: boolean } = {},
   ): Promise<unknown[][]> {
-    return (await this.selectAll(arel, name, binds)).rows;
+    return (await this.selectAll(arel, name, binds, { async })).rows;
   },
 
   async execQuery(

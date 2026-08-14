@@ -571,16 +571,27 @@ export interface AbstractAdapter {
     arel: string | unknown,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result>;
   selectOne(
     arel: unknown,
     name?: string | null,
     binds?: unknown[],
+    opts?: { async?: boolean },
   ): Promise<Record<string, unknown> | undefined>;
-  selectValue(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown>;
+  selectValue(
+    arel: unknown,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { async?: boolean },
+  ): Promise<unknown>;
   selectValues(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
-  selectRows(arel: unknown, name?: string | null, binds?: unknown[]): Promise<unknown[][]>;
+  selectRows(
+    arel: unknown,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { async?: boolean },
+  ): Promise<unknown[][]>;
   queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
   queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
   execQuery(
