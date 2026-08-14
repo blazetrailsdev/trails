@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "gem-version.ts",
+    "rubyName": "gem_version",
+    "call": "new",
+    "reason": "`Gem::Version.new VERSION::STRING` (gem_version.rb:6) wraps the version in RubyGems' comparable Version object. `Gem` is the RubyGems stdlib, not Rails, and trails ports no `Gem::Version`, so `gemVersion` answers `VERSION.STRING` itself — the same value, unwrapped — exactly as every other package's `gemVersion` does."
+  }
+]

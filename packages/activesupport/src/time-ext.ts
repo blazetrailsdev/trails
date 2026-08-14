@@ -9,13 +9,14 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { DateTime, Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
-import { isBlank } from "./core-ext/object/blank.js";
+import { toTime as stringToTime } from "./core-ext/string/conversions.js";
+import { preserveTimezone as compatibilityPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -723,22 +724,60 @@ export function toDate(date: Date): Temporal.PlainDate {
 
 /**
  * toTime — Rails `Time#to_time`. Returns the instant the Date refers to.
+ *
+ * @missingRailsCall preserve_timezone — `Time#to_time` is `preserve_timezone ?
+ * self : getlocal` (`core_ext/time/compatibility.rb:13-15`) and `DateTime#to_time`
+ * the same switch over two `getlocal` forms (`date_time/compatibility.rb:15-17`).
+ * Both arms answer one value for this receiver: a JS `Date` is an absolute
+ * instant carrying no offset of its own, so there is no receiver offset to
+ * preserve and nothing for `getlocal` to convert. The switch is consulted where
+ * the receiver does carry one — `preserveTimezone` below, over a ruby/date
+ * `Time`, which `String#to_time` reads.
  */
 export function toTime(date: Date): Temporal.Instant {
   return instantFrom(date);
 }
 
 /**
- * toDatetime — Rails `String#to_datetime`. Converts a string to a DateTime
- * value.
+ * Either return `self` or the time in the local system timezone depending on
+ * the setting of `ActiveSupport.to_time_preserves_timezone`.
  *
- * Mirrors: String#to_datetime (`core_ext/string/conversions.rb:57-59`).
+ * Mirrors: `Time#preserve_timezone` (`core_ext/time/compatibility.rb:17-19`) —
+ * `system_local_time? || super`, where `super` is the module-level switch
+ * `DateAndTime::Compatibility` mixes in.
  */
-export function toDatetime(
-  str: string,
-): Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined {
-  if (!isBlank(str)) return DateTime.parse(str, false);
-  return undefined;
+export function preserveTimezone(time: RubyTime): boolean | string {
+  return isSystemLocalTime(time) || compatibilityPreserveTimezone();
+}
+
+/**
+ * Mirrors: `Time#system_local_time?` (`core_ext/time/compatibility.rb:22-27`).
+ * Ruby's `::Time.equal?(self.class)` guard is what keeps `DateTime` and
+ * `TimeWithZone` — which reach the method through the same include — out; the
+ * `RubyTime` parameter is that guard, since neither is one.
+ */
+export function isSystemLocalTime(time: RubyTime): boolean {
+  const zone = time.zone;
+  return typeof zone === "string" && (zone !== "UTC" || activeSupportLocalZone() === "UTC");
+}
+
+let _activeSupportLocalTz: string | null = null;
+let _activeSupportLocalZone: string | null = null;
+
+/**
+ * Mirrors: `Time#active_support_local_zone` (`core_ext/time/compatibility.rb:31-38`)
+ * — `Time.new.zone`, memoized and dropped again when the zone the process runs
+ * in changes. Ruby keys that memo on `ENV["TZ"]`; the environment is not
+ * readable here, and `Temporal.Now.timeZoneId()` is the zone `TZ` selects, so
+ * it is both the key and where the zone is read from.
+ */
+export function activeSupportLocalZone(): string | null {
+  if (_activeSupportLocalTz !== Temporal.Now.timeZoneId()) _activeSupportLocalZone = null;
+  if (_activeSupportLocalZone == null) {
+    _activeSupportLocalTz = Temporal.Now.timeZoneId();
+    _activeSupportLocalZone = RubyTime.now().zone;
+  }
+  return _activeSupportLocalZone;
 }
 
 /**
@@ -747,24 +786,15 @@ export function toDatetime(
  * set, otherwise converts the String to a Time.
  *
  * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`).
- *
- * zones.rb:13's `else` arm is `to_time`, and trails' `toTime` here is
- * `Time#to_time`, not the String arm: `String#to_time` (conversions.rb:22-38)
- * has no port, because `core_ext/string/conversions.rb` buckets onto this file
- * and `Time#to_time` already holds the name, so the String arm is masked in the
- * flat index rather than reported missing. Parsing the string through the host `Date` first lands on the same
- * instant for an ISO-8601 string but does not carry conversions.rb's
- * `parts.fetch` defaults or its `form` parameter. Converging is story
- * 0098-activesupport-ar-closure-port/port-string-to-time-and-to-date.
  */
 export function inTimeZone(
   str: string,
   zone: unknown = timeZone(),
-): TimeWithZone | Temporal.Instant {
+): TimeWithZone | Temporal.ZonedDateTime | undefined {
   if (zone != null && zone !== false) {
     return (findZoneBang(zone) as TimeZone).parse(str);
   } else {
-    return toTime(new globalThis.Date(str));
+    return stringToTime(str);
   }
 }
 

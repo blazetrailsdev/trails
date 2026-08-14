@@ -400,7 +400,9 @@ export { NullStore } from "./cache/null-store.js";
 // FileStore uses getFs()/getPath() adapters but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
-export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS, deprecator } from "./deprecation.js";
+export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS } from "./deprecation.js";
+export { deprecator } from "./deprecator.js";
+export { VERSION, gemVersion } from "./gem-version.js";
 export type {
   DeprecationBehavior,
   DeprecationBehaviorCallable,
@@ -648,7 +650,9 @@ export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // `beginning_of_day`/`middle_of_day`/`end_of_day`/`advance`/`change`/`current`
 // are methods on `Date`, so they never collide with the `Time` arm's
 // same-named methods; in a flat ESM namespace they would, and `time-ext.js`
-// below owns those spellings.
+// below owns those spellings, and for core-ext/string's conversions
+// (`@blazetrails/activesupport/core-ext/string/conversions`), the `String` arm
+// of `to_time`/`to_date`/`to_datetime`.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

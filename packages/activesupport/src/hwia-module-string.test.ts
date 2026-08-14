@@ -12,7 +12,8 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { Deprecation, DeprecationException, deprecator } from "./deprecation.js";
+import { Deprecation, DeprecationException } from "./deprecation.js";
+import { deprecator } from "./deprecator.js";
 import {
   delegate,
   mattrAccessor,
@@ -112,7 +113,7 @@ describe("DeprecationTest", () => {
   });
 
   it("deprecator singleton is a Deprecation instance", () => {
-    expect(deprecator).toBeInstanceOf(Deprecation);
+    expect(deprecator()).toBeInstanceOf(Deprecation);
   });
 
   it("warn with no message produces default message", () => {

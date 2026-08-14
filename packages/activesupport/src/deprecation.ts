@@ -481,5 +481,3 @@ export class Deprecation {
     };
   }
 }
-
-export const deprecator = new Deprecation();

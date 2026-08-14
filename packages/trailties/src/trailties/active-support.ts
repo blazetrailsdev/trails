@@ -74,7 +74,7 @@ export class Trailtie extends BaseRailtie {
     this.config["activeSupport"] ??= {};
 
     this.initializer("active_support.deprecator", () => {
-      BaseRailtie.deprecators["activeSupport"] = deprecator;
+      BaseRailtie.deprecators["activeSupport"] = deprecator();
     });
 
     // ORDERING CAVEAT: in Rails, every `<framework>.deprecator` initializer

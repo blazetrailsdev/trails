@@ -2,6 +2,13 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
+    "rubyName": "active_support_local_zone",
+    "call": "new",
+    "reason": "`Time.new.zone` (compatibility.rb:36) reads the zone off a Time built for the current moment — MRI's `Time.new` with no arguments IS `Time.now`. trails' `Time` constructor requires the calendar fields, so the no-argument form is spelled `Time.now()`, the same value."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
     "rubyName": "current",
     "call": "to_datetime",
     "reason": "Homonym across two Ruby receivers: `Time.current` (time/calculations.rb:39-41) has no `to_datetime`, `DateTime.current` (date_time/calculations.rb:10-12) is that same expression plus `.to_datetime`, and trails has one `current()` here serving both — one function cannot return both a Time and a DateTime. Converging it means giving DateTime its own receiver file; tracked by 0098-activesupport-ar-closure-port/split-date-time-current-onto-its-own-receiver."
@@ -37,13 +44,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "to_date",
-    "call": "parse",
-    "reason": "`::Date.parse(self, false)` in `String#to_date`; trails' `toDate` takes an already-parsed `Date` and reads its calendar fields."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "to_fs",
     "call": "strftime",
     "reason": "`strftime` is Ruby's C-level time formatter. JS has no strftime; each named DATE_FORMATS entry is expanded with `Intl`/`toISOString` in `toFs`."
@@ -68,13 +68,6 @@
     "rubyName": "to_time",
     "call": "month",
     "reason": "`month` here is Date#month, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.month` — Integer#month — newly joined the ported-name population.)"
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "new",
-    "reason": "`::Time.new(...)` builds the Time from the parsed parts; trails routes string parsing through `@blazetrails/date` and returns the instant it produces."
   },
   {
     "package": "activesupport",

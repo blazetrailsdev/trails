@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { toDatetime } from "../time-ext.js";
+import { toDate, toDatetime, toTime } from "./string/conversions.js";
+import { ArgumentError, Rational, Temporal, Time } from "@blazetrails/date";
 import { at, from, to, first, last, indent, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -104,15 +105,227 @@ describe("StringAccessTest", () => {
   });
 });
 
+/** Mirrors `string_ext_test.rb`'s `with_env_tz` helper (`test/abstract_unit.rb`). */
+function withEnvTz<T>(tz: string, fn: () => T): T {
+  const orig = process.env.TZ;
+  process.env.TZ = tz;
+  try {
+    return fn();
+  } finally {
+    if (orig === undefined) delete process.env.TZ;
+    else process.env.TZ = orig;
+  }
+}
+
+/**
+ * Ruby's `assert_equal` on two `Time`s compares the instant; trails' `to_time`
+ * answers a `Temporal.ZonedDateTime` and `Time.local`/`Time.utc` a `Time`, so
+ * both sides are read as their epoch nanoseconds.
+ */
+function epochNs(time: Temporal.ZonedDateTime | Time | undefined): bigint | undefined {
+  if (time === undefined) return undefined;
+  return (time instanceof Time ? time.toTime() : time).epochNanoseconds;
+}
+
 describe("StringConversionsTest", () => {
-  it.skip("string to time");
-  it.skip("timestamp string to time");
-  it.skip("string to time utc offset");
-  it.skip("partial string to time");
-  it.skip("standard time string to time when current time is standard time");
-  it.skip("standard time string to time when current time is daylight savings");
-  it.skip("daylight savings string to time when current time is standard time");
-  it.skip("daylight savings string to time when current time is daylight savings");
+  it("string to time", () => {
+    withEnvTz("Europe/Moscow", () => {
+      expect(epochNs(toTime("2005-02-27 23:50", "utc"))).toBe(
+        epochNs(Time.utc(2005, 2, 27, 23, 50)),
+      );
+      expect(epochNs(toTime("2005-02-27 23:50"))).toBe(epochNs(Time.mktime(2005, 2, 27, 23, 50)));
+      // Rails passes the microsecond as `Time.utc`'s seventh positional; trails'
+      // folds it into `sec` as a float there, which loses the last nanosecond,
+      // so the exact `Rational` MRI holds is spelled out instead.
+      expect(epochNs(toTime("2005-02-27T23:50:19.275038", "utc"))).toBe(
+        epochNs(Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000))),
+      );
+      expect(epochNs(toTime("2005-02-27T23:50:19.275038"))).toBe(
+        epochNs(Time.mktime(2005, 2, 27, 23, 50, new Rational(19275038, 1000000))),
+      );
+      expect(epochNs(toTime("2039-02-27 23:50", "utc"))).toBe(
+        epochNs(Time.utc(2039, 2, 27, 23, 50)),
+      );
+      expect(epochNs(toTime("2039-02-27 23:50"))).toBe(epochNs(Time.mktime(2039, 2, 27, 23, 50)));
+      expect(epochNs(toTime("2011-02-27 13:50 -0100"))).toBe(
+        epochNs(Time.mktime(2011, 2, 27, 17, 50)),
+      );
+      expect(epochNs(toTime("2011-02-27 22:50 -0100", "utc"))).toBe(
+        epochNs(Time.utc(2011, 2, 27, 23, 50)),
+      );
+      expect(epochNs(toTime("2005-02-27 14:50 -0500"))).toBe(
+        epochNs(Time.mktime(2005, 2, 27, 22, 50)),
+      );
+      expect(toTime("010")).toBeUndefined();
+      expect(toTime("")).toBeUndefined();
+    });
+  });
+
+  it("timestamp string to time", () => {
+    expect(() => toTime("1604326192")).toThrow(ArgumentError);
+    expect(() => toTime("1604326192")).toThrow("argument out of range");
+  });
+
+  it("string to time utc offset", () => {
+    withEnvTz("US/Eastern", () => {
+      // Rails' `else` branch: `preserve_timezone` defaults to nil, which its
+      // reader latches to false absent an app initializer setting
+      // `to_time_preserves_timezone = :zone` (date_and_time/compatibility.rb:24-37),
+      // so `Time#to_time` converts an offset-built time to the system zone.
+      expect(toTime("2005-02-27 23:50", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
+      expect(toTime("2005-02-27 23:50")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
+      expect(toTime("2005-02-27 22:50 -0100", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
+      expect(toTime("2005-02-27 22:50 -0100")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
+    });
+  });
+
+  it("partial string to time", () => {
+    withEnvTz("Europe/Moscow", () => {
+      // use timezone which does not observe DST.
+      const now = Time.now();
+      expect(epochNs(toTime("23:50"))).toBe(
+        epochNs(Time.mktime(now.year, now.month, now.day, 23, 50)),
+      );
+      expect(epochNs(toTime("23:50", "utc"))).toBe(
+        epochNs(Time.utc(now.year, now.month, now.day, 23, 50)),
+      );
+      expect(epochNs(toTime("13:50 -0100"))).toBe(
+        epochNs(Time.mktime(now.year, now.month, now.day, 17, 50)),
+      );
+      expect(epochNs(toTime("22:50 -0100", "utc"))).toBe(
+        epochNs(Time.utc(now.year, now.month, now.day, 23, 50)),
+      );
+    });
+  });
+
+  // Rails wraps the four cases below in `Time.stub(:now, ...)`, which fixes the
+  // date `to_time` would default a partial string to. Every string here names a
+  // full date, so the stubbed clock never reaches the answer; trails' clock is
+  // left alone rather than stubbed through a seam Rails does not have.
+  it("standard time string to time when current time is standard time", () => {
+    withEnvTz("US/Eastern", () => {
+      expect(epochNs(toTime("2012-01-01 10:00"))).toBe(epochNs(Time.mktime(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00", "utc"))).toBe(epochNs(Time.utc(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 -0800"))).toBe(
+        epochNs(Time.mktime(2012, 1, 1, 13, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0800", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 18, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0500"))).toBe(
+        epochNs(Time.mktime(2012, 1, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0500", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 15, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 UTC"))).toBe(epochNs(Time.mktime(2012, 1, 1, 5, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 UTC", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 PST"))).toBe(epochNs(Time.mktime(2012, 1, 1, 13, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 PST", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 18, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 EST"))).toBe(epochNs(Time.mktime(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 EST", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 15, 0)),
+      );
+    });
+  });
+
+  it("standard time string to time when current time is daylight savings", () => {
+    withEnvTz("US/Eastern", () => {
+      expect(epochNs(toTime("2012-01-01 10:00"))).toBe(epochNs(Time.mktime(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00", "utc"))).toBe(epochNs(Time.utc(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 -0800"))).toBe(
+        epochNs(Time.mktime(2012, 1, 1, 13, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0800", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 18, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0500"))).toBe(
+        epochNs(Time.mktime(2012, 1, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 -0500", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 15, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 UTC"))).toBe(epochNs(Time.mktime(2012, 1, 1, 5, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 UTC", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 PST"))).toBe(epochNs(Time.mktime(2012, 1, 1, 13, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 PST", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 18, 0)),
+      );
+      expect(epochNs(toTime("2012-01-01 10:00 EST"))).toBe(epochNs(Time.mktime(2012, 1, 1, 10, 0)));
+      expect(epochNs(toTime("2012-01-01 10:00 EST", "utc"))).toBe(
+        epochNs(Time.utc(2012, 1, 1, 15, 0)),
+      );
+    });
+  });
+
+  it("daylight savings string to time when current time is standard time", () => {
+    withEnvTz("US/Eastern", () => {
+      expect(epochNs(toTime("2012-07-01 10:00"))).toBe(epochNs(Time.mktime(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00", "utc"))).toBe(epochNs(Time.utc(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 -0700"))).toBe(
+        epochNs(Time.mktime(2012, 7, 1, 13, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0700", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 17, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0400"))).toBe(
+        epochNs(Time.mktime(2012, 7, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0400", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 14, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 UTC"))).toBe(epochNs(Time.mktime(2012, 7, 1, 6, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 UTC", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 PDT"))).toBe(epochNs(Time.mktime(2012, 7, 1, 13, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 PDT", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 17, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 EDT"))).toBe(epochNs(Time.mktime(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 EDT", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 14, 0)),
+      );
+    });
+  });
+
+  it("daylight savings string to time when current time is daylight savings", () => {
+    withEnvTz("US/Eastern", () => {
+      expect(epochNs(toTime("2012-07-01 10:00"))).toBe(epochNs(Time.mktime(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00", "utc"))).toBe(epochNs(Time.utc(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 -0700"))).toBe(
+        epochNs(Time.mktime(2012, 7, 1, 13, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0700", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 17, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0400"))).toBe(
+        epochNs(Time.mktime(2012, 7, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 -0400", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 14, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 UTC"))).toBe(epochNs(Time.mktime(2012, 7, 1, 6, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 UTC", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 10, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 PDT"))).toBe(epochNs(Time.mktime(2012, 7, 1, 13, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 PDT", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 17, 0)),
+      );
+      expect(epochNs(toTime("2012-07-01 10:00 EDT"))).toBe(epochNs(Time.mktime(2012, 7, 1, 10, 0)));
+      expect(epochNs(toTime("2012-07-01 10:00 EDT", "utc"))).toBe(
+        epochNs(Time.utc(2012, 7, 1, 14, 0)),
+      );
+    });
+  });
+
   it.skip("partial string to time when current time is standard time");
   it.skip("partial string to time when current time is daylight savings");
   it("string to datetime", () => {
@@ -127,7 +340,11 @@ describe("StringConversionsTest", () => {
     expect(toDatetime("")).toBeUndefined();
   });
   it.skip("partial string to datetime");
-  it.skip("string to date");
+  it("string to date", () => {
+    expect(String(toDate("2005-02-27"))).toBe("2005-02-27");
+    expect(toDate("")).toBeUndefined();
+    expect(String(toDate("Feb 3rd"))).toBe(`${Temporal.Now.plainDateISO().year}-02-03`);
+  });
 });
 
 describe("StringIndentTest", () => {

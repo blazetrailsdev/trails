@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ActiveSupport } from "./index.js";
-import {
-  Deprecation,
-  DeprecationException,
-  deprecator,
-  type CallerLocation,
-} from "./deprecation.js";
+import { Deprecation, DeprecationException, type CallerLocation } from "./deprecation.js";
+import { deprecator } from "./deprecator.js";
 import { ErrorReporter } from "./error-reporter.js";
 import { ErrorSubscriber } from "./error-reporter/test-helper.js";
 import { Logger } from "./logger.js";
@@ -149,7 +145,7 @@ describe("DeprecationTest", () => {
   });
 
   it("deprecator singleton is a Deprecation instance", () => {
-    expect(deprecator).toBeInstanceOf(Deprecation);
+    expect(deprecator()).toBeInstanceOf(Deprecation);
   });
 
   it("gem option stored on instance", () => {
