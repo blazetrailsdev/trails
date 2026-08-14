@@ -268,6 +268,20 @@ export class LookupContext {
     this._prefixes = prefixes;
     this._details = this.initializeDetails({}, details);
     this._viewPaths = this.buildViewPaths(viewPaths);
+    // Rails has one backing `@view_paths` behind every lookup
+    // (`lookup_context.rb:128-141`). Trails still carries a second resolver
+    // list that `findTemplate` / `render` read, so a resolver handed to the
+    // constructor has to join both — the mirror of `addResolver`, which
+    // pushes the other way. Without this, view paths seeded at boot are
+    // invisible to the controller's render path.
+    if (Array.isArray(viewPaths)) {
+      for (const resolver of viewPaths) {
+        const templateResolver = resolver as PathSetResolver & Partial<TemplateResolver>;
+        if (typeof templateResolver.find === "function") {
+          this.resolvers.push(templateResolver as TemplateResolver);
+        }
+      }
+    }
   }
 
   /**

@@ -4,7 +4,8 @@ import { Base, registerModel } from "@blazetrails/activerecord";
 import { getCryptoAsync } from "@blazetrails/activesupport/crypto-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { backend } from "@blazetrails/i18n";
-import { Application as ServerApplication } from "@blazetrails/trailties/server";
+import type { RackApp } from "@blazetrails/actionpack";
+import { Application, Trails } from "@blazetrails/trailties";
 import { User } from "../app/models/user.js";
 import { Tweet } from "../app/models/tweet.js";
 import { Follow } from "../app/models/follow.js";
@@ -12,6 +13,33 @@ import { Like } from "../app/models/like.js";
 import { Hashtag } from "../app/models/hashtag.js";
 
 const MODELS = [User, Tweet, Follow, Like, Hashtag];
+
+/**
+ * Rails' `class Application < Rails::Application` in `config/application.rb`.
+ * Importing this file registers the subclass, so `Trails.application` is null
+ * until it has been loaded — `trails server` performs that import before
+ * calling `Trails.initialize()`.
+ */
+export class TwitterApp extends Application {
+  /**
+   * TODO(0104-twitter-app-full-stack-integration/generator-src-layout-vs-engine-paths):
+   * `trails new` generates `src/app` and `src/config`, but the engine's path
+   * set declares Rails' root-level `app/` and `config/`
+   * (`engine/configuration.ts:70-89`), so nothing is found. Rails' `with:`
+   * remap is the supported way to point a path at a different directory
+   * (`railties/lib/rails/paths.rb`); one of the two layouts should win.
+   */
+  override async paths() {
+    const paths = await super.paths();
+    for (const name of ["app/views", "app/controllers", "app/models", "config/locales"]) {
+      paths.add(name, { with: `src/${name}` });
+    }
+    paths.add("config/routes.ts", { with: "src/config/routes.ts" });
+    return paths;
+  }
+}
+
+Application.register(TwitterApp);
 
 let connected = false;
 
@@ -59,18 +87,13 @@ async function loadLocales(): Promise<void> {
 }
 
 /**
- * Boot the application and return the Rack app.
+ * Boot the application and return its Rack endpoint.
  *
- * TODO(0104-twitter-app-full-stack-integration/boot-app-through-trailties-application):
- * this should be `class Application extends Trailties.Application` and boot
- * through the initializer chain. It isn't, because two different classes are
- * named `Application` and only the bespoke one in `trailties/src/server/`
- * can serve a request — `Trailties.Application` never splices `Finisher`, so
- * it builds no middleware stack and loads no routes.
+ * `Trails.initialize()` runs the Bootstrap → Engine → Finisher initializer
+ * chain, and `app()` is `config.ru`'s `run Rails.application`.
  */
-export async function boot(cwd: string): Promise<ServerApplication> {
+export async function boot(): Promise<RackApp> {
   await connect();
-  const app = new ServerApplication({ cwd });
-  await app.initialize();
-  return app;
+  const app = await Trails.initialize();
+  return app.app();
 }

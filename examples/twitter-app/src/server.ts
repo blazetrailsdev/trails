@@ -17,8 +17,8 @@ export const APP_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)
  * `trailties/src/server/vite-plugin.ts`.
  */
 export async function listen(port = 0, host = "127.0.0.1"): Promise<http.Server> {
-  const booted = await boot(APP_ROOT);
-  const app = withStaticFiles((env) => booted.call(env));
+  const booted = await boot();
+  const app = withStaticFiles((env) => booted(env));
 
   const server = http.createServer((req, res) => {
     void (async () => {

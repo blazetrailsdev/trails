@@ -10,10 +10,6 @@
   },
   "exports": {
     ".": "./dist/cli.js",
-    "./server": {
-      "types": "./dist/server/application.d.ts",
-      "default": "./dist/server/application.js"
-    },
     "./generators": "./dist/generators/index.js",
     "./vite": {
       "types": "./dist/server/vite-plugin.d.ts",

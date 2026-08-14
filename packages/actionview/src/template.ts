@@ -9,6 +9,8 @@
  */
 import { TemplateError } from "./template/error.js";
 import { TemplateHandlers, type RenderContext, type TemplateHandler } from "./template/handlers.js";
+import { Raw } from "./template/handlers/raw.js";
+import { Tse } from "./template/handlers/tse.js";
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
@@ -200,3 +202,12 @@ function basename(path: string): string {
   const slash = path.lastIndexOf("/");
   return slash === -1 ? path : path.slice(slash + 1);
 }
+
+// Rails registers the default handlers the moment `Template` extends
+// `Template::Handlers` (`template.rb:178` → `handlers.rb:12-18`, whose
+// `self.extended` hook installs `raw` as the default plus `erb`, `html`,
+// `builder` and `ruby`). This is that hook: without it nothing can render,
+// because no extension resolves to a handler. `tse` stands in for `erb`;
+// `html`, `builder` and `ruby` land with their handlers.
+TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
+TemplateHandlers.registerTemplateHandler("tse", new Tse());
