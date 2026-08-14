@@ -10,13 +10,6 @@
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
     "rubyName": "alias_attribute_method_definition",
-    "call": "build_mangled_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "alias_attribute_method_definition",
     "call": "define_call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
