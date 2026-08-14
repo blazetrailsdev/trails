@@ -628,16 +628,7 @@ export {
   UNTRACKED,
   BacktraceFilter,
   Minitest,
-  Skip,
-  UnexpectedWarning,
-  AbstractReporter,
-  Reporter,
-  ProgressReporter,
-  StatisticsReporter,
-  SummaryReporter,
-  CompositeReporter,
 } from "./testing/assertions.js";
-export type { IO, Options, Reportable } from "./testing/assertions.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
