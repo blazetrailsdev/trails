@@ -851,8 +851,8 @@ export class SchemaStatements {
     )
       return;
 
-    // Rails takes `if_not_exists:` as its own kwarg, so it survives the
-    // `options = check_constraint_options(...)` rebind on the next line.
+    // schema_statements.rb:1293 takes `if_not_exists:` as its own kwarg, so it
+    // survives the `options = check_constraint_options(...)` rebind below.
     const ifNotExists = options.ifNotExists;
     options = this.checkConstraintOptions(tableName, expression, options) as {
       name?: string;

@@ -124,11 +124,8 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       return (
         (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
           isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
-        // DIVERGENCE (a1): Rails passes `new_value_before_type_cast` here
-        // (activemodel/lib/active_model/type/helpers/numeric.rb:33). trails
-        // passes the cast value, which is what `float.test.ts`'s
-        // "equal_nan? uses cast value" case enshrines. Filed as
-        // `numeric-equal-nan-before-type-cast-arg`.
+        // DIVERGENCE (a1): numeric.rb:33 passes `new_value_before_type_cast`.
+        // Filed as `numeric-equal-nan-before-type-cast-arg`.
         !isEqualNan(oldValue, newValue)
       );
     }

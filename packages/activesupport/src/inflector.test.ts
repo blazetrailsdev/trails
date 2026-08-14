@@ -169,8 +169,20 @@ describe("InflectorTest", () => {
   });
 
   it("uncountable word is not greedy", () => {
-    expect(singularize("sponsor")).toBe("sponsor");
-    expect(pluralize("sponsor")).toBe("sponsors");
+    withInflections((inflect) => {
+      const uncountableWord = "ors";
+      const countableWord = "sponsor";
+
+      inflect.uncountable(uncountableWord);
+
+      expect(singularize(uncountableWord)).toBe(uncountableWord);
+      expect(pluralize(uncountableWord)).toBe(uncountableWord);
+      expect(pluralize(uncountableWord)).toBe(singularize(uncountableWord));
+
+      expect(singularize(countableWord)).toBe("sponsor");
+      expect(pluralize(countableWord)).toBe("sponsors");
+      expect(singularize(pluralize(countableWord))).toBe("sponsor");
+    });
   });
 
   it("overwrite previous inflectors", () => {

@@ -21,31 +21,32 @@ export interface HumanRule {
  * through untouched.
  */
 export class Uncountables extends Array<string> {
-  #regexArray: RegExp[] = [];
+  private _regexArray: RegExp[] = [];
 
   delete(entry: string): void {
-    const index = this.indexOf(entry);
-    if (index !== -1) this.splice(index, 1);
-    const regex = Uncountables.toRegex(entry);
-    const regexIndex = this.#regexArray.findIndex((r) => r.source === regex.source);
-    if (regexIndex !== -1) this.#regexArray.splice(regexIndex, 1);
+    // Ruby's Array#delete removes every equal element, not just the first.
+    let index: number;
+    while ((index = this.indexOf(entry)) !== -1) this.splice(index, 1);
+    const regex = this.toRegex(entry);
+    while ((index = this._regexArray.findIndex((r) => r.source === regex.source)) !== -1) {
+      this._regexArray.splice(index, 1);
+    }
   }
 
   add(words: (string | string[])[]): this {
-    const flattened = words.flat().map((word) => word.toLowerCase());
-    this.push(...flattened);
-    this.#regexArray.push(...flattened.map((word) => Uncountables.toRegex(word)));
+    words = words.flat().map((word) => word.toLowerCase());
+    this.push(...(words as string[]));
+    this._regexArray.push(...(words as string[]).map((word) => this.toRegex(word)));
     return this;
   }
 
   isUncountable(str: string): boolean {
-    return this.#regexArray.some((regex) => regex.test(str));
+    return this._regexArray.some((regex) => regex.test(str));
   }
 
-  // Ruby's `/\b#{...}\Z/i` uses a Unicode-aware `\w`, so `\b` fires before a
-  // non-ASCII word like "猫". JS `\b` is ASCII-only; the Unicode property
-  // lookbehind is the equivalent boundary.
-  private static toRegex(string: string): RegExp {
+  // Ruby's `/\b…\Z/i` boundary is Unicode-aware, so it fires before a
+  // non-ASCII word like "猫"; JS `\b` is ASCII-only.
+  private toRegex(string: string): RegExp {
     return new RegExp(
       `(?<![\\p{L}\\p{N}_])${string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
       "iu",
