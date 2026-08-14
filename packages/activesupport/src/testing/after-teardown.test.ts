@@ -25,7 +25,6 @@ describe("AfterTeardownTest", () => {
       throw new MyError("Test raises an error, all after_teardown should still get called");
     });
 
-    /** Mirrors `OtherAfterTeardown#after_teardown` (after_teardown_test.rb:5-9). */
     const otherAfterTeardown = () => {
       afterTeardown.call(klass);
       witness = true;

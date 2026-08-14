@@ -17,6 +17,13 @@ export type DeprecationBehaviorCallable = (
   deprecator: Deprecation,
 ) => void;
 
+/**
+ * Raised when ActiveSupport::Deprecation::Behavior#behavior is set with
+ * `:raise`. You would set `:raise`, as a behavior to raise errors and
+ * proactively report exceptions from deprecations.
+ *
+ * Mirrors: `ActiveSupport::DeprecationException` (deprecation/behaviors.rb:8).
+ */
 export class DeprecationException extends Error {
   constructor(message: string) {
     super(message);
