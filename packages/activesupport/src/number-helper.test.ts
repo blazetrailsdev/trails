@@ -8,6 +8,20 @@ import {
   numberToHumanSize,
   numberToHuman,
 } from "./number-helper.js";
+import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+
+/** Mirrors: number_helper_test.rb:18-25's `NumberWithToD`. */
+class NumberWithToD {
+  readonly #number: number;
+
+  constructor(number: number) {
+    this.#number = number;
+  }
+
+  toD(): BigDecimal {
+    return new BigDecimal(this.#number);
+  }
+}
 
 describe("NumberHelperTest", () => {
   it("number to phone", () => {
@@ -59,6 +73,7 @@ describe("NumberHelperTest", () => {
     expect(numberToCurrency("-,11")).toBe("-$,11");
     expect(numberToCurrency(-0.0)).toBe("$0.00");
     expect(numberToCurrency("-0.0")).toBe("$0.00");
+    expect(numberToCurrency(new NumberWithToD(1.23))).toBe("$1.23");
   });
 
   it("number to percentage", () => {
@@ -200,6 +215,13 @@ describe("NumberHelperTest", () => {
 });
 
 describe("NumberConverter subclasses", () => {
+  it("valid_bigdecimal takes a BigDecimal through the rounded branch, not the string fallback", () => {
+    expect(numberToCurrency(new BigDecimal("123456789012345678.91"))).toBe(
+      "$123,456,789,012,345,678.91",
+    );
+    expect(numberToCurrency(new BigDecimal("-1234.5"), { precision: 1 })).toBe("-$1,234.5");
+  });
+
   it("NumberToPhoneConverter.convert works", async () => {
     const { NumberToPhoneConverter } = await import("./number-helper/number-to-phone-converter.js");
     expect(NumberToPhoneConverter.convert(5551234567, { areaCode: true })).toBe("(555) 123-4567");

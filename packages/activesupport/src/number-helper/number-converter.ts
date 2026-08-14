@@ -110,7 +110,9 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
    *
    * The String arm reproduces `BigDecimal(number, exception: false)` — the
    * whole string must parse, so `"1,11"` and `"12.5abc"` are `null`, while
-   * surrounding whitespace and an exponent are accepted.
+   * surrounding whitespace and an exponent are accepted. The final arm is
+   * Ruby's `number.to_d rescue nil`: a `BigDecimal` is already converted, and
+   * anything else answering `to_d` is converted through it.
    */
   protected validBigdecimal(): BigDecimal | null {
     const number = this.number;
@@ -121,7 +123,17 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     if (typeof number === "string") {
       return BIGDECIMAL_STRING.test(number) ? new BigDecimal(number.trim()) : null;
     }
-    return null;
+    if (number instanceof BigDecimal) return number;
+    const toD = (number as { toD?: () => unknown } | null | undefined)?.toD;
+    if (typeof toD !== "function") return null;
+    try {
+      const converted = toD.call(number);
+      return converted instanceof BigDecimal
+        ? converted
+        : new BigDecimal(converted as string | number | bigint);
+    } catch {
+      return null;
+    }
   }
 
   protected get options(): Record<string, unknown> {
