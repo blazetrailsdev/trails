@@ -1071,15 +1071,6 @@ export const ARITY_OVERRIDE_GROUPS: ArityOverrideGroup[] = [
   },
   {
     reason:
-      "Rails AttributeMethods compiles attribute accessors via a CodeGenerator that " +
-      "evals method-body strings; trails has no eval/code generation, so the port " +
-      "drops the `code_generator`/`parameters`/`call_args` and keyword args these " +
-      "helpers thread into the generated source and defines the method directly.",
-    names: ["define_proxy_call", "define_call"],
-    rubyFiles: ["attribute_methods.rb"],
-  },
-  {
-    reason:
       "Static-host porting pattern (CLAUDE.md): these Rails instance/class methods " +
       "are ported as free functions taking the host class explicitly as a leading " +
       "`cls` param, so the TS arity is one higher than Rails. The receiver is the " +

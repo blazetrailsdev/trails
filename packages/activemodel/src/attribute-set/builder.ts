@@ -206,13 +206,15 @@ export class LazyAttributeHash {
     return copy;
   }
 
+  // builder.rb:129-132 unions `types | values | delegate_hash` and yields every
+  // key — unlike `keys`, it does NOT drop uninitialized attributes.
   eachKey(fn: (key: string) => void): void {
-    const allKeys = new Set([
-      ...this.delegate.keys(),
-      ...Object.keys(this.values),
+    const keys = new Set([
       ...this.types.keys(),
+      ...Object.keys(this.values),
+      ...this.delegate.keys(),
     ]);
-    for (const key of allKeys) fn(key);
+    for (const key of keys) fn(key);
   }
 
   marshalDump(): [
@@ -266,12 +268,12 @@ export class LazyAttributeHash {
   }
 
   keys(): string[] {
-    const allKeys = new Set([
-      ...this.delegate.keys(),
+    const keys = new Set([
       ...Object.keys(this.values),
       ...this.types.keys(),
+      ...this.delegate.keys(),
     ]);
-    return [...allKeys];
+    return [...keys].filter((name) => this.get(name).isInitialized());
   }
 
   has(name: string): boolean {

@@ -178,6 +178,11 @@ export class Request {
     return ((this.env["REQUEST_METHOD"] as string) || "GET").toUpperCase();
   }
 
+  /** Mirrors: `alias raw_request_method request_method` (request.rb:145). */
+  get rawRequestMethod(): string {
+    return this.requestMethod;
+  }
+
   get isGet(): boolean {
     return this.method === "GET";
   }

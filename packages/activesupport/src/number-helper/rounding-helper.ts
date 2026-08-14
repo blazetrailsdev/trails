@@ -16,10 +16,44 @@ export class RoundingHelper {
     return this.roundPrecision(number);
   }
 
+  /**
+   * Rails hands `options.fetch(:round_mode, :default).to_sym` straight to
+   * `BigDecimal#round` (rounding_helper.rb:16), so every mode Ruby's
+   * BigDecimal understands is reachable from every number helper. This is that
+   * dispatch. A Ruby Symbol option value is a `":name"` string in trails, and
+   * the camelCased spelling is accepted alongside the Ruby one.
+   */
   private applyRound(value: number): number {
-    if (this.roundMode === "halfEven" || this.roundMode === "half_even") {
-      return this.bankersRound(value);
+    switch (this.roundMode.replace(/^:/, "")) {
+      case "up":
+        // BigDecimal ROUND_UP — away from zero, not "half up".
+        return value < 0 ? Math.floor(value) : Math.ceil(value);
+      case "down":
+      case "truncate":
+        return Math.trunc(value);
+      case "ceiling":
+      case "ceil":
+        return Math.ceil(value);
+      case "floor":
+        return Math.floor(value);
+      case "half_down":
+      case "halfDown":
+        return this.halfDownRound(value);
+      case "half_even":
+      case "halfEven":
+      case "even":
+      case "banker":
+        return this.bankersRound(value);
+      default:
+        return this.rubyRound(value);
     }
+  }
+
+  /** BigDecimal ROUND_HALF_DOWN — ties toward zero, everything else as half-up. */
+  private halfDownRound(value: number): number {
+    const truncated = Math.trunc(value);
+    const fraction = Math.abs(value - truncated);
+    if (Math.abs(fraction - 0.5) < 1e-10) return truncated;
     return this.rubyRound(value);
   }
 

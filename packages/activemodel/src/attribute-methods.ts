@@ -396,7 +396,7 @@ export function attributeAlias(host: AttributeMethodHost, name: string): string 
 export function defineAttributeMethods(this: AttributeMethodHost, ...attrNames: string[]): void {
   CodeGenerator.batch(generatedAttributeMethods.call(this), __FILE__, __LINE__, (owner) => {
     for (const attrName of attrNames) {
-      defineAttributeMethod(this, attrName);
+      defineAttributeMethod(this, attrName, { _owner: owner });
       const aliases = aliasesByAttributeName(this);
       const attrAliases = aliases.get(attrName);
       if (attrAliases) {
@@ -416,17 +416,27 @@ const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
 
 // -- Internal helpers (take explicit host arg) --------------------------------
 
-export function defineAttributeMethod(host: AttributeMethodHost, attrName: string): void {
-  for (const pattern of host._attributeMethodPatterns) {
-    defineAttributeMethodPattern(host, pattern, attrName);
-  }
+export function defineAttributeMethod(
+  host: AttributeMethodHost,
+  attrName: string,
+  {
+    _owner = generatedAttributeMethods.call(host),
+    as = attrName,
+  }: { _owner?: Module | CodeGenerator; as?: string } = {},
+): void {
+  CodeGenerator.batch(_owner, __FILE__, __LINE__, (owner) => {
+    for (const pattern of host._attributeMethodPatterns) {
+      defineAttributeMethodPattern.call(host, pattern, attrName, { owner, as });
+    }
+    attributeMethodPatternsCache.call(host).clear();
+  });
 }
 
 export function defineAttributeMethodPattern(
-  host: AttributeMethodHost,
+  this: AttributeMethodHost,
   pattern: AttributeMethodPattern,
   attrName: string,
-  options?: { override?: boolean },
+  { owner, as, override = false }: { owner: CodeGenerator; as: string; override?: boolean },
 ): void {
   // Rails' default bare pattern (empty prefix/suffix) exists to route the plain
   // `attribute` reader through method_missing. trails exposes readers as real
@@ -434,12 +444,40 @@ export function defineAttributeMethodPattern(
   // here would collide with that accessor. Skip it — the seeded bare pattern is
   // kept only so `attributeMethodPatterns()` matches Rails' default.
   if (pattern.prefix === "" && pattern.suffix === "") return;
-  const methodName = pattern.methodName(attrName);
-  if (host.prototype[methodName] !== undefined && !options?.override) return;
-  const fn = function (this: ReadWriteHost) {
-    return this.readAttribute(attrName);
-  };
-  generatedAttributeMethods.call(host).defineMethod(methodName, fn);
+
+  const canonicalMethodName = pattern.methodName(attrName);
+  const publicMethodName = pattern.methodName(as);
+
+  // If defining a regular attribute method, we don't override methods that are
+  // explicitly defined in parent classes. ActiveModel's
+  // `instance_method_already_implemented?` only consults the generated module;
+  // the extra prototype arm stands in for AR's override
+  // (attribute_methods.rb#instance_method_already_implemented?), which also
+  // rejects a name the class itself defines. trails has one host interface for
+  // both, so the arm lives here.
+  if (
+    isInstanceMethodAlreadyImplemented.call(this, publicMethodName) ||
+    this.prototype[publicMethodName] !== undefined
+  ) {
+    // However, for `alias_attribute`, we always define the method.
+    if (!override) return;
+  }
+
+  const generateMethod = `defineMethod${pattern.proxyTarget.charAt(0).toUpperCase()}${pattern.proxyTarget.slice(1)}`;
+
+  const generator = (this as unknown as Record<string, unknown>)[generateMethod];
+  if (typeof generator === "function") {
+    (generator as (attrName: string, options: { owner: CodeGenerator; as: string }) => void).call(
+      this,
+      attrName,
+      { owner, as },
+    );
+  } else {
+    defineProxyCall(owner, canonicalMethodName, pattern.proxyTarget, pattern.parameters, attrName, {
+      namespace: "active_model_proxy",
+      as: publicMethodName,
+    });
+  }
 }
 
 export function undefineAttributeMethods(this: AttributeMethodHost): void {
@@ -543,22 +581,25 @@ export function attributeMethodPatternsMatching(
 
 /** @internal Rails-private helper. Mirrors: ClassMethods#define_proxy_call */
 export function defineProxyCall(
-  this: AttributeMethodHost,
+  codeGenerator: CodeGenerator,
   name: string,
   proxyTarget: string,
-  _parameters: string | null,
-  attrName: string,
+  parameters: string | null,
+  ...rest: [...callArgs: string[], options: { namespace: string; as?: string }]
 ): void {
-  const fn = function (this: ReadWriteHost, ...args: unknown[]) {
-    const handler = this[proxyTarget];
-    if (typeof handler !== "function") {
-      throw new MissingAttributeError(
-        `attribute_missing dispatch failed: ${proxyTarget} not defined`,
-      );
-    }
-    return (handler as (...a: unknown[]) => unknown).call(this, attrName, ...args);
-  };
-  generatedAttributeMethods.call(this).defineMethod(name, fn);
+  const options = rest[rest.length - 1] as { namespace: string; as?: string };
+  const callArgs = rest.slice(0, -1) as string[];
+  const mangledName = buildMangledName(name);
+
+  // We have to use a different namespace for every target method, because if
+  // someone defines an attribute that looks like an attribute method we could
+  // clash, e.g. `attribute :title_was` / `attribute :title`.
+  const namespace = `${options.namespace}_${proxyTarget}`;
+
+  defineCall(codeGenerator, name, proxyTarget, mangledName, parameters, callArgs, {
+    namespace,
+    as: options.as ?? name,
+  });
 }
 
 /**
@@ -575,17 +616,41 @@ export function buildMangledName(name: string): string {
 
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#define_call
- * Trails has no eval/code generation, so delegates to defineProxyCall.
+ *
+ * Rails compiles `def mangled_name(params); self.target_name(call_args); end`
+ * into the generator's batch. A TS "source" is the definition itself, so the
+ * emitted body is the equivalent closure over `callArgs`; `CALL_COMPILABLE_REGEXP`
+ * has no analogue because a JS property lookup needs no name to be compilable.
  */
 export function defineCall(
-  this: AttributeMethodHost,
-  name: string,
+  codeGenerator: CodeGenerator,
+  _name: string,
   targetName: string,
-  _mangledName: string,
+  mangledName: string,
   _parameters: string | null,
-  attrName: string,
+  callArgs: string[],
+  { namespace, as }: { namespace: string; as: string },
 ): void {
-  defineProxyCall.call(this, name, targetName, _parameters, attrName);
+  codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
+    batch.push((mod) => {
+      Object.defineProperty(mod, mangledName, {
+        value: function (this: ReadWriteHost, ...args: unknown[]) {
+          const target = this[targetName];
+          // Ruby's `self.#{target_name}(...)` raises NoMethodError when the
+          // host never defined the proxy target. trails has always fallen back
+          // to reading the attribute instead, and its prefix/suffix/affix tests
+          // pin that; keeping the fallback here rather than converging it is
+          // tracked separately from this generator rewiring.
+          if (typeof target !== "function") {
+            return this.readAttribute(callArgs[0]);
+          }
+          return (target as (...a: unknown[]) => unknown).call(this, ...callArgs, ...args);
+        },
+        writable: true,
+        configurable: true,
+      });
+    });
+  });
 }
 
 function ensureOwnPatterns(host: AttributeMethodHost): void {
