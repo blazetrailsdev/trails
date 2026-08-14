@@ -17,12 +17,22 @@ import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { CallArgArtifact } from "./call-args-baseline.js";
+
 import { parseTop, section, tally } from "./lint-call-mismatches.js";
 import { classifyRow, NAMING_CLASSES } from "./naming-taxonomy.js";
 
 export { parseTop };
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
+const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
+
+/** The slice of output/ts-api.json this report reads. */
+export type TsApi = {
+  packages: Record<
+    string,
+    { fileFunctions?: Record<string, { name: string; params?: { name: string }[] }[]> }
+  >;
+};
 
 /**
  * The grouped report. The `naming` half is what the gate flip plans to
@@ -31,13 +41,34 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
  * class beats one bespoke sentence per row, and why the rest is never
  * baselined).
  */
-export function renderReport(artifact: CallArgArtifact, top: number): string {
+/**
+ * Per package, the top-level functions whose first parameter is `this` — the
+ * trails mixin idiom (CLAUDE.md, Module mixins). {@link classifyRow} needs it to
+ * tell a real `foo.call(this)` receiver from any other TS `call`.
+ */
+export function thisTypedFunctionsByPackage(api: TsApi): Map<string, ReadonlySet<string>> {
+  const byPackage = new Map<string, ReadonlySet<string>>();
+  for (const [pkg, entry] of Object.entries(api.packages)) {
+    const names = new Set<string>();
+    for (const fns of Object.values(entry.fileFunctions ?? {})) {
+      for (const fn of fns) if (fn.params?.[0]?.name === "this") names.add(fn.name);
+    }
+    byPackage.set(pkg, names);
+  }
+  return byPackage;
+}
+
+export function renderReport(
+  artifact: CallArgArtifact,
+  top: number,
+  thisTyped: Map<string, ReadonlySet<string>> = new Map(),
+): string {
   const rows = artifact.mismatches;
   const files = new Set(rows.map((r) => `${r.package} ${r.tsFile}`)).size;
   const naming = rows.filter((r) => r.class === "naming");
   const permanent = new Set(NAMING_CLASSES.filter((c) => c.permanent).map((c) => c.name));
   const namingLabel = (r: (typeof rows)[number]): string => {
-    const cls = classifyRow(r.rubyArgs, r.tsArgs);
+    const cls = classifyRow(r.rubyArgs, r.tsArgs, thisTyped.get(r.package));
     return `${cls} (${permanent.has(cls) ? "permanent" : "burndown"})`;
   };
   return [
@@ -86,7 +117,8 @@ async function reportMain(top: number): Promise<number> {
     );
     return 2;
   }
-  console.log(renderReport(artifact, top));
+  const api = JSON.parse(await readFile(TS_API_PATH, "utf8")) as TsApi;
+  console.log(renderReport(artifact, top, thisTypedFunctionsByPackage(api)));
   return 0;
 }
 

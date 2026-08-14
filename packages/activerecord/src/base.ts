@@ -193,6 +193,7 @@ import {
   ClassMethods as AttributeMethodsClassMethods,
   isAttributeMethod as _isAttributeMethod,
   isDangerousAttributeMethod as _isDangerousAttributeMethod,
+  isInstanceMethodAlreadyImplemented as _isInstanceMethodAlreadyImplemented,
   defineAttributeMethods as _defineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
   GeneratedAttributeMethods,
@@ -4567,6 +4568,10 @@ extend(Base, {
 // clash with an Active Record instance method (Rails: dangerous_attribute_method?).
 // Consumed by Associations::Builder::Association#build to reject e.g. `has_one :save`.
 extend(Base, { isDangerousAttributeMethod: _isDangerousAttributeMethod });
+// ActiveRecord's override of ActiveModel's predicate (attribute_methods.rb:165):
+// define_attribute_method_pattern dispatches it through the class, so the
+// dangerous-method raise runs before any accessor is generated.
+extend(Base, { isInstanceMethodAlreadyImplemented: _isInstanceMethodAlreadyImplemented });
 extend(Base, {
   // ConnectionHandling.ClassMethods does not include resolveConfigForConnection
   // (it's a standalone export, not in the ClassMethods object), so wire it here.

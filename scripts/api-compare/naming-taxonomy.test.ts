@@ -33,6 +33,38 @@ describe("classifyPair", () => {
     expect(classifyPair("this", "target")).toBe("module-mixin-receiver");
     expect(classifyPair("options", "opts")).toBe("burndown");
   });
+
+  // migration.rb:1422 `migration.migrate(@direction)` vs migration.ts:2575
+  // `migrate(this._direction)`; attribute_methods.rb:47 `include
+  // @generated_attribute_methods` vs attribute-methods.ts:285
+  // `include(this, this._generatedAttributeMethods)`.
+  it("names a Ruby ivar the TS side spells with a leading underscore", () => {
+    expect(classifyPair("direction", "_direction")).toBe("ivar-underscore");
+    expect(classifyPair("generated_attribute_methods", "_generatedAttributeMethods")).toBe(
+      "ivar-underscore",
+    );
+    expect(classifyPair("direction", "_dir")).toBe("burndown");
+  });
+
+  // model_schema.rb:433 `columns_hash.values` vs model-schema.ts:775
+  // `Object.values(columnsHash.call(this))`.
+  it("names the mixin call the module-mixin idiom records as the outermost callee", () => {
+    const thisTyped = new Set(["columnsHash", "viewPaths"]);
+    expect(classifyPair("columns_hash", "call", thisTyped)).toBe("module-mixin-call");
+    expect(classifyPair("_view_paths", "call", thisTyped)).toBe("module-mixin-call");
+    // A TS `call` the Ruby name cannot account for stays convergeable: the class
+    // is permanent, so an unqualified `ref:call` must never fall into it.
+    expect(classifyPair("some_method", "call", thisTyped)).toBe("burndown");
+    expect(classifyPair("columns_hash", "call")).toBe("burndown");
+  });
+
+  // belongs_to_association.rb:47 `writer(owner.instance_exec(&block))` vs
+  // belongs-to-association.ts:76 `await this.writer(await block(this.owner))`.
+  it("names the block idiom Ruby writes as instance_exec", () => {
+    expect(classifyPair("instance_exec", "block")).toBe("block-idiom");
+    expect(classifyPair("instanceExec", "block")).toBe("block-idiom");
+    expect(classifyPair("instance_exec", "proc")).toBe("burndown");
+  });
 });
 
 describe("classifyRow", () => {
@@ -58,6 +90,9 @@ describe("the taxonomy itself", () => {
       "js-reserved-word",
       "no-js-equivalent",
       "conventions-rename",
+      "ivar-underscore",
+      "module-mixin-call",
+      "block-idiom",
     ]);
   });
 

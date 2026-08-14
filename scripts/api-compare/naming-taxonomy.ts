@@ -22,6 +22,9 @@ export type NamingClass =
   | "no-js-equivalent"
   | "conventions-rename"
   | "module-mixin-receiver"
+  | "ivar-underscore"
+  | "module-mixin-call"
+  | "block-idiom"
   | "burndown";
 
 export interface NamingClassInfo {
@@ -51,6 +54,31 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
     reason:
       "Exactly what docs/ruby-ts-conventions.md produces from the Ruby name (`@callbacks` → " +
       "`_callbacks`); the recorder compares raw identifiers and cannot see the table.",
+  },
+  {
+    name: "ivar-underscore",
+    permanent: true,
+    reason:
+      "Ruby reads an ivar bare (`@direction` at migration.rb:1422) where trails spells the same " +
+      "ivar `this._direction`; the leading underscore is the settled repo-wide spelling for a " +
+      "Ruby ivar, so the two sides already match.",
+  },
+  {
+    name: "module-mixin-call",
+    permanent: true,
+    reason:
+      "The settled `this`-typed mixin idiom (CLAUDE.md, Module mixins) turns Ruby's " +
+      "`columns_hash` into `columnsHash.call(this)` (model-schema.ts:775); the recorder takes " +
+      "the outermost callee, so the argument records as `call`. Only counted when the Ruby " +
+      "name really is a `this`-typed function in the package.",
+  },
+  {
+    name: "block-idiom",
+    permanent: true,
+    reason:
+      "Ruby `owner.instance_exec(&block)` (belongs_to_association.rb:47) is trails' " +
+      "`block(this.owner)` — the block is a plain function and the receiver its argument, so " +
+      "the recorder sees `instance_exec` against `block`.",
   },
   {
     name: "module-mixin-receiver",
@@ -102,6 +130,20 @@ export function refName(arg: string): string | undefined {
 }
 
 /**
+ * Is the Ruby name a `this`-typed function — the trails mixin idiom — under
+ * either its own spelling or the ivar-underscore one the recorder may have
+ * given it (`_view_paths` for `view_paths` at view-paths.ts)? The set is
+ * package-wide rather than file-local because a mixin function is called from
+ * the file it is assigned into, not the one it is defined in (relation.ts calls
+ * timestamp.ts' `touchAttributesWithTime`).
+ */
+function isThisTypedFunction(rubyRef: string, thisTypedFunctions?: ReadonlySet<string>): boolean {
+  if (thisTypedFunctions === undefined) return false;
+  const camel = snakeToCamel(rubyRef);
+  return thisTypedFunctions.has(camel) || thisTypedFunctions.has(camel.replace(/^_/, ""));
+}
+
+/**
  * Classify ONE differing identifier pair. Arm order is load-bearing:
  *
  * - Ruby `self` reaches the artifact already normalized to `this`, so the
@@ -112,15 +154,37 @@ export function refName(arg: string): string | undefined {
  *   unconvergeable for the stronger reason, so the reserved arm precedes it.
  * - {@link NO_JS_EQUIVALENT} is read with `Object.hasOwn`: a Ruby name like
  *   `constructor` would otherwise pick a value off `Object.prototype`.
+ * - The ivar arm runs before the conventions arm and only on a bare Ruby name:
+ *   the recorder strips the `@`, so `@direction` reaches here as `direction`,
+ *   which the conventions table would camelCase without the underscore. A row
+ *   that DID keep its `@` is the conventions table's own rename, so it falls
+ *   through to that arm.
+ * - `block` is a TS-side artifact of the block idiom, so that arm keys on the
+ *   TS spelling; `call` is one too, but a bare `ref:call` proves nothing on its
+ *   own, so that arm additionally requires the Ruby name to BE a `this`-typed
+ *   function — `thisTypedFunctions`, which the caller reads off the TS API
+ *   manifest. Without that set the arm never fires and the row stays burndown,
+ *   which is the safe direction for a permanent class.
  * - `rubyMethodToTsIgnoringSkip` answers every spelling the conventions table
  *   sanctions (`primary_class?` → `isPrimaryClass` / `primaryClass`); the `Q`
  *   suffix and the leading-underscore ivar form are what it adds on top.
  */
-export function classifyPair(rubyRef: string, tsRef: string): NamingClass {
+export function classifyPair(
+  rubyRef: string,
+  tsRef: string,
+  thisTypedFunctions?: ReadonlySet<string>,
+): NamingClass {
   if (rubyRef === "self" || rubyRef === "this") return "module-mixin-receiver";
   if (JS_RESERVED_WORDS.has(rubyRef)) return "js-reserved-word";
   if (Object.hasOwn(NO_JS_EQUIVALENT, rubyRef) && NO_JS_EQUIVALENT[rubyRef].includes(tsRef)) {
     return "no-js-equivalent";
+  }
+  if (!rubyRef.startsWith("@") && tsRef === `_${snakeToCamel(rubyRef)}`) return "ivar-underscore";
+  if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
+    return "module-mixin-call";
+  }
+  if ((rubyRef === "instance_exec" || rubyRef === "instanceExec") && tsRef === "block") {
+    return "block-idiom";
   }
   const ivar = rubyRef.startsWith("@");
   const bare = ivar ? rubyRef.slice(1) : rubyRef;
@@ -140,13 +204,17 @@ export function classifyPair(rubyRef: string, tsRef: string): NamingClass {
  * EVERY identifier it differs on is, so one convergeable pair keeps the row out
  * of any baseline. No differing `ref:` pair at all is recorder shape → burndown.
  */
-export function classifyRow(rubyArgs: string[], tsArgs: string[]): NamingClass {
+export function classifyRow(
+  rubyArgs: string[],
+  tsArgs: string[],
+  thisTypedFunctions?: ReadonlySet<string>,
+): NamingClass {
   const seen: NamingClass[] = [];
   for (let i = 0; i < Math.max(rubyArgs.length, tsArgs.length); i++) {
     const r = refName(rubyArgs[i] ?? "");
     const t = refName(tsArgs[i] ?? "");
     if (r === undefined || t === undefined || r === t) continue;
-    seen.push(classifyPair(r, t));
+    seen.push(classifyPair(r, t, thisTypedFunctions));
   }
   if (seen.length === 0) return "burndown";
   const permanent = new Set(NAMING_CLASSES.filter((c) => c.permanent).map((c) => c.name));
