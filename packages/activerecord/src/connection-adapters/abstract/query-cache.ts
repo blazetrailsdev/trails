@@ -6,6 +6,7 @@ import {
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Result } from "../../result.js";
+import type { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import {
   executionContextId,
   registerContextExitHook,
@@ -382,14 +383,20 @@ export function clearQueryCache(this: QueryCacheHost): void {
   this.pool.clearQueryCache();
 }
 
-/** The base (uncached) `selectAll` signature the override wraps via `super`. */
+/**
+ * The base (uncached) `selectAll` signature the override wraps via `super`.
+ *
+ * The base returns a pending `FutureResult` synchronously on the async arm
+ * (database_statements.rb:74,671-694), so the union is not decorative — see
+ * `makeCachedSelectAll` for why this wrapper collapses it today.
+ */
 type BaseSelectAll = (
   this: QueryCacheHost,
   arel: string | unknown,
   name?: string | null,
   binds?: unknown[],
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-) => Promise<Result>;
+) => Result | Promise<Result> | FutureResult | FutureResultComplete;
 
 /**
  * Wrap a base `selectAll` (e.g. the one mixed in from `DatabaseStatements`)
@@ -459,6 +466,10 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
       });
       return Result.fromRowHashes(rows);
     }
+    // Rails' `else` arm is a bare `super` (query_cache.rb:251). A FutureResult
+    // the base returns here is still adopted by this async function's own
+    // promise — see the async-arm note above and story
+    // wire-load-async-through-future-result.
     return original.call(this, sql, name, binds, forwardOpts);
   };
 }
