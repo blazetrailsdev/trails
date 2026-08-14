@@ -484,7 +484,7 @@ describe("AttributeTest", () => {
     it("float attribute NaN-to-NaN reports isChanged false — equal_nan? exemption", () => {
       const floatType = typeRegistry.lookup("float");
       const original = Attribute.fromDatabase("ratio", NaN, floatType);
-      const updated = original.withValueFromUser("NaN");
+      const updated = original.withValueFromUser(NaN);
       expect(updated.isChanged()).toBe(false);
     });
   });

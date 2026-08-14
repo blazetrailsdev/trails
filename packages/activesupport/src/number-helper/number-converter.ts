@@ -1,5 +1,9 @@
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
+import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+
+/** What `BigDecimal(str, exception: false)` accepts (number_converter.rb:183). */
+const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 
 export type NumberFormatOptions = object;
 
@@ -95,6 +99,30 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected numberAsFloat(): number {
     return Number(this.number);
+  }
+
+  /**
+   * Mirrors: ActiveSupport::NumberHelper::NumberConverter#valid_bigdecimal
+   * (number_converter.rb:178-187).
+   *
+   * Returns a JS number rather than a BigDecimal: trails' rounding spine is
+   * float-based (`numberAsFloat`), and `BigDecimal` here carries no arithmetic
+   * for the `negative?`/`abs`/`* 10**precision` its callers need. The String
+   * arm reproduces `BigDecimal(number, exception: false)` — the whole string
+   * must parse, so `"1,11"` and `"12.5abc"` are `null`, while surrounding
+   * whitespace and an exponent are accepted.
+   */
+  protected validBigdecimal(): number | null {
+    const number = this.number;
+    if (typeof number === "number" && !Number.isFinite(number)) return number;
+    if (typeof number === "number" || typeof number === "bigint") {
+      return Number(new BigDecimal(number).toString("F"));
+    }
+    if (typeof number === "string") {
+      if (!BIGDECIMAL_STRING.test(number)) return null;
+      return Number(new BigDecimal(number.trim()).toString("F"));
+    }
+    return null;
   }
 
   protected get options(): Record<string, unknown> {

@@ -22,12 +22,44 @@ describe("NumberHelperTest", () => {
   it("number to currency", () => {
     expect(numberToCurrency(1234567890.5)).toBe("$1,234,567,890.50");
     expect(numberToCurrency(1234567890.506)).toBe("$1,234,567,890.51");
-    expect(numberToCurrency("1234567890.50")).toBe("$1,234,567,890.50");
-    expect(numberToCurrency(1234567890.5, { unit: "Kroner", format: "%n %u" })).toBe(
-      "1,234,567,890.50 Kroner",
-    );
     expect(numberToCurrency(-1234567890.5)).toBe("-$1,234,567,890.50");
-    expect(numberToCurrency(-1234567890.5, { format: "%u%n" })).toBe("-$1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5, { format: "%u %n" })).toBe("-$ 1,234,567,890.50");
+    expect(numberToCurrency(-1234567890.5, { negativeFormat: "(%u%n)" })).toBe(
+      "($1,234,567,890.50)",
+    );
+    expect(numberToCurrency(1234567891.5, { precision: 0 })).toBe("$1,234,567,892");
+    // number_helper_test.rb:82 and :88 are held back on `RoundingHelper`'s
+    // round-mode coverage and the float spine — see the
+    // `rounding-helper-round-mode-coverage` and
+    // `number-helper-bigdecimal-precision-spine` stories.
+    expect(numberToCurrency(1234567890.5, { precision: 1 })).toBe("$1,234,567,890.5");
+    expect(numberToCurrency(1234567890.5, { unit: "&pound;", separator: ",", delimiter: "" })).toBe(
+      "&pound;1234567890,50",
+    );
+    expect(numberToCurrency("1234567890.50")).toBe("$1,234,567,890.50");
+    expect(numberToCurrency("1234567890.50", { unit: "K&#269;", format: "%n %u" })).toBe(
+      "1,234,567,890.50 K&#269;",
+    );
+    expect(
+      numberToCurrency("-1234567890.50", {
+        unit: "K&#269;",
+        format: "%n %u",
+        negativeFormat: "%n - %u",
+      }),
+    ).toBe("1,234,567,890.50 - K&#269;");
+    expect(numberToCurrency(+0.0, { unit: "", negativeFormat: "(%n)" })).toBe("0.00");
+    expect(numberToCurrency(-0.456789, { precision: 0 })).toBe("$0");
+    expect(numberToCurrency(-0.0456789, { precision: 1 })).toBe("$0.0");
+    expect(numberToCurrency(-0.00456789, { precision: 2 })).toBe("$0.00");
+    expect(numberToCurrency(-0.5, { precision: 0 })).toBe("-$1");
+    expect(numberToCurrency("1,11")).toBe("$1,11");
+    expect(numberToCurrency("0,11")).toBe("$0,11");
+    expect(numberToCurrency(",11")).toBe("$,11");
+    expect(numberToCurrency("-1,11")).toBe("-$1,11");
+    expect(numberToCurrency("-0,11")).toBe("-$0,11");
+    expect(numberToCurrency("-,11")).toBe("-$,11");
+    expect(numberToCurrency(-0.0)).toBe("$0.00");
+    expect(numberToCurrency("-0.0")).toBe("$0.00");
   });
 
   it("number to percentage", () => {

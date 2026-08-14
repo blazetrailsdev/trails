@@ -20,23 +20,27 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
 
   protected convert(): string {
     const options = this.options;
-    const unit = (options.unit ?? "$") as string;
+    let format = options.format as string;
 
-    const num = Number(this.number);
-    if (!Number.isFinite(num)) return String(this.number);
-
-    const isNegative = num < 0;
-    const numberD = Math.abs(num);
-
-    const numberStr = NumberToRoundedConverter.convert(numberD, options);
-
-    let format: string;
-    if (isNegative) {
-      format = (options.negativeFormat ?? `-%u%n`) as string;
+    let numberS: string;
+    let numberD = this.validBigdecimal();
+    if (numberD !== null) {
+      if (numberD < 0) {
+        numberD = Math.abs(numberD);
+        if (numberD * 10 ** (options.precision as number) >= 0.5) {
+          format = options.negativeFormat as string;
+        }
+      }
+      numberS = NumberToRoundedConverter.convert(numberD, options);
     } else {
-      format = (options.format ?? "%u%n") as string;
+      numberS = String(this.number).trim();
+      const stripped = numberS.replace(/^-/, "");
+      if (stripped !== numberS) {
+        numberS = stripped;
+        format = options.negativeFormat as string;
+      }
     }
 
-    return format.replaceAll("%u", unit).replaceAll("%n", numberStr);
+    return format.replaceAll("%n", numberS).replaceAll("%u", options.unit as string);
   }
 }
