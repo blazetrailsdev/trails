@@ -22,6 +22,7 @@ import {
   NotImplementedError,
   RangeError as ARRangeError,
   AsynchronousQueryInsideTransactionError,
+  ActiveRecordError,
 } from "../../errors.js";
 
 import type { Quoting } from "./quoting.js";
@@ -35,7 +36,20 @@ import {
   type FutureResultPool,
   type FutureResultConnection,
 } from "../../future-result.js";
-import { asynchronousQueriesSession } from "../../core.js";
+import type { Base } from "../../base.js";
+
+/** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
+let _base: typeof Base | undefined;
+
+/** @internal */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
+}
 import { isWriteQuerySql } from "../sql-classification.js";
 import { ActiveRecord } from "../../ar-config.js";
 
@@ -2197,7 +2211,7 @@ export function select(
       { prepare: options?.prepare },
     );
     if (this.supportsConcurrentConnections?.() && !currentTransactionJoinable(this)) {
-      futureResult.scheduleBang(asynchronousQueriesSession());
+      futureResult.scheduleBang(baseClass().asynchronousQueriesSession());
       return futureResult;
     } else {
       // Ruby's `execute!` is an ordinary blocking call, so by the time this

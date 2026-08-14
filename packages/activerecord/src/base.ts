@@ -56,6 +56,8 @@ import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migr
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
 import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.js";
 import { _registerBase as _registerBaseWithNamedScoping } from "./scoping/named.js";
+import { _registerBase as _registerBaseWithAsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
+import { _registerBase as _registerBaseWithDatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import {
   discriminateClassForRecord,
   stiName,
@@ -5007,3 +5009,5 @@ _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
 _registerBaseWithNamedScoping(Base);
 _registerBaseWithConnectionHandler(Base);
+_registerBaseWithAsynchronousQueriesTracker(Base);
+_registerBaseWithDatabaseStatements(Base);
