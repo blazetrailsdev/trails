@@ -19,7 +19,7 @@ import {
   ordinal,
   ordinalize,
 } from "./index.js";
-import { Inflections } from "./inflector/inflections.js";
+import { Inflections, Uncountables } from "./inflector/inflections.js";
 import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
@@ -106,7 +106,7 @@ function withInflections(fn: (inflect: Inflections) => void): void {
   const inflect = Inflections.instance("en");
   const savedPlurals = [...inflect.plurals];
   const savedSingulars = [...inflect.singulars];
-  const savedUncountables = new Set(inflect.uncountables);
+  const savedUncountables = [...inflect.uncountables];
   const savedHumans = [...inflect.humans];
   const savedAcronyms = new Map(inflect.acronyms);
   const savedAcronymRegex = inflect.acronymRegex;
@@ -117,7 +117,7 @@ function withInflections(fn: (inflect: Inflections) => void): void {
   } finally {
     inflect.plurals = savedPlurals;
     inflect.singulars = savedSingulars;
-    inflect.uncountables = savedUncountables;
+    inflect.uncountables = new Uncountables().add(savedUncountables);
     inflect.humans = savedHumans;
     inflect.acronyms = savedAcronyms;
     inflect.acronymRegex = savedAcronymRegex;
@@ -543,7 +543,7 @@ describe("InflectorTest", () => {
 
       expect(inflect.plurals).toEqual([]);
       expect(inflect.singulars).toEqual([]);
-      expect(inflect.uncountables.size).toBe(0);
+      expect(inflect.uncountables.length).toBe(0);
       expect(inflect.humans).toEqual([]);
       expect(inflect.acronyms.size).toBe(0);
     });
@@ -561,7 +561,7 @@ describe("InflectorTest", () => {
 
       expect(inflect.plurals).toEqual([]);
       expect(inflect.singulars).toEqual([]);
-      expect(inflect.uncountables.size).toBe(0);
+      expect(inflect.uncountables.length).toBe(0);
       expect(inflect.humans).toEqual([]);
       expect(inflect.acronyms.size).toBe(0);
     });

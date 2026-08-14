@@ -459,8 +459,8 @@ export class Before {
     if (typeof hook === "function") hook.call(env.target, this.filter, this.name);
   }
 
-  apply(seq: CallbackSequence): CallbackSequence {
-    return seq.before(this);
+  apply(callbackSequence: CallbackSequence): CallbackSequence {
+    return callbackSequence.before(this);
   }
 
   static build(callback: Callback, options: DefineCallbacksOptions): (target: object) => boolean {
@@ -520,8 +520,8 @@ export class After {
     return env;
   }
 
-  apply(seq: CallbackSequence): CallbackSequence {
-    return seq.after(this);
+  apply(callbackSequence: CallbackSequence): CallbackSequence {
+    return callbackSequence.after(this);
   }
 
   static build(callback: Callback): (target: object) => void {
@@ -545,8 +545,8 @@ export class Around {
     this.userConditions = userConditions;
   }
 
-  apply(seq: CallbackSequence): CallbackSequence {
-    return seq.around(this.userCallback, this.userConditions);
+  apply(callbackSequence: CallbackSequence): CallbackSequence {
+    return callbackSequence.around(this.userCallback, this.userConditions);
   }
 
   static build(callback: Callback): (target: object, block: () => void) => void {
@@ -1140,13 +1140,14 @@ export class CallbackChain {
     // Mirrors Rails CallbackChain#compile: fold the chain in reverse, applying
     // each callback's compiled filter onto the sequence. before/after mutate the
     // (single) final sequence's lists; around wraps it in a new nested sequence.
-    let seq = new CallbackSequence();
+    const finalSequence = new CallbackSequence();
+    let callbackSequence = finalSequence;
     for (let i = this.chain.length - 1; i >= 0; i--) {
-      seq = this.chain[i].compiled.apply(seq);
+      callbackSequence = this.chain[i].compiled.apply(callbackSequence);
     }
-    seq._callbackChain = this;
-    this._allCallbacks = seq;
-    return seq;
+    callbackSequence._callbackChain = this;
+    this._allCallbacks = callbackSequence;
+    return callbackSequence;
   }
 
   get isEmpty(): boolean {

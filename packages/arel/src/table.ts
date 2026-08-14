@@ -255,8 +255,8 @@ export class Table extends Node {
    *
    * Mirrors: Arel::FactoryMethods#as (Table delegation)
    */
-  as(aliasName: string): TableAlias {
-    return new TableAlias(this, aliasName);
+  as(name: string): TableAlias {
+    return new TableAlias(this, name);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

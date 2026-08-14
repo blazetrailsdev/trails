@@ -189,7 +189,7 @@ export {
   titlecase,
 } from "./inflector.js";
 
-export { Inflections, loadDefaults } from "./inflector/inflections.js";
+export { Inflections, Uncountables, loadDefaults } from "./inflector/inflections.js";
 
 export {
   PARSING,

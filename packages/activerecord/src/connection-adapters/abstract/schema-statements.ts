@@ -782,13 +782,17 @@ export class SchemaStatements {
     // override addForeignKey on the class and call super for this body, so
     // there is no self-delegation here — the override already shadows the
     // mixed-in method on the prototype.
-    const opts = this.foreignKeyOptions(fromTable, toTable, options as Record<string, unknown>);
+    options = this.foreignKeyOptions(
+      fromTable,
+      toTable,
+      options as Record<string, unknown>,
+    ) as AddForeignKeyOptions;
     const at = this.createAlterTable(fromTable);
     // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
     // (now converged) rather than building the FK def inline: it applies
     // table_name_prefix/suffix to to_table and re-runs foreign_key_options
     // idempotently (column/name already filled above), mirroring Rails.
-    at.addForeignKey(toTable, opts as Partial<AddForeignKeyOptions>);
+    at.addForeignKey(toTable, options as Partial<AddForeignKeyOptions>);
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -847,14 +851,17 @@ export class SchemaStatements {
     )
       return;
 
-    const resolved = this.checkConstraintOptions(tableName, expression, options) as {
+    // Rails takes `if_not_exists:` as its own kwarg, so it survives the
+    // `options = check_constraint_options(...)` rebind on the next line.
+    const ifNotExists = options.ifNotExists;
+    options = this.checkConstraintOptions(tableName, expression, options) as {
       name?: string;
       validate?: boolean;
     };
-    if (options.ifNotExists && (await this.checkConstraintExists(tableName, resolved))) return;
+    if (ifNotExists && (await this.checkConstraintExists(tableName, options))) return;
 
     const at = this.createAlterTable(tableName);
-    at.addCheckConstraint(expression, resolved);
+    at.addCheckConstraint(expression, options);
     await this.execute(await this.schemaCreation.accept(at));
   }
 

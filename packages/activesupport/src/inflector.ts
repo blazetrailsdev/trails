@@ -16,7 +16,7 @@ function applyInflections(
   if (!word || word.length === 0) return word;
 
   const inflections = Inflections.instance(locale);
-  if (inflections.uncountables.has(word.toLowerCase())) {
+  if (inflections.uncountables.isUncountable(word)) {
     return word;
   }
 

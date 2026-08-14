@@ -2491,8 +2491,7 @@ export function buildArel(
   if (this._optimizerHints.length > 0) arel.optimizerHints?.(...this._optimizerHints);
   arel.distinct(this._isDistinct);
 
-  const from = buildFrom.call(this);
-  if (from !== undefined && from !== null) arel.from(from as any);
+  if (!this._fromClause.isEmpty()) arel.from(buildFrom.call(this) as any);
 
   if (this._lockValue) arel.lock(this._lockValue);
 

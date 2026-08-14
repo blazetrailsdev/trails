@@ -119,12 +119,17 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
     ): boolean {
       // `super` is Value#changed? — Ruby `!=` on BigDecimal is value equality,
       // JS `!==` is object identity, so normalize before comparing.
-      const old = normalizeBigDecimal(oldValue);
-      const fresh = normalizeBigDecimal(newValue);
+      oldValue = normalizeBigDecimal(oldValue);
+      newValue = normalizeBigDecimal(newValue);
       return (
-        (super.isChanged(old, fresh, newValueBeforeTypeCast) ||
-          isNumberToNonNumber(old, newValueBeforeTypeCast)) &&
-        !isEqualNan(old, fresh)
+        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
+          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
+        // DIVERGENCE (a1): Rails passes `new_value_before_type_cast` here
+        // (activemodel/lib/active_model/type/helpers/numeric.rb:33). trails
+        // passes the cast value, which is what `float.test.ts`'s
+        // "equal_nan? uses cast value" case enshrines. Filed as
+        // `numeric-equal-nan-before-type-cast-arg`.
+        !isEqualNan(oldValue, newValue)
       );
     }
   }
