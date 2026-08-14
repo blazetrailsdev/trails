@@ -13,7 +13,7 @@
  * Mirrors: `class Date` (`core_ext/date/calculations.rb`)
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Date as RubyDate } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -233,7 +233,10 @@ export function change(
  * and a `TimeWithZone`; trails has no bare-`Time` class to key on. The day is
  * widened by ruby/date's own `to_datetime` (`date_core.c`
  * `d_lite_to_datetime`), which is midnight at offset 0 — `date_ext_test.rb:80`
- * asserts that — not midnight in `Time.zone`.
+ * asserts that — not midnight in `Time.zone`. That method is ported as
+ * `Date#toDatetime` (`packages/date/src/date.ts`), whose receiver is the
+ * ruby/date `Date`, so the `Temporal.PlainDate` this file is keyed on is handed
+ * to it through the `PlainDate` constructor overload.
  */
 export function compareWithCoercion(
   date: Temporal.PlainDate,
@@ -242,14 +245,22 @@ export function compareWithCoercion(
   // boundary: a JS `Date` is one of trails' moment receivers, and this arm is
   // keyed on being one.
   if (other instanceof Date || other instanceof Temporal.Instant || other instanceof TimeWithZone) {
-    const toDatetime = date.toZonedDateTime("UTC").toInstant();
+    const toDatetime = new RubyDate(date).toDatetime();
     const instant =
       other instanceof Temporal.Instant
         ? other
         : other instanceof TimeWithZone
           ? other.utc()
           : Temporal.Instant.fromEpochMilliseconds(other.getTime());
-    return Temporal.Instant.compare(toDatetime, instant);
+    return Temporal.Instant.compare(
+      // A `Date`'s `to_datetime` is always offset 0, which trails spells as the
+      // offsetless `PlainDateTime`; the `ZonedDateTime` arm is unreachable here.
+      (toDatetime instanceof Temporal.ZonedDateTime
+        ? toDatetime
+        : toDatetime.toZonedDateTime("UTC")
+      ).toInstant(),
+      instant,
+    );
   } else {
     return compareWithoutCoercion(date, other);
   }

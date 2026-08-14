@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date/calculations.ts",
-    "rubyName": "compare_with_coercion",
-    "call": "to_datetime",
-    "reason": "Rails coerces the receiver with `to_datetime` before comparing when the other side is a Time (date/calculations.rb:143); trails compares the temporal values directly. A pre-existing gap, newly visible because `toDatetime` entered the activesupport population; tracked by 0098-activesupport-ar-closure-port/converge-date-time-current-since-to-datetime."
-  }
-]
