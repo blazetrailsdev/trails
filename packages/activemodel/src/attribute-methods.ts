@@ -406,11 +406,19 @@ export function defineAttributeMethodPattern(
   const publicMethodName = pattern.methodName(as);
 
   // If defining a regular attribute method, we don't override methods that are
-  // explicitly defined in parent classes. The prototype arm is spelled `in`,
-  // as ActiveRecord's own override of the predicate spells it: a generated
-  // bare-pattern accessor is a getter that raises when read off the prototype.
+  // explicitly defined in parent classes. The predicate is dispatched through
+  // the class, as Ruby dispatches it: ActiveRecord overrides it to raise
+  // DangerousAttributeError for a name Active Record itself defines
+  // (activerecord/attribute_methods.rb:165-168) before this base behaviour
+  // runs. The prototype arm is spelled `in`, as that override spells it,
+  // because a generated bare-pattern accessor is a getter that raises when read
+  // off the prototype.
+  const alreadyImplemented = (this as unknown as Record<string, unknown>)
+    .isInstanceMethodAlreadyImplemented;
   if (
-    isInstanceMethodAlreadyImplemented.call(this, publicMethodName) ||
+    (typeof alreadyImplemented === "function"
+      ? (alreadyImplemented as (methodName: string) => boolean).call(this, publicMethodName)
+      : isInstanceMethodAlreadyImplemented.call(this, publicMethodName)) ||
     publicMethodName in this.prototype
   ) {
     // However, for `alias_attribute`, we always define the method.

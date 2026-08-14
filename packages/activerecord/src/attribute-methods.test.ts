@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
-import { Base } from "./index.js";
+import { Base, DangerousAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { inTimeZone } from "./cases/helper.js";
@@ -361,10 +361,23 @@ describe("AttributeMethodsTest", () => {
     const p = await Post.create({ title: "frozen" });
     expect(p.title).toBe("frozen");
   });
-  it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "dangerous" });
-    expect(p.id).toBeDefined();
+  it("raises ActiveRecord::DangerousAttributeError when defining an AR method or dangerous Object method in a model", () => {
+    // Rails also lists `hash`, which has no instance method in trails and so is
+    // not in the dangerous population.
+    for (const method of ["save", "createOrUpdate", "dup", "isFrozen"]) {
+      const klass = class extends Base {};
+      Object.defineProperty(klass.prototype, method, {
+        value() {
+          return `defined ${method}`;
+        },
+        configurable: true,
+      });
+      expect(() =>
+        (
+          klass as unknown as { isInstanceMethodAlreadyImplemented(name: string): boolean }
+        ).isInstanceMethodAlreadyImplemented(method),
+      ).toThrow(DangerousAttributeError);
+    }
   });
   it("setting time zone-aware read attribute", async () => {
     const { Post } = makeModel();

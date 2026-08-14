@@ -8,7 +8,7 @@
  * are kept verbatim per CLAUDE.md.
  */
 import { describe, it, expect } from "vitest";
-import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
+import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import { registerSubclass } from "./inheritance.js";
@@ -336,5 +336,19 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(NonExistentTable.attributeNames()).toEqual(["name"]);
     await NonExistentTable.loadSchema();
     expect(NonExistentTable.attributeNames()).toEqual([]);
+  });
+
+  it("aliasing an attribute onto an Active Record method raises DangerousAttributeError", () => {
+    // define_attribute_method_pattern dispatches instance_method_already_implemented?
+    // through the class, and ActiveRecord's override raises before the
+    // `override: true` arm alias_attribute relies on is consulted
+    // (activerecord/attribute_methods.rb:165-168, 324-331).
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+
+    expect(() => Employee.aliasAttribute("save", "name")).toThrow(DangerousAttributeError);
   });
 });

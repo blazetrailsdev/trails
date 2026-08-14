@@ -10,6 +10,7 @@ import {
   resolveAliasNameIn,
   type InstanceHost as AttributeMethodsInstanceHost,
 } from "@blazetrails/activemodel";
+import { DangerousAttributeError } from "./errors.js";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import {
   attributeForInspect as _attrForInspect,
@@ -228,6 +229,8 @@ export function dangerousAttributeMethods(): Set<string> {
     "dup",
     "clone",
     "becomes",
+    "createOrUpdate",
+    "isFrozen",
     "inspect",
     "toJSON",
     "isNewRecord",
@@ -528,10 +531,24 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
   this._aliasAttributesMassGenerated = false;
 }
 
+/**
+ * Mirrors: ClassMethods#instance_method_already_implemented?
+ * (attribute_methods.rb:165-179) — the dangerous-method raise comes first, so
+ * `alias_attribute :save, :name` raises rather than generating an accessor
+ * over Active Record's own method. The `superclass == Base` split below it
+ * reduces to the prototype probe here: the generated module is spliced into
+ * the prototype chain, so an inherited generated accessor and an inherited
+ * real method are both visible from `this.prototype`.
+ */
 export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost,
   methodName: string,
 ): boolean {
+  if (isDangerousAttributeMethod.call(this, methodName)) {
+    throw new DangerousAttributeError(
+      `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
+    );
+  }
   return methodName in this.prototype;
 }
 
