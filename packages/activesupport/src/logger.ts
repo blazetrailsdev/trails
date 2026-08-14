@@ -349,17 +349,6 @@ export class Logger {
   }
 }
 
-// Add convenience predicate methods (debug?, info?, etc.)
-(["debug", "info", "warn", "error", "fatal"] as LogLevel[]).forEach((name) => {
-  const level = LOG_LEVELS[name];
-  Object.defineProperty(Logger.prototype, `${name}?`, {
-    get() {
-      return this.level <= level;
-    },
-    configurable: true,
-  });
-});
-
 /**
  * TaggedLogging — wraps a Logger to prepend tags to messages.
  * Mirrors ActiveSupport::TaggedLogging.
