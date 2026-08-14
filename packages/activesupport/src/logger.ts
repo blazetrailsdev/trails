@@ -171,14 +171,17 @@ export class Logger {
     return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
   }
 
+  /**
+   * `logger_thread_safe_level.rb:14-22`. Ruby has three non-raising arms and
+   * one raise: a Symbol goes through `Logger::Severity.const_get`, which raises
+   * NameError for an unknown name, so only the `else` arm — a String or any
+   * other value — reaches ArgumentError.
+   */
   set localLevel(level: number | LogLevel | null) {
     let value: number | null;
     if (typeof level === "number") {
       value = level;
     } else if (typeof level === "string") {
-      // `Logger::Severity.const_get(level.to_s.upcase)` — `const_get` raises
-      // NameError for an unknown name, so only the `else` arm below reaches
-      // ArgumentError.
       const constantName = level.toUpperCase();
       value = LOG_LEVELS[level.toLowerCase() as LogLevel];
       if (value === undefined) {

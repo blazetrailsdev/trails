@@ -91,7 +91,7 @@ describe("LoggerSilence", () => {
 });
 
 describe("LoggerThreadSafeLevel", () => {
-  it("raises NameError on an unknown level name", () => {
+  it("raises on an unknown level", () => {
     const logger = new Logger({ write: () => {} });
 
     expect(() => {
