@@ -1583,14 +1583,11 @@ export const DatabaseStatements = {
     // is correct for every shape that carries binds.
     const preparable = compiledPreparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
-    // Rails passes `async: async && FutureResult::SelectAll` down into `select`
-    // (database_statements.rb:74), which schedules the query on the async
-    // executor and hands back a FutureResult the caller resolves later. Every
-    // trails select already returns a Promise, so the `async` kwarg the select
-    // family forwards here collapses into that Promise — see the future_result.rb
-    // entry in scripts/parity/unported-files/unscoped.ts. It is accepted and
-    // threaded so the forwarding call sites match Rails' argument lists; the
-    // scheduling half lands with the load_async port.
+    // Rails passes `async: async && FutureResult::SelectAll` into `select`
+    // (database_statements.rb:74) so the caller gets a FutureResult to resolve
+    // later; a trails select already returns that Promise, which is what the
+    // forwarded `async` collapses to here (future_result.rb is permanently
+    // unported — scripts/parity/unported-files/unscoped.ts:21).
     try {
       // Rails' select_all runs `internal_exec_query` (the private work method),
       // NOT the public `exec_query` — the latter is wrapped by
