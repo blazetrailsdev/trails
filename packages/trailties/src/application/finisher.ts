@@ -3,9 +3,8 @@
  * `railties/lib/rails/application/finisher.rb`. Defines the finisher
  * initializers that run after the Trailtie + bootstrap initializers.
  *
- * Application (PR 2.5) will splice these into its initializer chain via
- * `initializersChain()`. Until then this class stands alone so tests can
- * exercise the declarations and block bodies against a mock host.
+ * `Application#initializers` splices these in after the Bootstrap and
+ * Trailtie/Engine initializers, mirroring `application.rb:445-449`.
  *
  * Rails blocks of the form `initializer :foo do |app|` get the
  * Application instance both as `self` and as the block argument. In our
@@ -21,10 +20,12 @@
  * of scope per the trailties plan.
  */
 import { Initializable } from "../initializable.js";
+import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
+import type { DrawCallback } from "@blazetrails/actionpack";
 
 export interface FinisherRoutes {
-  prepend(block: () => void): void;
+  prepend(block: DrawCallback): void;
   defineMountedHelper(name: string): void;
 }
 
@@ -37,18 +38,12 @@ export interface FinisherConfig {
   toPrepareBlocks: ConfigurationBlock[];
 }
 
-export interface FinisherEnv {
-  isDevelopment(): boolean;
-}
-
 export interface FinisherHost {
   config: FinisherConfig;
-  routes: FinisherRoutes;
+  routes(): FinisherRoutes;
   reloader: FinisherReloader;
-  env: FinisherEnv;
   ensureGeneratorTemplatesAdded(): void;
   buildMiddlewareStack(): void;
-  appendInternalRoute(verb: string, path: string, to: string): void;
 }
 
 export class Finisher extends Initializable {}
@@ -58,12 +53,15 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  if (!this.env.isDevelopment()) return;
-  this.routes.prepend(() => {
-    this.appendInternalRoute("get", "/rails/info/properties", "rails/info#properties");
-    this.appendInternalRoute("get", "/rails/info/routes", "rails/info#routes");
-    this.appendInternalRoute("get", "/rails/info/notes", "rails/info#notes");
-    this.appendInternalRoute("get", "/rails/info", "rails/info#index");
+  // `Trails.env` is an `EnvironmentInquirer`, whose per-environment
+  // predicates are Proxy-generated (`string-inquirer.ts:12-28`) and so are
+  // absent from its static type; Rails reads `Rails.env.development?`.
+  if (!(Trails.env as unknown as { isDevelopment(): boolean }).isDevelopment()) return;
+  this.routes().prepend((mapper) => {
+    mapper.get("/rails/info/properties", "rails/info#properties");
+    mapper.get("/rails/info/routes", "rails/info#routes");
+    mapper.get("/rails/info/notes", "rails/info#notes");
+    mapper.get("/rails/info", "rails/info#index");
   });
 });
 
@@ -72,7 +70,7 @@ Finisher.initializer("build_middleware_stack", function (this: FinisherHost) {
 });
 
 Finisher.initializer("define_main_app_helper", function (this: FinisherHost) {
-  this.routes.defineMountedHelper("main_app");
+  this.routes().defineMountedHelper("main_app");
 });
 
 Finisher.initializer("add_to_prepare_blocks", function (this: FinisherHost) {

@@ -56,7 +56,11 @@ export class DefaultMiddlewareStack {
     if (config.publicFileServer.enabled) {
       const root = this.paths.public();
       if (root) {
-        stack.use(Static as never, root, {
+        // Rails passes `root` positionally (`default_middleware_stack.rb:32`);
+        // trails' `Static` takes it as an option key
+        // (`actionpack/.../middleware/static.ts:47`).
+        stack.use(Static as never, {
+          root,
           index: config.publicFileServer.indexName,
           headers: config.publicFileServer.headers ?? {},
         });

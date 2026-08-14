@@ -1,28 +1,35 @@
 // Mirrors railties/test/application/initializers/finisher_test.rb.
 // The ported subset of finisher initializers is exercised against a
 // mock host so we don't need the full Application shell (PR 2.5).
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import {
   Finisher,
   type FinisherConfig,
-  type FinisherEnv,
   type FinisherReloader,
   type FinisherRoutes,
 } from "./finisher.js";
+import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
+import type { Mapper } from "@blazetrails/actionpack";
 
 class TestApp extends Finisher {
   config: FinisherConfig = { toPrepareBlocks: [] };
-  env: FinisherEnv = { isDevelopment: () => true };
   calls: string[] = [];
   internalRoutes: string[] = [];
   toPrepared: ConfigurationBlock[] = [];
   mountedHelpers: string[] = [];
 
-  routes: FinisherRoutes = {
-    prepend: (block) => block(),
+  private _routes: FinisherRoutes = {
+    prepend: (block) =>
+      block({
+        get: (path: string, to: string) => this.internalRoutes.push(`get ${path} -> ${to}`),
+      } as unknown as Mapper),
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
   };
+
+  routes(): FinisherRoutes {
+    return this._routes;
+  }
   reloader: FinisherReloader = {
     toPrepare: (block) => this.toPrepared.push(block),
     prepareBang: () => this.calls.push("prepare!"),
@@ -34,9 +41,6 @@ class TestApp extends Finisher {
   buildMiddlewareStack(): void {
     this.calls.push("middleware_stack");
   }
-  appendInternalRoute(verb: string, path: string, to: string): void {
-    this.internalRoutes.push(`${verb} ${path} -> ${to}`);
-  }
 }
 
 function run(app: TestApp, name: string): void {
@@ -44,6 +48,11 @@ function run(app: TestApp, name: string): void {
 }
 
 describe("Finisher", () => {
+  const originalEnv = Trails.env.toString();
+  afterEach(() => {
+    Trails.env = originalEnv;
+  });
+
   it("registers the ported finisher initializers in Rails order", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
     expect(names).toEqual([
@@ -105,6 +114,7 @@ describe("Finisher", () => {
   });
 
   it("add_internal_routes prepends rails/info routes in development", () => {
+    Trails.env = "development";
     const app = new TestApp();
     run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([
@@ -116,13 +126,14 @@ describe("Finisher", () => {
   });
 
   it("add_internal_routes is a no-op outside development", () => {
+    Trails.env = "production";
     const app = new TestApp();
-    app.env = { isDevelopment: () => false };
     run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([]);
   });
 
   it("runs all finisher initializers in declared order via runInitializers", () => {
+    Trails.env = "production";
     const app = new TestApp();
     app.runInitializers();
     expect(app.calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);

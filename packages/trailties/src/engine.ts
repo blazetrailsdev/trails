@@ -2,6 +2,7 @@
 // EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
 // → 2.2c. `env_config`/`endpoint`/`call`/`helpers` → blocked on PR 2.5.
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import type { DrawCallback, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
@@ -11,7 +12,7 @@ import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 export class Engine extends Trailtie {
   private _railtiesCollection?: Trailties;
   private _allLoadPathsCache?: string[];
-  private _routes?: unknown;
+  private _routes?: RouteSet;
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
@@ -125,15 +126,10 @@ export class Engine extends Trailtie {
     return this._railtiesCollection;
   }
 
-  /** `Engine#routes(&block)` — undefined when no `routeSetClass` is set. */
-  routes(block?: (this: unknown) => void): unknown {
-    if (!this._routes) {
-      const cfg = this.config;
-      if (!cfg.routeSetClass) return undefined;
-      this._routes = new cfg.routeSetClass(cfg);
-    }
-    const r = this._routes as { append?: (b: (this: unknown) => void) => void };
-    if (block) r.append?.(block);
+  /** Mirrors `Engine#routes(&block)` (`engine.rb:462-466`). */
+  routes(block?: DrawCallback): RouteSet {
+    this._routes ??= this.config.routeSetClass.newWithConfig(this.config);
+    if (block) this._routes.append(block);
     return this._routes;
   }
   hasRoutes(): boolean {

@@ -11,16 +11,20 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
+import { Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import { Bootstrap } from "./application/bootstrap.js";
+import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
+import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
+import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
 
 let _appClass: typeof Application | null = null;
 /** @internal Tracks which subclasses have fired `:before_configuration`. */
@@ -31,6 +35,11 @@ export class Application extends Engine {
   private _routesReloader?: RoutesReloader;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
+  private _app?: RackApp;
+  /** Rails: `@reloader = Class.new(ActiveSupport::Reloader)` (`application.rb:123`) —
+   * a per-application subclass so one app's prepare callbacks don't leak into
+   * another's. */
+  readonly reloader = class extends Reloader {};
   logger: Logger | null = null;
   cache: CacheStore | null = null;
 
@@ -91,14 +100,18 @@ export class Application extends Engine {
 
   /**
    * Splice Bootstrap + Engine/Trailtie + Finisher initializers — mirrors
-   * Rails' `Application#initializers`. Finisher splicing lands in PR 2.5b
-   * once `Configuration` + the middleware stack supply the host methods
-   * Finisher requires.
+   * Rails' `Application#initializers` (`application.rb:445-449`).
+   *
+   * @missingRailsCall railties_initializers — Rails wraps the inherited
+   * collection in `railties_initializers(super)` so `config.railties_order`
+   * can reorder engines around the app; `ordered_railties` is not ported
+   * (see `application.ts` PR 2.5), so the inherited collection is spliced
+   * in load order.
    */
   get initializers(): Collection {
     const bootstrap = Bootstrap.initializersFor(this);
     const inherited = super.initializers;
-    return bootstrap.plus(inherited);
+    return bootstrap.plus(inherited).plus(Finisher.initializersFor(this));
   }
 
   /**
@@ -119,6 +132,62 @@ export class Application extends Engine {
     this._initialized = true;
     runLoadHooks("after_initialize", this);
     return this;
+  }
+
+  /**
+   * Mirrors `Engine#app` (`engine.rb:516-524`) — builds the middleware
+   * stack once and wraps the endpoint in it.
+   *
+   * @missingRailsCall build_middleware, merge_into — Rails merges
+   * `config.app_middleware + config.middleware` (both
+   * `MiddlewareStackProxy`s) into the default stack. `MiddlewareStackProxy`
+   * is not ported (`trailtie/configuration.ts:87` — `appMiddleware()`
+   * returns undefined), so there are no queued operations to merge and the
+   * default stack is assigned to `config.middleware` directly.
+   */
+  app(): RackApp {
+    if (this._app) return this._app;
+    const stack = this.defaultMiddlewareStack();
+    this.config.middleware = stack;
+    return (this._app = stack.build(this.endpoint()));
+  }
+
+  /** Rails: `alias :build_middleware_stack :app` (`application.rb:558`). */
+  buildMiddlewareStack(): RackApp {
+    return this.app();
+  }
+
+  /**
+   * Mirrors `Engine#endpoint` (`engine.rb:527-529`) — `self.class.endpoint`
+   * is not ported, so the route set is always the endpoint. Rails hands the
+   * `RouteSet` itself to the stack because it responds to `call`; trails'
+   * `RackApp` is a function type, so the method is wrapped.
+   */
+  endpoint(): RackApp {
+    const routes = this.routes();
+    return (env) => routes.call(env);
+  }
+
+  /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`). */
+  defaultMiddlewareStack(): MiddlewareStack {
+    const defaultStack = new DefaultMiddlewareStack(this, this.config, {
+      public: () => this.config.paths().get("public")?.toAry()[0],
+    });
+    return defaultStack.buildStack();
+  }
+
+  /**
+   * Mirrors `Application#ensure_generator_templates_added`
+   * (`application.rb:631-634`).
+   *
+   * Rails also unshifts the existent `paths["lib/templates"]` directories
+   * ahead of the configured ones. `Path#existent` is async in trails (`paths.ts:147`) and initializers run
+   * synchronously (`initializable.ts:runInitializers`), so the filesystem
+   * scan is skipped; see the `generator-templates-existent-paths` story.
+   */
+  ensureGeneratorTemplatesAdded(): void {
+    const generators = this.config.generators();
+    generators.templates ??= [];
   }
 
   routesReloader(): RoutesReloader {

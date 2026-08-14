@@ -7,23 +7,23 @@
  * - Constructing with a `null` root is allowed (matches 2.2a
  *   `Engine#paths()` tolerance); `Engine#paths()` injects the resolved
  *   root via `setRoot()` once known.
- * - `routeSetClass` is held as an opaque constructor; the real
- *   `ActionDispatch::Routing::RouteSet` wiring lands with PR 2.5.
  */
+import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 
-export type MiddlewareEntry = { name: string; args: unknown[] };
-export type RouteSetCtor = new (config: EngineConfiguration) => unknown;
+/** Mirrors `config.route_set_class` (`engine/configuration.rb:47`) — the
+ * class is used through its `new_with_config` factory. */
+export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteSet };
 
 export class EngineConfiguration extends RailtieConfiguration {
   private _root: string | null;
   private _paths?: Root;
 
-  middleware: MiddlewareEntry[] = [];
+  middleware: MiddlewareStack = new MiddlewareStack();
   javascriptPath = "javascript";
-  routeSetClass: RouteSetCtor | null = null;
+  routeSetClass: RouteSetClass = RouteSet;
   defaultScope: Record<string, unknown> | null = null;
   tableNamePrefix: string | null = null;
 
