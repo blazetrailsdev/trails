@@ -156,11 +156,15 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // `!group_values.empty?` branch — load + count rows, not a scalar
     // COUNT(*). The `.select("title")` pairs with the GROUP BY so the loaded
     // SELECT is valid SQL (PostgreSQL rejects `SELECT *` under GROUP BY).
-    Associations.hasMany.call(CpcAuthor, "cpcPostsByTitle", {
-      className: "CpcPost",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.group("title").select("title"),
-    });
+    Associations.hasMany.call(
+      CpcAuthor,
+      "cpcPostsByTitle",
+      (rel: any) => rel.group("title").select("title"),
+      {
+        className: "CpcPost",
+        foreignKey: "author_id",
+      },
+    );
     const author = await CpcAuthor.create({ name: "g" });
     await CpcPost.create({ author_id: author.id, title: "X", body: "b1" });
     await CpcPost.create({ author_id: author.id, title: "X", body: "b2" });
@@ -173,10 +177,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("size() with DISTINCT ignores the unsaved-records shortcut and counts via SQL", async () => {
-    Associations.hasMany.call(CpcAuthor, "cpcPostsDistinct", {
+    Associations.hasMany.call(CpcAuthor, "cpcPostsDistinct", (rel: any) => rel.distinct(), {
       className: "CpcPost",
       foreignKey: "author_id",
-      scope: (rel: any) => rel.distinct(),
     });
     const author = await CpcAuthor.create({ name: "d" });
     await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
@@ -234,10 +237,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     // ActiveRecord::Core#== (class + present primary key), not object identity.
     // A re-fetched instance (same id, different object) must dedup in place
     // rather than appending a duplicate to the loaded target.
-    Associations.hasMany.call(CpcAuthor, "cpcPostsDedup", {
+    Associations.hasMany.call(CpcAuthor, "cpcPostsDedup", (rel: any) => rel.distinct(), {
       className: "CpcPost",
       foreignKey: "author_id",
-      scope: (rel: any) => rel.distinct(),
     });
     const author = await CpcAuthor.create({ name: "dedup" });
     const post = await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
@@ -298,10 +300,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
   it("count_records clamps the result to the association scope's limit_value", async () => {
     // Mirrors `[association_scope.limit_value, count].compact.min`: a scoped
     // limit caps the reported size even when the DB holds more rows.
-    Associations.hasMany.call(CpcAuthor, "cpcPostsLimited", {
+    Associations.hasMany.call(CpcAuthor, "cpcPostsLimited", (rel: any) => rel.limit(2), {
       className: "CpcPost",
       foreignKey: "author_id",
-      scope: (rel: any) => rel.limit(2),
     });
     const author = await CpcAuthor.create({ name: "limited" });
     await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });

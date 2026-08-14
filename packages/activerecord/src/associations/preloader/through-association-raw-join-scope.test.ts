@@ -52,20 +52,27 @@ type JoinWhere = {
   where: (sql: string) => JoinWhere;
 };
 type HasOneHost = {
-  hasOne: (name: string, options: Record<string, unknown>) => void;
+  hasOne: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
 };
 
 // A has_one-through mirroring `general_club` (Member → current_membership →
 // club) but whose scope reaches `categories` via a RAW string join instead of
 // `left_joins(:category)` — the case real Rails raises on.
-(Member as unknown as HasOneHost).hasOne("rawGeneralClub", {
-  through: "currentMembership",
-  source: "club",
-  scope: (rel: JoinWhere) =>
+(Member as unknown as HasOneHost).hasOne(
+  "rawGeneralClub",
+  (rel: JoinWhere) =>
     rel
       .joins("INNER JOIN categories ON categories.id = clubs.category_id")
       .where("categories.name = 'General'"),
-});
+  {
+    through: "currentMembership",
+    source: "club",
+  },
+);
 
 describe("Preloader::ThroughAssociation#through_scope raw-join handling", () => {
   const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);

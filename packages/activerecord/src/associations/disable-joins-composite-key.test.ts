@@ -134,10 +134,9 @@ describe("DJAS — composite key support", () => {
   });
 
   it("composite-key + ordered upstream: skips DJAR wrap (records load via composite-key WHERE, no in-list reorder)", async () => {
-    Associations.hasMany.call(CkShop, "ckOrdersOrdered", {
+    Associations.hasMany.call(CkShop, "ckOrdersOrdered", (rel: any) => rel.order("name"), {
       className: "CkOrder",
       foreignKey: "shop_id",
-      scope: (rel: any) => rel.order("name"),
     });
     Associations.hasMany.call(CkShop, "ckLineItemsOrdered", {
       className: "CkLineItem",
@@ -312,10 +311,9 @@ describe("DJAS — composite key support", () => {
   });
 
   it("composite-key + ordered upstream + empty through: preserves none() instead of full table scan", async () => {
-    Associations.hasMany.call(CkShop, "ckOrdersOrdered2", {
+    Associations.hasMany.call(CkShop, "ckOrdersOrdered2", (rel: any) => rel.order("name"), {
       className: "CkOrder",
       foreignKey: "shop_id",
-      scope: (rel: any) => rel.order("name"),
     });
     Associations.hasMany.call(CkShop, "ckLineItemsEmpty", {
       className: "CkLineItem",

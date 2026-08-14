@@ -91,9 +91,8 @@ class PostWithHasOneNullify extends Base {
 class WelcomeOnlyTagging extends Base {
   static {
     this._tableName = "taggings";
-    this.belongsTo("taggable", {
+    this.belongsTo("taggable", (q: any) => q.where({ posts: { title: "Welcome to the weblog" } }), {
       polymorphic: true,
-      scope: (q: any) => q.where({ posts: { title: "Welcome to the weblog" } }),
     });
   }
 }

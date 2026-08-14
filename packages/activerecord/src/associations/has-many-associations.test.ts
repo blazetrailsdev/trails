@@ -3101,11 +3101,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DcClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -3143,11 +3142,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DsClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -3177,11 +3175,10 @@ describe("HasManyAssociationsTest", () => {
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
-        this.hasMany("conditionalClients", {
+        this.hasMany("conditionalClients", (rel: any) => rel.where({ name: "BigShot Inc." }), {
           className: "DhClient",
           foreignKey: "firm_id",
           dependent: "destroy",
-          scope: (rel: any) => rel.where({ name: "BigShot Inc." }),
         });
       }
     }
@@ -4055,11 +4052,10 @@ describe("HasManyAssociationsTest", () => {
           className: "HcPost",
           foreignKey: "author_id",
         });
-        this.hasMany("helloPostComments", {
+        this.hasMany("helloPostComments", (rel: any) => rel.where({ body: "hello" }), {
           className: "HcComment",
           through: "hcPosts",
           source: "hcComments",
-          scope: (rel: any) => rel.where({ body: "hello" }),
         });
       }
     }

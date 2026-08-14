@@ -66,8 +66,7 @@ for (const model of [
 export class SpecialTopic extends Topic {
   static {
     this.hasMany("specialReplies", { className: "SpecialReply", foreignKey: "parent_id" });
-    this.hasMany("lightweightSpecialReplies", {
-      scope: (q: any) => q.select("topics.id", "topics.title"),
+    this.hasMany("lightweightSpecialReplies", (q: any) => q.select("topics.id", "topics.title"), {
       className: "SpecialReply",
       foreignKey: "parent_id",
     });

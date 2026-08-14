@@ -52,20 +52,27 @@ type JoinWhere = {
   where: (sql: string) => JoinWhere;
 };
 type HasManyHost = {
-  hasMany: (name: string, options: Record<string, unknown>) => void;
+  hasMany: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
 };
 
 // A has_many-through mirroring `clubs` (Member → favoriteMemberships → club) but
 // whose scope reaches `categories` via a RAW string join instead of a symbol
 // association — the case real Rails raises on for has_many-through too.
-(Member as unknown as HasManyHost).hasMany("rawClubs", {
-  through: "favoriteMemberships",
-  source: "club",
-  scope: (rel: JoinWhere) =>
+(Member as unknown as HasManyHost).hasMany(
+  "rawClubs",
+  (rel: JoinWhere) =>
     rel
       .joins("INNER JOIN categories ON categories.id = clubs.category_id")
       .where("categories.name = 'General'"),
-});
+  {
+    through: "favoriteMemberships",
+    source: "club",
+  },
+);
 
 describe("Preloader::ThroughAssociation#through_scope has_many raw-join handling", () => {
   const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);

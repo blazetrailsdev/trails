@@ -153,10 +153,9 @@ describe("DJAS routing widening — nested-through", () => {
   });
 
   it("nested-through + ordered intermediate: DJAR wrap reorders final records by chain-intermediate sequence", async () => {
-    Associations.hasMany.call(NtPost, "ntCommentsOrdered", {
+    Associations.hasMany.call(NtPost, "ntCommentsOrdered", (rel: any) => rel.order("body"), {
       className: "NtComment",
       foreignKey: "nt_post_id",
-      scope: (rel: any) => rel.order("body"),
     });
     Associations.hasMany.call(NtAuthor, "ntCommentsOrd", {
       className: "NtComment",

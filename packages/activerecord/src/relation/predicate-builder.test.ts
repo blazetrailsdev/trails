@@ -97,11 +97,14 @@ describe("PredicateBuilderTest", () => {
     // the canonical Reply (Rails leaks the association; we keep it scoped).
     class RegexpReply extends Reply {
       static {
-        this.belongsTo("regexp_topic", {
-          className: "Topic",
-          foreignKey: "parent_id",
-          scope: (rel: any) => rel.where({ title: new RegexFilter("rails") }),
-        });
+        this.belongsTo(
+          "regexp_topic",
+          (rel: any) => rel.where({ title: new RegexFilter("rails") }),
+          {
+            className: "Topic",
+            foreignKey: "parent_id",
+          },
+        );
       }
     }
     registerModel("RegexpReply", RegexpReply);

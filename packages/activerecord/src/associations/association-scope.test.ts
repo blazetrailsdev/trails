@@ -163,14 +163,18 @@ describe("AssociationScope", () => {
     }
     registerModel(CountAuthor);
     registerModel(CountPost);
-    Associations.hasMany.call(CountAuthor, "count_posts", {
-      className: "CountPost",
-      foreignKey: "count_author_id",
-      scope: (rel: any) => {
+    Associations.hasMany.call(
+      CountAuthor,
+      "count_posts",
+      (rel: any) => {
         calls++;
         return rel.where({ published: true });
       },
-    });
+      {
+        className: "CountPost",
+        foreignKey: "count_author_id",
+      },
+    );
 
     const author = new CountAuthor({ id: 5 });
     const reflection = (CountAuthor as any)._reflectOnAssociation("count_posts");
@@ -627,12 +631,11 @@ describe("AssociationScope", () => {
 
       static {
         this.attribute("id", "integer");
-        this.hasMany("cc_memberships", {
+        // Scope on the through reflection — chain.reverse_each must pick
+        // it up when AssociationScope walks the chain for cc_tags.
+        this.hasMany("cc_memberships", (rel: any) => rel.where({ active: true }), {
           className: "CcMembership",
           foreignKey: "cc_author_id",
-          // Scope on the through reflection — chain.reverse_each must pick
-          // it up when AssociationScope walks the chain for cc_tags.
-          scope: (rel: any) => rel.where({ active: true }),
         });
         this.hasMany("cc_tags", {
           className: "CcTag",
