@@ -296,11 +296,15 @@ describe("AssociationScope", () => {
     // scope (which is null here). Loader must still apply it. No reader form:
     // the caller-supplied `options.scope` IS the subject, and the generated
     // `author.posts` accessor can only pass the reflection's own options.
-    const results = await findTarget(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-      scope: (rel: any) => rel.where({ title: "published" }),
-    });
+    const results = await findTarget(
+      author,
+      "posts",
+      (rel: any) => rel.where({ title: "published" }),
+      {
+        className: "Post",
+        foreignKey: "author_id",
+      },
+    );
     expect(results).toHaveLength(1);
     expect((results[0] as any).title).toBe("published");
   });
