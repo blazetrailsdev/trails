@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Types } from "../index.js";
+import { assertSame } from "@blazetrails/activesupport";
 import { ImmutableStringType } from "./immutable-string.js";
 
 describe("ImmutableStringTest", () => {
   it("cast strings are frozen", () => {
-    const type = Types.typeRegistry.lookup("immutable_string");
-    const result = type.cast("hello");
-    expect(result).toBe("hello");
-    expect(Object.isFrozen(result)).toBe(true);
+    const s = "foo";
+    const type = new ImmutableStringType();
+    expect(Object.isFrozen(type.cast(s))).toEqual(true);
   });
 
   it("casts booleans to the PG literal form", () => {
@@ -19,14 +19,10 @@ describe("ImmutableStringTest", () => {
   });
 
   it("immutable strings are not duped coming out", () => {
-    const type = Types.typeRegistry.lookup("immutable_string");
-    const a = type.cast("hello");
-    const b = type.cast("hello");
-    // Both should be frozen strings
-    expect(Object.isFrozen(a)).toBe(true);
-    expect(Object.isFrozen(b)).toBe(true);
-    expect(a).toBe("hello");
-    expect(b).toBe("hello");
+    const s = "foo";
+    const type = new ImmutableStringType();
+    assertSame(s, type.cast(s));
+    assertSame(s, type.deserialize(s));
   });
 
   it("custom trueString is returned for true", () => {

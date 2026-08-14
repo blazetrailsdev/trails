@@ -3,9 +3,9 @@ import { Types, BigIntegerType, IntegerType } from "../index.js";
 
 describe("BigIntegerTest", () => {
   it("type cast big integer", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    expect(type.cast("42")).toBe(42);
-    expect(type.cast(null)).toBe(null);
+    const type = new BigIntegerType();
+    expect(type.cast(1)).toEqual(1);
+    expect(type.cast("1")).toEqual(1);
   });
 
   it("BigInteger small values", () => {
@@ -22,21 +22,25 @@ describe("BigIntegerTest", () => {
   });
 
   it("serialize_cast_value is equivalent to serialize after cast", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    const cast = type.cast("123");
-    const serialized = type.serialize(cast);
-    expect(cast).toBe(123);
-    expect(String(serialized)).toBe(String(cast));
+    const type = new BigIntegerType();
+    const value = type.cast(9999999999999999999999999999999n);
+
+    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
+    expect(type.serializeCastValue(-value!)).toEqual(type.serialize(-value!));
   });
 
   it("small values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    expect(type.cast(42)).toBe(42);
+    const type = new BigIntegerType();
+    expect(type.serialize(-9999999999999999999999999999999n)).toEqual(
+      -9999999999999999999999999999999n,
+    );
   });
 
   it("large values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
-    expect(type.cast("99999999999999999999")).toBe(BigInt("99999999999999999999"));
+    const type = new BigIntegerType();
+    expect(type.serialize(9999999999999999999999999999999n)).toEqual(
+      9999999999999999999999999999999n,
+    );
   });
 
   it("inherits from IntegerType", () => {

@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { Types, ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../index.js";
+import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../index.js";
+import { NoMethodError } from "../attribute-assignment.js";
 
 describe("ValueTest", () => {
   it("type equality", () => {
-    const type1 = Types.typeRegistry.lookup("value");
-    const type2 = Types.typeRegistry.lookup("value");
-    expect(type1.constructor).toBe(type2.constructor);
+    expect(new ValueType().equals(new ValueType())).toEqual(true);
+    expect(new ValueType().equals(new IntegerType())).not.toEqual(true);
+    expect(new ValueType({ precision: 1 }).equals(new ValueType({ precision: 2 }))).not.toEqual(
+      true,
+    );
   });
 
   it("type is nil for the unmapped default", () => {
@@ -14,11 +17,7 @@ describe("ValueTest", () => {
   });
 
   it("as json not defined", () => {
-    const type = Types.typeRegistry.lookup("value");
-    // Value type passes through without transformation
-    expect(type.cast("hello")).toBe("hello");
-    expect(type.cast(42)).toBe(42);
-    expect(type.cast(null)).toBe(null);
+    expect(() => new ValueType().asJson()).toThrow(NoMethodError);
   });
 
   describe("equals", () => {

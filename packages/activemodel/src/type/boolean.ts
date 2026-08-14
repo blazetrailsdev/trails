@@ -5,19 +5,26 @@ export class BooleanType extends ValueType<boolean> {
 
   // Mirrors Rails `ActiveModel::Type::Boolean::FALSE_VALUES`
   // (activemodel/lib/active_model/type/boolean.rb:15-24). Rails' Symbol
-  // variants (`:"0"`, `:false`, `:FALSE`, `:off`, `:OFF`, …) are omitted
-  // since JS has no symbols for those strings.
+  // variants carry their leading colon here, the trails spelling for a Ruby
+  // Symbol value.
   private static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
     false,
     0,
     0n, // safeIntegers mode returns bigint 0n for SQLite boolean columns
     "0",
+    ":0",
     "f",
+    ":f",
     "F",
+    ":F",
     "false",
+    ":false",
     "FALSE",
+    ":FALSE",
     "off",
+    ":off",
     "OFF",
+    ":OFF",
   ]);
 
   type(): string {
