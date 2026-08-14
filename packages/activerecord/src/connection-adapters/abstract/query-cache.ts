@@ -6,7 +6,7 @@ import {
   type DatabaseStatementsHost,
 } from "./database-statements.js";
 import { Result } from "../../result.js";
-import type { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
+import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import {
   executionContextId,
   registerContextExitHook,
@@ -387,8 +387,8 @@ export function clearQueryCache(this: QueryCacheHost): void {
  * The base (uncached) `selectAll` signature the override wraps via `super`.
  *
  * The base returns a pending `FutureResult` synchronously on the async arm
- * (database_statements.rb:74,671-694), so the union is not decorative — see
- * `makeCachedSelectAll` for why this wrapper collapses it today.
+ * (database_statements.rb:74,671-694), so the union is not decorative: the
+ * wrapper hands that handle straight back.
  */
 type BaseSelectAll = (
   this: QueryCacheHost,
@@ -413,13 +413,17 @@ type BaseSelectAll = (
  * `cache_sql(...) { super }`.
  */
 export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
-  return async function cachedSelectAll(
+  // NOT an `async function`: `FutureResult#then` implements the JS thenable
+  // protocol, so an async wrapper's own promise would adopt a returned
+  // FutureResult and settle with the final Result, losing the pending handle
+  // Rails' `async` arm exists to hand back (future_result.rb:126-129).
+  return function cachedSelectAll(
     this: QueryCacheHost,
     arel: string | unknown,
     name: string | null = null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Promise<Result> {
+  ): Result | Promise<Result> | FutureResult | FutureResultComplete {
     // Rails' QueryCache#select_all first unwraps a Relation to its Arel AST
     // (`arel = arel_from_relation(arel)`), then converts the Arel node to
     // SQL + binds via `to_sql_and_binds` before consulting the cache. A SQL
@@ -440,14 +444,26 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     const forwardOpts = { ...opts, preparable: resolvedPreparable };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
-      // Rails splits this by `async`: the sync path is `cache_sql { super }`
-      // (which itself tracks `hit` and instruments, query_cache.rb:283,291-296),
-      // the async path is `lookup_sql_cache(...) || super` wrapped in
-      // `FutureResult.wrap` (query_cache.rb:244-249). Only the sync shape is
-      // ported: this wrapper is an `async function`, so a FutureResult returned
-      // by the base `selectAll` would be adopted and resolved away by its own
-      // promise — story wire-load-async-through-future-result ports the async
-      // arm and the non-collapsing shape it needs. INVARIANT: there must be no `await` between this lookupSqlCache
+      if (opts?.async) {
+        // Rails: `result = lookup_sql_cache(sql, name, binds) || super(...)`,
+        // then `FutureResult.wrap(result)` (query_cache.rb:244-247). A miss is
+        // NOT written back to the cache on this arm — Rails doesn't either.
+        const cached = this.lookupSqlCache(sql, name, binds ?? []);
+        const result =
+          cached !== undefined
+            ? Result.fromRowHashes(cached.map((r) => ({ ...r })))
+            : original.call(this, sql, name, binds, forwardOpts);
+        // Ruby's `super` here is either a FutureResult or a Result; trails'
+        // base hands back a promise whenever the async arm isn't live (e.g.
+        // no async_query_executor), so that case wraps once it resolves —
+        // the same shape `select` uses (database_statements.rb:691-693).
+        return result instanceof Promise
+          ? result.then((r) => FutureResult.wrap(r))
+          : FutureResult.wrap(result);
+      }
+      // Rails' sync path is `cache_sql { super }` (query_cache.rb:249), which
+      // itself tracks `hit` and instruments (query_cache.rb:283,291-296).
+      // INVARIANT: there must be no `await` between this lookupSqlCache
       // and the cacheSql below — lookupSqlCache runs synchronously and cacheSql
       // reaches `Store.computeIfAbsent`'s synchronous `get` immediately, so
       // nothing can populate the key in between. That is why trails' cacheSql
@@ -458,18 +474,17 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
       // into a silent, uninstrumented cache hit.
       const cached = this.lookupSqlCache(sql, name, binds ?? []);
       if (cached !== undefined) {
-        return Result.fromRowHashes(cached.map((r) => ({ ...r })));
+        // Resolved, not bare: Ruby's callers reach `select_all(...).then`
+        // through Kernel#then, which every object answers (database_statements
+        // .rb:85,102); a trails `Result` deliberately defines no `then`.
+        return Promise.resolve(Result.fromRowHashes(cached.map((r) => ({ ...r }))));
       }
-      const rows = await this.cacheSql(sql, name, binds ?? [], async () => {
+      return this.cacheSql(sql, name, binds ?? [], async () => {
         const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
-      });
-      return Result.fromRowHashes(rows);
+      }).then((rows) => Result.fromRowHashes(rows));
     }
-    // Rails' `else` arm is a bare `super` (query_cache.rb:251). A FutureResult
-    // the base returns here is still adopted by this async function's own
-    // promise — see the async-arm note above and story
-    // wire-load-async-through-future-result.
+    // Rails' `else` arm is a bare `super` (query_cache.rb:251).
     return original.call(this, sql, name, binds, forwardOpts);
   };
 }

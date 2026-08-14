@@ -329,9 +329,18 @@ export async function performQuery(
 }
 
 /** @internal */
-export function castResult(result: Result): Result {
-  // SQLite3 already returns an ActiveRecord::Result; nothing to cast.
-  return result;
+export function castResult(result: Result | { rows: Record<string, unknown>[] }): Result {
+  // Rails' `cast_result` is the identity because its `perform_query` already
+  // returns an ActiveRecord::Result (sqlite3/database_statements.rb:110-121).
+  // trails' `performQuery` returns the raw `{ rows, affectedRows, insertRowid }`
+  // bag instead — `executeMutation` reads the last two off the RETURN value to
+  // avoid racing `this._last*` — so the identity arm only holds for the
+  // Result-shaped inputs, and the bag is built into a Result here, where Rails'
+  // perform_query builds it. Converging performQuery onto Rails' return shape
+  // (which also restores the column set of a zero-row SELECT) is story
+  // sqlite3-perform-query-returns-result.
+  if (result instanceof Result) return result;
+  return Result.fromRowHashes(result.rows);
 }
 
 /** @internal */
