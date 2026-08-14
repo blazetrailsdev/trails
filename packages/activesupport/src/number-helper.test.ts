@@ -95,6 +95,14 @@ describe("NumberHelperTest", () => {
     expect(numberWithDelimiter(123456.78)).toBe("123,456.78");
     expect(numberWithDelimiter(1234567890.5)).toBe("1,234,567,890.5");
     expect(numberWithDelimiter("123456.789")).toBe("123,456.789");
+    expect(numberWithDelimiter(123456.78901)).toBe("123,456.78901");
+    expect(numberWithDelimiter(123456789.78901)).toBe("123,456,789.78901");
+    expect(numberWithDelimiter(0.78901)).toBe("0.78901");
+    expect(numberWithDelimiter("123456.78")).toBe("123,456.78");
+    expect(
+      numberWithDelimiter("123456.78", { delimiterPattern: /(\d+?)(?=(\d\d)+(\d)(?!\d))/ }),
+    ).toBe("1,23,456.78");
+    expect(numberWithDelimiter("123456789012345678.91")).toBe("123,456,789,012,345,678.91");
   });
 
   it("to delimited with options hash", () => {
@@ -115,6 +123,17 @@ describe("NumberHelperTest", () => {
     expect(numberToRounded(3268, { precision: 0 })).toBe("3268");
     expect(numberToRounded(6.5, { precision: 0 })).toBe("7");
     expect(numberToRounded(0, { precision: 0 })).toBe("0");
+    expect(numberToRounded(0.001, { precision: 5 })).toBe("0.00100");
+    expect(numberToRounded(0.00111, { precision: 3 })).toBe("0.001");
+    expect(numberToRounded(9.995, { precision: 2 })).toBe("10.00");
+    expect(numberToRounded(10.995, { precision: 2 })).toBe("11.00");
+    expect(numberToRounded(-0.001, { precision: 2 })).toBe("0.00");
+    expect(numberToRounded(111.2346, { precision: 20 })).toBe("111.23460000000000000000");
+    expect(numberToRounded("111.2346", { precision: 20 })).toBe("111.23460000000000000000");
+    expect(numberToRounded(new BigDecimal("111.2346"), { precision: 20 })).toBe(
+      "111.23460000000000000000",
+    );
+    expect(numberToRounded("111.2346", { precision: 100 })).toBe(`111.2346${"0".repeat(96)}`);
     expect(numberToRounded("x")).toBe("x");
   });
 
@@ -130,11 +149,37 @@ describe("NumberHelperTest", () => {
     expect(numberToRounded(123987, { precision: 3, significant: true, roundMode: ":down" })).toBe(
       "123000",
     );
+    expect(numberToRounded(123987876, { precision: 2, significant: true })).toBe("120000000");
+    expect(numberToRounded("43523", { precision: 1, significant: true })).toBe("40000");
+    expect(numberToRounded(9775, { precision: 4, significant: true })).toBe("9775");
     expect(numberToRounded(5.3923, { precision: 2, significant: true })).toBe("5.4");
+    expect(numberToRounded(52.7923, { precision: 2, significant: true })).toBe("53");
+    expect(numberToRounded(9775, { precision: 6, significant: true })).toBe("9775.00");
+    expect(numberToRounded(0, { precision: 2, significant: true })).toBe("0.0");
+    expect(numberToRounded(0.0001, { precision: 1, significant: true })).toBe("0.0001");
+    expect(numberToRounded(0.0001, { precision: 3, significant: true })).toBe("0.000100");
+    expect(numberToRounded(9.995, { precision: 3, significant: true })).toBe("10.0");
+    expect(numberToRounded(9.994, { precision: 3, significant: true })).toBe("9.99");
+    expect(numberToRounded(10.995, { precision: 3, significant: true })).toBe("11.0");
     expect(numberToRounded(1.232, { precision: 3, significant: true })).toBe("1.23");
     expect(numberToRounded(7, { precision: 1, significant: true })).toBe("7");
     expect(numberToRounded(9.8, { precision: 3, significant: true })).toBe("9.80");
     expect(numberToRounded(0.001111, { precision: 3, significant: true })).toBe("0.00111");
+    expect(numberToRounded(9775, { precision: 20, significant: true })).toBe(
+      "9775.0000000000000000",
+    );
+    expect(numberToRounded(new BigDecimal("9775"), { precision: 20, significant: true })).toBe(
+      "9775.0000000000000000",
+    );
+    expect(numberToRounded("9775", { precision: 20, significant: true })).toBe(
+      "9775.0000000000000000",
+    );
+    expect(numberToRounded("9775", { precision: 100, significant: true })).toBe(
+      `9775.${"0".repeat(96)}`,
+    );
+    expect(
+      numberToRounded(new BigDecimal("0.287298702e23"), { precision: 0, significant: true }),
+    ).toBe("28729870200000000000000");
   });
 
   it("to rounded with strip insignificant zeros", () => {
@@ -150,6 +195,9 @@ describe("NumberHelperTest", () => {
   it("to rounded with significant true and zero precision", () => {
     expect(numberToRounded(0, { precision: 0, significant: true })).toBe("0");
     expect(numberToRounded(0.0001, { precision: 0, significant: true })).toBe("0");
+    expect(numberToRounded(123.987, { precision: 0, significant: true })).toBe("124");
+    expect(numberToRounded(12, { precision: 0, significant: true })).toBe("12");
+    expect(numberToRounded("12.3", { precision: 0, significant: true })).toBe("12");
   });
 
   it("number number to human size", () => {
@@ -251,35 +299,35 @@ describe("RoundingHelper", () => {
   it("rounds to precision", async () => {
     const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
     const h = new RoundingHelper({ precision: 2 });
-    expect(h.round(1.236)).toBeCloseTo(1.24, 5);
-    expect(h.round(1.234)).toBeCloseTo(1.23, 5);
-    expect(h.round(1.555)).toBeCloseTo(1.56, 5);
+    expect(String(h.round(1.236))).toBe("1.24");
+    expect(String(h.round(1.234))).toBe("1.23");
+    expect(String(h.round(1.555))).toBe("1.56");
   });
 
   it("rounds negative numbers half away from zero", async () => {
     const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
     const h = new RoundingHelper({ precision: 0 });
-    expect(h.round(-1.5)).toBe(-2);
-    expect(h.round(1.5)).toBe(2);
+    expect(String(h.round(-1.5))).toBe("-2.0");
+    expect(String(h.round(1.5))).toBe("2.0");
   });
 
   it("rounds with significant digits", async () => {
     const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
     const h = new RoundingHelper({ precision: 3, significant: true });
-    expect(h.round(1234)).toBeCloseTo(1230, 0);
-    expect(h.round(0.001234)).toBeCloseTo(0.00123, 10);
+    expect(String(h.round(1234))).toBe("1230.0");
+    expect(String(h.round(0.001234))).toBe("0.00123");
   });
 
   it("handles zero", async () => {
     const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
     const h = new RoundingHelper({ precision: 2, significant: true });
-    expect(h.round(0)).toBe(0);
+    expect(String(h.round(0))).toBe("0.0");
   });
 
   it("precision <= 0 rounds to integer", async () => {
     const { RoundingHelper } = await import("./number-helper/rounding-helper.js");
     const h = new RoundingHelper({ precision: 0 });
-    expect(h.round(3.7)).toBe(4);
-    expect(h.round(3.2)).toBe(3);
+    expect(String(h.round(3.7))).toBe("4.0");
+    expect(String(h.round(3.2))).toBe("3.0");
   });
 });

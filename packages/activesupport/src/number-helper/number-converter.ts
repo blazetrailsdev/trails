@@ -3,7 +3,7 @@ import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 
 /** What `BigDecimal(str, exception: false)` accepts (number_converter.rb:183). */
-const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
+export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 
 export type NumberFormatOptions = object;
 
@@ -94,6 +94,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected isValidFloat(): boolean {
     if (this.number instanceof BigDecimal) return true;
+    // Ruby's `Float("")` / `Float(" ")` raise, where `Number("")` is 0.
+    if (typeof this.number === "string" && this.number.trim() === "") return false;
     const n = Number(this.number);
     return !isNaN(n) && isFinite(n);
   }

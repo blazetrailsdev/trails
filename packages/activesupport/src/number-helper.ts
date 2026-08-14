@@ -47,6 +47,7 @@ export interface NumberWithDelimiterOptions {
   locale?: string;
   delimiter?: string;
   separator?: string;
+  delimiterPattern?: RegExp;
 }
 
 export interface NumberToRoundedOptions {

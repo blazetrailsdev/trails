@@ -1,95 +1,74 @@
-export class RoundingHelper {
-  private precision: number;
-  private significant: boolean;
-  private roundMode: string;
+import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
+import { BIGDECIMAL_STRING } from "./number-converter.js";
 
-  constructor(options: { precision?: number; significant?: boolean; roundMode?: string } = {}) {
-    this.precision = options.precision ?? 3;
-    this.significant = options.significant ?? false;
-    this.roundMode = options.roundMode ?? "default";
+class ArgumentError extends Error {
+  override name = "ArgumentError";
+}
+
+class NoMethodError extends Error {
+  override name = "NoMethodError";
+}
+
+/**
+ * Mirrors: ActiveSupport::NumberHelper::RoundingHelper
+ * (activesupport/lib/active_support/number_helper/rounding_helper.rb).
+ */
+export class RoundingHelper {
+  readonly options: Record<string, unknown>;
+
+  constructor(options: Record<string, unknown>) {
+    this.options = options;
   }
 
-  round(number: number): number {
-    if (this.significant) {
-      return this.roundSignificant(number);
-    }
-    return this.roundPrecision(number);
+  round(number: unknown): unknown {
+    const precision = this.absolutePrecision(number);
+    if (precision == null) return number;
+
+    const roundedNumber = this.convertToDecimal(number).round(
+      precision,
+      ("roundMode" in this.options ? this.options.roundMode : ":default") as string,
+    );
+    return roundedNumber.isZero() ? roundedNumber.abs() : roundedNumber; // prevent showing negative zeros
+  }
+
+  digitCount(number: unknown): number {
+    const value = number instanceof BigDecimal ? Number(number.toString("F")) : Number(number);
+    if (value === 0) return 1;
+    return Math.floor(Math.log10(Math.abs(value)) + 1);
   }
 
   /**
-   * Rails hands `options.fetch(:round_mode, :default).to_sym` straight to
-   * `BigDecimal#round` (rounding_helper.rb:16), so every mode Ruby's
-   * BigDecimal understands is reachable from every number helper. This is that
-   * dispatch. A Ruby Symbol option value is a `":name"` string in trails, and
-   * the camelCased spelling is accepted alongside the Ruby one. `:up` is
-   * BigDecimal's ROUND_UP — away from zero — not "half up".
+   * The literal-shape guard is what `BigDecimal(number.to_s)` does by raising:
+   * a string that is not a decimal literal is an `ArgumentError`, not a
+   * silently coerced zero.
+   *
+   * @missingRailsCall digit_count — only the `Rational` arm calls it, to size
+   * the `BigDecimal(number, ndigits)` precision; there is no trails Rational.
    */
-  private applyRound(value: number): number {
-    switch (this.roundMode.replace(/^:/, "")) {
-      case "up":
-        return value < 0 ? Math.floor(value) : Math.ceil(value);
-      case "down":
-      case "truncate":
-        return Math.trunc(value);
-      case "ceiling":
-      case "ceil":
-        return Math.ceil(value);
-      case "floor":
-        return Math.floor(value);
-      case "half_down":
-      case "halfDown":
-        return this.halfDownRound(value);
-      case "half_even":
-      case "halfEven":
-      case "even":
-      case "banker":
-        return this.bankersRound(value);
-      default:
-        return this.rubyRound(value);
+  private convertToDecimal(number: unknown): BigDecimal {
+    if (number instanceof BigDecimal) return number;
+    const value = String(number);
+    if (!BIGDECIMAL_STRING.test(value)) {
+      throw new ArgumentError(`invalid value for BigDecimal(): "${value}"`);
     }
+    return new BigDecimal(value.trim());
   }
 
-  /** BigDecimal ROUND_HALF_DOWN — ties toward zero, everything else as half-up. */
-  private halfDownRound(value: number): number {
-    const truncated = Math.trunc(value);
-    const fraction = Math.abs(value - truncated);
-    if (Math.abs(fraction - 0.5) < 1e-10) return truncated;
-    return this.rubyRound(value);
-  }
-
-  private rubyRound(value: number): number {
-    if (value === 0) return 0;
-    const adjusted = value + (value >= 0 ? Number.EPSILON : -Number.EPSILON);
-    if (adjusted > 0) {
-      return Math.floor(adjusted + 0.5);
+  private absolutePrecision(number: unknown): number | undefined {
+    const { precision, significant } = this.options as {
+      precision?: number;
+      significant?: unknown;
+    };
+    if (significant != null && significant !== false) {
+      // Ruby evaluates `options[:precision] > 0` here, which raises on a nil
+      // precision rather than falling through to the else arm.
+      if (precision == null) throw new NoMethodError("undefined method '>' for nil");
+      if (precision > 0) {
+        return precision - this.digitCount(this.convertToDecimal(number));
+      }
+      return precision;
+    } else {
+      return precision ?? undefined;
     }
-    return -Math.floor(-adjusted + 0.5);
-  }
-
-  private bankersRound(value: number): number {
-    if (value === 0) return 0;
-    const rounded = Math.round(value);
-    const diff = Math.abs(value - Math.trunc(value));
-    if (Math.abs(diff - 0.5) < 1e-10) {
-      const truncated = Math.trunc(value);
-      if (truncated % 2 === 0) return truncated;
-      return truncated + (value > 0 ? 1 : -1);
-    }
-    return rounded;
-  }
-
-  private roundPrecision(number: number): number {
-    if (this.precision === 0) return this.applyRound(number);
-    const factor = Math.pow(10, this.precision);
-    return this.applyRound(number * factor) / factor;
-  }
-
-  private roundSignificant(number: number): number {
-    if (number === 0) return 0;
-    if (this.precision === 0) return this.applyRound(number);
-    const d = Math.ceil(Math.log10(Math.abs(number)));
-    const power = this.precision - d;
-    const magnitude = Math.pow(10, power);
-    return this.applyRound(number * magnitude) / magnitude;
   }
 }
