@@ -71,11 +71,15 @@ export function delegatedType(
   const primaryKey = options.primaryKey ?? "id";
   const config = { ...options, foreignKey, foreignType, primaryKey };
 
-  // Rails: belongs_to role, options.delete(:scope), **options.merge(polymorphic: true)
-  // — the `:scope` proc becomes the belongs_to scope; the rest are options.
-  // trails' belongsTo takes the scope as `options.scope`, so forward it there.
-  const { types: _types, ...assocOptions } = options as DelegatedTypeOptions & { types?: unknown };
-  (modelClass as any).belongsTo(role, {
+  // `belongs_to role, options.delete(:scope), **options.merge(polymorphic: true)`
+  // (delegated_type.rb:232) — the `:scope` proc is the belongs_to's positional
+  // scope, and `delete` takes it out of the options hash before the merge.
+  const {
+    types: _types,
+    scope,
+    ...assocOptions
+  } = options as DelegatedTypeOptions & { types?: unknown; scope?: (...args: any[]) => any };
+  (modelClass as any).belongsTo(role, scope ?? null, {
     ...assocOptions,
     polymorphic: true,
     foreignKey,

@@ -171,6 +171,28 @@ export function validOptions(): string[] {
   return ["autosave"];
 }
 
+/**
+ * `AutosaveAssociation`'s `included do` block
+ * (autosave_association.rb:153-155): `Associations::Builder::Association
+ * .extensions << AssociationBuilderExtension`, the registration that puts
+ * `:autosave` in `valid_options` (autosave_association.rb:148) — Rails' base
+ * `VALID_OPTIONS` deliberately does not list it (association.rb:21). Called
+ * from `base.ts` beside `include(Base, AutosaveAssociation)`, since importing
+ * the builder here closes a module cycle through `reflection.ts`.
+ * @internal
+ */
+export function _registerAssociationBuilderExtension(extensions: ExtensionList): void {
+  extensions.push({ build, validOptions });
+}
+
+/** The `Builder::Association.extensions` array the block above pushes onto. */
+interface ExtensionList {
+  push(extension: {
+    build(model: typeof Base, reflection: { options: Record<string, unknown> }): void;
+    validOptions(): string[];
+  }): void;
+}
+
 // Post-commit flush for association instances that still queue a deferred
 // `_pendingReplace`. Collection associations no longer participate: their
 // persisted-owner assignment throws (`CollectionPersistedAssignmentError`) and

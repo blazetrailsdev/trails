@@ -32,6 +32,8 @@ import {
   assertChanges,
   assertNoChanges,
 } from "./testing/assertions.js";
+import { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
+import { stubConst } from "./testing/constant-stubbing.js";
 import {
   assertDeprecated,
   assertNotDeprecated,
@@ -63,10 +65,17 @@ export class TestCase {
   static assertChanges = assertChanges;
   static assertNoChanges = assertNoChanges;
 
+  // include ActiveSupport::Testing::ErrorReporterAssertions (test_case.rb:148)
+  static assertErrorReported = assertErrorReported;
+  static assertNoErrorReported = assertNoErrorReported;
+
   // include ActiveSupport::Testing::Deprecation (test_case.rb:149)
   static assertDeprecated = assertDeprecated;
   static assertNotDeprecated = assertNotDeprecated;
   static collectDeprecations = collectDeprecations;
+
+  // include ActiveSupport::Testing::ConstantStubbing (test_case.rb:150)
+  static stubConst = stubConst;
 
   // include ActiveSupport::Testing::TimeHelpers (test_case.rb:151)
   static travel = travel;

@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { AssociationOptions } from "../associations.js";
+import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { _buildAssociationInstance } from "../associations/instance-methods.js";
 
 /**
@@ -19,21 +19,30 @@ import { _buildAssociationInstance } from "../associations/instance-methods.js";
  *
  * `scope` is positional ahead of `options`, as on the macros it stands in for
  * (`has_many(name, scope = nil, **options)`, `associations.rb:1302`), and is
- * folded into the holder's options the same way `Builder::Association.build`
- * folds it into the reflection's (`builder/association.ts:151`) — which is what
- * a caller forwarding a whole `reflection.options` is already passing.
+ * kept beside the options the same way `Builder::Association.createReflection`
+ * keeps it beside the reflection's (`association.rb:48-49`) — the options hash
+ * never carries it, so a caller forwarding a whole `reflection.options` passes
+ * options only.
  */
+type AssociationScopeLambda = NonNullable<AssociationDefinition["scope"]>;
+
 export async function findCollectionTarget(
   record: Base,
   name: string,
-  scope: NonNullable<AssociationOptions["scope"]> | AssociationOptions | null = {},
+  scope: AssociationScopeLambda | AssociationOptions | null = {},
   options: AssociationOptions = {},
 ): Promise<Base[]> {
+  let positionalScope: AssociationScopeLambda | null = null;
   if (typeof scope === "function") {
-    options = { ...options, scope };
+    positionalScope = scope;
   } else if (scope !== null) {
     options = scope;
   }
-  const assoc = _buildAssociationInstance.call(record, { name, type: "hasMany", options });
+  const assoc = _buildAssociationInstance.call(record, {
+    name,
+    type: "hasMany",
+    scope: positionalScope,
+    options,
+  });
   return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }

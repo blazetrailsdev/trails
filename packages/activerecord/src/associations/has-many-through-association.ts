@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import type { AssociationDefinition } from "../associations.js";
 import { association, _buildAssociationInstance } from "./instance-methods.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import {
@@ -113,7 +113,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * @internal
    */
   protected loadHasManyThrough(): Promise<Base[]> {
-    return loadHasManyThrough(this.owner, this.reflection.name, this.reflection.options);
+    return loadHasManyThrough(this.owner, this.reflection.name, this.reflection);
   }
 
   /**
@@ -1145,12 +1145,13 @@ function targetReflectionHasAssociatedRecord(
 function findHasManyTarget(
   record: Base,
   assocName: string,
-  options: AssociationOptions,
+  assocDef: Pick<AssociationDefinition, "options" | "scope">,
 ): Promise<Base[]> {
   const assoc = _buildAssociationInstance.call(record, {
     name: assocName,
     type: "hasMany",
-    options,
+    scope: assocDef.scope,
+    options: assocDef.options,
   });
   return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }
@@ -1162,8 +1163,9 @@ function findHasManyTarget(
 async function loadHasManyThrough(
   record: Base,
   assocName: string,
-  options: AssociationOptions,
+  assocDef: AssociationDefinition,
 ): Promise<Base[]> {
+  const options = assocDef.options;
   const ctor = record.constructor as typeof Base;
   const associations: AssociationDefinition[] = ctor._associations ?? [];
   const throughAssoc = associations.find((a) => a.name === options.through);
@@ -1195,18 +1197,22 @@ async function loadHasManyThrough(
     ) {
       const resolvedSourceName = sourceAssoc?.name ?? sourceName;
       const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
-      const originalScope = throughAssoc.options.scope;
-      const augmentedOptions = {
-        ...throughAssoc.options,
+      const originalScope = throughAssoc.scope;
+      // `Reflection.create(macro, name, scope, options, model)` keeps the scope
+      // beside the options hash rather than in it (association.rb:48-49), so the
+      // synthesised `sourceType` scope replaces the definition's own without
+      // touching its options.
+      const augmentedDefinition = {
+        options: throughAssoc.options,
         scope: (rel: any) => {
           let r = rel.where({ [sourceTypeCol]: options.sourceType });
           if (originalScope) r = originalScope(r);
           return r;
         },
       };
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, augmentedOptions);
+      throughRecords = await findHasManyTarget(record, throughAssoc.name, augmentedDefinition);
     } else {
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc.options);
+      throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc);
     }
   } else if (throughAssoc.type === "hasOne") {
     const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
@@ -1228,22 +1234,22 @@ async function loadHasManyThrough(
       .filter((v) => v !== null && v !== undefined);
     if (targetIds.length === 0) return [];
     let rel = targetModel.all().where({ [targetModel.primaryKey as string]: targetIds });
-    rel = applyAssociationScope(rel, options.scope, record);
+    rel = applyAssociationScope(rel, assocDef.scope, record);
     return rel.toArray();
   } else if (sourceAssoc?.options?.through) {
     const results: Base[] = [];
     for (const tr of throughRecords) {
-      const sub = await findHasManyTarget(tr, sourceAssoc.name, sourceAssoc.options);
+      const sub = await findHasManyTarget(tr, sourceAssoc.name, sourceAssoc);
       results.push(...sub);
     }
-    if (!options.scope) return results;
+    if (!assocDef.scope) return results;
     const ids = results
       .map((r) => r._readAttribute(targetModel.primaryKey as string))
       .filter((v) => v !== null && v !== undefined);
     if (ids.length === 0) return [];
     const rel = applyAssociationScope(
       targetModel.all().where({ [targetModel.primaryKey as string]: ids }),
-      options.scope,
+      assocDef.scope,
       record,
     );
     return rel.toArray();
@@ -1259,7 +1265,7 @@ async function loadHasManyThrough(
     const whereConditions: Record<string, unknown> = { [sourceFk as string]: throughIds };
     if (sourceAsName) whereConditions[`${underscore(sourceAsName)}_type`] = throughClassName;
     let rel = targetModel.all().where(whereConditions);
-    rel = applyAssociationScope(rel, options.scope, record);
+    rel = applyAssociationScope(rel, assocDef.scope, record);
     return rel.toArray();
   }
 }

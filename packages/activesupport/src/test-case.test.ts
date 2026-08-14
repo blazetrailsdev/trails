@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { NameError } from "./core-ext/name-error.js";
+import { stubConst } from "./testing/constant-stubbing.js";
 
 function mbLength(str: string): number {
   return [...str].length;
@@ -628,43 +630,63 @@ describe("TestOrderTest", () => {
   });
 });
 
+class ConstStubbable {
+  static CONSTANT = 1;
+}
+
+class SubclassOfConstStubbable extends ConstStubbable {}
+
 describe("TestConstStubbing", () => {
   it("stubbing a constant temporarily replaces it with a new value", () => {
-    // In JS, we can temporarily override object properties
-    const container: any = { CONSTANT: "original" };
-    const original = container.CONSTANT;
-    container.CONSTANT = "stubbed";
-    expect(container.CONSTANT).toBe("stubbed");
-    container.CONSTANT = original;
-    expect(container.CONSTANT).toBe("original");
+    stubConst(ConstStubbable as never, "CONSTANT", 2, () => {
+      expect(ConstStubbable.CONSTANT).toBe(2);
+    });
+
+    expect(ConstStubbable.CONSTANT).toBe(1);
   });
 
   it("stubbed constant still reset even if exception is raised", () => {
-    const container: any = { CONSTANT: "original" };
-    const original = container.CONSTANT;
-    try {
-      container.CONSTANT = "stubbed";
-      throw new Error("test");
-    } catch {
-      // Reset always
-    } finally {
-      container.CONSTANT = original;
-    }
-    expect(container.CONSTANT).toBe("original");
+    expect(() => {
+      stubConst(ConstStubbable as never, "CONSTANT", 2, () => {
+        expect(ConstStubbable.CONSTANT).toBe(2);
+        throw new Error("Exception");
+      });
+    }).toThrow("Exception");
+
+    expect(ConstStubbable.CONSTANT).toBe(1);
   });
 
   it("stubbing a constant that does not exist in the receiver raises NameError", () => {
-    // In JS, accessing undefined property is safe (returns undefined), not an error
-    const obj: any = {};
-    expect(obj.NONEXISTENT).toBeUndefined();
+    expect(() => {
+      stubConst(ConstStubbable as never, "NOT_A_CONSTANT", 1, () => {});
+    }).toThrow(NameError);
+
+    // `const_get(constant, false)` does not look up the ancestors, so the
+    // constant the SUBCLASS inherits is not one it defines.
+    expect(() => {
+      stubConst(SubclassOfConstStubbable as never, "CONSTANT", 1, () => {});
+    }).toThrow(NameError);
   });
 
   it("stubbing a constant that does not exist can be done with `exists: false`", () => {
-    const container: any = {};
-    container.NEW_CONST = "value";
-    expect(container.NEW_CONST).toBe("value");
-    delete container.NEW_CONST;
-    expect(container.NEW_CONST).toBeUndefined();
+    stubConst(
+      ConstStubbable as never,
+      "NOT_A_CONSTANT",
+      1,
+      () => {
+        expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toBe(1);
+      },
+      { exists: false },
+    );
+
+    // Ruby raises NameError for an undefined constant; JS reads `undefined`.
+    expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toBeUndefined();
+
+    // Ruby's `Object`, the namespace `ConstStubbable` itself is defined in.
+    const namespace = { ConstStubbable } as unknown as Record<string, unknown>;
+    expect(() => {
+      stubConst(namespace, "ConstStubbable", 1, () => {}, { exists: false });
+    }).toThrow(NameError);
   });
 });
 

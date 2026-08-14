@@ -26,8 +26,15 @@ import { indexWith } from "../enumerable-utils.js";
 import { cwd, env } from "../process-adapter.js";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
-/** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
-class Assertion extends Error {
+/**
+ * Mirrors `Minitest::Assertion` — the error a failed assertion raises.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
+ * (assertions.rb, error_reporter_assertions.rb:45) but the class is defined in
+ * the minitest gem, which has no vendored Rails file for the comparator to map
+ * onto. Exported so `testing/error-reporter-assertions.ts` raises the same one.
+ */
+export class Assertion extends Error {
   override name = "Assertion";
 }
 
@@ -448,7 +455,7 @@ export async function assertNoChanges<T>(
 }
 
 /** @internal */
-async function _assertNothingRaisedOrWarn<T>(
+export async function _assertNothingRaisedOrWarn<T>(
   assertion: string,
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {

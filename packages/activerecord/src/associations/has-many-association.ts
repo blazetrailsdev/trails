@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition, AssociationOptions } from "../associations.js";
+import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
   _canRouteThroughViaDisableJoinsAssociationScope,
@@ -191,7 +191,7 @@ export class HasManyAssociation extends CollectionAssociation {
       const records = await findTarget(
         this.owner,
         this.reflection.name,
-        this.reflection.options,
+        this.reflection,
         this._queryExecutor,
         this.isViolatesStrictLoading(),
       );
@@ -563,10 +563,11 @@ export function setIntersection(a: Base[], b: Base[]): Base[] {
 async function findTarget(
   record: Base,
   assocName: string,
-  options: AssociationOptions,
+  assocDef: AssociationDefinition,
   queryExecutor?: () => Promise<Base[]>,
   violatesStrictLoading = false,
 ): Promise<Base[]> {
+  const options = assocDef.options;
   if (options.through) {
     validateThroughReflection(record.constructor as typeof Base, assocName);
   }
@@ -639,6 +640,7 @@ async function findTarget(
       const through = _buildAssociationInstance.call(record, {
         name: assocName,
         type: "hasMany",
+        scope: assocDef.scope,
         options,
       }) as unknown as { loadHasManyThrough(): Promise<Base[]> };
       return through.loadHasManyThrough();
@@ -656,7 +658,7 @@ async function findTarget(
     );
   }
 
-  const rel = scope(record, assocName, options);
+  const rel = scope(record, assocName, assocDef);
   if (rel === null) return [];
 
   // Set inverse_of on each loaded child. Resolve via the reflection so
@@ -694,7 +696,12 @@ async function findTarget(
  *
  * @internal
  */
-export function scope(record: Base, assocName: string, options: AssociationOptions): any | null {
+export function scope(
+  record: Base,
+  assocName: string,
+  assocDef: AssociationDefinition,
+): any | null {
+  const options = assocDef.options;
   const ctor = record.constructor as typeof Base;
   const className = options.className ?? camelize(singularize(assocName));
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
@@ -769,14 +776,14 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
     // be merged with `klass.scope_for_association` — otherwise default_scope
     // / scope extensions silently disappear. AssociationScope.scope
     // already merges `reflection.scope` (macro-time lambda) via scopeFor;
-    // skip re-applying `options.scope` ONLY when it's that exact same
+    // skip re-applying the definition's scope ONLY when it's that exact same
     // function. Callers like `loadHasManyThrough` synthesize a NEW
-    // `options.scope` (wrapping with `sourceType` filtering) — those
+    // scope (wrapping with `sourceType` filtering) — those
     // must still run.
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, options.scope, record, reflection.scope);
+    rel = applyAssociationScope(rel, assocDef.scope, record, reflection.scope);
   } else {
     // Inline fallback: no reflection (lower-level test helpers).
     if (Array.isArray(foreignKey)) {
@@ -818,7 +825,7 @@ export function scope(record: Base, assocName: string, options: AssociationOptio
         [foreignKey]: record._readAttribute(ownerKey as string),
       });
     }
-    rel = applyAssociationScope(rel, options.scope, record);
+    rel = applyAssociationScope(rel, assocDef.scope, record);
   }
   return rel;
 }

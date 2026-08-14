@@ -4,9 +4,8 @@ export class Author extends Base {
   static {
     this.tableName = "authors";
     this.hasMany("books");
-    this.hasMany("publishedBooks", {
+    this.hasMany("publishedBooks", (rel: Relation<any>) => rel.where({ status: "published" }), {
       className: "Book",
-      scope: (rel: Relation<any>) => rel.where({ status: "published" }),
     });
     registerModel(this);
   }

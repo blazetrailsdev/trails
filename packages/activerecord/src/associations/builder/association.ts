@@ -6,7 +6,7 @@
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
-import { throwAbort } from "@blazetrails/activesupport";
+import { assertValidKeys, throwAbort } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
 import { beforeDestroy } from "../../callbacks.js";
@@ -68,11 +68,9 @@ export class Association {
     "foreignKey",
     "dependent",
     "validate",
-    "autosave",
     "inverseOf",
     "strictLoading",
     "queryConstraints",
-    "scope",
   ];
 
   static build(
@@ -122,13 +120,6 @@ export class Association {
 
     this.validateOptions(options);
 
-    // Extract scope from options if passed there (e.g., Associations.hasMany(name, { scope: fn }))
-    if (!scope && typeof options.scope === "function") {
-      scope = options.scope as (...args: any[]) => any;
-      const { scope: _, ...rest } = options;
-      options = rest;
-    }
-
     const extension = this.defineExtensions(model, name);
     if (extension) {
       options.extend = [
@@ -147,12 +138,11 @@ export class Association {
     const reflection = Reflection.create(macro as any, name, scope, options, model);
 
     this._ensureOwnAssociations(model);
-    const assocOptions: Record<string, unknown> = { ...options };
-    if (scope) assocOptions.scope = scope;
     model._associations.push({
       type: macro,
       name,
-      options: assocOptions,
+      scope,
+      options: { ...options },
     });
 
     Reflection.addReflection(model, name, reflection as any);
@@ -185,14 +175,7 @@ export class Association {
   }
 
   static validateOptions(options: Record<string, unknown>): void {
-    const valid = new Set(this.validOptions(options));
-    for (const key of Object.keys(options)) {
-      if (!valid.has(key)) {
-        throw new Error(
-          `Unknown key: :${key}. Valid keys are: ${[...valid].map((k) => `:${k}`).join(", ")}`,
-        );
-      }
-    }
+    assertValidKeys(options, this.validOptions(options));
   }
 
   static defineExtensions(_model: any, _name: string): any {

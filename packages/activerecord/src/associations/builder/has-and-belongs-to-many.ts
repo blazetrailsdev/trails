@@ -329,17 +329,11 @@ export class HasAndBelongsToMany {
         habtmOptions[k] = options[k];
       }
     }
-    // Rails passes `scope` as the second positional to
-    // `HasAndBelongsToManyReflection.new` (associations.rb:1871). It is
-    // captured as a positional reflection arg below, but kept on the options
-    // bag too for the through-routing loaders, which read it from there.
     const positionalScope = typeof scope === "function" ? scope : null;
-    if (positionalScope) {
-      habtmOptions.scope = positionalScope;
-    }
     model._associations.push({
       type: "hasAndBelongsToMany",
       name,
+      scope: positionalScope,
       options: habtmOptions,
     });
     // Register before/after_add/remove class properties for Rails parity —
@@ -353,12 +347,11 @@ export class HasAndBelongsToMany {
     // the HasAndBelongsToManyReflection in a ThroughReflection — mirrors
     // Rails' `Builder::HasAndBelongsToMany`, which builds an internal
     // has_many :through and registers the HABTM as a through reflection.
-    const { scope: _scope, ...habtmReflectionOptions } = habtmOptions;
     const habtmReflection = Reflection.create(
       "hasAndBelongsToMany" as any,
       name,
       positionalScope,
-      habtmReflectionOptions,
+      habtmOptions,
       model,
     );
     Reflection.addReflection(model, name, habtmReflection as any);

@@ -1637,7 +1637,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   private _appendAssociationScope(predicates: Nodes.Node[], assocDef: any, targetModel: any): void {
-    const scope = assocDef.options.scope;
+    const scope = assocDef.scope;
     if (typeof scope !== "function") return;
     const baseRel = targetModel._allForPreload();
     const scopeRel = invokeScopeLambda(scope, baseRel, undefined as unknown as Base) || baseRel;
