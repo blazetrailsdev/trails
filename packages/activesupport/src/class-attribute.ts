@@ -6,120 +6,126 @@
  */
 
 export interface ClassAttributeOptions {
-  instanceWriter?: boolean;
+  instanceAccessor?: boolean;
   instanceReader?: boolean;
+  instanceWriter?: boolean;
   instancePredicate?: boolean;
   default?: unknown;
 }
 
-const CLASS_ATTRS = Symbol("classAttributes");
-
-interface AttrStore {
-  values: Map<string, unknown>;
-}
-
-function getStore(target: any): AttrStore {
-  if (!Object.prototype.hasOwnProperty.call(target, CLASS_ATTRS)) {
-    target[CLASS_ATTRS] = { values: new Map() };
-  }
-  return target[CLASS_ATTRS];
+function inspect(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  return String(value);
 }
 
 /**
- * Define a class-level attribute that is inherited by subclasses.
- * Reads walk the prototype chain; writes are local to the class/instance.
+ * A Ruby class's singleton class holds its class methods; in JS those live on
+ * the constructor itself, and the constructor's prototype chain gives the same
+ * inheritance, so `owner.singleton_class` is the owner.
  */
 export namespace ClassAttribute {
-  export function redefine(
-    owner: any,
-    _name: string,
-    namespacedName: string,
-    value: unknown,
-  ): void {
-    const store = getStore(owner);
-    store.values.set(namespacedName, value);
+  export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
+    // Rails' `if owner.singleton_class?` arm has no JS counterpart: there is no
+    // singleton class to reopen, and no attached object to test for a Module.
+    redefineMethod(owner, namespacedName, true, () => value);
+
+    redefineMethod(owner, `${namespacedName}=`, true, function (this: any, newValue: unknown) {
+      if (owner === this) {
+        value = newValue;
+      } else {
+        ClassAttribute.redefine(this, name, namespacedName, newValue);
+      }
+    });
   }
 
   export function redefineMethod(
     owner: any,
     name: string,
     isPrivate: boolean,
-    fn: () => unknown,
+    fn: (...args: any[]) => unknown,
   ): void {
-    Object.defineProperty(owner.prototype ?? owner, name, {
-      get: fn,
+    // A zero-arg Ruby reader is a JS getter and a Ruby `name=` writer is a JS
+    // setter; both are `define_method` on the Ruby side. Ruby's two methods are
+    // one JS property, so the writer keeps whatever reader is already there.
+    const isWriter = name.endsWith("=");
+    const key = isWriter ? name.slice(0, -1) : name;
+    const existing = isWriter ? Object.getOwnPropertyDescriptor(owner, key) : undefined;
+    Object.defineProperty(owner, key, {
+      get: isWriter ? existing?.get : (fn as () => unknown),
+      set: isWriter ? (fn as (value: unknown) => void) : undefined,
       configurable: true,
       enumerable: !isPrivate,
     });
   }
 }
 
-export function classAttribute(
-  klass: any,
-  name: string,
-  options: ClassAttributeOptions = {},
-): void {
+/**
+ * Define a class-level attribute that is inherited by subclasses.
+ * Reads walk the constructor chain; writes are local to the class/instance.
+ */
+export function classAttribute(klass: any, ...attrs: (string | ClassAttributeOptions)[]): void {
+  const last = attrs[attrs.length - 1];
+  const options: ClassAttributeOptions =
+    typeof last === "object" && last !== null ? (attrs.pop() as ClassAttributeOptions) : {};
   const {
-    instanceWriter = true,
-    instanceReader = true,
-    instancePredicate = false,
+    instanceAccessor = true,
+    instanceReader = instanceAccessor,
+    instanceWriter = instanceAccessor,
+    instancePredicate = true,
     default: defaultValue,
   } = options;
 
-  // Set default value on the class
-  if (defaultValue !== undefined) {
-    getStore(klass).values.set(name, defaultValue);
-  }
+  for (const name of attrs as string[]) {
+    if (typeof name !== "string") {
+      // Ruby's core TypeError, exactly as attribute.rb:91 raises it — there is
+      // no Rails error class to port here.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`${inspect(name)} is not a symbol nor a string`);
+    }
 
-  // Class-level getter/setter
-  Object.defineProperty(klass, name, {
-    get() {
-      // Walk prototype chain for inherited values
-      let current = this;
-      while (current) {
-        const store = current[CLASS_ATTRS] as AttrStore | undefined;
-        if (store?.values.has(name)) {
-          return store.values.get(name);
-        }
-        current = Object.getPrototypeOf(current);
-      }
-      return undefined;
-    },
-    set(value: unknown) {
-      getStore(this).values.set(name, value);
-    },
-    configurable: true,
-  });
+    const namespacedName = `__class_attr_${name}`;
+    ClassAttribute.redefine(klass, name, namespacedName, defaultValue);
 
-  // Instance-level reader
-  if (instanceReader) {
-    Object.defineProperty(klass.prototype, name, {
-      get() {
-        // Check instance-level override first
-        const instanceStore = this[CLASS_ATTRS] as AttrStore | undefined;
-        if (instanceStore?.values.has(name)) {
-          return instanceStore.values.get(name);
-        }
-        // Fall back to class-level value
-        return this.constructor[name];
+    Object.defineProperty(klass, name, {
+      configurable: true,
+      enumerable: false,
+      get(this: any) {
+        return this[namespacedName];
       },
-      set: instanceWriter
-        ? function (this: any, value: unknown) {
-            getStore(this).values.set(name, value);
+      set(this: any, value: unknown) {
+        this[namespacedName] = value;
+      },
+    });
+
+    if (instanceReader || instanceWriter) {
+      const descriptor: PropertyDescriptor = { configurable: true, enumerable: false };
+      if (instanceReader) {
+        descriptor.get = function (this: any) {
+          if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
+            return this[`@${name}`];
+          } else {
+            return this.constructor[name];
           }
-        : undefined,
-      configurable: true,
-    });
-  }
+        };
+      }
+      if (instanceWriter) {
+        descriptor.set = function (this: any, value: unknown) {
+          this[`@${name}`] = value;
+        };
+      }
+      Object.defineProperty(klass.prototype, name, descriptor);
+    }
 
-  // Instance predicate (name + "?"-like, we use `isName` in TS)
-  if (instancePredicate) {
-    const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-    Object.defineProperty(klass.prototype, predicateName, {
-      get() {
+    if (instancePredicate) {
+      const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      ClassAttribute.redefineMethod(klass, predicateName, false, function (this: any) {
         return !!this[name];
-      },
-      configurable: true,
-    });
+      });
+      if (instanceReader) {
+        ClassAttribute.redefineMethod(klass.prototype, predicateName, false, function (this: any) {
+          return !!this[name];
+        });
+      }
+    }
   }
 }

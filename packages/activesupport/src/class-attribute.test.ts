@@ -95,6 +95,20 @@ describe("classAttribute", () => {
     expect(instance.isActive).toBe(true);
   });
 
+  it("defines several attributes at once", () => {
+    class Model {}
+    classAttribute(Model, "one", "two", { default: 1 });
+
+    expect((Model as any).one).toBe(1);
+    expect((Model as any).two).toBe(1);
+  });
+
+  it("raises a TypeError on a name that is neither a symbol nor a string", () => {
+    expect(() => classAttribute(class {}, 1 as unknown as string)).toThrow(
+      new TypeError("1 is not a symbol nor a string"),
+    );
+  });
+
   it("predicate reflects current value", () => {
     class Model {}
     classAttribute(Model, "active", {
