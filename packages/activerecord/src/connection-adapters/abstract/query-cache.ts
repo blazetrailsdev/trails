@@ -388,7 +388,7 @@ type BaseSelectAll = (
   arel: string | unknown,
   name?: string | null,
   binds?: unknown[],
-  opts?: { allowRetry?: boolean; preparable?: boolean | null },
+  opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Promise<Result>;
 
 /**
@@ -411,7 +411,7 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     arel: string | unknown,
     name: string | null = null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean; preparable?: boolean | null },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
   ): Promise<Result> {
     // Rails' QueryCache#select_all first unwraps a Relation to its Arel AST
     // (`arel = arel_from_relation(arel)`), then converts the Arel node to

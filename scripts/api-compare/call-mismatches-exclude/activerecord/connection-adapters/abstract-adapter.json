@@ -125,48 +125,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_one",
-    "call": "select_all",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:arel",
-      "ref:name",
-      "ref:binds",
-      "kwargs{async=ref:async}"
-    ],
-    "reason": "database_statements.rb:85 forwards `async:` into `select_all`, which turns it into `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_rows",
-    "call": "select_all",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:arel",
-      "ref:name",
-      "ref:binds",
-      "kwargs{async=ref:async}"
-    ],
-    "reason": "database_statements.rb:102 forwards `async:` into `select_all`, which turns it into `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "select_value",
-    "call": "select_rows",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:arel",
-      "ref:name",
-      "ref:binds",
-      "kwargs{async=ref:async}"
-    ],
-    "reason": "database_statements.rb:90 forwards `async:` into `select_rows` → `select_all` → `FutureResult::SelectAll` (:75). FutureResult and the load_async infrastructure are deliberately unported (database-statements.ts:2099-2112), so the kwarg would forward into nothing — story call-args-ar-select-async-kwarg."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "select_value",
     "call": "single_value_from_rows",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
