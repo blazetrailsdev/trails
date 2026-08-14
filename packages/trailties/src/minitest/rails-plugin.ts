@@ -16,8 +16,7 @@ import { Trails } from "../rails.js";
  * outside the trailties libPath the API comparator scans
  * (`railties/lib/rails`, vendor/sources.ts:128), so it cannot be matched —
  * the same reason `Minitest::BacktraceFilter` carries one in
- * `activesupport/src/testing/assertions.ts`. Tracked by
- * `widen-trailties-libpath-to-cover-lib-minitest`.
+ * `activesupport/src/testing/assertions.ts`.
  */
 export class BacktraceFilterWithFallback {
   private preferred: { filter(backtrace: string[]): string[] };
@@ -51,8 +50,7 @@ export class BacktraceFilterWithFallback {
  *
  * @noRailsEquivalent CONVERGEABLE — comparator gap, not a deviation. Ports
  * `Minitest.plugin_rails_init`, which the comparator cannot see for the libPath
- * reason on {@link BacktraceFilterWithFallback}; same story,
- * `widen-trailties-libpath-to-cover-lib-minitest`.
+ * reason on {@link BacktraceFilterWithFallback}.
  */
 export function pluginRailsInit(options: { fullBacktrace?: boolean }): void {
   if (env.RAILS_ENV == null && env.RAILS_MINITEST_PLUGIN == null) return;
