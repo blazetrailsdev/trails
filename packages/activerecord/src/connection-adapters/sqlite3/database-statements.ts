@@ -110,6 +110,7 @@ interface InternalBeginTransactionHost {
 interface PerformQueryHost {
   _cachedStatement(sql: string): Promise<SqliteStatement>;
   _freshStatement(sql: string): Promise<SqliteStatement>;
+  _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void;
   verifiedBang(): void;
   _statementLock: Promise<void> | null;
   _lastAffectedRows: number;
@@ -308,6 +309,7 @@ export async function performQuery(
       // the columns come off the statement, not off the rows, so a SELECT that
       // matches nothing still reports them.
       const rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
+      this._narrowSpilledBigInts(stmt, rows);
       result =
         rows.length > 0
           ? Result.fromRowHashes(rows)
