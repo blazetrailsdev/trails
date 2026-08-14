@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "renderer/abstract-renderer.ts",
+    "rubyName": "local_variable",
+    "call": "basename",
+    "reason": "Rails' local_variable takes the base via `File.basename(path)` (actionview/lib/action_view/renderer/abstract_renderer.rb:48); trails splits on `/` inline instead of calling the ported `basename`. Unmasked by the RFC 0025 same-file-closure fix, not introduced by it."
+  }
+]
