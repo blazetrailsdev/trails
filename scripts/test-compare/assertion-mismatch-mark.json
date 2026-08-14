@@ -21,44 +21,44 @@
       "value": 0
     },
     "activemodel": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 473,
+      "kind": 707,
+      "value": 96
     },
     "activerecord": {
-      "assertionCount": 1987,
-      "kind": 4069,
-      "value": 54
+      "assertionCount": 1977,
+      "kind": 4066,
+      "value": 49
     },
     "activesupport": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 1090,
+      "kind": 1505,
+      "value": 139
     },
     "arel": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 180,
+      "kind": 591,
+      "value": 17
     },
     "date": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 21,
+      "kind": 31,
+      "value": 1
     },
     "did-you-mean": {
-      "assertionCount": 0,
-      "kind": 0,
+      "assertionCount": 1,
+      "kind": 2,
       "value": 0
     },
     "globalid": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 53,
+      "kind": 71,
+      "value": 2
     },
     "i18n": {
-      "assertionCount": 0,
-      "kind": 0,
-      "value": 0
+      "assertionCount": 18,
+      "kind": 32,
+      "value": 6
     },
     "rack": {
       "assertionCount": 0,
