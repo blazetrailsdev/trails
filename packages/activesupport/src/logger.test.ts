@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { Temporal } from "@blazetrails/date";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, sep } from "node:path";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -175,17 +178,49 @@ describe("LoggerTest", () => {
   });
 
   it("log outputs to", () => {
-    logger.info("outputs to message");
-    expect(output.string).toContain("outputs to message");
+    const stdout = makeBuffer();
+    const stderr = makeBuffer();
+
+    expect(Logger.isLoggerOutputsTo(logger, output)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(logger, output, stdout)).toBe(true);
+
+    expect(Logger.isLoggerOutputsTo(logger, stdout)).toBe(false);
+    expect(Logger.isLoggerOutputsTo(logger, stdout, stderr)).toBe(false);
+    expect(Logger.isLoggerOutputsTo(logger, "log/production.log")).toBe(false);
   });
 
   it("log outputs to with a broadcast logger", () => {
-    const out2 = makeBuffer();
-    const log2 = new Logger(out2);
-    const broadcast = new BroadcastLogger(logger, log2);
-    broadcast.info("broadcast message");
-    expect(output.string).toContain("broadcast message");
-    expect(out2.string).toContain("broadcast message");
+    const stdout = makeBuffer();
+    const stderr = makeBuffer();
+    const broadcast = new BroadcastLogger(new Logger(stdout));
+
+    expect(Logger.isLoggerOutputsTo(broadcast, stdout)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(false);
+
+    broadcast.broadcastTo(new Logger(stderr));
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(true);
+  });
+
+  it("log outputs to with a filename", () => {
+    const dir = mkdtempSync(join(tmpdir(), "logger-test-"));
+    const path = join(dir, "development.log");
+    writeFileSync(path, "");
+    const broadcast = new BroadcastLogger(new Logger({ filename: path, write: () => {} }));
+
+    try {
+      expect(Logger.isLoggerOutputsTo(broadcast, path)).toBe(true);
+      // Ruby's File.join concatenates without normalizing, so Rails' third
+      // assertion (logger_test.rb:48) is what drives `normalize_sources`'
+      // File.realpath branch — `join()` would collapse the dot segment first.
+      expect(
+        Logger.isLoggerOutputsTo(broadcast, `${dirname(path)}${sep}.${sep}${basename(path)}`),
+      ).toBe(true);
+      expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBe(false);
+      expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBe(false);
+    } finally {
+      broadcast.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("defaults to simple formatter", () => {

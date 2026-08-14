@@ -3,71 +3,101 @@
  * Allows registering callbacks that run when a component is loaded.
  */
 
-interface HookEntry {
-  callback: (base: any) => void;
-  options: { once?: boolean };
+type Hook = (base: any) => void;
+
+interface HookOptions {
+  once?: boolean;
 }
 
-const hookRegistry = new Map<string, HookEntry[]>();
-const loadedBases = new Map<string, any[]>();
+const loadHooks = new Map<string, [Hook, HookOptions][]>();
+const loaded = new Map<string, any[]>();
+const runOnce = new Map<string, Hook[]>();
+
+function bucket<T>(registry: Map<string, T[]>, name: string): T[] {
+  let entries = registry.get(name);
+  if (!entries) {
+    entries = [];
+    registry.set(name, entries);
+  }
+  return entries;
+}
 
 /**
  * Register a callback to run when `name` is loaded.
  * If `name` was already loaded, runs immediately.
+ *
+ * `lazy_load_hooks.rb:59`.
  */
-export function onLoad(
-  name: string,
-  options: { once?: boolean } | ((base: any) => void),
-  callback?: (base: any) => void,
-): void {
-  let opts: { once?: boolean };
-  let cb: (base: any) => void;
-
+export function onLoad(name: string, options: HookOptions | Hook, callback?: Hook): void {
+  let block: Hook;
   if (typeof options === "function") {
-    cb = options;
-    opts = {};
+    block = options;
+    options = {};
   } else {
-    cb = callback!;
-    opts = options;
+    block = callback!;
   }
 
-  const hooks = hookRegistry.get(name) ?? [];
-
-  if (opts.once) {
-    // Don't register again if already registered with same callback
-    if (hooks.some((h) => h.callback === cb)) return;
+  for (const base of bucket(loaded, name)) {
+    executeHook(name, base, options, block);
   }
 
-  hooks.push({ callback: cb, options: opts });
-  hookRegistry.set(name, hooks);
-
-  // Run immediately if already loaded
-  const bases = loadedBases.get(name);
-  if (bases) {
-    for (const base of bases) {
-      cb(base);
-    }
-  }
+  bucket(loadHooks, name).push([block, options]);
 }
 
 /**
  * Run all registered hooks for `name` with `base`.
+ *
+ * `lazy_load_hooks.rb:70`.
  */
 export function runLoadHooks(name: string, base: any): void {
-  const bases = loadedBases.get(name) ?? [];
-  bases.push(base);
-  loadedBases.set(name, bases);
-
-  const hooks = hookRegistry.get(name) ?? [];
-  for (const { callback } of hooks) {
-    callback(base);
+  bucket(loaded, name).push(base);
+  for (const [hook, options] of bucket(loadHooks, name)) {
+    executeHook(name, base, options, hook);
   }
 }
 
 /**
+ * `lazy_load_hooks.rb:83` — private.
+ *
+ * @internal
+ */
+function withExecutionControl(
+  name: string,
+  block: Hook,
+  once: boolean | undefined,
+  fn: () => void,
+): void {
+  if (!bucket(runOnce, name).includes(block)) {
+    if (once === true) bucket(runOnce, name).push(block);
+
+    fn();
+  }
+}
+
+/**
+ * `lazy_load_hooks.rb:91` — private.
+ *
+ * Rails' `options[:yield]` arm exists only to distinguish yielding `base` from
+ * `class_eval`ing the block against it; JS has no `class_eval`, so every hook
+ * takes `base` as its argument and the two arms collapse into one call.
+ *
+ * @internal
+ */
+function executeHook(name: string, base: any, options: HookOptions, block: Hook): void {
+  withExecutionControl(name, block, options.once, () => {
+    block(base);
+  });
+}
+
+/**
  * Reset all hook registrations (for testing).
+ *
+ * @noRailsEquivalent PERMANENT — Rails' hook registries live on the ActiveSupport module
+ * and are reset by re-loading it; a TS module's state outlives the suite, so
+ * tests need an explicit reset.
  */
 export function resetLoadHooks(): void {
-  hookRegistry.clear();
-  loadedBases.clear();
+  loadHooks.clear();
+  loaded.clear();
+  runOnce.clear();
 }

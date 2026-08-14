@@ -58,3 +58,53 @@ describe("Logger default output", () => {
     expect(written.join("")).toBe("late\n");
   });
 });
+
+describe("LoggerSilence", () => {
+  it("does not silence when the silencer is off", () => {
+    const output: string[] = [];
+    const logger = new Logger({ write: (s) => void output.push(s) });
+
+    logger.setSilencer(false);
+    try {
+      logger.silence(Logger.ERROR, () => {
+        logger.debug("THIS IS HERE");
+      });
+    } finally {
+      logger.setSilencer(true);
+    }
+
+    expect(output.join("")).toContain("THIS IS HERE");
+    expect(Logger.silencer).toBe(true);
+  });
+
+  it("yields the logger to the block", () => {
+    const logger = new Logger({ write: () => {} });
+    let yielded: Logger | null = null;
+
+    logger.silence(Logger.ERROR, (l) => {
+      yielded = l;
+    });
+
+    expect(yielded).toBe(logger);
+  });
+});
+
+describe("LoggerThreadSafeLevel", () => {
+  it("raises on an unknown level", () => {
+    const logger = new Logger({ write: () => {} });
+
+    expect(() => {
+      logger.localLevel = "nope" as never;
+    }).toThrowError("Invalid log level: nope");
+  });
+
+  it("clears the local level when assigned null", () => {
+    const logger = new Logger({ write: () => {} });
+
+    logger.localLevel = Logger.ERROR;
+    expect(logger.localLevel).toBe(Logger.ERROR);
+
+    logger.localLevel = null;
+    expect(logger.localLevel).toBeNull();
+  });
+});
