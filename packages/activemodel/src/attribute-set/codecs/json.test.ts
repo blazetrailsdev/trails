@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { jsonCodec } from "./json.js";
-import { AttributeSetCoderError } from "../coder.js";
-import type { AttributeSetEnvelope } from "../coder.js";
+import { AttributeSetCodecError } from "./codec.js";
+import type { AttributeSetEnvelope } from "./codec.js";
 
 describe("jsonCodec", () => {
   const envelope: AttributeSetEnvelope = {
@@ -25,12 +25,12 @@ describe("jsonCodec", () => {
     expect(jsonCodec.decode(jsonCodec.encode(envelope))).toEqual(envelope);
   });
 
-  it("throws AttributeSetCoderError on malformed input", () => {
-    expect(() => jsonCodec.decode("null")).toThrow(AttributeSetCoderError);
-    expect(() => jsonCodec.decode("[]")).toThrow(AttributeSetCoderError);
-    expect(() => jsonCodec.decode('{"v":1}')).toThrow(AttributeSetCoderError);
+  it("throws AttributeSetCodecError on malformed input", () => {
+    expect(() => jsonCodec.decode("null")).toThrow(AttributeSetCodecError);
+    expect(() => jsonCodec.decode("[]")).toThrow(AttributeSetCodecError);
+    expect(() => jsonCodec.decode('{"v":1}')).toThrow(AttributeSetCodecError);
     expect(() => jsonCodec.decode('{"v":1,"types":null,"values":{}}')).toThrow(
-      AttributeSetCoderError,
+      AttributeSetCodecError,
     );
   });
 

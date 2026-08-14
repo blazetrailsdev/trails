@@ -4,7 +4,7 @@ import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   Attribute,
   AttributeSetBuilder,
-  AttributeSetCoder,
+  YAMLEncoder,
   typeRegistry,
   defineDirtyAttributeMethods,
   replayOwnPendingDecorators,
@@ -594,7 +594,7 @@ interface SchemaHost {
   _columns?: any[];
   _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
-  _yamlEncoder?: AttributeSetCoder;
+  _yamlEncoder?: YAMLEncoder;
   attributeTypes(): Record<string, any>;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
@@ -785,10 +785,10 @@ export function columns(this: SchemaHost): any[] {
  *
  * @internal
  */
-export function yamlEncoder(this: SchemaHost): AttributeSetCoder {
+export function yamlEncoder(this: SchemaHost): YAMLEncoder {
   const own = ownSchemaMemo(this, "_yamlEncoder");
   if (own) return own;
-  this._yamlEncoder = new AttributeSetCoder(this.attributeTypes());
+  this._yamlEncoder = new YAMLEncoder(this.attributeTypes());
   return this._yamlEncoder;
 }
 

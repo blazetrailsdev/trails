@@ -1,6 +1,6 @@
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import { AttributeSetCoderError } from "../coder.js";
-import type { AttributeSetCodec, AttributeSetEnvelope } from "../coder.js";
+import { AttributeSetCodecError } from "./codec.js";
+import type { AttributeSetCodec, AttributeSetEnvelope } from "./codec.js";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -20,7 +20,7 @@ export const yamlCodec: AttributeSetCodec = {
       !isPlainObject(parsed.types) ||
       !isPlainObject(parsed.values)
     ) {
-      throw new AttributeSetCoderError(
+      throw new AttributeSetCodecError(
         "yamlCodec.decode: input is not a valid AttributeSetEnvelope",
       );
     }
