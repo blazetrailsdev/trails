@@ -682,7 +682,7 @@ export function strictLoadingViolationBang({
   owner,
   reflection,
 }: {
-  owner: any;
+  owner: unknown;
   reflection: { name: string; strictLoadingViolationMessage(owner: unknown): string };
 }): void {
   switch (ActiveRecord.actionOnStrictLoadingViolation) {

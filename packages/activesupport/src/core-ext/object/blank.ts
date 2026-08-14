@@ -74,38 +74,36 @@ export class Time {
 
 /**
  * `Object#blank?` (`core_ext/object/blank.rb:18-20`) plus the per-class
- * overrides, dispatched on the value class.
+ * overrides, dispatched on the value class in blank.rb's own order: `NilClass`
+ * (:56), `FalseClass` (:69), `TrueClass` (:82), `Array` (:96), `Hash` (:111),
+ * `Symbol` (:120), `String` (:145-153), `Numeric` (:167-169), `Time`
+ * (:182-184). `Array`, `Hash` and `Numeric` get no class of their own here:
+ * their arms are `alias_method :blank?, :empty?` and a bare `false`, applied at
+ * the switch.
+ *
+ * A Ruby Symbol is a JS string, so the `Symbol` arm is reached only by a
+ * genuine JS `symbol`; the string spelling falls through to `String`.
+ *
+ * `Object#blank?`'s `respond_to?(:empty?)` arm answers for `Set` and `Map`,
+ * which `Object.keys` reports as empty, and for any other object carrying a
+ * boolean `isEmpty` (the conventions-table spelling of `empty?`) or `empty`
+ * (the getter actionpack's Hash-like wrappers carry). A method-shaped
+ * `isEmpty()` is deliberately not invoked: trails has async ones
+ * (`Relation#isEmpty` runs a query) and Ruby's `blank?` issues no I/O.
  */
 export function isBlank(value: unknown): boolean {
-  // blank.rb:56 — NilClass#blank?
   if (value === null || value === undefined) return NilClass.isBlank(value);
-  // blank.rb:69 / :82 — FalseClass#blank? and TrueClass#blank?
   if (typeof value === "boolean")
     return value ? TrueClass.isBlank(value) : FalseClass.isBlank(value);
-  // blank.rb:96 — `alias_method :blank?, :empty?` on Array.
   if (Array.isArray(value)) return value.length === 0;
-  // blank.rb:120 — Symbol#blank?. A Ruby Symbol is a JS string, so this arm is
-  // only reached by a genuine JS `symbol`; the string spelling falls to String.
   if (typeof value === "symbol") return Symbol.isBlank(value);
-  // blank.rb:145-153 — String#blank?
   if (typeof value === "string") return String.isBlank(value);
-  // blank.rb:167-169 — Numeric#blank? is always false, including for 0.
   if (typeof value === "number" || typeof value === "bigint") return false;
-  // blank.rb:182-184 — Time#blank?
-  // boundary: the `Time` arm below is typed on the JS `Date` this dispatches to.
+  // boundary: the `Time` arm is typed on the JS `Date` this dispatches to.
   if (value instanceof Date) return Time.isBlank(value);
-  // `Object#blank?`'s `respond_to?(:empty?)` arm: `Object.keys` reports none
-  // for a Set or Map, which answer by size.
   if (value instanceof Set || value instanceof Map) return value.size === 0;
-  // The same arm for any other object that answers `empty?`. Ruby probes one
-  // spelling; trails has two — `isEmpty` from the conventions table, and the
-  // `empty` getter actionpack's Hash-like wrappers (`Parameters`, `FlashHash`)
-  // carry — so both are probed. Only a boolean-valued reader answers here: a
-  // method-shaped `isEmpty()` is not invoked, because trails has async ones
-  // (`Relation#isEmpty` runs a query) and Ruby's `blank?` issues no I/O.
   const empty = (value as { isEmpty?: unknown }).isEmpty ?? (value as { empty?: unknown }).empty;
   if (typeof empty === "boolean") return empty;
-  // blank.rb:111 — `alias_method :blank?, :empty?` on Hash.
   if (typeof value === "object") return Object.keys(value).length === 0;
   return false;
 }

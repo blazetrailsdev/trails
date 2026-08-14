@@ -8,11 +8,12 @@ type AnyObject = Record<string, unknown>;
  *
  * `hash.default` / `hash.default_proc` have no JS analogue: a plain object has
  * no default-value seat, so slice.rb:13-14 has nothing to copy over.
+ * `replace(hash)` (slice.rb:15) is the own-key clear plus `Object.assign` —
+ * JS objects carry no `replace`.
  */
 export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T> {
   const omit = slice(hash, ...(Object.keys(hash).filter((k) => !keys.includes(k)) as (keyof T)[]));
   const result = slice(hash, ...(keys as (keyof T)[]));
-  // `replace(hash)`: empty the receiver, then take the sliced pairs.
   for (const key of Object.keys(hash)) delete hash[key];
   Object.assign(hash, result);
   return omit as Partial<T>;
