@@ -3,37 +3,19 @@ import { AttributeSet } from "../attribute-set.js";
 import { typeRegistry, type TypeRegistry } from "../type/registry.js";
 import type { Type } from "../type/value.js";
 import { jsonCodec } from "./codecs/json.js";
-
-export interface AttributeSetEnvelope {
-  v: 1;
-  /**
-   * attr → registry type key (e.g. "string", "integer", "decimal"), or `null`
-   * for `attr.with_type(nil)` (`yaml_encoder.rb:15`) — the attribute's type is
-   * the model's default type for that name, so it is not written out.
-   */
-  types: Record<string, string | null>;
-  /** attr → raw value before type-cast (valueBeforeTypeCast) */
-  values: Record<string, unknown>;
-  /** attrs that were Uninitialized when encoded */
-  defaultAttributes?: string[];
-}
-
-export interface AttributeSetCodec {
-  encode(envelope: AttributeSetEnvelope): string;
-  decode(input: string): AttributeSetEnvelope;
-}
-
-export class AttributeSetCoderError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AttributeSetCoderError";
-  }
-}
+import {
+  AttributeSetCodecError,
+  type AttributeSetCodec,
+  type AttributeSetEnvelope,
+} from "./codecs/codec.js";
 
 const warnedKeys = new Set<string>();
 
 /**
  * Mirrors: ActiveModel::AttributeSet::YAMLEncoder
+ *
+ * Attempts to do more intelligent YAML dumping of an
+ * ActiveModel::AttributeSet to reduce the size of the resulting string.
  *
  * Rails takes the model's `attribute_types` as `default_types` and encodes an
  * attribute whose type is that default as `attr.with_type(nil)`
@@ -51,7 +33,7 @@ const warnedKeys = new Set<string>();
  *   has no value to carry for one, so those names are listed in
  *   `defaultAttributes` and rebuilt as `Uninitialized` on decode.
  */
-export class AttributeSetCoder {
+export class YAMLEncoder {
   private defaultTypes: Record<string, Type>;
   private registry: TypeRegistry;
   private codec: AttributeSetCodec;
@@ -72,18 +54,25 @@ export class AttributeSetCoder {
   }
 
   encode(attributeSet: AttributeSet): string {
-    const types: Record<string, string | null> = {};
-    const values: Record<string, unknown> = {};
-    const defaultAttributes: string[] = [];
-
-    attributeSet.forEach((attr, name) => {
-      if (attr instanceof Uninitialized) {
-        defaultAttributes.push(name);
-        return;
-      }
-      types[name] = attr.type === this.defaultTypes[name] ? null : attr.type.name;
-      values[name] = attr.valueBeforeTypeCast;
+    const attributes: Attribute[] = [];
+    attributeSet.eachValue((attr) => {
+      attributes.push(attr);
     });
+
+    const defaultAttributes = attributes
+      .filter((attr) => attr instanceof Uninitialized)
+      .map((attr) => attr.name);
+
+    const conciseAttributes = attributes.filter((attr) => !(attr instanceof Uninitialized));
+    const types = Object.fromEntries(
+      conciseAttributes.map((attr) => [
+        attr.name,
+        attr.type === this.defaultTypes[attr.name] ? null : attr.type.name,
+      ]),
+    );
+    const values = Object.fromEntries(
+      conciseAttributes.map((attr) => [attr.name, attr.valueBeforeTypeCast]),
+    );
 
     const envelope: AttributeSetEnvelope = { v: 1, types, values };
     if (defaultAttributes.length > 0) envelope.defaultAttributes = defaultAttributes;
@@ -94,30 +83,30 @@ export class AttributeSetCoder {
     const envelope = this.codec.decode(input);
 
     if (envelope.v !== 1) {
-      throw new AttributeSetCoderError(`envelope version v=${envelope.v} not supported`);
+      throw new AttributeSetCodecError(`envelope version v=${envelope.v} not supported`);
     }
 
-    const attributesHash = new Map<string, Attribute>();
-
-    for (const [name, typeKey] of Object.entries(envelope.types)) {
-      let type: Type;
-      if (typeKey == null) {
-        type = this.defaultTypes[name];
-      } else {
-        try {
-          type = this.registry.lookup(typeKey);
-        } catch {
-          if (!this.silenceDriftWarnings && !warnedKeys.has(typeKey)) {
-            warnedKeys.add(typeKey);
-            console.warn(
-              `AttributeSetCoder: unknown type key "${typeKey}" — falling back to "value" type`,
-            );
+    const attributesHash = new Map<string, Attribute>(
+      Object.entries(envelope.types).map(([name, typeKey]) => {
+        let type: Type;
+        if (typeKey == null) {
+          type = this.defaultTypes[name];
+        } else {
+          try {
+            type = this.registry.lookup(typeKey);
+          } catch {
+            if (!this.silenceDriftWarnings && !warnedKeys.has(typeKey)) {
+              warnedKeys.add(typeKey);
+              console.warn(
+                `YAMLEncoder: unknown type key "${typeKey}" — falling back to "value" type`,
+              );
+            }
+            type = this.registry.lookup("value");
           }
-          type = this.registry.lookup("value");
         }
-      }
-      attributesHash.set(name, Attribute.fromUser(name, envelope.values[name], type));
-    }
+        return [name, Attribute.fromUser(name, envelope.values[name], type)];
+      }),
+    );
 
     for (const name of envelope.defaultAttributes ?? []) {
       attributesHash.set(name, Attribute.uninitialized(name, this.defaultTypes[name]));

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { AttributeSetCoder, AttributeSetCoderError } from "./coder.js";
-import type { AttributeSetCodec, AttributeSetEnvelope } from "./coder.js";
+import { YAMLEncoder } from "./yaml-encoder.js";
+import { AttributeSetCodecError } from "./codecs/codec.js";
+import type { AttributeSetCodec, AttributeSetEnvelope } from "./codecs/codec.js";
 import { AttributeSet } from "../attribute-set.js";
 import { Attribute } from "../attribute.js";
 import { typeRegistry } from "../type/registry.js";
@@ -20,11 +21,11 @@ function intAttr(name: string, value: number): Attribute {
   return Attribute.fromUser(name, value, integerType);
 }
 
-describe("AttributeSetCoder", () => {
+describe("YAMLEncoder", () => {
   // `default_types` is the model's `attribute_types`, whose values are the very
   // Type instances its attributes carry — Rails' `equal?` check depends on that.
   const defaultTypes = { name: stringType, age: integerType };
-  const coder = new AttributeSetCoder(defaultTypes);
+  const coder = new YAMLEncoder(defaultTypes);
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -53,7 +54,7 @@ describe("AttributeSetCoder", () => {
 
   it("restores the default type for an attribute encoded without one", () => {
     const custom = integerType;
-    const localCoder = new AttributeSetCoder({ qty: custom });
+    const localCoder = new YAMLEncoder({ qty: custom });
     const json = JSON.stringify({ v: 1, types: { qty: null }, values: { qty: 5 } });
     const decoded = localCoder.decode(json);
     expect(decoded.fetchValue("qty")).toBe(5);
@@ -62,7 +63,7 @@ describe("AttributeSetCoder", () => {
 
   it("uninitialized attributes round-trip as uninitialized", () => {
     const intType = integerType;
-    const localCoder = new AttributeSetCoder({ score: intType });
+    const localCoder = new YAMLEncoder({ score: intType });
     const set = makeSet(new Map([["score", Attribute.uninitialized("score", intType)]]));
 
     const encoded = localCoder.encode(set);
@@ -75,7 +76,7 @@ describe("AttributeSetCoder", () => {
 
   it("unknown type key falls back to value type and warns once", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const localCoder = new AttributeSetCoder({});
+    const localCoder = new YAMLEncoder({});
     const json = JSON.stringify({
       v: 1,
       types: { x: "unknown_type_xyz" },
@@ -91,7 +92,7 @@ describe("AttributeSetCoder", () => {
 
   it("silenceDriftWarnings suppresses the console.warn", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const silentCoder = new AttributeSetCoder({}, { silenceDriftWarnings: true });
+    const silentCoder = new YAMLEncoder({}, { silenceDriftWarnings: true });
     const json = JSON.stringify({
       v: 1,
       types: { y: "completely_unknown_type_abc" },
@@ -101,9 +102,9 @@ describe("AttributeSetCoder", () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it("v mismatch throws AttributeSetCoderError", () => {
+  it("v mismatch throws AttributeSetCodecError", () => {
     const json = JSON.stringify({ v: 2, types: {}, values: {} });
-    expect(() => coder.decode(json)).toThrow(AttributeSetCoderError);
+    expect(() => coder.decode(json)).toThrow(AttributeSetCodecError);
     expect(() => coder.decode(json)).toThrow("v=2 not supported");
   });
 
@@ -140,7 +141,7 @@ describe("AttributeSetCoder", () => {
       }),
       decode: vi.fn((input: string) => JSON.parse(input) as AttributeSetEnvelope),
     };
-    const customCoder = new AttributeSetCoder({}, { codec: customCodec });
+    const customCoder = new YAMLEncoder({}, { codec: customCodec });
     const set = makeSet(new Map([["x", stringAttr("x", "hi")]]));
     customCoder.decode(customCoder.encode(set));
     expect(customCodec.encode).toHaveBeenCalledOnce();

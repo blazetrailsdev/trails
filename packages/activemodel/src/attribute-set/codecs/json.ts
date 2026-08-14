@@ -1,8 +1,8 @@
-import { AttributeSetCoderError } from "../coder.js";
-import type { AttributeSetCodec, AttributeSetEnvelope } from "../coder.js";
+import { AttributeSetCodecError } from "./codec.js";
+import type { AttributeSetCodec, AttributeSetEnvelope } from "./codec.js";
 
 /**
- * Default JSON codec for AttributeSetCoder.
+ * Default JSON codec for YAMLEncoder.
  *
  * Known JSON format limitations (Rails YAMLEncoder stores full Ruby objects
  * and is not subject to these constraints):
@@ -33,7 +33,7 @@ export const jsonCodec: AttributeSetCodec = {
       !isPlainObject(parsed.types) ||
       !isPlainObject(parsed.values)
     ) {
-      throw new AttributeSetCoderError(
+      throw new AttributeSetCodecError(
         "jsonCodec.decode: input is not a valid AttributeSetEnvelope",
       );
     }

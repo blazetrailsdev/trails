@@ -37,10 +37,6 @@
     "reason": "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; JS doesn't use YAML for AR column serialization."
   },
   {
-    "pattern": "attribute_set/yaml_encoder.rb",
-    "reason": "Rails' Psych-specific YAML round-trip class for AttributeSet. Replaced by the pluggable AttributeSetCoder architecture in #1173 (P24a) / #1176 (P24b) — see packages/activemodel/src/attribute-set/{coder.ts,codecs/json.ts,codecs/yaml.ts}. Functional capability is shipped; the Rails class hierarchy doesn't map to the TS codec-injection pattern (no Psych, JSON is the default)."
-  },
-  {
     "pattern": "coders/yaml_column.rb",
     "testFile": "coders/yaml_column_test.rb",
     "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."

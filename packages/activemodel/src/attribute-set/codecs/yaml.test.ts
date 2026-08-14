@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { yamlCodec } from "@blazetrails/activemodel/yaml";
-import { AttributeSetCoderError } from "../coder.js";
-import type { AttributeSetEnvelope } from "../coder.js";
+import { AttributeSetCodecError } from "./codec.js";
+import type { AttributeSetEnvelope } from "./codec.js";
 
 describe("yamlCodec", () => {
   const envelope: AttributeSetEnvelope = {
@@ -26,11 +26,11 @@ describe("yamlCodec", () => {
     expect(yamlCodec.decode(yamlCodec.encode(envelope))).toEqual(envelope);
   });
 
-  it("throws AttributeSetCoderError on malformed input", () => {
-    expect(() => yamlCodec.decode("null")).toThrow(AttributeSetCoderError);
-    expect(() => yamlCodec.decode("- item")).toThrow(AttributeSetCoderError);
-    expect(() => yamlCodec.decode("v: 1")).toThrow(AttributeSetCoderError);
-    expect(() => yamlCodec.decode("v: 1\ntypes: ~\nvalues: {}")).toThrow(AttributeSetCoderError);
+  it("throws AttributeSetCodecError on malformed input", () => {
+    expect(() => yamlCodec.decode("null")).toThrow(AttributeSetCodecError);
+    expect(() => yamlCodec.decode("- item")).toThrow(AttributeSetCodecError);
+    expect(() => yamlCodec.decode("v: 1")).toThrow(AttributeSetCodecError);
+    expect(() => yamlCodec.decode("v: 1\ntypes: ~\nvalues: {}")).toThrow(AttributeSetCodecError);
   });
 
   it("round-trips with unknown type key (schema drift)", () => {
