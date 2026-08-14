@@ -43,6 +43,19 @@ export class YAMLEncoder {
   private codec: AttributeSetCodec;
   private silenceDriftWarnings: boolean;
 
+  /**
+   * `YAMLEncoder#initialize` takes only `default_types` (`yaml_encoder.rb:8`)
+   * and `encode`/`decode` receive the `Psych::Coder` at the method boundary
+   * (`:12`, `:22`).
+   *
+   * @noRailsEquivalent `opts` carries what Psych supplies in Ruby and JS has no
+   * analogue of. Psych dumps a `Type` object inline, so a non-default type has
+   * to travel as a registry key and come back through `registry` (with
+   * `silenceDriftWarnings` muting the unknown-key warning), and there is no
+   * `Psych::Coder` object to pass per call, so the serializer is the injected
+   * `codec` instead. All three default, so `new YAMLEncoder(defaultTypes)` is
+   * the Rails call.
+   */
   constructor(
     defaultTypes: Record<string, Type>,
     opts: {
