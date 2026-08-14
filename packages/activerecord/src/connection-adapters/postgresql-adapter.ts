@@ -1634,19 +1634,13 @@ export class PostgreSQLAdapter
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
    * @internal
    */
-  performQuery(
+  declare performQuery: (
     rawConnection: pg.Client,
     sql: string,
     binds: unknown[],
     typeCastedBinds: unknown[],
     options: { prepare?: boolean; notificationPayload?: Record<string, unknown> },
-  ): Promise<pg.QueryResult> {
-    return this._performQuery(rawConnection, sql, binds, typeCastedBinds, {
-      prepare: options.prepare ?? false,
-      notificationPayload: options.notificationPayload ?? {},
-      rowMode: "array",
-    });
-  }
+  ) => Promise<pg.QueryResult>;
 
   /**
    * Dispatch the notices PG raised during the last statement, wired from the
@@ -4931,6 +4925,30 @@ dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).
 include(PostgreSQLAdapter, SchemaStatements);
+
+// Mirrors `include PostgreSQL::DatabaseStatements` — `perform_query` is an
+// instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`
+// dispatch resolves here (postgresql/database_statements.rb:135), which is what
+// makes `raw_exec_query` — and so `FutureResult#exec_query` — work on PG.
+// `rowMode` is supplied because node-pg decodes a row into one shape or the
+// other before the query runs, while `cast_result` reads the positional view
+// off the `PG::Result` Rails already has (`result.values`,
+// postgresql/database_statements.rb:180). The extracted `performQuery` carries
+// the full note; its other callers pass the shape they read.
+PostgreSQLAdapter.prototype.performQuery = function (
+  this: PostgreSQLAdapter,
+  rawConnection,
+  sql,
+  binds,
+  typeCastedBinds,
+  options,
+) {
+  return pgPerformQuery.call(this as never, rawConnection, sql, binds, typeCastedBinds, {
+    prepare: options.prepare ?? false,
+    notificationPayload: options.notificationPayload ?? {},
+    rowMode: "array",
+  });
+};
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
