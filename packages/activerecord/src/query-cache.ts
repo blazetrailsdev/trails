@@ -82,10 +82,7 @@ export class QueryCache {
   }
 
   /**
-   * Disable and clear query cache on all provided targets.
-   * Called at the end of a request/execution context.
-   *
-   * Mirrors: ActiveRecord::QueryCache::ExecutorHooks.complete
+   * Mirrors: ActiveRecord::QueryCache.complete (query_cache.rb:44-48).
    */
   static complete(targets: QueryCacheCompleteTarget[]): void {
     for (const target of targets) {

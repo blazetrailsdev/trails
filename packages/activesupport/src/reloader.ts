@@ -62,6 +62,12 @@ export class Reloader extends ExecutionWrapper {
     setCallback(this.prototype, "class_unload", "after", ...args);
   }
 
+  static {
+    this.toRun("after", function (this: Reloader) {
+      (this.constructor as typeof Reloader).prepareBang();
+    });
+  }
+
   /** Initiate a manual reload */
   static reloadBang(): void {
     this.executor.wrap(() => {
@@ -169,10 +175,6 @@ export class Reloader extends ExecutionWrapper {
     }
   }
 }
-
-Reloader.toRun("after", function (this: Reloader) {
-  (this.constructor as typeof Reloader).prepareBang();
-});
 
 classAttribute(Reloader, "executor", { default: Executor });
 classAttribute(Reloader, "check", { default: () => false });
