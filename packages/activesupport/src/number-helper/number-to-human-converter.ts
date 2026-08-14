@@ -1,6 +1,7 @@
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
+import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { I18n } from "../i18n.js";
 import type { NumberToHumanOptions } from "../number-helper.js";
 
@@ -40,13 +41,11 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
       options.stripInsignificantZeros = true;
     }
 
-    const precision = (options.precision ?? 3) as number;
-    const significant = (options.significant ?? true) as boolean;
-
-    const roundMode = options.roundMode as string | undefined;
-
-    let number = this.numberAsFloat();
-    number = new RoundingHelper({ precision, significant, roundMode }).round(number);
+    // Rails keeps the rounded BigDecimal through `number / (10**exponent)`
+    // (number_to_human_converter.rb:12-14); BigDecimal division is unported,
+    // so the value drops to a float for the exponent scaling.
+    const roundedValue = new RoundingHelper(options).round(this.number) as BigDecimal;
+    let number = Number(roundedValue.toString("F"));
 
     const units = this.opts.units;
     const exponent = this.calculateExponent(units, Math.abs(number));

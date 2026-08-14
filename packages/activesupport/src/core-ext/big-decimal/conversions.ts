@@ -143,9 +143,13 @@ export class BigDecimal {
   }
 
   /**
-   * Ruby `BigDecimal#round(n)` — ROUND_HALF_UP, i.e. ties away from zero,
-   * which is BigDecimal's default mode. A negative `n` rounds to an integer,
-   * matching what `RoundingHelper` already does for a non-positive precision.
+   * Ruby `BigDecimal#round(n, mode)`. `mode` is the rounding mode Symbol
+   * `RoundingHelper#round` forwards (`rounding_helper.rb:16`); it defaults to
+   * `:default`, i.e. ROUND_HALF_UP — ties away from zero. A negative `n`
+   * rounds to a multiple of `10 ** -n`, which is how the significant-digit
+   * path of `RoundingHelper#absolute_precision` uses it. Ruby answers an
+   * Integer for `n <= 0`; there is no separate Integer here, so the value
+   * comes back as a `BigDecimal` with no fractional digits.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
    * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
@@ -153,14 +157,16 @@ export class BigDecimal {
    * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
    * and `>=`) has to exist here for those ports to have anything to call.
    */
-  round(n = 0): BigDecimal {
-    const scale = Math.max(n, 0);
-    if (scale >= this.fracDigits.length) return this;
+  round(n = 0, mode = ":default"): BigDecimal {
+    if (n >= this.fracDigits.length) return this;
     const digits = this.intDigits + this.fracDigits;
-    const kept = digits.slice(0, this.intDigits.length + scale);
+    const keepCount = this.intDigits.length + n;
+    const kept = keepCount > 0 ? digits.slice(0, keepCount) : "";
+    const rest = keepCount > 0 ? digits.slice(keepCount) : "0".repeat(-keepCount) + digits;
     let value = BigInt(kept === "" ? "0" : kept);
-    if (Number(digits[this.intDigits.length + scale]) >= 5) value += 1n;
-    return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, scale);
+    if (roundsAway(rest, kept, this.sign === "-", mode)) value += 1n;
+    if (n < 0) value *= 10n ** BigInt(-n);
+    return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, Math.max(n, 0));
   }
 
   /** Digits as one integer, scaled by `10 ** fracDigits.length`. */
@@ -191,6 +197,44 @@ export class BigDecimal {
     const exp = this.intDigits.length - leadingZeros;
     const digits = group > 0 ? groupFromLeft(mantissa, group) : mantissa;
     return `0.${digits}e${exp}`;
+  }
+}
+
+/**
+ * Whether the digits `rest` dropped by {@link BigDecimal.round} push the kept
+ * magnitude one unit further from zero under `mode`.
+ *
+ * A Ruby Symbol option value is a `":name"` string in trails, and the
+ * camelCased spelling is accepted alongside the Ruby one. `:up` is
+ * BigDecimal's ROUND_UP — away from zero — not "half up".
+ */
+function roundsAway(rest: string, kept: string, negative: boolean, mode: string): boolean {
+  const nonZero = /[1-9]/.test(rest);
+  if (!nonZero) return false;
+  const first = Number(rest[0]);
+  switch (mode.replace(/^:/, "")) {
+    case "up":
+      return true;
+    case "down":
+    case "truncate":
+      return false;
+    case "ceiling":
+    case "ceil":
+      return !negative;
+    case "floor":
+      return negative;
+    case "half_down":
+    case "halfDown":
+      return first > 5 || (first === 5 && /[1-9]/.test(rest.slice(1)));
+    case "half_even":
+    case "halfEven":
+    case "even":
+    case "banker":
+      if (first !== 5) return first > 5;
+      if (/[1-9]/.test(rest.slice(1))) return true;
+      return Number(kept.slice(-1) || 0) % 2 === 1;
+    default:
+      return first >= 5;
   }
 }
 

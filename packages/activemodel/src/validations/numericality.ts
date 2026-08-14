@@ -278,7 +278,7 @@ export function round(num: number, scale?: number): number {
   if (scale === undefined || scale === null) return num;
   // Reuse the shared half-away-from-zero rounder so numericality
   // coercion stays consistent with the rest of the codebase.
-  return new RoundingHelper({ precision: scale }).round(num);
+  return Number((new RoundingHelper({ precision: scale }).round(num) as BigDecimal).toString("F"));
 }
 
 /**
