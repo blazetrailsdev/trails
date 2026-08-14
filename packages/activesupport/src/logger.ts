@@ -116,8 +116,9 @@ export class Logger {
       .map((logdev) => logdev?.filename ?? logdev)
       .filter((source) => source != null);
 
+    const normalizedLoggerSources = Logger.normalizeSources(loggerSources);
     return Logger.normalizeSources(sources).some((source) =>
-      Logger.normalizeSources(loggerSources).includes(source),
+      normalizedLoggerSources.includes(source),
     );
   }
 

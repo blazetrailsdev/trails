@@ -66,8 +66,8 @@ export class BroadcastLogger extends Logger {
   }
 
   set formatter(value: any) {
-    this.broadcasts.forEach((l) => {
-      (l as any).formatter = value;
+    this.dispatch((logger) => {
+      (logger as any).formatter = value;
     });
   }
 
@@ -76,38 +76,35 @@ export class BroadcastLogger extends Logger {
   }
 
   add(severity: number, message?: string | null, progname?: string): boolean {
-    this.broadcasts.forEach((l) => l.add(severity, message, progname));
-    return true;
+    return this.dispatch((logger) => logger.add(severity, message, progname));
   }
 
   log(severity: number, message?: string | (() => string), progname?: string): boolean {
-    const msg = typeof message === "function" ? String(message()) : message;
-    this.broadcasts.forEach((l) => l.log(severity, msg, progname));
-    return true;
+    return this.dispatch((logger) => logger.log(severity, message, progname));
   }
 
   debug(message?: string | (() => string)): boolean {
-    return this.log(Logger.DEBUG, message);
+    return this.dispatch((logger) => logger.debug(message));
   }
 
   info(message?: string | (() => string)): boolean {
-    return this.log(Logger.INFO, message);
+    return this.dispatch((logger) => logger.info(message));
   }
 
   warn(message?: string | (() => string)): boolean {
-    return this.log(Logger.WARN, message);
+    return this.dispatch((logger) => logger.warn(message));
   }
 
   error(message?: string | (() => string)): boolean {
-    return this.log(Logger.ERROR, message);
+    return this.dispatch((logger) => logger.error(message));
   }
 
   fatal(message?: string | (() => string)): boolean {
-    return this.log(Logger.FATAL, message);
+    return this.dispatch((logger) => logger.fatal(message));
   }
 
   unknown(message?: string | (() => string)): boolean {
-    return this.log(Logger.UNKNOWN, message);
+    return this.dispatch((logger) => logger.unknown(message));
   }
 
   get debugEnabled(): boolean {
