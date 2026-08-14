@@ -280,6 +280,16 @@ describe("rubyMethodToTs predicates", () => {
     expect(rubyMethodToTs("exclude?")).toEqual(["isExclude", "exclude", "excludes"]);
   });
 
+  it("offers the quoted literal first when the Ruby file also defines the bare name", () => {
+    // `Logger#debug?` (broadcast_logger.rb:167) sits next to `Logger#debug`,
+    // so the camel candidate `debug` names the LOGGING method — the pairing
+    // that reported BroadcastLogger's predicate bodies as call mismatches.
+    // trails spells the predicate `get "debug?"`, which is what should win.
+    expect(rubyMethodToTs("debug?", new Set(["debug"]))).toEqual(["debug?", "isDebug", "debug"]);
+    // No bare sibling — the candidate list is untouched.
+    expect(rubyMethodToTs("debug?", new Set())).toEqual(["isDebug", "debug"]);
+  });
+
   it("keeps the containment spelling last so existing isInclude ports still match first", () => {
     // CollectionAssociation#isInclude and Clusivity#isInclude are live ports;
     // widening the candidate list must never displace them.

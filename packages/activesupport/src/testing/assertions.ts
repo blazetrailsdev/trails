@@ -54,18 +54,18 @@ export class Skip extends Assertion {
 }
 
 /**
- * Mirrors `Minitest::UnexpectedError` (minitest.rb:1078-1110) — the wrapper
+ * Mirrors `Minitest::UnexpectedError` (minitest.rb:1074-1108) — the wrapper
  * `assert_nothing_raised` re-raises an unexpected error in, and the class
  * {@link _assertNothingRaisedOrWarn} rescues to warn about it.
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails names the class
  * (assertions.rb:52, 283) but defines it in the minitest gem
- * (minitest.rb:1078-1110), which is a test-framework dependency with no
+ * (minitest.rb:1074-1108), which is a test-framework dependency with no
  * vendored Rails file for the comparator to map onto. Porting it here is what
  * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
  * rescue, the class Rails names.
  *
- * `message` and `backtrace` are METHODS in minitest (minitest.rb:1097-1107),
+ * `message` and `backtrace` are METHODS in minitest (minitest.rb:1093-1102),
  * reading the wrapped error when called. TypeScript cannot declare an accessor
  * over a base-class data property (`Error#message`/`#stack`, TS2611), so they
  * are installed on the prototype below — and the constructor deletes the own
@@ -102,7 +102,7 @@ export class UnexpectedWarning extends Assertion {
 }
 
 /**
- * Rails' `e.class` rendered as a name (minitest.rb:1105, assertions.rb:285).
+ * Rails' `e.class` rendered as a name (minitest.rb:1102, assertions.rb:285).
  * trails carries the namespaced Rails name on `name` where it has been ported
  * (`ActionDispatch::ParamError`, param-error.ts:28), which `constructor.name`
  * truncates — so prefer it and fall back to the constructor, mirroring
@@ -116,7 +116,7 @@ function classNameOf(e: Error): string {
 }
 
 /**
- * Mirrors `Minitest::BacktraceFilter` (minitest.rb:1173-1199).
+ * Mirrors `Minitest::BacktraceFilter` (minitest.rb:1190-1218).
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails reassigns
  * `Minitest.backtrace_filter` but the class lives in the minitest gem, which
@@ -125,7 +125,7 @@ function classNameOf(e: Error): string {
  */
 export class BacktraceFilter {
   /**
-   * Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1176),
+   * Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1192),
    * `%r%lib/minitest|internal:warning%`. The frames trails filters are
    * vitest's and node's, not minitest's, so the pattern names those instead —
    * the only part of this class that cannot be transcribed literally.
@@ -142,11 +142,11 @@ export class BacktraceFilter {
   }
 
   /**
-   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1191-1201): the
+   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1207-1217): the
    * whole trace under debug, else the frames before the first framework frame,
    * else every non-framework frame, else the whole trace.
    *
-   * Ruby's `$DEBUG` half of the minitest.rb:1194 guard has no JS analogue —
+   * Ruby's `$DEBUG` half of the minitest.rb:1210 guard has no JS analogue —
    * there is no interpreter-wide debug global to read — so only the
    * `ENV["MT_DEBUG"]` half is ported, through `process-adapter`. Ruby
    * truthiness makes a set-but-empty `MT_DEBUG` count, hence the `!= null`
@@ -167,8 +167,8 @@ export class BacktraceFilter {
 }
 
 /**
- * Mirrors the `Minitest` module's `backtrace_filter` accessor (minitest.rb:43,
- * assigned at :1204) and `Minitest.filter_backtrace` (minitest.rb:365-369).
+ * Mirrors the `Minitest` module's `backtrace_filter` accessor (minitest.rb:44,
+ * assigned at :1220) and `Minitest.filter_backtrace` (minitest.rb:350-354).
  * Held on an object so the accessor is reassignable at the Ruby spelling
  * (`Minitest.backtraceFilter = ...`), which `filterBacktrace` reads on every
  * call the way the `cattr_accessor` does. The seat is typed by the `filter`
@@ -201,7 +201,7 @@ export const Minitest: {
   reporter: null,
 
   /**
-   * Mirrors `Minitest.clock_time` (minitest.rb:1229-1238): the monotonic clock
+   * Mirrors `Minitest.clock_time` (minitest.rb:1230-1240): the monotonic clock
    * where one exists, `Time.now` otherwise. `performance.now()` is JS'
    * monotonic clock and reads in milliseconds, so it is divided to the seconds
    * both Ruby arms return.
@@ -212,7 +212,7 @@ export const Minitest: {
   },
 };
 
-/** Mirrors `Minitest::UnexpectedError::BASE_RE` (minitest.rb:1101). */
+/** Mirrors `Minitest::UnexpectedError::BASE_RE` (minitest.rb:1097). */
 function baseRe(): RegExp {
   let pwd: string;
   try {

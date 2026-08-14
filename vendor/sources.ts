@@ -223,6 +223,34 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "minitest",
+    origin: {
+      type: "git",
+      url: "https://github.com/minitest/minitest.git",
+      // The version scripts/parity/pipeline/schema/ruby/Gemfile.lock:32 pins.
+      // Move this ref when that pin moves, so the `gem/path.rb:LINE` citations
+      // in activesupport/src/testing/assertions.ts stay checkable.
+      ref: "v5.27.0",
+    },
+    packages: [
+      {
+        name: "minitest",
+        libPath: "lib/minitest",
+        testPath: "test/minitest",
+        // Vendored as a read-anchor only. api-compare/test-compare derive their
+        // package list from this file and key each package to a TS workspace
+        // dir (`packages/<name>/src`); minitest has no such package — the port
+        // is a slice of `packages/activesupport/src/testing/assertions.ts` —
+        // so enrolling it would compare against a directory that does not
+        // exist. Whether the comparator can be taught to map a non-Rails gem
+        // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on
+        // those members then dropped, is its own story (RFC 0098).
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",

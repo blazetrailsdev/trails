@@ -34,16 +34,21 @@ export class BroadcastLogger extends Logger {
     return this;
   }
 
+  /**
+   * `broadcast_logger.rb:108-110` — the min over the broadcasts, with no
+   * storage of its own. Ruby's `[].min` is `nil`; TS cannot widen an inherited
+   * `get level(): number` to `number | null` (TS2416), so the empty broadcast
+   * reads as `Math.min()`'s `Infinity` — the same "no broadcast permits this
+   * severity" answer, since every `level <= SEVERITY` test it feeds is false.
+   */
   get level(): number {
-    if (this.broadcasts.length === 0) return this._level;
-    return Math.min(...this.broadcasts.map((l) => l.level));
+    return Math.min(...this.broadcasts.map((logger) => logger.level));
   }
 
-  set level(value: number | LogLevel) {
-    const lvl = typeof value === "string" ? LOG_LEVELS[value] : value;
-    this._level = lvl;
+  /** `broadcast_logger.rb:151-153` — dispatches only; stores nothing. */
+  set level(level: number | LogLevel) {
     this.dispatch((logger) => {
-      logger.level = lvl;
+      logger.level = level;
     });
   }
 
@@ -111,8 +116,16 @@ export class BroadcastLogger extends Logger {
     return this.dispatch((logger) => logger.unknown(message));
   }
 
+  /**
+   * `broadcast_logger.rb:167-169` — delegates to each broadcast's own
+   * predicate, so a broadcast that overrides it is honoured.
+   */
+  get "debug?"(): boolean {
+    return this.broadcasts.some((logger) => logger["debug?"]);
+  }
+
   get debugEnabled(): boolean {
-    return this.broadcasts.some((l) => l.level <= Logger.DEBUG);
+    return this["debug?"];
   }
 
   /** `broadcast_logger.rb:173` — sets the log level to +DEBUG+ for the whole broadcast. */
@@ -120,8 +133,16 @@ export class BroadcastLogger extends Logger {
     this.dispatch((logger) => logger.debugBang());
   }
 
+  /**
+   * `broadcast_logger.rb:178-180` — delegates to each broadcast's own
+   * predicate, so a broadcast that overrides it is honoured.
+   */
+  get "info?"(): boolean {
+    return this.broadcasts.some((logger) => logger["info?"]);
+  }
+
   get infoEnabled(): boolean {
-    return this.broadcasts.some((l) => l.level <= Logger.INFO);
+    return this["info?"];
   }
 
   /** `broadcast_logger.rb:184` — sets the log level to +INFO+ for the whole broadcast. */
@@ -129,8 +150,16 @@ export class BroadcastLogger extends Logger {
     this.dispatch((logger) => logger.infoBang());
   }
 
+  /**
+   * `broadcast_logger.rb:189-191` — delegates to each broadcast's own
+   * predicate, so a broadcast that overrides it is honoured.
+   */
+  get "warn?"(): boolean {
+    return this.broadcasts.some((logger) => logger["warn?"]);
+  }
+
   get warnEnabled(): boolean {
-    return this.broadcasts.some((l) => l.level <= Logger.WARN);
+    return this["warn?"];
   }
 
   /** `broadcast_logger.rb:195` — sets the log level to +WARN+ for the whole broadcast. */
@@ -138,8 +167,16 @@ export class BroadcastLogger extends Logger {
     this.dispatch((logger) => logger.warnBang());
   }
 
+  /**
+   * `broadcast_logger.rb:200-202` — delegates to each broadcast's own
+   * predicate, so a broadcast that overrides it is honoured.
+   */
+  get "error?"(): boolean {
+    return this.broadcasts.some((logger) => logger["error?"]);
+  }
+
   get errorEnabled(): boolean {
-    return this.broadcasts.some((l) => l.level <= Logger.ERROR);
+    return this["error?"];
   }
 
   /** `broadcast_logger.rb:206` — sets the log level to +ERROR+ for the whole broadcast. */
@@ -147,8 +184,16 @@ export class BroadcastLogger extends Logger {
     this.dispatch((logger) => logger.errorBang());
   }
 
+  /**
+   * `broadcast_logger.rb:211-213` — delegates to each broadcast's own
+   * predicate, so a broadcast that overrides it is honoured.
+   */
+  get "fatal?"(): boolean {
+    return this.broadcasts.some((logger) => logger["fatal?"]);
+  }
+
   get fatalEnabled(): boolean {
-    return this.broadcasts.some((l) => l.level <= Logger.FATAL);
+    return this["fatal?"];
   }
 
   /** `broadcast_logger.rb:217` — sets the log level to +FATAL+ for the whole broadcast. */
@@ -172,14 +217,3 @@ export class BroadcastLogger extends Logger {
 }
 
 _setBroadcastLoggerClass(BroadcastLogger);
-
-// BroadcastLogger predicate getters
-(["debug", "info", "warn", "error", "fatal"] as LogLevel[]).forEach((name) => {
-  const level = LOG_LEVELS[name];
-  Object.defineProperty(BroadcastLogger.prototype, `${name}?`, {
-    get() {
-      return this.broadcasts.some((l: Logger) => l.level <= level);
-    },
-    configurable: true,
-  });
-});

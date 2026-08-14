@@ -16,6 +16,10 @@
       "ref": "v1.14.8",
       "sha": "f2fb6a5766dee835082eb74ee83f52e0a6479573"
     },
+    "minitest": {
+      "ref": "v5.27.0",
+      "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"
+    },
     "rack": {
       "ref": "v3.1.14",
       "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"

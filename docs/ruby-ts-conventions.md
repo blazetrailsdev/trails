@@ -30,7 +30,10 @@ matches the first candidate present in the target file), not a call expression.
 | `-@` (unary minus)                                                                                                       | `negate`                             | `-@` → `negate`                                       |
 | everything else                                                                                                          | `snake_case` → `camelCase`           | `has_many` → `hasMany`                                |
 
-Predicate-form details: `is_*?` collapses to a single candidate so trails can't
+Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
+(`Logger#debug` next to `Logger#debug?`) offers the QUOTED LITERAL spelling
+first — `get "debug?"` — because its camel candidate names the sibling, not the
+predicate. `is_*?` collapses to a single candidate so trails can't
 land the redundant doubled `isIsNumber`. Already-predicate prefixes keep the
 `is*` fallback because the disambiguating alias is sometimes needed when the bare
 name collides with a macro (e.g. `isHasOne()` alongside the `Model.hasOne`

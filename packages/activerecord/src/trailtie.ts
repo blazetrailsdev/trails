@@ -139,7 +139,7 @@ function defaultActiveRecordConfig(): ActiveRecordConfig {
 
 // onLoad callbacks are module-level consts so that repeated
 // `Trailtie.runInitializers()` calls (common in tests) register the same
-// callback reference with `{ once: true }`, preventing the hook registry
+// callback reference with `{ runOnce: true }`, preventing the hook registry
 // from growing unboundedly.
 const setTimeZoneAwareAttributes = (base: typeof Base): void => {
   base.timeZoneAwareAttributes = true;
@@ -152,7 +152,7 @@ const pushTimestamptzToTimeZoneAwareTypes = (base: typeof Base): void => {
 };
 
 const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
-  onLoad("active_record", { once: true }, pushTimestamptzToTimeZoneAwareTypes);
+  onLoad("active_record", { runOnce: true }, pushTimestamptzToTimeZoneAwareTypes);
 };
 
 const installEncryptionExtendedQueries = (): void => {
@@ -179,7 +179,7 @@ export class Trailtie extends BaseRailtie {
 
     this.initializer("active_record.initialize_timezone", () => {
       // Rails: `ActiveSupport.on_load(:active_record) { self.time_zone_aware_attributes = true }`.
-      onLoad("active_record", { once: true }, setTimeZoneAwareAttributes);
+      onLoad("active_record", { runOnce: true }, setTimeZoneAwareAttributes);
     });
 
     this.initializer("active_record.postgresql_time_zone_aware_types", () => {
@@ -192,7 +192,7 @@ export class Trailtie extends BaseRailtie {
       // idempotent (Rails' `<<` would duplicate on hypothetical re-runs).
       onLoad(
         "active_record_postgresqladapter",
-        { once: true },
+        { runOnce: true },
         onPostgresqlAdapterLoadedPushTimestamptz,
       );
     });
@@ -208,7 +208,7 @@ export class Trailtie extends BaseRailtie {
       // gated on `on_load(:active_record_sqlite3adapter)`.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       if (cfg.sqlite3AdapterStrictStringsByDefault) {
-        onLoad("active_record_sqlite3adapter", { once: true }, setSqlite3StrictStringsByDefault);
+        onLoad("active_record_sqlite3adapter", { runOnce: true }, setSqlite3StrictStringsByDefault);
       }
     });
 
@@ -217,7 +217,7 @@ export class Trailtie extends BaseRailtie {
       // gated on `on_load(:active_record_postgresqladapter)`.
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       if (cfg.postgresqlAdapterDecodeDates) {
-        onLoad("active_record_postgresqladapter", { once: true }, setPostgresqlDecodeDates);
+        onLoad("active_record_postgresqladapter", { runOnce: true }, setPostgresqlDecodeDates);
       }
     });
 
@@ -261,7 +261,7 @@ export class Trailtie extends BaseRailtie {
       //   end
       // The `extend_queries` gate is read when the hook fires, not now; our
       // installer re-checks the flag itself, so it stays faithful.
-      onLoad("active_record", { once: true }, installEncryptionExtendedQueries);
+      onLoad("active_record", { runOnce: true }, installEncryptionExtendedQueries);
     });
   }
 }
