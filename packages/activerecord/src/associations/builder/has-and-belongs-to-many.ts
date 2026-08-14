@@ -334,8 +334,8 @@ export class HasAndBelongsToMany {
     // captured as a positional reflection arg below, but kept on the options
     // bag too for the through-routing loaders, which read it from there.
     const positionalScope = typeof scope === "function" ? scope : null;
-    if (positionalScope || typeof options.scope === "function") {
-      habtmOptions.scope = positionalScope ?? options.scope;
+    if (positionalScope) {
+      habtmOptions.scope = positionalScope;
     }
     model._associations.push({
       type: "hasAndBelongsToMany",

@@ -39,10 +39,7 @@ export class User extends Base {
 
     this.hasOne("room");
     this.hasOne("ownedRoom", { className: "Room", foreignKey: "owner_id" });
-    this.hasOne("familyTree", {
-      scope: (q: any) => q.where({ token: null }),
-      foreignKey: "member_id",
-    });
+    this.hasOne("familyTree", (q: any) => q.where({ token: null }), { foreignKey: "member_id" });
     this.hasOne("family", { through: "familyTree" });
     this.hasMany("familyMembers", { through: "family", source: "members" });
 

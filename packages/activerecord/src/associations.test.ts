@@ -1494,11 +1494,14 @@ describe("WithAnnotationsTest", () => {
         foreignKey: "parrot_id",
       });
       this.hasAndBelongsToMany("parrots", { className: "Parrot", foreignKey: "pirate_id" });
-      this.hasAndBelongsToMany("parrotsWithAnnotation", {
-        scope: (q: any) => q.annotate("that are very colorful"),
-        className: "Parrot",
-        foreignKey: "pirate_id",
-      });
+      this.hasAndBelongsToMany(
+        "parrotsWithAnnotation",
+        (q: any) => q.annotate("that are very colorful"),
+        {
+          className: "Parrot",
+          foreignKey: "pirate_id",
+        },
+      );
       this.hasOne("ship", { className: "Ship", foreignKey: "pirate_id" });
       this.hasOne("shipWithAnnotation", {
         scope: (q: any) => q.annotate("that is a rocket"),

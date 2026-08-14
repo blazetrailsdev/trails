@@ -28,7 +28,7 @@ export class Reader extends Base {
       foreignKey: "person_id",
       inverseOf: "reader",
     });
-    this.belongsTo("firstPost", { scope: (q: any) => q.where({ id: [2, 3] }) });
+    this.belongsTo("firstPost", (q: any) => q.where({ id: [2, 3] }));
   }
 }
 

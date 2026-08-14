@@ -39,15 +39,13 @@ export class Club extends Base {
     });
     this.belongsTo("category");
 
-    this.hasMany("favorites", {
-      scope: (q: any) => q.where({ memberships: { favorite: true } }),
+    this.hasMany("favorites", (q: any) => q.where({ memberships: { favorite: true } }), {
       through: "memberships",
       source: "member",
     });
 
     this.hasMany("customMemberships", { className: "Membership" });
-    this.hasMany("customFavorites", {
-      scope: (q: any) => q.where({ memberships: { favorite: true } }),
+    this.hasMany("customFavorites", (q: any) => q.where({ memberships: { favorite: true } }), {
       through: "customMemberships",
       source: "member",
     });

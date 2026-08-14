@@ -15,9 +15,9 @@ export class Subscription extends Base {
 
   static {
     this.belongsTo("subscriber", { counterCache: "books_count" });
-    this.belongsTo("book", {
-      scope: (q: ReturnType<(typeof Base)["all"]>) => q.where({ author_visibility: 0 }),
-    });
+    this.belongsTo("book", (q: ReturnType<(typeof Base)["all"]>) =>
+      q.where({ author_visibility: 0 }),
+    );
     this.validatesPresenceOf("subscriber_id", "book_id");
   }
 }

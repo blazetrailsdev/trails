@@ -122,8 +122,7 @@ class DeveloperWithExtendOption extends Developer {
 class ProjectUnscopingDavidDefaultScope extends Base {
   static {
     this.tableName = "projects";
-    this.hasAndBelongsToMany("developers", {
-      scope: (q: any) => q.unscope({ where: "name" }),
+    this.hasAndBelongsToMany("developers", (q: any) => q.unscope({ where: "name" }), {
       className: "LazyBlockDeveloperCalledDavid",
       joinTable: "developers_projects",
       foreignKey: "project_id",

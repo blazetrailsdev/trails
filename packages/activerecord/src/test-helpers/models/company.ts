@@ -64,9 +64,9 @@ export class Company extends AbstractCompany {
     this.hasOne("dummyAccount", { foreignKey: "firm_id", className: "Account" });
     this.hasMany("contracts");
     this.hasMany("developers", { through: "contracts" });
-    this.hasMany("specialContracts", {
-      scope: (q: any) => q.includes("specialDeveloper").whereNot({ "developers.id": null }),
-    });
+    this.hasMany("specialContracts", (q: any) =>
+      q.includes("specialDeveloper").whereNot({ "developers.id": null }),
+    );
     this.hasMany("specialDevelopers", { through: "specialContracts" });
     this.hasMany("comments", { foreignKey: "company" });
 
@@ -181,57 +181,48 @@ export class Firm extends Company {
   static {
     this.toParam("name");
 
-    this.hasMany("clients", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("clients", (q: any) => q.order("id"), {
       dependent: "destroy",
       beforeRemove: (owner: any, record: any) => (owner as Firm).logBeforeRemove(record),
       afterRemove: (owner: any, record: any) => (owner as Firm).logAfterRemove(record),
     });
     this.hasMany("unsortedClients", { className: "Client" });
     this.hasMany("unsortedClientsWithSymbol", { className: "Client" });
-    this.hasMany("clientsSortedDesc", {
-      scope: (q: any) => q.order("id DESC"),
-      className: "Client",
-    });
-    this.hasMany("clientsOfFirm", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("clientsSortedDesc", (q: any) => q.order("id DESC"), { className: "Client" });
+    this.hasMany("clientsOfFirm", (q: any) => q.order("id"), {
       className: "Client",
       inverseOf: "firm",
     });
-    this.hasMany("clientsOrderedByName", {
-      scope: (q: any) => q.order("name"),
-      className: "Client",
-    });
+    this.hasMany("clientsOrderedByName", (q: any) => q.order("name"), { className: "Client" });
     this.hasMany("unvalidatedClientsOfFirm", {
       foreignKey: "client_of",
       className: "Client",
       validate: false,
     });
-    this.hasMany("dependentClientsOfFirm", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("dependentClientsOfFirm", (q: any) => q.order("id"), {
       foreignKey: "client_of",
       className: "Client",
       dependent: "destroy",
     });
-    this.hasMany("exclusivelyDependentClientsOfFirm", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("exclusivelyDependentClientsOfFirm", (q: any) => q.order("id"), {
       foreignKey: "client_of",
       className: "Client",
       dependent: "delete",
     });
-    this.hasMany("limitedClients", { scope: (q: any) => q.limit(1), className: "Client" });
-    this.hasMany("clientsWithInterpolatedConditions", {
-      scope: (q: any, firm: any) => q.where(`rating > ${firm.rating}`),
+    this.hasMany("limitedClients", (q: any) => q.limit(1), { className: "Client" });
+    this.hasMany(
+      "clientsWithInterpolatedConditions",
+      (q: any, firm: any) => q.where(`rating > ${firm.rating}`),
+      { className: "Client" },
+    );
+    this.hasMany("clientsLikeMs", (q: any) => q.where("name = 'Microsoft'").order("id"), {
       className: "Client",
     });
-    this.hasMany("clientsLikeMs", {
-      scope: (q: any) => q.where("name = 'Microsoft'").order("id"),
-      className: "Client",
-    });
-    this.hasMany("clientsLikeMsWithHashConditions", {
-      scope: (q: any) => q.where({ name: "Microsoft" }).order("id"),
-      className: "Client",
-    });
+    this.hasMany(
+      "clientsLikeMsWithHashConditions",
+      (q: any) => q.where({ name: "Microsoft" }).order("id"),
+      { className: "Client" },
+    );
     this.hasMany("plainClients", { className: "Client" });
     this.hasMany("clientsUsingPrimaryKey", {
       className: "Client",
@@ -244,12 +235,10 @@ export class Firm extends Company {
       foreignKey: "firm_name",
       dependent: "delete",
     });
-    this.hasMany("clientsGroupedByFirmId", {
-      scope: (q: any) => q.group("firm_id").select("firm_id"),
+    this.hasMany("clientsGroupedByFirmId", (q: any) => q.group("firm_id").select("firm_id"), {
       className: "Client",
     });
-    this.hasMany("clientsGroupedByName", {
-      scope: (q: any) => q.group("name").select("name"),
+    this.hasMany("clientsGroupedByName", (q: any) => q.group("name").select("name"), {
       className: "Client",
     });
 
@@ -259,18 +248,15 @@ export class Firm extends Company {
       className: "Account",
       validate: false,
     });
-    this.hasOne("accountWithSelect", {
-      scope: (q: any) => q.select("id, firm_id"),
+    this.hasOne("accountWithSelect", (q: any) => q.select("id, firm_id"), {
       foreignKey: "firm_id",
       className: "Account",
     });
-    this.hasOne("readonlyAccount", {
-      scope: (q: any) => q.readonly(),
+    this.hasOne("readonlyAccount", (q: any) => q.readonly(), {
       foreignKey: "firm_id",
       className: "Account",
     });
-    this.hasOne("accountUsingPrimaryKey", {
-      scope: (q: any) => q.order("id"),
+    this.hasOne("accountUsingPrimaryKey", (q: any) => q.order("id"), {
       primaryKey: "firm_id",
       className: "Account",
     });
@@ -291,8 +277,7 @@ export class Firm extends Company {
 
     this.hasOne("client", { foreignKey: "client_of" });
 
-    this.hasOne("accountLimit500WithHashConditions", {
-      scope: (q: any) => q.where({ credit_limit: 500 }),
+    this.hasOne("accountLimit500WithHashConditions", (q: any) => q.where({ credit_limit: 500 }), {
       foreignKey: "firm_id",
       className: "Account",
     });
@@ -309,13 +294,11 @@ export class Firm extends Company {
       autosave: false,
     });
 
-    this.hasMany("associationWithReferences", {
-      scope: (q: any) => q.references("foo"),
+    this.hasMany("associationWithReferences", (q: any) => q.references("foo"), {
       className: "Client",
     });
 
-    this.hasMany("developersWithSelect", {
-      scope: (q: any) => q.select("id, name, first_name"),
+    this.hasMany("developersWithSelect", (q: any) => q.select("id, name, first_name"), {
       className: "Developer",
     });
 
@@ -345,8 +328,7 @@ export class DependentFirm extends Company {
     ((name: "company") => Promise<Company | null>);
 
   static {
-    this.hasOne("account", {
-      scope: (q: any) => q.order("id"),
+    this.hasOne("account", (q: any) => q.order("id"), {
       foreignKey: "firm_id",
       dependent: "nullify",
     });
@@ -362,13 +344,11 @@ export class RestrictedWithExceptionFirm extends Company {
     ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
-    this.hasOne("account", {
-      scope: (q: any) => q.order("id"),
+    this.hasOne("account", (q: any) => q.order("id"), {
       foreignKey: "firm_id",
       dependent: "restrictWithException",
     });
-    this.hasMany("companies", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("companies", (q: any) => q.order("id"), {
       foreignKey: "client_of",
       dependent: "restrictWithException",
     });
@@ -382,13 +362,11 @@ export class RestrictedWithErrorFirm extends Company {
     ((name: "dummyAccount") => Promise<Account | null>);
 
   static {
-    this.hasOne("account", {
-      scope: (q: any) => q.order("id"),
+    this.hasOne("account", (q: any) => q.order("id"), {
       foreignKey: "firm_id",
       dependent: "restrictWithError",
     });
-    this.hasMany("companies", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("companies", (q: any) => q.order("id"), {
       foreignKey: "client_of",
       dependent: "restrictWithError",
     });
@@ -452,14 +430,12 @@ export class Client extends Company {
   static {
     this.belongsTo("firm", { foreignKey: "client_of", inverseOf: "client" });
     this.belongsTo("firmWithBasicId", { className: "Firm", foreignKey: "firm_id" });
-    this.belongsTo("firmWithSelect", {
-      scope: (q: any) => q.select("id"),
+    this.belongsTo("firmWithSelect", (q: any) => q.select("id"), {
       className: "Firm",
       foreignKey: "firm_id",
     });
     this.belongsTo("firmWithOtherName", { className: "Firm", foreignKey: "client_of" });
-    this.belongsTo("firmWithCondition", {
-      scope: (q: any) => q.where("1 = ?", 1),
+    this.belongsTo("firmWithCondition", (q: any) => q.where("1 = ?", 1), {
       className: "Firm",
       foreignKey: "client_of",
     });
@@ -473,13 +449,11 @@ export class Client extends Company {
       primaryKey: "name",
       foreignKey: "firm_name",
     });
-    this.belongsTo("readonlyFirm", {
-      scope: (q: any) => q.readonly(),
+    this.belongsTo("readonlyFirm", (q: any) => q.readonly(), {
       className: "Firm",
       foreignKey: "firm_id",
     });
-    this.belongsTo("bobFirm", {
-      scope: (q: any) => q.where({ name: "Bob" }),
+    this.belongsTo("bobFirm", (q: any) => q.where({ name: "Bob" }), {
       className: "Firm",
       foreignKey: "client_of",
     });
@@ -545,24 +519,21 @@ export class ExclusivelyDependentFirm extends Company {
 
   static {
     this.hasOne("account", { foreignKey: "firm_id", dependent: "delete" });
-    this.hasMany("dependentSanitizedConditionalClientsOfFirm", {
-      scope: (q: any) => q.order("id").where("name = 'BigShot Inc.'"),
-      foreignKey: "client_of",
-      className: "Client",
-      dependent: "delete",
-    });
-    this.hasMany("dependentHashConditionalClientsOfFirm", {
-      scope: (q: any) => q.order("id").where({ name: "BigShot Inc." }),
-      foreignKey: "client_of",
-      className: "Client",
-      dependent: "delete",
-    });
-    this.hasMany("dependentConditionalClientsOfFirm", {
-      scope: (q: any) => q.order("id").where("name = ?", "BigShot Inc."),
-      foreignKey: "client_of",
-      className: "Client",
-      dependent: "delete",
-    });
+    this.hasMany(
+      "dependentSanitizedConditionalClientsOfFirm",
+      (q: any) => q.order("id").where("name = 'BigShot Inc.'"),
+      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+    );
+    this.hasMany(
+      "dependentHashConditionalClientsOfFirm",
+      (q: any) => q.order("id").where({ name: "BigShot Inc." }),
+      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+    );
+    this.hasMany(
+      "dependentConditionalClientsOfFirm",
+      (q: any) => q.order("id").where("name = ?", "BigShot Inc."),
+      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+    );
   }
 }
 

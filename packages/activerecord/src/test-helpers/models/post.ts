@@ -239,28 +239,23 @@ export class Post extends Base {
     );
 
     this.belongsTo("author");
-    this.belongsTo("readonlyAuthor", {
-      scope: (q: any) => q.readonly(),
+    this.belongsTo("readonlyAuthor", (q: any) => q.readonly(), {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithPosts", {
-      scope: (q: any) => q.includes("posts"),
+    this.belongsTo("authorWithPosts", (q: any) => q.includes("posts"), {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithAddress", {
-      scope: (q: any) => q.includes("authorAddress"),
+    this.belongsTo("authorWithAddress", (q: any) => q.includes("authorAddress"), {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithSelect", {
-      scope: (q: any) => q.select("id"),
+    this.belongsTo("authorWithSelect", (q: any) => q.select("id"), {
       className: "Author",
       foreignKey: "author_id",
     });
-    this.belongsTo("authorWithTheLetterA", {
-      scope: (q: any) => q.where("name LIKE '%a%'"),
+    this.belongsTo("authorWithTheLetterA", (q: any) => q.where("name LIKE '%a%'"), {
       className: "Author",
       foreignKey: "author_id",
     });
@@ -274,14 +269,8 @@ export class Post extends Base {
       configurable: false,
       enumerable: false,
     });
-    this.hasOne("firstComment", {
-      scope: (q: any) => q.order("id ASC"),
-      className: "Comment",
-    });
-    this.hasOne("lastComment", {
-      scope: (q: any) => q.order("id desc"),
-      className: "Comment",
-    });
+    this.hasOne("firstComment", (q: any) => q.order("id ASC"), { className: "Comment" });
+    this.hasOne("lastComment", (q: any) => q.order("id desc"), { className: "Comment" });
 
     this.hasMany("comments", {
       // Rails: `has_many :comments do ... end` — the inline extension block on
@@ -312,8 +301,7 @@ export class Post extends Base {
       className: "Comment",
       foreignKey: "post_id",
     });
-    this.hasMany("commentsWithExtending", {
-      scope: (q: any) => q.extending(Post.namedExtension),
+    this.hasMany("commentsWithExtending", (q: any) => q.extending(Post.namedExtension), {
       className: "Comment",
       foreignKey: "post_id",
     });
@@ -337,29 +325,30 @@ export class Post extends Base {
     });
 
     this.hasOne("verySpecialComment");
-    this.hasOne("verySpecialCommentWithPost", {
-      scope: (q: any) => q.includes("post"),
+    this.hasOne("verySpecialCommentWithPost", (q: any) => q.includes("post"), {
       className: "VerySpecialComment",
     });
-    this.hasOne("verySpecialCommentWithPostWithJoins", {
-      scope: (q: any) => q.joins("post").order("posts.id"),
-      className: "VerySpecialComment",
-    });
-    this.hasOne("verySpecialCommentWithStringJoins", {
-      scope: (q: any) =>
+    this.hasOne(
+      "verySpecialCommentWithPostWithJoins",
+      (q: any) => q.joins("post").order("posts.id"),
+      { className: "VerySpecialComment" },
+    );
+    this.hasOne(
+      "verySpecialCommentWithStringJoins",
+      (q: any) =>
         q.joins("JOIN posts AS p1 ON comments.post_id = p1.id").whereNot({ p1: { id: 999999 } }),
-      className: "VerySpecialComment",
-    });
+      { className: "VerySpecialComment" },
+    );
     // trails-authored: a through chain whose intermediate (`through`) reflection
     // scope contributes a raw-string `joins(...)`. Exercises the through-path
     // analogue of `verySpecialCommentWithStringJoins` — the string-join source
     // must attach to the intermediate chain step, not be dropped.
-    this.hasMany("commentsWithStringJoins", {
-      scope: (q: any) =>
+    this.hasMany(
+      "commentsWithStringJoins",
+      (q: any) =>
         q.joins("JOIN posts AS p2 ON comments.post_id = p2.id").whereNot({ p2: { id: 999999 } }),
-      className: "Comment",
-      foreignKey: "post_id",
-    });
+      { className: "Comment", foreignKey: "post_id" },
+    );
     this.hasMany("ratingsViaStringJoinComments", {
       through: "commentsWithStringJoins",
       source: "ratings",
@@ -377,8 +366,7 @@ export class Post extends Base {
 
     this.hasMany("categoryPosts", { className: "CategoryPost" });
     this.hasMany("scategories", { through: "categoryPosts", source: "category" });
-    this.hasMany("hmtSpecialCategories", {
-      scope: (q: any) => q.whereNot({ name: null }),
+    this.hasMany("hmtSpecialCategories", (q: any) => q.whereNot({ name: null }), {
       through: "categoryPosts",
       source: "category",
       className: "SpecialCategory",
@@ -390,8 +378,7 @@ export class Post extends Base {
     });
 
     this.hasMany("essays", { through: "categories" });
-    this.hasMany("authorsOfEssaysNamedBob", {
-      scope: (q: any) => q.where({ name: "Bob" }),
+    this.hasMany("authorsOfEssaysNamedBob", (q: any) => q.where({ name: "Bob" }), {
       through: "essays",
       source: "writer",
       sourceType: "Author",
@@ -445,8 +432,7 @@ export class Post extends Base {
       counterCache: "tags_with_nullify_count",
     });
 
-    this.hasMany("miscTags", {
-      scope: (q: any) => q.where({ tags: { name: "Misc" } }),
+    this.hasMany("miscTags", (q: any) => q.where({ tags: { name: "Misc" } }), {
       through: "taggings",
       source: "tag",
     });
@@ -456,24 +442,20 @@ export class Post extends Base {
     this.hasMany("tagsWithPrimaryKey", { through: "taggings", source: "tagWithPrimaryKey" });
     this.hasOne("tagging", { as: "taggable" });
 
-    this.hasMany("firstTaggings", {
-      scope: (q: any) => q.where({ taggings: { comment: "first" } }),
+    this.hasMany("firstTaggings", (q: any) => q.where({ taggings: { comment: "first" } }), {
       as: "taggable",
       className: "Tagging",
     });
-    this.hasMany("firstBlueTags", {
-      scope: (q: any) => q.where({ tags: { name: "Blue" } }),
+    this.hasMany("firstBlueTags", (q: any) => q.where({ tags: { name: "Blue" } }), {
       through: "firstTaggings",
       source: "tag",
     });
-    this.hasMany("firstBlueTags_2", {
-      scope: (q: any) => q.where({ taggings: { comment: "first" } }),
+    this.hasMany("firstBlueTags_2", (q: any) => q.where({ taggings: { comment: "first" } }), {
       through: "taggings",
       source: "blueTag",
     });
 
-    this.hasMany("invalidTaggings", {
-      scope: (q: any) => q.where("taggings.id < 0"),
+    this.hasMany("invalidTaggings", (q: any) => q.where("taggings.id < 0"), {
       as: "taggable",
       className: "Tagging",
     });
@@ -521,10 +503,7 @@ export class Post extends Base {
 
     this.hasMany("readers");
     this.hasMany("secureReaders");
-    this.hasMany("readersWithPerson", {
-      scope: (q: any) => q.includes("person"),
-      className: "Reader",
-    });
+    this.hasMany("readersWithPerson", (q: any) => q.includes("person"), { className: "Reader" });
     this.hasMany("people", { through: "readers" });
     this.hasMany("singlePeople", { through: "readers" });
     this.hasMany("peopleWithCallbacks", {
@@ -543,20 +522,15 @@ export class Post extends Base {
         Post.log("removed", "after", reader.first_name);
       },
     });
-    this.hasMany("skimmers", {
-      scope: (q: any) => q.where({ skimmer: true }),
-      className: "Reader",
-    });
+    this.hasMany("skimmers", (q: any) => q.where({ skimmer: true }), { className: "Reader" });
     this.hasMany("impatientPeople", { through: "skimmers", source: "person" });
 
     this.hasMany("lazyReaders");
-    this.hasMany("lazyReadersSkimmersOrNot", {
-      scope: (q: any) => q.where({ skimmer: [true, false] }),
+    this.hasMany("lazyReadersSkimmersOrNot", (q: any) => q.where({ skimmer: [true, false] }), {
       className: "LazyReader",
     });
     this.hasMany("lazyPeople", { through: "lazyReaders", source: "person" });
-    this.hasMany("lazyReadersUnscopeSkimmers", {
-      scope: (q: any) => q.skimmersOrNot(),
+    this.hasMany("lazyReadersUnscopeSkimmers", (q: any) => q.skimmersOrNot(), {
       className: "LazyReader",
     });
     this.hasMany("lazyPeopleUnscopeSkimmers", {
@@ -763,8 +737,7 @@ export class TaggedPost extends Post {
     ((name: "mainImage") => Promise<Image | null>);
 
   static {
-    this.hasMany("taggings", {
-      scope: (q: any) => q.rewhere({ taggable_type: "TaggedPost" }),
+    this.hasMany("taggings", (q: any) => q.rewhere({ taggable_type: "TaggedPost" }), {
       as: "taggable",
     });
     this.hasMany("tags", { through: "taggings" });

@@ -37,28 +37,28 @@ export class Project extends Base {
     this.hasAndBelongsToMany("developers", (q: any) =>
       q.distinct().order("developers.name desc, developers.id desc"),
     );
-    this.hasAndBelongsToMany("readonlyDevelopers", {
-      scope: (q: any) => q.readonly(),
+    this.hasAndBelongsToMany("readonlyDevelopers", (q: any) => q.readonly(), {
       className: "Developer",
     });
-    this.hasAndBelongsToMany("nonUniqueDevelopers", {
-      scope: (q: any) => q.order("developers.name desc, developers.id desc"),
+    this.hasAndBelongsToMany(
+      "nonUniqueDevelopers",
+      (q: any) => q.order("developers.name desc, developers.id desc"),
+      { className: "Developer" },
+    );
+    this.hasAndBelongsToMany("limitedDevelopers", (q: any) => q.limit(1), {
       className: "Developer",
     });
-    this.hasAndBelongsToMany("limitedDevelopers", {
-      scope: (q: any) => q.limit(1),
-      className: "Developer",
-    });
-    this.hasAndBelongsToMany("developersNamedDavid", {
-      scope: (q: any) => q.where("name = 'David'").distinct(),
-      className: "Developer",
-    });
-    this.hasAndBelongsToMany("developersNamedDavidWithHashConditions", {
-      scope: (q: any) => q.where({ name: "David" }).distinct(),
-      className: "Developer",
-    });
-    this.hasAndBelongsToMany("salariedDevelopers", {
-      scope: (q: any) => q.where("salary > 0"),
+    this.hasAndBelongsToMany(
+      "developersNamedDavid",
+      (q: any) => q.where("name = 'David'").distinct(),
+      { className: "Developer" },
+    );
+    this.hasAndBelongsToMany(
+      "developersNamedDavidWithHashConditions",
+      (q: any) => q.where({ name: "David" }).distinct(),
+      { className: "Developer" },
+    );
+    this.hasAndBelongsToMany("salariedDevelopers", (q: any) => q.where("salary > 0"), {
       className: "Developer",
     });
     this.hasAndBelongsToMany("developersWithCallbacks", {
@@ -83,11 +83,12 @@ export class Project extends Base {
           prev;
       }
     }
-    this.hasAndBelongsToMany("wellPaidSalaryGroups", {
-      scope: (q: any) =>
+    this.hasAndBelongsToMany(
+      "wellPaidSalaryGroups",
+      (q: any) =>
         q.group("developers.salary").having("SUM(salary) > 10000").select("SUM(salary) as salary"),
-      className: "Developer",
-    });
+      { className: "Developer" },
+    );
     this.belongsTo("firm");
     this.hasOne("leadDeveloper", { through: "firm", inverseOf: "contractedProjects" });
     this.hasOne("leadDeveloperDisableJoins", {

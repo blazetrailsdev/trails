@@ -47,32 +47,16 @@ export class Car extends Base {
   static {
     this.belongsTo("person", { counterCache: true });
     this.hasMany("bulbs");
-    this.hasMany("allBulbs", {
-      scope: (q: any) => q.unscope({ where: "name" }),
+    this.hasMany("allBulbs", (q: any) => q.unscope({ where: "name" }), { className: "Bulb" });
+    this.hasMany("allBulbs2", (q: any) => q.unscope("where"), { className: "Bulb" });
+    this.hasMany("otherBulbs", (q: any) => q.unscope({ where: "name" }).where({ name: "other" }), {
       className: "Bulb",
     });
-    this.hasMany("allBulbs2", {
-      scope: (q: any) => q.unscope("where"),
-      className: "Bulb",
-    });
-    this.hasMany("otherBulbs", {
-      scope: (q: any) => q.unscope({ where: "name" }).where({ name: "other" }),
-      className: "Bulb",
-    });
-    this.hasMany("oldBulbs", {
-      scope: (q: any) => q.rewhere({ name: "old" }),
-      className: "Bulb",
-    });
+    this.hasMany("oldBulbs", (q: any) => q.rewhere({ name: "old" }), { className: "Bulb" });
     this.hasMany("funkyBulbs", { className: "FunkyBulb", dependent: "destroy" });
     this.hasMany("failedBulbs", { className: "FailedBulb", dependent: "destroy" });
-    this.hasMany("fooBulbs", {
-      scope: (q: any) => q.where({ name: "foo" }),
-      className: "Bulb",
-    });
-    this.hasMany("awesomeBulbs", {
-      scope: (q: any) => q.awesome(),
-      className: "Bulb",
-    });
+    this.hasMany("fooBulbs", (q: any) => q.where({ name: "foo" }), { className: "Bulb" });
+    this.hasMany("awesomeBulbs", (q: any) => q.awesome(), { className: "Bulb" });
 
     this.hasOne("bulb");
 

@@ -209,52 +209,46 @@ export class Author extends Base {
     this.hasMany("serializedPosts");
     this.hasOne("post");
     this.hasMany("verySpecialComments", { through: "posts" });
-    this.hasMany("postsWithComments", {
-      scope: (q: any) => q.includes("comments"),
-      className: "Post",
-    });
-    this.hasMany("popularGroupedPosts", {
-      scope: (q: any) =>
+    this.hasMany("postsWithComments", (q: any) => q.includes("comments"), { className: "Post" });
+    this.hasMany(
+      "popularGroupedPosts",
+      (q: any) =>
         q
           .includes("comments")
           .group("type")
           .having("SUM(legacy_comments_count) > 1")
           .select("type"),
+      { className: "Post" },
+    );
+    this.hasMany(
+      "postsWithCommentsSortedByCommentId",
+      (q: any) => q.includes("comments").order("comments.id"),
+      { className: "Post" },
+    );
+    this.hasMany("postsSortedById", (q: any) => q.order("id"), { className: "Post" });
+    this.hasMany("postsSortedByIdLimited", (q: any) => q.order("posts.id").limit(1), {
       className: "Post",
     });
-    this.hasMany("postsWithCommentsSortedByCommentId", {
-      scope: (q: any) => q.includes("comments").order("comments.id"),
+    this.hasMany("postsWithCategories", (q: any) => q.includes("categories"), {
       className: "Post",
     });
-    this.hasMany("postsSortedById", {
-      scope: (q: any) => q.order("id"),
-      className: "Post",
-    });
-    this.hasMany("postsSortedByIdLimited", {
-      scope: (q: any) => q.order("posts.id").limit(1),
-      className: "Post",
-    });
-    this.hasMany("postsWithCategories", {
-      scope: (q: any) => q.includes("categories"),
-      className: "Post",
-    });
-    this.hasMany("postsWithCommentsAndCategories", {
-      scope: (q: any) => q.includes("comments", "categories").order("posts.id"),
-      className: "Post",
-    });
+    this.hasMany(
+      "postsWithCommentsAndCategories",
+      (q: any) => q.includes("comments", "categories").order("posts.id"),
+      { className: "Post" },
+    );
     this.hasMany("postsWithSpecialCategorizations", { className: "PostWithSpecialCategorization" });
-    this.hasOne("postAboutThinking", {
-      scope: (q: any) => q.where("posts.title like '%thinking%'"),
+    this.hasOne("postAboutThinking", (q: any) => q.where("posts.title like '%thinking%'"), {
       className: "Post",
     });
-    this.hasOne("postAboutThinkingWithLastComment", {
-      scope: (q: any) => q.where("posts.title like '%thinking%'").includes("lastComment"),
-      className: "Post",
-    });
+    this.hasOne(
+      "postAboutThinkingWithLastComment",
+      (q: any) => q.where("posts.title like '%thinking%'").includes("lastComment"),
+      { className: "Post" },
+    );
 
     this.hasMany("comments", { through: "posts" });
-    this.hasMany("commentsWithOrder", {
-      scope: (q: any) => q.orderedByPostId(),
+    this.hasMany("commentsWithOrder", (q: any) => q.orderedByPostId(), {
       through: "posts",
       source: "comments",
     });
@@ -287,14 +281,12 @@ export class Author extends Base {
       sourceType: "Member",
       disableJoins: true,
     });
-    this.hasMany("orderedMembers", {
-      scope: (q: any) => q.order({ id: "desc" }),
+    this.hasMany("orderedMembers", (q: any) => q.order({ id: "desc" }), {
       through: "commentsWithOrder",
       source: "origin",
       sourceType: "Member",
     });
-    this.hasMany("noJoinsOrderedMembers", {
-      scope: (q: any) => q.order({ id: "desc" }),
+    this.hasMany("noJoinsOrderedMembers", (q: any) => q.order({ id: "desc" }), {
       through: "commentsWithOrder",
       source: "origin",
       sourceType: "Member",
@@ -302,8 +294,7 @@ export class Author extends Base {
     });
 
     this.hasMany("ratings", { through: "comments" });
-    this.hasMany("goodRatings", {
-      scope: (q: any) => q.where("ratings.value > 5").order({ id: "asc" }),
+    this.hasMany("goodRatings", (q: any) => q.where("ratings.value > 5").order({ id: "asc" }), {
       through: "comments",
       source: "ratings",
     });
@@ -312,86 +303,76 @@ export class Author extends Base {
       disableJoins: true,
       source: "ratings",
     });
-    this.hasMany("noJoinsGoodRatings", {
-      scope: (q: any) => q.where("ratings.value > 5").order({ id: "asc" }),
-      through: "comments",
-      source: "ratings",
-      disableJoins: true,
-    });
+    this.hasMany(
+      "noJoinsGoodRatings",
+      (q: any) => q.where("ratings.value > 5").order({ id: "asc" }),
+      { through: "comments", source: "ratings", disableJoins: true },
+    );
 
     this.hasMany("commentsContainingTheLetterE", { through: "posts", source: "comments" });
-    this.hasMany("commentsWithOrderAndConditions", {
-      scope: (q: any) => q.order("comments.body").where("comments.body like 'Thank%'"),
-      through: "posts",
-      source: "comments",
-    });
-    this.hasMany("commentsWithInclude", {
-      scope: (q: any) => q.includes("post").where({ posts: { type: "Post" } }),
-      through: "posts",
-      source: "comments",
-    });
-    this.hasMany("commentsForFirstAuthor", {
-      scope: (q: any) => q.forFirstAuthor(),
+    this.hasMany(
+      "commentsWithOrderAndConditions",
+      (q: any) => q.order("comments.body").where("comments.body like 'Thank%'"),
+      { through: "posts", source: "comments" },
+    );
+    this.hasMany(
+      "commentsWithInclude",
+      (q: any) => q.includes("post").where({ posts: { type: "Post" } }),
+      { through: "posts", source: "comments" },
+    );
+    this.hasMany("commentsForFirstAuthor", (q: any) => q.forFirstAuthor(), {
       through: "posts",
       source: "comments",
     });
 
     this.hasMany("firstPosts");
-    this.hasMany("commentsOnFirstPosts", {
-      scope: (q: any) => q.order("posts.id desc, comments.id asc"),
+    this.hasMany("commentsOnFirstPosts", (q: any) => q.order("posts.id desc, comments.id asc"), {
       through: "firstPosts",
       source: "comments",
     });
     this.hasOne("firstPost");
-    this.hasOne("commentOnFirstPost", {
-      scope: (q: any) => q.order("posts.id desc, comments.id asc"),
+    this.hasOne("commentOnFirstPost", (q: any) => q.order("posts.id desc, comments.id asc"), {
       through: "firstPost",
       source: "comments",
     });
 
-    this.hasMany("thinkingPosts", {
-      scope: (q: any) => q.where({ title: "So I was thinking" }),
+    this.hasMany("thinkingPosts", (q: any) => q.where({ title: "So I was thinking" }), {
       // Rails: dependent: :delete_all — not yet supported, using "delete" as closest equivalent
       dependent: "delete",
       className: "Post",
     });
-    this.hasMany("welcomePosts", {
-      scope: (q: any) => q.where({ title: "Welcome to the weblog" }),
+    this.hasMany("welcomePosts", (q: any) => q.where({ title: "Welcome to the weblog" }), {
       className: "Post",
     });
-    this.hasMany("welcomePostsWithOneComment", {
-      scope: (q: any) => q.where({ title: "Welcome to the weblog" }).where({ comments_count: 1 }),
-      className: "Post",
-    });
-    this.hasMany("welcomePostsWithComments", {
-      scope: (q: any) =>
-        q.where({ title: "Welcome to the weblog" }).where("legacy_comments_count > 0"),
-      className: "Post",
-    });
+    this.hasMany(
+      "welcomePostsWithOneComment",
+      (q: any) => q.where({ title: "Welcome to the weblog" }).where({ comments_count: 1 }),
+      { className: "Post" },
+    );
+    this.hasMany(
+      "welcomePostsWithComments",
+      (q: any) => q.where({ title: "Welcome to the weblog" }).where("legacy_comments_count > 0"),
+      { className: "Post" },
+    );
 
-    this.hasMany("commentsDesc", {
-      scope: (q: any) => q.order("comments.id DESC"),
+    this.hasMany("commentsDesc", (q: any) => q.order("comments.id DESC"), {
       through: "postsSortedById",
       source: "comments",
     });
-    this.hasMany("unorderedComments", {
-      scope: (q: any) => q.unscope("order").distinct(),
+    this.hasMany("unorderedComments", (q: any) => q.unscope("order").distinct(), {
       through: "postsSortedByIdLimited",
       source: "comments",
     });
     this.hasMany("funkyComments", { through: "posts", source: "comments" });
-    this.hasMany("orderedUniqComments", {
-      scope: (q: any) => q.distinct().order("comments.id"),
+    this.hasMany("orderedUniqComments", (q: any) => q.distinct().order("comments.id"), {
       through: "posts",
       source: "comments",
     });
-    this.hasMany("orderedUniqCommentsDesc", {
-      scope: (q: any) => q.distinct().order("comments.id DESC"),
+    this.hasMany("orderedUniqCommentsDesc", (q: any) => q.distinct().order("comments.id DESC"), {
       through: "posts",
       source: "comments",
     });
-    this.hasMany("readonlyComments", {
-      scope: (q: any) => q.readonly(),
+    this.hasMany("readonlyComments", (q: any) => q.readonly(), {
       through: "posts",
       source: "comments",
     });
@@ -403,33 +384,29 @@ export class Author extends Base {
     this.hasMany("stiPosts", { className: "StiPost" });
     this.hasMany("stiPostComments", { through: "stiPosts", source: "comments" });
 
-    this.hasMany("specialNonexistentPosts", {
-      scope: (q: any) => q.where("posts.body = 'nonexistent'"),
+    this.hasMany("specialNonexistentPosts", (q: any) => q.where("posts.body = 'nonexistent'"), {
       className: "SpecialPost",
     });
-    this.hasMany("specialNonexistentPostComments", {
-      scope: (q: any) => q.where({ "comments.post_id": 0 }),
+    this.hasMany("specialNonexistentPostComments", (q: any) => q.where({ "comments.post_id": 0 }), {
       through: "specialNonexistentPosts",
       source: "comments",
     });
     this.hasMany("nonexistentComments", { through: "posts" });
 
-    this.hasMany("helloPosts", {
-      scope: (q: any) => q.where("posts.body = 'hello'"),
-      className: "Post",
-    });
+    this.hasMany("helloPosts", (q: any) => q.where("posts.body = 'hello'"), { className: "Post" });
     this.hasMany("helloPostComments", { through: "helloPosts", source: "comments" });
-    this.hasMany("postsWithNoComments", {
-      scope: (q: any) => q.where({ "comments.id": null }).includes("comments"),
-      className: "Post",
-    });
-    this.hasMany("postsWithNoComments_2", {
-      scope: (q: any) => q.leftJoins("comments").where({ "comments.id": null }),
-      className: "Post",
-    });
+    this.hasMany(
+      "postsWithNoComments",
+      (q: any) => q.where({ "comments.id": null }).includes("comments"),
+      { className: "Post" },
+    );
+    this.hasMany(
+      "postsWithNoComments_2",
+      (q: any) => q.leftJoins("comments").where({ "comments.id": null }),
+      { className: "Post" },
+    );
 
-    this.hasMany("helloPostsWithHashConditions", {
-      scope: (q: any) => q.where({ body: "hello" }),
+    this.hasMany("helloPostsWithHashConditions", (q: any) => q.where({ body: "hello" }), {
       className: "Post",
     });
     this.hasMany("helloPostCommentsWithHashConditions", {
@@ -494,33 +471,32 @@ export class Author extends Base {
     this.hasMany("specialCategories", { through: "specialCategorizations", source: "category" });
     this.hasOne("specialCategory", { through: "specialCategorizations", source: "category" });
 
-    this.hasMany("generalCategorizations", {
-      scope: (q: any) => q.joins("category").where({ "categories.name": "General" }),
-      className: "Categorization",
-    });
+    this.hasMany(
+      "generalCategorizations",
+      (q: any) => q.joins("category").where({ "categories.name": "General" }),
+      { className: "Categorization" },
+    );
     this.hasMany("generalPosts", { through: "generalCategorizations", source: "post" });
 
-    this.hasMany("specialCategoriesWithConditions", {
-      scope: (q: any) => q.where({ categorizations: { special: true } }),
-      through: "categorizations",
-      source: "category",
-    });
-    this.hasMany("nonspecialCategoriesWithConditions", {
-      scope: (q: any) => q.where({ categorizations: { special: false } }),
-      through: "categorizations",
-      source: "category",
-    });
+    this.hasMany(
+      "specialCategoriesWithConditions",
+      (q: any) => q.where({ categorizations: { special: true } }),
+      { through: "categorizations", source: "category" },
+    );
+    this.hasMany(
+      "nonspecialCategoriesWithConditions",
+      (q: any) => q.where({ categorizations: { special: false } }),
+      { through: "categorizations", source: "category" },
+    );
 
-    this.hasMany("categoriesLikeGeneral", {
-      scope: (q: any) => q.where({ name: "General" }),
+    this.hasMany("categoriesLikeGeneral", (q: any) => q.where({ name: "General" }), {
       through: "categorizations",
       source: "category",
       className: "Category",
     });
 
     this.hasMany("categorizedPosts", { through: "categorizations", source: "post" });
-    this.hasMany("uniqueCategorizedPosts", {
-      scope: (q: any) => q.distinct(),
+    this.hasMany("uniqueCategorizedPosts", (q: any) => q.distinct(), {
       through: "categorizations",
       source: "post",
     });
@@ -528,10 +504,7 @@ export class Author extends Base {
     this.hasMany("nothings", { through: "kateggorizatons", className: "Category" });
 
     this.hasMany("authorFavorites");
-    this.hasMany("favoriteAuthors", {
-      scope: (q: any) => q.order("name"),
-      through: "authorFavorites",
-    });
+    this.hasMany("favoriteAuthors", (q: any) => q.order("name"), { through: "authorFavorites" });
 
     this.hasMany("taggings", { through: "posts", source: "taggings" });
     this.hasMany("taggings_2", { through: "posts", source: "tagging" });
@@ -540,18 +513,15 @@ export class Author extends Base {
     this.hasMany("postCategories", { through: "posts", source: "categories" });
     this.hasMany("taggingTags", { through: "taggings", source: "tag" });
 
-    this.hasMany("similarPosts", {
-      scope: (q: any) => q.distinct(),
+    this.hasMany("similarPosts", (q: any) => q.distinct(), {
       through: "tags",
       source: "taggedPosts",
     });
-    this.hasMany("orderedPosts", {
-      scope: (q: any) => q.distinct(),
+    this.hasMany("orderedPosts", (q: any) => q.distinct(), {
       through: "orderedTags",
       source: "taggedPosts",
     });
-    this.hasMany("distinctTags", {
-      scope: (q: any) => q.select("DISTINCT tags.*").order("tags.name"),
+    this.hasMany("distinctTags", (q: any) => q.select("DISTINCT tags.*").order("tags.name"), {
       through: "posts",
       source: "tags",
     });
@@ -565,30 +535,26 @@ export class Author extends Base {
       sourceType: "BestHardback",
     });
     this.hasMany("publishedBooks", { className: "PublishedBook" });
-    this.hasMany("unpublishedBooks", {
-      scope: (q: any) => q.where({ status: ["proposed", "written"] }),
+    this.hasMany("unpublishedBooks", (q: any) => q.where({ status: ["proposed", "written"] }), {
       className: "Book",
     });
-    this.hasOne("unreadListing", {
-      scope: (q: any) => q.unread(),
+    this.hasOne("unreadListing", (q: any) => q.unread(), {
       className: "Book",
       foreignKey: "last_read",
     });
-    this.hasOne("readingListing", {
-      scope: (q: any) => q.reading(),
+    this.hasOne("readingListing", (q: any) => q.reading(), {
       className: "Book",
       foreignKey: "last_read",
     });
     this.hasMany("subscriptions", { through: "books" });
-    this.hasMany("subscribers", {
-      scope: (q: any) => q.order("subscribers.nick"),
+    this.hasMany("subscribers", (q: any) => q.order("subscribers.nick"), {
       through: "subscriptions",
     });
-    this.hasMany("distinctSubscribers", {
-      scope: (q: any) => q.select("DISTINCT subscribers.*").order("subscribers.nick"),
-      through: "subscriptions",
-      source: "subscriber",
-    });
+    this.hasMany(
+      "distinctSubscribers",
+      (q: any) => q.select("DISTINCT subscribers.*").order("subscribers.nick"),
+      { through: "subscriptions", source: "subscriber" },
+    );
 
     this.hasOne("essay", { primaryKey: "name", as: "writer" });
     this.hasOne("essayCategory", { through: "essay", source: "category" });
@@ -612,17 +578,18 @@ export class Author extends Base {
 
     this.hasMany("categoryPostComments", { through: "categories", source: "postComments" });
 
-    this.hasMany("miscPosts", {
-      scope: (q: any) => q.where({ posts: { title: ["misc post by bob", "misc post by mary"] } }),
-      className: "Post",
-    });
+    this.hasMany(
+      "miscPosts",
+      (q: any) => q.where({ posts: { title: ["misc post by bob", "misc post by mary"] } }),
+      { className: "Post" },
+    );
     this.hasMany("miscPostFirstBlueTags", { through: "miscPosts", source: "firstBlueTags" });
 
-    this.hasMany("miscPostFirstBlueTags_2", {
-      scope: (q: any) => q.where({ posts: { title: ["misc post by bob", "misc post by mary"] } }),
-      through: "posts",
-      source: "firstBlueTags_2",
-    });
+    this.hasMany(
+      "miscPostFirstBlueTags_2",
+      (q: any) => q.where({ posts: { title: ["misc post by bob", "misc post by mary"] } }),
+      { through: "posts", source: "firstBlueTags_2" },
+    );
 
     this.hasMany("postsWithDefaultInclude", { className: "PostWithDefaultInclude" });
     this.hasMany("commentsOnPostsWithDefaultInclude", {
@@ -630,42 +597,42 @@ export class Author extends Base {
       source: "comments",
     });
 
-    this.hasMany("postsWithSignature", {
-      scope: (q: any, record: any) =>
+    this.hasMany(
+      "postsWithSignature",
+      (q: any, record: any) =>
         q.where(q.model.arelTable.get("title").matches(`%by ${record.name.toLowerCase()}%`)),
-      className: "Post",
-    });
-    this.hasMany("postsMentioningAuthor", {
-      scope: (q: any, record: any) =>
+      { className: "Post" },
+    );
+    this.hasMany(
+      "postsMentioningAuthor",
+      (q: any, record: any) =>
         q.where(q.model.arelTable.get("body").matches(`%${record?.name?.toLowerCase() ?? ""}%`)),
-      className: "Post",
-    });
+      { className: "Post" },
+    );
     this.hasMany("commentsOnPostsMentioningAuthor", {
       through: "postsMentioningAuthor",
       source: "comments",
     });
-    this.hasMany("commentsMentioningAuthor", {
-      scope: (q: any, record: any) =>
+    this.hasMany(
+      "commentsMentioningAuthor",
+      (q: any, record: any) =>
         q.where(q.model.arelTable.get("body").matches(`%${record.name.toLowerCase()}%`)),
-      through: "posts",
-      source: "comments",
-    });
+      { through: "posts", source: "comments" },
+    );
 
-    this.hasOne("recentPost", { scope: (q: any) => q.order({ id: "desc" }), className: "Post" });
+    this.hasOne("recentPost", (q: any) => q.order({ id: "desc" }), { className: "Post" });
     this.hasOne("recentResponse", { through: "recentPost", source: "comments" });
 
-    this.hasMany("postsWithExtension", { scope: (q: any) => q.order("title"), className: "Post" });
-    this.hasMany("postsWithExtensionAndInstance", {
-      scope: (q: any, _record: any) => q.order("title"),
+    this.hasMany("postsWithExtension", (q: any) => q.order("title"), { className: "Post" });
+    this.hasMany("postsWithExtensionAndInstance", (q: any, _record: any) => q.order("title"), {
       className: "Post",
     });
 
-    this.hasMany("topPosts", { scope: (q: any) => q.order({ id: "asc" }), className: "Post" });
-    this.hasMany("otherTopPosts", { scope: (q: any) => q.order({ id: "asc" }), className: "Post" });
+    this.hasMany("topPosts", (q: any) => q.order({ id: "asc" }), { className: "Post" });
+    this.hasMany("otherTopPosts", (q: any) => q.order({ id: "asc" }), { className: "Post" });
 
     this.hasMany("topics", { primaryKey: "name", foreignKey: "author_name" });
-    this.hasMany("topicsWithoutType", {
-      scope: (q: any) => q.select("id", "title", "author_name"),
+    this.hasMany("topicsWithoutType", (q: any) => q.select("id", "title", "author_name"), {
       className: "Topic",
       primaryKey: "name",
       foreignKey: "author_name",
