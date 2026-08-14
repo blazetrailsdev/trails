@@ -77,6 +77,13 @@ describe("DigestUUIDExt", () => {
     );
 
     expect(() => uuidV5("A non-UUID string", "some value")).toThrow(ArgumentError);
+
+    // trails-only: Rails' `include?` over the namespace constants is String
+    // value equality (digest/uuid.rb:63), so a distinct copy of a known
+    // namespace's bytes takes the same branch as the constant itself.
+    expect(uuidV5(Uint8Array.from(DNS_NAMESPACE), "www.widgets.com")).toEqual(
+      uuidV5(DNS_NAMESPACE, "www.widgets.com"),
+    );
   });
 
   it("nil uuid", () => {

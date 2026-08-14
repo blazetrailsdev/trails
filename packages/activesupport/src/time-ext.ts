@@ -746,10 +746,16 @@ export function toDatetime(
  * TimeWithZone in the current zone if `Time.zone` or `Time.zone_default` is
  * set, otherwise converts the String to a Time.
  *
- * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`). trails has
- * no `String#to_time` port yet, so the fallback arm parses the string through
- * the host `Date` — the same instant Ruby's `Time.parse` would land on for an
- * ISO-8601 string.
+ * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`).
+ *
+ * zones.rb:13's `else` arm is `to_time`, and trails' `toTime` here is
+ * `Time#to_time`, not the String arm: `String#to_time` (conversions.rb:22-38)
+ * has no port, because `core_ext/string/conversions.rb` buckets onto this file
+ * and `Time#to_time` already holds the name, so the String arm is masked in the
+ * flat index rather than reported missing. Parsing the string through the host `Date` first lands on the same
+ * instant for an ISO-8601 string but does not carry conversions.rb's
+ * `parts.fetch` defaults or its `form` parameter. Converging is story
+ * 0098-activesupport-ar-closure-port/port-string-to-time-and-to-date.
  */
 export function inTimeZone(
   str: string,

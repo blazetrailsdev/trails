@@ -219,10 +219,13 @@ export const cattrWriter = mattrWriter;
  * attributes.
  *
  * Mirrors: Module#mattr_accessor (`module/attribute_accessors.rb:208-212`).
- * Rails forwards the block to `mattr_reader` only and passes the (then nil)
- * `default:` on to `mattr_writer`, where the `unless` guard makes it a no-op
- * because the reader already stored it; dropping `default` here is the same
- * thing spelled without a block/kwarg split. *
+ * Rails passes `default: default` to BOTH calls and forwards the block (`&blk`)
+ * to `mattr_reader` only. The writer's `default:` never takes effect, because
+ * `mattr_writer`'s `unless sym_default_value.nil? && class_variable_defined?`
+ * guard (attribute_accessors.rb:135) sees the value the reader already stored;
+ * trails drops `default` before the writer call instead, which is the same
+ * no-op reached without evaluating a function-valued default a second time.
+ *
  * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
  * into the generated definition (module/attribute_accessors.rb:208-211) so an error raised inside it points at the
  * declaring line rather than at the framework file. trails generates real JS functions,

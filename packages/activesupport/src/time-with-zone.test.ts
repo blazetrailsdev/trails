@@ -5,7 +5,7 @@ import { Duration } from "./duration.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
 import { Temporal } from "@blazetrails/date";
 import { inTimeZone } from "./time-ext.js";
-import { getZone, setZone } from "./time-zone-config.js";
+import { setZone, zone as timeZone } from "./time-zone-config.js";
 
 describe("TimeWithZoneTest", () => {
   let eastern: TimeZone;
@@ -960,7 +960,7 @@ describe("TimeWithZoneTest", () => {
 
 describe("TimeWithZoneMethodsForString", () => {
   it("in time zone with ambiguous time", () => {
-    const previousZone = getZone();
+    const previousZone = timeZone();
     setZone("Moscow");
     try {
       expect((inTimeZone("2014-10-26 01:00:00") as TimeWithZone).utc().epochMilliseconds).toEqual(

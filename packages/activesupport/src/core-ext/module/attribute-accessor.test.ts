@@ -128,5 +128,10 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(callCount).toBe(3);
   });
 
+  // Rails raises `TypeError, "module attributes should be defined directly on
+  // class, not singleton"` when the receiver is a singleton class
+  // (attribute_accessors.rb:52, :123). JS has no singleton class to be: a class
+  // object's own properties ARE where mattr stores, so there is no second
+  // receiver for the guard to reject.
   it.skip("declaring attributes on singleton errors");
 });

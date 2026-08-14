@@ -13,6 +13,17 @@ function namespaceBytes(hex: string): Uint8Array {
   return Uint8Array.from(hex.match(/../g)!, (byte) => parseInt(byte, 16));
 }
 
+/**
+ * Ruby's `[DNS_NAMESPACE, ...].include?(namespace)` (digest/uuid.rb:63) compares
+ * Strings with `==`, which is value equality; `Array#includes` over
+ * `Uint8Array`s is identity, so any independently-built copy of a known
+ * namespace would miss the branch and be rejected as a non-UUID.
+ */
+function sameBytes(known: Uint8Array, namespace: string | Uint8Array): boolean {
+  if (typeof namespace === "string") return false;
+  return known.length === namespace.length && known.every((byte, i) => byte === namespace[i]);
+}
+
 /** @internal */
 export const DNS_NAMESPACE = namespaceBytes("6ba7b8109dad11d180b400c04fd430c8");
 /** @internal */
@@ -115,7 +126,9 @@ export function nilUuid(): string {
  */
 export function packUuidNamespace(namespace: string | Uint8Array): Uint8Array {
   if (
-    ([DNS_NAMESPACE, OID_NAMESPACE, URL_NAMESPACE, X500_NAMESPACE] as unknown[]).includes(namespace)
+    [DNS_NAMESPACE, OID_NAMESPACE, URL_NAMESPACE, X500_NAMESPACE].some((known) =>
+      sameBytes(known, namespace),
+    )
   ) {
     return namespace as Uint8Array;
   } else {
