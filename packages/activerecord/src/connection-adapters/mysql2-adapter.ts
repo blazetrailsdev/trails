@@ -620,17 +620,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 
-  // Public `exec_query` is wrapped by `dirties_query_cache`; the actual work
-  // lives in `internal_exec_query` (Rails' structure), which `select_all`
-  // routes through so cached reads never clear the cache.
-  override async execQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean },
-  ): Promise<Result> {
-    return this.internalExecQuery(sql, name, binds, options);
-  }
+  // Rails' Mysql2Adapter has no `exec_query` override: the abstract
+  // `exec_query` (abstract/database_statements.rb:147-149) funnels into
+  // `internal_exec_query`, which is the one we override below.
 
   override async internalExecQuery(
     sql: string,
@@ -2059,7 +2051,7 @@ dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbac
 // (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
 // `internal_exec_query`.
 captureUnwrappedExecute(Mysql2Adapter);
-dirtiesQueryCache(Mysql2Adapter, "execQuery", "execute");
+dirtiesQueryCache(Mysql2Adapter, "execute");
 
 // Mirrors `include Mysql2::DatabaseStatements` — `perform_query` is an instance
 // method of the adapter, so `raw_execute`'s `this.performQuery(...)` dispatch

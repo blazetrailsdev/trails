@@ -880,19 +880,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  /**
-   * Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
-   * the abstract DatabaseStatements and funnels into `internal_exec_query`. We
-   * mirror that by delegating to `internalExecQuery`.
-   */
-  override async execQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds: unknown[] = [],
-    options: { prepare?: boolean; allowRetry?: boolean } = {},
-  ): Promise<Result> {
-    return this.internalExecQuery(sql, name, binds, options);
-  }
+  // Rails' SQLite3Adapter has no `exec_query` override: `exec_query` lives on
+  // the abstract DatabaseStatements and funnels into `internal_exec_query`, so
+  // we inherit it.
 
   // Rails' SQLite3Adapter has no `internal_exec_query` override: the abstract
   // `cast_result(internal_execute(...))`
@@ -3201,7 +3191,7 @@ dirtiesQueryCache(SQLite3Adapter, "execInsert", "rollbackDbTransaction", "rollba
 // (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
 // `internal_exec_query`.
 captureUnwrappedExecute(SQLite3Adapter);
-dirtiesQueryCache(SQLite3Adapter, "execQuery", "execute");
+dirtiesQueryCache(SQLite3Adapter, "execute");
 
 // Mirrors `include SQLite3::DatabaseStatements` — `perform_query` is an
 // instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`

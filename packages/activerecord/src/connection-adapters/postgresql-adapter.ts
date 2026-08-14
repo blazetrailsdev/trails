@@ -1063,8 +1063,8 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Mirrors: PostgreSQLAdapter#exec_query. Executes a query and returns
-   * an ActiveRecord::Result with `columnTypes` populated from the
+   * Mirrors: PostgreSQL::DatabaseStatements#internal_exec_query. Executes a
+   * query and returns an ActiveRecord::Result with `columnTypes` populated from the
    * adapter's type_map — each field's dataTypeID resolves to a
    * Type::Value via getOidType so callers can use `result.castValues()`
    * to deserialize values through the right PG OID type.
@@ -1076,22 +1076,13 @@ export class PostgreSQLAdapter
    * attach the right Type metadata so explicit casting has what it
    * needs.
    *
-   * The mixin-level execQuery returns a Result with empty columnTypes;
+   * The mixin-level internalExecQuery returns a Result with empty columnTypes;
    * this override is the Rails-faithful PG version that actually
    * populates them.
+   *
+   * Rails has no PG `exec_query` override: the abstract one
+   * (abstract/database_statements.rb:147-149) funnels here, so we inherit it.
    */
-  // Public `exec_query` is wrapped by `dirties_query_cache`; the actual work
-  // lives in `internal_exec_query` (Rails' structure), which `select_all`
-  // routes through so cached reads never clear the cache.
-  override async execQuery(
-    sql: string,
-    name: string | null = "SQL",
-    binds?: unknown[],
-    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<Result> {
-    return this.internalExecQuery(sql, name, binds, options);
-  }
-
   override async internalExecQuery(
     sql: string,
     name: string | null = "SQL",
@@ -4921,7 +4912,7 @@ dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rol
 // (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
 // `internal_exec_query`.
 captureUnwrappedExecute(PostgreSQLAdapter);
-dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
+dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).
 include(PostgreSQLAdapter, SchemaStatements);
