@@ -5,7 +5,7 @@
  * flash, CSRF, content negotiation, caching, rescue, and more.
  */
 
-import { getFs, getPath, getCrypto, Notifications } from "@blazetrails/activesupport";
+import { getFs, getPath, getCrypto, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -946,6 +946,12 @@ export class Base extends Metal {
     return false;
   }
 }
+
+// Rails: `base.rb:293-294` — fires at the bottom of the class body so
+// `ActiveSupport.on_load(:action_controller)` blocks (e.g. the engine's
+// `add_view_paths` initializer) get `Base` as their receiver.
+runLoadHooks("action_controller_base", Base);
+runLoadHooks("action_controller", Base);
 
 // Rails: `ActionController::DataStreaming#send_file_headers!` mixed in via
 // `include DataStreaming`. Trails wires it onto Base.prototype explicitly.

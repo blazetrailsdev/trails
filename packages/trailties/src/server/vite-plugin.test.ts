@@ -1,8 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
+import { bodyFromString } from "@blazetrails/rack";
+import type { RackApp } from "@blazetrails/actionpack";
 import { trailsPlugin, buildRackEnv } from "./vite-plugin.js";
-import * as applicationModule from "./application.js";
+
+const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, bodyFromString("ok")];
 
 function createMockReq(options: {
   method?: string;
@@ -31,45 +34,32 @@ function createMockReq(options: {
 
 describe("trailsPlugin", () => {
   it("creates a plugin with name 'trails' and enforce 'post'", () => {
-    const plugin = trailsPlugin();
+    const plugin = trailsPlugin({ app: okApp });
     expect(plugin.name).toBe("trails");
     expect(plugin.enforce).toBe("post");
   });
 
   it("registers middleware via configureServer", async () => {
-    const initSpy = vi
-      .spyOn(applicationModule.Application.prototype, "initialize")
-      .mockResolvedValue();
+    const plugin = trailsPlugin({ app: okApp });
+    const middlewares: any[] = [];
+    const fakeServer = {
+      config: { server: { port: 3000 } },
+      httpServer: null,
+      middlewares: { use: (fn: any) => middlewares.push(fn) },
+    };
 
-    try {
-      const plugin = trailsPlugin({ cwd: "/nonexistent" });
-      const middlewares: any[] = [];
-      const fakeServer = {
-        config: { server: { port: 3000 } },
-        httpServer: null,
-        middlewares: { use: (fn: any) => middlewares.push(fn) },
-      };
-
-      const registerFn = await (plugin as any).configureServer(fakeServer);
-      expect(typeof registerFn).toBe("function");
-      registerFn();
-      expect(middlewares.length).toBe(1);
-    } finally {
-      initSpy.mockRestore();
-    }
+    const registerFn = await (plugin as any).configureServer(fakeServer);
+    expect(typeof registerFn).toBe("function");
+    registerFn();
+    expect(middlewares.length).toBe(1);
   });
 
   it("calls next(err) when app.call throws", async () => {
     const thrownError = new Error("boom");
-    const callSpy = vi
-      .spyOn(applicationModule.Application.prototype, "call")
-      .mockRejectedValue(thrownError);
-    const initSpy = vi
-      .spyOn(applicationModule.Application.prototype, "initialize")
-      .mockResolvedValue();
+    const explodingApp: RackApp = () => Promise.reject(thrownError);
 
-    try {
-      const plugin = trailsPlugin({ cwd: "/test-error-path" });
+    {
+      const plugin = trailsPlugin({ app: explodingApp });
       const middlewares: any[] = [];
       const fakeServer = {
         config: { server: { port: 3000 } },
@@ -91,19 +81,12 @@ describe("trailsPlugin", () => {
 
       expect(next).toHaveBeenCalledWith(thrownError);
       expect(res.writeHead).not.toHaveBeenCalled();
-    } finally {
-      callSpy.mockRestore();
-      initSpy.mockRestore();
     }
   });
 
   it("propagates body-too-large error via next()", async () => {
-    const initSpy = vi
-      .spyOn(applicationModule.Application.prototype, "initialize")
-      .mockResolvedValue();
-
-    try {
-      const plugin = trailsPlugin({ cwd: "/test-large-body" });
+    {
+      const plugin = trailsPlugin({ app: okApp });
       const middlewares: any[] = [];
       const fakeServer = {
         config: { server: { port: 3000 } },
@@ -141,8 +124,6 @@ describe("trailsPlugin", () => {
       const err = next.mock.calls[0][0];
       expect(err).toBeInstanceOf(Error);
       expect((err as Error).message).toContain("too large");
-    } finally {
-      initSpy.mockRestore();
     }
   });
 });

@@ -1,9 +1,11 @@
 // Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell +
 // EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
 // → 2.2c. `env_config`/`endpoint`/`call`/`helpers` → blocked on PR 2.5.
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
 import type { DrawCallback, RouteSet } from "@blazetrails/actionpack";
+import { ActionView } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
+import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
@@ -149,6 +151,73 @@ export class Engine extends Trailtie {
     this._allLoadPathsCache = Array.from(new Set(out));
     return this._allLoadPathsCache;
   }
+}
+
+/**
+ * The slice of `Rails::Application` the engine initializers below reach for
+ * through their block argument (`initializer :add_routing_paths do |app|`).
+ * Declared structurally so `engine.ts` keeps no import edge on
+ * `application.ts`, which imports this file.
+ */
+export interface EngineInitializerApp {
+  routesReloader(): {
+    paths: string[];
+    routeSets: RouteSetLike[];
+    externalRoutes: string[];
+  };
+}
+
+/**
+ * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).
+ *
+ * @missingRailsCall draw_paths — Rails concats `paths["config/routes"].paths`
+ * onto `routes.draw_paths` and `app.routes.draw_paths` so `draw` can resolve
+ * partial route files relatively. `RouteSet#draw_paths` is not ported, so the
+ * external paths are only recorded on the reloader.
+ */
+Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {
+  const app = args[0] as EngineInitializerApp;
+  const paths = await this.paths();
+  // Rails reads `paths["config/routes.rb"]`; the trails path set declares
+  // the same entry under its TypeScript name (`engine/configuration.ts:84`).
+  const routingPaths = (await paths.get("config/routes.ts")?.existent()) ?? [];
+  const externalPaths = paths.get("config/routes")?.toAry() ?? [];
+
+  if (this.hasRoutes() || routingPaths.length > 0) {
+    app.routesReloader().paths.unshift(...routingPaths);
+    app.routesReloader().routeSets.push(this.routes());
+    app.routesReloader().externalRoutes.unshift(...externalPaths);
+  }
+});
+
+/**
+ * Mirrors `Engine`'s `add_view_paths` initializer (`engine.rb:614-620`).
+ *
+ * Rails' `respond_to?(:prepend_view_path)` guard is live in trails:
+ * `ActionController::Base` does not include `ActionView::ViewPaths` yet, so
+ * the class-level `prependViewPath` is absent and the view paths are seeded
+ * onto the `lookupContext` slot the renderer actually reads
+ * (`action-controller/base.ts:177`). The `action_mailer` arm is dropped —
+ * ActionMailer is not ported.
+ */
+Engine.initializer("add_view_paths", async function (this: Engine) {
+  const views = (await (await this.paths()).get("app/views")?.existent()) ?? [];
+  if (views.length === 0) return;
+  onLoad("action_controller", (base: ActionControllerBaseLike) => {
+    if (typeof base.prependViewPath === "function") {
+      base.prependViewPath(views);
+    } else {
+      base.lookupContext = new ActionView.LookupContext(
+        views.map((view) => new ActionView.FileSystemResolver(view)),
+      );
+    }
+  });
+});
+
+/** @internal The `on_load(:action_controller)` receiver — see `add_view_paths`. */
+interface ActionControllerBaseLike {
+  prependViewPath?: (views: string[]) => void;
+  lookupContext?: ActionView.LookupContext;
 }
 
 type Fs = Awaited<ReturnType<typeof getFsAsync>>;

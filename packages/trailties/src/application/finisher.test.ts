@@ -7,13 +7,15 @@ import {
   type FinisherConfig,
   type FinisherReloader,
   type FinisherRoutes,
+  type FinisherRoutesReloader,
 } from "./finisher.js";
+import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
 
 class TestApp extends Finisher {
-  config: FinisherConfig = { toPrepareBlocks: [] };
+  config: FinisherConfig = { toPrepareBlocks: [], eagerLoad: null };
   calls: string[] = [];
   internalRoutes: string[] = [];
   toPrepared: ConfigurationBlock[] = [];
@@ -28,7 +30,23 @@ class TestApp extends Finisher {
           ),
       } as unknown as Mapper),
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
+    setDispatcher: () => this.calls.push("dispatcher"),
   };
+
+  routesReloaderCalls: string[] = [];
+  private _routesReloader: FinisherRoutesReloader = {
+    eagerLoad: false,
+    executeUnlessLoaded: async () => {
+      this.routesReloaderCalls.push("execute_unless_loaded");
+      return true;
+    },
+  };
+  routesReloader(): FinisherRoutesReloader {
+    return this._routesReloader;
+  }
+  async paths(): Promise<Root> {
+    return new Root(null);
+  }
 
   routes(): FinisherRoutes {
     return this._routes;
@@ -46,8 +64,8 @@ class TestApp extends Finisher {
   }
 }
 
-function run(app: TestApp, name: string): void {
-  app.initializers.find((i) => i.name === name)!.run();
+async function run(app: TestApp, name: string): Promise<void> {
+  await app.initializers.find((i) => i.name === name)!.run();
 }
 
 describe("Finisher", () => {
@@ -60,11 +78,13 @@ describe("Finisher", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
     expect(names).toEqual([
       "add_generator_templates",
+      "setup_main_autoloader",
       "add_internal_routes",
       "build_middleware_stack",
       "define_main_app_helper",
       "add_to_prepare_blocks",
       "run_prepare_callbacks",
+      "set_routes_reloader_hook",
     ]);
   });
 
@@ -72,11 +92,9 @@ describe("Finisher", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
     for (const skipped of [
       "eager_load!",
-      "setup_main_autoloader",
       "setup_default_session_store",
       "finisher_hook",
       "configure_executor_for_concurrency",
-      "set_routes_reloader_hook",
       "set_clear_dependencies_hook",
       "enable_yjit",
     ]) {
@@ -84,42 +102,42 @@ describe("Finisher", () => {
     }
   });
 
-  it("add_generator_templates calls ensureGeneratorTemplatesAdded", () => {
+  it("add_generator_templates calls ensureGeneratorTemplatesAdded", async () => {
     const app = new TestApp();
-    run(app, "add_generator_templates");
+    await run(app, "add_generator_templates");
     expect(app.calls).toEqual(["generator_templates"]);
   });
 
-  it("build_middleware_stack calls buildMiddlewareStack", () => {
+  it("build_middleware_stack calls buildMiddlewareStack", async () => {
     const app = new TestApp();
-    run(app, "build_middleware_stack");
+    await run(app, "build_middleware_stack");
     expect(app.calls).toEqual(["middleware_stack"]);
   });
 
-  it("define_main_app_helper defines the main_app mounted helper", () => {
+  it("define_main_app_helper defines the main_app mounted helper", async () => {
     const app = new TestApp();
-    run(app, "define_main_app_helper");
+    await run(app, "define_main_app_helper");
     expect(app.mountedHelpers).toEqual(["main_app"]);
   });
 
-  it("add_to_prepare_blocks forwards config.toPrepareBlocks to the reloader", () => {
+  it("add_to_prepare_blocks forwards config.toPrepareBlocks to the reloader", async () => {
     const app = new TestApp();
     const block: ConfigurationBlock = () => {};
     app.config.toPrepareBlocks.push(block);
-    run(app, "add_to_prepare_blocks");
+    await run(app, "add_to_prepare_blocks");
     expect(app.toPrepared).toEqual([block]);
   });
 
-  it("run_prepare_callbacks runs reloader.prepare!", () => {
+  it("run_prepare_callbacks runs reloader.prepare!", async () => {
     const app = new TestApp();
-    run(app, "run_prepare_callbacks");
+    await run(app, "run_prepare_callbacks");
     expect(app.calls).toEqual(["prepare!"]);
   });
 
-  it("add_internal_routes prepends rails/info routes in development", () => {
+  it("add_internal_routes prepends rails/info routes in development", async () => {
     Trails.env = "development";
     const app = new TestApp();
-    run(app, "add_internal_routes");
+    await run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([
       "get /rails/info/properties -> rails/info#properties (internal)",
       "get /rails/info/routes -> rails/info#routes (internal)",
@@ -128,17 +146,31 @@ describe("Finisher", () => {
     ]);
   });
 
-  it("add_internal_routes is a no-op outside development", () => {
+  it("add_internal_routes is a no-op outside development", async () => {
     Trails.env = "production";
     const app = new TestApp();
-    run(app, "add_internal_routes");
+    await run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([]);
   });
 
-  it("runs all finisher initializers in declared order via runInitializers", () => {
+  it("runs all finisher initializers in declared order via runInitializers", async () => {
     Trails.env = "production";
     const app = new TestApp();
-    app.runInitializers();
-    expect(app.calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);
+    await app.runInitializers();
+    expect(app.calls).toEqual([
+      "generator_templates",
+      "dispatcher",
+      "middleware_stack",
+      "prepare!",
+    ]);
+    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
+  });
+
+  it("set_routes_reloader_hook copies config.eagerLoad onto the reloader", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    await run(app, "set_routes_reloader_hook");
+    expect(app.routesReloader().eagerLoad).toBe(true);
+    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
   });
 });

@@ -95,31 +95,31 @@ class InterdependentApplication extends Initializable {
   }
 }
 
-describe("Basic", () => {
-  test("initializers run", () => {
+describe("Basic", async () => {
+  test("initializers run", async () => {
     const foo = new Foo();
-    foo.runInitializers();
+    await foo.runInitializers();
     expect(foo.foo).toBe(1);
   });
-  test("initializers are inherited", () => {
+  test("initializers are inherited", async () => {
     const bar = new Bar();
-    bar.runInitializers();
+    await bar.runInitializers();
     expect([bar.foo, bar.bar]).toEqual([1, 1]);
   });
-  test("initializers only get run once", () => {
+  test("initializers only get run once", async () => {
     const foo = new Foo();
-    foo.runInitializers();
-    foo.runInitializers();
+    await foo.runInitializers();
+    await foo.runInitializers();
     expect(foo.foo).toBe(1);
   });
-  test("opts is optional (Rails initializer(name, opts = {}, &blk))", () => {
+  test("opts is optional (Rails initializer(name, opts = {}, &blk))", async () => {
     class NoOpts extends Initializable {
       static {
         NoOpts.initializer("only", () => void arr.push(7));
       }
     }
     arr = [];
-    new NoOpts().runInitializers();
+    await new NoOpts().runInitializers();
     expect(arr).toEqual([7]);
   });
 
@@ -136,49 +136,49 @@ describe("Basic", () => {
   });
 });
 
-describe("BeforeAfter", () => {
-  test("running on parent", () => {
+describe("BeforeAfter", async () => {
+  test("running on parent", async () => {
     arr = [];
-    new Parent().runInitializers();
+    await new Parent().runInitializers();
     expect(arr).toEqual([5, 1, 2]);
   });
-  test("running on child", () => {
+  test("running on child", async () => {
     arr = [];
-    new Child().runInitializers();
+    await new Child().runInitializers();
     expect(arr).toEqual([5, 3, 1, 4, 2]);
   });
-  test("handles dependencies introduced before all initializers are loaded", () => {
+  test("handles dependencies introduced before all initializers are loaded", async () => {
     arr = [];
-    new InterdependentApplication().runInitializers();
+    await new InterdependentApplication().runInitializers();
     expect(arr).toEqual([1, 2, 3, 4]);
   });
 });
 
-describe("InstanceTest", () => {
-  test("running locals", () => {
+describe("InstanceTest", async () => {
+  test("running locals", async () => {
     arr = [];
-    new Instance().runInitializers();
+    await new Instance().runInitializers();
     expect(arr).toEqual([2, 3, 4]);
   });
-  test("running locals with groups", () => {
+  test("running locals with groups", async () => {
     arr = [];
-    new Instance().runInitializers("assets");
+    await new Instance().runInitializers("assets");
     expect(arr).toEqual([1, 3]);
   });
 });
 
-describe("WithArgsTest", () => {
-  test("running initializers with args", () => {
+describe("WithArgsTest", async () => {
+  test("running initializers with args", async () => {
     withArg = null;
-    new WithArgs().runInitializers("default", "foo");
+    await new WithArgs().runInitializers("default", "foo");
     expect(withArg).toBe("foo");
   });
 });
 
-describe("OverriddenInitializerTest", () => {
-  test("merges in the initializers from the parent in the right order", () => {
+describe("OverriddenInitializerTest", async () => {
+  test("merges in the initializers from the parent in the right order", async () => {
     arr = [];
-    new OverriddenInitializer().runInitializers();
+    await new OverriddenInitializer().runInitializers();
     expect(arr).toEqual([1, 2, 3, 4]);
   });
 });

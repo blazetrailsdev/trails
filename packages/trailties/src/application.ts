@@ -127,8 +127,13 @@ export class Application extends Engine {
     // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
     // is the discovered/cwd fallback for before any explicit override.
     const bootRoot = await this.resolvedRoot();
+    // Rails' `Application::Configuration#root` is `@root ||= find_root(...)`
+    // (`application/configuration.rb:88`) — it is never nil once the app
+    // boots, which is what lets the initializers below read `paths[...]`.
+    // `Configuration#setRoot` is async-free, so it is pinned here instead.
+    if (this.config.root === null) this.config.setRoot(bootRoot);
     setTrailsRoot(() => this.config.root ?? bootRoot);
-    this.runInitializers(group, this);
+    await this.runInitializers(group, this);
     this._initialized = true;
     runLoadHooks("after_initialize", this);
     return this;

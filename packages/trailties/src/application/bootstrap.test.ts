@@ -16,7 +16,7 @@ class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = {};
 }
 
-describe("Bootstrap", () => {
+describe("Bootstrap", async () => {
   beforeEach(() => {
     resetLoadHooks();
   });
@@ -30,69 +30,69 @@ describe("Bootstrap", () => {
     });
   });
 
-  describe(":initialize_logger", () => {
-    it("uses config.logger when provided", () => {
+  describe(":initialize_logger", async () => {
+    it("uses config.logger when provided", async () => {
       const app = new TestApp();
       const custom = new Logger(null);
       app.config = { logger: custom };
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.logger).toBe(custom);
     });
 
-    it("falls back to a NullLogger when config.logger is unset", () => {
+    it("falls back to a NullLogger when config.logger is unset", async () => {
       const app = new TestApp();
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.logger).toBeInstanceOf(NullLogger);
     });
 
-    it("applies config.logLevel to the resulting logger", () => {
+    it("applies config.logLevel to the resulting logger", async () => {
       const app = new TestApp();
       app.config = { logLevel: "warn" };
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.logger?.level).toBe(Logger.WARN);
     });
 
-    it("preserves a pre-existing logger", () => {
+    it("preserves a pre-existing logger", async () => {
       const app = new TestApp();
       const preset = new Logger(null);
       app.logger = preset;
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.logger).toBe(preset);
     });
   });
 
-  describe(":initialize_cache", () => {
-    it("uses config.cacheStore when provided", () => {
+  describe(":initialize_cache", async () => {
+    it("uses config.cacheStore when provided", async () => {
       const app = new TestApp();
       const store = new NullStore();
       app.config = { cacheStore: store };
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.cache).toBe(store);
     });
 
-    it("invokes config.cacheStore when given as a factory", () => {
+    it("invokes config.cacheStore when given as a factory", async () => {
       const app = new TestApp();
       const store = new NullStore();
       app.config = { cacheStore: () => store };
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.cache).toBe(store);
     });
 
-    it("falls back to a NullStore when cacheStore is unset", () => {
+    it("falls back to a NullStore when cacheStore is unset", async () => {
       const app = new TestApp();
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(app.cache).toBeInstanceOf(NullStore);
     });
   });
 
-  describe(":bootstrap_hook", () => {
-    it("runs the :before_initialize load hooks against the app", () => {
+  describe(":bootstrap_hook", async () => {
+    it("runs the :before_initialize load hooks against the app", async () => {
       const app = new TestApp();
       let captured: unknown = null;
       onLoad("before_initialize", (base) => {
         captured = base;
       });
-      app.runInitializers("all");
+      await app.runInitializers("all");
       expect(captured).toBe(app);
     });
   });
