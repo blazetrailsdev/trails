@@ -65,7 +65,7 @@ export class Skip extends Assertion {
  * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
  * rescue, the class Rails names.
  *
- * `message` and `backtrace` are METHODS in minitest (minitest.rb:1093-1102),
+ * `message` and `backtrace` are METHODS in minitest (minitest.rb:1093-1103),
  * reading the wrapped error when called. TypeScript cannot declare an accessor
  * over a base-class data property (`Error#message`/`#stack`, TS2611), so they
  * are installed on the prototype below — and the constructor deletes the own
@@ -201,7 +201,7 @@ export const Minitest: {
   reporter: null,
 
   /**
-   * Mirrors `Minitest.clock_time` (minitest.rb:1230-1240): the monotonic clock
+   * Mirrors `Minitest.clock_time` (minitest.rb:1230-1238): the monotonic clock
    * where one exists, `Time.now` otherwise. `performance.now()` is JS'
    * monotonic clock and reads in milliseconds, so it is divided to the seconds
    * both Ruby arms return.
