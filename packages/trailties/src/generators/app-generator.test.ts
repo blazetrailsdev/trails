@@ -270,10 +270,36 @@ describe("AppGenerator", () => {
     expect(readme).toContain("my-app");
 
     const appConfig = fs.readFileSync(appPath("src/config/application.ts"), "utf-8");
-    expect(appConfig).toContain("my-app");
+    expect(appConfig).toContain("MyApp");
 
     const layout = fs.readFileSync(appPath("src/app/views/layouts/application.html.tse"), "utf-8");
     expect(layout).toContain("my-app");
+  });
+
+  it("generates an application class that subclasses Application", async () => {
+    await makeGen().run();
+
+    const appConfig = fs.readFileSync(appPath("src/config/application.ts"), "utf-8");
+    expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
+    expect(appConfig).toContain("export class MyApp extends Application {");
+    expect(appConfig).toContain("Application.register(MyApp);");
+
+    const environment = fs.readFileSync(appPath("src/config/environment.ts"), "utf-8");
+    expect(environment).toContain(`import "./application.js";`);
+    expect(environment).toContain("await Trails.initialize()");
+
+    const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
+    expect(configRu).toContain(`import "./src/config/environment.js";`);
+    expect(configRu).toContain("export default Trails.application;");
+  });
+
+  it("types drawRoutes against Mapper", async () => {
+    await makeGen().run();
+
+    const routes = fs.readFileSync(appPath("src/config/routes.ts"), "utf-8");
+    expect(routes).toContain(`import type { Mapper } from "@blazetrails/actionpack";`);
+    expect(routes).toContain("export function drawRoutes(mapper: Mapper): void {");
+    expect(routes).not.toContain(": any");
   });
 
   it("snapshots emitted TypeScript sources", async () => {

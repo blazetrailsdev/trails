@@ -1,3 +1,4 @@
+import { camelize } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
@@ -51,6 +52,18 @@ export class AppGenerator extends AppBase {
         `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
       );
     }
+  }
+
+  /**
+   * Rails' `Rails::Generators::AppName#app_const_base`
+   * (`railties/lib/rails/generators/app_name.rb:18`):
+   * `app_name.gsub(/\W/, "_").squeeze("_").camelize`. Rails names the app
+   * constant `<%= app_const_base %>::Application`; TypeScript has no module
+   * nesting, so the generated class is `app_const_base` itself — which is
+   * what `Application#name` dasherizes back into the Rails app name.
+   */
+  private appConstBase(name: string): string {
+    return camelize(name.replace(/\W/g, "_").replace(/_+/g, "_"));
   }
 
   private pmInstall(): string {
@@ -247,9 +260,12 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
 
     this.createFile(
       "config.ts",
-      `import { app } from "./src/config/application.js";
+      `// This file is used by Rack-based servers to start the application.
+import { Trails } from "@blazetrails/trailties";
 
-export default app;
+import "./src/config/environment.js";
+
+export default Trails.application;
 `,
     );
 
@@ -330,38 +346,45 @@ execSync("trails server", { stdio: "inherit" });
   private createConfigFiles(name: string): void {
     this.createFile(
       "src/config/application.ts",
-      `import { ActiveRecord } from "@blazetrails/activerecord";
-import { ActiveSupport } from "@blazetrails/activesupport";
-import databaseConfig from "./database.js";
-import { drawRoutes } from "./routes.js";
+      `import { Application } from "@blazetrails/trailties";
 
-export const app = {
-  name: "${name}",
-  config: {
-    database: databaseConfig,
-    // config
-  },
-  routes: drawRoutes,
-};
+export class ${this.appConstBase(name)} extends Application {
+  // Configuration for the application, engines, and trailties goes here.
+  //
+  // These settings can be overridden in specific environments using the files
+  // in src/config/environments, which are processed later.
+  //
+  // config.timeZone = "Central Time (US & Canada)";
+  // config.eagerLoadPaths.push("extras");
+  // config
+}
+
+Application.register(${this.appConstBase(name)});
 `,
     );
 
     this.createFile(
       "src/config/environment.ts",
-      `import { app } from "./application.js";
+      `// Load the trails application.
+import { Trails } from "@blazetrails/trailties";
+import "./application.js";
 
-export default app;
+// Initialize the trails application.
+export default await Trails.initialize();
 `,
     );
 
     this.createFile(
       "src/config/routes.ts",
-      `// Define your application routes here.
-// Example:
-//   router.resources("posts");
-//   router.get("/", "home#index");
+      `import type { Mapper } from "@blazetrails/actionpack";
 
-export function drawRoutes(router: any): void {
+export function drawRoutes(mapper: Mapper): void {
+  // Define your application routes here.
+  // Example:
+  //   mapper.get("/posts", { to: "posts#index" });
+
+  // Defines the root path route ("/")
+  // mapper.root("posts#index");
   // routes
 }
 `,
