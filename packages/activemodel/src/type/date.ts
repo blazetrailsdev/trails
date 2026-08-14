@@ -31,28 +31,52 @@ export class DateType extends ValueType<DateCastResult> {
     return JSON.stringify(cast.toString());
   }
 
-  /** @internal Rails-private helper. */
+  /**
+   * Mirrors: ActiveModel::Type::Date#cast_value (date.rb:39-48).
+   *
+   *   def cast_value(value)
+   *     if value.is_a?(::String)
+   *       return if value.empty?
+   *       fast_string_to_date(value) || fallback_string_to_date(value)
+   *     elsif value.respond_to?(:to_date)
+   *       value.to_date
+   *     else
+   *       value
+   *     end
+   *   end
+   *
+   * The `to_date` arm is spelled out per receiver, since TS has no
+   * `respond_to?`: `Temporal.PlainDate` is already a `::Date` (`to_date` is
+   * identity), while `Temporal.PlainDateTime` and a JS `Date` are the
+   * platform's `::Time`, whose `to_date` drops the time of day. An invalid JS
+   * `Date` has no calendar components to hand `::Date.new`, so it lands where
+   * `new_date`'s `rescue nil` puts it (date.rb:68).
+   *
+   * `DateInfinity` / `DateNegativeInfinity` are `Float::INFINITY`, which
+   * answers no `to_date` and so falls through the `else` arm untouched, as in
+   * Rails.
+   *
+   * @internal Rails-private helper.
+   */
   protected castValue(value: unknown): DateCastResult | null {
-    if (value === DateInfinity) return DateInfinity;
-    if (value === DateNegativeInfinity) return DateNegativeInfinity;
-    if (value instanceof Temporal.PlainDate) return value;
-    // Accept PlainDateTime from multiparameter assignment — extract the date part.
-    if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
-    // Mirrors AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
-    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
-    // boundary: cast accepts Date input from legacy callers / custom types
-    // and bridges into Temporal.PlainDate via the UTC calendar components.
-    if (value instanceof Date) {
+    if (typeof value === "string") {
+      if (value === "") return null;
+      return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
+    } else if (value instanceof Temporal.PlainDate) {
+      return value;
+    } else if (value instanceof Temporal.PlainDateTime) {
+      return value.toPlainDate();
+      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.
+    } else if (value instanceof Date) {
       if (Number.isNaN(value.getTime())) return null;
       return Temporal.PlainDate.from({
         year: value.getUTCFullYear(),
         month: value.getUTCMonth() + 1,
         day: value.getUTCDate(),
       });
+    } else {
+      return value as DateCastResult;
     }
-    const str = String(value).trim();
-    if (str === "") return null;
-    return this.fastStringToDate(str) ?? this.fallbackStringToDate(str);
   }
 
   /**
@@ -164,6 +188,19 @@ export class DateType extends ValueType<DateCastResult> {
     // within-range overflow like Time.local (Nov 31 → Dec 1).
     const time = new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
     return time && this.newDate(time.year, time.month, time.day);
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
+   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
+   * `Value#cast` (value.rb:53-55), which is `super`.
+   */
+  override cast(value: unknown): DateCastResult | null {
+    if (isHash(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return super.cast(value);
+    }
   }
 
   /**

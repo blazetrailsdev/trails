@@ -47,7 +47,16 @@ export class QueryAttribute extends Attribute {
     super(name, value, ensureType(type));
   }
 
+  /**
+   * `query_attribute.rb:22-24` is `def type_cast(value) = value` — a
+   * QueryAttribute never puts its raw value through the type. Trails casts
+   * here instead, which is why the `Substitute` arm has to be spelled out: a
+   * StatementCache placeholder stands in for a value not supplied yet, and
+   * Rails' own constructor names it as the one value it will not route through
+   * the type (query_attribute.rb:13-14). `nil?` below carries the same guard.
+   */
   typeCast(value: unknown): unknown {
+    if (value instanceof Substitute) return value;
     return this.type.cast(value);
   }
 

@@ -26,15 +26,7 @@
 import { defineCallbacks, setCallback, runCallbacks } from "../callbacks.js";
 import type { FilterListEntry } from "../callbacks.js";
 import { Assertion, UnexpectedError } from "./assertions.js";
-
-/**
- * Mirrors `self.failures` — Minitest keeps the failure list on the test
- * instance the module is mixed into, which lives for exactly one test. The
- * ported hooks are free functions with no such receiver, so the list is
- * module-global here, the same stand-in `testing/tagged_logging.rb`'s
- * `@tagged_logger` takes.
- */
-export const failures: (Assertion | UnexpectedError)[] = [];
+import type { RunningTest } from "./tests-without-assertions.js";
 
 /**
  * Mirrors `self.prepended(klass)` (setup_and_teardown.rb:21-25):
@@ -73,15 +65,25 @@ export function beforeSetup(this: object): void {
  * Mirrors `after_teardown` (setup_and_teardown.rb:44-53). A teardown callback
  * that raises is recorded as a failure rather than propagated, so the rest of
  * the `after_teardown` chain still runs.
+ *
+ * Ruby's `self` is one object: the Minitest instance both `run_callbacks` and
+ * `self.failures` (setup_and_teardown.rb:48,50) resolve against. Trails splits
+ * it — the callback chains live on the receiver `prepended()` installed them
+ * on, so the per-test half of that `self`, the `RunningTest` whose `failures`
+ * list lives for exactly one test, is taken as an argument.
+ *
+ * Ruby's `rescue => e` arm reads first, but `Minitest::Assertion` descends
+ * from `Exception`, not `StandardError`, so it is the second arm that takes
+ * it — which is the order the `instanceof` check spells out.
  */
-export function afterTeardown(this: object): void {
+export function afterTeardown(this: object, test: Pick<RunningTest, "failures">): void {
   try {
     runCallbacks(this, "teardown");
   } catch (e) {
     if (e instanceof Assertion) {
-      failures.push(e);
+      test.failures.push(e);
     } else {
-      failures.push(new UnexpectedError(e as Error));
+      test.failures.push(new UnexpectedError(e as Error));
     }
   }
 }

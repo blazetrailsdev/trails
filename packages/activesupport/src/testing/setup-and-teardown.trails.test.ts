@@ -2,21 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 
 import { resetCallbacks } from "../callbacks.js";
 import { Assertion, UnexpectedError } from "./assertions.js";
+import { afterTeardown, beforeSetup, prepended, setup, teardown } from "./setup-and-teardown.js";
 import {
-  afterTeardown,
-  beforeSetup,
-  failures,
-  prepended,
-  setup,
-  teardown,
-} from "./setup-and-teardown.js";
-import { afterTeardown as testsWithoutAssertionsAfterTeardown } from "./tests-without-assertions.js";
+  afterTeardown as testsWithoutAssertionsAfterTeardown,
+  type RunningTest,
+} from "./tests-without-assertions.js";
 import { TestCase } from "../test-case.js";
 
 function testCase(): Record<string, never> {
   const klass = {} as Record<string, never>;
   prepended(klass);
   return klass;
+}
+
+/** The `self` Ruby's `self.failures` resolves against — one list per test. */
+function runningTest(): Pick<RunningTest, "failures"> {
+  return { failures: [] };
 }
 
 describe("SetupAndTeardown", () => {
@@ -29,7 +30,7 @@ describe("SetupAndTeardown", () => {
     beforeSetup.call(klass);
     expect(ran).toEqual(["setup"]);
 
-    afterTeardown.call(klass);
+    afterTeardown.call(klass, runningTest());
     expect(ran).toEqual(["setup", "teardown"]);
     resetCallbacks(klass, "setup");
     resetCallbacks(klass, "teardown");
@@ -37,34 +38,32 @@ describe("SetupAndTeardown", () => {
 
   it("records a raising teardown callback as a failure instead of propagating", () => {
     const klass = testCase();
-    const before = failures.length;
+    const test = runningTest();
     const raised = new TypeError("boom");
     teardown.call(klass, () => {
       throw raised;
     });
 
-    afterTeardown.call(klass);
+    afterTeardown.call(klass, test);
 
-    expect(failures.length).toBe(before + 1);
-    const failure = failures[failures.length - 1];
+    expect(test.failures.length).toBe(1);
+    const failure = test.failures[0];
     expect(failure).toBeInstanceOf(UnexpectedError);
     expect((failure as UnexpectedError).error).toBe(raised);
-    failures.length = before;
     resetCallbacks(klass, "teardown");
   });
 
   it("records a failed assertion in a teardown callback as itself", () => {
     const klass = testCase();
-    const before = failures.length;
+    const test = runningTest();
     const raised = new Assertion("nope");
     teardown.call(klass, () => {
       throw raised;
     });
 
-    afterTeardown.call(klass);
+    afterTeardown.call(klass, test);
 
-    expect(failures[failures.length - 1]).toBe(raised);
-    failures.length = before;
+    expect(test.failures[0]).toBe(raised);
     resetCallbacks(klass, "teardown");
   });
 });
@@ -76,6 +75,7 @@ describe("TestsWithoutAssertions", () => {
     error: false,
     name: "a test",
     sourceLocation: ["some_test.ts", 12] as [string, number],
+    failures: [],
   };
 
   it("warns when a test made no assertion", () => {
@@ -114,10 +114,10 @@ describe("TestCase after_teardown chain", () => {
           error: false,
           name: "a test",
           sourceLocation: ["some_test.ts", 12],
+          failures: [],
         }),
       ).toThrow(UnexpectedError);
       expect(warn).not.toHaveBeenCalled();
-      expect(failures).toEqual([]);
     } finally {
       warn.mockRestore();
       resetCallbacks(TestCase, "teardown");

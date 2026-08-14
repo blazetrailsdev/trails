@@ -20,6 +20,7 @@ it("without assertions", () => {
       error: false,
       name: "test_without_assertions",
       sourceLocation: ["packages/activesupport/src/testing/test_without_assertions_test.ts", 9],
+      failures: [],
     });
 
     const err = warn.mock.calls.map((c) => String(c[0])).join("\n");

@@ -6,8 +6,6 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import {
-  DateInfinity,
-  DateNegativeInfinity,
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
@@ -32,18 +30,39 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return this.name;
   }
 
-  /** @internal Rails-private helper. */
+  /**
+   * Mirrors: ActiveModel::Type::DateTime#cast_value (date_time.rb:54-59).
+   *
+   *   def cast_value(value)
+   *     return apply_seconds_precision(value) unless value.is_a?(::String)
+   *     return if value.empty?
+   *
+   *     fast_string_to_time(value) || fallback_string_to_time(value)
+   *   end
+   *
+   * A JS `Date` and a `Temporal.PlainDateTime` are this platform's spellings
+   * of Ruby's `::Time`, which Rails hands straight to
+   * `apply_seconds_precision` — but that reads `nsec` off the receiver and
+   * trails' cast result is the `Temporal.Instant` that carries it, so they are
+   * anchored to one first, the zone-less `PlainDateTime` on the `is_utc?`
+   * branch `new_time` puts a zone-less value on (time_value.rb:57-62).
+   * Everything else — `DateInfinity` / `DateNegativeInfinity` included —
+   * reaches `apply_seconds_precision`, which answers a receiver with no `nsec`
+   * unchanged (time_value.rb:24-25).
+   *
+   * @internal Rails-private helper.
+   */
   protected castValue(value: unknown): DateTimeCastResult | null {
-    if (value === DateInfinity) return DateInfinity;
-    if (value === DateNegativeInfinity) return DateNegativeInfinity;
-    if (value instanceof Temporal.Instant) return this.applySecondsPrecision(value);
-    // boundary: JS Date assigned to a datetime attribute (e.g. aircraft.manufactured_at = new Date())
-    if (value instanceof Date) {
-      return this.applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
+    // boundary: a JS Date assigned to a datetime attribute is Ruby's ::Time.
+    if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
+    if (value instanceof Temporal.PlainDateTime) {
+      value = value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).toInstant();
     }
-    const str = String(value).trim();
-    if (str === "") return null;
-    return this.fastStringToTime(str) ?? this.fallbackStringToTime(str);
+    if (typeof value !== "string")
+      return this.applySecondsPrecision(value) as DateTimeCastResult | null;
+    if (value === "") return null;
+
+    return this.fastStringToTime(value) ?? this.fallbackStringToTime(value);
   }
 
   /**
@@ -187,12 +206,18 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return isHash(value);
   }
 
-  private applySecondsPrecision(value: Temporal.Instant): Temporal.Instant {
+  /**
+   * Mirrors: Helpers::TimeValue#apply_seconds_precision (time_value.rb:24-34).
+   * `return value unless precision && value.respond_to?(:nsec)` — `Instant` is
+   * the receiver carrying nanoseconds here; everything else passes through.
+   */
+  private applySecondsPrecision<T>(value: T): T {
     if (
       this.precision == null ||
       !Number.isInteger(this.precision) ||
       this.precision < 0 ||
-      this.precision > 9
+      this.precision > 9 ||
+      !(value instanceof Temporal.Instant)
     )
       return value;
     const mod = 10n ** BigInt(9 - this.precision);
@@ -200,7 +225,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (subsec < 0n) subsec += 1_000_000_000n;
     const roundedOff = subsec % mod;
     if (roundedOff === 0n) return value;
-    return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds - roundedOff);
+    return Temporal.Instant.fromEpochNanoseconds(value.epochNanoseconds - roundedOff) as T;
   }
 
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
@@ -243,7 +268,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   // Mirrors ActiveModel::Type::Helpers::TimeValue#serialize_cast_value (apply_seconds_precision).
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null {
-    if (value === null || value === DateInfinity || value === DateNegativeInfinity) return value;
-    return this.applySecondsPrecision(value as Temporal.Instant);
+    return this.applySecondsPrecision(value);
   }
 }
