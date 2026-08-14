@@ -40,22 +40,21 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    *     fast_string_to_time(value) || fallback_string_to_time(value)
    *   end
    *
-   * A JS `Date`, a `Temporal.ZonedDateTime` and a `Temporal.PlainDateTime` are
-   * this platform's spellings of Ruby's `::Time`, which Rails hands straight to
+   * A JS `Date` and a `Temporal.PlainDateTime` are this platform's spellings
+   * of Ruby's `::Time`, which Rails hands straight to
    * `apply_seconds_precision` — but that reads `nsec` off the receiver and
    * trails' cast result is the `Temporal.Instant` that carries it, so they are
-   * anchored to one first. The zone-less `PlainDateTime` is anchored on the
-   * `is_utc?` branch `new_time` puts a zone-less value on
-   * (time_value.rb:57-62). Everything else — `DateInfinity` /
-   * `DateNegativeInfinity` included — reaches `apply_seconds_precision`, which
-   * answers a receiver with no `nsec` unchanged (time_value.rb:24-25).
+   * anchored to one first, the zone-less `PlainDateTime` on the `is_utc?`
+   * branch `new_time` puts a zone-less value on (time_value.rb:57-62).
+   * Everything else — `DateInfinity` / `DateNegativeInfinity` included —
+   * reaches `apply_seconds_precision`, which answers a receiver with no `nsec`
+   * unchanged (time_value.rb:24-25).
    *
    * @internal Rails-private helper.
    */
   protected castValue(value: unknown): DateTimeCastResult | null {
     // boundary: a JS Date assigned to a datetime attribute is Ruby's ::Time.
     if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
-    if (value instanceof Temporal.ZonedDateTime) value = value.toInstant();
     if (value instanceof Temporal.PlainDateTime) {
       value = value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).toInstant();
     }
@@ -207,9 +206,11 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return isHash(value);
   }
 
-  // Mirrors Helpers::TimeValue#apply_seconds_precision (time_value.rb:24-34):
-  // `return value unless precision && value.respond_to?(:nsec)` — Instant is
-  // the receiver carrying nanoseconds here, everything else passes through.
+  /**
+   * Mirrors: Helpers::TimeValue#apply_seconds_precision (time_value.rb:24-34).
+   * `return value unless precision && value.respond_to?(:nsec)` — `Instant` is
+   * the receiver carrying nanoseconds here; everything else passes through.
+   */
   private applySecondsPrecision<T>(value: T): T {
     if (
       this.precision == null ||

@@ -19,7 +19,6 @@ describe("AfterTeardownAssertionTest", () => {
   it("teardown raise but all after teardown method are called", () => {
     const klass = {};
     prepended(klass);
-    // The `self` Ruby's `self.failures` resolves against — one list per test.
     const test: Pick<RunningTest, "failures"> = { failures: [] };
     let witness = false;
 

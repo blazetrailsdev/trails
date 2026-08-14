@@ -174,7 +174,6 @@ function _runningTest(context: TestContext): RunningTest {
     error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
     name: task.name,
     sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
-    // `Minitest::Runnable#initialize` starts every test on an empty list.
     failures: [],
   };
 }

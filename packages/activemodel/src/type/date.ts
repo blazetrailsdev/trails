@@ -47,10 +47,11 @@ export class DateType extends ValueType<DateCastResult> {
    *
    * The `to_date` arm is spelled out per receiver, since TS has no
    * `respond_to?`: `Temporal.PlainDate` is already a `::Date` (`to_date` is
-   * identity), `Temporal.PlainDateTime` and a JS `Date` are the platform's
-   * `Time`, whose `to_date` drops the time-of-day. The Hash arm stands in for
-   * `AcceptsMultiparameterTime::InstanceMethods#cast`, which Rails runs before
-   * `cast_value` and trails' `DateType` has no `cast` override for.
+   * identity), while `Temporal.PlainDateTime` and a JS `Date` are the
+   * platform's `::Time`, whose `to_date` drops the time of day. An invalid JS
+   * `Date` has no calendar components to hand `::Date.new`, so it lands where
+   * `new_date`'s `rescue nil` puts it (date.rb:68).
+   *
    * `DateInfinity` / `DateNegativeInfinity` are `Float::INFINITY`, which
    * answers no `to_date` and so falls through the `else` arm untouched, as in
    * Rails.
@@ -61,17 +62,12 @@ export class DateType extends ValueType<DateCastResult> {
     if (typeof value === "string") {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
-    } else if (isHash(value)) {
-      return this.valueFromMultiparameterAssignment(value);
     } else if (value instanceof Temporal.PlainDate) {
       return value;
     } else if (value instanceof Temporal.PlainDateTime) {
       return value.toPlainDate();
-      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time,
-      // whose `to_date` drops the time of day.
+      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.
     } else if (value instanceof Date) {
-      // An invalid JS Date has no calendar components to hand ::Date.new, so
-      // it lands where new_date's `rescue nil` would (date.rb:68).
       if (Number.isNaN(value.getTime())) return null;
       return Temporal.PlainDate.from({
         year: value.getUTCFullYear(),
@@ -192,6 +188,19 @@ export class DateType extends ValueType<DateCastResult> {
     // within-range overflow like Time.local (Nov 31 → Dec 1).
     const time = new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
     return time && this.newDate(time.year, time.month, time.day);
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#cast
+   * (accepts_multiparameter_time.rb:16-22). The nil guard stays in
+   * `Value#cast` (value.rb:53-55), which is `super`.
+   */
+  override cast(value: unknown): DateCastResult | null {
+    if (isHash(value)) {
+      return this.valueFromMultiparameterAssignment(value);
+    } else {
+      return super.cast(value);
+    }
   }
 
   /**
