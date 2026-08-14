@@ -22,7 +22,7 @@ describe("Object#blank? respond_to?(:empty?) probe", () => {
   // Invoking to find out is not an option — the query would already have been
   // issued — so the AsyncFunction is recognised before the call, bound or not
   // (`Function.prototype.bind` copies the target's prototype).
-  it("never invokes an async isEmpty, bound or not, falling back to the own-key arm", () => {
+  it("never invokes an async isEmpty, bound or not, falling back to !self", () => {
     let called = false;
     class Relation {
       async isEmpty(): Promise<boolean> {
@@ -31,9 +31,9 @@ describe("Object#blank? respond_to?(:empty?) probe", () => {
       }
     }
     const relation = new Relation();
-    // Both fall through to the own-key arm: a bare instance carries no own key
-    // (its method is on the prototype), the literal carries one.
-    expect(isBlank(relation)).toBe(true);
+    // Both fall through past the probe: the instance reaches `!self`
+    // (blank.rb:18-20), the literal is a Hash and carries one key.
+    expect(isBlank(relation)).toBe(false);
     expect(isBlank({ isEmpty: relation.isEmpty.bind(relation) })).toBe(false);
     expect(called).toBe(false);
   });
@@ -57,5 +57,36 @@ describe("Object#blank? respond_to?(:empty?) probe", () => {
     expect(isBlank({ isEmpty: () => null })).toBe(false);
     expect(isBlank({ isEmpty: true })).toBe(true);
     expect(isBlank({ empty: false })).toBe(false);
+  });
+});
+
+// blank.rb has two arms behind one TS switch: `Hash#blank?` is
+// `alias_method :blank?, :empty?` (blank.rb:111), and `Object#blank?` is
+// `!self` (blank.rb:18-20) — always `false`, since only nil/false are falsy.
+// A JS object literal is the Ruby Hash; every other object is the Ruby Object.
+describe("Object#blank? vs Hash#blank?", () => {
+  it("counts own keys for a Hash, per blank.rb:111", () => {
+    expect(isBlank({})).toBe(true);
+    expect(isBlank({ a: 1 })).toBe(false);
+    expect(isBlank(Object.create(null) as object)).toBe(true);
+  });
+
+  // Ruby keeps no own keys for a getter, so `Object.keys` reporting `0` says
+  // nothing about the receiver — Ruby's answer is `false` either way.
+  it("answers false for a class instance with no own keys, per blank.rb:18-20", () => {
+    class Config {
+      get name(): string {
+        return "trails";
+      }
+    }
+    expect(isBlank(new Config())).toBe(false);
+
+    class Slots {
+      readonly #value = 1;
+      value(): number {
+        return this.#value;
+      }
+    }
+    expect(isBlank(new Slots())).toBe(false);
   });
 });

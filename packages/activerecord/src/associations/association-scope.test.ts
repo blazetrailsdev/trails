@@ -319,16 +319,19 @@ describe("AssociationScope", () => {
 
       static {
         this.attribute("id", "integer");
-        this.hasMany("zero_arity_posts", {
-          className: "ZeroArityPost",
-          foreignKey: "zero_arity_author_id",
+        this.hasMany(
+          "zero_arity_posts",
           // The function's .length is 0, so the loader must use scopeFor's
           // 0-arity branch (this=relation). If we passed it as a 1-arg
           // function, `where` would not exist on the empty arg.
-          scope: function (this: any) {
+          function (this: any) {
             return this.where({ active: true });
           },
-        });
+          {
+            className: "ZeroArityPost",
+            foreignKey: "zero_arity_author_id",
+          },
+        );
       }
     }
     class ZeroArityPost extends Base {

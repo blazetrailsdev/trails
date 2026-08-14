@@ -22,6 +22,16 @@ function isAsyncFunction(fn: object): boolean {
   return Object.prototype.toString.call(fn) === "[object AsyncFunction]";
 }
 
+/**
+ * A JS object literal is trails' Ruby `Hash`, and only it reaches blank.rb:111's
+ * `alias_method :blank?, :empty?`. A class instance is a plain Ruby object, whose
+ * `blank?` is `!self` (blank.rb:18-20) — never an own-key count.
+ */
+function isPlainObject(value: object): boolean {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 function isThenable(v: unknown): v is PromiseLike<unknown> {
   return typeof (v as { then?: unknown } | null | undefined)?.then === "function";
 }
@@ -32,9 +42,8 @@ function isThenable(v: unknown): v is PromiseLike<unknown> {
  * typed on the whole family plus `TimeWithZone` — the same widening
  * `core-ext/object/json.ts` applies to `Time#as_json`. `Temporal.PlainDate` /
  * `PlainDateTime` stand for Ruby's `Date` / `DateTime`, which blank.rb does not
- * reopen; they are `false` in Ruby through `Object#blank?`, which the object
- * arm below cannot reproduce because it is trails' `Hash` arm and reports a
- * slot-only Temporal value as empty.
+ * reopen; they are `false` in Ruby through `Object#blank?`, which the fallthrough
+ * arm below now answers for them anyway.
  */
 type TimeValue =
   | Date
@@ -132,7 +141,7 @@ export class Time {
  * A NON-`async` function that returns a promise anyway defeats any pre-call
  * test, so the answer is also checked after the fact: a thenable result is
  * discarded (with its rejection swallowed, since nobody can await it) and the
- * own-key arm answers instead. That keeps a mis-declared querying `empty?` from
+ * fallthrough arm answers instead. That keeps a mis-declared querying `empty?` from
  * reporting a promise as present — the contract stays "a querying `empty?` is
  * spelled `async`", and this is what happens when it is not.
  *
@@ -166,7 +175,7 @@ export function isBlank(value: unknown): boolean {
     if (isThenable(result)) void Promise.resolve(result).catch(() => undefined);
     else return result != null && result !== false;
   }
-  if (typeof value === "object") return Object.keys(value).length === 0;
+  if (typeof value === "object" && isPlainObject(value)) return Object.keys(value).length === 0;
   return false;
 }
 
