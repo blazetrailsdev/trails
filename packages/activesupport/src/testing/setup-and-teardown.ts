@@ -1,0 +1,87 @@
+/**
+ * Mirrors: active_support/testing/setup_and_teardown.rb
+ *
+ * Adds support for `setup` and `teardown` callbacks. These callbacks serve as
+ * a replacement to overwriting the `#setup` and `#teardown` methods of your
+ * TestCase.
+ *
+ *     class ExampleTest extends TestCase {
+ *       static {
+ *         this.setup(() => {
+ *           // ...
+ *         });
+ *
+ *         this.teardown(() => {
+ *           // ...
+ *         });
+ *       }
+ *     }
+ *
+ * Ruby `prepend`s this module into `ActiveSupport::TestCase`
+ * (test_case.rb:145), which puts `before_setup` / `after_teardown` ahead of the
+ * included modules' own hooks in the ancestor chain. The trails receiver
+ * expresses the include list as assignments, so that ordering lives in the
+ * hook installation at the bottom of test-case.ts instead.
+ */
+import { defineCallbacks, setCallback, runCallbacks } from "../callbacks.js";
+import type { FilterListEntry } from "../callbacks.js";
+import { Assertion, UnexpectedError } from "./assertions.js";
+
+/**
+ * Mirrors `self.failures` — Minitest keeps the failure list on the test
+ * instance the module is mixed into, which lives for exactly one test. The
+ * ported hooks are free functions with no such receiver, so the list is
+ * module-global here, the same stand-in `testing/tagged_logging.rb`'s
+ * `@tagged_logger` takes.
+ */
+export const failures: (Assertion | UnexpectedError)[] = [];
+
+/**
+ * Mirrors `self.prepended(klass)` (setup_and_teardown.rb:21-25):
+ * `klass.include ActiveSupport::Callbacks` — `defineCallbacks` is that
+ * include's only observable effect here — then `define_callbacks :setup,
+ * :teardown`. Ruby's `klass.extend ClassMethods` is the `setup` / `teardown`
+ * assignment on the receiver.
+ */
+export function prepended(klass: object): void {
+  defineCallbacks(klass, "setup");
+  defineCallbacks(klass, "teardown");
+}
+
+/**
+ * Add a callback, which runs before `TestCase#setup`
+ * (setup_and_teardown.rb:29-31).
+ */
+export function setup(this: object, ...args: FilterListEntry<object>[]): void {
+  setCallback(this, "setup", "before", ...args);
+}
+
+/**
+ * Add a callback, which runs after `TestCase#teardown`
+ * (setup_and_teardown.rb:34-36).
+ */
+export function teardown(this: object, ...args: FilterListEntry<object>[]): void {
+  setCallback(this, "teardown", "after", ...args);
+}
+
+/** Mirrors `before_setup` (setup_and_teardown.rb:39-42). */
+export function beforeSetup(this: object): void {
+  runCallbacks(this, "setup");
+}
+
+/**
+ * Mirrors `after_teardown` (setup_and_teardown.rb:44-53). A teardown callback
+ * that raises is recorded as a failure rather than propagated, so the rest of
+ * the `after_teardown` chain still runs.
+ */
+export function afterTeardown(this: object): void {
+  try {
+    runCallbacks(this, "teardown");
+  } catch (e) {
+    if (e instanceof Assertion) {
+      failures.push(e);
+    } else {
+      failures.push(new UnexpectedError(e as Error));
+    }
+  }
+}
