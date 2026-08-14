@@ -4,6 +4,7 @@ import { FutureResult, Complete, type FutureResultConnection } from "./future-re
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { ActiveRecord } from "./ar-config.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
+import { makeCachedSelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Executor, type CompletableExecution } from "@blazetrails/activesupport";
@@ -347,6 +348,74 @@ describe("DatabaseStatements#select_all", () => {
     await expect(DatabaseStatements.selectAll.call(host as never, "SELECT 1")).rejects.toThrow(
       "boom",
     );
+  });
+});
+
+describe("QueryCache#select_all", () => {
+  // query_cache.rb:243-250 splits on `async`: the async arm is
+  // `FutureResult.wrap(lookup_sql_cache(...) || super)`, so the pending handle
+  // has to survive the cache wrapper. It only does because `cachedSelectAll`
+  // is not an `async function` — one would adopt the thenable FutureResult and
+  // settle with its Result, which is exactly the collapse this covers.
+  function cacheHost(store: Store) {
+    return {
+      _queryCache: store,
+      lookupSqlCache: (sql: string, _name: string | null | undefined, binds: unknown[]) =>
+        store.get(binds.length === 0 ? sql : JSON.stringify([sql, binds])),
+      cacheSql: async (
+        _sql: string,
+        _name: string | null | undefined,
+        _binds: unknown[],
+        block: () => Promise<Record<string, unknown>[]>,
+      ) => block(),
+    };
+  }
+
+  it("hands back a pending FutureResult with the query cache enabled", async () => {
+    const result = new Result(["id"], [[1]]);
+    const store = new Store();
+    store.enabled = true;
+    const pending = new FutureResult.SelectAll(deferredPool(result) as never, [
+      "SELECT 1",
+      null,
+      [],
+    ]);
+    const selectAll = makeCachedSelectAll(() => pending);
+
+    const returned = selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], {
+      async: true,
+    });
+
+    expect(returned).toBe(pending);
+    expect((returned as FutureResult).pending()).toBe(true);
+  });
+
+  it("wraps a cache hit in a Complete on the async arm", async () => {
+    const store = new Store();
+    store.enabled = true;
+    await store.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
+    const selectAll = makeCachedSelectAll(() => {
+      throw new Error("must not reach super on a cache hit");
+    });
+
+    const returned = selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], {
+      async: true,
+    });
+
+    expect(returned).toBeInstanceOf(Complete);
+    expect((returned as Complete).pending()).toBe(false);
+    expect((returned as Complete).toArray()).toEqual([{ id: 1 }]);
+  });
+
+  it("still caches through cache_sql on the sync arm", async () => {
+    const result = new Result(["id"], [[1]]);
+    const store = new Store();
+    store.enabled = true;
+    const selectAll = makeCachedSelectAll(async () => result);
+
+    expect(
+      await selectAll.call(cacheHost(store) as never, "SELECT 1", null, [], { async: false }),
+    ).toEqual(result);
   });
 });
 
