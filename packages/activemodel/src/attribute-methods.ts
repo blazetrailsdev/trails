@@ -595,6 +595,12 @@ export function attributeMethodPatternsMatching(
  * Ruby's `(code_generator, name, proxy_target, parameters, *call_args,
  * namespace:, as:)` puts required keywords after a splat, which TS cannot
  * express: the kwargs travel as the last element of the rest tuple.
+ *
+ * Two steps of attribute_methods.rb:408-424 have no TS analogue and are
+ * dropped rather than emulated: `call_args.map!(&:inspect)` quotes each
+ * argument for the Ruby source string, where the port passes the values
+ * themselves, and `call_args << parameters if parameters` appends the
+ * forwarding signature, which `defineCall`'s rest parameter already does.
  */
 export function defineProxyCall(
   codeGenerator: CodeGenerator,
@@ -635,8 +641,11 @@ export function buildMangledName(name: string): string {
  *
  * Rails compiles `def mangled_name(params); self.target_name(call_args); end`
  * into the generator's batch. A TS "source" is the definition itself, so the
- * emitted body is the equivalent closure over `callArgs`; `CALL_COMPILABLE_REGEXP`
- * has no analogue because a JS property lookup needs no name to be compilable.
+ * emitted body is the equivalent closure over `callArgs`, and `parameters` is
+ * inert because a rest parameter forwards what Ruby's `params` names.
+ * `CALL_COMPILABLE_REGEXP` has no analogue either: a JS property lookup needs
+ * no name to be compilable, so the `send(...)` arm it guards never applies.
+ * `name` is unused here exactly as it is in Ruby.
  */
 export function defineCall(
   codeGenerator: CodeGenerator,
