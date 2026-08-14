@@ -67,7 +67,7 @@ export class BoundedIO {
 
     const str = left < size ? this.io.read(left, outbuf) : this.io.read(size, outbuf);
     if (str) {
-      this.cursor += str.length;
+      this.cursor += new TextEncoder().encode(str).length;
     } else {
       throw new EmptyContentError("bad content body");
     }

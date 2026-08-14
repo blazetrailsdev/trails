@@ -5788,9 +5788,15 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update
    */
-  async update(id: unknown = ":all", attributes?: Record<string, unknown>): Promise<T | T[]> {
-    if (attributes === undefined && id !== ":all") {
-      attributes = (id ?? {}) as Record<string, unknown>;
+  update(attributes: Record<string, unknown>): Promise<T[]>;
+  update(id: ":all", attributes: Record<string, unknown>): Promise<T[]>;
+  update(id: unknown, attributes: Record<string, unknown>): Promise<T>;
+  async update(id?: unknown, attributes?: Record<string, unknown>): Promise<T | T[]> {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
+    }
+    if (arguments.length === 1) {
+      attributes = id as Record<string, unknown>;
       id = ":all";
     }
     if (id === ":all") {
@@ -5809,9 +5815,15 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update!
    */
-  async updateBang(id: unknown = ":all", attributes?: Record<string, unknown>): Promise<T | T[]> {
-    if (attributes === undefined && id !== ":all") {
-      attributes = (id ?? {}) as Record<string, unknown>;
+  updateBang(attributes: Record<string, unknown>): Promise<T[]>;
+  updateBang(id: ":all", attributes: Record<string, unknown>): Promise<T[]>;
+  updateBang(id: unknown, attributes: Record<string, unknown>): Promise<T>;
+  async updateBang(id?: unknown, attributes?: Record<string, unknown>): Promise<T | T[]> {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
+    }
+    if (arguments.length === 1) {
+      attributes = id as Record<string, unknown>;
       id = ":all";
     }
     if (id === ":all") {
