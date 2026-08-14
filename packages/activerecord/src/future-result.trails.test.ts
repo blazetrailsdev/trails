@@ -149,16 +149,19 @@ describe("DatabaseStatements#select", () => {
     ActiveRecord.asyncQueryExecutor = null;
   });
 
-  it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", async () => {
+  it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", () => {
     ActiveRecord.asyncQueryExecutor = "global_thread_pool";
     const host = {
       asyncEnabled: () => true,
       currentTransaction: () => ({ open: true, joinable: true }),
     };
 
-    await expect(
+    // Ruby raises here, synchronously, before any query is issued
+    // (database_statements.rb:672-674) — `select` is not an async function, so
+    // the raise reaches the caller as a throw rather than a rejected promise.
+    expect(() =>
       select.call(host as never, "SELECT 1", null, [], { async: FutureResult.SelectAll }),
-    ).rejects.toThrow(AsynchronousQueryInsideTransactionError);
+    ).toThrow(AsynchronousQueryInsideTransactionError);
   });
 
   it("resolves to the Result when async is set but no executor is enabled", async () => {
@@ -168,9 +171,8 @@ describe("DatabaseStatements#select", () => {
       internalExecQuery: async () => result,
     };
 
-    // Rails' non-enabled arm returns `FutureResult.wrap(result)`. `select` is
-    // itself async, so the returned promise adopts that Complete and awaiting
-    // yields the Result — which is exactly what select_one/select_rows read.
+    // Rails' non-enabled arm is `FutureResult.wrap(result)` — already complete,
+    // so awaiting it yields the Result, which is what select_one/select_rows read.
     expect(
       await select.call(host as never, "SELECT 1", null, [], { async: FutureResult.SelectAll }),
     ).toBe(result);
@@ -223,12 +225,62 @@ describe("DatabaseStatements#select", () => {
     expect(pool.calls).toBe(1);
   });
 
+  it("hands back a pending FutureResult without waiting for the query", async () => {
+    // Ruby's `select` is an ordinary method: the async arm schedules the query
+    // and returns the still-pending FutureResult, so the caller holds a handle
+    // and reads `.value` later (database_statements.rb:671-694). `select` is
+    // therefore NOT an async function here — an async function's promise would
+    // adopt the returned FutureResult (a thenable) and resolve it away, so no
+    // caller could ever observe one pending.
+    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    const result = new Result(["id"], [[1]]);
+    const pool = deferredPool(result);
+    const host = {
+      pool,
+      asyncEnabled: () => true,
+      supportsConcurrentConnections: () => true,
+      currentTransaction: () => ({ open: false, joinable: false }),
+    };
+
+    const futureResult = select.call(host as never, "SELECT 1", null, [], {
+      async: FutureResult.SelectAll,
+    });
+    expect(futureResult).toBeInstanceOf(FutureResult);
+    expect((futureResult as FutureResult).pending()).toBe(true);
+
+    pool.finish();
+    expect(await (futureResult as FutureResult).result()).toBe(result);
+    expect((futureResult as FutureResult).pending()).toBe(false);
+  });
+
   it("returns a bare Result when async is not set", async () => {
     const result = new Result(["id"], [[1]]);
     const host = { asyncEnabled: () => false, internalExecQuery: async () => result };
     expect(await select.call(host as never, "SELECT 1", null, [])).toBe(result);
   });
 });
+
+/** A pool whose query stays in flight until `finish()` is called. */
+function deferredPool(outcome: Result) {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  return {
+    finish: () => release(),
+    scheduleQuery(futureResult: { executeOrSkip(): void }) {
+      futureResult.executeOrSkip();
+    },
+    async withConnection<T>(
+      fn: (connection: FutureResultConnection) => Promise<T> | T,
+    ): Promise<T> {
+      return fn({
+        rawExecQuery: async () => {
+          await gate;
+          return outcome;
+        },
+      });
+    },
+  };
+}
 
 /**
  * A pool whose `withConnection` yields a connection returning (or raising)

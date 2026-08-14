@@ -435,9 +435,12 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       // Rails splits this by `async`: the sync path is `cache_sql { super }`
       // (which itself tracks `hit` and instruments, query_cache.rb:283,291-296),
-      // the async path is `lookup_sql_cache(...) || super`. trails has no async
-      // FutureResult path, so it always takes the `lookup_sql_cache || cacheSql`
-      // shape. INVARIANT: there must be no `await` between this lookupSqlCache
+      // the async path is `lookup_sql_cache(...) || super` wrapped in
+      // `FutureResult.wrap` (query_cache.rb:244-249). Only the sync shape is
+      // ported: this wrapper is an `async function`, so a FutureResult returned
+      // by the base `selectAll` would be adopted and resolved away by its own
+      // promise — story wire-load-async-through-future-result ports the async
+      // arm and the non-collapsing shape it needs. INVARIANT: there must be no `await` between this lookupSqlCache
       // and the cacheSql below — lookupSqlCache runs synchronously and cacheSql
       // reaches `Store.computeIfAbsent`'s synchronous `get` immediately, so
       // nothing can populate the key in between. That is why trails' cacheSql

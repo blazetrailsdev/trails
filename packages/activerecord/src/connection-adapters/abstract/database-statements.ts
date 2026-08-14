@@ -1517,7 +1517,7 @@ interface DatabaseStatementsDefaultsHost {
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Promise<Result | FutureResult | FutureResultComplete>;
+  ): Result | Promise<Result> | FutureResult | FutureResultComplete;
   selectRows(
     arel: unknown,
     name?: string | null,
@@ -1594,13 +1594,13 @@ async function insertStatement(
 
 export const DatabaseStatements = {
   resetTransaction,
-  async selectAll(
+  selectAll(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Promise<Result | FutureResult | FutureResultComplete> {
+  ): Result | Promise<Result> | FutureResult | FutureResultComplete {
     // Rails: `arel = arel_from_relation(arel)` then `sql, binds, preparable,
     // allow_retry = to_sql_and_binds(...)` (database_statements.rb:69-71) — a
     // SQL string passes through both unchanged, an Arel manager compiles here.
@@ -1627,15 +1627,29 @@ export const DatabaseStatements = {
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     const async = opts?.async ?? false;
     try {
-      return await select.call(this as DatabaseStatementsHost, sql, name, binds, {
+      const result = select.call(this as DatabaseStatementsHost, sql, name, binds, {
         prepare,
         async: async && FutureResult.SelectAll,
         allowRetry: compiledAllowRetry,
       });
+      // Ruby's `select` returns synchronously, so its one `rescue ::RangeError`
+      // covers a raise on the way out. trails' non-async arm hands back a
+      // promise instead, so the same clause is spelled twice — once for a
+      // synchronous throw, once for that promise's rejection. The async arm
+      // needs neither: `FutureResult::SelectAll` carries the rescue itself
+      // (future_result.rb:172-179), which is why Rails has that subclass.
+      return result instanceof Promise
+        ? result.catch((e) => {
+            if (e instanceof ActiveModelRangeError || e instanceof ARRangeError)
+              return Result.empty({ async });
+            throw e;
+          })
+        : result;
     } catch (e) {
-      // Mirrors: database_statements.rb:78 — rescue ::RangeError → Result.empty.
-      // Ruby ::RangeError covers both ActiveModel::RangeError (type-level, client-side)
-      // and ActiveRecord::RangeError (adapter-level, server-side wire rejection).
+      // Mirrors: database_statements.rb:78-79 — rescue ::RangeError →
+      // Result.empty(async: async). Ruby ::RangeError covers both
+      // ActiveModel::RangeError (type-level, client-side) and
+      // ActiveRecord::RangeError (adapter-level, server-side wire rejection).
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError)
         return Result.empty({ async });
       throw e;
@@ -2157,13 +2171,13 @@ export function combineMultiStatements(totalSql: string[]): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select
  * @internal
  */
-export async function select(
+export function select(
   this: DatabaseStatementsHost,
   sql: string,
   name?: string | null,
   binds: unknown[] = [],
   options?: { prepare?: boolean; async?: unknown; allowRetry?: boolean },
-): Promise<Result | FutureResult | FutureResultComplete> {
+): Promise<Result> | FutureResult | FutureResultComplete {
   const async = options?.async;
   if (async != null && async !== false && this.asyncEnabled?.()) {
     if (currentTransactionJoinable(this)) {
@@ -2189,12 +2203,12 @@ export async function select(
     // Dispatch through the instance so an adapter's internalExecQuery override
     // wins, as Ruby's virtual call does.
     const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-    const result = await run(sql, name, binds, {
+    const result = run(sql, name, binds, {
       prepare: options?.prepare,
       allowRetry: options?.allowRetry,
     });
     if (async != null && async !== false) {
-      return FutureResult.wrap(result);
+      return result.then((r) => FutureResult.wrap(r));
     } else {
       return result;
     }
