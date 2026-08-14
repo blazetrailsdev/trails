@@ -393,7 +393,7 @@ describe("QueryCache#select_all", () => {
 
     expect(returned).toBeInstanceOf(Complete);
     expect((returned as Complete).pending()).toBe(false);
-    expect(await (returned as Complete)).toEqual([{ id: 1 }]);
+    expect((returned as Complete).toArray()).toEqual([{ id: 1 }]);
   });
 
   it("still caches through cache_sql on the sync arm", async () => {

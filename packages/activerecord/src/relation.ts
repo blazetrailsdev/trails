@@ -2140,7 +2140,6 @@ export class Relation<T extends Base> {
     // inside `_toArrayInner` — so the in-flight handle a second caller must
     // join is that promise, not the FutureResult, which covers only the first
     // of those steps.
-    this._asyncLoad = true;
     // Kick off the load in the background and stash the in-flight promise.
     // toArray() already caches _loaded/_records when it resolves, so no
     // .then bookkeeping is needed. A later `await rel.toArray()` drains
@@ -2151,6 +2150,8 @@ export class Relation<T extends Base> {
     // in finally) so concurrent callers share the one in-flight query
     // instead of racing to fire additional ones.
     if (!this._loadAsyncPromise && !this._loaded) {
+      // Rails' `unless loaded?` guards the async query too (relation.rb:1141).
+      this._asyncLoad = true;
       const loadPromise = this.toArray().finally(() => {
         this._loadAsyncPromise = undefined;
         this._asyncLoad = false;
