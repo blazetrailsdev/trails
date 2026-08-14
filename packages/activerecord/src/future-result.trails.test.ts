@@ -3,8 +3,9 @@ import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { ActiveRecord } from "./ar-config.js";
-import { select } from "./connection-adapters/abstract/database-statements.js";
-import { AsynchronousQueryInsideTransactionError } from "./errors.js";
+import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
+import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 
 // Rails' own load_async_test.rb / asynchronous_queries_test.rb stay excluded
 // (scripts/parity/unported-files/unscoped.ts): every live test class there
@@ -253,10 +254,88 @@ describe("DatabaseStatements#select", () => {
     expect((futureResult as FutureResult).pending()).toBe(false);
   });
 
+  it("runs the query to completion before returning when connections are not concurrent", async () => {
+    // Ruby's `execute!` branch blocks (database_statements.rb:685-689): it is
+    // taken when the connection cannot be used concurrently, so the query must
+    // finish before anything else touches it.
+    ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    const result = new Result(["id"], [[1]]);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // `execute!` is handed the adapter itself as the connection, not a pooled
+    // one (database_statements.rb:688), so the host is what answers the query.
+    const host = {
+      pool: {},
+      asyncEnabled: () => true,
+      supportsConcurrentConnections: () => false,
+      currentTransaction: () => ({ open: false, joinable: false }),
+      rawExecQuery: async () => {
+        await gate;
+        return result;
+      },
+    };
+
+    let settled = false;
+    const pending = (
+      select.call(host as never, "SELECT 1", null, [], {
+        async: FutureResult.SelectAll,
+      }) as Promise<Result>
+    ).then((r) => {
+      settled = true;
+      return r;
+    });
+
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    release();
+    expect(await pending).toBe(result);
+    expect(settled).toBe(true);
+  });
+
   it("returns a bare Result when async is not set", async () => {
     const result = new Result(["id"], [[1]]);
     const host = { asyncEnabled: () => false, internalExecQuery: async () => result };
     expect(await select.call(host as never, "SELECT 1", null, [])).toBe(result);
+  });
+});
+
+describe("DatabaseStatements#select_all", () => {
+  // database_statements.rb:77-79 — `rescue ::RangeError` →
+  // `ActiveRecord::Result.empty(async: async)`. Ruby has one rescue clause; the
+  // port spells it at two points, so both need covering.
+  it("rescues a ::RangeError the query rejects with into an empty Result", async () => {
+    const host = {
+      internalExecQuery: async () => {
+        throw new ARRangeError("out of range");
+      },
+    };
+
+    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    expect(result).toBe(Result.empty());
+  });
+
+  it("rescues a ::RangeError raised before the query is issued", async () => {
+    const host = {
+      internalExecQuery: () => {
+        throw new ActiveModelRangeError("out of range");
+      },
+    };
+
+    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    expect(result).toBe(Result.empty());
+  });
+
+  it("lets any other error through", async () => {
+    const host = {
+      internalExecQuery: async () => {
+        throw new Error("boom");
+      },
+    };
+
+    await expect(DatabaseStatements.selectAll.call(host as never, "SELECT 1")).rejects.toThrow(
+      "boom",
+    );
   });
 });
 

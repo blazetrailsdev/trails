@@ -438,7 +438,7 @@ export function selectAll(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_one
  */
-export async function selectOne(
+export function selectOne(
   this: DatabaseStatementsHost | void,
   sql: string,
   name: string | null = null,
@@ -446,8 +446,7 @@ export async function selectOne(
   { async = false }: { async?: boolean } = {},
 ): Promise<Record<string, unknown> | undefined> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  const result = await doSelect(sql, name, binds, { async });
-  return result.first();
+  return doSelect(sql, name, binds, { async }).then((result) => result.first());
 }
 
 /**
@@ -486,7 +485,7 @@ export function selectValues(
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#select_rows
  */
-export async function selectRows(
+export function selectRows(
   this: DatabaseStatementsHost | void,
   sql: string,
   name: string | null = null,
@@ -494,8 +493,7 @@ export async function selectRows(
   { async = false }: { async?: boolean } = {},
 ): Promise<unknown[][]> {
   const doSelect = (this as DatabaseStatementsHost)?.selectAll ?? selectAll;
-  const result = await doSelect(sql, name, binds, { async });
-  return result.rows;
+  return doSelect(sql, name, binds, { async }).then((result) => result.rows);
 }
 
 /**
@@ -1517,7 +1515,7 @@ interface DatabaseStatementsDefaultsHost {
     name?: string | null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Result | Promise<Result> | FutureResult | FutureResultComplete;
+  ): Promise<Result> | FutureResult | FutureResultComplete;
   selectRows(
     arel: unknown,
     name?: string | null,
@@ -1600,7 +1598,7 @@ export const DatabaseStatements = {
     name: string | null = null,
     binds?: unknown[],
     opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
-  ): Result | Promise<Result> | FutureResult | FutureResultComplete {
+  ): Promise<Result> | FutureResult | FutureResultComplete {
     // Rails: `arel = arel_from_relation(arel)` then `sql, binds, preparable,
     // allow_retry = to_sql_and_binds(...)` (database_statements.rb:69-71) — a
     // SQL string passes through both unchanged, an Arel manager compiles here.
@@ -1613,13 +1611,8 @@ export const DatabaseStatements = {
       opts?.allowRetry ?? false,
     );
     binds = compiledBinds;
-    // Rails: select_all → internal_exec_query → exec_query. Delegating
-    // here lets adapters that override execQuery (e.g. PostgreSQLAdapter,
-    // which populates columnTypes via its type_map) have their override
-    // picked up automatically.
-    //
-    // Rails' select_all runs `exec_query(sql, ..., prepare: prepared_statements &&
-    // preparable)`, where `preparable` is the Arel collector's first-class flag
+    // Rails' select_all passes `prepare: prepared_statements && preparable`
+    // (database_statements.rb:73), where `preparable` is the Arel collector's flag
     // threaded through compileWithBinds → _compileSelectSql → opts.preparable.
     // Callers that don't supply opts.preparable fall back to bind presence, which
     // is correct for every shape that carries binds.
@@ -1632,26 +1625,31 @@ export const DatabaseStatements = {
         async: async && FutureResult.SelectAll,
         allowRetry: compiledAllowRetry,
       });
-      // Ruby's `select` returns synchronously, so its one `rescue ::RangeError`
-      // covers a raise on the way out. trails' non-async arm hands back a
-      // promise instead, so the same clause is spelled twice — once for a
-      // synchronous throw, once for that promise's rejection. The async arm
-      // needs neither: `FutureResult::SelectAll` carries the rescue itself
-      // (future_result.rb:172-179), which is why Rails has that subclass.
-      return result instanceof Promise
-        ? result.catch((e) => {
-            if (e instanceof ActiveModelRangeError || e instanceof ARRangeError)
-              return Result.empty({ async });
-            throw e;
-          })
-        : result;
+      // A FutureResult carries the ::RangeError rescue itself
+      // (FutureResult::SelectAll, future_result.rb:172-179 — which is why Rails
+      // has that subclass), so it passes straight through. Every other arm of
+      // `select` hands back a promise, and Ruby's one rescue clause has to cover
+      // its rejection as well as the synchronous throw the `catch` below takes.
+      if (result instanceof FutureResult || result instanceof FutureResultComplete) return result;
+      return result.catch((e) => {
+        if (e instanceof ActiveModelRangeError || e instanceof ARRangeError)
+          return Result.empty({ async });
+        throw e;
+      });
     } catch (e) {
       // Mirrors: database_statements.rb:78-79 — rescue ::RangeError →
       // Result.empty(async: async). Ruby ::RangeError covers both
       // ActiveModel::RangeError (type-level, client-side) and
       // ActiveRecord::RangeError (adapter-level, server-side wire rejection).
+      //
+      // Resolved rather than returned bare: select_one/select_rows call `#then`
+      // on whatever select_all returns (database_statements.rb:85,102), which in
+      // Ruby every object answers via Kernel#then. A TS `Result` deliberately
+      // does NOT define `then` — a thenable Result would be adopted by every
+      // `await` in the codebase — so this arm is wrapped to keep `then` uniform
+      // across select_all's return, exactly as Ruby's is.
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError)
-        return Result.empty({ async });
+        return Promise.resolve(Result.empty({ async }));
       throw e;
     }
   },
@@ -1659,45 +1657,50 @@ export const DatabaseStatements = {
   // select_one/value/values/rows delegate to select_all so the QueryCache
   // mixin's cached `selectAll` override is the single cached entry point —
   // mirroring Rails, where these all funnel through `select_all`.
-  async selectOne(
+  // Ruby's select_one/select_value/select_values/select_rows are ordinary
+  // methods that call `#then` on select_all's return and hand the chained value
+  // straight back (database_statements.rb:84-102) — nothing is resolved at this
+  // layer. Declaring them `async` here would `await` that return, and since a
+  // FutureResult is a thenable, the pending handle would be resolved away
+  // before the caller ever saw it. They are plain methods for the same reason
+  // `select`/`select_all` are.
+  selectOne(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
     { async = false }: { async?: boolean } = {},
   ): Promise<Record<string, unknown> | undefined> {
-    return (await this.selectAll(arel, name, binds, { async })).first();
+    return this.selectAll(arel, name, binds, { async }).then((result) => result.first());
   },
 
-  async selectValue(
+  selectValue(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
     { async = false }: { async?: boolean } = {},
   ): Promise<unknown> {
-    const rows = await this.selectRows(arel, name, binds, { async });
-    return rows.length > 0 ? rows[0][0] : undefined;
+    return this.selectRows(arel, name, binds, { async }).then((rows) => singleValueFromRows(rows));
   },
 
-  async selectValues(
+  selectValues(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
   ): Promise<unknown[]> {
-    const rows = await this.selectRows(arel, name, binds);
-    return rows.map((row) => row[0]);
+    return this.selectRows(arel, name, binds).then((rows) => rows.map((row) => row[0]));
   },
 
-  async selectRows(
+  selectRows(
     this: DatabaseStatementsDefaultsHost,
     arel: unknown,
     name: string | null = null,
     binds?: unknown[],
     { async = false }: { async?: boolean } = {},
   ): Promise<unknown[][]> {
-    return (await this.selectAll(arel, name, binds, { async })).rows;
+    return this.selectAll(arel, name, binds, { async }).then((result) => result.rows);
   },
 
   async execQuery(
@@ -2195,10 +2198,19 @@ export function select(
     );
     if (this.supportsConcurrentConnections?.() && !currentTransactionJoinable(this)) {
       futureResult.scheduleBang(asynchronousQueriesSession());
+      return futureResult;
     } else {
-      void futureResult.executeBang(this as FutureResultConnection);
+      // Ruby's `execute!` is an ordinary blocking call, so by the time this
+      // branch returns the query has already run on the calling thread and the
+      // future_result is complete (database_statements.rb:685-689). That is the
+      // entire point of the branch: it is taken precisely when the connection
+      // CANNOT be used concurrently, so the query has to finish before anything
+      // else touches it. Discarding the promise would leave the query in flight
+      // and let a synchronously-issued sibling query interleave on that same
+      // connection — the race the branch exists to prevent. JS cannot block, so
+      // "already complete on return" becomes the promise the caller settles.
+      return futureResult.executeBang(this as FutureResultConnection).then(() => futureResult);
     }
-    return futureResult;
   } else {
     // Dispatch through the instance so an adapter's internalExecQuery override
     // wins, as Ruby's virtual call does.
