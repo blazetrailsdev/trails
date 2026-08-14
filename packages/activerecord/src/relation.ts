@@ -5788,17 +5788,22 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update
    */
-  async update(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
-    if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
-      // update(attrs) form — update all matching records
-      const updates = (id ?? {}) as Record<string, unknown>;
+  async update(id: unknown = ":all", attributes?: Record<string, unknown>): Promise<T | T[]> {
+    // Ruby's `update(id = :all, attributes)` fills the trailing required arg
+    // first, so a one-argument call is `update(attributes)` with id == :all.
+    if (attributes === undefined) {
+      attributes = (id ?? {}) as Record<string, unknown>;
+      id = ":all";
+    }
+    if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.update(updates);
+        await record.update(attributes);
       }
       return records;
+    } else {
+      return (await this.model.update(id, attributes)) as T;
     }
-    return (await this.model.update(id, attrs ?? {})) as T;
   }
 
   /**
@@ -5806,16 +5811,20 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update!
    */
-  async updateBang(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
-    if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
-      const updates = (id ?? {}) as Record<string, unknown>;
+  async updateBang(id: unknown = ":all", attributes?: Record<string, unknown>): Promise<T | T[]> {
+    if (attributes === undefined) {
+      attributes = (id ?? {}) as Record<string, unknown>;
+      id = ":all";
+    }
+    if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.updateBang(updates);
+        await record.updateBang(attributes);
       }
       return records;
+    } else {
+      return (await this.model.updateBang(id, attributes)) as T;
     }
-    return (await this.model.updateBang(id, attrs ?? {})) as T;
   }
 
   /**

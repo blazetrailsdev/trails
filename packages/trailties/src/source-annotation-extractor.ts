@@ -59,11 +59,13 @@ registerDefaults();
 export class SourceAnnotationExtractor {
   static async enumerate(
     tag: string | null = null,
-    options: { dirs?: readonly string[]; tag?: boolean } = {},
+    options: AnnotationOptions & { dirs?: readonly string[] } = {},
   ): Promise<string> {
-    const extractor = new SourceAnnotationExtractor(tag ?? tags.join("|"));
-    const results = await extractor.find(options.dirs ?? directories);
-    return extractor.display(results, { tag: options.tag });
+    tag ??= tags.join("|");
+    const extractor = new SourceAnnotationExtractor(tag);
+    const dirs = options.dirs ?? directories;
+    delete options.dirs;
+    return extractor.display(await extractor.find(dirs), options);
   }
 
   constructor(public readonly tag: string) {}
