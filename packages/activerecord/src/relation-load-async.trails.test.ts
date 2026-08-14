@@ -13,6 +13,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { ActiveRecord } from "./ar-config.js";
 import { FutureResult } from "./future-result.js";
+import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
@@ -26,9 +27,21 @@ describe("Relation#load_async", () => {
   registerModel("Reply", Reply);
 
   let restoreExecutor: (() => void) | undefined;
+  let tracker: AsynchronousQueriesTracker | undefined;
 
   beforeEach(async () => {
     ActiveRecord.asyncQueryExecutor = "global_thread_pool";
+    // Rails schedules a FutureResult onto `asynchronous_queries_session`, which
+    // only exists inside one: the Executor opens it per request
+    // (`AsynchronousQueriesTracker.run` / `.complete`,
+    // asynchronous_queries_tracker.rb:32-40). trails has no Executor to hook
+    // yet — `asynchronousQueriesTracker()` seeds a session as a stopgap
+    // (core.ts:660-665, story install-executor-hooks-for-async-queries-tracker)
+    // — and that seed lives on a tracker shared through the isolated execution
+    // state, so a sibling suite's `complete()` can leave the stack empty. Open
+    // this suite's own session, exactly as the Executor would.
+    tracker = AsynchronousQueriesTracker.run();
+
     // The pool reads `asyncQueryExecutor` once, in its constructor
     // (connection_pool.rb:714-728 → buildAsyncExecutor), and the harness has
     // already built this one. Swap the executor in for the test so
@@ -43,6 +56,8 @@ describe("Relation#load_async", () => {
   });
 
   afterEach(() => {
+    if (tracker) AsynchronousQueriesTracker.complete(tracker);
+    tracker = undefined;
     restoreExecutor?.();
     restoreExecutor = undefined;
     ActiveRecord.asyncQueryExecutor = null;
