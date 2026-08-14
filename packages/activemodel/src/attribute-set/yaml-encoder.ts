@@ -29,6 +29,10 @@ const warnedKeys = new Set<string>();
  *   non-default type travels as its registry key and comes back through
  *   `registry`. An unknown key falls back to the "value" type with a one-time
  *   warning per key (opt out with `silenceDriftWarnings`).
+ * - Rails hands the concise attributes to the `Psych::Coder` its caller passes
+ *   in (`yaml_encoder.rb:13`); there is no such object in JS, so `encode` takes
+ *   the attribute set alone and returns what the injected codec wrote, and
+ *   `decode` reads that string back.
  * - Psych round-trips an `Attribute::Uninitialized` as itself; a JSON envelope
  *   has no value to carry for one, so those names are listed in
  *   `defaultAttributes` and rebuilt as `Uninitialized` on decode.
