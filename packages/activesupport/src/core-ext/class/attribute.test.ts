@@ -35,16 +35,20 @@ describe("ClassAttributeTest", () => {
     Klass.setting = 2;
     expect(Klass.setting).toBe(2);
     expect(Sub.setting).toBe(1);
+
+    expect(class extends Sub {}.setting).toBe(1);
+    expect(class extends Klass {}.setting).toBe(2);
   });
 
   it("predicate method", () => {
-    expect(!!Klass.setting).toBe(false);
+    expect(Klass.isSetting).toBe(false);
     Klass.setting = 1;
-    expect(!!Klass.setting).toBe(true);
+    expect(Klass.isSetting).toBe(true);
   });
 
   it("instance reader delegates to class", () => {
     expect(new Klass().setting).toBeUndefined();
+
     Klass.setting = 1;
     expect(new Klass().setting).toBe(1);
   });
@@ -58,12 +62,10 @@ describe("ClassAttributeTest", () => {
   });
 
   it("instance predicate", () => {
-    const Cls = class {};
-    classAttribute(Cls, "active", { instancePredicate: true });
-    const object = new (Cls as any)();
-    expect(object.isActive).toBe(false);
-    object.active = 1;
-    expect(object.isActive).toBe(true);
+    const object = new Klass();
+    expect(object.isSetting).toBe(false);
+    object.setting = 1;
+    expect(object.isSetting).toBe(true);
   });
 
   it("disabling instance writer", () => {
@@ -72,31 +74,40 @@ describe("ClassAttributeTest", () => {
     const object = new (Cls as any)();
     expect(() => {
       object.setting = "boom";
-    }).toThrow();
+    }).toThrow(TypeError);
+    expect(
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(object), "setting")?.set,
+    ).toBeUndefined();
   });
 
   it("disabling instance reader", () => {
     const Cls = class {};
     classAttribute(Cls, "setting", { instanceReader: false });
     const object = new (Cls as any)();
-    expect(Object.getOwnPropertyDescriptor(Cls.prototype, "setting")).toBeUndefined();
+    expect(object.setting).toBeUndefined();
+    expect(
+      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(object), "setting")?.get,
+    ).toBeUndefined();
+    expect(object.isSetting).toBeUndefined();
+    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
   });
 
   it("disabling both instance writer and reader", () => {
     const Cls = class {};
-    classAttribute(Cls, "setting", { instanceReader: false, instanceWriter: false });
+    classAttribute(Cls, "setting", { instanceAccessor: false });
     const object = new (Cls as any)();
-    expect(Object.getOwnPropertyDescriptor(Cls.prototype, "setting")).toBeUndefined();
+    expect(object.setting).toBeUndefined();
+    expect(Object.getPrototypeOf(object)).not.toHaveProperty("setting");
+    expect(object.isSetting).toBeUndefined();
+    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
   });
 
   it("disabling instance predicate", () => {
-    const WithPred = class {};
-    classAttribute(WithPred, "setting", { instancePredicate: true });
-    expect(Object.getOwnPropertyDescriptor(WithPred.prototype, "isSetting")).toBeDefined();
-
-    const Without = class {};
-    classAttribute(Without, "setting", { instancePredicate: false });
-    expect(Object.getOwnPropertyDescriptor(Without.prototype, "isSetting")).toBeUndefined();
+    const Cls = class {};
+    classAttribute(Cls, "setting", { instancePredicate: false });
+    const object = new (Cls as any)();
+    expect(object.isSetting).toBeUndefined();
+    expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
   });
 
   it.skip("works well with singleton classes");
@@ -104,8 +115,8 @@ describe("ClassAttributeTest", () => {
   it.skip("works well with module singleton classes");
 
   it("setter returns set value", () => {
-    Klass.setting = 1;
-    expect(Klass.setting).toBe(1);
+    const val = (Klass.setting = 1);
+    expect(val).toBe(1);
   });
 
   it("works when overriding private methods from an ancestor", () => {
@@ -115,11 +126,16 @@ describe("ClassAttributeTest", () => {
 
     const instance = new Klass();
     expect(instance.system).toBe(1);
+    expect(new Klass().isSystem).toBe(true);
     instance.system = 2;
     expect(instance.system).toBe(2);
   });
 
   it.skip("allow to prepend accessors");
 
-  it.skip("can check if value is set on a sub class");
+  it("can check if value is set on a sub class", () => {
+    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(false);
+    Sub.setting = true;
+    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(true);
+  });
 });
