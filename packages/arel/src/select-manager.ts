@@ -378,21 +378,19 @@ export class SelectManager extends TreeManager {
   /**
    * INTERSECT with another manager.
    */
-  intersect(other: SelectManager | SelectStatement): Intersect {
-    const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new Intersect(this.ast, otherAst);
+  intersect(other: SelectManager): Intersect {
+    return new Intersect(this.ast, other.ast);
   }
 
   /**
    * EXCEPT with another manager.
    */
-  except(other: SelectManager | SelectStatement): Except {
-    const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new Except(this.ast, otherAst);
+  except(other: SelectManager): Except {
+    return new Except(this.ast, other.ast);
   }
 
-  /** @internal */
-  minus(other: SelectManager | SelectStatement): Except {
+  /** Mirrors: `alias :minus :except` (select_manager.rb:215). */
+  minus(other: SelectManager): Except {
     return this.except(other);
   }
 

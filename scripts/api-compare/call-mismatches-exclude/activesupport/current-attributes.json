@@ -3,13 +3,6 @@
     "package": "activesupport",
     "tsFile": "current-attributes.ts",
     "rubyName": "attribute",
-    "call": "batch",
-    "reason": "current_attributes.rb:120 threads its generated readers/writers through ActiveSupport::CodeGenerator.batch; the port still defines them directly. Newly visible because CodeGenerator is now ported (RFC 0096) — tracked for convergence by the activesupport-current-attributes-code-generator story."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "current-attributes.ts",
-    "rubyName": "attribute",
     "call": "generate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

@@ -29,6 +29,7 @@ export interface NumberToCurrencyOptions {
   delimiter?: string;
   format?: string;
   negativeFormat?: string;
+  roundMode?: string;
 }
 
 export interface NumberToPercentageOptions {
@@ -39,6 +40,7 @@ export interface NumberToPercentageOptions {
   format?: string;
   stripInsignificantZeros?: boolean;
   significant?: boolean;
+  roundMode?: string;
 }
 
 export interface NumberWithDelimiterOptions {
@@ -64,6 +66,7 @@ export interface NumberToHumanSizeOptions {
   delimiter?: string;
   significant?: boolean;
   stripInsignificantZeros?: boolean;
+  roundMode?: string;
 }
 
 export interface NumberToHumanOptions {
@@ -75,6 +78,7 @@ export interface NumberToHumanOptions {
   stripInsignificantZeros?: boolean;
   units?: Record<string, string> | string;
   format?: string;
+  roundMode?: string;
 }
 
 export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {}): string {

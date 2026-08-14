@@ -43,8 +43,9 @@ describe("NumberHelperTest", () => {
       "($1,234,567,890.50)",
     );
     expect(numberToCurrency(1234567891.5, { precision: 0 })).toBe("$1,234,567,892");
-    // number_helper_test.rb:88 is held back on `RoundingHelper`'s round-mode
-    // coverage — see the `rounding-helper-round-mode-coverage` story.
+    expect(numberToCurrency(1234567891.5, { precision: 0, roundMode: ":down" })).toBe(
+      "$1,234,567,891",
+    );
     expect(numberToCurrency(1234567890.5, { precision: 1 })).toBe("$1,234,567,890.5");
     expect(numberToCurrency(1234567890.5, { unit: "&pound;", separator: ",", delimiter: "" })).toBe(
       "&pound;1234567890,50",
@@ -80,6 +81,7 @@ describe("NumberHelperTest", () => {
     expect(numberToPercentage(100)).toBe("100.000%");
     expect(numberToPercentage(100, { precision: 0 })).toBe("100%");
     expect(numberToPercentage(302.0574, { precision: 2 })).toBe("302.06%");
+    expect(numberToPercentage(302.0574, { precision: 2, roundMode: ":down" })).toBe("302.05%");
     expect(numberToPercentage("100")).toBe("100.000%");
     expect(numberToPercentage(100, { format: "%n%" })).toBe("100.000%");
     expect(numberToPercentage("x%")).toBe("x%%");
@@ -108,6 +110,7 @@ describe("NumberHelperTest", () => {
     expect(numberToRounded(-111.2346)).toBe("-111.235");
     expect(numberToRounded(111.2346)).toBe("111.235");
     expect(numberToRounded(111.2346, { precision: 2 })).toBe("111.23");
+    expect(numberToRounded(111.2346, { precision: 2, roundMode: ":up" })).toBe("111.24");
     expect(numberToRounded(111, { precision: 2 })).toBe("111.00");
     expect(numberToRounded(3268, { precision: 0 })).toBe("3268");
     expect(numberToRounded(6.5, { precision: 0 })).toBe("7");
@@ -124,6 +127,9 @@ describe("NumberHelperTest", () => {
 
   it("to rounded with significant digits", () => {
     expect(numberToRounded(123987, { precision: 3, significant: true })).toBe("124000");
+    expect(numberToRounded(123987, { precision: 3, significant: true, roundMode: ":down" })).toBe(
+      "123000",
+    );
     expect(numberToRounded(5.3923, { precision: 2, significant: true })).toBe("5.4");
     expect(numberToRounded(1.232, { precision: 3, significant: true })).toBe("1.23");
     expect(numberToRounded(7, { precision: 1, significant: true })).toBe("7");
@@ -165,6 +171,8 @@ describe("NumberHelperTest", () => {
 
   it("number to human size with options hash", () => {
     expect(numberToHumanSize(1234567, { precision: 2 })).toBe("1.2 MB");
+    expect(numberToHumanSize(1234567, { precision: 2, roundMode: ":down" })).toBe("1.1 MB");
+    expect(numberToHumanSize(41100, { precision: 1, roundMode: ":up" })).toBe("50 KB");
     // 123000 / 1024 = 120.117... KB
     expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe(
       "120.1 KB",

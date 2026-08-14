@@ -103,11 +103,11 @@ describe("Rack::Logger", () => {
           return [];
         },
       },
-      taggers: ["tag1", (env) => String(env["REQUEST_METHOD"])],
+      taggers: ["tag1", (request) => request.requestMethod, ":remoteIp"],
     });
-    const [, , body] = await middleware.call({ REQUEST_METHOD: "GET" });
-    expect(pushed).toEqual([["tag1", "GET"]]);
+    const [, , body] = await middleware.call({ REQUEST_METHOD: "GET", REMOTE_ADDR: "127.0.0.1" });
+    expect(pushed).toEqual([["tag1", "GET", "127.0.0.1"]]);
     closeBody(body);
-    expect(popped).toEqual([2]);
+    expect(popped).toEqual([3]);
   });
 });

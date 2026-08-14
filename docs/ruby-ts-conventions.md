@@ -197,8 +197,6 @@ not a real signature gap:
   - `match?`
 - `build_having_clause` is `alias :build_having_clause :build_where_clause` (query_methods.rb:1654), so the Ruby extractor records the alias with zero positional params while the TS port spells the real `(opts, rest)` signature it forwards to build_where_clause.
   - `build_having_clause`
-- Rails AttributeMethods compiles attribute accessors via a CodeGenerator that evals method-body strings; trails has no eval/code generation, so the port drops the `code_generator`/`parameters`/`call_args` and keyword args these helpers thread into the generated source and defines the method directly.
-  - `define_proxy_call`, `define_call`
 - Static-host porting pattern (CLAUDE.md): these Rails instance/class methods are ported as free functions taking the host class explicitly as a leading `cls` param, so the TS arity is one higher than Rails. The receiver is the definitional self, not a real extra argument.
   - `apply_pending_attribute_modifications`, `reset_default_attributes`
 - The real `parse_float` port is `parseFloatRails(num, precision, scale?)`, bound to the validator via prototype assignment plus a `declare parseFloat` type member; the by-name candidate pool only sees the zero-arg `declare` form, not the implementation's arity.

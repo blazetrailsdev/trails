@@ -8,6 +8,11 @@
  */
 
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
+import { CodeGenerator } from "./code-generator.js";
+import { include, Module } from "./include.js";
+
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 type AttributeValue = unknown;
 type DefaultValue<T> = T | (() => T);
@@ -51,6 +56,15 @@ export abstract class CurrentAttributes {
    */
   private static readonly RESTRICTED_NAMES = new Set(["reset", "set"]);
 
+  /**
+   * Mirrors: CurrentAttributes.attribute (current_attributes.rb:114-140).
+   *
+   * current_attributes.rb:128 makes a second
+   * `define_cached_method("#{name}=")` call for the writer. A TS attribute is
+   * one accessor pair, not two methods, so the writer has no separate
+   * descriptor to cache or to copy onto the owner; both Rails definitions land
+   * on the reader's entry.
+   */
   static attribute(...names: string[]): void;
   static attribute(name: string, options: AttributeDefinition): void;
   static attribute(name: string, ...rest: unknown[]): void {
@@ -72,21 +86,25 @@ export abstract class CurrentAttributes {
       throw new Error(`Restricted attribute names: ${restricted.join(", ")}`);
     }
 
-    for (const n of allNames) {
-      ctor._definitions.set(n, options);
-      const proto = ctor.prototype as unknown as Record<string, unknown>;
-      if (!(n in proto)) {
-        Object.defineProperty(proto, n, {
-          get(this: CurrentAttributes) {
-            return this._get(n);
-          },
-          set(this: CurrentAttributes, v: unknown) {
-            this._set(n, v);
-          },
-          configurable: true,
+    for (const n of allNames) ctor._definitions.set(n, options);
+
+    CodeGenerator.batch(generatedAttributeMethods.call(ctor), __FILE__, __LINE__, (owner) => {
+      for (const name of allNames) {
+        owner.defineCachedMethod(name, { namespace: "current_attributes" }, (batch) => {
+          batch.push((mod) =>
+            Object.defineProperty(mod, name, {
+              get(this: CurrentAttributes) {
+                return this._get(name);
+              },
+              set(this: CurrentAttributes, value: unknown) {
+                this._set(name, value);
+              },
+              configurable: true,
+            }),
+          );
         });
       }
-    }
+    });
   }
 
   /** Returns the singleton instance for this class (creates one if needed). */
@@ -198,4 +216,25 @@ export abstract class CurrentAttributes {
 type CurrentAttributesClass = typeof CurrentAttributes & {
   _definitions: Map<string, AttributeDefinition>;
   _instances: WeakMap<typeof CurrentAttributes, CurrentAttributes>;
+  _generatedAttributeMethods?: Module;
 };
+
+/**
+ * @internal Rails-private helper. Mirrors: CurrentAttributes#generated_attribute_methods
+ *
+ *   def generated_attribute_methods
+ *     @generated_attribute_methods ||= Module.new.tap { |mod| include mod }
+ *   end
+ *
+ * (current_attributes.rb:166-168.) The `||=` is on a per-class ivar, so the
+ * memo is checked as an *own* property — a subclass builds and includes its
+ * own module rather than reusing its parent's.
+ */
+function generatedAttributeMethods(this: CurrentAttributesClass): Module {
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    const mod = new Module();
+    include(this as unknown as new (...args: unknown[]) => unknown, mod);
+    this._generatedAttributeMethods = mod;
+  }
+  return this._generatedAttributeMethods!;
+}
