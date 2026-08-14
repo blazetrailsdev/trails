@@ -779,6 +779,27 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
   return sameArity * 1_000 + matches;
 }
 
+/** TS names that are language punctuation rather than a ported call, so pairing
+ *  a same-named Ruby site against one compares a real argument list against a
+ *  binding slot. Ruby's `strategy.call(raw_post)` (parameters.rb:95) invokes a
+ *  proc; TS invokes a callable value as `strategy(rawPost)` — every TS
+ *  `fn.call(host, …)` is `Function.prototype.call`, whose first argument is a
+ *  this-binding and never the proc's own first argument.
+ *
+ *  Both shapes it produces are punctuation: the settled Ruby-`include` mixin
+ *  idiom (`request.ts:1008`'s
+ *  `_parseFormattedParameters.call(this._paramsHost, …)`, whose ported site
+ *  really does pass `this.rawPost`, at `parameters.ts:192`), and a builtin
+ *  bound off a prototype (`deflater.ts:81`'s
+ *  `Object.prototype.hasOwnProperty.call(headers, CONTENT_TYPE)`). Neither is
+ *  the port OF a Ruby `.call`: `deflater.rb:149`'s
+ *  `@condition.call(env, status, headers, body)` is ported at `deflater.ts:85`
+ *  as the plain invocation `this.condition(env, status, headers, body)`, which
+ *  is the only spelling TS has for invoking a callable value. So a Ruby proc
+ *  call pairs against a TS `call` site only by accident, and the pairing it
+ *  produced is the one baseline row this constant retires. */
+const TS_CALL_HOMONYMS = new Set(["call"]);
+
 /**
  * Pair the call sites of one already name-matched (Ruby, TS) method pair: each
  * Ruby site named `x` against the TS site whose name is a faithful spelling of
@@ -816,6 +837,7 @@ export function pairCallSites(
     const keys = new Set(tsCallNameKeys(ruby.name));
     tsSites.forEach((ts, tsIdx) => {
       if (!keys.has(ts.name)) return;
+      if (TS_CALL_HOMONYMS.has(ts.name)) return;
       candidates.push({
         rubyIdx,
         tsIdx,
@@ -869,14 +891,6 @@ export function pairCallSites(
  * order, so the pairing {@link pairCallSites} then performs is unchanged for any
  * body that had no spare TS site.
  */
-/** Names whose Ruby meaning and TS spelling are homonyms, so a restored weak
- *  site would pair against language punctuation rather than a ported call:
- *  Ruby's `strategy.call(raw_post)` (parameters.rb:95) invokes a proc, while
- *  every TS `fn.call(host, …)` is `Function.prototype.call` — the mixin
- *  idiom's this-binding. Strong sites are unaffected; only the restoration
- *  above skips these. */
-const WEAK_RESTORE_HOMONYMS = new Set(["call"]);
-
 export function comparableRubySites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
@@ -900,9 +914,7 @@ export function comparableRubySites(
   return rubySites.filter(
     (ruby) =>
       !ruby.flags.includes("weak") ||
-      (!WEAK_RESTORE_HOMONYMS.has(ruby.name) &&
-        declaredInComparedFile(ruby.name) &&
-        consume(ruby.name)),
+      (!TS_CALL_HOMONYMS.has(ruby.name) && declaredInComparedFile(ruby.name) && consume(ruby.name)),
   );
 }
 

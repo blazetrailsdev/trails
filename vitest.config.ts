@@ -380,6 +380,9 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
+            // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
+            // which helper.rb picks up by requiring active_support/test_case.
+            "./packages/activesupport/src/test-case.ts",
             "./packages/activerecord/src/cases/helper.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
@@ -444,7 +447,7 @@ export default defineConfig({
           // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
           // (it runs under activerecord, where the engine is ActiveRecord::Base).
           setupFiles: [
-            "./packages/activesupport/src/test-setup-test-case.ts",
+            "./packages/activesupport/src/test-case.ts",
             "./packages/arel/src/test-setup-engine.ts",
           ],
         },

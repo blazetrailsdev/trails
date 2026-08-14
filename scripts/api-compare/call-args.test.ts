@@ -597,6 +597,27 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
   });
 
+  it("does not pair a Ruby proc call against a TS Function.prototype.call mixin dispatch", () => {
+    // parameters.rb:95 `strategy.call(raw_post)` vs request.ts:1008
+    // `_parseFormattedParameters.call(this._paramsHost, parsers, fallback)`.
+    const pairs = pairCallSites(
+      [site("call", ["id:raw_post"])],
+      [site("call", ["id:this._paramsHost", "id:parsers", "id:fallback"])],
+    );
+    expect(pairs).toEqual([]);
+  });
+
+  it("does not pair a Ruby proc call against a TS builtin bound through .call", () => {
+    // deflater.rb:149 `@condition.call(env, status, headers, body)` vs
+    // deflater.ts:81 `Object.prototype.hasOwnProperty.call(headers, CONTENT_TYPE)`
+    // — the port invokes the callable directly, at deflater.ts:85.
+    const pairs = pairCallSites(
+      [site("call", ["id:env", "id:status", "id:headers", "id:body"])],
+      [site("call", ["id:headers", "id:CONTENT_TYPE"])],
+    );
+    expect(pairs).toEqual([]);
+  });
+
   it("pairs same-named sites by argument agreement, not source order", () => {
     const pairs = pairCallSites(
       [site("new", ["id:table_name", "id:options"])],
