@@ -51,3 +51,6 @@ coverage/
 # (activerecord/.gitignore:5, /test/fixtures/*.sqlite*), so this entry is what
 # makes the configured fixture databases a legitimate writer under db/.
 /db/
+
+# Scratch output from local screenshot/driver runs.
+tmp/

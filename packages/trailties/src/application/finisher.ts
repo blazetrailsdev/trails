@@ -95,9 +95,16 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
  * routing layer — `ActionDispatch`'s {@link controllerDispatcher} is
  * `Dispatcher#serve`'s body and lives in `action_dispatch`, where Rails
  * keeps it.
+ *
+ * `raiseOnNameError` is `true`: Rails picks it per route from
+ * `defaults.key?(:controller)` (`mapper.rb:301`), and `RouteSet#call` only
+ * reaches the dispatcher with a controller the matched route already pinned,
+ * so the pinned arm is the one that applies.
  */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  this.routes().setDispatcher(controllerDispatcher(await loadControllers(await this.paths())));
+  this.routes().setDispatcher(
+    controllerDispatcher(await loadControllers(await this.paths()), true),
+  );
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {

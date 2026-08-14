@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
-import { DispatcherRegistry } from "./dispatcher.js";
+import { DispatcherRegistry, controllerDispatcher } from "./dispatcher.js";
+import { bodyToString } from "@blazetrails/rack";
+import { X_CASCADE } from "../constants.js";
+import { Response } from "../http/response.js";
+import type { Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { RackishResponse, RouterRequest } from "../journey/router.js";
 
@@ -115,5 +119,62 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     routes.dispatcherRegistry.unregister("posts");
     const res = routes.serve(makeReq("/p"));
     expect(res[0]).toBe(404);
+  });
+});
+
+describe("controllerDispatcher", () => {
+  class PostsController {
+    static makeResponseBang(request: Request): Response {
+      const res = new Response();
+      res.request = request;
+      return res;
+    }
+    dispatched: string | null = null;
+    async dispatch(action: string): Promise<void> {
+      this.dispatched = action;
+    }
+    toRackResponse(): [number, Record<string, string>, string[]] {
+      return [200, { "content-type": "text/plain" }, [String(this.dispatched)]];
+    }
+  }
+
+  const controllers = new Map([["posts", PostsController as never]]);
+  const envFor = (params: Record<string, unknown>) => ({
+    REQUEST_METHOD: "GET",
+    PATH_INFO: "/posts",
+    "action_dispatch.request.path_parameters": params,
+  });
+
+  it("defaults the action to index when path_parameters carries none", async () => {
+    const dispatcher = controllerDispatcher(controllers, true);
+    const [status, , body] = await dispatcher("posts", "", {}, envFor({ controller: "posts" }));
+    expect(status).toBe(200);
+    expect(await bodyToString(body)).toBe("index");
+  });
+
+  it("returns the PASS_NOT_FOUND cascade when path_parameters has no controller", async () => {
+    const dispatcher = controllerDispatcher(controllers, true);
+    const [status, headers] = await dispatcher("", "index", {}, envFor({ action: "index" }));
+    expect(status).toBe(404);
+    expect(headers[X_CASCADE]).toBe("pass");
+  });
+
+  it("raises the routing error when raise_on_name_error is true", async () => {
+    const dispatcher = controllerDispatcher(controllers, true);
+    await expect(
+      dispatcher("nope", "index", {}, envFor({ controller: "nope", action: "index" })),
+    ).rejects.toThrow(/uninitialized constant nope/);
+  });
+
+  it("cascades with a 404 pass when raise_on_name_error is false", async () => {
+    const dispatcher = controllerDispatcher(controllers, false);
+    const [status, headers] = await dispatcher(
+      "nope",
+      "index",
+      {},
+      envFor({ controller: "nope", action: "index" }),
+    );
+    expect(status).toBe(404);
+    expect(headers[X_CASCADE]).toBe("pass");
   });
 });
