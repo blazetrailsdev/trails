@@ -236,7 +236,11 @@ export function change(
  * asserts that — not midnight in `Time.zone`. That method is ported as
  * `Date#toDatetime` (`packages/date/src/date.ts`), whose receiver is the
  * ruby/date `Date`, so the `Temporal.PlainDate` this file is keyed on is handed
- * to it through the `PlainDate` constructor overload.
+ * to it through the `PlainDate` constructor overload. Its declared return is the
+ * `PlainDateTime | ZonedDateTime` union `DateTime#toDatetime` can produce; a
+ * `Date` is always offset 0, which trails spells as the offsetless
+ * `PlainDateTime`, so the `ZonedDateTime` arm of the narrow below is unreachable
+ * from here.
  */
 export function compareWithCoercion(
   date: Temporal.PlainDate,
@@ -253,8 +257,6 @@ export function compareWithCoercion(
           ? other.utc()
           : Temporal.Instant.fromEpochMilliseconds(other.getTime());
     return Temporal.Instant.compare(
-      // A `Date`'s `to_datetime` is always offset 0, which trails spells as the
-      // offsetless `PlainDateTime`; the `ZonedDateTime` arm is unreachable here.
       (toDatetime instanceof Temporal.ZonedDateTime
         ? toDatetime
         : toDatetime.toZonedDateTime("UTC")
