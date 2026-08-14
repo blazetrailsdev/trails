@@ -7,8 +7,9 @@ import { Deprecation } from "@blazetrails/activesupport";
 
 export { Deprecation as Deprecator };
 
-const _deprecator = new Deprecation();
+let _deprecator: Deprecation | undefined;
 
+/** Mirrors: `ActionView.deprecator` (deprecator.rb:4-6) — `@deprecator ||= ActiveSupport::Deprecation.new`. */
 export function deprecator(): Deprecation {
-  return _deprecator;
+  return (_deprecator ??= new Deprecation());
 }

@@ -37,13 +37,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "to_date",
-    "call": "parse",
-    "reason": "`::Date.parse(self, false)` in `String#to_date`; trails' `toDate` takes an already-parsed `Date` and reads its calendar fields."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "to_fs",
     "call": "strftime",
     "reason": "`strftime` is Ruby's C-level time formatter. JS has no strftime; each named DATE_FORMATS entry is expanded with `Intl`/`toISOString` in `toFs`."
@@ -68,13 +61,6 @@
     "rubyName": "to_time",
     "call": "month",
     "reason": "`month` here is Date#month, a calendar-field read on the receiver; `toTime` reads the field off a JS `Date`. (Surfaced only because `Duration.month` — Integer#month — newly joined the ported-name population.)"
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "new",
-    "reason": "`::Time.new(...)` builds the Time from the parsed parts; trails routes string parsing through `@blazetrails/date` and returns the instant it produces."
   },
   {
     "package": "activesupport",

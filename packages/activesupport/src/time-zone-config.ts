@@ -40,6 +40,13 @@ export function setZone(zone: TimeZone | string | number | Duration | null | fal
 /**
  * Reset Time.zone to its unset state (falls through to zone_default).
  * Useful in test teardown to restore exact prior state.
+ *
+ * @noRailsEquivalent CONVERGEABLE — Ruby's teardown is
+ * `ActiveSupport::IsolatedExecutionState[:time_zone] = nil` (zones.rb:15),
+ * i.e. `Time.zone = nil`, which `setZone` already spells. The seam exists
+ * because trails distinguishes a stored `null` from an absent key in `_zone`,
+ * a distinction `zone()` itself does not observe. Retiring it is a sweep over
+ * the ~30 test call sites in activerecord, not a change here.
  */
 export function resetZone(): void {
   _zone = undefined;
@@ -47,6 +54,9 @@ export function resetZone(): void {
 
 /**
  * Returns true if Time.zone was explicitly set (not falling through to zone_default).
+ *
+ * @noRailsEquivalent CONVERGEABLE — the reader half of `resetZone`'s
+ * absent-key distinction; see its tag.
  */
 export function isZoneExplicit(): boolean {
   return _zone !== undefined;

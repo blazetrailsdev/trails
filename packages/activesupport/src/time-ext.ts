@@ -9,13 +9,13 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { DateTime, Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
-import { isBlank } from "./core-ext/object/blank.js";
+import { toTime as stringToTime } from "./core-ext/string/conversions.js";
 import { currentTime } from "./time-travel.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -729,42 +729,20 @@ export function toTime(date: Date): Temporal.Instant {
 }
 
 /**
- * toDatetime — Rails `String#to_datetime`. Converts a string to a DateTime
- * value.
- *
- * Mirrors: String#to_datetime (`core_ext/string/conversions.rb:57-59`).
- */
-export function toDatetime(
-  str: string,
-): Temporal.PlainDateTime | Temporal.ZonedDateTime | undefined {
-  if (!isBlank(str)) return DateTime.parse(str, false);
-  return undefined;
-}
-
-/**
  * inTimeZone — Rails `String#in_time_zone`. Converts a String to a
  * TimeWithZone in the current zone if `Time.zone` or `Time.zone_default` is
  * set, otherwise converts the String to a Time.
  *
  * Mirrors: String#in_time_zone (`core_ext/string/zones.rb:8-14`).
- *
- * zones.rb:13's `else` arm is `to_time`, and trails' `toTime` here is
- * `Time#to_time`, not the String arm: `String#to_time` (conversions.rb:22-38)
- * has no port, because `core_ext/string/conversions.rb` buckets onto this file
- * and `Time#to_time` already holds the name, so the String arm is masked in the
- * flat index rather than reported missing. Parsing the string through the host `Date` first lands on the same
- * instant for an ISO-8601 string but does not carry conversions.rb's
- * `parts.fetch` defaults or its `form` parameter. Converging is story
- * 0098-activesupport-ar-closure-port/port-string-to-time-and-to-date.
  */
 export function inTimeZone(
   str: string,
   zone: unknown = timeZone(),
-): TimeWithZone | Temporal.Instant {
+): TimeWithZone | Temporal.ZonedDateTime | undefined {
   if (zone != null && zone !== false) {
     return (findZoneBang(zone) as TimeZone).parse(str);
   } else {
-    return toTime(new globalThis.Date(str));
+    return stringToTime(str);
   }
 }
 

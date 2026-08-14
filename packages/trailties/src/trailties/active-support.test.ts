@@ -3,11 +3,12 @@ import {
   Railtie as BaseRailtie,
   Deprecation,
   DEFAULT_BEHAVIORS,
-  deprecator,
+  deprecator as activeSupportDeprecator,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
+const deprecator = activeSupportDeprecator();
 const { deprecators } = BaseRailtie;
 
 describe("RailtieTest", () => {

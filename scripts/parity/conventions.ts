@@ -245,7 +245,10 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/time/compatibility.rb": "time-ext.ts",
   "activesupport:core_ext/date_time/compatibility.rb": "time-ext.ts",
   "activesupport:core_ext/time/acts_like.rb": "time-ext.ts",
-  "activesupport:core_ext/string/conversions.rb": "time-ext.ts",
+  // The String arm is its own file: `String#to_time` / `#to_date` are
+  // `time-ext.ts`'s `Time` names on a different receiver, so pointing the
+  // bucket here masked the String ports behind the Time ones.
+  "activesupport:core_ext/string/conversions.rb": "core-ext/string/conversions.ts",
   "activesupport:core_ext/string/zones.rb": "time-ext.ts",
   "activesupport:core_ext/time/zones.rb": "time-zone-config.ts",
   "activesupport:core_ext/numeric/time.rb": "duration.ts",
@@ -520,6 +523,17 @@ export interface ScopedSkipGroup {
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason:
+      "Ruby's Marshal hooks on TimeWithZone (time_with_zone.rb:529-535): " +
+      "`marshal_dump` answers the `[utc, time_zone.name, time]` triple " +
+      "`Marshal.dump` writes and `marshal_load` rebuilds the receiver from it. " +
+      "JS has no Marshal — no core serializer that consults a per-class hook — " +
+      "so neither has a caller to answer, and a hand-rolled pair would be a " +
+      "trails invention rather than a port. Scoped to time_with_zone.rb.",
+    names: ["marshal_dump", "marshal_load"],
+    rubyFiles: ["time_with_zone.rb"],
+  },
   {
     reason:
       "Rails' alias_method chains around Ruby's Time operators — `+`/`-`/`<=>`/" +
