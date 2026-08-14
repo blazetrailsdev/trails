@@ -60,10 +60,10 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
   if (!(Trails.env as unknown as { isDevelopment(): boolean }).isDevelopment()) return;
   this.routes().prepend((mapper) => {
-    mapper.get("/rails/info/properties", "rails/info#properties");
-    mapper.get("/rails/info/routes", "rails/info#routes");
-    mapper.get("/rails/info/notes", "rails/info#notes");
-    mapper.get("/rails/info", "rails/info#index");
+    mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
+    mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
+    mapper.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
+    mapper.get("/rails/info", { to: "rails/info#index", internal: true });
   });
 });
 

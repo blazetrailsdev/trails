@@ -22,7 +22,10 @@ class TestApp extends Finisher {
   private _routes: FinisherRoutes = {
     prepend: (block) =>
       block({
-        get: (path: string, to: string) => this.internalRoutes.push(`get ${path} -> ${to}`),
+        get: (path: string, options: { to: string; internal?: boolean }) =>
+          this.internalRoutes.push(
+            `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
+          ),
       } as unknown as Mapper),
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
   };
@@ -118,10 +121,10 @@ describe("Finisher", () => {
     const app = new TestApp();
     run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([
-      "get /rails/info/properties -> rails/info#properties",
-      "get /rails/info/routes -> rails/info#routes",
-      "get /rails/info/notes -> rails/info#notes",
-      "get /rails/info -> rails/info#index",
+      "get /rails/info/properties -> rails/info#properties (internal)",
+      "get /rails/info/routes -> rails/info#routes (internal)",
+      "get /rails/info/notes -> rails/info#notes (internal)",
+      "get /rails/info -> rails/info#index (internal)",
     ]);
   });
 
