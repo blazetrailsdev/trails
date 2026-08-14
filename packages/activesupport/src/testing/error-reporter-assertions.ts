@@ -59,8 +59,7 @@ export const ErrorCollector = {
       await block();
       return reports;
     } finally {
-      const at = recorders.findIndex((r) => reports === r);
-      if (at !== -1) recorders.splice(at, 1);
+      deleteIf(recorders, (r) => reports === r);
     }
   },
 
@@ -88,6 +87,13 @@ export const ErrorCollector = {
  *
  * @internal
  */
+function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
+  for (let i = array.length - 1; i >= 0; i--) {
+    if (predicate(array[i])) array.splice(i, 1);
+  }
+}
+
+/** @internal */
 function subscribe(): void {
   if (ErrorCollector.subscribed) return;
 
@@ -130,6 +136,11 @@ export async function assertNoErrorReported(block: () => unknown): Promise<void>
  *
  *   const report = await assertErrorReported(IOError, () => { ... });
  *   assertEqual("Oops", report.error.message);
+ *
+ * Ruby's block is a separate `&block` parameter and is not optional; TypeScript
+ * cannot declare a required parameter after `error_class`'s default, so the
+ * block carries one too. Rails' `self.assertions += 1` on the matching arm is
+ * Minitest's assertion counter, for which trails has no receiver.
  */
 export async function assertErrorReported(
   errorClass: abstract new (...args: any[]) => Error = Error,
