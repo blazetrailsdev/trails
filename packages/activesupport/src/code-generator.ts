@@ -10,6 +10,7 @@
  * nested batch join the enclosing one, and the deferred `apply`) ports
  * directly, and it is that batching the callers thread as `code_generator`.
  */
+import { NameError } from "./core-ext/name-error.js";
 import { Module } from "./include.js";
 
 /**
@@ -61,7 +62,8 @@ export class MethodSet {
    * Mirrors: MethodSet#apply — `owner.define_method(as,
    * @cache.instance_method(canonical_name))` (code_generator.rb:35) reinstalls
    * the property descriptor rather than a bare function, so a generated reader
-   * that is an accessor pair survives the copy.
+   * that is an accessor pair survives the copy. A canonical name the sources
+   * loop did not define raises, as Ruby's `Module#instance_method` does.
    */
   apply(owner: Module, _path: string, _line: number): void {
     if (this.sources.length !== 0) {
@@ -73,7 +75,10 @@ export class MethodSet {
 
     for (const [as, canonicalName] of this.methods) {
       const instanceMethod = this.cache.instanceMethod(canonicalName);
-      if (instanceMethod) owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
+      if (instanceMethod === undefined) {
+        throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
+      }
+      owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
     }
   }
 }
