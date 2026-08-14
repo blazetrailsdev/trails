@@ -59,15 +59,15 @@
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "mattr_reader",
-    "call": "module_eval",
-    "reason": "Rails builds the reader as a source string and `module_eval`s it (module/attribute_accessors.rb:72); trails defines a real property descriptor, which is the settled trails idiom for a Ruby `def` generated at runtime."
+    "call": "match?",
+    "reason": "Rails inlines `/\\A[_A-Za-z]\\w*\\z/.match?(sym)` (module/attribute_accessors.rb:60); trails calls the file's shared `assertValidAttrName`, which spells the same regex as `.test()` — JS RegExp has no `match?`."
   },
   {
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "mattr_reader",
-    "call": "match?",
-    "reason": "Rails inlines `/\\A[_A-Za-z]\\w*\\z/.match?(sym)` (module/attribute_accessors.rb:60); trails calls the file's shared `assertValidAttrName`, which spells the same regex as `.test()` — JS RegExp has no `match?`."
+    "call": "module_eval",
+    "reason": "Rails builds the reader as a source string and `module_eval`s it (module/attribute_accessors.rb:72); trails defines a real property descriptor, which is the settled trails idiom for a Ruby `def` generated at runtime."
   },
   {
     "package": "activesupport",
@@ -87,15 +87,15 @@
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "mattr_writer",
-    "call": "module_eval",
-    "reason": "Same as `mattr_reader`: Rails `module_eval`s a source string (module/attribute_accessors.rb:138), trails defines a property descriptor."
+    "call": "match?",
+    "reason": "Same as `mattr_reader`: the regex check lives in `assertValidAttrName` and JS RegExp spells it `.test()`."
   },
   {
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "mattr_writer",
-    "call": "match?",
-    "reason": "Same as `mattr_reader`: the regex check lives in `assertValidAttrName` and JS RegExp spells it `.test()`."
+    "call": "module_eval",
+    "reason": "Same as `mattr_reader`: Rails `module_eval`s a source string (module/attribute_accessors.rb:138), trails defines a property descriptor."
   },
   {
     "package": "activesupport",

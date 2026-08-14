@@ -2,9 +2,23 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
+    "rubyName": "current",
+    "call": "to_datetime",
+    "reason": "`DateTime.current` is `Time.zone.now.to_datetime` (date_time/calculations.rb:11); trails' `current` returns the Time/TimeWithZone arm only. A pre-existing gap in this body, newly visible because `String#to_datetime` put `toDatetime` in this file's population. Tracked by 0098-activesupport-ar-closure-port/converge-date-time-current-since-to-datetime."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
     "rubyName": "sec_fraction",
     "call": "subsec",
     "reason": "`Time#sec_fraction` is `subsec` (time/calculations.rb:107-109) and `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38) — the two are each other's body in Ruby only because the receivers differ. trails has one `secFraction` function exported under both names, so neither call site exists."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "since",
+    "call": "to_datetime",
+    "reason": "Same body-level gap: `DateTime#since` ends in `.to_datetime` (date_time/calculations.rb:87); tracked by the same story."
   },
   {
     "package": "activesupport",
@@ -75,19 +89,5 @@
     "rubyName": "xmlschema",
     "call": "in_time_zone",
     "reason": "Rails' `Date#xmlschema` goes through `in_time_zone.xmlschema` to pick up `Time.zone`; trails' is the zoneless arm, and `TimeWithZone#xmlschema` is the zone-aware one."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "current",
-    "call": "to_datetime",
-    "reason": "`DateTime.current` is `Time.zone.now.to_datetime` (date_time/calculations.rb:11); trails' `current` returns the Time/TimeWithZone arm only. A pre-existing gap in this body, newly visible because `String#to_datetime` put `toDatetime` in this file's population. Tracked by 0098-activesupport-ar-closure-port/converge-date-time-current-since-to-datetime."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "since",
-    "call": "to_datetime",
-    "reason": "Same body-level gap: `DateTime#since` ends in `.to_datetime` (date_time/calculations.rb:87); tracked by the same story."
   }
 ]
