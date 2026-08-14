@@ -338,8 +338,7 @@ export function _skipActionCallback(
     if (hasConditional) {
       const merged = cb.mergeConditionalOptions(
         { name: PROCESS_ACTION_CHAIN, config: cb.chainConfig },
-        ifConds,
-        unlessConds,
+        { ifOption: ifConds, unlessOption: unlessConds },
       );
       // mergeConditionalOptions creates fresh options ({ if, unless } only),
       // dropping trails' _trailsName metadata. Re-attach it so future name-based

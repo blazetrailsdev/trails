@@ -212,10 +212,11 @@ describe("Enum private validators", () => {
       expect(out).toEqual(["draft", "published"]);
     });
     it("accepts array with symbol entries", () => {
-      const sym1 = Symbol("draft");
-      const sym2 = Symbol("published");
-      const out = assertValidEnumDefinitionValues([sym1, sym2]);
-      expect(out).toEqual([sym1, sym2]);
+      const out = assertValidEnumDefinitionValues([":draft", ":published"]);
+      expect(out).toEqual([":draft", ":published"]);
+    });
+    it("rejects array mixing symbols and strings", () => {
+      expect(() => assertValidEnumDefinitionValues([":draft", "published"])).toThrow(/symbols/);
     });
     it("rejects array with blank name", () => {
       expect(() => assertValidEnumDefinitionValues(["a", ""])).toThrow(/blank name/);
@@ -227,8 +228,8 @@ describe("Enum private validators", () => {
       expect(() => assertValidEnumDefinitionValues({ "   ": 1 })).toThrow(/blank name/);
     });
     it("rejects array with blank-description Symbol", () => {
-      expect(() => assertValidEnumDefinitionValues([Symbol("")])).toThrow(/blank name/);
-      expect(() => assertValidEnumDefinitionValues([Symbol("   ")])).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues([":"])).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues([":   "])).toThrow(/blank name/);
     });
     it("rejects non-plain-object values (Map/Date/class instances)", () => {
       expect(() => assertValidEnumDefinitionValues(new Map())).toThrow(
@@ -252,12 +253,12 @@ describe("Enum private validators", () => {
     it("rejects hash with non-primitive value", () => {
       expect(() => assertValidEnumDefinitionValues({ a: { x: 1 } })).toThrow(ArgumentError);
     });
-    it("accepts hash with symbol keys (Reflect.ownKeys)", () => {
-      const out = assertValidEnumDefinitionValues({ [Symbol("draft")]: 0 });
+    it("accepts hash with symbol keys", () => {
+      const out = assertValidEnumDefinitionValues({ ":draft": 0 });
       expect(out).toBeDefined();
     });
     it("rejects hash with blank-description symbol key", () => {
-      expect(() => assertValidEnumDefinitionValues({ [Symbol("")]: 0 })).toThrow(/blank name/);
+      expect(() => assertValidEnumDefinitionValues({ ":": 0 })).toThrow(/blank name/);
     });
     it("rejects hash with NaN or Infinity number values", () => {
       expect(() => assertValidEnumDefinitionValues({ a: NaN })).toThrow(/finite numbers/);

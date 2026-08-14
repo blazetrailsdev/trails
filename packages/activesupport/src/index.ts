@@ -603,6 +603,7 @@ export {
   UnexpectedError,
   UNTRACKED,
 } from "./testing/assertions.js";
+export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
