@@ -115,6 +115,23 @@ describe("Minitest reporters", () => {
     expect(reporter.statistics()).toMatch(/^Finished in \d+\.\d{6}s, /);
   });
 
+  it("SummaryReporter leaves a read-only sync alone", () => {
+    const io: IO = {
+      print() {},
+      puts() {},
+      get sync() {
+        return true;
+      },
+    };
+    const reporter = new SummaryReporter(io);
+
+    reporter.start();
+
+    expect(reporter.sync).toBe(false);
+    expect(reporter.oldSync).toBeNull();
+    expect(io.sync).toBe(true);
+  });
+
   it("SummaryReporter#toString renders the aggregated results alone", () => {
     const reporter = new SummaryReporter(new FakeIO());
 

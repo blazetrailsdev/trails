@@ -39,7 +39,7 @@ export class Assertion extends Error {
 }
 
 /**
- * Mirrors `Minitest::Skip` (minitest.rb:1050-1054) — the assertion raised when
+ * Mirrors `Minitest::Skip` (minitest.rb:1065-1069) — the assertion raised when
  * skipping a run, and the class {@link StatisticsReporter#report} counts the
  * skips of a run by.
  *
@@ -88,7 +88,7 @@ export class UnexpectedError extends Assertion {
 }
 
 /**
- * Mirrors `Minitest::UnexpectedWarning` (minitest.rb:1098-1102) — the assertion
+ * Mirrors `Minitest::UnexpectedWarning` (minitest.rb:1113-1117) — the assertion
  * raised on a warning under `-Werror`.
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
@@ -195,13 +195,13 @@ export const Minitest: {
   /**
    * Mirrors the `cattr_accessor :reporter` (minitest.rb:51), which
    * `Minitest.run` sets to the run's `CompositeReporter` around
-   * `init_plugins` and nils out again (minitest.rb:277-282) — hence the
+   * `init_plugins` and nils out again (minitest.rb:290-296) — hence the
    * nullable seat rather than an eagerly-built composite.
    */
   reporter: null,
 
   /**
-   * Mirrors `Minitest.clock_time` (minitest.rb:1214-1222): the monotonic clock
+   * Mirrors `Minitest.clock_time` (minitest.rb:1229-1238): the monotonic clock
    * where one exists, `Time.now` otherwise. `performance.now()` is JS'
    * monotonic clock and reads in milliseconds, so it is divided to the seconds
    * both Ruby arms return.
@@ -647,9 +647,9 @@ function inspect(value: unknown): string {
 }
 
 /**
- * The subset of Ruby's `IO` a reporter talks to (minitest.rb:733-747 types the
+ * The subset of Ruby's `IO` a reporter talks to (minitest.rb:748-764 types the
  * seat as `$stdout`): `print`, `puts`, `flush`, and the `sync` flag
- * `SummaryReporter#start` flips (minitest.rb:911-912).
+ * `SummaryReporter#start` flips (minitest.rb:924-925).
  *
  * @noRailsEquivalent PERMANENT — Ruby's `IO`, from core, not from a Rails file
  * the comparator maps; declared here so the reporters below can name the
@@ -664,7 +664,7 @@ export interface IO {
 
 /**
  * Ruby's `StringIO`, which {@link SummaryReporter#toString} renders into
- * (minitest.rb:948).
+ * (minitest.rb:962).
  */
 class StringIO implements IO {
   string = "";
@@ -678,7 +678,26 @@ class StringIO implements IO {
   }
 }
 
-/** Ruby's `$stdout`, the `io` every reporter defaults to (minitest.rb:743). */
+/**
+ * Ruby's `io.respond_to? :"sync="` (minitest.rb:924) — asks for the SETTER, not
+ * for a readable `sync`, so an IO exposing a read-only `sync` answers false and
+ * keeps {@link SummaryReporter#start} from assigning to it. JS has no
+ * `respond_to?`, and `"sync" in io` would answer true for that read-only case,
+ * so the property descriptor is what carries the question.
+ */
+function respondToSyncWriter(io: IO): boolean {
+  for (
+    let obj: object | null = io;
+    obj !== null;
+    obj = Object.getPrototypeOf(obj) as object | null
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(obj, "sync");
+    if (descriptor) return descriptor.set !== undefined || descriptor.writable === true;
+  }
+  return false;
+}
+
+/** Ruby's `$stdout`, the `io` every reporter defaults to (minitest.rb:759). */
 const $stdout: IO = {
   print(str: string): void {
     stdout.write(str);
@@ -692,7 +711,7 @@ const $stdout: IO = {
 
 /**
  * The options hash minitest builds in `Minitest.process_args`
- * (minitest.rb:143-236) and hands every reporter. Ruby's keys are Symbols; the
+ * (minitest.rb:142-259) and hands every reporter. Ruby's keys are Symbols; the
  * `:show_skips` / `:Werror` spellings camelCase per docs/ruby-ts-conventions.md
  * (`Werror` is already a single token).
  *
@@ -712,7 +731,7 @@ export interface Options {
 }
 
 /**
- * The `Minitest::Reportable` surface (minitest.rb:579-628) a reporter receives:
+ * The `Minitest::Reportable` surface (minitest.rb:596-642) a reporter receives:
  * `Minitest::Test` and `Minitest::Result` both mix it in. trails runs its tests
  * under vitest, which owns the run lifecycle, so the runnable half of the gem
  * is not ported — this is the shape a reporter reads off whatever the runner
@@ -732,7 +751,7 @@ export interface Reportable {
 }
 
 /**
- * Mirrors `Minitest::AbstractReporter` (minitest.rb:687-731) — the API a
+ * Mirrors `Minitest::AbstractReporter` (minitest.rb:702-746) — the API a
  * reporter overrides. Ruby's `@mutex` guards a parallel run; JS has no threads,
  * so {@link AbstractReporter#synchronize} just calls the block.
  *
@@ -762,7 +781,7 @@ export class AbstractReporter {
 }
 
 /**
- * Mirrors `Minitest::Reporter` (minitest.rb:733-751).
+ * Mirrors `Minitest::Reporter` (minitest.rb:748-764).
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
  */
@@ -781,7 +800,7 @@ export class Reporter extends AbstractReporter {
 }
 
 /**
- * Mirrors `Minitest::ProgressReporter` (minitest.rb:759-771) — the reporter
+ * Mirrors `Minitest::ProgressReporter` (minitest.rb:774-787) — the reporter
  * that prints the "dots" during the run, and the one
  * `Minitest.plugin_rails_init` swaps for `Rails::TestUnitReporter`
  * (rails_plugin.rb:129-131).
@@ -804,7 +823,7 @@ export class ProgressReporter extends Reporter {
 }
 
 /**
- * Mirrors `Minitest::StatisticsReporter` (minitest.rb:795-878) — gathers
+ * Mirrors `Minitest::StatisticsReporter` (minitest.rb:810-901) — gathers
  * statistics about a test run, does no IO of its own.
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails'; see {@link Assertion}.
@@ -871,7 +890,7 @@ export class StatisticsReporter extends Reporter {
 }
 
 /**
- * Mirrors `Minitest::SummaryReporter` (minitest.rb:897-967) — prints the
+ * Mirrors `Minitest::SummaryReporter` (minitest.rb:912-979) — prints the
  * header, summary, and failure details at the end of the run, and the reporter
  * `Minitest.plugin_rails_init` swaps for `SuppressedSummaryReporter`
  * (rails_plugin.rb:126-128).
@@ -890,7 +909,7 @@ export class SummaryReporter extends StatisticsReporter {
     this.io.puts("# Running:");
     this.io.puts();
 
-    this.sync = "sync" in this.io;
+    this.sync = respondToSyncWriter(this.io);
     if (this.sync) {
       this.oldSync = this.io.sync ?? null;
       this.io.sync = true;
@@ -959,7 +978,7 @@ export class SummaryReporter extends StatisticsReporter {
 }
 
 /**
- * Mirrors `Minitest::CompositeReporter` (minitest.rb:969-1024) — dispatch to
+ * Mirrors `Minitest::CompositeReporter` (minitest.rb:984-1030) — dispatch to
  * multiple reporters as one. This is the receiver
  * `Minitest.plugin_rails_init` rejects from and appends to
  * (rails_plugin.rb:122-135).
@@ -980,7 +999,7 @@ export class CompositeReporter extends AbstractReporter {
   }
 
   /**
-   * Mirrors `Minitest::CompositeReporter#<<` (minitest.rb:988-990). TypeScript
+   * Mirrors `Minitest::CompositeReporter#<<` (minitest.rb:1002-1004). TypeScript
    * has no `<<` to overload, so the operator keeps its Ruby name spelled out —
    * `Array#<<` is `push` on both sides of the port.
    */
@@ -997,7 +1016,7 @@ export class CompositeReporter extends AbstractReporter {
   }
 
   /**
-   * Mirrors `Minitest::CompositeReporter#prerecord` (minitest.rb:1000-1005).
+   * Mirrors `Minitest::CompositeReporter#prerecord` (minitest.rb:1014-1019).
    * Ruby guards each dispatch with `if reporter.respond_to? :prerecord` — its
    * own `# TODO: remove conditional for minitest 6` — which a
    * {@link AbstractReporter}-typed element cannot fail, so the guard has no
