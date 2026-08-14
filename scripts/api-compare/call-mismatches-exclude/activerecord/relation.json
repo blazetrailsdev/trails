@@ -528,19 +528,19 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "in_batches",
-    "call": "order:actOnIgnoredOrder,map",
-    "reason": "The pre-existing order divergence previously keyed as order:ensureValidOptionsForBatchingBang,map; the first inversion moved when the order stream stopped positioning hoisted-closure calls (RFC 0084)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "in_batches",
     "call": "new",
     "kind": "args",
     "rubyArgs": [
       "kwargs{cursor=ref:cursor,finish=ref:finish,of=ref:of,order=ref:order,relation=ref:this,start=ref:start,useRanges=ref:useRanges}"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "in_batches",
+    "call": "order:actOnIgnoredOrder,map",
+    "reason": "The pre-existing order divergence previously keyed as order:ensureValidOptionsForBatchingBang,map; the first inversion moved when the order stream stopped positioning hoisted-closure calls (RFC 0084)."
   },
   {
     "package": "activerecord",

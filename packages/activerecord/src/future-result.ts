@@ -31,6 +31,52 @@ export interface FutureResultSession {
 }
 
 /**
+ * Mirrors: ActiveRecord::FutureResult::Complete (future_result.rb:5-23)
+ * @internal
+ */
+export class Complete {
+  readonly result: Result;
+
+  constructor(result: Result) {
+    this.result = result;
+  }
+
+  isEmpty(): boolean {
+    return this.result.isEmpty();
+  }
+
+  toArray(): Record<string, unknown>[] {
+    return this.result.toArray();
+  }
+
+  pending(): boolean {
+    return false;
+  }
+
+  canceled(): boolean {
+    return false;
+  }
+
+  then<U, V = never>(
+    onFulfilled?: ((result: Result) => U | PromiseLike<U>) | null,
+    onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null,
+  ): Promise<U | V> {
+    return Promise.resolve(this.result).then(onFulfilled, onRejected);
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::FutureResult::Canceled (future_result.rb:49)
+ * @internal
+ */
+export class Canceled extends ActiveRecordError {
+  constructor(message = "Canceled") {
+    super(message);
+    this.name = "Canceled";
+  }
+}
+
+/**
  * A query scheduled to run outside the caller's control flow.
  *
  * Rails guards the query with a `Mutex` and hands it to a thread pool, so
@@ -42,16 +88,15 @@ export interface FutureResultSession {
  * here — events publish inline on the one thread there is.
  *
  * Ruby's `#then(&block)` returns an `ActiveRecord::Promise` whose `#value`
- * blocks (promise.rb). The name is load-bearing in JS: ANY object with a
- * callable `then` is a thenable, so `await future_result` invokes `then` and
+ * blocks (promise.rb:36-38). The name is load-bearing in JS: ANY object with a
+ * callable `then` is a thenable, so `await futureResult` invokes `then` and
  * adopts whatever it returns. Returning an `ActiveRecord::Promise` there — a
  * thenable itself — makes `await` recurse, and returning a non-promise makes it
- * unwrap to the wrong value. So `then` implements the JS protocol
- * (`onFulfilled`/`onRejected` → native promise), which is the same contract
- * Ruby's Promise provides: `fr.then { |r| ... }.value` is
- * `await futureResult.then((r) => ...)`. That is why promise.rb stays unported
- * (scripts/parity/unported-files/unscoped.ts) rather than becoming a class
- * whose every use would be silently rewritten by `await`.
+ * unwrap to the wrong value. `then` therefore implements the JS protocol
+ * (`onFulfilled`/`onRejected` → native promise), which delivers the same
+ * contract Ruby's Promise does: `fr.then { |r| ... }.value` is
+ * `await futureResult.then((r) => ...)`. This is why promise.rb stays unported
+ * rather than becoming a class whose every use `await` would silently rewrite.
  *
  * Mirrors: ActiveRecord::FutureResult (future_result.rb)
  * @internal
@@ -118,7 +163,10 @@ export class FutureResult {
 
   cancel(): this {
     this.#pending = false;
-    this.#error = Canceled;
+    // Ruby stores the Canceled CLASS and re-raises it from `result`; `raise` is
+    // what instantiates it. JS `throw` has no such step, so it is materialized
+    // here (future_result.rb:88-92,120-125).
+    this.#error = new Canceled();
     return this;
   }
 
@@ -165,15 +213,15 @@ export class FutureResult {
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
       const start = Date.now();
+      // Ruby takes `@mutex` here and, if a worker thread already holds it,
+      // records how long the wait was. The in-flight promise IS that lock on a
+      // single thread (future_result.rb:142-156).
       if (this.#executing) {
         await this.#executing;
         this.lockWait = Date.now() - start;
       } else {
         await this.pool.withConnection((connection) => this.executeQuery(connection));
       }
-    } else if (this.#executing) {
-      await this.#executing;
-      this.lockWait = 0.0;
     } else {
       this.lockWait = 0.0;
     }
@@ -205,52 +253,6 @@ export class FutureResult {
     kwargs: Record<string, unknown>,
   ): Promise<Result> {
     return connection.rawExecQuery(...args, kwargs);
-  }
-}
-
-/**
- * Mirrors: ActiveRecord::FutureResult::Complete (future_result.rb:5-23)
- * @internal
- */
-export class Complete {
-  readonly result: Result;
-
-  constructor(result: Result) {
-    this.result = result;
-  }
-
-  isEmpty(): boolean {
-    return this.result.isEmpty();
-  }
-
-  toArray(): Record<string, unknown>[] {
-    return this.result.toArray();
-  }
-
-  pending(): boolean {
-    return false;
-  }
-
-  canceled(): boolean {
-    return false;
-  }
-
-  then<U, V = never>(
-    onFulfilled?: ((result: Result) => U | PromiseLike<U>) | null,
-    onRejected?: ((reason: unknown) => V | PromiseLike<V>) | null,
-  ): Promise<U | V> {
-    return Promise.resolve(this.result).then(onFulfilled, onRejected);
-  }
-}
-
-/**
- * Mirrors: ActiveRecord::FutureResult::Canceled (future_result.rb:49)
- * @internal
- */
-export class Canceled extends ActiveRecordError {
-  constructor(message = "Canceled") {
-    super(message);
-    this.name = "Canceled";
   }
 }
 

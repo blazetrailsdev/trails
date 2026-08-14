@@ -1598,10 +1598,6 @@ export const DatabaseStatements = {
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     const async = opts?.async ?? false;
     try {
-      // Rails' select_all runs `select`, which reaches `internal_exec_query`
-      // (the private work method) and NOT the public `exec_query` — the latter
-      // is wrapped by `dirties_query_cache` and clearing the cache on every
-      // read would defeat it.
       return await select.call(this as DatabaseStatementsHost, sql, name, binds, {
         prepare,
         async: async && FutureResult.SelectAll,
@@ -2149,12 +2145,7 @@ export async function select(
 
     // We make sure to run query transformers on the original thread
     sql = this.preprocessQuery ? this.preprocessQuery(sql) : sql;
-    const FutureResultClass = async as new (
-      pool: FutureResultPool,
-      args: unknown[],
-      kwargs: Record<string, unknown>,
-    ) => FutureResult;
-    const futureResult = new FutureResultClass(
+    const futureResult = new (async as FutureResultClass)(
       this.pool as unknown as FutureResultPool,
       [sql, name, binds],
       { prepare: options?.prepare },
@@ -2180,6 +2171,13 @@ export async function select(
     }
   }
 }
+
+/** The `FutureResult::SelectAll`-shaped constructor `select` receives as `async`. */
+type FutureResultClass = new (
+  pool: FutureResultPool,
+  args: unknown[],
+  kwargs: Record<string, unknown>,
+) => FutureResult;
 
 /**
  * Ruby reads `current_transaction.joinable?` directly; trails' host type makes

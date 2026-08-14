@@ -45,11 +45,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     pattern: "promise.rb",
     reason:
       "Rails Promise wraps a thread-backed FutureResult with a blocking #value. " +
-      "JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly. " +
-      "Reconfirmed by story call-args-ar-select-all-empty-async-row, which ported FutureResult " +
-      "and found the name load-bearing: any object with a callable `then` is a JS thenable, so " +
-      "`await` on an ActiveRecord::Promise would adopt it and recurse. FutureResult#then therefore " +
-      "implements the JS protocol and returns a native promise — see future-result.ts.",
+      "JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly.",
   },
   {
     testFile: "relation/load_async_test.rb",

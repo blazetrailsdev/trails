@@ -117,13 +117,30 @@ describe("AsynchronousQueriesTracker", () => {
   });
 
   it("stacks and finalizes sessions", () => {
-    const tracker = AsynchronousQueriesTracker.run(new AsynchronousQueriesTracker());
+    const tracker = new AsynchronousQueriesTracker();
+    tracker.startSession();
+    const outer = tracker.currentSession;
+    tracker.startSession();
+    const inner = tracker.currentSession;
+    expect(inner).not.toBe(outer);
+
+    tracker.finalizeSession();
+    expect(inner.active()).toBe(false);
+    expect(tracker.currentSession).toBe(outer);
+    expect(outer.active()).toBe(true);
+
+    tracker.finalizeSession();
+    expect(outer.active()).toBe(false);
+    expect(() => tracker.currentSession).toThrow();
+  });
+
+  it("run starts a session on the execution state's tracker", () => {
+    const tracker = AsynchronousQueriesTracker.run();
     const session = tracker.currentSession;
     expect(session.active()).toBe(true);
 
     AsynchronousQueriesTracker.complete(tracker);
     expect(session.active()).toBe(false);
-    expect(() => tracker.currentSession).toThrow();
   });
 });
 

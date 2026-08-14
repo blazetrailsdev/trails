@@ -1,4 +1,5 @@
 import { ActiveRecordError } from "./errors.js";
+import { asynchronousQueriesTracker } from "./core.js";
 
 /**
  * Tracks the async-query sessions opened around a unit of work.
@@ -17,9 +18,14 @@ export class AsynchronousQueriesTracker {
   /** Mirrors Ruby's nested `AsynchronousQueriesTracker::Session`. */
   static Session: typeof Session;
 
-  #stack: Session[] = [];
+  #stack: Session[];
 
-  static run(tracker: AsynchronousQueriesTracker): AsynchronousQueriesTracker {
+  constructor() {
+    this.#stack = [];
+  }
+
+  static run(): AsynchronousQueriesTracker {
+    const tracker = asynchronousQueriesTracker();
     tracker.startSession();
     return tracker;
   }

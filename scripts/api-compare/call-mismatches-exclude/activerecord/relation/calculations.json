@@ -17,19 +17,19 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "calculate",
-    "call": "table",
-    "reason": "Per-entry verified: Rails calculations.rb:238 `Array(model.primary_key || table[Arel.star])` reads `table` only for the no-primary-key fallback; the port spells that fallback as the `*` literal it compiles to, so no table read happens on the branch."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "calculate",
     "call": "new",
     "kind": "args",
     "rubyArgs": [
       "ref:result"
     ],
     "reason": "Per-entry verified: Rails calculations.rb:224/228 `@async ? Promise::Complete.new(result) : result` — trails has no `@async` relation flag, so only the synchronous arm is ported and the sole `new` in the body is the `Hash.new` (`new Map()`) the grouped result uses, which takes no arguments."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "calculate",
+    "call": "table",
+    "reason": "Per-entry verified: Rails calculations.rb:238 `Array(model.primary_key || table[Arel.star])` reads `table` only for the no-primary-key fallback; the port spells that fallback as the `*` literal it compiles to, so no table read happens on the branch."
   },
   {
     "package": "activerecord",
