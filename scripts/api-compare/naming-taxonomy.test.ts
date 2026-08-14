@@ -49,8 +49,13 @@ describe("classifyPair", () => {
   // model_schema.rb:433 `columns_hash.values` vs model-schema.ts:775
   // `Object.values(columnsHash.call(this))`.
   it("names the mixin call the module-mixin idiom records as the outermost callee", () => {
-    expect(classifyPair("columns_hash", "call")).toBe("module-mixin-call");
-    expect(classifyPair("call", "apply")).toBe("burndown");
+    const thisTyped = new Set(["columnsHash", "viewPaths"]);
+    expect(classifyPair("columns_hash", "call", thisTyped)).toBe("module-mixin-call");
+    expect(classifyPair("_view_paths", "call", thisTyped)).toBe("module-mixin-call");
+    // A TS `call` the Ruby name cannot account for stays convergeable: the class
+    // is permanent, so an unqualified `ref:call` must never fall into it.
+    expect(classifyPair("some_method", "call", thisTyped)).toBe("burndown");
+    expect(classifyPair("columns_hash", "call")).toBe("burndown");
   });
 
   // belongs_to_association.rb:47 `writer(owner.instance_exec(&block))` vs

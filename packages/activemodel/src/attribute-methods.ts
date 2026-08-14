@@ -402,33 +402,33 @@ export function defineAttributeMethodPattern(
   attrName: string,
   { owner, as, override = false }: { owner: CodeGenerator; as: string; override?: boolean },
 ): void {
-  // Rails' default bare pattern (empty prefix/suffix) exists to route the plain
-  // `attribute` reader through method_missing. trails exposes readers as real
-  // accessor properties via `attribute()`, so generating a bare `attr` method
-  // for the attribute's own name would collide with that accessor. Skip it —
-  // the seeded bare pattern is kept only so `attributeMethodPatterns()` matches
-  // Rails' default. An alias name has no such accessor, so for `alias_attribute`
-  // this pattern is what defines it, as it is in Rails; the writer rides along
-  // on the same accessor property instead of coming from an `attribute=`
-  // pattern. The arm runs before the guard below because reading the guard's
-  // property by value would run a generated accessor's raising getter.
-  if (pattern.prefix === "" && pattern.suffix === "") {
-    if (as === attrName) return;
-    defineAliasAccessor(owner, pattern.methodName(attrName), pattern.methodName(as), attrName);
-    return;
-  }
-
   const canonicalMethodName = pattern.methodName(attrName);
   const publicMethodName = pattern.methodName(as);
 
   // If defining a regular attribute method, we don't override methods that are
-  // explicitly defined in parent classes.
+  // explicitly defined in parent classes. The prototype arm is spelled `in`,
+  // as ActiveRecord's own override of the predicate spells it: a generated
+  // bare-pattern accessor is a getter that raises when read off the prototype.
   if (
     isInstanceMethodAlreadyImplemented.call(this, publicMethodName) ||
-    this.prototype[publicMethodName] !== undefined
+    publicMethodName in this.prototype
   ) {
     // However, for `alias_attribute`, we always define the method.
     if (!override) return;
+  }
+
+  // Rails' default bare pattern (empty prefix/suffix) exists to route the plain
+  // `attribute` reader through method_missing. trails exposes readers as real
+  // accessor properties via `attribute()`, so generating a bare `attr` method
+  // for the attribute's own name would collide with that accessor — the seeded
+  // bare pattern is kept only so `attributeMethodPatterns()` matches Rails'
+  // default. An alias name has no such accessor, so for `alias_attribute` this
+  // pattern is what defines it, as it is in Rails; the writer rides along on
+  // the same accessor property instead of coming from an `attribute=` pattern.
+  if (pattern.prefix === "" && pattern.suffix === "") {
+    if (as === attrName) return;
+    defineAliasAccessor(owner, canonicalMethodName, publicMethodName, attrName);
+    return;
   }
 
   const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);

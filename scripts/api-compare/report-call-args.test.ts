@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderReport } from "./report-call-args.js";
+import { renderReport, thisTypedFunctionsByPackage } from "./report-call-args.js";
 
 function row(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -58,5 +58,34 @@ describe("renderReport", () => {
 
   it("truncates a grouping to --top", () => {
     expect(renderReport(artifact, 1)).toContain("By file (top 1 of 2)");
+  });
+});
+
+describe("thisTypedFunctionsByPackage", () => {
+  // The mixin idiom is a top-level function whose first parameter is `this`
+  // (CLAUDE.md, Module mixins); anything else is an ordinary helper.
+  it("collects the this-typed top-level functions of each package", () => {
+    const api = {
+      packages: {
+        activerecord: {
+          fileFunctions: {
+            "model-schema.ts": [
+              { name: "columnsHash", params: [{ name: "this" }] },
+              { name: "ownProp", params: [{ name: "host" }, { name: "key" }] },
+            ],
+            "timestamp.ts": [{ name: "touchAttributesWithTime", params: [{ name: "this" }] }],
+          },
+        },
+        arel: {},
+      },
+    };
+
+    const byPackage = thisTypedFunctionsByPackage(api);
+
+    expect([...(byPackage.get("activerecord") ?? [])].sort()).toEqual([
+      "columnsHash",
+      "touchAttributesWithTime",
+    ]);
+    expect([...(byPackage.get("arel") ?? [])]).toEqual([]);
   });
 });
