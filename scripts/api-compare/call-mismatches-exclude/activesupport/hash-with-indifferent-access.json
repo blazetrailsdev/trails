@@ -9,15 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "hash-with-indifferent-access.ts",
-    "rubyName": "symbolize_keys",
-    "call": "symbolize_keys!",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby's `to_hash.symbolize_keys!` calls the bang form on the receiver; trails' `symbolizeKeysBang` takes that hash as its leading positional, so the same call carries one extra argument."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-with-indifferent-access.ts",
     "rubyName": "with_indifferent_access",
     "call": "new",
     "kind": "args",

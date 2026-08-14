@@ -288,7 +288,7 @@ export function _registerActionCallback(
     prototype,
     PROCESS_ACTION_CHAIN,
     kind,
-    filter as unknown as Parameters<typeof asSetCallback>[3],
+    filter as unknown as Parameters<typeof asSetCallback>[2],
     asOpts,
   );
 }

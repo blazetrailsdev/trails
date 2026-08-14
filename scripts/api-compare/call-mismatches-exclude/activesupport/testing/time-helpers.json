@@ -12,5 +12,29 @@
     "rubyName": "travel_to",
     "call": "order:parse,toTime",
     "reason": "Rails' first `to_time` is the Ruby Date arm's `date_or_time.midnight.to_time`; trails' Date arm takes a JS `Date` (a Ruby Time, not a Ruby Date), so the only `toTime` left is the one after `Time.zone.parse`, which inverts the pair's order."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "testing/time-helpers.ts",
+    "rubyName": "travel_to",
+    "call": "stub_object",
+    "kind": "args",
+    "rubyArgs": [
+      "const:Time",
+      "str:now"
+    ],
+    "reason": "TS language shortcoming: time_helpers.rb:178 stubs the singleton method `Time.now` itself; JS has no per-object method table to alias a built-in constructor's static through, so the port stubs the module-level `clock` seam (time-helpers.ts:200) instead. Same call, same method name, receiver forced to differ."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "testing/time-helpers.ts",
+    "rubyName": "travel_to",
+    "call": "stubbing",
+    "kind": "args",
+    "rubyArgs": [
+      "const:Time",
+      "str:now"
+    ],
+    "reason": "TS language shortcoming: the `stubbing(Time, :now)` probe (time_helpers.rb:177) reads back the same `clock` seam the stub is installed on — see the `stub_object` row above."
   }
 ]

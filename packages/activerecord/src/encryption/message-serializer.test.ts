@@ -92,13 +92,20 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
 
   it("raises Decryption when trying to parse message with more than one nested message", () => {
     const serializer = new MessageSerializer();
-    const data = JSON.stringify({
-      p: Buffer.from("payload").toString("base64"),
-      h: {
-        nested1: { p: Buffer.from("inner1").toString("base64"), h: {} },
-        nested2: { p: Buffer.from("inner2").toString("base64"), h: {} },
-      },
+    const message = new Message({ payload: "some payload", headers: { key_1: "1" } });
+    const otherMessage = new Message({
+      payload: "some other secret payload",
+      headers: { some_header: "some other value" },
     });
-    expect(() => serializer.load(data)).toThrow(Decryption);
+    otherMessage.headers.set(
+      "yet_another_message",
+      new Message({
+        payload: "yet some other secret payload",
+        headers: { some_header: "yet some other value" },
+      }),
+    );
+    message.headers.set("other_message", otherMessage);
+
+    expect(() => serializer.load(serializer.dump(message))).toThrow(Decryption);
   });
 });

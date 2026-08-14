@@ -124,6 +124,7 @@ import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
   CALL_ARG_SKIP_REASONS,
   compareCallArgs,
+  comparableRubySites,
   pairCallSites,
   type CallArgClass,
   type CallArgSkipReason,
@@ -2807,13 +2808,14 @@ export function main() {
         rubyModule: string,
       ) => {
         if (!callsGate) return;
-        // Same exclusion checkCalls makes through `dropWeakCalls`: a call on an
-        // inert receiver (`xs.map`, `opts.fetch`) collides by name with an
-        // unrelated ported method and says nothing about the port. Filtered per
+        // Near the exclusion checkCalls makes through `dropWeakCalls`: a call on
+        // an inert receiver (`xs.map`, `opts.fetch`) collides by name with an
+        // unrelated ported method and says nothing about the port. Decided per
         // SITE, on the flag extract-ruby-api.rb#record_call_site records from
         // `inert_receiver?` — the call-set gate has no per-site identity and can
         // only drop whole NAMES, but here a name that is weak at one site and a
-        // genuine call at another would lose both sites to a name filter.
+        // genuine call at another would lose both sites to a name filter. See
+        // {@link comparableRubySites} below for when a weak site is kept.
         const rubyOwnSites =
           (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
             ? rubyCallArgsByOwnerName.get(ownerKey(rubyModule, rubyName))
@@ -2825,16 +2827,15 @@ export function main() {
         // (:242) — and the port, carrying the reader as a FIELD, has only the
         // real one. Left in, the pairing hands the guard read the port's
         // genuine call and manufactures a shape row for a correct body.
-        const rubySites = rubyOwnSites?.filter(
+        const rubyReadableSites = rubyOwnSites?.filter(
           (s) =>
-            !s.flags.includes("weak") &&
             !(
               s.args.length === 0 &&
               s.recv === undefined &&
               rubyReaderNames.has(ownerKey(rubyModule, s.name))
             ),
         );
-        if (!rubySites || rubySites.length === 0) return;
+        if (!rubyReadableSites || rubyReadableSites.length === 0) return;
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
@@ -2845,6 +2846,12 @@ export function main() {
         }
         const tsSites = tsCallArgsByFileName.get(tsFile)?.get(tsName);
         if (tsSites?.length !== 1) return;
+        // `rubyOwnersByName` is built per Ruby FILE, a few lines up: its keys are
+        // the names THIS file (with its included modules flattened in) declares.
+        const rubySites = comparableRubySites(rubyReadableSites, tsSites[0], (name) =>
+          rubyOwnersByName.has(name),
+        );
+        if (rubySites.length === 0) return;
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites[0])) {
           const result = compareCallArgs(
             ruby,

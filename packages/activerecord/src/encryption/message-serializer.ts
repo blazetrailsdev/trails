@@ -44,25 +44,11 @@ export class MessageSerializer implements MessageSerializerLike {
     this.validateMessageDataFormat(data, level);
     const d = data as Record<string, unknown>;
     const payload = this.decodeIfNeeded(d["p"]);
-    const headers = this.parseProperties(
-      d["h"] as Record<string, unknown> | null | undefined,
-      level,
-    );
     // A present payload decodes to a Buffer; anything else becomes a null payload.
-    const message = new Message({
+    return new Message({
       payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
+      headers: this.parseProperties(d["h"] as Record<string, unknown> | null | undefined, level),
     });
-    let nestedCount = 0;
-    for (const [key, value] of headers.entries()) {
-      if (value instanceof Message) {
-        nestedCount++;
-        if (nestedCount > 1) {
-          throw new Decryption("Messages can only have one nested message in their headers");
-        }
-      }
-      message.headers.set(key, value);
-    }
-    return message;
   }
 
   /** @internal */

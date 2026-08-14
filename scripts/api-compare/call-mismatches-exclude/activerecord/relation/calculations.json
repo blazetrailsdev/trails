@@ -2,15 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "build_count_subquery?",
-    "call": "many?",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "RFC 0099 bucket (b) equivalent, verified at relation/calculations.rb:659 `(((column_name == :all || select_values.many?) && distinct) || has_limit_or_offset?)`: Rails invokes `many?` on a built-in receiver (a Ruby String/Hash/Object/Enumerable method or the ActiveSupport core-ext on one). TS cannot monkey-patch those prototypes, so the port calls the free function with that receiver as argument 1; the remaining arguments match Rails exactly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
     "rubyName": "calculate",
     "call": "apply_join_dependency",
     "reason": "Per-entry verified: Rails calculations.rb:232 `relation = apply_join_dependency`. Rails' apply_join_dependency EXECUTES `distinct_relation_for_primary_key` for a limited collection join, which a synchronous TS method cannot do, so `calculate` calls the awaitable block-form sibling `Relation#_applyJoinDependencyAsync` (finder_methods.rb:456-488, block arm) instead; the leading underscore keeps it off the compare population."

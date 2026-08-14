@@ -81,7 +81,7 @@ export function rubyInspectArray(values: unknown[]): string {
 export function inspectArelValue(value: unknown): string {
   if (value instanceof Nodes.SqlLiteral) return `sql(${JSON.stringify(value.value)})`;
   if (value instanceof Nodes.Node) return `sql(${JSON.stringify(value.toSql())})`;
-  if (typeof value === "symbol") return value.description ?? value.toString();
+  if (typeof value === "string" && value.startsWith(":")) return value;
   return JSON.stringify(value);
 }
 
