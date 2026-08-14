@@ -31,8 +31,6 @@ describe("BigIntegerTest", () => {
 
   it("small values", () => {
     const type = new BigIntegerType();
-    // Ruby's Integer is arbitrary-precision; JS needs `bigint` past
-    // Number.MAX_SAFE_INTEGER, which is what BigIntegerType returns.
     expect(type.serialize(-9999999999999999999999999999999n)).toEqual(
       -9999999999999999999999999999999n,
     );

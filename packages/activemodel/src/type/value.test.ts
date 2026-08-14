@@ -4,9 +4,6 @@ import { NoMethodError } from "../attribute-assignment.js";
 
 describe("ValueTest", () => {
   it("type equality", () => {
-    // Ruby `==` is `Type::Value#==` (value.rb:110-115); TS has no operator
-    // overloading, so the port spells it `equals`, which is what every trails
-    // call site uses.
     expect(new ValueType().equals(new ValueType())).toEqual(true);
     expect(new ValueType().equals(new IntegerType())).not.toEqual(true);
     expect(new ValueType({ precision: 1 }).equals(new ValueType({ precision: 2 }))).not.toEqual(

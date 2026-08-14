@@ -15,16 +15,18 @@ describe("DateTest", () => {
 
     const now = Temporal.Now.instant().toZonedDateTimeISO("UTC");
     const valuesHash = { 1: now.year, 2: now.month, 3: now.day };
-    // Ruby `now.strftime("%F")` — the ISO-8601 date, which is what
-    // `PlainDate#toString` renders.
     const dateString = now.toPlainDate().toString();
     expect((type.cast(dateString) as Temporal.PlainDate).toString()).toEqual(dateString);
     expect((type.cast(valuesHash) as Temporal.PlainDate).toString()).toEqual(dateString);
   });
 
   it("returns correct year", () => {
+    const time = new Temporal.PlainDateTime(1, 1, 1).toZonedDateTime("UTC");
+    const date = new Temporal.PlainDate(time.year, time.month, time.day);
+
     const valuesHashForMultiparameterAssignment = { 1: 1, 2: 1, 3: 1 };
-    expect(type.cast(valuesHashForMultiparameterAssignment)).toEqual(plainDate("0001-01-01"));
+
+    expect(type.cast(valuesHashForMultiparameterAssignment)).toEqual(date);
   });
 
   it("Temporal.PlainDate passthrough", () => {

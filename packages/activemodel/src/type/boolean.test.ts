@@ -21,9 +21,6 @@ describe("BooleanTest", () => {
     expect(type.cast("　\r\n")).toBeTruthy();
     expect(type.cast("\u0000")).toBeTruthy();
     expect(type.cast("SOMETHING RANDOM")).toBeTruthy();
-    // Rails' Symbol arm: `:"1"`, `:t`, … A Ruby Symbol is a JS string, and
-    // FALSE_VALUES holds both spellings (type/boolean.rb:15-24), so the Symbol
-    // rows repeat the String rows above rather than adding a distinct kind.
     expect(type.cast(":1")).toBeTruthy();
     expect(type.cast(":t")).toBeTruthy();
     expect(type.cast(":T")).toBeTruthy();

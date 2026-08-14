@@ -26,7 +26,6 @@ describe("TimeTest", () => {
     expect(type.cast("ABC")).toBeNull();
     expect(type.cast(" ".repeat(129))).toBeNull();
 
-    // Ruby `::Time.now.utc.strftime("%T")` — the zero-padded HH:MM:SS clock time.
     const timeString = Temporal.Now.instant()
       .toZonedDateTimeISO("UTC")
       .toPlainTime()
