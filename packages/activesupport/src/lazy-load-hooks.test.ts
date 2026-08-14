@@ -24,8 +24,8 @@ describe("LazyLoadHooksTest", () => {
   it("basic hook with two registrations only once", () => {
     const log: string[] = [];
     const cb = () => log.push("hook");
-    onLoad("test_base", { once: true }, cb);
-    onLoad("test_base", { once: true }, cb);
+    onLoad("test_base", { runOnce: true }, cb);
+    onLoad("test_base", { runOnce: true }, cb);
     runLoadHooks("test_base", {});
     expect(log).toEqual(["hook"]);
   });
@@ -50,9 +50,9 @@ describe("LazyLoadHooksTest", () => {
     const cb = (base: string) => log.push(base);
     runLoadHooks("test_base", "A");
     runLoadHooks("test_base", "B");
-    onLoad("test_base", { once: true }, cb);
-    onLoad("test_base", { once: true }, cb);
-    // once: true prevents duplicate registration; still runs for both bases
+    onLoad("test_base", { runOnce: true }, cb);
+    onLoad("test_base", { runOnce: true }, cb);
+    // runOnce: true prevents duplicate registration; still runs for both bases
     expect(log.length).toBeGreaterThan(0);
   });
 
@@ -67,9 +67,9 @@ describe("LazyLoadHooksTest", () => {
   it("hook registered interleaved run with two registrations once", () => {
     const log: string[] = [];
     const cb = (base: string) => log.push(base);
-    onLoad("test_base", { once: true }, cb);
+    onLoad("test_base", { runOnce: true }, cb);
     runLoadHooks("test_base", "X");
-    onLoad("test_base", { once: true }, cb);
+    onLoad("test_base", { runOnce: true }, cb);
     expect(log).toEqual(["X"]);
   });
 

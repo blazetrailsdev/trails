@@ -2826,6 +2826,26 @@ function callSiteName(call: ts.CallExpression | ts.NewExpression): string | unde
   return name;
 }
 
+/**
+ * `X.call(this, …)` / `X.apply(this, …)` is the project's `this`-typed mixin
+ * convention (CLAUDE.md "Module mixins"), and the call SET already credits the
+ * dispatched `X` alongside the literal `call`/`apply` (see collectCalls). In
+ * ARGUMENT position the site name alone reads as `call:call`, which can never
+ * pair with Ruby's `call:x` for the same dispatch — so resolve it here too,
+ * through the same import aliases.
+ */
+function dispatchedCallName(call: ts.CallExpression): string | undefined {
+  const callee = call.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return undefined;
+  const prop = callee.name.text;
+  if (prop !== "call" && prop !== "apply") return undefined;
+  if (!ts.isIdentifier(callee.expression)) return undefined;
+  if (call.arguments[0]?.kind !== ts.SyntaxKind.ThisKeyword) return undefined;
+  const name = currentImportAliases?.get(callee.expression.text) ?? callee.expression.text;
+  if (name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
+  return name;
+}
+
 function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: string[]): string[] {
   if (!args) return [];
   const out: string[] = [];
@@ -2884,6 +2904,8 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (expr.kind === ts.SyntaxKind.NullKeyword) return "nil";
   if (ts.isNewExpression(expr)) return "call:constructor";
   if (ts.isCallExpression(expr)) {
+    const dispatched = dispatchedCallName(expr);
+    if (dispatched !== undefined) return `call:${dispatched}`;
     const name = callSiteName(expr);
     return name === undefined ? "?" : `call:${name}`;
   }

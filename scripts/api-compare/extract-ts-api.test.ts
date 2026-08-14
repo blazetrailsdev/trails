@@ -3218,6 +3218,31 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("describes X.call(this, ...) in argument position as the dispatched identifier", () => {
+    // activemodel/attribute-methods.ts spells Rails'
+    // `generated_attribute_methods` (attribute_methods.rb:212) as
+    // `generatedAttributeMethods.call(this)` — the `this`-typed mixin idiom.
+    // Naming it `call:call` here could never pair with the Ruby descriptor.
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this.batch(generatedAttributeMethods.call(this), 1);
+            this.batch(helper.apply(this, [1]));
+            this.batch(fn.call(other));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "batch", args: ["call:generatedAttributeMethods", "num:1"], flags: [] },
+      { name: "call", args: ["id:this"], flags: [] },
+      { name: "batch", args: ["call:helper"], flags: [] },
+      { name: "apply", args: ["id:this", "array"], flags: [] },
+      { name: "batch", args: ["call:call"], flags: [] },
+      { name: "call", args: ["id:other"], flags: [] },
+    ]);
+  });
+
   it("unwraps await / as / non-null / parenthesized wrappers to the inner expression", () => {
     expect(
       site(

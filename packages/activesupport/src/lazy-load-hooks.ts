@@ -6,7 +6,7 @@
 type Hook = (base: any) => void;
 
 interface HookOptions {
-  once?: boolean;
+  runOnce?: boolean;
 }
 
 const loadHooks = new Map<string, [Hook, HookOptions][]>();
@@ -84,7 +84,7 @@ function withExecutionControl(
  * @internal
  */
 function executeHook(name: string, base: any, options: HookOptions, block: Hook): void {
-  withExecutionControl(name, block, options.once, () => {
+  withExecutionControl(name, block, options.runOnce, () => {
     block(base);
   });
 }

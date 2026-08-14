@@ -19,6 +19,16 @@ class ArgumentError extends Error {
   }
 }
 
+/**
+ * Ruby's `Object#inspect` for the values `local_level=`'s ArgumentError can
+ * carry (`logger_thread_safe_level.rb:21`): a String renders quoted, every
+ * other value through `to_s`. Same shape as class-attribute.ts's.
+ */
+function inspect(value: unknown): string {
+  if (typeof value === "string") return JSON.stringify(value);
+  return String(value);
+}
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
 export const LOG_LEVELS: Record<LogLevel, number> = {
@@ -167,12 +177,12 @@ export class Logger {
     } else if (typeof level === "string") {
       value = LOG_LEVELS[level];
       if (value === undefined) {
-        throw new ArgumentError(`Invalid log level: ${level}`);
+        throw new ArgumentError(`Invalid log level: ${inspect(level)}`);
       }
     } else if (level == null) {
       value = null;
     } else {
-      throw new ArgumentError(`Invalid log level: ${String(level)}`);
+      throw new ArgumentError(`Invalid log level: ${inspect(level)}`);
     }
 
     if (value === null) {

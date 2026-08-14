@@ -95,7 +95,7 @@ describe("LoggerThreadSafeLevel", () => {
 
     expect(() => {
       logger.localLevel = "nope" as never;
-    }).toThrowError("Invalid log level: nope");
+    }).toThrowError('Invalid log level: "nope"');
   });
 
   it("clears the local level when assigned null", () => {

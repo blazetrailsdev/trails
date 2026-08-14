@@ -1285,6 +1285,15 @@ export function rubyMethodToTsIgnoringSkip(
   if (name.endsWith("?")) {
     const base = name.slice(0, -1);
     const camel = snakeToCamel(base);
+    // When the Ruby file ALSO defines the bare `foo` next to `foo?`
+    // (`Logger#debug` and `Logger#debug?`), the camel candidate `debug` names
+    // the sibling, and pairing `debug?` with the port of `debug` compares two
+    // unrelated bodies. The quoted literal spelling is a legal TS member name
+    // and is how trails ports such a predicate (`get "debug?"` in logger.ts),
+    // so offer it FIRST in that case — and only in it, so no existing pairing
+    // moves.
+    const collides = siblingRubyNames?.has(base) === true;
+    const literal = collides ? [snakeToCamel(base) + "?"] : [];
     const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
@@ -1296,7 +1305,7 @@ export function rubyMethodToTsIgnoringSkip(
     // which camelizes to `isolationLevel` — is NOT swept into this
     // branch.
     if (base.startsWith("is_")) {
-      return [camel];
+      return [...literal, camel];
     }
     // Other already-predicate Ruby prefixes (has_one?, supports_x?,
     // can_y?, …) keep both candidates: the canonical camel form
@@ -1306,13 +1315,13 @@ export function rubyMethodToTsIgnoringSkip(
     // exposes `isHasOne()` as a predicate alongside the `Model.hasOne`
     // association declaration).
     if (ALREADY_PREDICATE_RE.test(camel)) {
-      return [camel, isPrefixed];
+      return [...literal, camel, isPrefixed];
     }
     const containment = CONTAINMENT_PREDICATE_ALIASES.get(name);
     if (containment !== undefined) {
-      return [isPrefixed, camel, containment];
+      return [...literal, isPrefixed, camel, containment];
     }
-    return [isPrefixed, camel];
+    return [...literal, isPrefixed, camel];
   }
 
   if (name.endsWith("!")) {
@@ -1442,7 +1451,10 @@ matches the first candidate present in the target file), not a call expression.
 | \`-@\` (unary minus) | \`negate\` | \`-@\` → ${example("-@")} |
 | everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
 
-Predicate-form details: \`is_*?\` collapses to a single candidate so trails can't
+Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
+(\`Logger#debug\` next to \`Logger#debug?\`) offers the QUOTED LITERAL spelling
+first — \`get "debug?"\` — because its camel candidate names the sibling, not the
+predicate. \`is_*?\` collapses to a single candidate so trails can't
 land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
 \`is*\` fallback because the disambiguating alias is sometimes needed when the bare
 name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
