@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { isBlank, isPresent, presence } from "../../index.js";
+import { Temporal } from "@blazetrails/date";
+import { isBlank, isPresent, presence, TimeWithZone, TimeZone } from "../../index.js";
+
+// blank_test.rb's NOT list carries `Time.now`; Ruby has one Time class, so the
+// trails analogue is the whole Temporal family plus `TimeWithZone`.
+const NOW = new Temporal.Instant(1_700_000_000_000_000_000n);
+const TIMES = [
+  new Date(NOW.epochMilliseconds),
+  new TimeWithZone(NOW, TimeZone.create("UTC")),
+  NOW,
+  NOW.toZonedDateTimeISO("UTC"),
+  Temporal.PlainDate.from("2026-08-13"),
+  Temporal.PlainDateTime.from("2026-08-13T12:00:00"),
+  Temporal.PlainTime.from("12:00:00"),
+];
 
 describe("BlankTest", () => {
   it("blank", () => {
@@ -13,6 +27,7 @@ describe("BlankTest", () => {
     expect(isBlank(0)).toBe(false);
     expect(isBlank("hello")).toBe(false);
     expect(isBlank([1])).toBe(false);
+    for (const v of TIMES) expect(isBlank(v)).toBe(false);
   });
 
   it("blank with bundled string encodings", () => {
@@ -26,6 +41,7 @@ describe("BlankTest", () => {
     expect(isPresent(42)).toBe(true);
     expect(isPresent(null)).toBe(false);
     expect(isPresent("")).toBe(false);
+    for (const v of TIMES) expect(isPresent(v)).toBe(true);
   });
 
   it("presence", () => {
@@ -33,5 +49,6 @@ describe("BlankTest", () => {
     expect(presence("")).toBeUndefined();
     expect(presence(null)).toBeUndefined();
     expect(presence(42)).toBe(42);
+    for (const v of TIMES) expect(presence(v)).toBe(v);
   });
 });
