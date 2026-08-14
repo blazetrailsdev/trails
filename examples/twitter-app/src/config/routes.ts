@@ -1,34 +1,34 @@
 import type { Mapper } from "@blazetrails/actionpack";
 
-export function drawRoutes(router: Mapper): void {
-  router.root("tweets#index");
+export function drawRoutes(mapper: Mapper): void {
+  mapper.root("tweets#index");
 
   // Sign up.
-  router.get("/signup", "users#new");
-  router.post("/users", "users#create");
+  mapper.get("/signup", "users#new");
+  mapper.post("/users", "users#create");
 
   // Log in / log out.
-  router.get("/login", "sessions#new");
-  router.post("/login", "sessions#create");
-  router.delete("/logout", "sessions#destroy");
+  mapper.get("/login", "sessions#new");
+  mapper.post("/login", "sessions#create");
+  mapper.delete("/logout", "sessions#destroy");
   // Browsers can't issue DELETE from a plain form; the log-out link posts.
-  router.post("/logout", "sessions#destroy");
+  mapper.post("/logout", "sessions#destroy");
 
-  router.resources("tweets", { only: ["index", "new", "create", "show", "destroy"] });
+  mapper.resources("tweets", { only: ["index", "new", "create", "show", "destroy"] });
 
-  router.get("/explore", "explore#index");
-  router.get("/hashtags/:name", "hashtags#show");
+  mapper.get("/explore", "explore#index");
+  mapper.get("/hashtags/:name", "hashtags#show");
 
   // Profiles are addressed by handle, not id: /@dean
-  router.get("/@:handle", "users#show");
-  router.get("/@:handle/following", "users#following");
-  router.get("/@:handle/followers", "users#followers");
+  mapper.get("/@:handle", "users#show");
+  mapper.get("/@:handle/following", "users#following");
+  mapper.get("/@:handle/followers", "users#followers");
 
-  router.post("/@:handle/follow", "follows#create");
-  router.delete("/@:handle/follow", "follows#destroy");
-  router.post("/@:handle/unfollow", "follows#destroy");
+  mapper.post("/@:handle/follow", "follows#create");
+  mapper.delete("/@:handle/follow", "follows#destroy");
+  mapper.post("/@:handle/unfollow", "follows#destroy");
 
-  router.post("/tweets/:tweet_id/like", "likes#create");
-  router.post("/tweets/:tweet_id/unlike", "likes#destroy");
-  router.delete("/tweets/:tweet_id/like", "likes#destroy");
+  mapper.post("/tweets/:tweet_id/like", "likes#create");
+  mapper.post("/tweets/:tweet_id/unlike", "likes#destroy");
+  mapper.delete("/tweets/:tweet_id/like", "likes#destroy");
 }
