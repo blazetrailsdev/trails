@@ -28,8 +28,7 @@ export class Sponsor extends Base {
       foreignType: "sponsorable_type",
       foreignKey: "sponsorable_id",
     });
-    this.belongsTo("sponsorableWithConditions", {
-      scope: (q: any) => q.where({ name: "Ernie" }),
+    this.belongsTo("sponsorableWithConditions", (q: any) => q.where({ name: "Ernie" }), {
       polymorphic: true,
       foreignType: "sponsorable_type",
       foreignKey: "sponsorable_id",

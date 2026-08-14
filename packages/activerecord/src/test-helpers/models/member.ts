@@ -84,16 +84,15 @@ export class Member extends Base {
       disableJoins: true,
     });
     this.hasOne("selectedClub", { through: "selectedMembership", source: "club" });
-    this.hasOne("favoriteClub", {
-      scope: (q: any) => q.where("memberships.favorite = ?", true),
+    this.hasOne("favoriteClub", (q: any) => q.where("memberships.favorite = ?", true), {
       through: "membership",
       source: "club",
     });
-    this.hasOne("hairyClub", {
-      scope: (q: any) => q.where({ clubs: { name: "Moustache and Eyebrow Fancier Club" } }),
-      through: "membership",
-      source: "club",
-    });
+    this.hasOne(
+      "hairyClub",
+      (q: any) => q.where({ clubs: { name: "Moustache and Eyebrow Fancier Club" } }),
+      { through: "membership", source: "club" },
+    );
     this.hasOne("sponsor", { as: "sponsorable" });
     this.hasOne("sponsorClub", { through: "sponsor" });
     this.hasOne("memberDetail", { inverseOf: false });
@@ -118,15 +117,13 @@ export class Member extends Base {
     });
 
     this.hasOne("clubCategory", { through: "club", source: "category" });
-    this.hasOne("generalClub", {
-      scope: (q: any) => q.general(),
+    this.hasOne("generalClub", (q: any) => q.general(), {
       through: "currentMembership",
       source: "club",
     });
 
     this.hasMany("superMemberships");
-    this.hasMany("favoriteMemberships", {
-      scope: (q: any) => q.where({ favorite: true }),
+    this.hasMany("favoriteMemberships", (q: any) => q.where({ favorite: true }), {
       className: "Membership",
     });
     this.hasMany("clubs", { through: "favoriteMemberships" });

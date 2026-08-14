@@ -9,6 +9,6 @@ export class Liquid extends Base {
   static _tableName = "liquid";
 
   static {
-    this.hasMany("molecules", { scope: (q: any) => q.distinct() });
+    this.hasMany("molecules", (q: any) => q.distinct());
   }
 }

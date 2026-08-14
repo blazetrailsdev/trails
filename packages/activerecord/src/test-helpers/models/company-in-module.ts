@@ -32,23 +32,19 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   static {
     // foreignKey explicit throughout: JS class name MyAppBusinessFirm would derive
     // my_app_business_firm_id, but Rails demodulizes MyApplication::Business::Firm → firm_id.
-    this.hasMany("clients", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("clients", (q: any) => q.order("id"), {
       foreignKey: "firm_id",
       dependent: "destroy",
     });
-    this.hasMany("clientsSortedDesc", {
-      scope: (q: any) => q.order("id DESC"),
+    this.hasMany("clientsSortedDesc", (q: any) => q.order("id DESC"), {
       className: "Client",
       foreignKey: "firm_id",
     });
-    this.hasMany("clientsOfFirm", {
-      scope: (q: any) => q.order("id"),
+    this.hasMany("clientsOfFirm", (q: any) => q.order("id"), {
       foreignKey: "client_of",
       className: "Client",
     });
-    this.hasMany("clientsLikeMs", {
-      scope: (q: any) => q.where("name = 'Microsoft'").order("id"),
+    this.hasMany("clientsLikeMs", (q: any) => q.where("name = 'Microsoft'").order("id"), {
       className: "Client",
       foreignKey: "firm_id",
     });

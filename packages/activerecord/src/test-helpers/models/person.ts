@@ -79,11 +79,11 @@ export class Person extends Base {
 
     this.hasMany("posts", { through: "readers" });
     this.hasMany("securePosts", { through: "secureReaders" });
-    this.hasMany("postsWithNoComments", {
-      scope: (q: any) => q.includes("comments").where("comments.id is null").references("comments"),
-      through: "readers",
-      source: "post",
-    });
+    this.hasMany(
+      "postsWithNoComments",
+      (q: any) => q.includes("comments").where("comments.id is null").references("comments"),
+      { through: "readers", source: "post" },
+    );
 
     this.hasMany("friendships", { foreignKey: "friend_id" });
     this.hasMany("friendsToo", { foreignKey: "friend_id", className: "Friendship" });
@@ -91,21 +91,19 @@ export class Person extends Base {
 
     this.hasMany("references");
     this.hasMany("badReferences");
-    this.hasMany("fixedBadReferences", {
-      scope: (q: any) => q.where({ favorite: true }),
+    this.hasMany("fixedBadReferences", (q: any) => q.where({ favorite: true }), {
       className: "BadReference",
     });
-    this.hasOne("favoriteReference", {
-      scope: (q: any) => q.where({ favorite: true }),
+    this.hasOne("favoriteReference", (q: any) => q.where({ favorite: true }), {
       className: "Reference",
     });
     this.hasOne("favoriteReferenceJob", { through: "favoriteReference", source: "job" });
-    this.hasMany("postsWithCommentsSortedByCommentId", {
-      scope: (q: any) => q.includes("comments").order("comments.id"),
-      through: "readers",
-      source: "post",
-    });
-    this.hasMany("firstPosts", { scope: (q: any) => q.where({ id: [1, 2] }), through: "readers" });
+    this.hasMany(
+      "postsWithCommentsSortedByCommentId",
+      (q: any) => q.includes("comments").order("comments.id"),
+      { through: "readers", source: "post" },
+    );
+    this.hasMany("firstPosts", (q: any) => q.where({ id: [1, 2] }), { through: "readers" });
 
     this.hasMany("jobs", { through: "references" });
     this.hasMany("jobsWithDependentDestroy", {

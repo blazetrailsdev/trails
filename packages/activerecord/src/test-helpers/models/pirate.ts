@@ -72,10 +72,7 @@ export class Pirate extends Base {
 
     this.belongsTo("parrot", { validate: true });
     this.belongsTo("nonValidatedParrot", { className: "Parrot" });
-    this.hasAndBelongsToMany("parrots", {
-      scope: (q: any) => q.order("parrots.id ASC"),
-      validate: true,
-    });
+    this.hasAndBelongsToMany("parrots", (q: any) => q.order("parrots.id ASC"), { validate: true });
     this.hasAndBelongsToMany("nonValidatedParrots", { className: "Parrot" });
     this.hasAndBelongsToMany("parrotsWithMethodCallbacks", {
       className: "Parrot",
@@ -100,7 +97,7 @@ export class Pirate extends Base {
     this.hasOne("ship");
     this.hasOne("updateOnlyShip", { className: "Ship" });
     this.hasOne("nonValidatedShip", { className: "Ship" });
-    this.hasMany("birds", { scope: (q: any) => q.order("birds.id ASC") });
+    this.hasMany("birds", (q: any) => q.order("birds.id ASC"));
     this.hasMany("birdsWithMethodCallbacks", {
       className: "Bird",
       beforeAdd: (p: any, b: any) => p.logBeforeAdd(b),
@@ -117,8 +114,7 @@ export class Pirate extends Base {
     });
     this.hasMany("birdsWithRejectAllBlank", { className: "Bird" });
 
-    this.hasOne("fooBulb", {
-      scope: (q: any) => q.where({ name: "foo" }),
+    this.hasOne("fooBulb", (q: any) => q.where({ name: "foo" }), {
       foreignKey: "car_id",
       className: "Bulb",
     });
