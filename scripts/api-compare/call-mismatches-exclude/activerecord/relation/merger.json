@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
     "rubyName": "merge_multi_values",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -33,6 +40,27 @@
     "rubyName": "merge_multi_values",
     "call": "reorder!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_select_values",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",

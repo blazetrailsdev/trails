@@ -2,6 +2,17 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
+    "rubyName": "build_async_executor",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{fallbackPolicy=str:callerRuns,maxQueue=ref:maxQueue,maxThreads=ref:maxThreads,minThreads=ref:minThreads}"
+    ],
+    "reason": "connection_pool.rb:717-722 sizes a `Concurrent::ThreadPoolExecutor` with min_threads/max_threads/max_queue/fallback_policy. trails' AsyncExecutor (ar-config.ts) defers work onto the microtask queue: with one thread there is no pool to size, no queue to bound and no caller-runs fallback to choose, so the four kwargs have no receiver. The `max_threads > 0` guard Rails wraps this in IS ported."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "checkout",
     "call": "acquire_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

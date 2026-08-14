@@ -31,6 +31,13 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_nth_from_last",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "find_nth_from_last",
     "call": "loaded?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -96,6 +103,13 @@
     "rubyName": "find_with_ids",
     "call": "order:findSome,findOne",
     "reason": "Re-spelling of the retired `order:model,primaryKey` row for the same reason as `find_some_ordered` above."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "ordered_relation",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",

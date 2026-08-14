@@ -16,6 +16,13 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "all_attributes?",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -247,6 +254,13 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "ensure_valid_options_for_batching!",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "except",
     "call": "relation_with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -320,6 +334,13 @@
     "rubyName": "execute_grouped_calculation",
     "call": "distinct!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "execute_grouped_calculation",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",
@@ -479,6 +500,13 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "ids",
+    "call": "empty",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "ids",
     "call": "skip_query_cache_if_necessary",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -616,6 +644,13 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "pluck",
+    "call": "empty",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "pluck",
     "call": "skip_query_cache_if_necessary",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -650,6 +685,20 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "scope_for_create",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "select_for_count",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "select_for_count",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -660,6 +709,13 @@
     "rubyName": "skip_query_cache_if_necessary",
     "call": "uncached",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "structurally_compatible?",
+    "call": "empty?",
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",

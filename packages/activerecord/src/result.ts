@@ -4,6 +4,8 @@
  * Mirrors: ActiveRecord::Result
  */
 
+import { FutureResult, type Complete } from "./future-result.js";
+
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
@@ -100,8 +102,16 @@ export class Result {
     this.columnTypes = columnTypes ?? EMPTY_COLUMN_TYPES;
   }
 
-  static empty(): Result {
-    return EMPTY;
+  static empty({ async = false }: { async?: boolean } = {}): Result {
+    if (async) {
+      // Rails' async arm returns EMPTY_ASYNC, a `FutureResult::Complete`
+      // (result.rb:96,247). The cast keeps the common (sync) call sites — every
+      // one in the repo but `select_all`'s ::RangeError rescue — reading as
+      // `Result`, which is what Ruby's untyped return gives them.
+      return emptyAsync() as unknown as Result;
+    } else {
+      return EMPTY;
+    }
   }
 
   /**
@@ -264,6 +274,20 @@ export class Result {
 const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
 const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
+
+/**
+ * Rails holds `EMPTY_ASYNC = FutureResult.wrap(EMPTY).freeze` as a private
+ * constant (result.rb:247). Built on first read rather than at module scope:
+ * future-result.ts imports this module back (SelectAll rescues ::RangeError
+ * into `Result.empty`), and a top-level `FutureResult.wrap` here would evaluate
+ * that binding while it is still in TDZ when the cycle is entered from
+ * future-result.ts.
+ */
+let EMPTY_ASYNC: Complete | undefined;
+
+function emptyAsync(): Complete {
+  return (EMPTY_ASYNC ??= FutureResult.wrap(EMPTY) as Complete);
+}
 
 /**
  * Look up the column type for a given column name and index, with optional overrides.

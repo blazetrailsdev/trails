@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "future-result.ts",
+    "rubyName": "execute_or_skip",
+    "call": "new",
+    "reason": "future_result.rb:104 builds an `EventBuffer` to carry instrumentation events from the worker thread to the foreground. There is no worker thread on a single-threaded event loop and nothing to buffer — events publish inline (see the FutureResult class comment)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "future-result.ts",
+    "rubyName": "result",
+    "call": "flush",
+    "reason": "future_result.rb:117 flushes the EventBuffer that this port does not build; see the `execute_or_skip`/`new` row."
+  }
+]

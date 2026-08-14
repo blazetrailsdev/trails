@@ -48,20 +48,21 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly.",
   },
   {
-    pattern: "future_result.rb",
     testFile: "relation/load_async_test.rb",
     reason:
-      "Thread-pool scheduled query with mutex + EventBuffer bridging Ruby's threaded async. " +
-      "Marked :nodoc: in Rails. Collapses to the Promise returned by the adapter's async exec. " +
-      "Test file fully excluded — all live test classes exercise FutureResult/scheduled? semantics " +
-      "that don't port to single-threaded JS where `await relation.toArray()` is the async surface.",
+      "SOURCE NOW PORTED (future_result.rb — story " +
+      "call-args-ar-select-all-empty-async-row); this is a test-only entry. The live " +
+      "test classes assert `scheduled?`, thread interleaving and mutex lock_wait, which " +
+      "have no observable analogue on a single-threaded event loop where " +
+      "`await relation.toArray()` is the async surface.",
   },
   {
-    pattern: "asynchronous_queries_tracker.rb",
     testFile: "asynchronous_queries_test.rb",
     reason:
-      "Per-thread async session barriers (Concurrent::AtomicBoolean, ReadWriteLock). " +
-      "No equivalent in single-threaded event-loop JS.",
+      "SOURCE NOW PORTED (asynchronous_queries_tracker.rb — story " +
+      "call-args-ar-select-all-empty-async-row); this is a test-only entry. The tests " +
+      "assert Concurrent::ThreadPoolExecutor sizing (min/max threads, max queue) and " +
+      "cross-thread session barriers, none of which exist without threads.",
   },
   {
     pattern: "marshalling.rb",
