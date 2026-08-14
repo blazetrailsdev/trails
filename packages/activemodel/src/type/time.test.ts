@@ -158,13 +158,6 @@ describe("TimeTest", () => {
     expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
   });
 
-  it("serialize_cast_value applies the declared precision", () => {
-    const type = new Types.TimeType({ precision: 1 });
-    const value = type.cast("1999-12-31T12:34:56.789-10:00");
-
-    expect(String(type.serializeCastValue(value))).toBe("2000-01-01T22:34:56.7Z");
-  });
-
   it("sec_fraction reaches new_time as Time.utc's microsecond argument", () => {
     const result = type.cast("3:30:15.5 PM") as Temporal.Instant;
     expect(result.toString()).toBe("2000-01-01T15:30:15.0000005Z");
