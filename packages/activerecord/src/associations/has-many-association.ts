@@ -23,7 +23,11 @@ import {
   validateThroughReflection,
   routeThroughCheckValidity,
 } from "./validate-through-reflection.js";
-import { CompositePrimaryKeyMismatchError, DeleteRestrictionError } from "./errors.js";
+import {
+  AssociationNotFoundError,
+  CompositePrimaryKeyMismatchError,
+  DeleteRestrictionError,
+} from "./errors.js";
 import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
 import { ForeignAssociation, ownerForeignKeyColumns } from "./foreign-association.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
@@ -606,9 +610,10 @@ async function findTarget(
   // by `find_target?`: a new-record owner without the FK present never reaches
   // `find_target` and so never raises.
   if (violatesStrictLoading && _findTargetReachable(record, assocName, options, "foreign")) {
-    strictLoadingViolationBang(record, assocName, {
-      className: options.className ?? camelize(singularize(assocName)),
-    });
+    const ctor = record.constructor as typeof Base;
+    const reflection = ctor._reflectOnAssociation?.(assocName);
+    if (!reflection) throw new AssociationNotFoundError(record, assocName);
+    strictLoadingViolationBang({ owner: ctor, reflection });
   }
 
   // Scope-override path: CollectionProxy passes this when its Relation state

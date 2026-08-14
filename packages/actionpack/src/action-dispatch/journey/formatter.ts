@@ -1,4 +1,4 @@
-import { isPlainObject, toParam } from "@blazetrails/activesupport";
+import { isPlainObject, isPresent, toParam } from "@blazetrails/activesupport";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
 
@@ -310,15 +310,6 @@ interface CacheNode {
 
 function pairKey(k: string, v: unknown): string {
   return JSON.stringify([k, v ?? null]);
-}
-
-function isPresent(v: unknown): boolean {
-  if (v == null) return false;
-  if (v === false) return false;
-  if (typeof v === "string") return v.length > 0;
-  if (Array.isArray(v)) return v.length > 0;
-  if (typeof v === "object") return Object.keys(v).length > 0;
-  return true;
 }
 
 function toS(v: unknown): string {

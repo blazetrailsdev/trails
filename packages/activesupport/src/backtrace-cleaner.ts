@@ -49,6 +49,11 @@ export class BacktraceCleaner {
     }
   }
 
+  /** filter — `alias :filter :clean` (backtrace_cleaner.rb:57). */
+  filter(backtrace: string[], kind: CleanKind = "silent"): string[] {
+    return this.clean(backtrace, kind);
+  }
+
   /** cleanFrame — clean a single frame; returns undefined when excluded by the selected kind. */
   cleanFrame(frame: string, kind: CleanKind = "silent"): string | undefined {
     for (const f of this._filters) frame = f(frame);

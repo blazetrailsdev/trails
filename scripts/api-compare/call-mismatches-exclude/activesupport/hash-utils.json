@@ -64,12 +64,5 @@
       "ref:otherHash"
     ],
     "reason": "Ruby's `reverse_merge(other_hash)` is called on the receiver; trails' core_ext functions take the receiver as the leading positional, so the same call carries one extra argument."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "slice!",
-    "call": "replace",
-    "reason": "Ruby's `Hash#replace` swaps a hash's contents in place; JS objects have no such method, so the port clears the own keys and `Object.assign`s the sliced result — the same in-place replacement."
   }
 ]

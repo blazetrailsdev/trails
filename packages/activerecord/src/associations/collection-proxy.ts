@@ -48,6 +48,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
   HasManyThroughOrderError,
   CompositePrimaryKeyMismatchError,
+  AssociationNotFoundError,
 } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
@@ -1107,9 +1108,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       | { isViolatesStrictLoading(): boolean }
       | undefined;
     if (association?.isViolatesStrictLoading()) {
-      strictLoadingViolationBang(this._record, this._assocName, {
-        className: this._assocDef.options.className ?? camelize(singularize(this._assocName)),
-      });
+      const ctor = this._record.constructor as typeof Base;
+      const reflection = ctor._reflectOnAssociation?.(this._assocName);
+      if (!reflection) throw new AssociationNotFoundError(this._record, this._assocName);
+      strictLoadingViolationBang({ owner: ctor, reflection });
     }
   }
 

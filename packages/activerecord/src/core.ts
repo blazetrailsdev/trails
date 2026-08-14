@@ -24,15 +24,10 @@ import {
   Notifications,
   IsolatedExecutionState,
   ParameterFilter,
-  camelize,
   constantize,
   pluralize,
 } from "@blazetrails/activesupport";
-import {
-  strictLoadingViolationMessage,
-  _reflectOnAssociation,
-  reflectOnAggregation,
-} from "./reflection.js";
+import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
@@ -678,37 +673,26 @@ export function asynchronousQueriesSession(): any {
  * `action_on_strict_loading_violation = "raise"` this throws
  * `StrictLoadingViolationError`; under `"log"` it instruments
  * `strict_loading_violation.active_record` and returns so the caller can
- * continue the (now warned-about) lazy load. `owner` is the violating
- * record (or its class); `reflection` is the association name.
+ * continue the (now warned-about) lazy load. Rails' callers pass
+ * `owner: owner.class` (association.rb:250).
  *
  * Mirrors: ActiveRecord::Core.strict_loading_violation!
  */
-export function strictLoadingViolationBang(
-  owner: any,
-  reflection: string,
-  options: { polymorphic?: boolean; className?: string } = {},
-): void {
-  const reflectionLike = {
-    name: reflection,
-    strictLoadingViolationMessage(ownerArg: unknown): string {
-      return strictLoadingViolationMessage(ownerArg, {
-        name: reflection,
-        polymorphic: options.polymorphic === true,
-        className: options.className ?? camelize(reflection),
-      });
-    },
-  };
-  // Rails passes `owner.class` (Notifications payload + message subject); the
-  // message builder stringifies it to the class name, matching Ruby's `#{owner}`.
-  const ownerClass = typeof owner === "function" ? owner : owner?.constructor;
+export function strictLoadingViolationBang({
+  owner,
+  reflection,
+}: {
+  owner: unknown;
+  reflection: { name: string; strictLoadingViolationMessage(owner: unknown): string };
+}): void {
   switch (ActiveRecord.actionOnStrictLoadingViolation) {
     case "raise": {
-      const message = reflectionLike.strictLoadingViolationMessage(ownerClass);
+      const message = reflection.strictLoadingViolationMessage(owner);
       throw new StrictLoadingViolationError(message);
     }
     case "log": {
       const name = "strict_loading_violation.active_record";
-      Notifications.instrument(name, { owner: ownerClass, reflection: reflectionLike });
+      Notifications.instrument(name, { owner, reflection });
     }
   }
 }

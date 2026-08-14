@@ -254,7 +254,6 @@ export {
   reverseMergeBang,
   reverseUpdate,
   withDefaultsBang,
-  sliceBang,
   exceptBang,
   nestedUnderIndifferentAccess,
   toParam,
@@ -309,6 +308,8 @@ export {
   isIn,
   presenceIn,
 } from "./enumerable-utils.js";
+
+export { sliceBang } from "./core-ext/hash/slice.js";
 
 // Note: `Hash#extract!` is intentionally kept off this flat index and reached
 // through the "./core-ext/hash/slice" subpath, which mirrors its Rails require
@@ -602,6 +603,8 @@ export {
   assertNoChanges,
   UnexpectedError,
   UNTRACKED,
+  BacktraceFilter,
+  Minitest,
 } from "./testing/assertions.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { currentTime } from "./time-travel.js";
