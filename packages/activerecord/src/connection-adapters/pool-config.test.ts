@@ -75,6 +75,20 @@ describe("PoolConfig", () => {
       const pool2 = config.pool;
       expect(pool1).toBe(pool2);
     });
+
+    // Rails takes the monitor here (`pool_config.rb:70-72`); trails does not,
+    // ratified 2026-08-14 because the critical section has no suspension point
+    // and so cannot interleave. That premise is what this pins: an `await`
+    // between the `@pool` read and the `@pool =` write would reintroduce the
+    // race the monitor exists to prevent, and no timing test can observe it.
+    it("keeps the pool critical section suspension-free", () => {
+      const getter = Object.getOwnPropertyDescriptor(PoolConfig.prototype, "pool")?.get;
+      expect(getter).toBeTypeOf("function");
+      const source = getter!.toString();
+      expect(source).not.toMatch(/^\s*async\b/);
+      expect(source).not.toMatch(/\bawait\b/);
+      expect(source).not.toMatch(/\byield\b/);
+    });
   });
 
   describe("disconnectBang", () => {
