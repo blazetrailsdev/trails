@@ -229,7 +229,7 @@ export class Deprecation {
   debug = false;
   /**
    * Rails: `disallowed_warnings` (deprecation/disallowed.rb:22), which is an
-   * array of substrings/Regexps, or the scalar `:all`.
+   * array of substrings/Symbols/Regexps, or the scalar `:all`.
    */
   disallowedWarnings: AllowMatcher[] | ":all" = [];
 

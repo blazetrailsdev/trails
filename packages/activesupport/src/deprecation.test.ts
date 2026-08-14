@@ -447,8 +447,6 @@ describe("DeprecationTest", () => {
   });
 
   it("disallowed_warnings can match using a substring as a symbol", () => {
-    // A Ruby Symbol value is a colon-prefixed string in trails;
-    // `deprecation_disallowed?` compares with `rule.to_s`, i.e. without the colon.
     dep.disallowedWarnings = [":fubar"];
 
     expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
