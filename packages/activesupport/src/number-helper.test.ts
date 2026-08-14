@@ -20,6 +20,7 @@ describe("NumberHelperTest", () => {
   });
 
   it("number to currency", () => {
+    expect(numberToCurrency("123456789012345678.91")).toBe("$123,456,789,012,345,678.91");
     expect(numberToCurrency(1234567890.5)).toBe("$1,234,567,890.50");
     expect(numberToCurrency(1234567890.506)).toBe("$1,234,567,890.51");
     expect(numberToCurrency(-1234567890.5)).toBe("-$1,234,567,890.50");
@@ -28,10 +29,8 @@ describe("NumberHelperTest", () => {
       "($1,234,567,890.50)",
     );
     expect(numberToCurrency(1234567891.5, { precision: 0 })).toBe("$1,234,567,892");
-    // number_helper_test.rb:82 and :88 are held back on `RoundingHelper`'s
-    // round-mode coverage and the float spine — see the
-    // `rounding-helper-round-mode-coverage` and
-    // `number-helper-bigdecimal-precision-spine` stories.
+    // number_helper_test.rb:88 is held back on `RoundingHelper`'s round-mode
+    // coverage — see the `rounding-helper-round-mode-coverage` story.
     expect(numberToCurrency(1234567890.5, { precision: 1 })).toBe("$1,234,567,890.5");
     expect(numberToCurrency(1234567890.5, { unit: "&pound;", separator: ",", delimiter: "" })).toBe(
       "&pound;1234567890,50",

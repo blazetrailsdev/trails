@@ -69,6 +69,119 @@ export class BigDecimal {
     return this.toString("F");
   }
 
+  /**
+   * Ruby `BigDecimal#zero?`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  isZero(): boolean {
+    return !/[1-9]/.test(this.intDigits + this.fracDigits);
+  }
+
+  /**
+   * Ruby `BigDecimal#negative?` — zero is neither positive nor negative.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  isNegative(): boolean {
+    return this.sign === "-" && !this.isZero();
+  }
+
+  /**
+   * Ruby `BigDecimal#abs`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  abs(): BigDecimal {
+    return this.sign === "-"
+      ? BigDecimal.fromUnscaled(this.unscaled(-1), this.fracDigits.length)
+      : this;
+  }
+
+  /**
+   * Ruby `BigDecimal#mult` (and `*`); the product is exact.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  mult(other: BigDecimal): BigDecimal {
+    return BigDecimal.fromUnscaled(
+      this.unscaled() * other.unscaled(),
+      this.fracDigits.length + other.fracDigits.length,
+    );
+  }
+
+  /**
+   * Ruby `BigDecimal#<=>`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  compare(other: BigDecimal): number {
+    const scale = Math.max(this.fracDigits.length, other.fracDigits.length);
+    const left = this.unscaledAt(scale);
+    const right = other.unscaledAt(scale);
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+
+  /**
+   * Ruby `BigDecimal#round(n)` — ROUND_HALF_UP, i.e. ties away from zero,
+   * which is BigDecimal's default mode. A negative `n` rounds to an integer,
+   * matching what `RoundingHelper` already does for a non-positive precision.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships; the arithmetic Rails' own number helpers call on it
+   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
+   * and `>=`) has to exist here for those ports to have anything to call.
+   */
+  round(n = 0): BigDecimal {
+    const scale = Math.max(n, 0);
+    if (scale >= this.fracDigits.length) return this;
+    const digits = this.intDigits + this.fracDigits;
+    const kept = digits.slice(0, this.intDigits.length + scale);
+    let value = BigInt(kept === "" ? "0" : kept);
+    if (Number(digits[this.intDigits.length + scale]) >= 5) value += 1n;
+    return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, scale);
+  }
+
+  /** Digits as one integer, scaled by `10 ** fracDigits.length`. */
+  private unscaled(signum = 1): bigint {
+    const magnitude = BigInt(this.intDigits + this.fracDigits);
+    return this.sign === "-" && signum > 0 ? -magnitude : magnitude;
+  }
+
+  /** {@link unscaled}, re-scaled to `10 ** scale`. */
+  private unscaledAt(scale: number): bigint {
+    return this.unscaled() * 10n ** BigInt(scale - this.fracDigits.length);
+  }
+
+  private static fromUnscaled(value: bigint, scale: number): BigDecimal {
+    const negative = value < 0n;
+    const digits = (negative ? -value : value).toString().padStart(scale + 1, "0");
+    const intPart = digits.slice(0, digits.length - scale);
+    const fracPart = scale > 0 ? digits.slice(digits.length - scale) : "0";
+    return new BigDecimal(`${negative ? "-" : ""}${intPart}.${fracPart}`);
+  }
+
   /** Render as `0.<digits>e<exp>` (Ruby's `"E"` form, sans sign prefix). */
   private toScientific(group: number): string {
     const allDigits = this.intDigits + this.fracDigits;
