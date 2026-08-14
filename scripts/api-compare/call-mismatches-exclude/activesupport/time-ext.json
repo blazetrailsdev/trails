@@ -11,7 +11,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "current",
     "call": "to_datetime",
-    "reason": "Homonym across two Ruby receivers: `Time.current` (time/calculations.rb:39-41) has no `to_datetime`, `DateTime.current` (date_time/calculations.rb:10-12) is that same expression plus `.to_datetime`, and trails has one `current()` here serving both — one function cannot return both a Time and a DateTime. Converging it means giving DateTime its own receiver file; tracked by 0098-activesupport-ar-closure-port/split-date-time-current-onto-its-own-receiver."
+    "reason": "Homonym across two Ruby receivers: `Time.current` (time/calculations.rb:39-41) has no `to_datetime`, `DateTime.current` (date_time/calculations.rb:10-12) is that same expression plus `.to_datetime`, and trails has one `current()` here serving both — one function cannot return both a Time and a DateTime. `DateTime.current` now has that receiver — `core-ext/date-time/calculations.ts` — but RUBY_FILE_TS_OVERRIDES maps one Ruby file to ONE TS file, so `date_time/calculations.rb` still points at `time-ext.ts` (where its other 28 members live) and its `current` is still charged here. The row dies when those 28 bodies move too: 0098-activesupport-ar-closure-port/port-date-time-calculations-onto-its-own-receiver."
   },
   {
     "package": "activesupport",

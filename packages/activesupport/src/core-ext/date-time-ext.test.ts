@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
-import type { Temporal } from "@blazetrails/date";
+import { describe, it, expect, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import { current } from "./date-time/calculations.js";
+import { setFrozenTime } from "../time-travel.js";
+import { setZone } from "../time-zone-config.js";
 import {
   advance,
   ago,
@@ -30,6 +33,11 @@ import {
   toTime,
   xmlschema,
 } from "../time-ext.js";
+
+afterEach(() => {
+  setFrozenTime(null);
+  setZone(null);
+});
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -233,16 +241,39 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("current returns date today when zone is not set", () => {
-    expect(isToday(new Date())).toBe(true);
+    // Rails stubs `Time.now` and pins TZ to US/Eastern to name the offset
+    // outright; trails freezes the same local wall clock and reads the offset
+    // back off the host zone, so the assertion holds wherever it runs.
+    const now = d(1999, 12, 31, 23, 59, 59);
+    setFrozenTime(now);
+    const dt = current();
+    expect(dt.year).toBe(1999);
+    expect(dt.month).toBe(12);
+    expect(dt.day).toBe(31);
+    expect(dt.hour).toBe(23);
+    expect(dt.minute).toBe(59);
+    expect(dt.second).toBe(59);
   });
 
-  it.skip("current returns time zone today when zone is set");
+  it("current returns time zone today when zone is set", () => {
+    setZone("Eastern Time (US & Canada)");
+    const now = d(1999, 12, 31, 23, 59, 59);
+    setFrozenTime(now);
+    const dt = current() as Temporal.ZonedDateTime;
+    expect(dt.timeZoneId).toBe("America/New_York");
+    expect(dt.toInstant().epochMilliseconds).toBe(now.getTime());
+  });
 
   it("current without time zone", () => {
-    expect(isToday(new Date())).toBe(true);
+    const dt = current();
+    expect(dt instanceof Temporal.PlainDateTime || dt instanceof Temporal.ZonedDateTime).toBe(true);
   });
 
-  it.skip("current with time zone");
+  it("current with time zone", () => {
+    setZone("Eastern Time (US & Canada)");
+    const dt = current();
+    expect(dt instanceof Temporal.PlainDateTime || dt instanceof Temporal.ZonedDateTime).toBe(true);
+  });
 
   it("acts like date", () => {
     const dt = new Date();

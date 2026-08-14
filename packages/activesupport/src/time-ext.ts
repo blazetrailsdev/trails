@@ -34,7 +34,9 @@ function clone(date: Date): Date {
 /**
  * Returns `Time.zone.now` when `Time.zone` or `config.time_zone` are set,
  * otherwise just returns `Time.now` — time/calculations.rb:39-41. DateTime's
- * `current` (date_time/calculations.rb:10-12) is the same value.
+ * `current` (date_time/calculations.rb:10-12) is that expression plus
+ * `to_datetime`, and lives on its own receiver in
+ * `core-ext/date-time/calculations.ts`.
  */
 export function current(): TimeWithZone | Date {
   const zone = timeZone();
