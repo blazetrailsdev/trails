@@ -2,8 +2,15 @@
   {
     "package": "activesupport",
     "tsFile": "logger.ts",
-    "rubyName": "silence",
-    "call": "log_at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "normalize_sources",
+    "call": "exist?",
+    "reason": "`File.exist?` / `File.realpath` (logger.rb:47-48) route through the FsAdapter's `existsSync` / `realpathSync`: activesupport takes no `node:fs` import, so the adapter is the only filesystem surface and its methods keep the Node spelling."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "logger.ts",
+    "rubyName": "normalize_sources",
+    "call": "realpath",
+    "reason": "`File.exist?` / `File.realpath` (logger.rb:47-48) route through the FsAdapter's `existsSync` / `realpathSync`: activesupport takes no `node:fs` import, so the adapter is the only filesystem surface and its methods keep the Node spelling."
   }
 ]

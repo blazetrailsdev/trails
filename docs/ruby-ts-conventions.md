@@ -105,7 +105,7 @@ parity:api never expects a TS counterpart for these Ruby methods:
 - Ruby core object / value-protocol methods with no meaningful public TypeScript surface (identity, reflection, coercion).
   - `dup`, `clone`, `freeze`, `hash`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `respond_to?`, `respond_to_missing?`, `method_missing`, `is_a?`, `kind_of?`, `instance_of?`, `nil?`, `equal?`, `eql?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
 - Ruby module lifecycle hooks — no TypeScript equivalent.
-  - `extended`, `included`, `inherited`
+  - `extended`, `included`, `inherited`, `append_features`, `prepend_features`
 - Ruby object hooks — no TypeScript equivalent.
   - `singleton_method_added`
 - Ruby constant-resolution hook — the VM calls it when a constant name misses. JS resolves nothing at runtime by name, so there is no slot for it.

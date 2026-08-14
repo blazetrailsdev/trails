@@ -421,7 +421,7 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason: "Ruby module lifecycle hooks — no TypeScript equivalent.",
-    names: ["extended", "included", "inherited"],
+    names: ["extended", "included", "inherited", "append_features", "prepend_features"],
     tsMirrorIsDrift: true,
   },
   {

@@ -175,17 +175,37 @@ describe("LoggerTest", () => {
   });
 
   it("log outputs to", () => {
-    logger.info("outputs to message");
-    expect(output.string).toContain("outputs to message");
+    const stdout = makeBuffer();
+    const stderr = makeBuffer();
+
+    expect(Logger.isLoggerOutputsTo(logger, output)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(logger, output, stdout)).toBe(true);
+
+    expect(Logger.isLoggerOutputsTo(logger, stdout)).toBe(false);
+    expect(Logger.isLoggerOutputsTo(logger, stdout, stderr)).toBe(false);
+    expect(Logger.isLoggerOutputsTo(logger, "log/production.log")).toBe(false);
   });
 
   it("log outputs to with a broadcast logger", () => {
-    const out2 = makeBuffer();
-    const log2 = new Logger(out2);
-    const broadcast = new BroadcastLogger(logger, log2);
-    broadcast.info("broadcast message");
-    expect(output.string).toContain("broadcast message");
-    expect(out2.string).toContain("broadcast message");
+    const stdout = makeBuffer();
+    const stderr = makeBuffer();
+    const broadcast = new BroadcastLogger(new Logger(stdout));
+
+    expect(Logger.isLoggerOutputsTo(broadcast, stdout)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(false);
+
+    broadcast.broadcastTo(new Logger(stderr));
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(true);
+  });
+
+  it("log outputs to with a filename", () => {
+    const broadcast = new BroadcastLogger(
+      new Logger({ filename: "development.log", write: () => {} }),
+    );
+
+    expect(Logger.isLoggerOutputsTo(broadcast, "development.log")).toBe(true);
+    expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBe(false);
+    expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBe(false);
   });
 
   it("defaults to simple formatter", () => {

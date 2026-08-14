@@ -4,6 +4,20 @@
 
 import { stdout } from "./process-adapter.js";
 import { Temporal } from "@blazetrails/date";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import { getFs } from "./fs-adapter.js";
+import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
+
+/**
+ * Mirror of Ruby's `ArgumentError`, raised by `local_level=` on an
+ * unrecognized level (`logger_thread_safe_level.rb:21`).
+ */
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
 
 export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
@@ -27,6 +41,11 @@ const LEVEL_NAMES: Record<number, LogLevel> = {
 
 export interface LoggerOutput {
   write(s: string): void;
+  /**
+   * `logger.rb:26` — `logdev.try(:filename)`. File-backed sinks carry the path
+   * they write to; stream sinks leave it unset and match by identity.
+   */
+  filename?: string;
 }
 
 const defaultOutput: LoggerOutput = {
@@ -58,8 +77,49 @@ export class Logger {
   }
 
   protected _level: number = 0; // DEBUG
-  protected _localLevel: number | null = null;
   protected output: LoggerOutput | null;
+
+  /**
+   * `logger_silence.rb:14` — `cattr_accessor :silencer, default: true`. Each
+   * class that includes LoggerSilence gets its own slot, so the static lives
+   * on the class rather than the module.
+   */
+  static silencer: boolean = true;
+
+  static setSilencer(silencer: boolean): void {
+    this.silencer = silencer;
+  }
+
+  get silencer(): boolean {
+    return (this.constructor as typeof Logger).silencer;
+  }
+
+  setSilencer(silencer: boolean): void {
+    (this.constructor as typeof Logger).setSilencer(silencer);
+  }
+
+  /**
+   * `logger.rb:19` — returns true if the logger destination matches one of the
+   * sources.
+   */
+  static isLoggerOutputsTo(logger: Logger, ...sources: unknown[]): boolean {
+    const loggers: Logger[] =
+      BroadcastLoggerClass !== null && logger instanceof BroadcastLoggerClass
+        ? logger.broadcasts
+        : [logger];
+
+    // trails' Logger holds the sink directly where Ruby wraps it in a
+    // `Logger::LogDevice`, so the output object *is* `@logdev.dev`; a
+    // file-backed sink carries `filename` just as the wrapper does.
+    const logdevs = loggers.map((logger) => logger.output);
+    const loggerSources = logdevs
+      .map((logdev) => logdev?.filename ?? logdev)
+      .filter((source) => source != null);
+
+    return Logger.normalizeSources(sources).some((source) =>
+      Logger.normalizeSources(loggerSources).includes(source),
+    );
+  }
 
   static readonly DEBUG = 0;
   static readonly INFO = 1;
@@ -73,7 +133,7 @@ export class Logger {
   }
 
   get level(): number {
-    return this._localLevel !== null ? this._localLevel : this._level;
+    return this.localLevel ?? this._level;
   }
 
   set level(value: number | LogLevel) {
@@ -84,17 +144,40 @@ export class Logger {
     }
   }
 
-  get localLevel(): number | null {
-    return this._localLevel;
+  /**
+   * `logger_thread_safe_level.rb:38` — `:"logger_thread_safe_level_#{object_id}"`.
+   * A JS Symbol is the private per-instance key here, exactly as Ruby's
+   * per-object_id Symbol is: it is never a Ruby Symbol *value*.
+   */
+  private _localLevelKey?: symbol;
+
+  protected get localLevelKey(): symbol {
+    return (this._localLevelKey ??= Symbol("loggerThreadSafeLevel"));
   }
 
-  set localLevel(value: number | LogLevel | null) {
-    if (value === null) {
-      this._localLevel = null;
-    } else if (typeof value === "string") {
-      this._localLevel = LOG_LEVELS[value];
+  get localLevel(): number | null {
+    return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
+  }
+
+  set localLevel(level: number | LogLevel | null) {
+    let value: number | null;
+    if (typeof level === "number") {
+      value = level;
+    } else if (typeof level === "string") {
+      value = LOG_LEVELS[level];
+      if (value === undefined) {
+        throw new ArgumentError(`Invalid log level: ${level}`);
+      }
+    } else if (level == null) {
+      value = null;
     } else {
-      this._localLevel = value;
+      throw new ArgumentError(`Invalid log level: ${String(level)}`);
+    }
+
+    if (value === null) {
+      IsolatedExecutionState.delete(this.localLevelKey);
+    } else {
+      IsolatedExecutionState.set(this.localLevelKey, value);
     }
   }
 
@@ -179,26 +262,49 @@ export class Logger {
     return this.level <= Logger.FATAL;
   }
 
-  silence(tempLevel: number | LogLevel = Logger.ERROR, fn?: () => void): void {
-    const prevLocal = this._localLevel;
-    const lvl = typeof tempLevel === "string" ? LOG_LEVELS[tempLevel] : tempLevel;
-    this._localLevel = lvl;
-    try {
-      fn?.();
-    } finally {
-      this._localLevel = prevLocal;
+  /** `logger_silence.rb:19` — silences the logger for the duration of the block. */
+  silence(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => void): void {
+    if (this.silencer) {
+      this.logAt(severity, () => fn?.(this));
+    } else {
+      fn?.(this);
     }
   }
 
+  /** `logger_thread_safe_level.rb:31` — change the local level for the block. */
   logAt(level: number | LogLevel, fn: () => void): void {
-    const prevLocal = this._localLevel;
-    const lvl = typeof level === "string" ? LOG_LEVELS[level] : level;
-    this._localLevel = lvl;
+    const oldLocalLevel = this.localLevel;
+    this.localLevel = level;
     try {
       fn();
     } finally {
-      this._localLevel = prevLocal;
+      this.localLevel = oldLocalLevel;
     }
+  }
+
+  /** `ruby/logger lib/logger.rb#debug!` — sets the log level to DEBUG. */
+  debugBang(): void {
+    this.level = Logger.DEBUG;
+  }
+
+  /** `ruby/logger lib/logger.rb#info!` — sets the log level to INFO. */
+  infoBang(): void {
+    this.level = Logger.INFO;
+  }
+
+  /** `ruby/logger lib/logger.rb#warn!` — sets the log level to WARN. */
+  warnBang(): void {
+    this.level = Logger.WARN;
+  }
+
+  /** `ruby/logger lib/logger.rb#error!` — sets the log level to ERROR. */
+  errorBang(): void {
+    this.level = Logger.ERROR;
+  }
+
+  /** `ruby/logger lib/logger.rb#fatal!` — sets the log level to FATAL. */
+  fatalBang(): void {
+    this.level = Logger.FATAL;
   }
 
   close(): void {
@@ -207,6 +313,20 @@ export class Logger {
 
   append(s: string): void {
     this.output?.write(s);
+  }
+
+  /** `logger.rb:46` — private. */
+  private static normalizeSources(sources: unknown[]): unknown[] {
+    return sources.map((source) => {
+      const fs = getFs();
+      if (typeof (source as { path?: unknown })?.path === "string") {
+        source = (source as { path: string }).path;
+      }
+      if (typeof source === "string" && fs.existsSync(source)) {
+        source = fs.realpathSync ? fs.realpathSync(source) : source;
+      }
+      return source;
+    });
   }
 }
 
