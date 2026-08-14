@@ -30,7 +30,11 @@
  *     stale-HIGH mark, so drift used to surface only when the next story
  *     reseeded and found its own before-value was never reproducible. It is a
  *     GATE, not advisory: the mark only shrinks, so tightening is always safe,
- *     and `pnpm parity:api:calls:reseed` fixes it in one command. Baseline ROW
+ *     and `pnpm parity:api:calls:tighten [<shard>...]` fixes it in one command,
+ *     writing ONLY the stale shards. That narrowness is the point: the usual way
+ *     to land here is converging a call and retiring its baseline row by hand,
+ *     and the whole-tree `--write` reseed CLAUDE.md forbids would bury that one
+ *     row — and sweep in any concurrent drift — to clear it. Baseline ROW
  *     drift needs no separate arm — a gating run regenerates the artifact
  *     itself (see below), so a row set that a clean reseed would change already
  *     fails as NEW or STALE entries.
@@ -72,6 +76,7 @@
  * Usage:
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts           # gate (CI)
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --set-reason <cat> [--dry-run] [--force]
+ *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --tighten [<shard>...]  # stale marks only
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write   # reseed baseline
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --report  # read-only grouping
  *   pnpm tsx scripts/api-compare/lint-call-mismatches.ts --no-regen # gate the artifact on disk
@@ -150,6 +155,8 @@ import {
   renderSlack,
   renderWriteSummary,
   slackByPath,
+  tightenMarks,
+  TIGHTEN_ARG,
   totalMark,
   unreviewedCounts,
   unreviewedEntries,
@@ -796,6 +803,56 @@ async function setReasonMain(name: string, dryRun: boolean, force: boolean): Pro
 }
 
 /**
+ * `--tighten [<shard>...]`: the narrow remedy for a STALE high-water mark.
+ *
+ * Lowers the named shards (all slack ones when none are named) to the
+ * unreviewed count the CURRENT baseline carries, and writes nothing else — no
+ * exclude row, no untouched shard. That is what an agent who converged a call
+ * and deleted its baseline row by hand needs; `--write` is for a genuine
+ * reseed, and CLAUDE.md forbids reaching for it here. It reads the baseline
+ * only — the marks count baselined rows, so there is no artifact to regenerate.
+ */
+async function tightenMain(only: string[]): Promise<number> {
+  const baseline = await loadBaseline();
+  const counts = unreviewedCounts(baseline, DEFAULT_REASON, relPathFor);
+  const marks = await loadMarks(MARK_DIR);
+  const markDir = path.relative(ROOT_DIR, MARK_DIR);
+
+  const unknown = only.filter((f) => !marks.has(f));
+  if (unknown.length > 0) {
+    console.error(`call-mismatches --tighten: no such shard under ${markDir}/: ${unknown}`);
+    return 2;
+  }
+
+  const next = tightenMarks(counts, marks, only.length > 0 ? only : undefined);
+  const lowered = [...next].filter(([file, max]) => max !== marks.get(file));
+  if (lowered.length === 0) {
+    console.log(`call-mismatches --tighten: nothing to tighten (${markDir}/ is already tight).`);
+    return 0;
+  }
+
+  await writeMarks(MARK_DIR, next);
+  console.log(
+    `Tightened ${lowered.length} shard(s) under ${markDir}/ ` +
+      `(now ${next.size} mark(s) totalling ${totalMark(next)}):\n` +
+      lowered
+        .map(([file, max]) => `  - ${file}  mark ${marks.get(file)} → ${max}`)
+        .sort()
+        .join("\n"),
+  );
+  return 0;
+}
+
+/** Shard paths after `--tighten`, stopping at the next flag; none = every stale shard. */
+export function parseTighten(argv: string[]): string[] {
+  const i = argv.indexOf(TIGHTEN_ARG);
+  if (i === -1) return [];
+  const rest = argv.slice(i + 1);
+  const end = rest.findIndex((a) => a.startsWith("--"));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/**
  * The `--set-reason <cat>` / `--set-reason=<cat>` category name, or undefined
  * when the mode was not asked for. A missing value reads as `""`, which names
  * no category, so the caller lists the table instead of silently consuming the
@@ -826,6 +883,7 @@ async function runAsScript(): Promise<void> {
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
   const unreviewed = argv.includes("--unreviewed");
+  if (argv.includes(TIGHTEN_ARG)) process.exit(await tightenMain(parseTighten(argv)));
   const setReason = parseSetReason(argv);
   if (setReason !== undefined) {
     process.exit(

@@ -23,6 +23,7 @@ import {
   findCategory,
   matchesCategory,
   parseSetReason,
+  parseTighten,
   REASON_CATEGORIES,
   type ReasonCategory,
 } from "./lint-call-mismatches.js";
@@ -486,6 +487,15 @@ describe("--set-reason categories", () => {
     expect(parseSetReason(["--set-reason=mutex-sync-body"])).toBe("mutex-sync-body");
     expect(parseSetReason(["--set-reason", "--dry-run"])).toBe("");
     expect(parseSetReason(["--set-reason"])).toBe("");
+  });
+
+  it("parses the shards named after --tighten, stopping at the next flag", () => {
+    expect(parseTighten(["--report"])).toEqual([]);
+    expect(parseTighten(["--tighten"])).toEqual([]);
+    expect(parseTighten(["--tighten", "a/b.json", "c/d.json", "--no-regen"])).toEqual([
+      "a/b.json",
+      "c/d.json",
+    ]);
   });
 
   it("defines every category with a distinct name, a reason and its evidence", () => {

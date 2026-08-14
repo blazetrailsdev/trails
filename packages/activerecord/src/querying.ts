@@ -705,8 +705,15 @@ export function isNone<T extends typeof Base>(
 
 /**
  * Mirrors: ActiveRecord::Querying#empty? — delegates to `all().empty?`.
+ *
+ * `async` rather than a bare `Promise` return so the I/O is visible on the
+ * function object itself: `Object#blank?` (core_ext/object/blank.rb:19) invokes
+ * a method-shaped `empty?` and must never reach a querying one, and it tells
+ * the two apart by construction — an AsyncFunction, not a return type tsc
+ * erases. Every sibling querying `isEmpty` (Relation, CollectionAssociation,
+ * Preloader) is already spelled this way.
  */
-export function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
+export async function isEmpty<T extends typeof Base>(this: T): Promise<boolean> {
   return this.all().isEmpty();
 }
 

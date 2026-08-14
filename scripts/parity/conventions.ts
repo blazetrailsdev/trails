@@ -253,7 +253,11 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/date/blank.rb": "core-ext/object/blank.ts",
   "activesupport:core_ext/date_time/blank.rb": "core-ext/object/blank.ts",
   "activesupport:core_ext/pathname/blank.rb": "core-ext/object/blank.ts",
-  "activesupport:core_ext/hash/slice.rb": "hash-utils.ts",
+  // slice.rb's two methods (`slice!`, `extract!`) moved out of the collapsed
+  // `hash-utils.ts` onto Rails' own file layout by #6468 / #6499, so the
+  // reopening bucket follows them; the path is the one the default rule
+  // produces anyway. (`Hash#slice` itself is core Ruby, not this file.)
+  "activesupport:core_ext/hash/slice.rb": "core-ext/hash/slice.ts",
   "activesupport:core_ext/hash/except.rb": "hash-utils.ts",
   "activesupport:core_ext/hash/deep_merge.rb": "hash-utils.ts",
   "activesupport:core_ext/hash/indifferent_access.rb": "hash-with-indifferent-access.ts",
