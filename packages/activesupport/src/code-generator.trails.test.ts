@@ -82,7 +82,6 @@ describe("CodeGenerator (trails)", () => {
           });
         });
       });
-      // The nested batch must not have executed the outer one early.
       expect(owner.isMethodDefined("fromNestedBatch")).toBe(false);
     });
 

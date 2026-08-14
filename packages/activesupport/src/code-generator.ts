@@ -57,7 +57,12 @@ export class MethodSet {
     return canonicalName;
   }
 
-  /** Mirrors: MethodSet#apply */
+  /**
+   * Mirrors: MethodSet#apply — `owner.define_method(as,
+   * @cache.instance_method(canonical_name))` (code_generator.rb:35) reinstalls
+   * the property descriptor rather than a bare function, so a generated reader
+   * that is an accessor pair survives the copy.
+   */
   apply(owner: Module, _path: string, _line: number): void {
     if (this.sources.length !== 0) {
       this.cache.moduleEval((mod) => {
@@ -67,10 +72,6 @@ export class MethodSet {
     this.canonicalMethods.clear();
 
     for (const [as, canonicalName] of this.methods) {
-      // Rails: `owner.define_method(as, @cache.instance_method(canonical_name))`.
-      // The descriptor rather than the bare function because a generated
-      // attribute reader may be an accessor pair, which Ruby writes as two
-      // `def`s and TS as one property (code_generator.rb:35).
       const instanceMethod = this.cache.instanceMethod(canonicalName);
       if (instanceMethod) owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
     }
