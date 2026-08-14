@@ -11,9 +11,13 @@
  * either side of the boundary.
  */
 
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { testPathsManifest } from "../../vendor/sources.js";
 
 import { OUT_OF_CLOSURE_TEST_FILES } from "./closure-aliases.js";
 import {
@@ -22,16 +26,29 @@ import {
   tableProblems,
 } from "./closure-manifest.js";
 
-const RAILS_TESTS_JSON = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "output/rails-tests.json",
-);
+const DIR = dirname(fileURLToPath(import.meta.url));
+const RAILS_TESTS_JSON = resolve(DIR, "output/rails-tests.json");
 
-/** Rails test counts per activesupport test file, when a compare run left them. */
+const execFileAsync = promisify(execFile);
+
+/**
+ * Rails test counts per activesupport test file. `output/rails-tests.json` is
+ * whatever a previous `parity:test` run left behind; on a fresh checkout there
+ * is none, so the Ruby extractor runs here rather than reporting zeros. A Ruby
+ * or vendor failure propagates — a count is either real or the command fails.
+ */
 async function railsTestCounts(): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
-  const raw = await readFile(RAILS_TESTS_JSON, "utf-8").catch(() => null);
-  if (raw === null) return counts;
+  let raw = await readFile(RAILS_TESTS_JSON, "utf-8").catch(() => null);
+  if (raw === null) {
+    process.stderr.write("==> No output/rails-tests.json; running the Ruby test extractor\n");
+    await execFileAsync("ruby", [join(DIR, "extract-ruby-tests.rb")], {
+      cwd: resolve(DIR, "../.."),
+      env: { ...process.env, TEST_PATHS_JSON: JSON.stringify(testPathsManifest()) },
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    raw = await readFile(RAILS_TESTS_JSON, "utf-8");
+  }
   const manifest = JSON.parse(raw) as {
     packages: Record<string, { files: { file: string; testCases: unknown[] }[] }>;
   };
@@ -64,23 +81,21 @@ async function main(): Promise<void> {
     return;
   }
 
-  const counts = await railsTestCounts();
-  const tests = (files: { testFile: string }[]) =>
-    files.reduce((sum, f) => sum + (counts.get(f.testFile) ?? 0), 0);
-
   if (!check) {
+    const counts = await railsTestCounts();
+    const tests = (files: { testFile: string }[]) =>
+      files.reduce((sum, f) => sum + (counts.get(f.testFile) ?? 0), 0);
+
     for (const verdict of partition.inClosure) {
       process.stdout.write(`  IN  ${(verdict.rule ?? "").padEnd(5)} ${verdict.testFile}\n`);
     }
     for (const verdict of partition.outOfClosure) {
       process.stdout.write(`  OUT       ${verdict.testFile}\n`);
     }
-    const seen =
-      counts.size > 0 ? "" : " (run `pnpm parity:test -- --package activesupport` for test counts)";
     process.stdout.write(
       `\nAR closure: ${partition.closureFiles.length} activesupport lib files\n` +
         `  in closure:  ${partition.inClosure.length} test files, ${tests(partition.inClosure)} Rails tests\n` +
-        `  out:         ${partition.outOfClosure.length} test files, ${tests(partition.outOfClosure)} Rails tests${seen}\n`,
+        `  out:         ${partition.outOfClosure.length} test files, ${tests(partition.outOfClosure)} Rails tests\n`,
     );
   }
 
