@@ -37,6 +37,8 @@ import {
   type FutureResultConnection,
 } from "../../future-result.js";
 import type { Base } from "../../base.js";
+import { isWriteQuerySql } from "../sql-classification.js";
+import { ActiveRecord } from "../../ar-config.js";
 
 /** @internal Set by `base.ts` at the bottom of its own module body — see the note there. */
 let _base: typeof Base | undefined;
@@ -50,8 +52,6 @@ function baseClass(): typeof Base {
   if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
   return _base;
 }
-import { isWriteQuerySql } from "../sql-classification.js";
-import { ActiveRecord } from "../../ar-config.js";
 
 /**
  * A single entry in `Relation#explain`'s options list. Either a bare
