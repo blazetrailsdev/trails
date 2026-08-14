@@ -5,7 +5,6 @@ export type { PrettyPrinter, PPSink } from "./pretty-print.js";
 export { Result, IndexedRow } from "./result.js";
 export { FutureResult } from "./future-result.js";
 export { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
-export { asynchronousQueriesTracker } from "./core.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
 

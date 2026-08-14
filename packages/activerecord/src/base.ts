@@ -257,6 +257,7 @@ import {
   filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
+import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
 import {
@@ -1047,6 +1048,16 @@ export class Base extends Model {
    */
   static primaryClassQ(): boolean {
     return this === Base || this.applicationRecordClassQ();
+  }
+
+  // Mirrors: ActiveRecord::Core.asynchronous_queries_session (core.rb:141-143).
+  static asynchronousQueriesSession(): Session {
+    return _Core.asynchronousQueriesSession();
+  }
+
+  // Mirrors: ActiveRecord::Core.asynchronous_queries_tracker (core.rb:145-148).
+  static asynchronousQueriesTracker(): AsynchronousQueriesTracker {
+    return _Core.asynchronousQueriesTracker();
   }
 
   static currentPreventingWrites(): boolean {
