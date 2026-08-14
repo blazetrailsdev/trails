@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "node:url";
 import {
+  BoundedIO,
   Parser,
   BoundaryTooLongError,
   EmptyContentError,
@@ -142,6 +143,20 @@ describe("Rack::Multipart::Parser", () => {
     } finally {
       setMultipartFileLimit(prev);
     }
+  });
+
+  it("bounds the read by content length in bytes", () => {
+    let calls = 0;
+    const io = {
+      read: (_size: number) => {
+        calls++;
+        return "\u00e9";
+      },
+    };
+    const bounded = new BoundedIO(io, 2);
+    expect(bounded.read(10)).toBe("\u00e9");
+    expect(bounded.read(10)).toBeNull();
+    expect(calls).toBe(1);
   });
 
   it("reaches a multipart total limit", () => {

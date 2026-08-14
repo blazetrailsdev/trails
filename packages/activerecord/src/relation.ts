@@ -5782,17 +5782,26 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update
    */
-  async update(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
-    if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
-      // update(attrs) form — update all matching records
-      const updates = (id ?? {}) as Record<string, unknown>;
+  update(attributes: Record<string, unknown>): Promise<T[]>;
+  update(id: ":all", attributes: Record<string, unknown>): Promise<T[]>;
+  update(id: unknown, attributes: Record<string, unknown>): Promise<T>;
+  async update(id?: unknown, attributes?: Record<string, unknown>): Promise<T | T[]> {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
+    }
+    if (arguments.length === 1) {
+      attributes = id as Record<string, unknown>;
+      id = ":all";
+    }
+    if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.update(updates);
+        await record.update(attributes!);
       }
       return records;
+    } else {
+      return (await this.model.update(id, attributes!)) as T;
     }
-    return (await this.model.update(id, attrs ?? {})) as T;
   }
 
   /**
@@ -5800,16 +5809,26 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#update!
    */
-  async updateBang(id?: unknown, attrs?: Record<string, unknown>): Promise<T | T[]> {
-    if (id === undefined || (typeof id === "object" && id !== null && attrs === undefined)) {
-      const updates = (id ?? {}) as Record<string, unknown>;
+  updateBang(attributes: Record<string, unknown>): Promise<T[]>;
+  updateBang(id: ":all", attributes: Record<string, unknown>): Promise<T[]>;
+  updateBang(id: unknown, attributes: Record<string, unknown>): Promise<T>;
+  async updateBang(id?: unknown, attributes?: Record<string, unknown>): Promise<T | T[]> {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
+    }
+    if (arguments.length === 1) {
+      attributes = id as Record<string, unknown>;
+      id = ":all";
+    }
+    if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.updateBang(updates);
+        await record.updateBang(attributes!);
       }
       return records;
+    } else {
+      return (await this.model.updateBang(id, attributes!)) as T;
     }
-    return (await this.model.updateBang(id, attrs ?? {})) as T;
   }
 
   /**

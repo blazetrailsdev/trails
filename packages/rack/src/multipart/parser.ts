@@ -55,17 +55,19 @@ Object.freeze(EMPTY);
 export class BoundedIO {
   private cursor = 0;
   constructor(
-    private io: { read(n: number): string | null },
+    private io: { read(n: number, outbuf?: string): string | null },
     private contentLength: number,
   ) {}
 
   /** @internal */
-  read(size: number, _outbuf?: string): string | null {
+  read(size: number, outbuf?: string): string | null {
     if (this.cursor >= this.contentLength) return null;
+
     const left = this.contentLength - this.cursor;
-    const str = this.io.read(left < size ? left : size);
+
+    const str = left < size ? this.io.read(left, outbuf) : this.io.read(size, outbuf);
     if (str) {
-      this.cursor += str.length;
+      this.cursor += new TextEncoder().encode(str).length;
     } else {
       throw new EmptyContentError("bad content body");
     }
@@ -294,8 +296,9 @@ export class Parser {
     this.headRe = new RegExp(`(.*?${EOL})${EOL}`, "s");
   }
 
-  parse(io: { read(n: number): string | null }) {
-    this.readData(io);
+  parse(io: { read(n: number, outbuf?: string): string | null }) {
+    const outbuf = "";
+    this.readData(io, outbuf);
     while (true) {
       let s: void | "want_read";
       if (this.state === "FAST_FORWARD") s = this.handleFastForward();
@@ -303,7 +306,7 @@ export class Parser {
       else if (this.state === "MIME_HEAD") s = this.handleMimeHead();
       else if (this.state === "MIME_BODY") s = this.handleMimeBody();
       else return;
-      if (s === "want_read") this.readData(io);
+      if (s === "want_read") this.readData(io, outbuf);
     }
   }
 
@@ -323,10 +326,13 @@ export class Parser {
     return (m ? m[1] : str).replace(/\\(.)/g, "$1");
   }
 
-  /** @internal */ private readData(io: { read(n: number): string | null }) {
-    const c = io.read(this.bufsize);
-    this.handleEmptyContentBang(c);
-    this.sb.concat(c!);
+  /** @internal */ private readData(
+    io: { read(n: number, outbuf?: string): string | null },
+    outbuf: string,
+  ) {
+    const content = io.read(this.bufsize, outbuf);
+    this.handleEmptyContentBang(content);
+    this.sb.concat(content!);
   }
 
   /** @internal */ private handleFastForward(): void | "want_read" {
