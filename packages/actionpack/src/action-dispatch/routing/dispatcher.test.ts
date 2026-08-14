@@ -152,11 +152,11 @@ describe("controllerDispatcher", () => {
     expect(await bodyToString(body)).toBe("index");
   });
 
-  it("returns the PASS_NOT_FOUND cascade when path_parameters has no controller", async () => {
+  it("raises on PASS_NOT_FOUND, which has no make_response!, when there is no controller", async () => {
     const dispatcher = controllerDispatcher(controllers, true);
-    const [status, headers] = await dispatcher("", "index", {}, envFor({ action: "index" }));
-    expect(status).toBe(404);
-    expect(headers[X_CASCADE]).toBe("pass");
+    await expect(dispatcher("", "index", {}, envFor({ action: "index" }))).rejects.toThrow(
+      TypeError,
+    );
   });
 
   it("raises the routing error when raise_on_name_error is true", async () => {

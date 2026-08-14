@@ -9,10 +9,10 @@
  * @internal trails-private (no Rails counterpart as a standalone file)
  */
 
-import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
-import { PassNotFound, Request } from "../http/request.js";
+import { emptyRackBody, PassNotFound, Request } from "../http/request.js";
 import type { Response } from "../http/response.js";
 import type { RackishResponse, RouterRequest } from "../journey/router.js";
 import type { DispatcherCallback } from "./route-set.js";
@@ -81,6 +81,9 @@ export interface DispatchableControllerClass {
  * `req.path_parameters`, so {@link controllerClass}'s `params[:action] ||=
  * "index"` default (`http/request.rb:88-91`) is the one that applies.
  *
+ * `make_response!` is called on whatever {@link controllerClass} returns,
+ * unconditionally, exactly as `route_set.rb:49` does.
+ *
  * @internal
  */
 export function controllerDispatcher(
@@ -92,13 +95,12 @@ export function controllerDispatcher(
     try {
       const params = req.pathParameters;
       const controller = controllerClass(controllers, req);
-      if (!("makeResponseBang" in controller)) return controller.call(env);
       const res = controller.makeResponseBang(req);
       return await dispatch(controller, params["action"] as string, req, res);
     } catch (error) {
       if (error instanceof RoutingError) {
         if (raiseOnNameError) throw error;
-        return [404, { [X_CASCADE]: "pass" }, bodyFromString("")];
+        return [404, { [X_CASCADE]: "pass" }, emptyRackBody()];
       }
       throw error;
     }
@@ -113,16 +115,22 @@ export function controllerDispatcher(
  * {@link controllerDispatcher} was handed; the absent-name arm still returns
  * `PASS_NOT_FOUND` (`http/request.rb:107`).
  *
+ * `PASS_NOT_FOUND` has no `make_response!`, so `Dispatcher#serve` raises
+ * `NoMethodError` the moment it gets one — the arm is unreachable from
+ * `serve`, which is only entered for a route that already pinned
+ * `:controller`. The cast keeps that shape rather than inventing a graceful
+ * 404 arm the Rails source does not have.
+ *
  * @internal
  */
 function controllerClass(
   controllers: Map<string, DispatchableControllerClass>,
   req: Request,
-): DispatchableControllerClass | typeof PassNotFound {
+): DispatchableControllerClass {
   const params = req.pathParameters;
   if (params["action"] == null) params["action"] = "index";
   const name = params["controller"];
-  if (name == null) return PassNotFound;
+  if (name == null) return PassNotFound as unknown as DispatchableControllerClass;
   const controller = controllers.get(String(name));
   if (!controller) {
     throw new RoutingError(`uninitialized constant ${String(name)}`);
