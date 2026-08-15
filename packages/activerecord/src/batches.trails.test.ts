@@ -9,10 +9,6 @@ import { Post } from "./test-helpers/models/post.js";
 describe("BatchEnumerator (trails)", () => {
   fixtures(["posts"] as const);
 
-  // batch_enumerator.rb:104-108 — `each` re-derives the batches with
-  // `@relation.to_enum(:in_batches, ..., cursor: @cursor, order: @order,
-  // use_ranges: @use_ranges)`, so a blockless `in_batches(order: :desc)`
-  // enumerated twice honours :desc both times.
   it("re-enumerating honours the order it was built with", async () => {
     const enumerator = Post.inBatches({ of: 1, order: "desc" });
     const idsOf = async () => {
@@ -29,7 +25,6 @@ describe("BatchEnumerator (trails)", () => {
     expect(await idsOf()).toEqual(first);
   });
 
-  // batch_enumerator.rb:54-56 — `each_record` re-derives with `cursor: @cursor`.
   it("eachRecord honours the cursor it was built with", async () => {
     const records: Post[] = [];
     await Post.inBatches({ of: 1, cursor: "id", order: "desc" }).eachRecord((post: Post) => {

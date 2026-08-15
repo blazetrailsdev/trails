@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
 
-// notifications_test.rb:535-537 — `random_id` is `SecureRandom.hex(10)`.
 function randomId(): string {
   return Array.from({ length: 10 }, () =>
     Math.floor(Math.random() * 256)
@@ -549,15 +548,15 @@ describe("ActiveSupport::Notifications", () => {
     });
 
     it("duration is positive after finish", () => {
-      const e = new Event("foo", null, null, randomId());
+      const e = new Event("foo", null, null, randomId(), {});
       e.startBang();
       e.finishBang();
       expect(e.duration).toBeGreaterThanOrEqual(0);
     });
 
     it("has unique transactionId", () => {
-      const a = new Event("a", null, null, randomId());
-      const b = new Event("b", null, null, randomId());
+      const a = new Event("a", null, null, randomId(), {});
+      const b = new Event("b", null, null, randomId(), {});
       expect(a.transactionId).not.toBe(b.transactionId);
     });
 
@@ -671,7 +670,7 @@ describe("LegacyHandle", () => {
         published.push(event);
       },
     };
-    const event = new Event("legacy.event", null, null, randomId());
+    const event = new Event("legacy.event", null, null, randomId(), {});
     const handle = new LegacyHandle(event, notifier);
     handle.finish();
     expect(published).toHaveLength(1);

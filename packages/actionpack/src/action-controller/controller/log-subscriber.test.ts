@@ -18,8 +18,6 @@ function makeEvent(
   payload: Record<string, unknown>,
   duration = 10,
 ): NotificationEvent {
-  // Event holds float-second times and derives #duration from them
-  // (instrumenter.rb:110-114, :219-221).
   return new NotificationEvent(name, 0, duration / 1000.0, "x", payload);
 }
 

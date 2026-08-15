@@ -4452,9 +4452,6 @@ export class Relation<T extends Base> {
     cursor?: string | string[];
     errorOnIgnore?: boolean;
   } = {}): AsyncGenerator<T[]> {
-    // Rails' find_in_batches calls `in_batches(..., load: true) { |batch| ... }`
-    // WITH a block, i.e. the batching arm rather than the BatchEnumerator one
-    // (batches.rb:99-101). The generator is trails' spelling of that block arm.
     const enumerator = this.inBatches({
       of: batchSize,
       start,
@@ -4546,8 +4543,6 @@ export class Relation<T extends Base> {
 
     const batchOrders = _buildBatchOrders(cursor, order as any);
 
-    // batches.rb:267-269 — without a block, `in_batches` hands back the
-    // enumerator, which re-derives the batches under these same options.
     const enumerator = block
       ? null
       : new BatchEnumerator<LoadedRelation<Relation<T>>>({

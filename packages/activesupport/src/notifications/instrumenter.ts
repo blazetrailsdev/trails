@@ -28,8 +28,6 @@ export class Event {
   private _end: number | null;
   private _cpuTimeStart = 0.0;
   private _cpuTimeFinish = 0.0;
-  // trails threads nested instrumentation through the parent event; Rails'
-  // Event has no such field (see Instrumenter#_nest).
   readonly children: Event[];
 
   constructor(
@@ -37,7 +35,7 @@ export class Event {
     start: number | null,
     ending: number | null,
     transactionId: string,
-    payload: EventPayload = {},
+    payload: EventPayload,
   ) {
     this.name = name;
     // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy):
@@ -114,15 +112,17 @@ export class Event {
     return this._end! - this._time!;
   }
 
-  // instrumenter.rb:196-198 — `Process.clock_gettime(CLOCK_MONOTONIC, :float_millisecond)`.
+  /** instrumenter.rb:196-198 — `Process.clock_gettime(CLOCK_MONOTONIC, :float_millisecond)`. */
   private now(): number {
     return performance.now();
   }
 
-  // instrumenter.rb:200-211 — Ruby defines `now_cpu` from CLOCK_THREAD_CPUTIME_ID
-  // and falls back to the `0.0` arm on platforms without that clock. JS has no
-  // thread CPU clock at all (`performance.now()` is a wall clock, not CPU time),
-  // so this port is Rails' own fallback arm, not a stub of the first one.
+  /**
+   * instrumenter.rb:200-211 — Ruby defines `now_cpu` from CLOCK_THREAD_CPUTIME_ID
+   * and falls back to the `0.0` arm on platforms without that clock. JS has no
+   * thread CPU clock at all (`performance.now()` is a wall clock, not CPU time),
+   * so this is Rails' own fallback arm, not a stub of the first one.
+   */
   private nowCpu(): number {
     return 0.0;
   }
@@ -290,7 +290,7 @@ export class Instrumenter {
     this._notifier.finish?.(name, this.id, payload, listenersState);
   }
 
-  // instrumenter.rb:100-102 — `SecureRandom.hex(10)`.
+  /** instrumenter.rb:100-102 — `SecureRandom.hex(10)`. */
   private uniqueId(): string {
     return Array.from(getCrypto().randomBytes(10))
       .map((b) => b.toString(16).padStart(2, "0"))
