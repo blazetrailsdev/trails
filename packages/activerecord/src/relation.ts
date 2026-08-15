@@ -2523,7 +2523,7 @@ export class Relation<T extends Base> {
     let loadedRecords: T[];
     if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
       const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
-      await this._executeEagerLoad(allEager, { async });
+      await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
       if (token !== this._loadToken) return [];
       loadedRecords = this._records;
       this.loadRecords(loadedRecords);
@@ -2536,11 +2536,13 @@ export class Relation<T extends Base> {
       const allowRetry = this._lastSelectRetryable;
       // Awaiting the FutureResult here is trails' `future.result` in
       // `exec_queries` (relation.rb:1408).
-      const result = await c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
-        allowRetry,
-        preparable: this._lastSelectPreparable,
-        async,
-      });
+      const result = await this.skipQueryCacheIfNecessary(() =>
+        c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
+          allowRetry,
+          preparable: this._lastSelectPreparable,
+          async,
+        }),
+      );
       if (token !== this._loadToken) return [];
       const rows = result.toArray();
       loadedRecords = this._instrumentInstantiation(
@@ -3715,8 +3717,6 @@ export class Relation<T extends Base> {
     await this._materializeDeferredDistinctPkPredicates();
 
     const table = this.table;
-    // Mirrors Rails relation.rb:593-599: bump locking_column when omitted, into
-    // the updates hash, so _substituteValues sees it on its arel-node arm.
     if (
       this.model.lockingEnabled &&
       !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
@@ -6395,7 +6395,6 @@ export class Relation<T extends Base> {
     return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
   }
 
-  // Mirrors relation.rb:102-111.
   bindAttribute<R>(name: string, value: unknown, block: (attr: any, bind: any) => R): R {
     const reflection = this.model._reflectOnAssociation(name);
     if (reflection) {
@@ -6934,7 +6933,6 @@ export class Relation<T extends Base> {
     });
   }
 
-  // Mirrors relation.rb:1396-1401.
   private _incrementAttribute(attribute: any, value = 1): any {
     const bind = this.predicateBuilder.buildBindAttribute(attribute.name, Math.abs(value));
     // Rails passes the bare Integer `0`; the to_sql visitor dispatches on the
@@ -6969,7 +6967,6 @@ export class Relation<T extends Base> {
     return rows.map((row) => this.model._instantiate(row) as T);
   }
 
-  // Mirrors relation.rb:1466-1472.
   private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
     if (this.skipQueryCacheValue) {
       return this.model.uncached(block);

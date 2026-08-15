@@ -2541,12 +2541,32 @@ describe("RelationTest", () => {
     expect(firstPost!.id).not.toBe(thirdPost!.id);
   });
 
-  it("#skip_query_cache!", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it("#skip_query_cache!", async () => {
+    await Post.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Post.all().load();
+        await Post.all().load();
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Post.all().skipQueryCacheBang().load();
+        await Post.all().skipQueryCacheBang().load();
+      });
+    });
   });
 
-  it("#skip_query_cache! with an eager load", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it("#skip_query_cache! with an eager load", async () => {
+    await Post.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Post.eagerLoad("comments").load();
+        await Post.eagerLoad("comments").load();
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Post.eagerLoad("comments").skipQueryCacheBang().load();
+        await Post.eagerLoad("comments").skipQueryCacheBang().load();
+      });
+    });
   });
 
   it("#skip_query_cache! with a preload", () => {
