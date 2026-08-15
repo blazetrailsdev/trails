@@ -5,17 +5,5 @@
     "rubyName": "from_json",
     "call": "decode",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "serializers/json.ts",
-    "rubyName": "model_name",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:this",
-      "ref:namespace"
-    ],
-    "reason": "Same as activemodel/model.ts's `model_name` row: `ActiveModel::Name.new(self, namespace)` (naming.rb:275) resolves the namespace from the Ruby constant path, which a JS class does not have."
   }
 ]

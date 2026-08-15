@@ -224,10 +224,11 @@ describe("StoreTest", () => {
     });
 
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(((user.settings as HashWithIndifferentAccess).get("color") as any).jenny).toBe("blue");
-    expect((user.settings as HashWithIndifferentAccess).get("color")).toMatchObject({
-      jenny: "blue",
-    });
+    expect(
+      ((user.settings as HashWithIndifferentAccess).get("color") as HashWithIndifferentAccess).get(
+        "jenny",
+      ),
+    ).toBe("blue");
     expect(user.color).toMatchObject({ jenny: "blue" });
   });
 

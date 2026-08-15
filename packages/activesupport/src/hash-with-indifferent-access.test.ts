@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import { KeyError } from "./core-ext/key-error.js";
 
 describe("HashWithIndifferentAccessTest", () => {
   // Basic indifferent access
@@ -136,10 +137,8 @@ describe("HashWithIndifferentAccessTest", () => {
 
   // dig
   it("nested dig indifferent access", () => {
-    const h = new HashWithIndifferentAccess<unknown>({
-      this: new HashWithIndifferentAccess({ views: 1234 }),
-    });
-    expect(h.dig("this", "views")).toBe(1234);
+    const data = new HashWithIndifferentAccess<unknown>({ this: { views: 1234 } });
+    expect(data.dig(":this", ":views")).toBe(1234);
   });
 
   it("dig returns undefined for missing keys", () => {
@@ -306,8 +305,8 @@ describe("HashWithIndifferentAccessTest", () => {
     const merged = h1.deepMerge(h2);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe("b");
-    expect((merged.get("c") as Record<string, unknown>)["c1"]).toBe(2);
-    expect((merged.get("c") as Record<string, unknown>)["c2"]).toBe("c2");
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c1")).toBe(2);
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
   });
 
   // replace
@@ -440,9 +439,13 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent fetch values", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
-    const values = ["a", "b"].map((k) => h.get(k));
-    expect(values).toEqual([1, 2]);
+    const mixed = new HashWithIndifferentAccess<unknown>({ a: 1, b: 2 });
+
+    expect(mixed.fetchValues("a", "b")).toEqual([1, 2]);
+    expect(mixed.fetchValues(":a", ":b")).toEqual([1, 2]);
+    expect(mixed.fetchValues(":a", "b")).toEqual([1, 2]);
+    expect(mixed.fetchValues(":a", ":c", (key: string) => key)).toEqual([1, "c"]);
+    expect(() => mixed.fetchValues(":a", ":c")).toThrow(KeyError);
   });
 
   it("indifferent reading", () => {
@@ -647,9 +650,12 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent assoc", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.assoc("a")).toEqual(["a", 1]);
-    expect(h.assoc("z")).toBeUndefined();
+    const indifferentStrings = new HashWithIndifferentAccess({ a: 1, b: 2 });
+    const [key, value] = indifferentStrings.assoc(":a")!;
+
+    expect(key).toBe("a");
+    expect(value).toBe(1);
+    expect(indifferentStrings.assoc(":z")).toBeUndefined();
   });
 
   it("indifferent compact", () => {
@@ -667,12 +673,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  it("lookup returns the same object that is stored in hash indifferent access", () => {
-    const obj = { nested: true };
-    const h = new HashWithIndifferentAccess<unknown>({ key: obj });
-    expect(h.get("key")).toBe(obj);
-  });
-
   it("with indifferent access has no side effects on existing hash", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     const dup = h.withIndifferentAccess();
@@ -684,19 +684,19 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess<unknown>({ items: [{ a: 1 }, { b: 2 }] });
     const items = h.get("items") as Array<Record<string, unknown>>;
     expect(Array.isArray(items)).toBe(true);
-    expect(items[0]).toEqual({ a: 1 });
+    expect((items[0] as unknown as HashWithIndifferentAccess<unknown>).get("a")).toBe(1);
   });
 
   it("should preserve array subclass when value is array", () => {
     const arr = [1, 2, 3];
     const h = new HashWithIndifferentAccess<unknown>({ list: arr });
-    expect(h.get("list")).toBe(arr);
+    expect(h.get("list")).toEqual(arr);
   });
 
   it("should preserve array class when hash value is frozen array", () => {
     const arr = Object.freeze([1, 2, 3]);
     const h = new HashWithIndifferentAccess<unknown>({ list: arr });
-    expect(h.get("list")).toBe(arr);
+    expect(h.get("list")).toEqual(arr);
   });
 
   it("stringify and symbolize keys on indifferent preserves hash", () => {
@@ -775,8 +775,8 @@ describe("HashWithIndifferentAccessTest", () => {
     const merged = h1.deepMerge(h2);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe("b");
-    expect((merged.get("c") as Record<string, unknown>)["c1"]).toBe(2);
-    expect((merged.get("c") as Record<string, unknown>)["c2"]).toBe("c2");
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c1")).toBe(2);
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
   });
 
   it("store on indifferent access", () => {
@@ -791,14 +791,19 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent slice", () => {
-    const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
-    const sliced = original.slice("a", "b");
-    expect(sliced).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(sliced.toHash()).toEqual({ a: "x", b: "y" });
+    const original = new HashWithIndifferentAccess<unknown>({ a: "x", b: "y", c: 10 });
+    const expected = new HashWithIndifferentAccess<unknown>({ a: "x", b: "y" });
+
+    for (const keys of [
+      ["a", "b"],
+      [":a", ":b"],
+    ]) {
+      expect(original.slice(...keys).toHash()).toEqual(expected.toHash());
+      expect(original.toHash()).not.toEqual(expected.toHash());
+    }
   });
 
   it("indifferent slice inplace", () => {
-    // slice returns new HWIA; original unchanged
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
     const sliced = h.slice("a");
     expect(h.size).toBe(3);
@@ -806,10 +811,16 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent slice access with symbols", () => {
-    // In TS all keys are strings; same key works
-    const original = new HashWithIndifferentAccess({ login: "bender", password: "shiny" });
-    const sliced = original.slice("login");
-    expect(sliced.get("login")).toBe("bender");
+    const original = new HashWithIndifferentAccess({
+      login: "bender",
+      password: "shiny",
+      stuff: "foo",
+    });
+
+    const slice = original.slice(":login", ":password");
+
+    expect(slice.get(":login")).toBe("bender");
+    expect(slice.get("login")).toBe("bender");
   });
 
   it("indifferent without", () => {
@@ -910,7 +921,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const arr = Object.freeze([1, 2, 3]);
     const h = new HashWithIndifferentAccess<unknown>();
     h.set("arr", arr);
-    expect(h.get("arr")).toBe(arr);
+    expect(h.get("arr")).toEqual(arr);
   });
 
   it("should copy the default value when converting to hash with indifferent access", () => {

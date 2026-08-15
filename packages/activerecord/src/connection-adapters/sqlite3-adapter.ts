@@ -82,6 +82,7 @@ import {
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
   performQuery as sqlitePerformQuery,
+  highPrecisionCurrentTimestamp as sqliteHighPrecisionCurrentTimestamp,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -552,6 +553,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    */
   declare performQuery: typeof sqlitePerformQuery;
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#high_precision_current_timestamp
+   * (sqlite3/database_statements.rb:49-51).
+   */
+  declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
 
   /**
    * Rows affected by the most recent write. Rails takes the statement result
@@ -1946,22 +1953,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (raw) {
         sql += raw.value;
       } else {
-        // Rails concatenates the two fragments directly (sqlite3_adapter.rb:463-464)
-        // because `touch_model_timestamps_unless` terminates every entry it emits
-        // with a comma (insert_all.rb:284). trails' `touchModelTimestampsUnless`
-        // joins on "," with no trailing separator instead, so the two fragments are
-        // joined here rather than appended. Converging that builder changes all
-        // three adapters at once: story insert-all-touch-timestamps-trailing-comma.
-        const assignments: string[] = [];
-        const touch = insert.touchModelTimestampsUnless(
-          (column) => `${column} IS excluded.${column}`,
-          "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')",
-        );
-        if (touch) assignments.push(touch);
-        assignments.push(
-          ...insert.updatableColumns().map((column) => `${column}=excluded.${column}`),
-        );
-        sql += assignments.join(",");
+        sql += insert.touchModelTimestampsUnless((column) => `${column} IS excluded.${column}`);
+        sql += insert
+          .updatableColumns()
+          .map((column) => `${column}=excluded.${column}`)
+          .join(",");
       }
     }
 
@@ -3183,6 +3179,7 @@ dirtiesQueryCache(SQLite3Adapter, "execute");
 // instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`
 // dispatch resolves here (sqlite3/database_statements.rb:78).
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
+SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**

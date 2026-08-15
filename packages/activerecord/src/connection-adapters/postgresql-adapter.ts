@@ -3058,13 +3058,14 @@ export class PostgreSQLAdapter
       if (raw) {
         sql += raw.value;
       } else {
-        const assignments: string[] = [];
-        const touch = insert.touchModelTimestampsUnless(
-          (col) => `${insert.quotedTableName()}.${col} IS NOT DISTINCT FROM excluded.${col}`,
+        sql += insert.touchModelTimestampsUnless(
+          (column) =>
+            `${insert.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
         );
-        if (touch) assignments.push(touch);
-        for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
-        sql += assignments.join(",");
+        sql += insert
+          .updatableColumns()
+          .map((column) => `${column}=excluded.${column}`)
+          .join(",");
       }
     }
 

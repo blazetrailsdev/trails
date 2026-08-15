@@ -615,6 +615,7 @@ export interface AbstractAdapter {
   execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
   isWriteQuery(sql: string): boolean;
   emptyInsertStatementValue(pk?: string | null): string;
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
   cacheableQuery(
     klass: {
       query?(sql: string): unknown;

@@ -9,18 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "model.ts",
-    "rubyName": "model_name",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:this",
-      "ref:namespace"
-    ],
-    "reason": "naming.rb:275 `ActiveModel::Name.new(self, namespace)` derives the bare name and namespace from the Ruby constant path. A JS class carries no module path, so trails' `ModelName(name, { klass, namespace })` takes the demodulized name and the `moduleName` carrier explicitly (see the block comment at model.ts:1532). Language shortcoming; the namespace-carrier design, not the call, is what would have to change."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "model.ts",
     "rubyName": "validates_each",
     "call": "validates_with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

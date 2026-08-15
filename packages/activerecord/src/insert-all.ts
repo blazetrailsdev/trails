@@ -586,7 +586,7 @@ export interface InsertBuilder {
   conflictTarget(): string;
   returning(): string | undefined;
   updatableColumns(): string[];
-  touchModelTimestampsUnless(block: (col: string) => string, nowValue?: string): string;
+  touchModelTimestampsUnless(block: (col: string) => string): string;
   rawUpdateSql(): Nodes.SqlLiteral | undefined;
   skipDuplicates(): boolean;
   updateDuplicates(): boolean;
@@ -739,30 +739,27 @@ export class Builder implements InsertBuilder {
     return this._insertAll.updatableColumns().map((c) => this.quoteColumn(c));
   }
 
-  touchModelTimestampsUnless(
-    block: (col: string) => string,
-    nowValue = "CURRENT_TIMESTAMP",
-  ): string {
+  touchModelTimestampsUnless(block: (col: string) => string): string {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    const quotedUpdatable = this.updatableColumns();
-    if (quotedUpdatable.length === 0) return "";
-    const updatable = this._insertAll.updatableColumns();
-    const parts: string[] = [];
-    const tableName = this.quotedTableName();
-    const conditions = quotedUpdatable.map(block).join(" AND ");
-    for (const col of this._insertAll.updateTimestampColumnsInModel()) {
-      if (!updatable.includes(col)) {
-        // Rails emits the timestamp column name raw here — only quoted_table_name
-        // is quoted (insert_all.rb:284): `#{column_name}=(CASE WHEN (...) THEN
-        // #{model.quoted_table_name}.#{column_name} ELSE ...)`.
-        parts.push(
-          `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END)`,
-        );
-      }
-    }
-    return parts.join(",");
+    return this._insertAll
+      .updateTimestampColumnsInModel()
+      .filter((columnName) => this.touchTimestampAttribute(columnName))
+      .map(
+        (columnName) =>
+          `${columnName}=(CASE WHEN (${this.updatableColumns()
+            .map(block)
+            .join(" AND ")}) THEN ${this.quotedTableName()}.${columnName} ELSE ${String(
+            this._insertAll.connection.highPrecisionCurrentTimestamp(),
+          )} END),`,
+      )
+      .join("");
+  }
+
+  /** Mirrors Rails `touch_timestamp_attribute?` (insert_all.rb:300-302). @internal */
+  private touchTimestampAttribute(columnName: string): boolean {
+    return !this._insertAll.updatableColumns().includes(columnName);
   }
 
   /** @internal Mirrors Rails `insert.model.quoted_table_name`. */
