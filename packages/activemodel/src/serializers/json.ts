@@ -60,7 +60,7 @@ export class JSON {
    * namespace `model_name` passes to `ActiveModel::Name.new`
    * (naming.rb:271-275).
    *
-   * @noRailsEquivalent Ruby reads the module path off the constant itself
+   * @noRailsEquivalent PERMANENT — Ruby reads the module path off the constant itself
    * (`module_parents`); a JS class name carries no module path, so a
    * namespaced host declares it. Same carrier as `Model.moduleName`.
    */

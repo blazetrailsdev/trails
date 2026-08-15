@@ -10,7 +10,12 @@
  * Rails' own name.
  */
 
-import { deepMerge as deepMergeObj, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
+import {
+  deepMerge as deepMergeObj,
+  isPlainObject,
+  nestedUnderIndifferentAccess,
+  symbolizeKeysBang,
+} from "./hash-utils.js";
 import { KeyError } from "./core-ext/key-error.js";
 
 type AnyObject = Record<string, unknown>;
@@ -20,6 +25,12 @@ type AnyObject = Record<string, unknown>;
  * called with the key, the receiver's value and the other hash's value.
  */
 type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
+
+/**
+ * The `fetch`/`fetch_values` block (hash_with_indifferent_access.rb:195, :253):
+ * called with the converted key when it is not in the hash.
+ */
+type DefaultBlock<V> = (key: string) => V;
 
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
@@ -121,13 +132,21 @@ export class HashWithIndifferentAccess<V = unknown> {
   /**
    * Mirrors `fetch` (hash_with_indifferent_access.rb:195-197) — `Hash#fetch`
    * semantics over the converted key: a stored value wins over the default
-   * (including a stored `null`), an absent key without a default raises
-   * `KeyError`.
+   * (including a stored `null`), an absent key with neither a default nor a
+   * block raises `KeyError`.
+   *
+   * Ruby's block is syntactically separate from `*extras`; JS has no such
+   * separation, so a single trailing function argument is read as the block —
+   * `Hash#fetch` accepts at most one extra anyway, and `counters.fetch(:bar) { 0 }`
+   * has no other spelling here.
    */
-  fetch(key: string, ...extras: V[]): V {
+  fetch(key: string, ...extras: (V | DefaultBlock<V>)[]): V {
     key = this.convertKey(key);
     if (this.data.has(key)) return this.data.get(key)!;
-    if (extras.length > 0) return extras[0];
+    if (extras.length > 0) {
+      const extra = extras[0];
+      return typeof extra === "function" ? (extra as DefaultBlock<V>)(key) : extra;
+    }
     throw new KeyError(`key not found: "${key}"`);
   }
 
@@ -142,8 +161,13 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirrors `fetch_values` (hash_with_indifferent_access.rb:251-254) — like
    * `values_at`, but raises for a key that is not there.
    */
-  fetchValues(...indices: string[]): V[] {
-    return indices.map((key) => this.fetch(key));
+  fetchValues(...args: (string | DefaultBlock<V>)[]): V[] {
+    const indices = [...args];
+    const block =
+      typeof indices[indices.length - 1] === "function"
+        ? (indices.pop() as DefaultBlock<V>)
+        : undefined;
+    return (indices as string[]).map((key) => (block ? this.fetch(key, block) : this.fetch(key)));
   }
 
   get size(): number {
@@ -246,6 +270,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Return a new HashWithIndifferentAccess with only the specified keys.
    */
   slice(...keys: string[]): HashWithIndifferentAccess<V> {
+    keys = keys.map((key) => this.convertKey(key));
     const result = new HashWithIndifferentAccess<V>();
     for (const key of keys) {
       if (this.data.has(key)) {
@@ -425,6 +450,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * assoc — returns [key, value] pair for the given key, or undefined.
    */
   assoc(key: string): [string, V] | undefined {
+    key = this.convertKey(key);
     if (this.data.has(key)) {
       return [key, this.data.get(key)!];
     }
@@ -500,7 +526,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Each intermediate value must be a HashWithIndifferentAccess or support get().
    */
   dig(key: string, ...rest: string[]): unknown {
-    const val = this.data.get(key);
+    const val = this.data.get(this.convertKey(key));
     if (rest.length === 0) return val;
     if (val === null || val === undefined) return undefined;
     if (val instanceof HashWithIndifferentAccess) {
@@ -588,7 +614,7 @@ export class HashWithIndifferentAccess<V = unknown> {
     if (value instanceof HashWithIndifferentAccess) {
       return value.nestedUnderIndifferentAccess() as V;
     } else if (isPlainObject(value)) {
-      return new HashWithIndifferentAccess(value as AnyObject) as V;
+      return nestedUnderIndifferentAccess(value) as V;
     } else if (Array.isArray(value)) {
       let array = value as unknown[];
       if (conversion !== "assignment" || Object.isFrozen(array)) {

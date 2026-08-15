@@ -236,9 +236,13 @@ export class ModelName {
    * path, so the demodulized name comes from the `_demodulizedName` carrier
    * when the class has one, and the namespace is passed in as segments: a
    * single string (`"Blog"`), a segment array (`["Admin", "Blog"]`), or a
-   * module-like object with a string `name` (`{ name: "Blog" }`). `klass` may
-   * also be a bare name string, standing in for Rails' `name` argument for a
-   * `ModelName` built without a class.
+   * module-like object with a string `name` (`{ name: "Blog" }`).
+   *
+   * `klass` also accepts a bare name string. Ruby always has a class or module
+   * to pass, and reaches the same place with the `name` argument
+   * (`ActiveModel::Name.new(Class.new, nil, "Anonymous")`, naming_test.rb:295);
+   * the string arm is that call spelled without the placeholder class, for a
+   * `ModelName` built with no host class to walk for I18n lookup.
    *
    * Field math follows naming.rb:173-184 but operates on the namespace
    * segments directly rather than round-tripping through a Ruby-shaped
