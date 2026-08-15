@@ -400,9 +400,19 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     );
   });
 
-  it("leaves the acts_like.rb reopenings on the default kebab-case rule", () => {
+  it("leaves date/acts_like.rb on the default kebab-case rule", () => {
     expect(hasRubyFileTsOverride("core_ext/date/acts_like.rb", "activesupport")).toBe(false);
-    expect(hasRubyFileTsOverride("core_ext/date_time/acts_like.rb", "activesupport")).toBe(false);
+  });
+
+  it("buckets core_ext/date_time/acts_like.rb onto the Compatibility module", () => {
+    // It is DateTime's FIRST reopening, so `preserve_timezone` and
+    // `utc_to_local_returns_utc_offset_times` — mixed in from
+    // `date_and_time/compatibility.rb` — are stamped with a file that defines
+    // neither. trails carries that pair on the one Compatibility module.
+    expect(hasRubyFileTsOverride("core_ext/date_time/acts_like.rb", "activesupport")).toBe(true);
+    expect(rubyFileToTs("core_ext/date_time/acts_like.rb", "activesupport")).toBe(
+      "core-ext/date-and-time/compatibility.ts",
+    );
   });
 });
 

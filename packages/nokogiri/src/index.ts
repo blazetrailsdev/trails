@@ -10,3 +10,4 @@ export { parseXml, SaxDocument, SaxParser };
 export type { XmlNode, XmlDocument };
 export type { AttrNode } from "./xml/node.js";
 export type { XmlError } from "./xml/document.js";
+export type { Readable } from "./readable.js";

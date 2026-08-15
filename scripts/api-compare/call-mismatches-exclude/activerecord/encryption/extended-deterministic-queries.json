@@ -11,7 +11,7 @@
     "tsFile": "encryption/extended-deterministic-queries.ts",
     "rubyName": "process_arguments",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `owner.deterministic_encrypted_attributes&.empty?` and `type.previous_types.empty?` (extended_deterministic_queries.rb:46,61) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",

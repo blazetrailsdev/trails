@@ -4278,8 +4278,8 @@ export class Base extends Model {
   override async isValid(context?: ValidationContextArg): Promise<boolean> {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
-    const result = await validationsIsValid.call(this, effectiveContext);
-    return result && !this.errors.any;
+    const output = await validationsIsValid.call(this, effectiveContext);
+    return this.errors.empty && output;
   }
 
   // validate / customValidationContext: wired via include() below.

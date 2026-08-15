@@ -101,16 +101,14 @@ export class HasManyAssociation extends CollectionAssociation {
 
     switch (dependent) {
       case "restrictWithException": {
-        const records = await this.loadTarget();
-        if (records.length > 0) {
+        if (!(await this.isEmpty())) {
           throw new DeleteRestrictionError(this.reflection.name);
         }
         break;
       }
 
       case "restrictWithError": {
-        const records = await this.loadTarget();
-        if (records.length > 0) {
+        if (!(await this.isEmpty())) {
           // Rails: owner.errors.add(:base, ...); throw(:abort). The owner is
           // NOT destroyed and no exception is raised — `destroy` returns false.
           // We signal :abort to the before_destroy chain by returning false.

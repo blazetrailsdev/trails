@@ -1,5 +1,6 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
 import { XmlNode } from "./node.js";
+import { type Readable, readSource } from "../readable.js";
 
 export interface XmlError {
   level: "warning" | "error" | "fatal";
@@ -19,10 +20,10 @@ export class XmlDocument {
     this._root = doc !== null ? new XmlNode(doc.root) : null;
   }
 
-  static parse(data: string): XmlDocument {
+  static parse(data: string | Readable): XmlDocument {
     const errors: XmlError[] = [];
     try {
-      const doc = LibXmlDocument.fromString(data);
+      const doc = LibXmlDocument.fromString(readSource(data));
       return new XmlDocument(doc, errors);
     } catch (e) {
       if (e instanceof XmlParseError) {

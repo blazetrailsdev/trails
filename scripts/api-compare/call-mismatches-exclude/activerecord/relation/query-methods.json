@@ -88,7 +88,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_buckets",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `left_outer_joins_values.empty?` / `joins_values.empty?` (query_methods.rb:1828,1838) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
@@ -109,14 +109,14 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_dependencies",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `eager_load_values.empty?` / `includes_values.empty?` (query_methods.rb:1737,1738) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_joins",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `joins_values.empty?` / `left_outer_joins_values.empty?` / `leading_joins.empty?` (query_methods.rb:1882,1891,1893) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
@@ -179,7 +179,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_subquery",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `optimizer_hints_values.empty?` (query_methods.rb:1609) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
@@ -214,7 +214,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_with",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `with_values.empty?` (query_methods.rb:1914) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
@@ -281,7 +281,7 @@
     "tsFile": "relation/query-methods.ts",
     "rubyName": "order_column",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `group_values.empty?` (query_methods.rb:2155) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",

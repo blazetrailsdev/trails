@@ -130,6 +130,6 @@
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "target_version",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `ENV[\"VERSION\"].empty?` (database_tasks.rb:324) — `empty?` on a Ruby String, whose faithful JS spelling is `s === \"\"`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   }
 ]
