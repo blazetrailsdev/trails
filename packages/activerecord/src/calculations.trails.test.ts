@@ -464,4 +464,11 @@ describe("empty-scope aggregate identities", () => {
     expect(await empty.minimum("credit_limit")).toBeNull();
     expect(await empty.maximum("credit_limit")).toBeNull();
   });
+  // Rails' `ids` (calculations.rb:371-405) has no `@none` arm — unlike `pluck`
+  // (:292) — so a `none` relation falls through to the third arm and issues the
+  // `WHERE 1=0` that `none!` seeded (query_methods.rb:1285).
+  it("returns no ids for a none relation", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    expect(await Account.none().ids()).toEqual([]);
+  });
 });

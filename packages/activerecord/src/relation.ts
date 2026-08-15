@@ -3680,23 +3680,15 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#ids
    */
   async ids(): Promise<unknown[]> {
-    // trails models `none` with the `_isEmptyRelation()` chokepoint rather than
-    // Rails' `where!("1=0")` seed, so the contradiction arm below never fires for
-    // it; short-circuit here as `pluck` does.
-    if (this._isEmptyRelation()) return [];
     const pk = this.model.primaryKey as string | string[] | null;
     const primaryKeyArray = Array.isArray(pk) ? pk : pk == null ? [] : [pk];
 
     if (this.loaded) {
       const result = this._records.map((record) => {
         if (primaryKeyArray.length === 1) {
-          return (record as unknown as { _readAttribute(name: string): unknown })._readAttribute(
-            primaryKeyArray[0],
-          );
+          return record._readAttribute(primaryKeyArray[0]);
         }
-        return primaryKeyArray.map((column) =>
-          (record as unknown as { _readAttribute(name: string): unknown })._readAttribute(column),
-        );
+        return primaryKeyArray.map((column) => record._readAttribute(column));
       });
       return result;
     }
@@ -3709,10 +3701,12 @@ export class Relation<T extends Base> {
       // `eager_load_values | includes_values`, and materialize the limited
       // DISTINCT primary keys (`distinct_relation_for_primary_key`, :463) that
       // a synchronous applyJoinDependency cannot execute.
-      // Deduped without a `Set`: Rails' only constructor here is the
-      // `Promise::Complete.new` of the `loaded?` arm (calculations.rb:382),
-      // which trails models with the native async surface, so a `new Set` would
-      // become the body's first constructor and reorder the recorded sequence.
+      // Deduped without a `Set` (unlike `pluck`, whose Ruby body has no `new`):
+      // the only `new` Rails records for `ids` is `Promise::Complete.new` in the
+      // `loaded?` arm (calculations.rb:382), which trails models with the native
+      // async surface, so a `new Set` here is the body's FIRST constructor and
+      // lands after `hasInclude` — measured as a new
+      // `ids order:hasInclude,constructor` call-order row.
       const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
         (spec, i, all) => all.indexOf(spec) === i,
       );
