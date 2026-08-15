@@ -10,12 +10,8 @@
  * Rails' own name.
  */
 
-import {
-  deepMerge as deepMergeObj,
-  isPlainObject,
-  nestedUnderIndifferentAccess,
-  symbolizeKeysBang,
-} from "./hash-utils.js";
+import { deepMerge as deepMergeObj, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
+import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { KeyError } from "./core-ext/key-error.js";
 
 type AnyObject = Record<string, unknown>;
@@ -35,18 +31,14 @@ type DefaultBlock<V> = (key: string) => V;
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
 
-  constructor(constructor?: AnyObject | Map<string, V> | HashWithIndifferentAccess<V>) {
+  constructor(constructor?: AnyObject | HashWithIndifferentAccess<V>) {
     this.data = new Map();
-    if (constructor) {
-      if (constructor instanceof Map) {
-        for (const [key, value] of constructor) {
-          this.data.set(String(key), value);
-        }
-      } else {
-        // Mirrors Rails HashWithIndifferentAccess#initialize, which populates
-        // via `update(constructor)` rather than inlining the copy.
-        this.update(constructor);
-      }
+    // Mirrors `initialize` (hash_with_indifferent_access.rb:70-83): the
+    // populated arm goes through `update`, so every key gets `convert_key` and
+    // every value `convert_value`. Rails' `else super(constructor)` arm sets a
+    // Hash default value, which this class does not model.
+    if (constructor != null) {
+      this.update(constructor);
     }
   }
 

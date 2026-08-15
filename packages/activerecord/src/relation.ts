@@ -4762,6 +4762,16 @@ export class Relation<T extends Base> {
    * relation), the limit/offset materialization guard below is skipped, because
    * Rails only rewrites the relation via `distinct_relation_for_primary_key`
    * when `eager_loading` is truthy.
+   *
+   * The second `using_limitable_reflections?` clause (finder_methods.rb:466-470)
+   * reads `_namedInnerJoins` where Rails reads `joins_values`. Rails'
+   * `select_association_list` (query_methods.rb:1810-1823) keeps only the
+   * `Hash, Symbol, Array` members and drops raw SQL Strings; TypeScript collapses
+   * Ruby's Symbol and String onto one type, so that `when` cannot be spelled by
+   * type — `_namedInnerJoins` is the `joins_values` subset it selects, under the
+   * same discriminator `joins()` itself uses. `left_outer_joins_values` needs no
+   * such subset: `assertValidLeftOuterJoinsBang` already rejects a raw String
+   * there, exactly where Rails raises for it.
    * @internal
    */
   applyJoinDependency({
@@ -4776,7 +4786,8 @@ export class Relation<T extends Base> {
       eagerSpecs as any,
       Nodes.OuterJoin,
     );
-    const rel = this._exceptEagerValues(joinDependency);
+    const rel = this.except("includes", "eagerLoad", "preload");
+    QueryMethodBangs.joinsBang.call(rel as any, joinDependency as any);
 
     // Rails `apply_join_dependency`, for a limit/offset over non-limitable
     // (collection) reflections, replaces the relation with
@@ -4794,7 +4805,17 @@ export class Relation<T extends Base> {
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
     const isLimitable =
       this.usingLimitableReflections(joinDependency.reflections as never) &&
-      this._joinsReflectionsAreLimitable();
+      this.usingLimitableReflections(
+        QueryMethodBangs.constructJoinDependency.call(
+          this as any,
+          _qm.selectAssociationList
+            .call(this as any, this._namedInnerJoins, null)
+            .concat(
+              _qm.selectAssociationList.call(this as any, this._leftOuterJoinsValues, null),
+            ) as AssociationSpec[],
+          null,
+        ).reflections as never,
+      );
     if (eagerLoading && hasLimitOrOffset && !isLimitable) {
       // @nie disposition=TODO
       throw new NotImplementedError(
@@ -4836,67 +4857,20 @@ export class Relation<T extends Base> {
       const limitedIds = await this._materializeLimitedIds(jd, basePk);
       return run(this._applyEagerJoinDependency(jd, basePk, limitedIds));
     }
-    return run(this._exceptEagerValues(jd));
-  }
-
-  /**
-   * Limitability of Rails' first `using_limitable_reflections?` clause: the
-   * reflections of `construct_join_dependency(eager_load_values | includes_values)`
-   * (finder_methods.rb:457-470, join_dependency.rb:81-82). Specs are resolved
-   * through a JoinDependency so nested-hash/array eager chains
-   * (`eagerLoad({ author: "profile" })`) contribute every reflection in the tree
-   * — matching Rails' `JoinDependency#reflections` — rather than short-circuiting
-   * to non-limitable on the first non-string spec. Shares the resolution path
-   * with `_joinsReflectionsAreLimitable`.
-   */
-  private _eagerReflectionsAreLimitable(specs: AssociationSpec[]): boolean {
-    if (specs.length === 0) return true;
-    const jd = this._buildEagerJoinDependency(specs);
-    return this.usingLimitableReflections(jd.reflections);
+    const relation = this.except("includes", "eagerLoad", "preload");
+    QueryMethodBangs.joinsBang.call(relation as any, jd as any);
+    return run(relation);
   }
 
   /**
    * Mirror Rails' two-clause `using_limitable_reflections?` test in
-   * `apply_join_dependency` (finder_methods.rb:464-470): a limit/offset over an
-   * eager join dependency is deferral-free (limitable) only when BOTH the eager
-   * join-dependency reflections (`eager_load_values | includes_values`) AND a
-   * second join-dependency built from
-   * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
-   * are limitable. A collection reflection in joins/leftOuterJoins forces
-   * `distinct_relation_for_primary_key` materialization even when every eager
-   * reflection is singular.
+   * `apply_join_dependency` (finder_methods.rb:464-470) for the callers that
+   * hold the eager specs rather than the built dependency: resolve them through
+   * a JoinDependency, as `construct_join_dependency(eager_load_values |
+   * includes_values, …)` does, and apply the same guard.
    */
   private _applyJoinDependencyIsLimitable(eagerSpecs: AssociationSpec[]): boolean {
-    return this._eagerReflectionsAreLimitable(eagerSpecs) && this._joinsReflectionsAreLimitable();
-  }
-
-  /**
-   * Limitability of Rails' second `using_limitable_reflections?` clause: the
-   * reflections of `construct_join_dependency(select_association_list(joins_values)
-   * .concat(select_association_list(left_outer_joins_values)), nil)`
-   * (finder_methods.rb:466-470). `_namedInnerJoins` holds the association
-   * references routed out of `joins` (Rails' `select_association_list(joins_values)`,
-   * query_methods.rb:1810); `_leftOuterJoinsValues` the same for left joins. Raw
-   * SQL/Arel joins stay in `_joinValues` and are not reflections. Specs are
-   * resolved through a JoinDependency so nested-hash/array chains
-   * (`joins({ account: "profile" })`) contribute every reflection in the tree —
-   * matching Rails' `JoinDependency#reflections` rather than the conservative
-   * eager-spec resolver, which rejects every non-string spec.
-   */
-  private _joinsReflectionsAreLimitable(): boolean {
-    const specs = [...this._namedInnerJoins, ...this._leftOuterJoinsValues];
-    if (specs.length === 0) return true;
-    const mergedReflections: unknown[] = [];
-    const namedSpecs: AssociationSpec[] = [];
-    for (const spec of specs) {
-      if (spec instanceof JoinDependency) {
-        mergedReflections.push(...spec.reflections);
-        continue;
-      }
-      namedSpecs.push(spec);
-    }
-    const jd = this._buildEagerJoinDependency(namedSpecs);
-    return this.usingLimitableReflections([...jd.reflections, ...mergedReflections] as never);
+    return this._eagerJoinDependencyIsLimitable(this._buildEagerJoinDependency(eagerSpecs));
   }
 
   /**
@@ -5165,7 +5139,8 @@ export class Relation<T extends Base> {
     basePk: string | string[],
     limitedIds?: unknown[],
   ): Relation<T> {
-    let rel = this._exceptEagerValues(jd);
+    let rel = this.except("includes", "eagerLoad", "preload");
+    QueryMethodBangs.joinsBang.call(rel as any, jd as any);
     const hasLimit = this._limitValue !== null || this._offsetValue !== null;
     if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
       if (Array.isArray(basePk)) {
@@ -5195,28 +5170,25 @@ export class Relation<T extends Base> {
    * must be non-collection. A collection reflection in `joins`/`leftOuterJoins`
    * forces the distinct-parent-id rewrite even when every eager reflection is
    * singular. Sibling of `_applyJoinDependencyIsLimitable`, which resolves the
-   * first clause from specs instead of a built dependency.
+   * first clause from specs instead of a built dependency. See
+   * {@link applyJoinDependency} for why the second clause reads
+   * `_namedInnerJoins` where Rails reads `joins_values`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
       this.usingLimitableReflections(jd.reflections as never) &&
-      this._joinsReflectionsAreLimitable()
+      this.usingLimitableReflections(
+        QueryMethodBangs.constructJoinDependency.call(
+          this as any,
+          _qm.selectAssociationList
+            .call(this as any, this._namedInnerJoins, null)
+            .concat(
+              _qm.selectAssociationList.call(this as any, this._leftOuterJoinsValues, null),
+            ) as AssociationSpec[],
+          null,
+        ).reflections as never,
+      )
     );
-  }
-
-  /**
-   * Rails `except(:includes, :eager_load, :preload).joins!(join_dependency)`
-   * (finder_methods.rb:460) — the relation rewrite both `apply_join_dependency`
-   * entry points share. With the JoinDependency in `joins_values`, `build_joins`
-   * folds it into the single `join_constraints` call alongside the manual joins,
-   * under one shared AliasTracker and the `walk` dedup.
-   */
-  private _exceptEagerValues(jd: JoinDependency): Relation<T> {
-    const rel = this._withEagerJoinDependency(jd);
-    rel._eagerLoadAssociations = [];
-    rel._includesAssociations = [];
-    rel._preloadAssociations = [];
-    return rel;
   }
 
   /**
