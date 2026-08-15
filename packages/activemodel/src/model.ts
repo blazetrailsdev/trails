@@ -1738,7 +1738,7 @@ export class Model {
     // already applied here — no separate imperative hook.
     let newValue = this._attributes.fetchValue(name);
     newValue = this._applyNullifyBlanks(name, newValue);
-    if (newValue !== this._attributes.fetchValue(name)) {
+    if (!Object.is(newValue, this._attributes.fetchValue(name))) {
       this._attributes.writeCastValue(name, newValue);
     }
     // Route through type.isChanged so numeric semantics (equal_nan?,
