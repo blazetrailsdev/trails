@@ -1,3 +1,4 @@
+import { getCrypto } from "../crypto-adapter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;
@@ -301,15 +302,25 @@ export class Instrumenter {
   }
 
   /**
-   * instrumenter.rb:100-102 — `SecureRandom.hex(10)`. Reads the platform's Web
-   * Crypto global rather than the `CryptoAdapter` seam: the adapter's Node
-   * auto-registration is async-only, and an Instrumenter is built on the
-   * instrumentation path itself, before any host has had a chance to warm it.
+   * instrumenter.rb:100-102 — `SecureRandom.hex(10)`. Prefers the
+   * `CryptoAdapter` seam, so a host that installs its own adapter keeps it
+   * here as at every other call site. The seam's Node auto-registration only
+   * has a CJS arm (`crypto-adapter.ts:178-187` needs `require`), so under pure
+   * ESM it throws until some caller has awaited `getCryptoAsync()` — and an
+   * Instrumenter is built on the instrumentation path itself, before any host
+   * gets that chance. Web Crypto is the fallback for exactly that window; the
+   * seam gap itself is tracked by
+   * `0023-surfaced-deviations/get-crypto-sync-auto-registration-has-no-esm-arm`,
+   * which retires this fallback.
    */
   private uniqueId(): string {
-    const bytes = new Uint8Array(10);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    try {
+      return getCrypto().randomBytes(10).toString("hex");
+    } catch {
+      const bytes = new Uint8Array(10);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    }
   }
 }
 
