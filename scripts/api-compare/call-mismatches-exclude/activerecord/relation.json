@@ -485,24 +485,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "in_batches",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{cursor=ref:cursor,finish=ref:finish,of=ref:of,order=ref:order,relation=ref:this,start=ref:start,useRanges=ref:useRanges}"
-    ],
-    "reason": "batches.rb:268 `BatchEnumerator.new(of:, start:, finish:, relation:, cursor:, order:, use_ranges:)` is a lazy Enumerable that re-derives each batch from the relation on demand. trails' BatchEnumerator wraps an async generator built here, so it takes `(generator, of, { start, finish, relation })`; Ruby's lazy-Enumerator protocol has no async equivalent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "in_batches",
-    "call": "order:actOnIgnoredOrder,map",
-    "reason": "The pre-existing order divergence previously keyed as order:ensureValidOptionsForBatchingBang,map; the first inversion moved when the order stream stopped positioning hoisted-closure calls (RFC 0084)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "in_order_of",
     "call": "build_case_for_value_position",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

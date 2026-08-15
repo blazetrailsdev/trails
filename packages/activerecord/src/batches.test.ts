@@ -886,10 +886,10 @@ describe("EachTest", () => {
   it("in batches should use any column as primary key when start is not specified", async () => {
     const count = Number(await Subscriber.count());
     await assertQueriesCount(count + 1, false, async () => {
-      for await (const relation of Subscriber.inBatches({ of: 1, load: true })) {
+      await Subscriber.inBatches({ of: 1, load: true }, async (relation: any) => {
         expect(relation).toBeInstanceOf(Relation);
         expect(await relation.first()).toBeInstanceOf(Subscriber);
-      }
+      });
     });
   });
 
