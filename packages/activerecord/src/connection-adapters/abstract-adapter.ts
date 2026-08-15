@@ -2239,7 +2239,7 @@ export class AbstractAdapter implements Quoting {
   // The base adapter only knows plain inserts; adapters that support upsert /
   // skip-duplicates override this. `into()` already bundles the VALUES list,
   // mirroring `"INSERT #{insert.into} #{insert.values_list}"`.
-  buildInsertSql(insert: InsertBuilder): string {
+  async buildInsertSql(insert: InsertBuilder): Promise<string> {
     if (insert.skipDuplicates() || insert.updateDuplicates()) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:843
       throw new NotImplementedError(

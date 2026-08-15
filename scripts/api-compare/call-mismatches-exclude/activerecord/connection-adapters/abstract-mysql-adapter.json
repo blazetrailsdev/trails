@@ -16,20 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_insert_sql",
-    "call": "quote_table_name",
-    "reason": "Verified per-site (RFC 0106): same arm as the `table_name` row — `quote_table_name(\"#{insert.model.table_name.parameterize}_values\")` (abstract_mysql_adapter.rb:646) is only reached under `supports_insert_raw_alias_syntax?`, which a synchronous `buildInsertSql` cannot await."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "build_insert_sql",
-    "call": "table_name",
-    "reason": "Verified per-site (RFC 0106): both calls live only in the `supports_insert_raw_alias_syntax?` arm (abstract_mysql_adapter.rb:644-661), which trails does not emit — `supportsInsertRawAliasSyntax()` is async and `buildInsertSql` is a synchronous adapter hook, so the MySQL 8.0.19 row-alias INSERT form cannot be selected from here. Tracked separately as the async-buildInsertSql convergence."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "columns_for_distinct",
     "call": "compact_blank",
     "kind": "args",

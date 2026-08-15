@@ -3049,7 +3049,7 @@ export class PostgreSQLAdapter
   // Like the SQLite form, but the timestamp-touch guard uses
   // `<table>.<col> IS NOT DISTINCT FROM excluded.<col>` (Rails qualifies the
   // target with the table name and uses Postgres-correct NULL comparison).
-  override buildInsertSql(insert: InsertBuilder): string {
+  override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     let sql = `INSERT ${insert.into()}`;
 
     if (insert.skipDuplicates()) {
