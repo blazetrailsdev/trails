@@ -311,6 +311,23 @@ export class Time {
   }
 
   /**
+   * Ruby `Time.local`, the singleton `Time.mktime` is aliased to
+   * (`time.c`: both names bind `time_s_mktime`), so it takes the same
+   * positionals and builds in the LOCAL zone too.
+   */
+  static local(
+    year: number,
+    month: number,
+    day: number,
+    hour = 0,
+    min = 0,
+    sec: number | Rational = 0,
+    usec?: number,
+  ): Time {
+    return Time.mktime(year, month, day, hour, min, sec, usec);
+  }
+
+  /**
    * Ruby `Time.new(year, month, day, hour = 0, min = 0, sec = 0, zone = nil)`,
    * which builds a time in the *local* zone unless `zone` gives an offset.
    * `Time.utc` is the UTC entry point, as in Ruby, and `zone` takes the

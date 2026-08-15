@@ -25,6 +25,7 @@ export type NamingClass =
   | "ivar-underscore"
   | "module-mixin-call"
   | "block-idiom"
+  | "ivar-reflection"
   | "burndown";
 
 export interface NamingClassInfo {
@@ -81,6 +82,15 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "the recorder sees `instance_exec` against `block`.",
   },
   {
+    name: "ivar-reflection",
+    permanent: true,
+    reason:
+      "Ruby reflection reaching another object's ivar — `becoming.instance_variable_get(:@attributes)` " +
+      "(persistence.rb:491). TS has no counterpart and needs none: the field is read or written " +
+      "directly (`becoming._attributes`), which is the only shape the language offers, so the " +
+      "recorder sees the ivar's own name where Ruby names the reflection accessor.",
+  },
+  {
     name: "module-mixin-receiver",
     permanent: false,
     reason:
@@ -95,6 +105,18 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "the recorder-shape minority. Free fidelity: rename it. Never baseline it.",
   },
 ];
+
+/**
+ * Ruby's ivar reflection accessors. A TS call site reads or writes the field
+ * itself, so the recorded TS identifier is the ivar's own name whatever it is —
+ * the class keys on the RUBY side alone.
+ */
+export const IVAR_REFLECTION_ACCESSORS = new Set([
+  "instance_variable_get",
+  "instanceVariableGet",
+  "instance_variable_set",
+  "instanceVariableSet",
+]);
 
 /** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
 export const JS_RESERVED_WORDS = new Set(
@@ -161,6 +183,9 @@ function isThisTypedFunction(rubyRef: string, thisTypedFunctions?: ReadonlySet<s
  *   receiver arm runs FIRST — `this` is a keyword in both languages, and
  *   reading these rows as unconvergeable would baseline the one class that
  *   converges by rewiring.
+ * - Ruby's ivar reflection accessors are read off the RUBY side alone: the TS
+ *   counterpart is the field access itself, so its identifier is the ivar's
+ *   name and carries no fixed spelling to match on.
  * - A name that is both a reserved word and a conventions rename is
  *   unconvergeable for the stronger reason, so the reserved arm precedes it.
  * - {@link NO_JS_EQUIVALENT} is read with `Object.hasOwn`: a Ruby name like
@@ -187,6 +212,7 @@ export function classifyPair(
 ): NamingClass {
   if (rubyRef === "self" || rubyRef === "this") return "module-mixin-receiver";
   if (JS_RESERVED_WORDS.has(rubyRef)) return "js-reserved-word";
+  if (IVAR_REFLECTION_ACCESSORS.has(rubyRef)) return "ivar-reflection";
   const noJsEquivalent = Object.hasOwn(NO_JS_EQUIVALENT, rubyRef)
     ? NO_JS_EQUIVALENT[rubyRef]
     : NO_JS_EQUIVALENT_BY_CAMEL.get(rubyRef);

@@ -11,28 +11,28 @@
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): Rails' `except(:includes, :eager_load, :preload).joins!(join_dependency)` (finder_methods.rb:461) is spelled by `_exceptEagerValues(jd)`, which performs exactly that rewrite; the extraction exists because trails has three apply-join-dependency entry points (sync, async, eager) sharing the one Rails expression."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "select_association_list",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): Rails re-selects the association subset of joins_values/left_outer_joins_values here (finder_methods.rb:466-470); trails routes named association joins out at `joins()` time into `_namedInnerJoins`/`_leftOuterJoinsValues`, so the selection is already done and `_joinsReflectionsAreLimitable` reads those lists directly."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): the call sits in Rails' `distinct_relation_for_primary_key` arm (finder_methods.rb:473-477), which executes a query. The synchronous `applyJoinDependency` cannot and throws NotImplementedError instead; the awaitable `_applyJoinDependencyAsync` carries that arm, and the gate matches only the Rails-named method."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): same arm as the `skip_query_cache_if_necessary` row — `model.with_connection { |c| c.distinct_relation_for_primary_key(relation) }` (finder_methods.rb:474-476) is only reachable from the awaitable `_applyJoinDependencyAsync`, since the synchronous entry point cannot run the query."
   },
   {
     "package": "activerecord",
@@ -46,27 +46,6 @@
     "tsFile": "relation.ts",
     "rubyName": "arel",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "batch_on_unloaded_relation",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "batch_on_unloaded_relation",
-    "call": "apply_finish_limit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "batch_on_unloaded_relation",
-    "call": "where",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -108,36 +87,8 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "create",
-    "call": "current_scope_restoring_block",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "create",
     "call": "relation_class_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "create",
-    "call": "scoping",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "create!",
-    "call": "current_scope_restoring_block",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "create!",
-    "call": "scoping",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): homonym. `relation_class_for` is called by `Relation::ClassMethods.create(model, ...)` (delegation.rb:139-141), the relation-class constructor; relation.ts's `create` ports the unrelated `Relation#create(attributes, &block)` (relation.rb:154-161), which makes no such call."
   },
   {
     "package": "activerecord",
@@ -170,23 +121,9 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "ensure_valid_options_for_batching!",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `(Array(index.columns) - cursor).empty?` (batches.rb:316) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "except",
     "call": "relation_with",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `relation_with values.except(*skips)` (spawn_methods.rb:59-61) writes a whole `@values` hash back onto a spawned clone. trails keeps query state in typed fields, not a `@values` hash — `values()` is a read-only snapshot with no writable counterpart — so the clone is reset key by key via `_resetExceptValue`, which is the same per-key erasure."
   },
   {
     "package": "activerecord",
@@ -240,23 +177,16 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "exists?",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "find_each",
     "call": "apply_limits",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): the call is inside `enum_for(:find_each, ...) { ... }`'s size lambda (batches.rb:92-95), which reports the enumerator's `size` without iterating. trails' `findEach` is an async generator, which has no size hook, so the no-block arm has no body to port."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "find_in_batches",
     "call": "apply_limits",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): the call is inside `to_enum(:find_in_batches, ...)`'s size lambda (batches.rb:164-168), computing the batch count for `Enumerator#size`. trails' `findInBatches` is an async generator with no size hook, so that arm has no body to port."
   },
   {
     "package": "activerecord",
@@ -308,14 +238,14 @@
     "tsFile": "relation.ts",
     "rubyName": "only",
     "call": "relation_with",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `relation_with values.slice(*onlies)` (spawn_methods.rb:66-68) writes a whole `@values` hash back onto a spawned clone; trails' relation state lives in typed fields with no writable `@values`, so the clone resets the complement of `onlies` via `_resetExceptValue`."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "only",
     "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `values.slice(*onlies)` (spawn_methods.rb:67) selects hash keys; with no `@values` hash to slice, trails iterates `EXCEPT_ONLY_KEYS` and resets every key not in `onlies` — the complement of the same selection."
   },
   {
     "package": "activerecord",
@@ -329,13 +259,6 @@
     "tsFile": "relation.ts",
     "rubyName": "pluck",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "record_cursor_values",
-    "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -413,13 +336,6 @@
     "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

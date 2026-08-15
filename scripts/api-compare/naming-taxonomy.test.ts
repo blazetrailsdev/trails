@@ -74,6 +74,11 @@ describe("classifyPair", () => {
   it("names the block idiom Ruby writes as instance_exec", () => {
     expect(classifyPair("instance_exec", "block")).toBe("block-idiom");
     expect(classifyPair("instanceExec", "block")).toBe("block-idiom");
+    // Ruby reflection reaching another object's ivar: the TS side is the field
+    // read itself (persistence.rb:491 `becoming.instance_variable_get(:@attributes)`
+    // → `becoming._attributes`), so the class keys on the Ruby name alone.
+    expect(classifyPair("instanceVariableGet", "_attributes")).toBe("ivar-reflection");
+    expect(classifyPair("instance_variable_set", "_attributes")).toBe("ivar-reflection");
     expect(classifyPair("instance_exec", "proc")).toBe("burndown");
   });
 });
@@ -104,6 +109,7 @@ describe("the taxonomy itself", () => {
       "ivar-underscore",
       "module-mixin-call",
       "block-idiom",
+      "ivar-reflection",
     ]);
   });
 

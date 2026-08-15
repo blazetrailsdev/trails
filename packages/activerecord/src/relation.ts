@@ -70,15 +70,9 @@ import * as _qm from "./relation/query-methods.js";
 import { seedJoinClauseAliases } from "./relation/merged-join-alias-tracker.js";
 import {
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
-  applyLimits as _applyLimits,
-  applyStartLimit as _applyStartLimit,
-  applyFinishLimit as _applyFinishLimit,
-  batchCondition as _batchCondition,
   buildBatchOrders as _buildBatchOrders,
   actOnIgnoredOrder as _actOnIgnoredOrder,
   batchOnLoadedRelation as _batchOnLoadedRelation,
-  recordCursorValues as _recordCursorValues,
-  compareValuesForOrder as _compareValuesForOrder,
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
 } from "./relation/batches.js";
 import {
@@ -2216,9 +2210,11 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = this.build(attrs, block);
-    await record.save();
-    return record;
+    // Rails: `block = current_scope_restoring_block(&block); scoping { _create(attributes, &block) }`
+    // (relation.rb:158-159) — the record is built by `model.create` *under* this
+    // relation's scope, while the user block runs with the PRIOR scope restored.
+    const restoring = this.currentScopeRestoringBlock(block);
+    return await this.scoping(() => this._create(attrs, restoring));
   }
 
   /**
@@ -2239,9 +2235,10 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    const record = this.build(attrs, block);
-    await record.saveBang();
-    return record;
+    // Rails: `block = current_scope_restoring_block(&block); scoping { _create!(attributes, &block) }`
+    // (relation.rb:173-174).
+    const restoring = this.currentScopeRestoringBlock(block);
+    return await this.scoping(() => this._createBang(attrs, restoring));
   }
 
   /**
@@ -2466,114 +2463,123 @@ export class Relation<T extends Base> {
   }
 
   private async _toArrayInner(): Promise<T[]> {
-    // Lazily reflect the schema before issuing the query so consumers
-    // don't have to call loadSchema explicitly. Idempotent and cheap.
-    await (this._model as unknown as { ensureSchemaLoaded(): Promise<void> }).ensureSchemaLoaded();
+    // Rails wraps the whole of `exec_queries` — the main query, the record
+    // instantiation and `preload_associations` alike — in one
+    // `skip_query_cache_if_necessary` block (relation.rb:1403-1419), so a
+    // `skip_query_cache!` relation bypasses the cache for its preload queries
+    // too, not just for its own SELECT.
+    return this.skipQueryCacheIfNecessary(async () => {
+      // Lazily reflect the schema before issuing the query so consumers
+      // don't have to call loadSchema explicitly. Idempotent and cheap.
+      await (
+        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
+      ).ensureSchemaLoaded();
 
-    // Rails materializes a `distinct_relation_for_primary_key` subquery value
-    // (an eager-loading relation with limit/offset over a collection reflection)
-    // into a literal id list inside `.where()`. trails' `.where()` is sync, so
-    // the materialization is deferred to here — run it before the contradiction
-    // check so an empty id set becomes an empty `IN` (no-query empty result).
-    await this._materializeDeferredDistinctPkPredicates();
+      // Rails materializes a `distinct_relation_for_primary_key` subquery value
+      // (an eager-loading relation with limit/offset over a collection reflection)
+      // into a literal id list inside `.where()`. trails' `.where()` is sync, so
+      // the materialization is deferred to here — run it before the contradiction
+      // check so an empty id set becomes an empty `IN` (no-query empty result).
+      await this._materializeDeferredDistinctPkPredicates();
 
-    // Rails Relation#exec_main_query short-circuits a contradictory
-    // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
-    // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
-    // SELECT is sent and `.explain` collects zero queries. Distinct from
-    // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
-    if (this._whereClause.isContradiction()) {
-      this.loadRecords([]);
-      return [];
-    }
-
-    // Capture the load token before any await so we can detect if a
-    // reset() landed while the query was in flight and bail without
-    // clobbering the fresh state.
-    const token = this._loadToken;
-
-    // Rails: `includes(:assoc).references(:assocs_table)` promotes the
-    // matching includes to eager_load so the JOIN is present — otherwise
-    // a raw where condition referring to that table would fail.
-    // See ActiveRecord::Relation#references_eager_loaded_tables?
-    const promotedIncludes = [
-      ...new Set([
-        ...this._includesToPromoteFromReferences(),
-        ...this._includesToPromoteFromJoins(),
-      ]),
-    ];
-
-    // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
-    // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
-    // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
-    // the eager-loading `select_all(relation.arel, "SQL", async: async)`
-    // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
-    // querying.rb:67-68). This method is that `exec_main_query`, so the value
-    // is computed once here and threaded into both.
-    const c = this._conn();
-    const async =
-      this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
-
-    let loadedRecords: T[];
-    if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
-      const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
-      await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
-      if (token !== this._loadToken) return [];
-      loadedRecords = this._records;
-      this.loadRecords(loadedRecords);
-    } else {
-      const sql = this._toSql();
-      // _compileSelectSql captures the SELECT's retryability and bind values
-      // into _lastSelectRetryable/_lastSelectBinds at compile time. Reading the
-      // visitor's collector here would be wrong: from(ArelNode) recompiles and
-      // resets it.
-      const allowRetry = this._lastSelectRetryable;
-      // Awaiting the FutureResult here is trails' `future.result` in
-      // `exec_queries` (relation.rb:1408).
-      const result = await this.skipQueryCacheIfNecessary(() =>
-        c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
-          allowRetry,
-          preparable: this._lastSelectPreparable,
-          async,
-        }),
-      );
-      if (token !== this._loadToken) return [];
-      const rows = result.toArray();
-      loadedRecords = this._instrumentInstantiation(
-        rows,
-        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-      );
-      this.loadRecords(loadedRecords);
-    }
-
-    // Apply readonly and strict_loading flags to loaded records
-    if (this._isReadonly) {
-      for (const record of this._records) {
-        (record as any)._readonly = true;
+      // Rails Relation#exec_main_query short-circuits a contradictory
+      // where-clause (e.g. `where(id: [])`, which compiles to an empty `IN`)
+      // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
+      // SELECT is sent and `.explain` collects zero queries. Distinct from
+      // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
+      if (this._whereClause.isContradiction()) {
+        this.loadRecords([]);
+        return [];
       }
-    }
-    if (this._isStrictLoading !== undefined) {
-      for (const record of this._records) {
-        (record as any)._strictLoading = this._isStrictLoading;
+
+      // Capture the load token before any await so we can detect if a
+      // reset() landed while the query was in flight and bail without
+      // clobbering the fresh state.
+      const token = this._loadToken;
+
+      // Rails: `includes(:assoc).references(:assocs_table)` promotes the
+      // matching includes to eager_load so the JOIN is present — otherwise
+      // a raw where condition referring to that table would fail.
+      // See ActiveRecord::Relation#references_eager_loaded_tables?
+      const promotedIncludes = [
+        ...new Set([
+          ...this._includesToPromoteFromReferences(),
+          ...this._includesToPromoteFromJoins(),
+        ]),
+      ];
+
+      // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
+      // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
+      // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
+      // the eager-loading `select_all(relation.arel, "SQL", async: async)`
+      // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
+      // querying.rb:67-68). This method is that `exec_main_query`, so the value
+      // is computed once here and threaded into both.
+      const c = this._conn();
+      const async =
+        this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+
+      let loadedRecords: T[];
+      if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
+        const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
+        await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
+        if (token !== this._loadToken) return [];
+        loadedRecords = this._records;
+        this.loadRecords(loadedRecords);
+      } else {
+        const sql = this._toSql();
+        // _compileSelectSql captures the SELECT's retryability and bind values
+        // into _lastSelectRetryable/_lastSelectBinds at compile time. Reading the
+        // visitor's collector here would be wrong: from(ArelNode) recompiles and
+        // resets it.
+        const allowRetry = this._lastSelectRetryable;
+        // Awaiting the FutureResult here is trails' `future.result` in
+        // `exec_queries` (relation.rb:1408).
+        const result = await this.skipQueryCacheIfNecessary(() =>
+          c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
+            allowRetry,
+            preparable: this._lastSelectPreparable,
+            async,
+          }),
+        );
+        if (token !== this._loadToken) return [];
+        const rows = result.toArray();
+        loadedRecords = this._instrumentInstantiation(
+          rows,
+          result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+        );
+        this.loadRecords(loadedRecords);
       }
-    }
 
-    // Preload associations via separate queries. Rails builds this list as
-    // `preload = preload_values; preload += includes_values unless eager_loading?`
-    // (relation.rb:1321-1322) — preload_values FIRST, then any includes not
-    // already eager-loaded via JOIN. Order matters now that each spec runs as
-    // its own sequential `Preloader.call()`, so the query-issue sequence matches
-    // Rails for relations mixing `.preload(...)` and `.includes(...)`.
-    const preloadAssocs = [
-      ...this._preloadAssociations,
-      ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
-    ];
-    if (preloadAssocs.length > 0 && this._records.length > 0) {
-      await this.preloadAssociations(this._records, preloadAssocs);
-      if (token !== this._loadToken) return [];
-    }
+      // Apply readonly and strict_loading flags to loaded records
+      if (this._isReadonly) {
+        for (const record of this._records) {
+          (record as any)._readonly = true;
+        }
+      }
+      if (this._isStrictLoading !== undefined) {
+        for (const record of this._records) {
+          (record as any)._strictLoading = this._isStrictLoading;
+        }
+      }
 
-    return [...this._records];
+      // Preload associations via separate queries. Rails builds this list as
+      // `preload = preload_values; preload += includes_values unless eager_loading?`
+      // (relation.rb:1321-1322) — preload_values FIRST, then any includes not
+      // already eager-loaded via JOIN. Order matters now that each spec runs as
+      // its own sequential `Preloader.call()`, so the query-issue sequence matches
+      // Rails for relations mixing `.preload(...)` and `.includes(...)`.
+      const preloadAssocs = [
+        ...this._preloadAssociations,
+        ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
+      ];
+      if (preloadAssocs.length > 0 && this._records.length > 0) {
+        await this.preloadAssociations(this._records, preloadAssocs);
+        if (token !== this._loadToken) return [];
+      }
+
+      return [...this._records];
+    });
   }
 
   /**
@@ -3447,16 +3453,19 @@ export class Relation<T extends Base> {
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = this._compileAstWithBinds(probe.toArel().ast);
-    // Rails: `select_rows(relation.arel, "#{name} Exists?")` — the cached read
-    // path (select_rows → select_all), so repeated `exists?` probes inside a
-    // `cache` block are served from the query cache. Routing through the raw
-    // `execute()` here would bypass the cached `selectAll` override.
-    const rows = await this._withQueryConnection(() =>
-      this._conn().selectRows(existsSql, `${this.model.name} Exists?`, existsBinds),
+    // Rails: `skip_query_cache_if_necessary { with_connection { |c|
+    // c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
+    // (finder_methods.rb:377-381) — the cached read path (select_rows →
+    // select_all), so repeated `exists?` probes inside a `cache` block are
+    // served from the query cache, and `skip_query_cache!` bypasses it.
+    // With LIMIT 1 the probe returns at most one row, so a non-empty result
+    // means a match.
+    return await this.skipQueryCacheIfNecessary(() =>
+      this.withConnection(
+        async (c) =>
+          (await c.selectRows(existsSql, `${this.model.name} Exists?`, existsBinds)).length === 1,
+      ),
     );
-    // Rails: `select_rows(...).size == 1` — with LIMIT 1 the probe returns at
-    // most one row, so a non-empty result means a match.
-    return rows.length === 1;
   }
 
   // -- Async query interface (Rails 7.0+) --
@@ -6922,12 +6931,15 @@ export class Relation<T extends Base> {
     return new (this.model as any)(attributes) as T;
   }
 
-  private _create(attributes: Record<string, unknown>): Promise<T> {
-    return (this.model as any).create(attributes);
+  private _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
+    return (this.model as any).create(attributes, block);
   }
 
-  private _createBang(attributes: Record<string, unknown>): Promise<T> {
-    return (this.model as any).createBang(attributes);
+  private _createBang(
+    attributes: Record<string, unknown>,
+    block?: (record: T) => void,
+  ): Promise<T> {
+    return (this.model as any).createBang(attributes, block);
   }
 
   private _scoping<R>(scope: any, registry: any, fn: () => R): R {
@@ -7229,97 +7241,8 @@ export class Relation<T extends Base> {
   // ---------------------------------------------------------------------------
 
   /** @internal */
-  private ensureValidOptionsForBatchingBang(
-    cursor: string | string[],
-    start: unknown,
-    finish: unknown,
-    order: "asc" | "desc" | ("asc" | "desc")[],
-  ): Promise<void> {
-    return _ensureValidOptionsForBatchingBang(this, cursor, start, finish, order);
-  }
-
-  /** @internal */
-  private applyLimits(
-    cursor: string | string[],
-    start: unknown,
-    finish: unknown,
-    batchOrders: [string, "asc" | "desc"][],
-  ): this {
-    return _applyLimits(this, cursor, start, finish, batchOrders) as this;
-  }
-
-  /** @internal */
-  private applyStartLimit(
-    cursor: string | string[],
-    start: unknown,
-    batchOrders: [string, "asc" | "desc"][],
-  ): this {
-    return _applyStartLimit(this, cursor, start, batchOrders) as this;
-  }
-
-  /** @internal */
-  private applyFinishLimit(
-    cursor: string | string[],
-    finish: unknown,
-    batchOrders: [string, "asc" | "desc"][],
-  ): this {
-    return _applyFinishLimit(this, cursor, finish, batchOrders) as this;
-  }
-
-  /** @internal */
-  private batchCondition(cursor: string | string[], values: unknown, operators: string[]): this {
-    return _batchCondition(this, cursor, values, operators) as this;
-  }
-
-  /** @internal */
-  private buildBatchOrders(
-    cursor: string | string[],
-    order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
-  ): [string, "asc" | "desc"][] {
-    return _buildBatchOrders(cursor, order);
-  }
-
-  /** @internal */
   private actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
     _actOnIgnoredOrder(this, errorOnIgnore);
-  }
-
-  /** @internal */
-  private batchOnLoadedRelation(opts: {
-    start: unknown;
-    finish: unknown;
-    cursor: string | string[];
-    order: "asc" | "desc" | ("asc" | "desc")[];
-    batchLimit: number;
-  }): T[][] {
-    return _batchOnLoadedRelation({ relation: this, ...opts });
-  }
-
-  /** @internal */
-  private recordCursorValues(record: T, cursor: string | string[]): unknown[] {
-    return _recordCursorValues(record, cursor);
-  }
-
-  /** @internal */
-  private compareValuesForOrder(
-    values1: unknown[],
-    values2: unknown[],
-    order: ("asc" | "desc")[],
-  ): number {
-    return _compareValuesForOrder(values1, values2, order);
-  }
-
-  /** @internal */
-  private batchOnUnloadedRelation(opts: {
-    start: unknown;
-    finish: unknown;
-    cursor: string[];
-    order: "asc" | "desc" | ("asc" | "desc")[];
-    batchLimit: number;
-    load?: boolean;
-    useRanges?: boolean | null;
-  }): AsyncGenerator<{ rows: T[]; useRanges: boolean }> {
-    return _batchOnUnloadedRelation({ relation: this, ...opts });
   }
 
   // ---------------------------------------------------------------------------
