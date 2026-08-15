@@ -797,13 +797,20 @@ export class UnknownAttributeReference extends ActiveRecordError {
   }
 }
 
-export class UnknownPrimaryKey extends ActiveRecordError {
-  readonly model: typeof import("./base.js").Base | null;
+/** @noRailsEquivalent Ruby is duck-typed; TS needs a name for `table_name`. */
+type UnknownPrimaryKeyModel = { readonly tableName: string; readonly name?: unknown };
 
-  constructor(model?: typeof import("./base.js").Base | null, description?: string) {
+export class UnknownPrimaryKey extends ActiveRecordError {
+  // Rails takes whatever responds to `table_name` — `token_for.rb:42` raises
+  // it with a Relation, not a model class (errors.rb:475).
+  readonly model: UnknownPrimaryKeyModel | null;
+
+  constructor(model?: UnknownPrimaryKeyModel | null, description?: string) {
     let msg: string;
     if (model) {
-      msg = `Unknown primary key for table ${model.tableName} in model ${model.name}.`;
+      // Ruby's `#{model}` (errors.rb:477): a Class interpolates as its name,
+      // anything else as its own `to_s`.
+      msg = `Unknown primary key for table ${model.tableName} in model ${String(model.name ?? model)}.`;
       if (description) msg += `\n${description}`;
     } else {
       msg = "Unknown primary key.";

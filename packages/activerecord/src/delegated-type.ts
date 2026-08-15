@@ -53,7 +53,7 @@ const delegatedTypeRegistry = new WeakMap<
  *
  * This adds:
  *   - entry.entryableClass         → constantized model class for the current foreign_type (Rails: `entryable_class`)
- *   - entry.entryableName          → StringInquirer (e.g. inquiry("message"))
+ *   - entry.entryableName          → StringInquirer (e.g. inquiry.call("message"))
  *   - entry.isMessage()            → type predicate
  *   - entry.isComment()            → type predicate
  *   - Entry.messages()             → scope (returns Relation)
@@ -133,7 +133,7 @@ export function delegatedType(
       // Rails: model_name.singular == name.underscore.tr("/", "_").
       // "Access::NoticeMessage" → "access/notice_message" → "access_notice_message".
       const singular = underscore(typeName).replace(/\//g, "_");
-      return inquiry(singular);
+      return inquiry.call(singular);
     },
     configurable: true,
   });

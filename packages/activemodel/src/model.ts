@@ -794,6 +794,14 @@ export class Model {
       }
       this._registerValidator(validator, explicitAttributes);
 
+      // The `validator.validate(...)` calls below carry the RECORD, which is a
+      // callback parameter here, not a receiver: this is the CLASS-side
+      // `validates_with` (with.rb:88-105), whose Rails body ends in
+      // `validate(validator, options)` and never invokes the validator itself.
+      // The recorder pairs them with the INSTANCE `validates_with`
+      // (with.rb:143-151), whose `validator.validate(self)` trails has no
+      // counterpart for — a real gap, filed as
+      // `activemodel-instance-validates-with`, not a receiver-parameter shape.
       let callbackFn: CallbackFn;
       if (isStrict) {
         callbackFn = (record: object) => {

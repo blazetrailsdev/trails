@@ -176,5 +176,5 @@ export class Reloader extends ExecutionWrapper {
   }
 }
 
-classAttribute(Reloader, "executor", { default: Executor });
-classAttribute(Reloader, "check", { default: () => false });
+classAttribute.call(Reloader, "executor", { default: Executor });
+classAttribute.call(Reloader, "check", { default: () => false });

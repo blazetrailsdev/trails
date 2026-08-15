@@ -47,8 +47,10 @@ export class StringInquirer {
 }
 
 /**
- * Factory — mirrors Rails' String#inquiry core ext.
+ * `String#inquiry` (core_ext/string/inquiry.rb:11-13). Ruby reopens String, so
+ * the receiver is `self`; TS spells that with the `this`-typed mixin idiom
+ * (CLAUDE.md, _Module mixins_) and callers write `inquiry.call(str)`.
  */
-export function inquiry(value: string): StringInquirer & Record<string, () => boolean> {
-  return new StringInquirer(value) as any;
+export function inquiry(this: string): StringInquirer & Record<string, () => boolean> {
+  return new StringInquirer(this) as any;
 }

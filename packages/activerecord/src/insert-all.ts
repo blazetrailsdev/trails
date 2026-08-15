@@ -148,9 +148,7 @@ export class InsertAll {
    * @internal
    */
   async toSql(): Promise<string> {
-    return this.connection.buildInsertSql(
-      new Builder(this, this.connection.adapterName as AdapterName),
-    );
+    return this.connection.buildInsertSql(new Builder(this));
   }
 
   updatableColumns(): string[] {
@@ -619,10 +617,14 @@ export class Builder implements InsertBuilder {
   private _insertAll: InsertAll;
   private _dialect: AdapterDialect;
 
-  constructor(insertAll: InsertAll, dialect: AdapterDialect = "sqlite") {
+  // Rails: `@insert_all, @model, @connection = insert_all, insert_all.model,
+  // insert_all.connection` (insert_all.rb:229-231). `_dialect` stands in for
+  // `@connection`, which the SQL fragments below only ever consult for its
+  // adapter name.
+  constructor(insertAll: InsertAll) {
     this._insertAll = insertAll;
     this.model = insertAll.model;
-    this._dialect = dialect;
+    this._dialect = insertAll.connection.adapterName as AdapterDialect;
   }
 
   /** Mirrors Rails `quote_column` → `connection.quote_column_name`. @internal */
