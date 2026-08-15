@@ -30,13 +30,10 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   it("schema dump", async () => {
     const output = (await SchemaDumper.dump(adapter)).join("\n");
 
-    // Internal FTS5 shadow tables (e.g. searchables_docsize) must not appear
-    expect(output).not.toMatch(/searchables_docsize/);
-    // The virtual table definition must appear
-    expect(output).toContain('createVirtualTable("searchables", "fts5"');
-    expect(output).toContain('"content"');
-    expect(output).toContain('"meta UNINDEXED"');
-    expect(output).toContain("\"tokenize='porter ascii'\"");
+    expect(output).not.toContain("searchables_docsize");
+    expect(output).toContain(
+      `createVirtualTable("searchables", "fts5", ${JSON.stringify(["content", "meta UNINDEXED", "tokenize='porter ascii'"])})`,
+    );
   });
 
   it("schema load", async () => {

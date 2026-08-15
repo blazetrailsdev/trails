@@ -4,6 +4,7 @@ import { numberToHuman } from "../number-helper.js";
 import { Duration } from "../duration.js";
 import { Numeric } from "./numeric/bytes.js";
 import { NumericWithFormat } from "./numeric/conversions.js";
+import { BigDecimal } from "./big-decimal/conversions.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -391,6 +392,7 @@ describe("NumericExtFormattingTest", () => {
     expect(NumericWithFormat.toFs(1230, ":human")).toBe("1.23 Thousand");
     expect(NumericWithFormat.toFs(Number(1230), ":human")).toBe("1.23 Thousand");
     expect(NumericWithFormat.toFs(100 ** 10, ":human")).toBe("100000 Quadrillion");
+    expect(NumericWithFormat.toFs(new BigDecimal("1000010"), ":human")).toBe("1 Million");
   });
 
   it("to fs with invalid formatter", () => {
@@ -398,6 +400,7 @@ describe("NumericExtFormattingTest", () => {
     expect(NumericWithFormat.toFormattedS(123, ":invalid")).toBe("123");
     expect(NumericWithFormat.toFs(2.5, ":invalid")).toBe("2.5");
     expect(NumericWithFormat.toFs(100 ** 10, ":invalid")).toBe("100000000000000000000");
+    expect(NumericWithFormat.toFs(new BigDecimal("1000010"), ":invalid")).toBe("1000010.0");
   });
 
   it("default to fs", () => {

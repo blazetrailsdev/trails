@@ -1,4 +1,5 @@
 import { NumberHelper } from "../../number-helper.js";
+import { BigDecimal } from "../big-decimal/conversions.js";
 
 /**
  * Mirrors: `ActiveSupport::NumericWithFormat`
@@ -28,17 +29,20 @@ export namespace NumericWithFormat {
    * separates that arm from the format Symbols below. Ruby's trailing
    * `else to_s(format)` arm takes a format that is none of those three types,
    * which this parameter type excludes, so the `when Symbol` fallback to `to_s`
-   * is the last arm here.
+   * is the last arm here. `to_s(format)` dispatches on the receiver:
+   * `BigDecimal#to_s` takes a format string, `Integer#to_s` a base.
    */
   export function toFs(
-    self: number,
+    self: number | BigDecimal,
     format: number | string | null = null,
     options: Record<string, unknown> | null = null,
   ): string {
-    if (format === null) return String(self);
+    if (format === null) return self.toString();
 
     if (typeof format === "number" || !format.startsWith(":")) {
-      return self.toString(format as number);
+      return self instanceof BigDecimal
+        ? self.toString(String(format))
+        : self.toString(format as number);
     }
 
     switch (format) {
@@ -57,7 +61,7 @@ export namespace NumericWithFormat {
       case ":human_size":
         return NumberHelper.numberToHumanSize(self, options ?? {});
       default:
-        return String(self);
+        return self.toString();
     }
   }
 

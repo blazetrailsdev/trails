@@ -1679,19 +1679,32 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteVirtualTableExists(this, tableName);
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
-  // Returns { tableName => [moduleName, argsString] }
-  async virtualTables(): Promise<Record<string, [string, string]>> {
+  /** Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::VIRTUAL_TABLE_REGEX */
+  static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
+
+  /**
+   * Returns a list of defined virtual tables, as the
+   * `[tableName, [moduleName, arguments]]` pairs Rails' trailing `.to_a`
+   * produces (sqlite3_adapter.rb:296-307). Built through a `Map` because Rails
+   * builds a Hash first (`each_with_object({})`), so a repeated `tableName`
+   * collapses last-write-wins at its first-insertion position.
+   *
+   * Rails' `arguments` local is `args` here — `arguments` is not a legal
+   * binding name in a strict-mode module.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
+   */
+  async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
     const rows = (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][];
-    const result: Record<string, [string, string]> = {};
+    const memo = new Map<string, [string, string]>();
     for (const row of rows) {
       const [tableName, sql] = row as [string, string];
-      const m = /USING\s+(\w+)\s*\((.*)\)\s*$/is.exec(sql);
-      if (m) result[tableName] = [m[1], m[2]];
+      const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
+      memo.set(tableName, [moduleName, args]);
     }
-    return result;
+    return [...memo];
   }
 
   override async createVirtualTable(
