@@ -1871,17 +1871,29 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       fkDefs[`${table},${from},${to}`] =
         mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate";
     }
-    const groupedFk: Record<number, Array<Record<string, unknown>>> = {};
+    // Ruby's `group_by` returns a Hash in first-encounter order of the key
+    // (sqlite3_adapter.rb:432), and `.values` inherits it. A `Record` keyed by
+    // the numeric `id` would not: JS iterates integer-like keys in ascending
+    // numeric order regardless of insertion order, which silently substitutes
+    // SQLite's id numbering for the pragma's row order. Hold the groups in an
+    // array — that IS the encounter order — and index into it separately.
+    const groupedFk: Array<Array<Record<string, unknown>>> = [];
+    const groupsById: Record<string, Array<Record<string, unknown>>> = {};
     for (const row of rows) {
-      const id = row.id as number;
-      (groupedFk[id] ??= []).push(row);
+      const id = String(row.id);
+      let group = groupsById[id];
+      if (!group) {
+        group = groupsById[id] = [];
+        groupedFk.push(group);
+      }
+      group.push(row);
     }
 
     // Use explicit CONSTRAINT names from DDL when available (PRAGMA doesn't expose them).
     const namesByColumn = await this._parseForeignKeyNames(tableName);
 
     const results: ForeignKeyDefinition[] = [];
-    for (const group of Object.values(groupedFk)) {
+    for (const group of groupedFk) {
       group.sort((a, b) => (a.seq as number) - (b.seq as number));
       const first = group[0];
       const toTable = first.table as string;
