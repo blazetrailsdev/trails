@@ -3,6 +3,7 @@ import type { Temporal } from "@blazetrails/date";
 import { numberToHuman } from "../number-helper.js";
 import { Duration } from "../duration.js";
 import { Numeric } from "./numeric/bytes.js";
+import { NumericWithFormat } from "./numeric/conversions.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -147,5 +148,37 @@ describe("NumericExtFormattingTest", () => {
 
   it("number to human with custom format", () => {
     expect(numberToHuman(1234567, { format: "%n %u!" })).toBe("1.23 Million!");
+  });
+
+  it("to fs phone", () => {
+    expect(NumericWithFormat.toFs(5551234, ":phone")).toBe("555-1234");
+    expect(NumericWithFormat.toFormattedS(5551234, ":phone")).toBe("555-1234");
+    expect(NumericWithFormat.toFs(8005551212, ":phone")).toBe("800-555-1212");
+    expect(NumericWithFormat.toFs(8005551212, ":phone", { areaCode: true })).toBe("(800) 555-1212");
+    expect(NumericWithFormat.toFs(8005551212, ":phone", { delimiter: " " })).toBe("800 555 1212");
+  });
+
+  it("to fs delimited", () => {
+    expect(NumericWithFormat.toFs(12345678, ":delimited")).toBe("12,345,678");
+    expect(NumericWithFormat.toFs(0, ":delimited")).toBe("0");
+    expect(NumericWithFormat.toFs(123, ":delimited")).toBe("123");
+  });
+
+  it("to fs human size", () => {
+    expect(NumericWithFormat.toFs(123, ":human_size")).toBe("123 Bytes");
+    expect(NumericWithFormat.toFs(1234, ":human_size")).toBe("1.21 KB");
+  });
+
+  it("to fs with invalid formatter", () => {
+    expect(NumericWithFormat.toFs(123, ":invalid")).toBe("123");
+    expect(NumericWithFormat.toFormattedS(123, ":invalid")).toBe("123");
+    expect(NumericWithFormat.toFs(2.5, ":invalid")).toBe("2.5");
+  });
+
+  it("default to fs", () => {
+    expect(NumericWithFormat.toFs(123)).toBe("123");
+    expect(NumericWithFormat.toFormattedS(123)).toBe("123");
+    expect(NumericWithFormat.toFs(123, 2)).toBe("1111011");
+    expect(NumericWithFormat.toFs(2.5)).toBe("2.5");
   });
 });

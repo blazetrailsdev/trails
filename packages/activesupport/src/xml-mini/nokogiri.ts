@@ -37,7 +37,7 @@ interface XmlDocument {
 }
 
 interface NokogiriModule {
-  parseXml(data: string): XmlDocument;
+  parseXml(data: string | StringIO): XmlDocument;
 }
 
 // Loaded via a non-literal specifier so the optional dependency does not have
@@ -112,7 +112,7 @@ export async function parse(data: string | StringIO | null | undefined): Promise
     return {};
   } else {
     const { parseXml } = await loadNokogiri();
-    const doc = parseXml(data.read() ?? "");
+    const doc = parseXml(data);
     try {
       if (doc.errors.length > 0) {
         throw new Error(doc.errors[0].message);

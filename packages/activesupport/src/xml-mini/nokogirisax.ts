@@ -25,7 +25,7 @@ interface SaxDocument {
 }
 
 interface SaxParser {
-  parse(data: string): void;
+  parse(data: string | StringIO): void;
 }
 
 interface NokogiriModule {
@@ -157,7 +157,7 @@ export async function parse(data: string | StringIO | null | undefined): Promise
 
     const document = new (documentClass())();
     const parser = new SAX.Parser(document);
-    parser.parse(data.read() ?? "");
+    parser.parse(data);
     return document.hash;
   }
 }

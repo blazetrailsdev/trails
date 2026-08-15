@@ -109,7 +109,7 @@
     "tsFile": "transactions.ts",
     "rubyName": "has_transactional_callbacks?",
     "call": "empty?",
-    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
+    "reason": "Verified per-site (RFC 0106): `_rollback_callbacks.empty?` / `_commit_callbacks.empty?` / `_before_commit_callbacks.empty?` (transactions.rb:519) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",

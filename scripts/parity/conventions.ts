@@ -244,6 +244,14 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/date_time/conversions.rb": "time-ext.ts",
   "activesupport:core_ext/time/compatibility.rb": "time-ext.ts",
   "activesupport:core_ext/date_time/compatibility.rb": "time-ext.ts",
+  // `date_time/acts_like.rb:6` is DateTime's FIRST reopening, so the whole
+  // `DateTime` bucket — `preserve_timezone` and
+  // `utc_to_local_returns_utc_offset_times`, which `DateAndTime::Compatibility`
+  // mixes in from `date_and_time/compatibility.rb` — is stamped with this file's
+  // name, which defines neither. trails carries that pair on the one
+  // `DateAndTime::Compatibility` module, so the bucket is measured there. (The
+  // two `acts_like_*?` markers the file really does define are skipped below.)
+  "activesupport:core_ext/date_time/acts_like.rb": "core-ext/date-and-time/compatibility.ts",
   "activesupport:core_ext/time/acts_like.rb": "time-ext.ts",
   // The String arm is its own file: `String#to_time` / `#to_date` are
   // `time-ext.ts`'s `Time` names on a different receiver, so pointing the
@@ -614,7 +622,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`Concern` + the `include()`/`Included<>` mixin idiom, which the callers " +
       "already use directly. (ActiveRecord's own `alias_attribute` is a separate " +
       "method on ActiveRecord::Base and is ported there.)",
-    names: ["concerning", "concern"],
+    names: ["alias_attribute", "concerning", "concern"],
     rubyFiles: ["core_ext/module/aliasing.rb", "core_ext/module/concerning.rb"],
   },
   {
@@ -846,6 +854,93 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "raw_state",
     ],
     rubyFiles: ["dependencies.rb", "dependencies/autoload.rb", "dependencies/interlock.rb"],
+  },
+  {
+    reason:
+      "`Date#acts_like_date?` (core_ext/date/acts_like.rb:7) and DateTime's " +
+      "`acts_like_date?` / `acts_like_time?` (core_ext/date_time/acts_like.rb:8-14) " +
+      "are marker methods: Ruby reopens the class to hang an empty predicate on " +
+      "it so `Object#acts_like?` can find it with `respond_to?`. trails' " +
+      "receivers for those two arms are `Temporal.PlainDate` and a JS `Date` / " +
+      "`Temporal.Instant` — built-ins the port does not monkey-patch — so there " +
+      "is no reopening to define a marker in, and the `:date` / `:time` arms " +
+      "answer from the receiver's own type instead " +
+      "(core-ext/date-and-time/calculations.ts:200-210). Scoped to the two " +
+      "acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a " +
+      "trails-owned class and IS ported (time-with-zone.ts:935).",
+    names: ["acts_like_date?", "acts_like_time?"],
+    rubyFiles: ["core_ext/date/acts_like.rb", "core_ext/date_time/acts_like.rb"],
+  },
+  {
+    reason:
+      "`ActiveSupport::Multibyte.proxy_class` / `proxy_class=` (multibyte.rb:14-22) " +
+      "configure which class `String#mb_chars` wraps a String in, defaulting to " +
+      "ActiveSupport::Multibyte::Chars. That proxy has no port and is skipped " +
+      "for the reason in the multibyte/chars.rb group below, and `mb_chars` " +
+      "itself (core_ext/string/multibyte.rb) is an excluded file — so this is an " +
+      "accessor whose only value, only default and only reader would all be " +
+      "absent. Scoped to multibyte.rb.",
+    names: ["proxy_class", "proxy_class="],
+    rubyFiles: ["multibyte.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Concurrency::ShareLock (concurrency/share_lock.rb) is a " +
+      "reader-writer lock built on `Monitor` + `ConditionVariable`: it tracks " +
+      "per-Thread share counts, blocks a thread until the waiters it conflicts " +
+      "with drain, and exists because MRI preempts threads between any two " +
+      "bytecodes. JS has no preemption — a turn of the event loop runs to " +
+      "completion — so there is no window for the sharing/exclusive counts to " +
+      "be observed torn, and nothing for a thread to block on: trails' " +
+      "Interlock/Executor callers take the null lock (concurrency/null-lock.ts), " +
+      "which is what Rails itself substitutes when it does not need the real " +
+      "one. Scoped to share_lock.rb so `exclusive`, `sharing`, `initialize` and " +
+      "`raw_state` stay expected everywhere else.",
+    names: [
+      "initialize",
+      "raw_state",
+      "start_exclusive",
+      "stop_exclusive",
+      "start_sharing",
+      "stop_sharing",
+      "exclusive",
+      "sharing",
+      "yield_shares",
+      "busy_for_exclusive?",
+      "busy_for_sharing?",
+      "eligible_waiters?",
+      "wait_for",
+    ],
+    rubyFiles: ["concurrency/share_lock.rb"],
+  },
+  {
+    reason:
+      "ActiveSupport::Testing::Parallelization::Server and ::Worker " +
+      "(testing/parallelization/server.rb, worker.rb) are the two halves of the " +
+      "fork-based parallel runner skipped against parallelization.rb above: the " +
+      "Server is a DRb-published queue of test jobs, the Worker is the forked " +
+      "child that pops from it, re-runs the setup hooks and reports back over " +
+      "DRb. vitest owns process/worker parallelism and work distribution in " +
+      "trails, so neither half has an object to hang off. Scoped to the two " +
+      "files.",
+    names: [
+      "initialize",
+      "record",
+      "pop",
+      "start_worker",
+      "stop_worker",
+      "active_workers?",
+      "interrupt",
+      "shutdown",
+      "work_from_queue",
+      "perform_job",
+      "safe_record",
+      "after_fork",
+      "run_cleanup",
+      "add_setup_exception",
+      "set_process_title",
+    ],
+    rubyFiles: ["testing/parallelization/server.rb", "testing/parallelization/worker.rb"],
   },
   {
     reason:

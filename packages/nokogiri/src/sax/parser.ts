@@ -7,14 +7,15 @@ import {
   XmlParseError,
 } from "libxml2-wasm";
 import { SaxDocument } from "./document.js";
+import { type Readable, readSource } from "../readable.js";
 
 export class SaxParser {
   constructor(private readonly handler: SaxDocument) {}
 
-  parse(data: string): void {
+  parse(data: string | Readable): void {
     let doc: LibXmlDocument;
     try {
-      doc = LibXmlDocument.fromString(data);
+      doc = LibXmlDocument.fromString(readSource(data));
     } catch (e) {
       if (e instanceof XmlParseError) {
         for (const detail of e.details) {

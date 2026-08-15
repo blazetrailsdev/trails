@@ -94,7 +94,7 @@ import {
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
-import type { Result } from "./result.js";
+import { Result } from "./result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -3533,7 +3533,9 @@ export class Relation<T extends Base> {
     // an empty `IN`) returns `ActiveRecord::Result.empty` — i.e. `[]` — without
     // issuing SQL. Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
-    if (this._whereClause.isContradiction()) return [];
+    if (this._whereClause.isContradiction()) {
+      return this.typeCastPluckValues(Result.empty(), columns);
+    }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
     // the eager values) and recurses, so the plucked columns can reference the
