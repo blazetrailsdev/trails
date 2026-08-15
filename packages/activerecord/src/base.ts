@@ -3608,7 +3608,7 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        // Thread the `withQueryConnection` connection rather than the deprecated
+        // Thread the `withConnection` connection rather than the deprecated
         // `.connection` getter (see `_createRecord` in persistence.ts); resolved here, at the
         // actual DELETE, so a connectionless model never touches `.connection`.
         const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;

@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
-import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -99,7 +99,7 @@ export async function transaction<T>(
   // callback path from flipping the lease permanent under
   // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
   // releases the connection once the transaction completes.
-  return withQueryConnection(modelClass, async () => {
+  return modelClass.withConnection(async () => {
     const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
 
     const result = await dbTransaction.call(
@@ -574,7 +574,7 @@ export async function withTransactionReturningStatus<T>(
   // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
   // connection is threaded via `threadedConnectionFor()` rather than re-read
   // off the deprecated `.connection` getter (matching Rails' block parameter).
-  await withQueryConnection(modelClass, async () => {
+  await modelClass.withConnection(async () => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
     const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
     const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;

@@ -13,7 +13,7 @@
 
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
-import { stripThis } from "./arity.js";
+import { stripThis, isReceiverParam } from "./arity.js";
 import { normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
@@ -528,11 +528,70 @@ function alignBuiltinReceiver(
 function alignReceiverArgs(
   ruby: CallSite,
   tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
 ): { rubyArgs: string[]; tsArgs: string[] } {
   return alignPortedReceiver(
     ruby,
-    alignBuiltinReceiver(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs)),
+    alignBuiltinReceiver(
+      ruby,
+      ruby.args,
+      stripCalleeReceiverArg(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs), calleeSigs),
+    ),
   );
+}
+
+/** A bare local/ivar argument, whose identifier is what decides whether it is
+ *  the receiver the callee declares (`id:this`, `id:rel`). */
+const BARE_REF_ARG = /^id:(.+)$/;
+
+/**
+ * Drop the explicit receiver argument a call to a ported PRIVATE takes, when the
+ * Ruby call has no receiver at all (RFC 0106).
+ *
+ * `perform_calculation` calls its private siblings on implicit self
+ * (calculations.rb:434-458); their trails ports are module functions in the same
+ * file whose receiver is a declared parameter — `selectForCount(rel)`,
+ * `typeCastPluckValues(result, columns, this)` — so the site carries one
+ * argument the Ruby call has no slot for. That is the settled port shape for a
+ * Ruby private with no class member to hang on ({@link stripMixinReceiver} is
+ * the same alignment for the sites that spell the parameter `this`), not a
+ * divergence, and the remaining arguments still compare pairwise.
+ *
+ * Narrow on purpose. The Ruby call must be receiverless — a call with a receiver
+ * is {@link alignPortedReceiver}'s job, which COMPARES it rather than dropping
+ * it. The extra argument must be exactly one, some callee signature must have
+ * the same length as the TS list, and the parameter in the dropped position must
+ * be an explicit receiver by `arity.ts`' own {@link isReceiverParam} — read
+ * against an argument that names it (modulo the leading `_` a parameter the
+ * body ignores carries), or names `this`. A `this` argument wins the
+ * position, since a callee whose leading VALUE parameter happens to be
+ * receiver-typed (`typeCastPluckValues`' `result: Result`) would otherwise take
+ * the strip away from the receiver the site actually passes.
+ */
+function stripCalleeReceiverArg(
+  ruby: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (ruby.recv !== undefined) return tsArgs;
+  if (tsArgs.length !== rubyArgs.length + 1) return tsArgs;
+  const sigs = (calleeSigs ?? []).map(stripThis).filter((sig) => sig.length === tsArgs.length);
+  const receiverAt = (index: number): boolean =>
+    sigs.some((sig) => {
+      const ref = BARE_REF_ARG.exec(tsArgs[index]);
+      return (
+        ref !== null &&
+        isReceiverParam(sig[index]) &&
+        (ref[1] === MIXIN_RECEIVER.slice("id:".length) ||
+          ref[1] === sig[index].name.replace(/^_+/, ""))
+      );
+    });
+  const last = tsArgs.length - 1;
+  if (tsArgs[last] === MIXIN_RECEIVER && receiverAt(last)) return tsArgs.slice(0, last);
+  if (receiverAt(0)) return tsArgs.slice(1);
+  if (receiverAt(last)) return tsArgs.slice(0, last);
+  return tsArgs;
 }
 
 /**
@@ -764,7 +823,7 @@ function blockAffinity(ruby: CallSite, ts: CallSite): number {
  * assignment takes it whenever the key matches tie.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
-  const aligned = alignReceiverArgs(ruby, stripForwardedBlockArg(ruby, ts));
+  const aligned = alignReceiverArgs(ruby, stripForwardedBlockArg(ruby, ts), undefined);
   const sameArity = aligned.rubyArgs.length === aligned.tsArgs.length ? 1 : 0;
   const rubyArgs = normalizeArgs(aligned.rubyArgs);
   const tsArgs = normalizeArgs(aligned.tsArgs);
@@ -1043,7 +1102,7 @@ export function compareCallArgs(
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 
-  const aligned = alignReceiverArgs(ruby, ts.args);
+  const aligned = alignReceiverArgs(ruby, ts.args, calleeSigs);
   const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");

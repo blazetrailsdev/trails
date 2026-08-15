@@ -3,6 +3,7 @@
  */
 
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import { isBlank } from "./core-ext/object/blank.js";
 
 type AnyObject = Record<string, unknown>;
 
@@ -557,7 +558,7 @@ export function compactBlank<T extends AnyObject>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj)) {
     const val = obj[key];
-    if (!_isBlankValue(val)) {
+    if (!isBlank(val)) {
       result[key as keyof T] = val as T[keyof T];
     }
   }
@@ -573,17 +574,7 @@ export function compactBlank<T extends AnyObject>(obj: T): Partial<T> {
  */
 export function compactBlankBang<T extends AnyObject>(hash: T): T {
   for (const key of Object.keys(hash)) {
-    if (_isBlankValue(hash[key])) delete hash[key];
+    if (isBlank(hash[key])) delete hash[key];
   }
   return hash;
-}
-
-function _isBlankValue(value: unknown): boolean {
-  if (value === null || value === undefined || value === false) return true;
-  if (typeof value === "string") return value.trim() === "";
-  if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === "object" && value !== null) {
-    return Object.keys(value).length === 0;
-  }
-  return false;
 }

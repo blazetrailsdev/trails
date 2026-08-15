@@ -13,7 +13,6 @@ import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, many, tryCall } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
-import { withQueryConnection } from "../connection-handling.js";
 import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
@@ -132,12 +131,14 @@ interface CalculationRelation {
     connection: CalculationConnection;
   };
   /**
-   * The connection threaded by the enclosing `withQueryConnection` wrap, else
+   * The connection threaded by the enclosing `withConnection` wrap, else
    * the model's `.connection`. Mirrors `Relation#_conn`; reading it instead of
    * `_model.connection` keeps internal reads off the deprecated getter.
    * @internal
    */
   _conn(): CalculationConnection;
+  /** Rails `delegate :with_connection, to: :model` (delegation.rb:106). */
+  withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
   _limitValue: number | null;
   _offsetValue: number | null;
   _optimizerHints: string[];
@@ -581,9 +582,12 @@ export async function calculate(
     // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
     // thenable, so the joined relation is delivered to a block instead (the
     // block form `apply_join_dependency` also has).
-    return this._applyJoinDependencyAsync((relation) => {
+    return this._applyJoinDependencyAsync(async (relation) => {
       if (operation === "count") {
-        if (!this._isDistinct && !isDistinctSelect(this, columnName ?? selectForCount(this))) {
+        if (
+          !this._isDistinct &&
+          !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
+        ) {
           relation.distinctBang();
           const primaryKey = this.model.primaryKey;
           relation._selectColumns =
@@ -732,7 +736,7 @@ export interface CalculationMethods {
 
 /**
  * Wrap a calculation method so its query runs inside `with_connection`; see
- * {@link withQueryConnection}. Releases the connection afterwards instead of
+ * {@link withConnection}. Releases the connection afterwards instead of
  * permanently leasing it via the deprecated `.connection` getter under
  * `permanent_connection_checkout = :deprecated | :disallowed`.
  */
@@ -741,7 +745,7 @@ function inQueryConnection<A extends unknown[], R>(
 ): (this: CalculationRelation, ...args: A) => Promise<R> {
   return function (this: CalculationRelation, ...args: A): Promise<R> {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
-    return withQueryConnection(modelClass, async () => {
+    return modelClass.withConnection(async () => {
       // Resolve any deferred distinct-PK subquery markers to a literal id list
       // before the calculation compiles its where clause, so count/sum/avg/min/
       // max emit `pk IN (ids)` rather than the inline `IN (SELECT … LIMIT n)`
@@ -836,7 +840,7 @@ function aggregateTarget(
 }
 
 /** @internal */
-export function performCalculation(
+export async function performCalculation(
   rel: CalculationRelation,
   operation: string,
   columnName: string | string[] | Nodes.Node | number | null,
@@ -849,10 +853,11 @@ export function performCalculation(
   // Arel.star — calculations.rb:414-423).
   let distinct: boolean | null = rel._isDistinct;
   if (operation === "count") {
-    columnName ??= selectForCount(rel);
+    columnName ??= await selectForCount(rel);
     if (columnName === "*" || columnName === "all") {
       if (!distinct) {
-        if (rel._groupColumns.length === 0) distinct = isDistinctSelect(rel, selectForCount(rel));
+        if (rel._groupColumns.length === 0)
+          distinct = isDistinctSelect(rel, await selectForCount(rel));
       } else if (
         any(rel.groupValues) ||
         (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
@@ -987,13 +992,13 @@ export async function executeSimpleCalculation(
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
-        rel
-          ._conn()
-          .selectAll(
+        rel.withConnection((c) =>
+          c.selectAll(
             sql,
             `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
             binds,
           ),
+        ),
       );
 
   let type: unknown;
@@ -1029,7 +1034,7 @@ export async function executeGroupedCalculation(
   distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
-  return groupedAggregate(rel, fn, aggregateTarget(columnName), distinct);
+  return rel.withConnection(() => groupedAggregate(rel, fn, aggregateTarget(columnName), distinct));
 }
 
 /** @internal */
@@ -1172,13 +1177,14 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 }
 
 /** @internal */
-export function selectForCount(rel: CalculationRelation): string {
+export function selectForCount(rel: CalculationRelation): Promise<string> | string {
   // "*" is the JS analogue of Rails' `:all` symbol (calculations.rb:646-654).
   if (rel.selectValues.length === 0) return "*";
-  const visitor = rel._conn().visitor;
-  return (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
-    .map((column) => (visitor ? visitor.compile(column) : String(column)))
-    .join(", ");
+  return rel.withConnection((conn) =>
+    (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
+      .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))
+      .join(", "),
+  );
 }
 
 /**

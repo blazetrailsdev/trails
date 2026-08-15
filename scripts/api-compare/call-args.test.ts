@@ -264,6 +264,67 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
   });
 });
 
+describe("compareCallArgs ported-private receiver argument", () => {
+  const required = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
+
+  // calculations.rb:438 `select_for_count` on implicit self, ported as
+  // `selectForCount(rel)` in relation/calculations.ts.
+  it("drops a leading receiver the callee declares", () => {
+    expect(
+      compareCallArgs(site("select_for_count", []), site("selectForCount", ["id:rel"]), undefined, [
+        [required("rel", "CalculationRelation")],
+      ]).verdict,
+    ).toBe("match");
+  });
+
+  it("reads a `_`-prefixed receiver parameter as the same receiver", () => {
+    expect(
+      compareCallArgs(
+        site("distinct_select?", ["id:column_name"]),
+        site("isDistinctSelect", ["id:rel", "id:columnName"]),
+        undefined,
+        [[required("_rel", "CalculationRelation"), required("columnName")]],
+      ).verdict,
+    ).toBe("match");
+  });
+
+  // calculations.rb:402 `type_cast_pluck_values(result, columns)`, ported as
+  // `typeCastPluckValues(result, columns, this)` — the `this` wins the position
+  // over the receiver-TYPED leading `result: Result`.
+  it("drops a trailing `this` receiver rather than a receiver-typed value argument", () => {
+    expect(
+      compareCallArgs(
+        site("type_cast_pluck_values", ["id:result", "id:columns"]),
+        site("typeCastPluckValues", ["id:result", "id:columns", "id:this"]),
+        undefined,
+        [[required("result", "Result"), required("columns"), required("rel", "Relation")]],
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("keeps flagging an extra argument the callee declares as a value", () => {
+    expect(
+      compareCallArgs(
+        site("select_for_count", []),
+        site("selectForCount", ["id:name"]),
+        undefined,
+        [[required("name")]],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("compares rather than drops the receiver when Ruby names one", () => {
+    expect(
+      compareCallArgs(
+        { ...site("select_for_count", []), recv: "id:other" },
+        site("selectForCount", ["id:rel"]),
+        undefined,
+        [[required("rel", "CalculationRelation")]],
+      ).verdict,
+    ).toBe("mismatch");
+  });
+});
+
 describe("compareCallArgs block-tail nil padding", () => {
   const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
   const required = (name: string): ParamInfo => ({ name, kind: "required" });
