@@ -305,9 +305,17 @@ export class InstanceExec2 implements CallTemplate {
   }
 }
 
-/** Mirrors: ActiveSupport::Callbacks::CallTemplate::ProcCall */
+/**
+ * Mirrors: ActiveSupport::Callbacks::CallTemplate::ProcCall
+ *
+ * Rails calls `(@override_target || target).call(target, value, &block)` — no
+ * `instance_exec`, so the proc keeps its own binding. Ruby reaches both a Proc
+ * filter and a `Conditionals::Value` filter through that one `.call`; TS has to
+ * name the two shapes, and a JS function's own `.call` means the union has to
+ * be discriminated where Ruby dispatches for free.
+ */
 export class ProcCall implements CallTemplate {
-  constructor(readonly fn: (...args: any[]) => unknown) {}
+  constructor(readonly fn: ((...args: any[]) => unknown) | Value) {}
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [this.fn, block, "call", target, value];
@@ -315,20 +323,19 @@ export class ProcCall implements CallTemplate {
 
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
     const f = this.fn;
-    // Rails: @override_block.call(target, value, &block) — no instance_exec, the
-    // proc keeps its own binding; forward target, value and the block.
     return (target: object, value: unknown, block?: (() => unknown) | null) =>
-      f(target, value, block);
+      typeof f === "function" ? f(target, value, block) : f.call(target, value);
   }
 
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
     const f = this.fn;
     return (target: object, value: unknown, block?: (() => unknown) | null) =>
-      !f(target, value, block);
+      !(typeof f === "function" ? f(target, value, block) : f.call(target, value));
   }
 
   make(target: object, _value: unknown): unknown {
-    return this.fn(target);
+    const f = this.fn;
+    return typeof f === "function" ? f(target) : f.call(target, undefined);
   }
 }
 
@@ -342,21 +349,26 @@ export class ProcCall implements CallTemplate {
  * All of these objects are converted into a CallTemplate and handled
  * the same after this point.
  *
+ * A Ruby Symbol is a JS string, and this dispatch turns on Symbol-vs-String, so
+ * the Symbol keeps its leading colon and a bare string takes the arm that
+ * raises. The object arm's method name is `current_scopes.join("_").to_sym`
+ * camelCased, so the default `[:kind]` scope calls `around`/`before`/`after`
+ * and `scope: [:kind, :name]` calls `aroundSave`.
+ *
  * Mirrors: ActiveSupport::Callbacks::CallTemplate.build
  */
 export namespace CallTemplate {
   export function build(
-    filter: AnyCallback | string | symbol | CallbackObject,
+    filter: AnyCallback | string | symbol | CallbackObject | Value,
     callback: Callback,
   ): CallTemplate {
     if (typeof filter === "string" || typeof filter === "symbol") {
-      // A Ruby Symbol is a JS string; here the control flow turns on
-      // Symbol-vs-String, so the Symbol keeps its leading colon and a bare
-      // string is Callback.build's String arm, which raises.
       if (typeof filter === "string" && !filter.startsWith(":")) {
         throw new Error(`Passing string to define a callback is not supported: ${filter}`);
       }
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
+    } else if (filter instanceof Value) {
+      return new ProcCall(filter);
     } else if (typeof filter === "function") {
       const arity = filter.length;
       if (arity > 1) {
@@ -369,10 +381,6 @@ export namespace CallTemplate {
         return new InstanceExec0(filter as () => unknown);
       }
     } else {
-      // Rails: ObjectCall.new(filter, current_scopes.join("_").to_sym) — the
-      // dispatched method is the callback's scope-join, so the default `[:kind]`
-      // scope calls `around`/`before`/`after` and `scope: [:kind, :name]` calls
-      // `aroundSave`.
       const [head, ...rest] = callback.currentScopes();
       return new ObjectCall(
         filter,

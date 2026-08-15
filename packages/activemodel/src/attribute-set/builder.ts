@@ -109,13 +109,18 @@ export class LazyAttributeSet extends AttributeSet {
     return this._attributes;
   }
 
+  /**
+   * Mirrors `LazyAttributeSet#default_attribute` (builder.rb:69-88). Ruby
+   * defaults `value` to `values.fetch(name) { value_present = false }`,
+   * evaluated only when the caller omits it, and `Attribute#initialize` keeps
+   * its computed-value slot empty when the 4th argument is nil
+   * (attribute.rb:37) — hence the two guards below.
+   */
   protected override defaultAttribute(
     name: string,
     valuePresent?: boolean,
     value?: unknown,
   ): Attribute {
-    // Rails defaults `value` to `values.fetch(name) { value_present = false }`,
-    // evaluated only when the caller omits it (builder.rb:69-73).
     if (valuePresent === undefined) {
       valuePresent = Object.prototype.hasOwnProperty.call(this.values, name);
       value = valuePresent ? this.values[name] : undefined;
@@ -124,9 +129,6 @@ export class LazyAttributeSet extends AttributeSet {
     const type = this.additionalTypes.get(name) ?? this.types.get(name);
 
     if (valuePresent) {
-      // `Attribute#initialize` keeps the computed-value slot empty when the
-      // 4th argument is nil (attribute.rb:37), so only thread a cached cast
-      // through when one exists.
       const castedValue = this.castedValues.get(name);
       const attr =
         castedValue === undefined

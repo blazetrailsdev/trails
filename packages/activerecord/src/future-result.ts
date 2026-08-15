@@ -293,7 +293,6 @@ export class FutureResult {
 
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
-      // Ruby: `Process.clock_gettime(CLOCK_MONOTONIC, :float_millisecond)`.
       const start = performance.now();
       // Ruby takes `@mutex` here and, if a worker thread already holds it,
       // records how long the wait was. The in-flight promise IS that lock on a

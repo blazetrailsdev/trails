@@ -427,8 +427,6 @@ describe("QueryCache#select_all", () => {
 });
 
 describe("FutureResult::EventBuffer", () => {
-  // future_result.rb:40-46 — the buffered events are republished with the
-  // foreground's `lock_wait` stamped onto each payload.
   it("reports the wait on a contended read", async () => {
     const events: NotificationEvent[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: NotificationEvent) =>
