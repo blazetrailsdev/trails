@@ -194,14 +194,12 @@ export class JoinDependency {
       this._baseTableAliasLength(),
       new Map([[this._baseAlias, 1]]),
     );
-    this._joinRoot = new JoinBase(baseModel, baseTable);
+    // `@join_type` is assigned after `@join_root` in Rails; here `build` reads it
+    // to construct each node's provisional join, so it is set first.
     this._joinType = joinType ?? Nodes.OuterJoin;
-
-    const specs =
-      associations == null ? [] : Array.isArray(associations) ? associations : [associations];
-    for (const spec of specs) {
-      this.build(JoinDependency.makeTree(spec), baseModel, this._baseAlias, "");
-    }
+    const tree = JoinDependency.makeTree(associations ?? []);
+    this._joinRoot = new JoinBase(baseModel, baseTable, this.build(tree, baseModel));
+    this._assignPaths(this._joinRoot, null);
   }
 
   /**
@@ -233,16 +231,35 @@ export class JoinDependency {
 
   /**
    * The t-index for the next table to join: 0 is the base (join root), then one
-   * per joined node in allocation order. Derived from the live tree rather than
-   * a mutable counter, so rollback (node pruning) restores it for free.
+   * per joined node in allocation order. A counter rather than a walk of the
+   * live tree: `build` mirrors Rails in returning the subtree to its caller, so
+   * a node is not reachable from the root until the whole tree is built.
    * @internal
    */
+  private _tableIndexCounter = 1;
+
+  /** @internal */
   private _nextTableIndex(): number {
-    let count = 1;
-    this._joinRoot.each((p) => {
-      if (p !== this._joinRoot) count++;
-    });
-    return count;
+    return this._tableIndexCounter++;
+  }
+
+  /**
+   * Stamp each node's dotted association path (`comments.author`) from the tree
+   * shape, once the tree is complete. Rails' JoinAssociation carries no path —
+   * it is a trails affordance for path-addressed lookups (`jd.nodes`, preload
+   * wiring) — so it cannot be threaded through `build`'s Rails signature.
+   * @internal
+   */
+  private _assignPaths(node: JoinPart, parentPath: string | null): void {
+    if (node !== this._joinRoot) {
+      node.parentPath = parentPath;
+      node.assocName = parentPath
+        ? `${parentPath}.${node.immediateAssocName}`
+        : node.immediateAssocName;
+    }
+    for (const child of node.children) {
+      this._assignPaths(child, node === this._joinRoot ? null : node.assocName);
+    }
   }
 
   /** @internal */
@@ -261,47 +278,24 @@ export class JoinDependency {
   }
 
   /**
-   * Materialize one JOIN node under `options.fromModel`/`fromAlias`. Internal
-   * helper of the constructor's `build` walk — the tree is never grown after
-   * construction.
+   * Materialize the JOIN node(s) for one already-checked reflection off
+   * `modelClass` — the body of Rails' `JoinAssociation.new(reflection, ...)`,
+   * which in trails also allocates the node's t-index and its provisional join.
+   * A `through` reflection materializes one node per chain link (the target plus
+   * its `_through_` leaves), so the return is an array; the target is last.
    * @internal
    */
-  private addAssociation(
-    assocName: string,
-    options?: {
-      fromModel?: any;
-      fromAlias?: string;
-      parentAssocName?: string;
-    },
-  ): JoinPart {
-    const modelClass = options?.fromModel ?? this._baseModel;
+  private addAssociation(reflection: any, modelClass: typeof Base): JoinPart[] {
+    // A joined-to table is only ever aliased at emit, so a nested node's source
+    // is its parent model's real table; only the root can carry a base alias
+    // the caller chose (the `table` constructor argument).
+    const sourceAlias =
+      modelClass === this._baseModel ? this._baseAlias : (modelClass as any).tableName;
 
-    // Mirrors: ActiveRecord::Associations::JoinDependency#build
-    // (join_dependency.rb:229-231) — `find_reflection`, then `check_validity!`
-    // before `check_eager_loadable!`. `find_reflection` raises
-    // ConfigurationError for a name that doesn't resolve; `check_validity!`
-    // raises CompositePrimaryKeyMismatchError for a composite PK/FK arity
-    // mismatch, so a mismatched composite collection surfaces that error here
-    // rather than the generic join-key arity error deeper in `joinConstraints`.
-    const reflection = this.findReflection(modelClass, assocName);
-    reflection.checkValidityBang?.();
-    reflection.checkEagerLoadableBang?.();
-
-    const sourceAlias = options?.fromAlias ?? this._baseAlias;
-
-    // Rails raises for polymorphic eager loads — the join target table is not
-    // known statically (join_dependency.rb#build).
-    if (reflection.isPolymorphic?.()) {
-      throw new EagerLoadPolymorphicError(assocName);
-    }
     if (reflection.isThroughReflection()) {
-      return this._addThroughViaJoinAssociation(
-        reflection,
-        modelClass,
-        sourceAlias,
-        options?.parentAssocName,
-      );
+      return this._addThroughViaJoinAssociation(reflection, modelClass, sourceAlias);
     }
+    const assocName: string = reflection.name;
 
     const assocType: "hasMany" | "hasOne" | "belongsTo" =
       reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
@@ -350,88 +344,47 @@ export class JoinDependency {
     treePart.tableAlias = tableAlias;
     treePart.effectiveSqlName = effectiveName;
     treePart.columns = columns;
-    treePart.assocName = options?.parentAssocName
-      ? `${options.parentAssocName}.${assocName}`
-      : assocName;
     treePart.immediateAssocName = assocName;
-    treePart.parentPath = options?.parentAssocName ?? null;
     treePart.assocType = assocType;
     treePart.arelJoin = arelJoin;
     treePart.nodeReflection = reflection;
     treePart.isThroughNode = false;
-    this._insertTreeNode(treePart);
-    return treePart;
+    return [treePart];
   }
 
   /**
-   * Build the join tree from a normalized make_tree-style hash (dotted strings
-   * already split into nested keys by `walkTree`). Each key becomes a JOIN via
-   * `_addOrReuse`; children recurse under the joined node's model and effective
-   * alias — `effectiveSqlName` is the name that actually appears in the JOIN
-   * SQL (the real table name unless aliased due to a collision), so using
-   * `tableAlias` here would emit ON clauses referencing e.g. "t1" against SQL
-   * that names the real table.
-   *
-   * Called once per top-level spec, from the constructor. Like Rails, a name
-   * that doesn't resolve raises `ConfigurationError` from `findReflection`
-   * (Rails' `find_reflection`); every reflection that does resolve is JOINed.
-   * There is no lenient mode.
-   *
    * Mirrors: ActiveRecord::Associations::JoinDependency#build
-   * (join_dependency.rb:228).
+   * (join_dependency.rb:228-240) — map the normalized make_tree hash to a tree
+   * of JoinAssociation nodes, each owning the nodes built from its own nested
+   * hash. `findReflection` (Rails' `find_reflection`) raises ConfigurationError
+   * for a name that doesn't resolve; `check_validity!` raises
+   * CompositePrimaryKeyMismatchError for a composite PK/FK arity mismatch, so a
+   * mismatched composite collection surfaces that error here rather than the
+   * generic join-key arity error deeper in `joinConstraints`. There is no
+   * lenient mode: every reflection that does resolve is JOINed.
+   *
+   * Rails' `JoinAssociation.new(reflection, build(right, reflection.klass))`
+   * builds the children first; trails materializes the node before recursing
+   * because it also allocates the node's t-index, which numbers the tables in
+   * tree order.
    * @internal
    */
-  private build(
-    hash: Record<string, any>,
-    model: typeof Base,
-    alias: string,
-    parentPath: string,
-  ): void {
-    for (const name of Object.keys(hash)) {
-      const node = this._addOrReuse(name, model, alias, parentPath);
-      const child = hash[name];
-      const childPath = parentPath ? `${parentPath}.${name}` : name;
-      if (child != null && Reflect.ownKeys(child).length > 0) {
-        this.build(child, node.baseKlass, node.effectiveSqlName, childPath);
+  private build(associations: Record<string, any>, baseKlass: typeof Base): JoinPart[] {
+    return Object.keys(associations).flatMap((name) => {
+      const right = associations[name];
+      const reflection = this.findReflection(baseKlass, name);
+      reflection.checkValidityBang?.();
+      reflection.checkEagerLoadableBang?.();
+      // Rails raises for polymorphic eager loads — the join target table is not
+      // known statically.
+      if (reflection.isPolymorphic?.()) {
+        throw new EagerLoadPolymorphicError(name);
       }
-    }
-  }
-
-  /**
-   * Add `assocName` under `parentPath`, reusing an existing tree node when the
-   * same path was already joined (shared-prefix dedup).
-   * @internal
-   */
-  private _addOrReuse(
-    assocName: string,
-    fromModel: typeof Base,
-    fromAlias: string,
-    parentPath: string,
-  ): JoinPart {
-    const existing = this._findNodeByPath(parentPath ? `${parentPath}.${assocName}` : assocName);
-    if (existing) return existing;
-    return this.addAssociation(assocName, {
-      fromModel,
-      fromAlias,
-      parentAssocName: parentPath || undefined,
+      const nodes = this.addAssociation(reflection, baseKlass);
+      const node = nodes[nodes.length - 1];
+      if (right != null) node.children.push(...this.build(right, reflection.klass));
+      return nodes;
     });
-  }
-
-  /**
-   * Resolve a tree node by its dotted association path (`comments.author`) by
-   * walking children from the root. Replaces the `_treeNodesByPath` index:
-   * the tree itself is the source of truth. Empty/null path is the root.
-   * @internal
-   */
-  private _findNodeByPath(path: string | null): JoinPart | null {
-    if (!path) return this._joinRoot;
-    let node: JoinPart = this._joinRoot;
-    for (const segment of path.split(".")) {
-      const child = node.children.find((c) => c.immediateAssocName === segment);
-      if (!child) return null;
-      node = child;
-    }
-    return node;
   }
 
   private _buildSelectArelNodes(): Nodes.As[] {
@@ -1196,8 +1149,8 @@ export class JoinDependency {
    * The base table is keyed by the join root; each joined node supplies its own
    * column names and Arel table. Replaces the index-keyed `_aliases`/`_arelTablesByIndex`.
    *
-   * Memoized like Rails' `@aliases ||=`; the cache is cleared on any tree
-   * mutation (`_insertTreeNode`) so it can never go stale.
+   * Memoized like Rails' `@aliases ||=`; the tree is fully built in the
+   * constructor and never mutated afterwards, so the memo can never go stale.
    * @internal
    */
   private aliases(): Aliases {
@@ -1366,28 +1319,15 @@ export class JoinDependency {
     }
   }
 
-  private _insertTreeNode(treePart: JoinPart): void {
-    const parentPath = treePart.parentPath;
-    const parent = this._findNodeByPath(parentPath);
-    if (!parent) {
-      throw new Error(
-        `JoinDependency tree: parent path "${parentPath}" not found for "${treePart.immediateAssocName}"`,
-      );
-    }
-    parent.children.push(treePart);
-    this._aliasesCache = undefined;
-  }
-
   private _addThroughViaJoinAssociation(
     reflection: any,
     modelClass: any,
     sourceAlias: string,
-    parentAssocName?: string,
-  ): JoinPart {
+  ): JoinPart[] {
     // A through reflection's `chain` is `[self, *through_reflection.chain]`, so
     // it always carries the target plus at least one through link, and
     // `joinConstraints` emits one join per link — the walk below always reaches
-    // the target (chain index 0) and assigns `targetNode`.
+    // the target (chain index 0), which is the last node returned.
     const chain = reflection.chain;
 
     const joinAssoc = new JoinAssociation(reflection);
@@ -1409,9 +1349,10 @@ export class JoinDependency {
       model: typeof Base;
     }> = [];
 
-    // Nothing is inserted into the tree yet, so the indices for the whole chain
-    // are allocated up front off the current next-index (base + already-joined).
-    const startIndex = this._nextTableIndex();
+    // The indices for the whole chain are allocated up front, before any
+    // nested association under the target claims one.
+    const startIndex = this._tableIndexCounter;
+    this._tableIndexCounter += chain.length;
     for (let i = 0; i < chain.length; i++) {
       const refl = chain[i];
       const model = refl.klass as typeof Base;
@@ -1449,7 +1390,7 @@ export class JoinDependency {
       nodes: new Array(chain.length),
       resolved: false,
     };
-    let targetNode: JoinPart | null = null;
+    const nodes: JoinPart[] = [];
 
     for (let i = 0; i < joins.length; i++) {
       const chainIdx = chain.length - 1 - i;
@@ -1460,18 +1401,13 @@ export class JoinDependency {
       const columns = getModelColumns(entry.model);
 
       if (isTarget) {
-        const fullAssocName = parentAssocName
-          ? `${parentAssocName}.${reflection.name}`
-          : reflection.name;
         const treePart = new JoinAssociation(reflection);
         treePart.tableIndex = entry.tableIndex;
         treePart.arelTable = entry.table;
         treePart.tableAlias = entry.tableAlias;
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
-        treePart.assocName = fullAssocName;
         treePart.immediateAssocName = reflection.name;
-        treePart.parentPath = parentAssocName ?? null;
         treePart.assocType =
           reflection.macro === "hasAndBelongsToMany" ? "hasMany" : reflection.macro;
         treePart.arelJoin = arelJoin;
@@ -1480,12 +1416,10 @@ export class JoinDependency {
         treePart.scopeJoinSources = stepJoinSources;
         treePart.throughGroup = group;
         group.nodes[chainIdx] = treePart;
-        this._insertTreeNode(treePart);
-        targetNode = treePart;
+        nodes.push(treePart);
       } else {
         const reflName = chain[chainIdx].name ?? entry.tableName;
         const throughName = `_through_${reflName}`;
-        const throughNodeName = parentAssocName ? `${parentAssocName}.${throughName}` : throughName;
         const refl = chain[chainIdx];
         const treePart = new JoinLeaf(entry.model);
         treePart.tableIndex = entry.tableIndex;
@@ -1493,20 +1427,18 @@ export class JoinDependency {
         treePart.tableAlias = entry.tableAlias;
         treePart.effectiveSqlName = entry.tableName;
         treePart.columns = columns;
-        treePart.assocName = throughNodeName;
         treePart.immediateAssocName = throughName;
-        treePart.parentPath = parentAssocName ?? null;
         treePart.assocType = (refl._reflection ?? refl).macro === "hasOne" ? "hasOne" : "hasMany";
         treePart.arelJoin = arelJoin;
         treePart.isThroughNode = true;
         treePart.scopeJoinSources = stepJoinSources;
         treePart.throughGroup = group;
         group.nodes[chainIdx] = treePart;
-        this._insertTreeNode(treePart);
+        nodes.push(treePart);
       }
     }
 
-    return targetNode!;
+    return nodes;
   }
 }
 

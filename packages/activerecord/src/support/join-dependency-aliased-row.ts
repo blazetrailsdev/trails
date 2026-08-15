@@ -10,7 +10,22 @@ import type { JoinPart } from "../associations/join-dependency/join-part.js";
  */
 interface AliasReadableJoinDependency {
   aliases(): { columnAlias(node: JoinPart | null, column: string): string | undefined };
-  _findNodeByPath(path: string | null): JoinPart | null;
+  joinRoot: JoinPart;
+}
+
+/**
+ * Resolve a tree node by its dotted association path ("comments.author"),
+ * walking children from the join root. Empty/null path is the root.
+ */
+function findNodeByPath(root: JoinPart, path: string | null): JoinPart | null {
+  if (!path) return root;
+  let node: JoinPart = root;
+  for (const segment of path.split(".")) {
+    const child: JoinPart | undefined = node.children.find((c) => c.immediateAssocName === segment);
+    if (!child) return null;
+    node = child;
+  }
+  return node;
 }
 
 /**
@@ -29,7 +44,7 @@ export function aliasedRow(
   const aliases = inner.aliases();
   const row: Record<string, unknown> = {};
   for (const [path, columns] of Object.entries(spec)) {
-    const node = inner._findNodeByPath(path || null);
+    const node = findNodeByPath(inner.joinRoot, path || null);
     if (!node) {
       throw new ArgumentError(`aliasedRow: no join node at path "${path}"`);
     }
