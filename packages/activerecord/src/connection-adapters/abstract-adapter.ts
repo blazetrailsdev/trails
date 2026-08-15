@@ -391,6 +391,8 @@ export interface AbstractAdapter {
     columnName: string | string[] | null | undefined,
     options: { name?: string; column?: string | string[] },
   ): Promise<string>;
+  /** @internal */
+  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
   tableExists(tableName: string): Promise<boolean>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   // Options SchemaMigration / InternalMetadata pass to `t.string` for their

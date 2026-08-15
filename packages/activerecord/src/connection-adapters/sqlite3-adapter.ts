@@ -32,11 +32,6 @@ import {
   validateIndexLengthBang as sqliteValidateIndexLengthBang,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
-import {
-  indexNameForRemoveFrom,
-  indexExistsForRemoveFrom,
-  canRemoveIndexByName,
-} from "./abstract/schema-statements.js";
 import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
@@ -72,7 +67,14 @@ import {
   BinaryType,
   DecimalType,
 } from "@blazetrails/activemodel";
-import { getFs, getPath, pluralize, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
+import {
+  getFs,
+  getPath,
+  isBlank,
+  pluralize,
+  runLoadHooks,
+  trailsRoot,
+} from "@blazetrails/activesupport";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -1619,13 +1621,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   // --- Schema operations ---
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    const { schema, bare } = this._splitTableName(tableName);
-    const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.schemaQuery(`PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`);
-    return rows
-      .filter((r) => Number(r.pk) > 0)
-      .sort((a, b) => Number(a.pk) - Number(b.pk))
-      .map((r) => String(r.name));
+    const pks = (await this.tableStructure(tableName)).filter((f) => Number(f["pk"]) > 0);
+    return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
   }
 
   private _splitTableName(tableName: string): { schema: string; bare: string } {
@@ -1647,38 +1644,30 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // Rails: `remove_index(table_name, column_name = nil, **options)` — column
     // may be positional or in the options hash.
     let columnName: string | string[] | undefined;
-    let opts: { name?: string; column?: string | string[]; ifExists?: boolean };
     if (typeof columnOrOptions === "string" || Array.isArray(columnOrOptions)) {
       columnName = columnOrOptions;
-      opts = options;
     } else {
       columnName = undefined;
-      opts = columnOrOptions ?? {};
+      options = { ...columnOrOptions, ...options };
     }
 
-    // A bare `{ name }` resolves without introspection (Rails
-    // `can_remove_index_by_name?`); otherwise (or for `ifExists`) fetch indexes.
-    const canRemoveByName = canRemoveIndexByName(columnName, opts);
-    const all =
-      opts.ifExists || !canRemoveByName
-        ? ((await this.indexes(tableName)) as Array<{ name: string; columns: string[] }>)
-        : [];
-    // Rails: `return if options[:if_exists] && !index_exists?(...)`.
-    const genName = (t: string, c: string | string[]) => this.generateIndexName(t, c);
-    if (opts.ifExists && !indexExistsForRemoveFrom(genName, all, tableName, columnName, opts)) {
-      return;
-    }
-    const indexName = indexNameForRemoveFrom(genName, all, tableName, columnName, opts);
-    // Rails: `exec_query "DROP INDEX ..."` (sqlite3_adapter.rb:290) — DDL on the
+    // Rails: `return if options[:if_exists] && !index_exists?(table_name,
+    // column_name, **options)` (sqlite3_adapter.rb:287).
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
+
+    const indexName = await this.indexNameForRemove(tableName, columnName, options);
+
+    // Rails: `exec_query "DROP INDEX ..."` (sqlite3_adapter.rb:291) — DDL on the
     // wrapped path, so it dirties the query cache, and with no "SCHEMA" name.
-    await this.execute(`DROP INDEX ${quoteColumnName(indexName)}`);
+    await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(
     source: SchemaSource,
     options: Record<string, unknown> = {},
   ): Sqlite3SchemaDumper {
-    return new Sqlite3SchemaDumper(source, options);
+    // Rails: `SQLite3::SchemaDumper.create(self, options)` (schema_statements.rb:8).
+    return Sqlite3SchemaDumper.create(source, options);
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
@@ -1692,15 +1681,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // Rails uses `exec_query(query, "SCHEMA")` (sqlite3_adapter.rb:301): the
     // wrapped path — so this dirties — but it still carries the "SCHEMA" name
     // for LogSubscriber/ExplainSubscriber filtering.
-    const rows = (await this.execute(
-      "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
-      [],
-      "SCHEMA",
-    )) as Array<{ name: string; sql: string }>;
+    const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
+
+    const rows = (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][];
     const result: Record<string, [string, string]> = {};
-    for (const r of rows) {
-      const m = /USING\s+(\w+)\s*\((.*)\)\s*$/is.exec(r.sql);
-      if (m) result[r.name] = [m[1], m[2]];
+    for (const row of rows) {
+      const [tableName, sql] = row as [string, string];
+      const m = /USING\s+(\w+)\s*\((.*)\)\s*$/is.exec(sql);
+      if (m) result[tableName] = [m[1], m[2]];
     }
     return result;
   }
@@ -1733,7 +1721,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const rawArgs = args.join(", ");
     // Rails: `exec_query "CREATE VIRTUAL TABLE ..."` (sqlite3_adapter.rb:314) —
     // DDL on the wrapped path, so it dirties the query cache.
-    await this.execute(
+    await this.execQuery(
       `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
     );
   }
@@ -1743,14 +1731,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     _moduleName?: string,
     _values?: string[],
   ): Promise<void> {
-    await this.execute(`DROP TABLE IF EXISTS ${quoteTableName(tableName)}`);
+    // Rails: `drop_table(table_name)` (sqlite3_adapter.rb:323) — the module name
+    // and values are accepted only so the migration can be reverted.
+    await this.dropTable(tableName);
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.validateTableLengthBang(newName);
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
-    await this.execute(
+    await this.execQuery(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
     await this.renameTableIndexes(tableName, newName);
@@ -1821,7 +1811,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
       const serialized = this.serializeDefaultForColumn(default_, existing?.sqlType ?? null);
       const quotedDefault = this.quoteDefault(serialized);
-      await this.execute(
+      await this.internalExecQuery(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
     }
@@ -1882,34 +1872,33 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       (columnString) =>
         columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
     );
-    const deferrableByKey = new Map<string, "immediate" | "deferred" | false>();
+    // Ruby's `to_h` / `group_by` build plain Hashes; a JS object literal is the
+    // analogue — `new Map()` would add a construction Rails' body does not make.
+    const fkDefs: Record<string, "immediate" | "deferred" | false> = {};
     for (const fkString of fkStrings) {
       const fk = SQLite3Adapter.FK_REGEX.exec(fkString);
       if (!fk) continue;
       const [, from, table, to] = fk;
       const mode = SQLite3Adapter.DEFERRABLE_REGEX.exec(fkString)?.[1];
-      deferrableByKey.set(
-        `${table},${from},${to}`,
-        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate",
-      );
+      fkDefs[`${table},${from},${to}`] =
+        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate";
     }
-    const grouped = new Map<number, Array<Record<string, unknown>>>();
+    const groupedFk: Record<number, Array<Record<string, unknown>>> = {};
     for (const row of rows) {
       const id = row.id as number;
-      if (!grouped.has(id)) grouped.set(id, []);
-      grouped.get(id)!.push(row);
+      (groupedFk[id] ??= []).push(row);
     }
 
     // Use explicit CONSTRAINT names from DDL when available (PRAGMA doesn't expose them).
     const namesByColumn = await this._parseForeignKeyNames(tableName);
 
     const results: ForeignKeyDefinition[] = [];
-    for (const group of grouped.values()) {
+    for (const group of Object.values(groupedFk)) {
       group.sort((a, b) => (a.seq as number) - (b.seq as number));
       const first = group[0];
       const toTable = first.table as string;
-      const onDelete = this._extractFkAction(first.on_delete as string);
-      const onUpdate = this._extractFkAction(first.on_update as string);
+      const onDelete = this.extractForeignKeyAction(first.on_delete as string);
+      const onUpdate = this.extractForeignKeyAction(first.on_update as string);
       // Rails returns composite column/primary_key as arrays and a bare string
       // for single-column FKs (sqlite3_adapter.rb#foreign_keys). The name and
       // deferrable maps are still keyed on the comma-joined column list.
@@ -1921,7 +1910,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const primaryKeyKey = toCols.join(",");
       const nameKey = columnKey.replace(/,/g, "_");
       const name = namesByColumn.get(columnKey) ?? `fk_${bare}_${nameKey}`;
-      const deferrable = deferrableByKey.get(`${toTable},${columnKey},${primaryKeyKey}`);
+      const deferrable = fkDefs[`${toTable},${columnKey},${primaryKeyKey}`];
       results.push(
         // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
         // deferrable/column/primary_key but no :name (we synthesize one for the
@@ -1945,21 +1934,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return results;
   }
 
-  private _extractFkAction(
-    action: string | null | undefined,
-  ): "cascade" | "nullify" | "restrict" | undefined {
-    switch ((action ?? "").toUpperCase()) {
-      case "CASCADE":
-        return "cascade";
-      case "SET NULL":
-        return "nullify";
-      case "RESTRICT":
-        return "restrict";
-      default:
-        return undefined;
-    }
-  }
-
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_insert_sql.
   override buildInsertSql(insert: InsertBuilder): string {
     let sql = `INSERT ${insert.into()}`;
@@ -1972,13 +1946,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (raw) {
         sql += raw.value;
       } else {
+        // Rails concatenates the two fragments directly (sqlite3_adapter.rb:463-464)
+        // because `touch_model_timestamps_unless` terminates every entry it emits
+        // with a comma (insert_all.rb:284). trails' `touchModelTimestampsUnless`
+        // joins on "," with no trailing separator instead, so the two fragments are
+        // joined here rather than appended — tracked as its own convergence story.
         const assignments: string[] = [];
         const touch = insert.touchModelTimestampsUnless(
-          (col) => `${col} IS excluded.${col}`,
+          (column) => `${column} IS excluded.${column}`,
           "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')",
         );
         if (touch) assignments.push(touch);
-        for (const col of insert.updatableColumns()) assignments.push(`${col}=excluded.${col}`);
+        assignments.push(
+          ...insert.updatableColumns().map((column) => `${column}=excluded.${column}`),
+        );
         sql += assignments.join(",");
       }
     }
@@ -2004,13 +1985,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override async checkAllForeignKeysValidBang(): Promise<void> {
     await this.ensureConnected();
-    const violations = (await this.driver.pragma("foreign_key_check")) as Array<
-      Record<string, unknown>
-    >;
-    if (violations.length > 0) {
-      const tables = violations.map((r) => r.table).join(", ");
-      throw new StatementInvalid(`Foreign key violations found: ${tables}`, {
-        sql: "PRAGMA foreign_key_check",
+    const sql = "PRAGMA foreign_key_check";
+    const result = await this.execute(sql);
+
+    if (!isBlank(result)) {
+      const tables = result.map((row) => row["table"]);
+      throw new StatementInvalid(`Foreign key violations found: ${tables.join(", ")}`, {
+        sql,
         binds: [],
       });
     }
@@ -2281,11 +2262,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     delete matchOptions.toTable;
     delete matchOptions.validate;
 
-    const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
-    const table = this.stripTableNamePrefixAndSuffix(
-      toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
-    );
-
     const foreignKeys = await this.foreignKeys(fromTable);
     // Rails' SQLite override hand-rolls `options.slice(*fk.options.keys)` +
     // `fk.options[k].to_s == v.to_s` (sqlite3/schema_statements.rb:79-80) rather
@@ -2294,10 +2270,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // the `["a", "b"]` inspect form. Reproducing that would mean porting Ruby
     // inspect formatting, and it is unreachable here: SQLite add_foreign_key is
     // single-column.
-    const fkey = foreignKeys.find(
-      (fk) =>
-        this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions),
-    );
+    const fkey = foreignKeys.find((fk) => {
+      // Rails resolves the target table name INSIDE the detect block
+      // (sqlite3/schema_statements.rb:73-78), after `foreign_keys(from_table)`.
+      const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
+      const table = this.stripTableNamePrefixAndSuffix(
+        toTable ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
+      );
+      return (
+        this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions)
+      );
+    });
 
     if (!fkey) {
       throw new ArgumentError(
@@ -2426,9 +2409,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // prefix form; `PRAGMA table_info("aux"."t")` treats the whole quoted argument
     // as a bare table name and returns zero rows.
     const { schema, bare } = this._splitTableName(tableName);
-    const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
+    const pragmaPrefix = schema ? `${quoteTableName(schema)}.` : "";
     const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
-    return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`);
+    // Rails: `internal_exec_query("PRAGMA table_xinfo(#{quote_table_name(table_name)})",
+    // "SCHEMA")` (sqlite3_adapter.rb:792-794). `schemaQuery` IS that call — it
+    // routes the unwrapped `execute` under the "SCHEMA" name — and hands back
+    // plain rows, which every reader of `tableInfo` here consumes.
+    return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteTableName(bare)})`);
   }
 
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
