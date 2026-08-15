@@ -5,6 +5,7 @@
 import { assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { camelize } from "./inflector.js";
+import { toS } from "./core-ext/object/inspect.js";
 
 /**
  * Wraps a value in an array. `null`/`undefined` → `[]`, arrays pass through,
@@ -170,33 +171,6 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
     }
   }
   return extracted;
-}
-
-/**
- * Ruby `Array#to_s`, which is `inspect` — the element list in brackets, each
- * element inspected. `Array#to_fs`'s `else` arm is the receiver's own `to_s`,
- * and a JS array's `toString` is the comma-joined form instead, so the Ruby
- * one is spelled out here.
- */
-function toS(self: unknown[]): string {
-  return `[${self.map(inspect).join(", ")}]`;
-}
-
-/**
- * Ruby `Object#inspect`, which `Array#to_s` calls on each element and which
- * recurses through nested Arrays and Hashes. JS has no `inspect`: `String(x)`
- * is `to_s`, which for a nested Array is the comma-joined form and for a
- * plain object is `[object Object]`.
- */
-function inspect(value: unknown): string {
-  if (value == null) return "nil";
-  if (typeof value === "string") return JSON.stringify(value);
-  if (Array.isArray(value)) return toS(value);
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    return `{${entries.map(([k, v]) => `:${k}=>${inspect(v)}`).join(", ")}}`;
-  }
-  return String(value);
 }
 
 /**

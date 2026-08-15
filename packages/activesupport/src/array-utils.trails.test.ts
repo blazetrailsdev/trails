@@ -43,8 +43,10 @@ describe("ToFsTest (trails)", () => {
   // Rails' own suite only covers the `:db` arm (core_ext/array/conversions_test.rb
   // `test_to_fs_db`). The default arm is `Array#to_s`, which is `Array#inspect`
   // and recurses; the expectation is MRI's own `[1, [2, "a"], {b: 3}, nil].to_s`.
+  // A Ruby Symbol key is a colon-prefixed string in trails (CLAUDE.md), which is
+  // what makes it render as `:b` rather than as the quoted string key `"b"`.
   it("default format inspects nested arrays and hashes", () => {
-    expect(toFs([1, [2, "a"], { b: 3 }, null])).toBe('[1, [2, "a"], {:b=>3}, nil]');
+    expect(toFs([1, [2, "a"], { ":b": 3 }, null])).toBe('[1, [2, "a"], {:b=>3}, nil]');
   });
 
   it("default format is the empty brackets for an empty array", () => {

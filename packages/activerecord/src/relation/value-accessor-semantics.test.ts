@@ -13,6 +13,7 @@ import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
+import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
 
 fixtures([]);
 /** The split join-storage and group fields the reader semantics build on. */
@@ -110,5 +111,13 @@ describe("Relation value accessor Rails semantics", () => {
   it("select_values returns the shared frozen empty array when unset", () => {
     expect(relation().selectValues).toBe(relation().selectValues);
     expect(relation().selectValues).toEqual([]);
+  });
+
+  it("values() covers exactly the Relation::VALUE_METHODS key set", () => {
+    // `except`/`only` round-trip through `values()` and `setValues`
+    // (spawn_methods.rb:59-68), so a VALUE_METHODS key present in
+    // EXCEPT_ONLY_KEYS but absent from `values()` would reset that field on
+    // every call, named or not, and an extra key would never be resettable.
+    expect(new Set(Object.keys(Post.all().values()))).toEqual(new Set(EXCEPT_ONLY_KEYS));
   });
 });

@@ -5,7 +5,7 @@
  */
 
 import { Merger, HashMerger } from "./merger.js";
-import { argumentError } from "./query-methods.js";
+import { argumentError, setValues } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -109,11 +109,20 @@ export const SpawnMethods = {
   mergeBang,
 } as const;
 
-/** @internal */
-export function relationWith<T extends SpawnRelation<T>>(self: T, values: Partial<T>): T {
-  const result = self._clone();
-  for (const [key, val] of Object.entries(values as Record<string, unknown>)) {
-    (result as any)[key] = val;
-  }
+/**
+ * Mirrors: ActiveRecord::SpawnMethods#relation_with (spawn_methods.rb:71-74) —
+ * `result = spawn; result.instance_variable_set(:@values, values); result`.
+ * trails holds the values in typed fields instead of a `@values` hash, so the
+ * ivar replacement is spelled as `setValues`, which assigns the keys the hash
+ * carries and resets the ones it dropped.
+ *
+ * @internal
+ */
+export function relationWith<T extends SpawnRelation<T>>(
+  self: T,
+  values: Record<string, unknown>,
+): T {
+  const result = (self as any).spawn();
+  setValues(result, values);
   return result;
 }

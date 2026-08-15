@@ -6,6 +6,7 @@ import { StringIO } from "./string-io.js";
 import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
+import { toS } from "./core-ext/object/inspect.js";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 
 /**
@@ -254,22 +255,6 @@ function toF(value: unknown): number {
 function toD(value: string): BigDecimal {
   const match = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/.exec(value);
   return new BigDecimal(match ? match[0].trim() : "0");
-}
-
-/**
- * Ruby `Object#to_s`, for the shapes `PARSING["string"]` is asked to render:
- * an Array is `"[]"`-bracketed and a Hash `"{}"`-braced, where JS `String()`
- * gives `""` and `"[object Object]"`.
- */
-function toS(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map((v) => toS(v)).join(", ")}]`;
-  // boundary: a JS `Date` is one of the values a document can carry, and it
-  // renders through `String()` rather than as a Hash.
-  if (value !== null && typeof value === "object" && !(value instanceof Date)) {
-    const entries = Object.entries(value as Record<string, unknown>);
-    return `{${entries.map(([k, v]) => `${k} => ${toS(v)}`).join(", ")}}`;
-  }
-  return String(value);
 }
 
 /**
