@@ -1,3 +1,4 @@
+import { AliasPredication } from "./alias-predication.js";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node, NodeVisitor } from "./nodes/node.js";
@@ -250,14 +251,8 @@ export class Table extends Node {
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
-  /**
-   * Alias as a subquery — wraps in a TableAlias.
-   *
-   * Mirrors: Arel::FactoryMethods#as (Table delegation)
-   */
-  as(name: string): TableAlias {
-    return new TableAlias(this, name);
-  }
+  /** Rails: `include Arel::AliasPredication` (table.rb:6). */
+  as = AliasPredication.as;
 
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);

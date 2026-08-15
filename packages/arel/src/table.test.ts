@@ -295,7 +295,7 @@ describe("TableTest", () => {
 
   describe("alias", () => {
     it("should create a node that proxies to a table", () => {
-      const aliased = users.as("u");
+      const aliased = users.alias("u");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.relation).toBe(users);
       const sql = new Visitors.ToSql(testConnection).compile(aliased.get("id"));
@@ -318,7 +318,7 @@ describe("TableTest", () => {
     });
 
     it("builds an attribute on a TableAlias", () => {
-      const aliased = users.as("u");
+      const aliased = users.alias("u");
       const attr = users.get("id", aliased);
       expect(attr.relation).toBe(aliased);
       expect(new Visitors.ToSql(testConnection).compile(attr)).toBe('"u"."id"');

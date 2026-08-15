@@ -428,8 +428,7 @@ export class Dot extends Visitor {
       const klass = (o as { constructor?: { name?: string } }).constructor?.name ?? "Object";
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }
-    const value = (o as Record<string, unknown>)[method];
-    this.edge(method, () => this.visit(value));
+    this.edge(method, () => this.visit((o as Record<string, unknown>)[method]));
   }
 
   /**

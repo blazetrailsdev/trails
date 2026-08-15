@@ -365,8 +365,15 @@ function makeFindSomeRel(
     findSomeOrdered(ids: unknown[]) {
       return findSomeOrdered(this, ids);
     },
+    except(..._skips: string[]) {
+      return this;
+    },
     where(_cond: any) {
-      const rel: any = { toArray: async () => records, select: () => rel };
+      const rel: any = {
+        toArray: async () => records,
+        records: async () => records,
+        select: () => rel,
+      };
       return rel;
     },
   };
@@ -468,8 +475,15 @@ function makeFindSomeOrderedRel(
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
     _whereClause: { isEmpty: () => true },
+    except(..._skips: string[]) {
+      return this;
+    },
     where(_cond: any) {
-      const rel: any = { toArray: async () => records, select: () => rel };
+      const rel: any = {
+        toArray: async () => records,
+        records: async () => records,
+        select: () => rel,
+      };
       return rel;
     },
   };
@@ -492,7 +506,11 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
       ...makeFindSomeOrderedRel(dbRows, { limit: 10 }),
       where(cond: any) {
         queriedIds = cond["id"];
-        const r: any = { toArray: async () => dbRows, select: () => r };
+        const r: any = {
+          toArray: async () => dbRows,
+          records: async () => dbRows,
+          select: () => r,
+        };
         return r;
       },
     };
@@ -511,7 +529,11 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
       ...makeFindSomeOrderedRel(dbRows, { limit: 3, offset: 9 }),
       where(cond: any) {
         queriedIds = cond["id"];
-        const r: any = { toArray: async () => dbRows, select: () => r };
+        const r: any = {
+          toArray: async () => dbRows,
+          records: async () => dbRows,
+          select: () => r,
+        };
         return r;
       },
     };
@@ -534,6 +556,7 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
       where(_cond: any) {
         const inner: any = {
           toArray: async () => dbRows,
+          records: async () => dbRows,
           select(col: unknown) {
             selectArg = col;
             return inner;
@@ -554,9 +577,12 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
 
 function makeLoadedRel(records: any[]): any {
   return {
-    _loaded: true,
-    _records: records,
-    limit: (_n: number) => ({ toArray: async () => records.slice(0, _n) }),
+    isLoaded: true,
+    records: async () => records,
+    limit: (_n: number) => ({
+      records: async () => records.slice(0, _n),
+      toArray: async () => records.slice(0, _n),
+    }),
   };
 }
 
@@ -668,8 +694,15 @@ describe("finder not-found message fidelity", () => {
       selectValues: [],
       raiseRecordNotFoundExceptionBang,
       _whereClause: { isEmpty: () => true },
+      except(..._skips: string[]) {
+        return this;
+      },
       where(_cond: any) {
-        const inner: any = { toArray: async () => [], select: () => inner };
+        const inner: any = {
+          toArray: async () => [],
+          records: async () => [],
+          select: () => inner,
+        };
         return inner;
       },
     };

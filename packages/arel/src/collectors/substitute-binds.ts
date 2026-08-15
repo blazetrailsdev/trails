@@ -1,21 +1,5 @@
 import { BindParam } from "../nodes/bind-param.js";
 
-function extractValue(bind: unknown): unknown {
-  // A raw Arel BindParam carries its bound value on `.value` (the visitor
-  // pushes the node itself so the Bind collector can render `?` while
-  // `compileWithBinds` unwraps it). When inlining, unwrap to the value so it
-  // can be quoted directly — matching Rails' `add_bind(o.value)`.
-  if (bind instanceof BindParam) return extractValue(bind.value);
-  if (bind && typeof bind === "object" && "valueForDatabase" in bind) {
-    // `valueForDatabase` is a method on a raw Arel attribute but a getter on
-    // ActiveModel::Attribute (`get valueForDatabase()`); read the property and
-    // only invoke it when it resolves to a function so both shapes unwrap.
-    const v = (bind as Record<string, unknown>).valueForDatabase;
-    return typeof v === "function" ? (v as () => unknown).call(bind) : v;
-  }
-  return bind;
-}
-
 export class SubstituteBinds {
   private quoter: { quote(value: unknown): string };
   private delegate: { append(str: string): unknown; value: string };
@@ -31,7 +15,22 @@ export class SubstituteBinds {
   }
 
   addBind(bind: unknown): this {
-    return this.append(this.quoter.quote(extractValue(bind)));
+    // A raw Arel BindParam carries its bound value on `.value` (the visitor
+    // pushes the node itself so the Bind collector can render `?` while
+    // `compileWithBinds` unwraps it). When inlining, unwrap to the value so it
+    // can be quoted directly — matching Rails' `add_bind(o.value)`.
+    while (bind instanceof BindParam) bind = bind.value;
+    if (bind != null && typeof bind === "object" && "valueForDatabase" in bind) {
+      // `valueForDatabase` is a method on a raw Arel attribute but a getter on
+      // ActiveModel::Attribute (`get valueForDatabase()`); read the property and
+      // only invoke it when it resolves to a function so both shapes unwrap.
+      const valueForDatabase = (bind as Record<string, unknown>).valueForDatabase;
+      bind =
+        typeof valueForDatabase === "function"
+          ? (valueForDatabase as () => unknown).call(bind)
+          : valueForDatabase;
+    }
+    return this.append(this.quoter.quote(bind));
   }
 
   // Mirrors Rails `SubstituteBinds#add_binds` (substitute_binds.rb:23-25):

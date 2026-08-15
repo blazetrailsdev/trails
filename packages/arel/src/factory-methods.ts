@@ -72,8 +72,10 @@ export const FactoryMethods: FactoryMethodsModule = {
   },
 
   createStringJoin(to: string | Node): StringJoin {
-    const node = typeof to === "string" ? new SqlLiteral(to) : to;
-    return this.createJoin(node, null, StringJoin) as StringJoin;
+    // Ruby's StringJoin visitor renders a bare String `to` directly; TS needs
+    // the SqlLiteral wrapper for the node to reach the visitor at all.
+    if (typeof to === "string") to = new SqlLiteral(to);
+    return this.createJoin(to, null, StringJoin) as StringJoin;
   },
 
   createAnd(clauses: (Node | string)[]): And {

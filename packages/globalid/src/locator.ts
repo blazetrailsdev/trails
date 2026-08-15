@@ -309,15 +309,14 @@ export class Locator {
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,
   ): Promise<unknown[]> {
-    const uris: string[] = [];
-    for (const s of sgids) {
-      const parsed = SignedGlobalID.parse(String(s), {
-        for: options.for,
-        verifier: options.verifier,
-      });
-      if (parsed) uris.push(parsed.uri);
-    }
-    return Locator.locateMany(uris, options);
+    return Locator.locateMany(
+      sgids
+        .map((sgid) =>
+          SignedGlobalID.parse(String(sgid), { for: options.for, verifier: options.verifier }),
+        )
+        .filter((sgid) => sgid != null),
+      options,
+    );
   }
 
   // ─── Class-level config (Rails: attr_accessor :default_locator) ───────────
