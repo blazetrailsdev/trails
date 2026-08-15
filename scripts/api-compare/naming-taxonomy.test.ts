@@ -22,6 +22,17 @@ describe("classifyPair", () => {
     expect(classifyPair("size", "n")).toBe("burndown");
   });
 
+  // The recorder camelCases a plain Ruby `ref:` identifier, so a multi-word
+  // key only ever reaches here in its camel spelling (abstract-adapter.ts's
+  // `object_id` records as `objectId`) — matching snake_case alone missed the
+  // whole `to_*` family and read four permanent rows as burndown work.
+  it("names a Ruby construct under the camelCased spelling the recorder gives it", () => {
+    expect(classifyPair("objectId", "this")).toBe("no-js-equivalent");
+    expect(classifyPair("toI", "parseInt")).toBe("no-js-equivalent");
+    expect(classifyPair("toS", "toString")).toBe("no-js-equivalent");
+    expect(classifyPair("toS", "fetchValue")).toBe("burndown");
+  });
+
   it("names what the conventions table itself produces", () => {
     expect(classifyPair("primary_class?", "primaryClassQ")).toBe("conventions-rename");
     expect(classifyPair("@callbacks", "_callbacks")).toBe("conventions-rename");

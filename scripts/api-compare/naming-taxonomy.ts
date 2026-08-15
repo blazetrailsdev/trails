@@ -124,6 +124,17 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   to_s: ["toString", "String"],
 };
 
+/**
+ * {@link NO_JS_EQUIVALENT} keyed by the camelCased Ruby name as well. The
+ * recorder camelCases a Ruby `ref:` argument that is a plain identifier
+ * (`object_id` reaches the artifact as `objectId`, `to_i` as `toI`) while
+ * leaving a `?`/`!` one alone, so a snake_case-only lookup silently never fires
+ * for the multi-word keys — `object_id`, `to_f`, `to_i`, `to_s`.
+ */
+const NO_JS_EQUIVALENT_BY_CAMEL = new Map(
+  Object.entries(NO_JS_EQUIVALENT).map(([rubyRef, tsRefs]) => [snakeToCamel(rubyRef), tsRefs]),
+);
+
 /** The bare identifier behind a recorded `ref:` argument, or undefined. */
 export function refName(arg: string): string | undefined {
   return arg.startsWith("ref:") ? arg.slice("ref:".length) : undefined;
@@ -176,9 +187,10 @@ export function classifyPair(
 ): NamingClass {
   if (rubyRef === "self" || rubyRef === "this") return "module-mixin-receiver";
   if (JS_RESERVED_WORDS.has(rubyRef)) return "js-reserved-word";
-  if (Object.hasOwn(NO_JS_EQUIVALENT, rubyRef) && NO_JS_EQUIVALENT[rubyRef].includes(tsRef)) {
-    return "no-js-equivalent";
-  }
+  const noJsEquivalent = Object.hasOwn(NO_JS_EQUIVALENT, rubyRef)
+    ? NO_JS_EQUIVALENT[rubyRef]
+    : NO_JS_EQUIVALENT_BY_CAMEL.get(rubyRef);
+  if (noJsEquivalent?.includes(tsRef)) return "no-js-equivalent";
   if (!rubyRef.startsWith("@") && tsRef === `_${snakeToCamel(rubyRef)}`) return "ivar-underscore";
   if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
     return "module-mixin-call";
