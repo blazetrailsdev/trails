@@ -64,7 +64,10 @@ export function transliterate(str: string | null | undefined, replacement = "?")
  * "pretty" URL.
  *
  * Mirrors: `Inflector.parameterize`
- * (`inflector/transliterate.rb:123-147`).
+ * (`inflector/transliterate.rb:123-147`). Rails forwards a `locale:` kwarg to
+ * `transliterate`, which selects that locale's `i18n.transliterate.rule`;
+ * trails' `transliterate` has no locale arm yet, so there is nothing to
+ * forward it to.
  */
 export function parameterize(
   string: string,
@@ -83,7 +86,7 @@ export function parameterize(
       reDuplicateSeparator = /-{2,}/g;
       reLeadingTrailingSeparator = /^-|-$/gi;
     } else {
-      const reSep = separator.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const reSep = separator.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
       reDuplicateSeparator = new RegExp(`${reSep}{2,}`, "g");
       reLeadingTrailingSeparator = new RegExp(`^${reSep}|${reSep}$`, "gi");
     }

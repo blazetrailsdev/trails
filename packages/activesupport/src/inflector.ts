@@ -336,6 +336,14 @@ export function foreignKey(className: string, separateWithUnderscore: boolean = 
 }
 
 /**
+ * Ruby `Regexp.escape` (`re.c` `rb_reg_s_quote`), which escapes every character
+ * `Regexp` gives a meaning to plus whitespace. JS has no `RegExp.escape`.
+ */
+function regexpEscape(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
+}
+
+/**
  * Mirrors: `Inflector.const_regexp` (`inflector/methods.rb:357-367`) — a
  * `Regexp` source that will match part by part the given constant.
  *
@@ -349,7 +357,7 @@ export function constRegexp(camelCasedWord: string): string {
   const parts = camelCasedWord.split("::");
   while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
 
-  if (parts.length === 0) return camelCasedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (parts.length === 0) return regexpEscape(camelCasedWord);
 
   const last = parts.pop()!;
 

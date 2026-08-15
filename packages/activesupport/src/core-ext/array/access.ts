@@ -6,7 +6,7 @@
  * idiom `core-ext/object/blank.ts` uses for `NilClass`/`String`/`Time`.
  */
 
-import { isBlank } from "../../string-utils.js";
+import { isBlank } from "../object/blank.js";
 
 export class Array {
   /**

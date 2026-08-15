@@ -179,7 +179,11 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
  * one is spelled out here.
  */
 function toS(self: unknown[]): string {
-  return `[${self.map((e) => (typeof e === "string" ? JSON.stringify(e) : String(e))).join(", ")}]`;
+  const inspect = (e: unknown): string => {
+    if (e == null) return "nil";
+    return typeof e === "string" ? JSON.stringify(e) : String(e);
+  };
+  return `[${self.map(inspect).join(", ")}]`;
 }
 
 /**
@@ -188,9 +192,9 @@ function toS(self: unknown[]): string {
  *
  * Mirrors: `Array#to_fs` (`core_ext/array/conversions.rb:94-105`).
  */
-export function toFs(self: unknown[], format = ":default"): string {
+export function toFs(self: unknown[], format = "default"): string {
   switch (format) {
-    case ":db":
+    case "db":
       if (self.length === 0) {
         return "null";
       } else {
