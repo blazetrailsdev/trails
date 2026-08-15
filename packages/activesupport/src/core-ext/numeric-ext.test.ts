@@ -158,21 +158,235 @@ describe("NumericExtFormattingTest", () => {
     expect(NumericWithFormat.toFs(8005551212, ":phone", { delimiter: " " })).toBe("800 555 1212");
   });
 
+  it("to fs currency", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(1234567890.5, ":currency")).toBe("$1,234,567,890.50");
+    expect(NumericWithFormat.toFormattedS(1234567890.5, ":currency")).toBe("$1,234,567,890.50");
+    expect(toFs(1234567890.506, ":currency")).toBe("$1,234,567,890.51");
+    expect(toFs(-1234567890.5, ":currency")).toBe("-$1,234,567,890.50");
+    expect(toFs(-1234567890.5, ":currency", { format: "%u %n" })).toBe("-$ 1,234,567,890.50");
+    expect(toFs(-1234567890.5, ":currency", { negativeFormat: "(%u%n)" })).toBe(
+      "($1,234,567,890.50)",
+    );
+    expect(toFs(1234567891.5, ":currency", { precision: 0 })).toBe("$1,234,567,892");
+    expect(toFs(1234567891.5, ":currency", { precision: 0, roundMode: ":down" })).toBe(
+      "$1,234,567,891",
+    );
+    expect(toFs(1234567890.5, ":currency", { precision: 1 })).toBe("$1,234,567,890.5");
+    expect(
+      toFs(1234567890.5, ":currency", { unit: "&pound;", separator: ",", delimiter: "" }),
+    ).toBe("&pound;1234567890,50");
+  });
+
+  it("to fs rounded", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(-111.2346, ":rounded")).toBe("-111.235");
+    expect(NumericWithFormat.toFormattedS(-111.2346, ":rounded")).toBe("-111.235");
+    expect(toFs(111.2346, ":rounded")).toBe("111.235");
+    expect(toFs(31.825, ":rounded", { precision: 2 })).toBe("31.83");
+    expect(toFs(31.825, ":rounded", { precision: 2, roundMode: ":down" })).toBe("31.82");
+    expect(toFs(111.2346, ":rounded", { precision: 2 })).toBe("111.23");
+    expect(toFs(111, ":rounded", { precision: 2 })).toBe("111.00");
+    expect(toFs(32.6751 * 100.0, ":rounded", { precision: 0 })).toBe("3268");
+    expect(toFs(111.5, ":rounded", { precision: 0 })).toBe("112");
+    expect(toFs(1234567891.5, ":rounded", { precision: 0 })).toBe("1234567892");
+    expect(toFs(0, ":rounded", { precision: 0 })).toBe("0");
+    expect(toFs(0.001, ":rounded", { precision: 5 })).toBe("0.00100");
+    expect(toFs(0.00111, ":rounded", { precision: 3 })).toBe("0.001");
+    expect(toFs(9.995, ":rounded", { precision: 2 })).toBe("10.00");
+    expect(toFs(10.995, ":rounded", { precision: 2 })).toBe("11.00");
+    expect(toFs(-0.001, ":rounded", { precision: 2 })).toBe("0.00");
+  });
+
+  it("to fs rounded with custom delimiter and separator", () => {
+    expect(NumericWithFormat.toFs(31.825, ":rounded", { precision: 2, separator: "," })).toBe(
+      "31,83",
+    );
+    expect(
+      NumericWithFormat.toFs(1231.825, ":rounded", {
+        precision: 2,
+        separator: ",",
+        delimiter: ".",
+      }),
+    ).toBe("1.231,83");
+  });
+
+  it("to fs rounded with significant digits", () => {
+    const rounded = (n: number, options: Record<string, unknown>) =>
+      NumericWithFormat.toFs(n, ":rounded", options);
+    expect(rounded(123987, { precision: 3, significant: true })).toBe("124000");
+    expect(rounded(123987876, { precision: 2, significant: true })).toBe("120000000");
+    expect(rounded(9775, { precision: 4, significant: true })).toBe("9775");
+    expect(rounded(5.3923, { precision: 2, significant: true })).toBe("5.4");
+    expect(rounded(5.3923, { precision: 1, significant: true })).toBe("5");
+    expect(rounded(1.232, { precision: 1, significant: true })).toBe("1");
+    expect(rounded(7, { precision: 1, significant: true })).toBe("7");
+    expect(rounded(52.7923, { precision: 2, significant: true })).toBe("53");
+    expect(rounded(9775, { precision: 6, significant: true })).toBe("9775.00");
+    expect(rounded(5.3929, { precision: 7, significant: true })).toBe("5.392900");
+    expect(rounded(0, { precision: 2, significant: true })).toBe("0.0");
+    expect(rounded(0, { precision: 1, significant: true })).toBe("0");
+    expect(rounded(0.0001, { precision: 1, significant: true })).toBe("0.0001");
+    expect(rounded(0.0001, { precision: 3, significant: true })).toBe("0.000100");
+    expect(rounded(0.0001111, { precision: 1, significant: true })).toBe("0.0001");
+    expect(rounded(9.995, { precision: 3, significant: true })).toBe("10.0");
+    expect(rounded(9.994, { precision: 3, significant: true })).toBe("9.99");
+    expect(rounded(10.995, { precision: 3, significant: true })).toBe("11.0");
+    expect(rounded(10.995, { precision: 3, significant: true, roundMode: ":down" })).toBe("10.9");
+  });
+
+  it("to fs rounded with strip insignificant zeros", () => {
+    const rounded = (n: number, options: Record<string, unknown>) =>
+      NumericWithFormat.toFs(n, ":rounded", options);
+    expect(rounded(9775.43, { precision: 4, stripInsignificantZeros: true })).toBe("9775.43");
+    expect(
+      rounded(9775.2, { precision: 6, significant: true, stripInsignificantZeros: true }),
+    ).toBe("9775.2");
+    expect(rounded(0, { precision: 6, significant: true, stripInsignificantZeros: true })).toBe(
+      "0",
+    );
+  });
+
+  it("to fs rounded with significant true and zero precision", () => {
+    expect(NumericWithFormat.toFs(123.987, ":rounded", { precision: 0, significant: true })).toBe(
+      "124",
+    );
+    expect(NumericWithFormat.toFs(12, ":rounded", { precision: 0, significant: true })).toBe("12");
+  });
+
+  it("to fs percentage", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(100, ":percentage")).toBe("100.000%");
+    expect(NumericWithFormat.toFormattedS(100, ":percentage")).toBe("100.000%");
+    expect(toFs(100, ":percentage", { precision: 0 })).toBe("100%");
+    expect(toFs(302.0574, ":percentage", { precision: 2 })).toBe("302.06%");
+    expect(toFs(302.0574, ":percentage", { precision: 2, roundMode: ":down" })).toBe("302.05%");
+    expect(toFs(123.4, ":percentage", { precision: 3, stripInsignificantZeros: true })).toBe(
+      "123.4%",
+    );
+    expect(toFs(1000, ":percentage", { delimiter: ".", separator: "," })).toBe("1.000,000%");
+    expect(toFs(1000, ":percentage", { format: "%n  %" })).toBe("1000.000  %");
+  });
+
   it("to fs delimited", () => {
-    expect(NumericWithFormat.toFs(12345678, ":delimited")).toBe("12,345,678");
-    expect(NumericWithFormat.toFs(0, ":delimited")).toBe("0");
-    expect(NumericWithFormat.toFs(123, ":delimited")).toBe("123");
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(12345678, ":delimited")).toBe("12,345,678");
+    expect(NumericWithFormat.toFormattedS(12345678, ":delimited")).toBe("12,345,678");
+    expect(toFs(0, ":delimited")).toBe("0");
+    expect(toFs(123, ":delimited")).toBe("123");
+    expect(toFs(123456, ":delimited")).toBe("123,456");
+    expect(toFs(123456.78, ":delimited")).toBe("123,456.78");
+    expect(toFs(123456.789, ":delimited")).toBe("123,456.789");
+    expect(toFs(123456.78901, ":delimited")).toBe("123,456.78901");
+    expect(toFs(123456789.78901, ":delimited")).toBe("123,456,789.78901");
+    expect(toFs(0.78901, ":delimited")).toBe("0.78901");
+  });
+
+  it("to fs delimited with options hash", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(12345678, ":delimited", { delimiter: " " })).toBe("12 345 678");
+    expect(toFs(12345678.05, ":delimited", { separator: "-" })).toBe("12,345,678-05");
+    expect(toFs(12345678.05, ":delimited", { separator: ",", delimiter: "." })).toBe(
+      "12.345.678,05",
+    );
+    expect(toFs(12345678.05, ":delimited", { delimiter: ".", separator: "," })).toBe(
+      "12.345.678,05",
+    );
   });
 
   it("to fs human size", () => {
-    expect(NumericWithFormat.toFs(123, ":human_size")).toBe("123 Bytes");
-    expect(NumericWithFormat.toFs(1234, ":human_size")).toBe("1.21 KB");
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(0, ":human_size")).toBe("0 Bytes");
+    expect(toFs(1, ":human_size")).toBe("1 Byte");
+    expect(toFs(3.14159265, ":human_size")).toBe("3 Bytes");
+    expect(toFs(123.0, ":human_size")).toBe("123 Bytes");
+    expect(toFs(123, ":human_size")).toBe("123 Bytes");
+    expect(toFs(1234, ":human_size")).toBe("1.21 KB");
+    expect(toFs(12345, ":human_size")).toBe("12.1 KB");
+    expect(toFs(1234567, ":human_size")).toBe("1.18 MB");
+    expect(toFs(1234567890, ":human_size")).toBe("1.15 GB");
+    expect(toFs(1234567890123, ":human_size")).toBe("1.12 TB");
+    expect(toFs(1234567890123456, ":human_size")).toBe("1.1 PB");
+    expect(toFs(Numeric.exabytes(1023), ":human_size")).toBe("1020 EB");
+    expect(toFs(Numeric.zettabytes(16), ":human_size")).toBe("16 ZB");
+    expect(toFs(Numeric.kilobytes(444), ":human_size")).toBe("444 KB");
+    expect(toFs(Numeric.megabytes(1023), ":human_size")).toBe("1020 MB");
+    expect(toFs(Numeric.terabytes(3), ":human_size")).toBe("3 TB");
+    expect(toFs(1234567, ":human_size", { precision: 2 })).toBe("1.2 MB");
+    expect(toFs(3.14159265, ":human_size", { precision: 4 })).toBe("3 Bytes");
+    expect(toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 2 })).toBe("1 KB");
+    expect(toFs(Numeric.kilobytes(1.01), ":human_size", { precision: 4 })).toBe("1.01 KB");
+    expect(toFs(Numeric.kilobytes(10.0), ":human_size", { precision: 4 })).toBe("10 KB");
+    expect(toFs(1.1, ":human_size")).toBe("1 Byte");
+    expect(toFs(10, ":human_size")).toBe("10 Bytes");
+  });
+
+  it("to fs human size with negative number", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(-1, ":human_size")).toBe("-1 Bytes");
+    expect(toFs(-3.14159265, ":human_size")).toBe("-3 Bytes");
+    expect(toFs(-123, ":human_size")).toBe("-123 Bytes");
+    expect(toFs(-12345, ":human_size")).toBe("-12.1 KB");
+    expect(toFs(Numeric.kilobytes(-444), ":human_size")).toBe("-444 KB");
+    expect(toFs(-1234567890123, ":human_size")).toBe("-1.12 TB");
+    expect(toFs(Numeric.kilobytes(-1.01), ":human_size", { precision: 4 })).toBe("-1.01 KB");
+  });
+
+  it("to fs human size with options hash", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(1234567, ":human_size", { precision: 2 })).toBe("1.2 MB");
+    expect(toFs(3.14159265, ":human_size", { precision: 4 })).toBe("3 Bytes");
+    expect(toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 2 })).toBe("1 KB");
+    expect(toFs(Numeric.kilobytes(1.01), ":human_size", { precision: 4 })).toBe("1.01 KB");
+    expect(toFs(Numeric.kilobytes(10.0), ":human_size", { precision: 4 })).toBe("10 KB");
+    expect(toFs(1234567890123, ":human_size", { precision: 1 })).toBe("1 TB");
+    expect(toFs(524288000, ":human_size", { precision: 3 })).toBe("500 MB");
+    expect(toFs(9961472, ":human_size", { precision: 0 })).toBe("10 MB");
+    expect(toFs(41010, ":human_size", { precision: 1 })).toBe("40 KB");
+    expect(toFs(41100, ":human_size", { precision: 2 })).toBe("40 KB");
+    expect(toFs(41100, ":human_size", { precision: 1, roundMode: ":up" })).toBe("50 KB");
+    expect(
+      toFs(Numeric.kilobytes(1.0123), ":human_size", {
+        precision: 2,
+        stripInsignificantZeros: false,
+      }),
+    ).toBe("1.0 KB");
+    expect(
+      toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 3, significant: false }),
+    ).toBe("1.012 KB");
+    expect(
+      toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 0, significant: true }),
+    ).toBe("1 KB");
+  });
+
+  it("to fs human size with custom delimiter and separator", () => {
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 3, separator: "," })).toBe(
+      "1,01 KB",
+    );
+    expect(toFs(Numeric.kilobytes(1.01), ":human_size", { precision: 4, separator: "," })).toBe(
+      "1,01 KB",
+    );
+    expect(
+      toFs(Numeric.terabytes(1000.1), ":human_size", {
+        precision: 5,
+        delimiter: ".",
+        separator: ",",
+      }),
+    ).toBe("1.000,1 TB");
+  });
+
+  it("to fs injected on proper types", () => {
+    expect(NumericWithFormat.toFs(1230, ":human")).toBe("1.23 Thousand");
+    expect(NumericWithFormat.toFs(Number(1230), ":human")).toBe("1.23 Thousand");
+    expect(NumericWithFormat.toFs(100 ** 10, ":human")).toBe("100000 Quadrillion");
   });
 
   it("to fs with invalid formatter", () => {
     expect(NumericWithFormat.toFs(123, ":invalid")).toBe("123");
     expect(NumericWithFormat.toFormattedS(123, ":invalid")).toBe("123");
     expect(NumericWithFormat.toFs(2.5, ":invalid")).toBe("2.5");
+    expect(NumericWithFormat.toFs(100 ** 10, ":invalid")).toBe("100000000000000000000");
   });
 
   it("default to fs", () => {
@@ -180,5 +394,6 @@ describe("NumericExtFormattingTest", () => {
     expect(NumericWithFormat.toFormattedS(123)).toBe("123");
     expect(NumericWithFormat.toFs(123, 2)).toBe("1111011");
     expect(NumericWithFormat.toFs(2.5)).toBe("2.5");
+    expect(NumericWithFormat.toFs(100 ** 10)).toBe("100000000000000000000");
   });
 });
