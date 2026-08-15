@@ -28,18 +28,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream.push(
       "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
     );
-    // Split on commas that are NOT inside single quotes; filter empty segments
-    const splitArgs = (s: string): string[] => {
-      if (s.trim() === "") return [];
-      return s
-        .split(/,(?=(?:[^']*'[^']*')*[^']*$)/)
-        .map((a) => a.trim())
-        .filter((a) => a.length > 0);
-    };
     for (const [tableName, options] of [...virtualTables].sort()) {
       const [moduleName, argumentsStr] = options;
       stream.push(
-        `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(splitArgs(argumentsStr))});`,
+        `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(argumentsStr.split(", "))});`,
       );
     }
   }

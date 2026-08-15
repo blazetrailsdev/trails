@@ -29,7 +29,8 @@ export namespace NumericWithFormat {
    * separates that arm from the format Symbols below. Ruby's trailing
    * `else to_s(format)` arm takes a format that is none of those three types,
    * which this parameter type excludes, so the `when Symbol` fallback to `to_s`
-   * is the last arm here.
+   * is the last arm here. `to_s(format)` dispatches on the receiver:
+   * `BigDecimal#to_s` takes a format string, `Integer#to_s` a base.
    */
   export function toFs(
     self: number | BigDecimal,
@@ -39,8 +40,6 @@ export namespace NumericWithFormat {
     if (format === null) return self.toString();
 
     if (typeof format === "number" || !format.startsWith(":")) {
-      // `to_s(format)` dispatches on the receiver: `BigDecimal#to_s` takes a
-      // format string, `Integer#to_s` a base (conversions.rb:117-118).
       return self instanceof BigDecimal
         ? self.toString(String(format))
         : self.toString(format as number);

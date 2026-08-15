@@ -1672,11 +1672,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteVirtualTableExists(this, tableName);
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::VIRTUAL_TABLE_REGEX
+  /** Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::VIRTUAL_TABLE_REGEX */
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
-  // Returns a list of defined virtual tables, as `[tableName, [moduleName, arguments]]` pairs.
+  /**
+   * Returns a list of defined virtual tables, as the
+   * `[tableName, [moduleName, arguments]]` pairs Rails' trailing `.to_a`
+   * produces (sqlite3_adapter.rb:296-307).
+   *
+   * Rails uses `exec_query(query, "SCHEMA")` (sqlite3_adapter.rb:301): the
+   * wrapped path — so this dirties — but it still carries the "SCHEMA" name
+   * for LogSubscriber/ExplainSubscriber filtering. Rails' `arguments` local is
+   * `args` here — `arguments` is not a legal binding name in a strict-mode
+   * module.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
+   */
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
