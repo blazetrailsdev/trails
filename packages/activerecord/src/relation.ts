@@ -3702,17 +3702,17 @@ export class Relation<T extends Base> {
     }
 
     if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], pk as string)) {
-      // Rails `apply_join_dependency` converts includes/eager_load to LEFT OUTER
-      // JOINs over `eager_load_values | includes_values` (finder_methods.rb:457)
-      // and clears the eager values, so the grouped recursion below takes the
-      // plain arm and terminates. Same shape `pluck` uses above, including the
-      // limit/offset `distinct_relation_for_primary_key` materialization
-      // (finder_methods.rb:463), which a synchronous applyJoinDependency cannot
-      // perform.
-      // Deduped without a `Set` on purpose: Rails' only constructor call in this
-      // body is the `Promise::Complete.new` of the `loaded?` arm, which trails
-      // models with the native async surface, so a `new Set` here would be the
-      // body's first constructor and reorder the recorded call sequence.
+      // DIVERGENCE (finder_methods.rb:457-463): trails' `applyJoinDependency`
+      // no-ops unless the relation already eager-loads for SQL, so the plain
+      // `apply_join_dependency` call would not terminate this recursion. Spell
+      // it as `pluck` does — clear the eager values, LEFT OUTER JOIN
+      // `eager_load_values | includes_values`, and materialize the limited
+      // DISTINCT primary keys (`distinct_relation_for_primary_key`, :463) that
+      // a synchronous applyJoinDependency cannot execute.
+      // Deduped without a `Set`: Rails' only constructor here is the
+      // `Promise::Complete.new` of the `loaded?` arm (calculations.rb:382),
+      // which trails models with the native async surface, so a `new Set` would
+      // become the body's first constructor and reorder the recorded sequence.
       const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
         (spec, i, all) => all.indexOf(spec) === i,
       );
