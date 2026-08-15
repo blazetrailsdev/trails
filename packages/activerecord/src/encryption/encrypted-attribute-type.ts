@@ -54,8 +54,7 @@ export class EncryptedAttributeType extends ValueType {
 
   deserialize(value: unknown): unknown {
     if (value === null || value === undefined) return value;
-    const decrypted = this.decrypt(value);
-    return this.castType.deserialize?.(decrypted) ?? decrypted;
+    return this.castType.deserialize(this.decrypt(value));
   }
 
   serialize(value: unknown): unknown {

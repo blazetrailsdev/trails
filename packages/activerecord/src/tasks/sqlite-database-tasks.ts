@@ -315,9 +315,7 @@ export class SQLiteDatabaseTasks {
    * `reconnect`/`purge` (`:31-37`) does not.
    */
   private async establishConnection(config: DatabaseConfig = this.dbConfig): Promise<void> {
-    await Base.establishConnection(
-      config.configuration as { adapter?: string; [key: string]: unknown },
-    );
+    await Base.establishConnection(config);
     await (await this.connection()).connectBang();
   }
 

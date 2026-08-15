@@ -51,6 +51,7 @@ import {
   presence,
   assertValidKeys,
   KeyError,
+  any,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { rubyInspect } from "../../relation/ruby-inspect.js";
@@ -399,8 +400,8 @@ export class SchemaStatements {
     const { id, primaryKey, force, ...options } = kwargs;
     this.validateCreateTableOptionsBang(options);
 
-    if (tableName.length > 64) {
-      throw new Error(`Table name '${tableName}' is too long; the limit is 64 characters`);
+    if ((options as { _usesLegacyTableName?: boolean })._usesLegacyTableName !== true) {
+      this.validateTableLengthBang(tableName);
     }
 
     if (force && options.ifNotExists) {
@@ -505,7 +506,7 @@ export class SchemaStatements {
       return;
     }
     await this.execute(
-      `ALTER TABLE ${this.quoteColumnName(tableName)} DROP COLUMN ${this.quoteColumnName(columnName)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} ${this.removeColumnForAlter(tableName, columnName, _type as ColumnType | undefined, options)}`,
     );
   }
 
@@ -621,9 +622,8 @@ export class SchemaStatements {
   async tableExists(tableName: string): Promise<boolean> {
     if (!isPresent(tableName)) return false;
     try {
-      return (
-        (await this.queryValues(this.dataSourceSql(tableName, { type: "BASE TABLE" }), "SCHEMA"))
-          .length > 0
+      return any(
+        await this.queryValues(this.dataSourceSql(tableName, { type: "BASE TABLE" }), "SCHEMA"),
       );
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
@@ -1324,10 +1324,7 @@ export class SchemaStatements {
     // The "SCHEMA" name is what keeps the probe out of assertQueries counts.
     if (!isPresent(viewName)) return false;
     try {
-      return (
-        (await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA")).length >
-        0
-      );
+      return any(await this.queryValues(this.dataSourceSql(viewName, { type: "VIEW" }), "SCHEMA"));
     } catch (e) {
       if (e instanceof NotImplementedError) {
         return (await this.views()).includes(String(viewName));
@@ -1431,7 +1428,7 @@ export class SchemaStatements {
   async dataSourceExists(name: string): Promise<boolean> {
     if (!isPresent(name)) return false;
     try {
-      return (await this.queryValues(this.dataSourceSql(name), "SCHEMA")).length > 0;
+      return any(await this.queryValues(this.dataSourceSql(name), "SCHEMA"));
     } catch (error) {
       if (!(error instanceof NotImplementedError)) throw error;
       return (await this.dataSources()).includes(String(name));

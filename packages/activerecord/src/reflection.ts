@@ -2340,13 +2340,13 @@ export function create(
  * Mirrors: ActiveRecord::Reflection.add_reflection
  */
 export function addReflection(
-  activeRecord: typeof Base,
+  ar: typeof Base,
   name: string,
   reflection: AssociationReflection | ThroughReflection,
 ): void {
-  clearReflectionsCache(activeRecord);
-  const hasOwn = Object.prototype.hasOwnProperty.call(activeRecord, "_reflections");
-  const inherited: Record<string, unknown> = (activeRecord as any)._reflections ?? {};
+  clearReflectionsCache(ar);
+  const hasOwn = Object.prototype.hasOwnProperty.call(ar, "_reflections");
+  const inherited: Record<string, unknown> = (ar as any)._reflections ?? {};
   const reflections = hasOwn ? inherited : { ...inherited };
   // Rails: `_reflections.except(name).merge!(name => reflection)` — redefining an
   // existing association deletes it first so the new reflection is re-appended at
@@ -2354,25 +2354,25 @@ export function addReflection(
   // :through order check in checkValidityBang depends on).
   delete reflections[name];
   reflections[name] = reflection;
-  (activeRecord as any)._reflections = reflections;
+  (ar as any)._reflections = reflections;
 }
 
 /**
  * Mirrors: ActiveRecord::Reflection.add_aggregate_reflection
  */
 export function addAggregateReflection(
-  activeRecord: typeof Base,
+  ar: typeof Base,
   name: string,
   reflection: AggregateReflection,
 ): void {
-  const hasOwn = Object.prototype.hasOwnProperty.call(activeRecord, "_aggregateReflections");
-  const existing = (activeRecord as any)._aggregateReflections;
+  const hasOwn = Object.prototype.hasOwnProperty.call(ar, "_aggregateReflections");
+  const existing = (ar as any)._aggregateReflections;
   const aggs: Map<string, AggregateReflection> =
     hasOwn && existing instanceof Map
       ? existing
       : new Map<string, AggregateReflection>(existing instanceof Map ? existing : undefined);
   aggs.set(name, reflection);
-  (activeRecord as any)._aggregateReflections = aggs;
+  (ar as any)._aggregateReflections = aggs;
 }
 
 // ---------------------------------------------------------------------------

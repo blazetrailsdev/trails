@@ -252,7 +252,7 @@ export class InternalMetadata {
   ): Promise<Record<string, unknown> | null> {
     const sm = new SelectManager(this.arelTable);
     sm.project(star);
-    sm.where(this.arelTable.get(this.primaryKey).eq(key));
+    sm.where(this.arelTable.get(this.primaryKey).eq(new Nodes.BindParam(key)));
     sm.order(this.arelTable.get(this.primaryKey).asc());
     sm.take(1);
     // Rails: connection.select_all(sm, "#{self.class} Load").first
