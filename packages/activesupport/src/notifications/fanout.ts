@@ -475,8 +475,9 @@ export class Fanout {
   /**
    * Drop every subscriber and reset cached state. Used by unsubscribeAll.
    *
-   * @noRailsEquivalent Rails' test suite reaches into the notifier's ivars to
-   * reset it; trails has no such reflection, so the reset is a method.
+   * @noRailsEquivalent PERMANENT — Rails' test suite resets a notifier by
+   * reassigning `Notifications.notifier`, relying on Ruby's ivar reflection
+   * for the rest; JS has no such reflection, so the reset is a method.
    */
   clear(): void {
     this.stringSubscribers.clear();
@@ -577,8 +578,8 @@ export class EventObject extends Evented<EventObjectCallback> {
   }
 }
 
-export const Subscribers = {
-  new(
+export class Subscribers {
+  static new(
     pattern: string | RegExp | null,
     listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
     monotonic: boolean,
@@ -605,10 +606,10 @@ export const Subscribers = {
     return monotonic
       ? new MonotonicTimed(pattern, delegate as TimedCallback)
       : new Timed(pattern, delegate as TimedCallback);
-  },
+  }
 
-  Evented,
-  Timed,
-  MonotonicTimed,
-  EventObject,
-};
+  static readonly Evented = Evented;
+  static readonly Timed = Timed;
+  static readonly MonotonicTimed = MonotonicTimed;
+  static readonly EventObject = EventObject;
+}

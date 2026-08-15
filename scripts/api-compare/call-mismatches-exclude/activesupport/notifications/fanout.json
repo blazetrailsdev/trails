@@ -3,21 +3,7 @@
     "package": "activesupport",
     "tsFile": "notifications/fanout.ts",
     "rubyName": "groups_for",
-    "call": "group_by",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "notifications/fanout.ts",
-    "rubyName": "groups_for",
     "call": "transform_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "notifications/fanout.ts",
-    "rubyName": "subscribe",
-    "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
