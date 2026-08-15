@@ -2,65 +2,39 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "add_index_for_alter",
-    "call": "accept",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "add_index_for_alter",
-    "call": "add_index_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `insert.keys.first` (abstract_mysql_adapter.rb:640) is reached through `InsertBuilder#firstColumn()`, the trails contract that bundles Rails' `quote_column_name(insert.keys.first)` into one fragment call (insert-all.ts:789-792); the builder exposes no raw key list to this file. Converging is `insert-builder-exposes-raw-keys`-shaped work in insert-all.ts, not here."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "quote_column_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): same site as the `first` row — `quote_column_name(insert.keys.first)` (abstract_mysql_adapter.rb:640) is performed inside `InsertBuilder#firstColumn()` (insert-all.ts:789-792), which quotes through the connection, so no `quoteColumnName` call appears in this body."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "quote_table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): same arm as the `table_name` row — `quote_table_name(\"#{insert.model.table_name.parameterize}_values\")` (abstract_mysql_adapter.rb:646) is only reached under `supports_insert_raw_alias_syntax?`, which a synchronous `buildInsertSql` cannot await."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "build_insert_sql",
     "call": "table_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): both calls live only in the `supports_insert_raw_alias_syntax?` arm (abstract_mysql_adapter.rb:644-661), which trails does not emit — `supportsInsertRawAliasSyntax()` is async and `buildInsertSql` is a synchronous adapter hook, so the MySQL 8.0.19 row-alias INSERT form cannot be selected from here. Tracked separately as the async-buildInsertSql convergence."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "columns_for_distinct",
     "call": "compact_blank",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "create_table_info",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "current_database",
-    "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Verified per-site (RFC 0106): Ruby's `orders.compact_blank` (abstract_mysql_adapter.rb:620,625) is Enumerable#compact_blank, a receiver method. trails does not monkey-patch Array, so ActiveSupport's `compactBlank(collection)` takes the receiver as its only argument — the zero-vs-one arg delta is the standalone-function spelling, not a dropped argument."
   },
   {
     "package": "activerecord",
@@ -74,84 +48,49 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "dbconsole",
     "call": "find_cmd_and_exec",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `find_cmd_and_exec` (abstract_mysql_adapter.rb:82) resolves the mysql binary on PATH and `exec`s it. trails forbids `process.*`/`node:*` here, so `dbconsole` returns the assembled argv for the CLI layer to spawn — the argument construction this method is tested on is fully ported."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in (RFC 0106): `ActiveRecord.db_warnings_action.call(warning)` (abstract_mysql_adapter.rb:782) is dispatched from `mysql2-adapter.ts#handleWarnings` alongside the rest of the body; the abstract method only delegates."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in (RFC 0106): `SQLWarning.new(message, code, level, sql, @pool)` (abstract_mysql_adapter.rb:779) is constructed in `mysql2-adapter.ts#handleWarnings`, which owns the raw connection this body reads; the abstract method only delegates."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
     "call": "query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in (RFC 0106): the full `handle_warnings` body — `@raw_connection.warning_count`, the `SHOW WARNINGS` query, `SQLWarning.new`, `warning_ignored?` and the `db_warnings_action.call` dispatch — is ported on the concrete adapter (`mysql2-adapter.ts#handleWarnings`), where the raw mysql2 connection lives; this method is the abstract dispatch point and only delegates."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "handle_warnings",
     "call": "warning_ignored?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Include stand-in (RFC 0106): the `warning_ignored?` guard (abstract_mysql_adapter.rb:780) runs in `mysql2-adapter.ts#handleWarnings`; `isWarningIgnored` itself IS overridden in this file, per abstract_mysql_adapter.rb:786-788."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mismatched_foreign_key_details",
     "call": "column_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "mismatched_foreign_key_details",
-    "call": "match",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "primary_keys",
-    "call": "query_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "primary_keys",
-    "call": "quoted_scope",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `options[:primary_key_column] = column_for(...)` (abstract_mysql_adapter.rb:995) is an async schema read in trails, while this method is reached synchronously from `_translateException`. The lookup is performed instead in `_enrichMismatchedForeignKey`, which rebuilds the error with the referenced column's sql_type once it can await."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "quote_string",
     "call": "with_raw_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "recreate_database",
-    "call": "reconnect!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "remove_index_for_alter",
-    "call": "index_name_for_remove",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `with_raw_connection { |c| c.escape(string) }` (abstract_mysql_adapter.rb:695-699) is an async checkout in trails, while `quoteString` is the synchronous `Quoting` contract every `quote()` call site depends on. The body delegates to `mysql/quoting.ts#quoteString`, which applies the same escape rules without a connection."
   },
   {
     "package": "activerecord",
@@ -159,26 +98,5 @@
     "rubyName": "returning_column_values",
     "call": "first",
     "reason": "Include stand-in: `MySQL::DatabaseStatements#returning_column_values` is ported in the Rails-layout file `connection-adapters/mysql/database-statements.ts` (`returningColumnValues`, which does read `result.rows[0]`); the adapter method is the `include` resolution point and only delegates."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "show_variable",
-    "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "table_comment",
-    "call": "query_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "translate_exception",
-    "call": "error_number",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

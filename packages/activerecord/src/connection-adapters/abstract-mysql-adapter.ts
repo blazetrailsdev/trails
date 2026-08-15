@@ -65,7 +65,6 @@ import {
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
   CreateIndexDefinition,
-  IndexDefinition,
 } from "./abstract/schema-definitions.js";
 import type {
   AddIndexOptions,
@@ -88,7 +87,7 @@ import {
   tableAliasLength as mysqlTableAliasLength,
   MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
-import { include } from "@blazetrails/activesupport";
+import { compactBlank, include, isPresent, presence } from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -99,6 +98,7 @@ import {
   BooleanType,
   BinaryType,
   BinaryData,
+  ArgumentError,
 } from "@blazetrails/activemodel";
 
 /**
@@ -559,6 +559,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
     await this.dropDatabase(name);
     await this.createDatabase(name, options);
+    await this.reconnectBang();
   }
 
   async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
@@ -586,20 +587,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /**
-   * Mirrors AbstractMysqlAdapter#current_database — `query_value("SELECT database()", "SCHEMA")`.
-   * The Ruby form returns a single scalar; we project the first column off the
-   * result row and coerce a null DATABASE() (no current schema) to "".
+   * Mirrors AbstractMysqlAdapter#current_database (abstract_mysql_adapter.rb:296-298).
+   * A null DATABASE() (no schema selected) is coerced to "" — trails callers type
+   * the result as a plain string.
    */
   async currentDatabase(): Promise<string> {
-    const rows = (
-      await this.internalExecQuery("SELECT database() AS name", "SCHEMA")
-    ).toArray() as Array<{
-      name?: string | null;
-      NAME?: string | null;
-    }>;
-    if (rows.length === 0) return "";
-    const val = rows[0].name ?? rows[0].NAME;
-    return val == null ? "" : String(val);
+    const value = await this.queryValue("SELECT database()", "SCHEMA");
+    return value == null ? "" : String(value);
   }
 
   async charset(): Promise<string> {
@@ -639,20 +633,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlDataSourceSql.call(this, name, opts);
   }
 
+  /** Mirrors: AbstractMysqlAdapter#table_comment (abstract_mysql_adapter.rb:310-319) */
   async tableComment(tableName: string): Promise<string | null> {
     const scope = quotedScope.call(this, tableName);
-    if (!scope.name) return null;
-    const rows = (
-      await this.internalExecQuery(
-        `SELECT table_comment FROM information_schema.tables` +
-          ` WHERE table_schema = ${scope.schema} AND table_name = ${scope.name}`,
-        "SCHEMA",
-      )
-    ).toArray();
-    const row = rows[0] ?? {};
-    const val = (row["table_comment"] ?? row["TABLE_COMMENT"]) as string | null | undefined;
-    // Mirrors Rails' `.presence` — a blank/whitespace-only comment reads as nil.
-    return val && val.trim().length > 0 ? val : null;
+
+    const value = (await this.queryValue(
+      `SELECT table_comment
+       FROM information_schema.tables
+       WHERE table_schema = ${scope.schema}
+         AND table_name = ${scope.name}`,
+      "SCHEMA",
+    )) as string | null | undefined;
+    return presence(value) ?? null;
   }
 
   async changeTableComment(tableName: string, commentOrChanges: CommentOrChanges): Promise<void> {
@@ -960,10 +952,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // additionally filters cc.table_name (mirrors Rails).
     if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
-    const rows = (await this.internalExecQuery(sql, "SCHEMA")).toArray();
+    const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
     return Promise.all(
-      rows.map(async (row) => {
+      chkInfo.toArray().map(async (row) => {
         const options = { name: row["name"] as string };
         let expression = row["expression"] as string;
         if (expression.startsWith("(") && expression.endsWith(")")) {
@@ -1000,10 +992,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async showVariable(name: string): Promise<string | null> {
     if (!/^\w+$/.test(name)) return null;
     try {
-      const rows = (await this.internalExecQuery(`SELECT @@${name}`, "SCHEMA")).toArray();
-      if (rows.length === 0) return null;
-      const row = rows[0];
-      const val = row[Object.keys(row)[0]];
+      const val = await this.queryValue(`SELECT @@${name}`, "SCHEMA");
       return val == null ? null : String(val);
     } catch (e) {
       // Mirrors Rails: rescue ActiveRecord::StatementInvalid — unknown variables
@@ -1025,14 +1014,21 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlMaxAllowedPacket.call(this);
   }
 
+  /** Mirrors: AbstractMysqlAdapter#primary_keys (abstract_mysql_adapter.rb:585-598) */
   async primaryKeys(tableName: string): Promise<string[]> {
-    // Mirrors Rails: AbstractMysqlAdapter#primary_keys (mysql/schema_statements.rb)
-    const rows = await this.execute(
-      `SELECT column_name FROM information_schema.key_column_usage WHERE constraint_name = 'PRIMARY' AND table_schema = DATABASE() AND table_name = ${this.quote(tableName)} ORDER BY ordinal_position`,
-    );
-    return (rows as { column_name?: string; COLUMN_NAME?: string }[]).map(
-      (r) => (r.column_name ?? r.COLUMN_NAME) as string,
-    );
+    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+
+    const scope = quotedScope.call(this, tableName);
+
+    return (await this.queryValues(
+      `SELECT column_name
+       FROM information_schema.statistics
+       WHERE index_name = 'PRIMARY'
+         AND table_schema = ${scope.schema}
+         AND table_name = ${scope.name}
+       ORDER BY seq_in_index`,
+      "SCHEMA",
+    )) as string[];
   }
 
   /**
@@ -1082,12 +1078,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // Two-pass compact_blank (mirroring Rails): filter blanks before AND after
     // stripping so an order that becomes empty after stripping doesn't consume
     // an alias index slot.
-    const orderColumns = (orders ?? [])
-      .map((s) => (typeof s === "string" ? s : visitor.compile(s)))
-      .filter((s) => s.trim().length > 0)
-      .map((s) => s.replace(/\s+(?:ASC|DESC)\b/gi, "").trim())
-      .filter((column) => column.length > 0)
-      .map((column, i) => `${column} AS alias_${i}`);
+    const orderColumns = compactBlank(
+      compactBlank(orders ?? []).map((s) =>
+        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
+      ),
+    ).map((column, i) => `${column} AS alias_${i}`);
     if (orderColumns.length === 0) return columns;
     return [...orderColumns, columns].join(", ");
   }
@@ -1423,13 +1418,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
     const fkPat = fkFromMsg ?? "\\w+";
 
-    const match = new RegExp(
-      String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
-        String.raw`\`?(?<table>\w+)\`?.+?` +
-        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
-        String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
-      "ims",
-    ).exec(sql);
+    const match = sql.match(
+      new RegExp(
+        String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
+          String.raw`\`?(?<table>\w+)\`?.+?` +
+          String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
+          String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
+        "ims",
+      ),
+    );
 
     if (!match?.groups) return {};
 
@@ -1494,7 +1491,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const build = (): Error => {
       if (!(e instanceof Error))
         return new StatementInvalid(String(e), { sql, binds, connectionPool: this.pool });
-      const errno = (e as { errno?: number }).errno;
+      const errno = this.errorNumber(e) ?? undefined;
       const msg = e.message;
       if (typeof errno !== "number") {
         // Mirrors Rails' `when nil` branch — driver errors without a MySQL
@@ -1745,111 +1742,43 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return this.schemaCreation.accept(new ChangeColumnDefinition(cd, column.name));
   }
 
-  /** @internal */
-  addIndexForAlter(
+  /** @internal Mirrors: AbstractMysqlAdapter#add_index_for_alter (abstract_mysql_adapter.rb:880-885) */
+  async addIndexForAlter(
     tableName: string,
     columnName: string | string[],
     options: Record<string, unknown> = {},
-  ): string {
-    const columnNames = Array.isArray(columnName) ? columnName : [columnName];
-    const indexName =
-      (options.name as string | undefined) ?? `index_${tableName}_on_${columnNames.join("_and_")}`;
-    const algorithmKey = (options.algorithm as string | undefined)?.toLowerCase();
-    let algorithmSql: string | undefined;
-    if (algorithmKey) {
-      const algorithms = this.indexAlgorithms();
-      if (!(algorithmKey in algorithms)) {
-        const valid = Object.keys(algorithms);
-        throw new Error(
-          `Algorithm must be one of the following: ${valid.map((a) => `'${a}'`).join(", ")}`,
-        );
-      }
-      // "default" maps to "ALGORITHM = DEFAULT" in the table but means no algorithm clause
-      algorithmSql = algorithmKey === "default" ? undefined : algorithms[algorithmKey];
-    }
-    const comment = options.comment as string | undefined;
-    const idx = new IndexDefinition(tableName, indexName, !!options.unique, columnNames, {
-      where: options.where as string | undefined,
-      using: options.using as string | undefined,
-      type: options.type as string | undefined,
-      lengths: (options.length ?? {}) as Record<string, number>,
-      orders: (options.order ?? {}) as Record<string, string>,
-      include: options.include as string[] | undefined,
-      comment,
-    });
-    // Mirrors visit_IndexDefinition(o, create=false): no ON clause, no CREATE prefix.
-    // Lengths applied per MySQL's add_index_length: col(N) for prefix indexes.
-    // Comment appended via addSqlCommentBang pattern. Algorithm with ", " separator.
-    const lengths = idx.lengths as Record<string, number> | number | undefined;
-    const indexType = idx.type?.toUpperCase() ?? (idx.unique ? "UNIQUE" : undefined);
-    const parts: string[] = [];
-    if (indexType) parts.push(indexType);
-    parts.push("INDEX");
-    parts.push(this.quoteColumnName(idx.name));
-    if (idx.using) parts.push(`USING ${idx.using}`);
-    const quotedCols = columnNames
-      .map((c) => {
-        const len =
-          typeof lengths === "number"
-            ? lengths
-            : typeof lengths === "object"
-              ? lengths[c]
-              : undefined;
-        return len ? `${this.quoteColumnName(c)}(${len})` : this.quoteColumnName(c);
-      })
-      .join(", ");
-    parts.push(`(${quotedCols})`);
-    let idxSql = parts.join(" ");
-    if (comment) idxSql += ` COMMENT ${this.quote(comment)}`;
-    return algorithmSql ? `ADD ${idxSql}, ${algorithmSql}` : `ADD ${idxSql}`;
+  ): Promise<string> {
+    const [index, algorithm] = await this.addIndexOptions(tableName, columnName, options);
+
+    return `ADD ${await this.schemaCreation.accept(index)}${algorithm ? `, ${algorithm}` : ""}`;
   }
 
-  /** @internal */
-  removeIndexForAlter(
+  /** @internal Mirrors: AbstractMysqlAdapter#remove_index_for_alter (abstract_mysql_adapter.rb:887-890) */
+  async removeIndexForAlter(
     tableName: string,
-    columnNameOrOptions?: string | string[] | Record<string, unknown>,
-    options: Record<string, unknown> = {},
-  ): string {
-    // Accept both the Rails-style (columnName, options) and the bulk-recorder
-    // options-object form (options) where the second arg carries {column?, name?}.
-    let columnName: string | string[] | undefined;
-    let opts: Record<string, unknown>;
-    if (
-      columnNameOrOptions != null &&
-      typeof columnNameOrOptions === "object" &&
-      !Array.isArray(columnNameOrOptions)
-    ) {
-      opts = columnNameOrOptions;
-      columnName = opts.column as string | string[] | undefined;
-    } else {
-      columnName = columnNameOrOptions;
-      opts = options;
-    }
-    const indexName =
-      (opts.name as string | undefined) ??
-      (columnName
-        ? `index_${tableName}_on_${Array.isArray(columnName) ? columnName.join("_and_") : columnName}`
-        : undefined);
-    if (!indexName) throw new Error("removeIndexForAlter: no name or column provided");
+    columnName?: string | string[] | null,
+    options: { name?: string; column?: string | string[] } = {},
+  ): Promise<string> {
+    const indexName = await this.indexNameForRemove(tableName, columnName, options);
     return `DROP INDEX ${this.quoteColumnName(indexName)}`;
   }
 
-  /** @internal */
+  /** @internal Mirrors: AbstractMysqlAdapter#column_definitions (abstract_mysql_adapter.rb:962-964) */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
-    return (
-      await this.internalExecQuery(
-        `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
-        "SCHEMA",
-      )
-    ).toArray();
+    const result = await this.internalExecQuery(
+      `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
+      "SCHEMA",
+    );
+    return result.toArray();
   }
 
-  /** @internal */
+  /** @internal Mirrors: AbstractMysqlAdapter#create_table_info (abstract_mysql_adapter.rb:966-968) */
   async createTableInfo(tableName: string): Promise<string | null> {
-    const rows = (
-      await this.internalExecQuery(`SHOW CREATE TABLE ${this.quoteTableName(tableName)}`, "SCHEMA")
-    ).toArray();
-    return (rows[0]?.["Create Table"] as string | null | undefined) ?? null;
+    const result = await this.internalExecQuery(
+      `SHOW CREATE TABLE ${this.quoteTableName(tableName)}`,
+      "SCHEMA",
+    );
+    return (result.first()?.["Create Table"] as string | null | undefined) ?? null;
   }
 
   /** @internal */
