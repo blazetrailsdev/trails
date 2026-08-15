@@ -111,10 +111,6 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 
   it("db create establishes a connection", async () => {
-    // Rails collects the args of the stubbed `establish_connection` and reads
-    // `configuration_hash` off the db_config it was handed
-    // (`sqlite_rake_test.rb:56-61`); trails hands it the configuration hash
-    // itself (`sqlite_database_tasks.rb:72-75`).
     const calls: unknown[][] = [];
     vi.spyOn(Base, "establishConnection").mockImplementation(async (...args: unknown[]) => {
       calls.push(args);
@@ -124,7 +120,9 @@ describeIfSqlite("SqliteDBCreateTest", () => {
 
     await DatabaseTasks.create(configuration);
 
-    expect(calls.map((c) => c[0])).toEqual([configuration.configuration]);
+    expect(calls.map((c) => (c[0] as HashConfig).configurationHash)).toEqual([
+      configuration.configurationHash,
+    ]);
   });
 
   it("db create with error prints message", async () => {
