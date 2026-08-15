@@ -291,7 +291,7 @@ export interface AbstractAdapter {
   removeColumn(
     tableName: string,
     columnName: string,
-    type?: string,
+    type?: ColumnType,
     options?: { ifExists?: boolean },
   ): Promise<void>;
   removeColumns(tableName: string, ...columns: string[]): Promise<void>;
