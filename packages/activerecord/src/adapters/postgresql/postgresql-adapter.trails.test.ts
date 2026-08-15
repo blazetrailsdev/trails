@@ -1331,8 +1331,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("quotes the default via the OID key without a regtype SCHEMA query", async () => {
       const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
       const spy = vi.spyOn(
-        adapter as unknown as { schemaQuery(sql: string): Promise<unknown[]> },
-        "schemaQuery",
+        adapter as unknown as { internalExecQuery(sql: string): Promise<unknown> },
+        "internalExecQuery",
       );
       try {
         const sql = await adapter.schemaCreation.accept(def!);
@@ -1369,13 +1369,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     async function columnSqlType(colName: string): Promise<string> {
-      const rows = await (adapter as any).schemaQuery(
-        `SELECT pg_catalog.format_type(a.atttypid, a.atttypmod) AS sql_type
+      const rows = (
+        await (adapter as any).internalExecQuery(
+          `SELECT pg_catalog.format_type(a.atttypid, a.atttypmod) AS sql_type
          FROM pg_attribute a
          JOIN pg_class t ON t.oid = a.attrelid
          WHERE t.relname = 'dt_prec_test' AND a.attname = $1 AND a.attnum > 0`,
-        [colName],
-      );
+          "SCHEMA",
+          [colName],
+        )
+      ).toArray();
       return rows[0]?.sql_type as string;
     }
 
@@ -1604,12 +1607,12 @@ describeIfPg("PostgreSQLAdapter#active", () => {
       await adapter.close();
     }
   });
-  // Regression: `schemaQuery -> internalExecQuery -> castResult -> getOidType ->
-  // loadAdditionalTypes -> schemaQuery` was a cycle. Rails cannot reach it
+  // Regression: `internalExecQuery -> castResult -> getOidType ->
+  // loadAdditionalTypes -> internalExecQuery` was a cycle. Rails cannot reach it
   // because `load_additional_types` runs the pg_type query through the UNCAST
   // `internal_execute` (postgresql_adapter.rb:870), which never consults the
   // type map — so `get_oid_type` is a two-line body with no reentrancy branch.
-  // Pre-fix trails ran it through `schemaQuery` and recursed until timeout.
+  // Pre-fix trails ran it through the cast read path and recursed until timeout.
   it("loadAdditionalTypes runs uncast, so it cannot re-enter getOidType", async () => {
     const adapter = new PostgreSQLAdapter(PG_TEST_URL);
     try {

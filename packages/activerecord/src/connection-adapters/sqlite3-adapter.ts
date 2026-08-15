@@ -32,7 +32,7 @@ import {
   validateIndexLengthBang as sqliteValidateIndexLengthBang,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
-import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1867,9 +1867,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.schemaQuery(
-      `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
-    );
+    const rows = (
+      await this.internalExecQuery(
+        `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
+        "SCHEMA",
+      )
+    ).toArray();
     // Deferred or immediate foreign keys can only be seen in the CREATE TABLE sql
     // Rails: `table_structure_sql(table_name).select { |column_string|
     // column_string.start_with?("CONSTRAINT") && column_string.include?("FOREIGN
@@ -2067,16 +2070,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * matches Rails' SQLite3::SchemaStatements#tables filter.
    */
   async tables(): Promise<string[]> {
-    const rows = (await this.schemaQuery(
-      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
-    )) as Array<{ name: string }>;
+    const rows = (
+      await this.internalExecQuery(
+        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
+        "SCHEMA",
+      )
+    ).toArray() as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
 
   async views(): Promise<string[]> {
-    const rows = (await this.schemaQuery(
-      "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
-    )) as Array<{ name: string }>;
+    const rows = (
+      await this.internalExecQuery(
+        "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
+        "SCHEMA",
+      )
+    ).toArray() as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
 
@@ -2132,14 +2141,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     if (name.includes(".")) {
       // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
-      const rows = (await this.schemaQuery(
-        `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name='${sqliteQuoteString(bare)}'`,
-      )) as Array<{ one: number }>;
+      const rows = (
+        await this.internalExecQuery(
+          `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name='${sqliteQuoteString(bare)}'`,
+          "SCHEMA",
+        )
+      ).toArray() as Array<{ one: number }>;
       return rows.length > 0;
     }
-    const rows = (await this.schemaQuery(
-      `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
-    )) as Array<{ name: string }>;
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = '${sqliteQuoteString(name)}' AND type IN ('table')`,
+        "SCHEMA",
+      )
+    ).toArray() as Array<{ name: string }>;
     return rows.length > 0;
   }
 
@@ -2157,9 +2172,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = (await this.schemaQuery(
-      `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
-    )) as Array<{ name: string; pk: number }>;
+    const rows = (
+      await this.internalExecQuery(
+        `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
+        "SCHEMA",
+      )
+    ).toArray() as Array<{ name: string; pk: number }>;
     const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
     if (pks.length === 0) return null;
     if (pks.length === 1) return pks[0].name;
@@ -2420,10 +2438,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const pragmaPrefix = schema ? `${quoteTableName(schema)}.` : "";
     const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
     // Rails: `internal_exec_query("PRAGMA table_xinfo(#{quote_table_name(table_name)})",
-    // "SCHEMA")` (sqlite3_adapter.rb:792-794). `schemaQuery` IS that call — it
-    // routes the unwrapped `execute` under the "SCHEMA" name — and hands back
-    // plain rows, which every reader of `tableInfo` here consumes.
-    return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteTableName(bare)})`);
+    // "SCHEMA")` (sqlite3_adapter.rb:792-794); `toArray` hands back the plain
+    // rows every reader of `tableInfo` here consumes.
+    return (
+      await this.internalExecQuery(
+        `PRAGMA ${pragmaPrefix}${pragma}(${quoteTableName(bare)})`,
+        "SCHEMA",
+      )
+    ).toArray();
   }
 
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
@@ -3182,10 +3204,6 @@ function translateException(
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(SQLite3Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
-// Snapshot the unwrapped `execute` first: schema reflection routes through it
-// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
-// `internal_exec_query`.
-captureUnwrappedExecute(SQLite3Adapter);
 dirtiesQueryCache(SQLite3Adapter, "execute");
 
 // Mirrors `include SQLite3::DatabaseStatements` — `perform_query` is an

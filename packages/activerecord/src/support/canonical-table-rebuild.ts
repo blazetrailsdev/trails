@@ -233,7 +233,7 @@ export function bulkInboundFkHost(
                AND kcu.referenced_table_schema = DATABASE()
                AND kcu.referenced_table_name IN (${list})
              ORDER BY kcu.constraint_name`;
-    const rows = await adapter.schemaQuery(sql);
+    const rows = (await adapter.internalExecQuery(sql, "SCHEMA")).toArray();
     // `key_column_usage` reports a composite foreign key as one row per column
     // (the PG query joins no attribute rows, so it is already per-constraint);
     // the plan wants one blocker per constraint either way.

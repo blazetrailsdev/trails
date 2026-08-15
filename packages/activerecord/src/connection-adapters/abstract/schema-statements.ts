@@ -1060,9 +1060,12 @@ export class SchemaStatements {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.schemaQuery(
-          `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
+            "SCHEMA",
+          )
+        ).toArray();
         return rows.map((row: any) => {
           const meta = deduplicate(new SqlTypeMetadata({ sqlType: row.type, type: row.type }));
           return new Column(row.name, row.dflt_value, meta, row.notnull === 0, {
@@ -1084,8 +1087,9 @@ export class SchemaStatements {
         } else {
           schemaClause = "ANY (current_schemas(false))";
         }
-        const rows = await this.schemaQuery(
-          `SELECT c.column_name, c.data_type, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
+        const rows = (
+          await this.internalExecQuery(
+            `SELECT c.column_name, c.data_type, c.udt_name, c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.is_nullable, c.column_default,
             CASE WHEN pk.attname IS NOT NULL THEN true ELSE false END AS is_primary_key
           FROM information_schema.columns c
           LEFT JOIN (
@@ -1096,8 +1100,10 @@ export class SchemaStatements {
           ) pk ON pk.attname = c.column_name
           WHERE c.table_schema = ${schemaClause} AND c.table_name = $1
           ORDER BY c.ordinal_position`,
-          params,
-        );
+            "SCHEMA",
+            params,
+          )
+        ).toArray();
         return rows.map((row: any) => {
           let sqlType: string = row.data_type;
           if (row.data_type === "ARRAY") {
@@ -1128,10 +1134,13 @@ export class SchemaStatements {
         });
       }
       case "mysql2": {
-        const rows = await this.schemaQuery(
-          `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
-          [tableName],
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `SELECT column_name, column_key, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position`,
+            "SCHEMA",
+            [tableName],
+          )
+        ).toArray();
         return rows.map((row: any) => {
           const name = row.COLUMN_NAME ?? row.column_name;
           let sqlType: string = row.DATA_TYPE ?? row.data_type;
@@ -1183,8 +1192,9 @@ export class SchemaStatements {
         // key has attnum 0 with no pg_attribute row, so an inner join would drop
         // the entire index. LEFT JOIN keeps the row (attname NULL) so the
         // has_expressions arm can substitute the raw pg_get_indexdef expression.
-        const rows = await this.schemaQuery(
-          `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
+        const rows = (
+          await this.internalExecQuery(
+            `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,
                   bool_or(ix.indexprs IS NOT NULL) AS has_expressions,
                   pg_get_indexdef(i.oid) AS definition
            FROM pg_index ix
@@ -1195,7 +1205,9 @@ export class SchemaStatements {
            LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
            WHERE t.relname = '${tableName}' AND n.nspname = 'public' AND NOT ix.indisprimary
            GROUP BY i.relname, ix.indisunique, i.oid`,
-        );
+            "SCHEMA",
+          )
+        ).toArray();
         return rows.map((row: any) => {
           // Recover the partial-index WHERE predicate and per-column DESC
           // directions from the index definition, mirroring the concrete
@@ -1235,9 +1247,12 @@ export class SchemaStatements {
         });
       }
       case "mysql2": {
-        const rows = await this.schemaQuery(
-          `SHOW INDEX FROM ${this.quoteTableName(tableName)} WHERE Key_name != 'PRIMARY'`,
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `SHOW INDEX FROM ${this.quoteTableName(tableName)} WHERE Key_name != 'PRIMARY'`,
+            "SCHEMA",
+          )
+        ).toArray();
         const indexMap = new Map<
           string,
           { unique: boolean; seqs: [number, string, string | null][] }
@@ -1276,23 +1291,32 @@ export class SchemaStatements {
     switch (this.adapterName as AdapterName) {
       case "sqlite": {
         const { prefix, bare } = this._sqliteSchemaPrefix(tableName);
-        const rows = await this.schemaQuery(
-          `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `PRAGMA ${prefix}table_info(${this.quoteColumnName(bare)})`,
+            "SCHEMA",
+          )
+        ).toArray();
         const pk = (rows as any[]).find((r: any) => r.pk > 0);
         return pk ? pk.name : null;
       }
       case "postgres": {
-        const rows = await this.schemaQuery(
-          `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = to_regclass($1) AND i.indisprimary LIMIT 1`,
-          [tableName],
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = to_regclass($1) AND i.indisprimary LIMIT 1`,
+            "SCHEMA",
+            [tableName],
+          )
+        ).toArray();
         return rows.length > 0 ? (rows[0] as any).attname : null;
       }
       case "mysql2": {
-        const rows = await this.schemaQuery(
-          `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`,
-        );
+        const rows = (
+          await this.internalExecQuery(
+            `SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`,
+            "SCHEMA",
+          )
+        ).toArray();
         return rows.length > 0 ? (rows[0] as any).Column_name : null;
       }
     }

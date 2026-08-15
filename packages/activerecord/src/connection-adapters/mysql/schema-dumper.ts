@@ -5,6 +5,7 @@
  */
 
 import type { ColumnInfo } from "../../schema-dumper.js";
+import type { Result } from "../../result.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 
 /**
@@ -34,7 +35,7 @@ interface MysqlColumn extends ColumnInfo {
 interface MysqlAdapterLike {
   tableOptions(tableName: string): Promise<Record<string, string>>;
   primaryKeys?(tableName: string): Promise<string[]>;
-  schemaQuery?(sql: string): Promise<Record<string, unknown>[]>;
+  internalExecQuery?(sql: string, name?: string | null): Promise<Result>;
   quote?(value: unknown): string;
 }
 
@@ -100,8 +101,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected async populateTableCollationFromStatus(tableName: string): Promise<void> {
     if (Object.hasOwn(this.tableCollationCache, tableName)) return;
     const conn = this.connection;
-    if (!conn?.schemaQuery || !conn.quote) return;
-    const rows = await conn.schemaQuery(`SHOW TABLE STATUS LIKE ${conn.quote(tableName)}`);
+    if (!conn?.internalExecQuery || !conn.quote) return;
+    const rows = (
+      await conn.internalExecQuery(`SHOW TABLE STATUS LIKE ${conn.quote(tableName)}`, "SCHEMA")
+    ).toArray();
     const collation = rows[0]?.["Collation"] as string | null | undefined;
     if (typeof collation === "string" && collation.length > 0) {
       this.tableCollationCache[tableName] = collation;
@@ -235,14 +238,17 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected async populateVirtualExpressionCache(tableName: string): Promise<void> {
     if (Object.hasOwn(this.virtualExpressionCache, tableName)) return;
     const conn = this.connection;
-    if (!conn?.schemaQuery || !conn.quote) return;
-    const rows = await conn.schemaQuery(
-      `SELECT column_name AS name, generation_expression AS expr
+    if (!conn?.internalExecQuery || !conn.quote) return;
+    const rows = (
+      await conn.internalExecQuery(
+        `SELECT column_name AS name, generation_expression AS expr
          FROM information_schema.columns
         WHERE table_schema = database()
           AND table_name = ${conn.quote(tableName)}
           AND generation_expression <> ''`,
-    );
+        "SCHEMA",
+      )
+    ).toArray();
     const byColumn: Record<string, string> = Object.create(null);
     for (const row of rows) {
       const name = (row["name"] ?? row["NAME"] ?? row["COLUMN_NAME"]) as string | undefined;

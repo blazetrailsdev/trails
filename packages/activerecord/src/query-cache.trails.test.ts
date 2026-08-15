@@ -178,11 +178,11 @@ describe("Store max size eviction gate (trails)", () => {
 // reflection structurally cannot evict the cache. trails previously reproduced
 // that with a `name === "SCHEMA"` check inside the dirtying wrapper; these pin
 // the structural property instead, so re-introducing a name check (or routing
-// `schemaQuery` back through the wrapped `execute`) fails here.
+// `internalExecQuery` back through the wrapped `execute`) fails here.
 describe("schema reflection does not dirty the query cache (trails)", () => {
   fixtures(["tasks"]);
 
-  it("schemaQuery leaves cached results in place", async () => {
+  it("internalExecQuery leaves cached results in place", async () => {
     await Task.cache(async () => {
       await Task.find(1);
       const conn = await Base.leaseConnection();
@@ -200,10 +200,10 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
     });
   });
 
-  it("schemaQuery bypasses the wrapped execute entirely", async () => {
+  it("internalExecQuery bypasses the wrapped execute entirely", async () => {
     const conn = (await Base.leaseConnection()) as unknown as {
       execute: (...a: unknown[]) => unknown;
-      schemaQuery: (sql: string) => Promise<unknown>;
+      internalExecQuery: (sql: string, name?: string | null) => Promise<unknown>;
     };
     const original = conn.execute;
     let executeCalls = 0;
@@ -212,7 +212,7 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
       return original.apply(this, args);
     };
     try {
-      await conn.schemaQuery("SELECT 1");
+      await conn.internalExecQuery("SELECT 1", "SCHEMA");
     } finally {
       conn.execute = original;
     }

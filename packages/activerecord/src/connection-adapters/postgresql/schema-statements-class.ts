@@ -96,7 +96,6 @@ export interface SchemaStatements
       | "quoteColumnName"
       | "quoteTableName"
       | "reloadTypeMap"
-      | "schemaQuery"
       | "supportsIdentityColumns"
       | "supportsNativePartitioning"
       | "supportsVirtualColumns"
@@ -262,7 +261,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   // Mirrors Rails #tables (data_source_sql type: "BASE TABLE" → relkind
   // IN ('r','p')). pg_tables would omit partitioned tables (relkind 'p').
   async tables(): Promise<string[]> {
-    const rows = await this.schemaQuery(this.dataSourceSql({ type: "BASE TABLE" }));
+    const rows = (
+      await this.internalExecQuery(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")
+    ).toArray();
     return rows.map((r) => r.relname as string);
   }
 
@@ -275,13 +276,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
    * directly catches both.
    */
   async views(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT c.relname FROM pg_class c
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT c.relname FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
          AND c.relkind IN ('v', 'm')
          ORDER BY c.relname`,
-    );
+        "SCHEMA",
+      )
+    ).toArray();
     return rows.map((r) => r.relname as string);
   }
 
@@ -312,14 +316,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (schema) {
       // $1=schema, $2=table, $3..=relkinds
       const relPlaceholders = relkinds.map((_, i) => `$${i + 3}`).join(", ");
-      const rows = await this.schemaQuery(
-        `SELECT 1 AS one FROM pg_class c
+      const rows = (
+        await this.internalExecQuery(
+          `SELECT 1 AS one FROM pg_class c
            LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = $1 AND c.relname = $2
            AND c.relkind IN (${relPlaceholders})
            LIMIT 1`,
-        [schema, table, ...relkinds],
-      );
+          "SCHEMA",
+          [schema, table, ...relkinds],
+        )
+      ).toArray();
       return rows.length > 0;
     }
     // $1=table, $2..=relkinds. Bind `table` (the unquoted identifier
@@ -328,14 +335,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // compared against `relname = '"widgets"'` in pg_class, which
     // never matches (the catalog stores names unquoted).
     const relPlaceholders = relkinds.map((_, i) => `$${i + 2}`).join(", ");
-    const rows = await this.schemaQuery(
-      `SELECT 1 AS one FROM pg_class c
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT 1 AS one FROM pg_class c
          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE n.nspname = ANY(current_schemas(false))
          AND c.relname = $1 AND c.relkind IN (${relPlaceholders})
          LIMIT 1`,
-      [table, ...relkinds],
-    );
+        "SCHEMA",
+        [table, ...relkinds],
+      )
+    ).toArray();
     return rows.length > 0;
   }
 
@@ -421,8 +431,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const generatedCol = (await this.supportsVirtualColumns())
       ? "attgenerated"
       : `${this.quote("")}::varchar`;
-    const rows = await this.schemaQuery(
-      `SELECT a.attname, format_type(a.atttypid, a.atttypmod),
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT a.attname, format_type(a.atttypid, a.atttypmod),
               pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
               c.collname, col_description(a.attrelid, a.attnum) AS comment,
               ${identityCol} AS identity,
@@ -434,7 +445,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
         WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
           AND a.attnum > 0 AND NOT a.attisdropped
         ORDER BY a.attnum`,
-    );
+        "SCHEMA",
+      )
+    ).toArray();
     return rows.map((r) => ({
       attname: r.attname as string,
       format_type: r.format_type as string,
@@ -618,8 +631,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
       tableCondition = `t.oid = to_regclass($1)`;
     }
 
-    const rows = await this.schemaQuery(
-      `SELECT a.attname AS name,
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT a.attname AS name,
               pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
               pg_get_expr(d.adbin, d.adrelid) AS "default",
               a.attnotnull AS notnull,
@@ -643,8 +657,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
          AND a.attnum > 0
          AND NOT a.attisdropped
        ORDER BY a.attnum`,
-      binds,
-    );
+        "SCHEMA",
+        binds,
+      )
+    ).toArray();
 
     // Mirrors Rails' load_additional_types batch call: gather all OIDs not
     // yet in the map and load them in a single pg_type query before building
@@ -1277,12 +1293,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Promise<ExclusionConstraintDefinition | undefined> {
     const name = this.exclusionConstraintName(tableName, options);
     const scope = this.quotedScope(tableName);
-    const rows = await this.schemaQuery(
-      `SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef FROM pg_constraint c
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef FROM pg_constraint c
        JOIN pg_class t ON c.conrelid = t.oid JOIN pg_namespace n ON n.oid = c.connamespace
        WHERE c.contype = 'x' AND c.conname = $1 AND t.relname = ${scope.name} AND n.nspname = ${scope.schema}`,
-      [name],
-    );
+        "SCHEMA",
+        [name],
+      )
+    ).toArray();
     if (rows.length === 0) return undefined;
     const row = rows[0] as Record<string, string>;
     // Split on WHERE first (Rails approach), then extract expression from EXCLUDE clause.
@@ -1465,7 +1484,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       GROUP BY type.OID, n.nspname, type.typname
     `;
     const currentSchema = await this.currentSchema();
-    const rows = (await this.schemaQuery(query)) as Array<{
+    const rows = (await this.internalExecQuery(query, "SCHEMA")).toArray() as Array<{
       name: string;
       schema: string;
       value: string[];
@@ -1670,8 +1689,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     // non-deterministic order pg_attribute happens to yield rows.
     // `array_position(i.indkey, a.attnum)` gives each column's
     // 1-based position inside the index definition.
-    const rows = await this.schemaQuery(
-      `SELECT a.attname
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT a.attname
        FROM pg_index i
        JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
        JOIN pg_class t ON t.oid = i.indrelid
@@ -1679,8 +1699,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
        WHERE ${tableCondition}
          AND i.indisprimary = true
        ORDER BY array_position(i.indkey, a.attnum)`,
-      binds,
-    );
+        "SCHEMA",
+        binds,
+      )
+    ).toArray();
 
     if (rows.length === 0) return null;
     if (rows.length === 1) return rows[0].attname as string;

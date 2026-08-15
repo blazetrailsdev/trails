@@ -70,6 +70,7 @@ import { seedJoinClauseAliases } from "./relation/merged-join-alias-tracker.js";
 import {
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
   buildBatchOrders as _buildBatchOrders,
+  applyLimits as _applyLimits,
   actOnIgnoredOrder as _actOnIgnoredOrder,
   batchOnLoadedRelation as _batchOnLoadedRelation,
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
@@ -4446,12 +4447,12 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#find_in_batches
    */
-  async *findInBatches({
+  findInBatches({
     batchSize = 1000,
     start,
     finish,
     order,
-    cursor,
+    cursor = this.primaryKey,
     errorOnIgnore,
   }: {
     batchSize?: number;
@@ -4460,19 +4461,39 @@ export class Relation<T extends Base> {
     order?: "asc" | "desc" | ("asc" | "desc")[];
     cursor?: string | string[];
     errorOnIgnore?: boolean;
-  } = {}): AsyncGenerator<T[]> {
-    const enumerator = this.inBatches({
-      of: batchSize,
-      start,
-      finish,
-      load: true,
-      errorOnIgnore,
-      cursor,
-      order,
-    });
-    for await (const batchRel of enumerator._generator()) {
-      yield ((batchRel as any)._records ?? []) as T[];
-    }
+  } = {}): AsyncGenerator<T[]> & { size(): Promise<number> } {
+    const relation = this;
+    // Rails' `to_enum(:find_in_batches, ...) { ... }` size block
+    // (batches.rb:161-168). An async iterator has no `Enumerator#size`, so the
+    // block hangs off the returned iterator under the same name; `size` is
+    // async here only because the count reaches the database.
+    const size = async (): Promise<number> => {
+      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
+      const total = await _applyLimits(
+        relation,
+        cursorArr,
+        start,
+        finish,
+        _buildBatchOrders(cursorArr, order),
+      ).size();
+      return Math.floor((total - 1) / batchSize) + 1;
+    };
+    const enumerator = (async function* () {
+      const enumerator = relation.inBatches({
+        of: batchSize,
+        start,
+        finish,
+        load: true,
+        errorOnIgnore,
+        cursor,
+        order,
+      });
+      for await (const batchRel of enumerator._generator()) {
+        yield ((batchRel as any)._records ?? []) as T[];
+      }
+    })() as AsyncGenerator<T[]> & { size(): Promise<number> };
+    enumerator.size = size;
+    return enumerator;
   }
 
   /**
@@ -4480,12 +4501,12 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#find_each
    */
-  async *findEach({
+  findEach({
     batchSize = 1000,
     start,
     finish,
     order,
-    cursor,
+    cursor = this.primaryKey,
     errorOnIgnore,
   }: {
     batchSize?: number;
@@ -4494,19 +4515,35 @@ export class Relation<T extends Base> {
     order?: "asc" | "desc" | ("asc" | "desc")[];
     cursor?: string | string[];
     errorOnIgnore?: boolean;
-  } = {}): AsyncGenerator<T> {
-    for await (const batch of this.findInBatches({
-      batchSize,
-      start,
-      finish,
-      order,
-      cursor,
-      errorOnIgnore,
-    })) {
-      for (const record of batch) {
-        yield record;
+  } = {}): AsyncGenerator<T> & { size(): Promise<number> } {
+    const relation = this;
+    const enumerator = (async function* () {
+      for await (const batch of relation.findInBatches({
+        batchSize,
+        start,
+        finish,
+        order,
+        cursor,
+        errorOnIgnore,
+      })) {
+        for (const record of batch) {
+          yield record;
+        }
       }
-    }
+    })() as AsyncGenerator<T> & { size(): Promise<number> };
+    // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
+    // see findInBatches above for why it lives on the iterator.
+    enumerator.size = async (): Promise<number> => {
+      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
+      return _applyLimits(
+        relation,
+        cursorArr,
+        start,
+        finish,
+        _buildBatchOrders(cursorArr, order),
+      ).size();
+    };
+    return enumerator;
   }
 
   /**

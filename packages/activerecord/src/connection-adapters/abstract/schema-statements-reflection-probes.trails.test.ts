@@ -2,7 +2,7 @@
  * trails-only regression coverage for the SchemaStatements reflection probes.
  *
  * Rails issues every read-only reflection query through
- * `internal_exec_query(sql, "SCHEMA")` (trails' `schemaQuery`), so the payload
+ * `internal_exec_query(sql, "SCHEMA")`, so the payload
  * is named "SCHEMA" and query counting skips it. trails probed several of them
  * through `execute`, which names the query "SQL" and inflated `assertQueries`
  * counts in any suite that straddled a reflection read.
@@ -10,7 +10,7 @@
  * The concrete adapters override most of these, so the probes are exercised by
  * layering just the abstract bodies over the live connection — that is the code
  * path the abstract bodies actually own, while everything they delegate to
- * (`dataSourceSql`, `schemaQuery`) still resolves on the real adapter.
+ * (`dataSourceSql`, `internalExecQuery`) still resolves on the real adapter.
  */
 import { describe, it, expect } from "vitest";
 import { Base } from "../../index.js";

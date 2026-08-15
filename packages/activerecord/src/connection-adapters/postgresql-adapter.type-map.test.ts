@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { Result } from "../result.js";
 
 describe("PostgreSQLAdapter#typeMap", () => {
   let adapter: PostgreSQLAdapter;
@@ -101,7 +102,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
    * the type-map initializer's array pass would. */
   function stubRegtypeLookup(): void {
     adapter.typeMap.registerType(1007, new OidArray(new IntegerType()) as never);
-    vi.spyOn(adapter, "schemaQuery").mockResolvedValue([{ oid: 1007 }]);
+    vi.spyOn(adapter, "internalExecQuery").mockResolvedValue(Result.fromRowHashes([{ oid: 1007 }]));
   }
 
   it("reads `array` from ColumnDefinition.options for DDL paths", async () => {

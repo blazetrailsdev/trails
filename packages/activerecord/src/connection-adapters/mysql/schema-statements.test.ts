@@ -24,6 +24,7 @@ import {
 import type { RowFormatHost } from "./schema-statements.js";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
+import { Result } from "../../result.js";
 
 // `quotedScope` / `dataSourceSql` / `foreignKeys` self-send `quote`
 // (mysql/schema_statements.rb), and MySQL — which has no `quote` override — self-sends
@@ -33,12 +34,12 @@ import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
   Object.assign(Object.create(AbstractMysqlAdapter.prototype), overrides);
 
-// Minimal ForeignKeysHost: foreignKeys() reads via schemaQuery, quotes the
-// table name, and maps referential actions. We stub schemaQuery to return the
+// Minimal ForeignKeysHost: foreignKeys() reads via internalExecQuery, quotes the
+// table name, and maps referential actions. We stub internalExecQuery to return the
 // information_schema rows MySQL would yield (1 row per FK column).
 function fkHost(rows: Record<string, unknown>[]) {
   return mysqlAdapterHost({
-    schemaQuery: async () => rows,
+    internalExecQuery: async () => Result.fromRowHashes(rows),
     extractForeignKeyAction,
   });
 }
@@ -505,11 +506,11 @@ describe("MySQL::SchemaStatements", () => {
     expect(fks[0].toTable).toBe("roc`kets");
   });
 
-  // Minimal host: indexes() reads via schemaQuery and quotes the table
-  // name. Stub schemaQuery to return the `SHOW KEYS FROM` rows MySQL yields.
+  // Minimal host: indexes() reads via internalExecQuery and quotes the table
+  // name. Stub internalExecQuery to return the `SHOW KEYS FROM` rows MySQL yields.
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
     Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
-      schemaQuery: async () => rows,
+      internalExecQuery: async () => Result.fromRowHashes(rows),
       quoteTableName: (n: string) => `\`${n}\``,
       supportsIndexSortOrder: async () => sortOrderSupported,
     });

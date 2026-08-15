@@ -121,20 +121,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "find_each",
-    "call": "apply_limits",
-    "reason": "Verified per-site (RFC 0106): the call is inside `enum_for(:find_each, ...) { ... }`'s size lambda (batches.rb:92-95), which reports the enumerator's `size` without iterating. trails' `findEach` is an async generator, which has no size hook, so the no-block arm has no body to port."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "find_in_batches",
-    "call": "apply_limits",
-    "reason": "Verified per-site (RFC 0106): the call is inside `to_enum(:find_in_batches, ...)`'s size lambda (batches.rb:164-168), computing the batch count for `Enumerator#size`. trails' `findInBatches` is an async generator with no size hook, so that arm has no body to port."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "in_batches",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."

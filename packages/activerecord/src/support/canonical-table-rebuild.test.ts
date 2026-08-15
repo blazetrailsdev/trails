@@ -3,6 +3,7 @@ import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "./canonical-schema.js";
+import { Result } from "../result.js";
 import { newSqlitePool } from "./pooled-sqlite-adapter.js";
 import type { FkSafeDropPlanHost } from "./canonical-table-rebuild.js";
 import {
@@ -252,9 +253,9 @@ describe("bulkInboundFkHost", () => {
     const adapter = {
       adapterName,
       quote: (value: unknown) => `'${String(value)}'`,
-      schemaQuery: async (sql: string) => {
+      internalExecQuery: async (sql: string) => {
         queries.push(sql);
-        return rows;
+        return Result.fromRowHashes(rows);
       },
     } as unknown as AbstractAdapter;
     return { adapter, queries };

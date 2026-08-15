@@ -15,6 +15,7 @@ import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definit
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
+import { Result } from "../../result.js";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},
@@ -38,15 +39,20 @@ function makeStatements(
     schemaCache: { clearDataSourceCacheBang: vi.fn().mockResolvedValue(undefined) },
     ...adapterOverrides,
   };
-  // Real hosts inherit AbstractAdapter#schemaQuery, which is `execute` tagged
-  // with the "SCHEMA" query name (Rails' `internal_exec_query(sql, "SCHEMA")`).
-  // Route the stub's through whichever `execute` this call installed so
-  // reflection probes stay visible to per-test `execute` spies.
-  adapter["schemaQuery"] ??= (sql: string, binds: unknown[] = []) =>
-    (adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>)(
-      sql,
-      binds,
-      "SCHEMA",
+  // Real hosts reflect through `internal_exec_query(sql, "SCHEMA")`. Route the
+  // stub's through whichever `execute` this call installed so reflection probes
+  // stay visible to per-test `execute` spies.
+  adapter["internalExecQuery"] ??= async (
+    sql: string,
+    _name?: string | null,
+    binds: unknown[] = [],
+  ) =>
+    Result.fromRowHashes(
+      (await (adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>)(
+        sql,
+        binds,
+        "SCHEMA",
+      )) as Record<string, unknown>[],
     );
   // `SchemaCreation` delegates every capability probe to `@conn`
   // (abstract/schema_creation.rb:16-21); the stub answers as SQLite3Adapter

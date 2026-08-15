@@ -51,7 +51,6 @@ import {
   checkVersion as checkVersionMixin,
   makeCachedSelectAll,
   dirtiesQueryCache,
-  UNWRAPPED_EXECUTE,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -1120,36 +1119,6 @@ export class AbstractAdapter implements Quoting {
 
   sanitizeAsSqlComment(value: unknown): string {
     return abstractSanitizeAsSqlComment(value);
-  }
-
-  /**
-   * Run an adapter-internal schema/introspection query and return raw
-   * rows. Emits `sql.active_record` with `name = "SCHEMA"` so
-   * LogSubscriber / RuntimeRegistry / ExplainSubscriber filter it out
-   * of normal query output the same way Rails does (LogSubscriber's
-   * `IGNORE_PAYLOAD_NAMES` / ExplainSubscriber's `IGNORED_PAYLOADS`).
-   *
-   * Use for pg_class / pg_attribute / information_schema /
-   * sqlite_master / PRAGMA / etc. — anything the adapter runs on its
-   * own behalf. Migrations' user-visible DDL stays on regular
-   * `executeMutation`.
-   *
-   * Mirrors: ActiveRecord's `internal_exec_query(sql, "SCHEMA")` usage
-   * pattern in SchemaStatements / SchemaCache.
-   */
-  schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
-    // Prefer the snapshot taken before `dirtiesQueryCache` wired `execute`, so
-    // reflection runs the same body without the cache-clearing wrapper — Rails'
-    // `internal_exec_query` / `exec_query` split. Adapters that were never wired
-    // (test doubles) fall back to `execute`, which is unwrapped for them anyway.
-    const self = this as unknown as Record<string, unknown>;
-    const unwrapped = (self[UNWRAPPED_EXECUTE] ?? self.execute) as
-      | ((sql: string, binds?: unknown[], name?: string) => Promise<Record<string, unknown>[]>)
-      | undefined;
-    if (typeof unwrapped !== "function") {
-      throw new Error("schemaQuery requires the adapter to implement execute()");
-    }
-    return unwrapped.call(this, sql, binds, "SCHEMA");
   }
 
   // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---

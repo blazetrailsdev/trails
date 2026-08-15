@@ -73,7 +73,7 @@ describe("QueryCache DDL dirties (trails)", () => {
   // via `exec_query` (sqlite3_adapter.rb:290, :314) — the wrapped path, so they
   // dirty. They are one regex away from looking like the reflection reads
   // around them (both were briefly mis-routed through the non-dirtying
-  // `schemaQuery`), so pin that they still clear.
+  // `internalExecQuery`), so pin that they still clear.
   it.skipIf(!isSqliteRun())(
     "sqlite removeIndex and createVirtualTable dirty the query cache",
     async () => {
