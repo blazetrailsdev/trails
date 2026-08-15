@@ -182,12 +182,20 @@ export class PoolConfig {
    * Mirrors: `PoolConfig#pool` (`pool_config.rb:70-72`) —
    * `@pool || synchronize { @pool ||= ConnectionPool.new(self) }`.
    *
-   * Reviewed against the monitor: the critical section is `ConnectionPool.new`,
-   * which is synchronous here as it is in Rails, so the read-check-write runs
-   * to completion with no suspension point and no other task can observe or
-   * race it. Taking the (necessarily async) monitor would mean making this a
-   * method returning a promise, which no caller of a Ruby attribute-shaped
-   * reader can absorb. Left unlocked deliberately.
+   * The `synchronize` is deliberately omitted, ratified by a parity owner on
+   * 2026-08-14 (story `converge-pool-config-pool-under-the-monitor`). Ruby's
+   * monitor is load-bearing because threads preempt: two of them can interleave
+   * between the `@pool` read and the `@pool =` write and build two pools. Here
+   * the critical section is a single constructor call, and a constructor can
+   * never be `async` — so the body has no suspension point as a matter of the
+   * language, not of its current shape, and the mutual exclusion the monitor
+   * buys is already guaranteed by run-to-completion. A regression test in
+   * `pool-config.test.ts` pins that guarantee against a later edit.
+   *
+   * The ratification is scoped to this method only. `#serverVersion` (:160) and
+   * `#disconnectBang` (:214) both `await` inside their critical sections
+   * (`getDatabaseVersion`, `ConnectionPool#disconnectBang`), so their monitors
+   * are real and stay.
    */
   get pool(): ConnectionPool {
     if (!this._pool) {
