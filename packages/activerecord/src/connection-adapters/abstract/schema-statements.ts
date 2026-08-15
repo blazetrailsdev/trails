@@ -496,7 +496,7 @@ export class SchemaStatements {
   async removeColumn(
     tableName: string,
     columnName: string,
-    _type?: string,
+    type?: ColumnType,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
     if (columnName === undefined) {
@@ -506,7 +506,7 @@ export class SchemaStatements {
       return;
     }
     await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} ${this.removeColumnForAlter(tableName, columnName, _type as ColumnType | undefined, options)}`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} ${this.removeColumnForAlter(tableName, columnName, type, options)}`,
     );
   }
 

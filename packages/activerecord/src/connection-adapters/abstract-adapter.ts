@@ -2243,7 +2243,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async caseInsensitiveComparison(attribute: Nodes.Attribute, value: unknown): Promise<Nodes.Node> {
-    const column = await this.columnForAttribute(attribute as any);
+    const column = await this.columnForAttribute(attribute);
 
     if (await this.canPerformCaseInsensitiveComparisonFor(column)) {
       return attribute.lower().eq(attribute.relation.lower(value));
