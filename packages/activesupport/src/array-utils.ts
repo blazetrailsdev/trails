@@ -171,3 +171,35 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
   }
   return extracted;
 }
+
+/**
+ * Ruby `Array#to_s`, which is `inspect` — the element list in brackets, each
+ * element inspected. `Array#to_fs`'s `else` arm is the receiver's own `to_s`,
+ * and a JS array's `toString` is the comma-joined form instead, so the Ruby
+ * one is spelled out here.
+ */
+function toS(self: unknown[]): string {
+  return `[${self.map((e) => (typeof e === "string" ? JSON.stringify(e) : String(e))).join(", ")}]`;
+}
+
+/**
+ * Extends `Array#to_s` to convert a collection of elements into a comma
+ * separated id list if `:db` argument is given as the format.
+ *
+ * Mirrors: `Array#to_fs` (`core_ext/array/conversions.rb:94-105`).
+ */
+export function toFs(self: unknown[], format = ":default"): string {
+  switch (format) {
+    case ":db":
+      if (self.length === 0) {
+        return "null";
+      } else {
+        return self.map((e) => (e as { id: unknown }).id).join(",");
+      }
+    default:
+      return toS(self);
+  }
+}
+
+// `alias_method :to_formatted_s, :to_fs` — conversions.rb:106.
+export { toFs as toFormattedS };

@@ -29,7 +29,7 @@ import {
   withIndifferentAccess,
   toParam,
   compact,
-  compactBlankObj,
+  compactBlank,
 } from "./hash-utils.js";
 
 // ── HashExtTest ────────────────────────────────────────────────────────────────
@@ -254,9 +254,9 @@ describe("HashExtToParamTests", () => {
     expect(result).toBe("a=2&b=1&c=0");
   });
 
-  it("compactBlankObj — removes blank values from object", () => {
+  it("compactBlank — removes blank values from object", () => {
     const values = { a: "", b: 1, c: null, d: [] as unknown[], e: false, f: true };
-    expect(compactBlankObj(values)).toEqual({ b: 1, f: true });
+    expect(compactBlank(values)).toEqual({ b: 1, f: true });
   });
 });
 

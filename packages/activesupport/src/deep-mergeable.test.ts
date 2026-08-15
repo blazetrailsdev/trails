@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepMerge, deepMergeInPlace } from "./index.js";
+import { deepMerge, deepMergeBang } from "./index.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 
 describe("DeepMergeableTest", () => {
@@ -12,7 +12,7 @@ describe("DeepMergeableTest", () => {
   it("deep_merge! works", () => {
     const a = { x: { y: 1, z: 2 } };
     const b = { x: { y: 99 } };
-    deepMergeInPlace(a, b);
+    deepMergeBang(a, b);
     expect(a).toEqual({ x: { y: 99, z: 2 } });
   });
 
@@ -28,7 +28,7 @@ describe("DeepMergeableTest", () => {
   it("deep_merge! supports a merge block", () => {
     const a = { x: 1, y: 2 };
     const b = { y: 3 };
-    deepMergeInPlace(a, b);
+    deepMergeBang(a, b);
     expect(a.y).toBe(3);
   });
 
@@ -42,7 +42,7 @@ describe("DeepMergeableTest", () => {
 
   it("deep_merge! mutates the instance", () => {
     const a = { x: 1 };
-    deepMergeInPlace(a, { x: 2 });
+    deepMergeBang(a, { x: 2 });
     expect(a.x).toBe(2);
   });
 
@@ -50,7 +50,7 @@ describe("DeepMergeableTest", () => {
     const inner = { y: 1 };
     const a = { x: inner };
     const b = { x: { z: 2 } };
-    deepMergeInPlace(a, b);
+    deepMergeBang(a, b);
     expect(inner.y).toBe(1);
   });
 

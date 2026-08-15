@@ -88,21 +88,21 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochMilliseconds).toBe(dt.getTime());
+    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
   });
 
   it("to time", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochMilliseconds).toBe(dt.getTime());
+    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
   });
 
   it("to time preserves fractional seconds", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
     const result = toTime(dt);
-    expect(asDate(result).getMilliseconds()).toBe(500);
+    expect(result.millisecond).toBe(500);
   });
 
   it("civil from format", () => {

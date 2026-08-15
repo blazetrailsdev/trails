@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "core-ext/array/access.ts",
+    "rubyName": "compact_blank!",
+    "call": "delete_if",
+    "reason": "`Array#delete_if(&:blank?)` (core_ext/enumerable.rb:263-266) is Ruby's in-place Enumerable primitive — Rails picks it over `reject!` precisely because it always returns self. JS arrays have neither, so the port splices the blank elements out in place and returns the receiver, which is the behaviour `delete_if` is there for."
+  }
+]

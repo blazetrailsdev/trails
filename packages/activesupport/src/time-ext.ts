@@ -9,7 +9,7 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal, Time as RubyTime, cCivilToJd } from "@blazetrails/date";
+import { Rational, Temporal, Time as RubyTime, cCivilToJd } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
@@ -810,14 +810,28 @@ export function nsec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime):
 }
 
 /**
+ * Ruby `DateTime#offset` (ruby/date, `date_core.c` `d_lite_offset`) over the
+ * `PlainDateTime | ZonedDateTime` receiver this file's `DateTime` methods take:
+ * the offset as a Rational fraction of a day, built from `of` in seconds.
+ * `@blazetrails/date`'s `DateTime#offset` is the same reader over the ruby/date
+ * receiver; a `PlainDateTime` stands in for the `+00:00` a `DateTime` defaults
+ * to (date.rb's `civil`).
+ */
+function offset(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): Rational {
+  const of =
+    datetime instanceof Temporal.PlainDateTime
+      ? 0
+      : Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
+  return new Rational(of, 86_400);
+}
+
+/**
  * Mirrors: `DateTime#offset_in_seconds`
  * (`core_ext/date_time/conversions.rb:99-101`) — `(offset * 86400).to_i`,
- * where Ruby's `offset` is the fraction of a day. A `PlainDateTime` stands in
- * for the `+00:00` a `DateTime` defaults to (date.rb's `civil`).
+ * where Ruby's `offset` is the fraction of a day.
  */
 export function offsetInSeconds(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
-  if (datetime instanceof Temporal.PlainDateTime) return 0;
-  return Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
+  return offset(datetime).mul(86400).toI();
 }
 
 /**
@@ -844,21 +858,10 @@ export function secondsSinceUnixEpoch(
  * Both receivers carry an offset, which is what the switch chooses between;
  * `getlocal` re-reads the same instant in the system zone, and
  * `getlocal(utc_offset)` in the receiver's own offset.
- *
- * The JS-`Date` arm is neither Ruby method: a `Date` is an absolute instant
- * with no offset of its own, so both branches answer the same value and the
- * switch has nothing to choose between.
  */
-export function toTime(time: RubyTime): Temporal.ZonedDateTime;
 export function toTime(
-  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): Temporal.ZonedDateTime;
-export function toTime(date: Date): Temporal.Instant;
-export function toTime(
-  receiver: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime | Date,
-): Temporal.ZonedDateTime | Temporal.Instant {
-  if (receiver instanceof Date) return instantFrom(receiver);
-
+  receiver: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): Temporal.ZonedDateTime {
   if (receiver instanceof RubyTime) {
     const self = receiver.toTime();
     return preserveTimezone(receiver) ? self : self.withTimeZone(Temporal.Now.timeZoneId());

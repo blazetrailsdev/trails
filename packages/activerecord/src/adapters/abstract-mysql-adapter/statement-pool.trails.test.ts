@@ -134,14 +134,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await configured.close();
     });
 
-    // Self-built by construction: these assert what the constructor rejects.
-    it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
-      // Mirror coverage to PG's statement-pool tests — without an
-      // explicit guard test the runtime TypeError could regress
-      // silently when adapter options are wired. `"false"` is NOT rejected:
+    // Self-built by construction: these assert what the constructor does with
+    // a non-boolean config value.
+    it("passes a non-boolean preparedStatements config through as Rails does", async () => {
       // abstract_adapter.rb:159 pipes the config through
       // `type_cast_config_to_boolean`, which maps the string `"false"` to
-      // `false` (abstract_adapter.rb:65-71), so a database.yml value survives.
+      // `false` and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
       const cast = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
         preparedStatements: "false" as unknown as boolean,
@@ -151,21 +149,22 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       } finally {
         await cast.close();
       }
-      expect(
-        () =>
-          new Mysql2Adapter({
-            uri: MYSQL_TEST_URL,
-            preparedStatements: 0 as unknown as boolean,
-          }),
-      ).toThrow(TypeError);
+      // `0` survives the cast and is truthy in Ruby, so
+      // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
+      const zero = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        preparedStatements: 0 as unknown as boolean,
+      });
+      try {
+        expect(zero.preparedStatements).toBe(true);
+      } finally {
+        await zero.close();
+      }
 
-      // Stays self-built: the assignment guard is asserted on a throwaway
-      // adapter so a rejected value can never reach the leased connection.
       const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
-        expect(() => {
-          (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
-        }).toThrow(TypeError);
+        (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
+        expect(adapter2.preparedStatements).toBe(true);
       } finally {
         // mysql2 pool keeps open handles — close to avoid leaked
         // sockets / Vitest hangs.

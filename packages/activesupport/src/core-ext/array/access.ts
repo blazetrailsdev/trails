@@ -6,6 +6,8 @@
  * idiom `core-ext/object/blank.ts` uses for `NilClass`/`String`/`Time`.
  */
 
+import { isBlank } from "../../string-utils.js";
+
 export class Array {
   /**
    * Returns the tail of the array from +position+.
@@ -138,5 +140,19 @@ export class Array {
    */
   static secondToLast<T>(self: T[]): T | undefined {
     return self.at(-2);
+  }
+
+  /**
+   * Removes all blank elements from the `Array` in place and returns self.
+   *
+   * Mirrors: `Array#compact_blank!` (`core_ext/enumerable.rb:263-266`) —
+   * `delete_if(&:blank?)`, which Rails uses rather than `reject!` because it
+   * always returns self even if nothing changed.
+   */
+  static compactBlankBang<T>(self: T[]): T[] {
+    for (let i = self.length - 1; i >= 0; i--) {
+      if (isBlank(self[i])) self.splice(i, 1);
+    }
+    return self;
   }
 }

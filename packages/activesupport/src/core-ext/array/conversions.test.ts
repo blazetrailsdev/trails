@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { toSentence } from "../../array-utils.js";
+import { toFormattedS, toFs, toSentence } from "../../array-utils.js";
 import { ArgumentError } from "../../hash-utils.js";
 
 describe("ToSentenceTest", () => {
@@ -71,10 +71,12 @@ describe("ToSentenceTest", () => {
 
 describe("ToFsTest", () => {
   it("to fs db", () => {
-    // Array to db format (similar to join with comma)
-    const arr = ["a", "b", "c"];
-    expect(arr.join(", ")).toBe("a, b, c");
-    expect([1, 2, 3].join(", ")).toBe("1, 2, 3");
+    const collection = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+    expect(toFs([], ":db")).toBe("null");
+    expect(toFs(collection, ":db")).toBe("1,2,3");
+    expect(toFormattedS([], ":db")).toBe("null");
+    expect(toFormattedS([{ id: 4 }, { id: 5 }, { id: 6 }], ":db")).toBe("4,5,6");
   });
 });
 

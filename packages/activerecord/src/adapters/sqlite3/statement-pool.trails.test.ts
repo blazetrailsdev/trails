@@ -31,22 +31,27 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
     expect(adapter.preparedStatements).toBe(false);
   });
 
-  it("rejects non-boolean preparedStatements at construction time and via assignment", () => {
-    // `"false"` is NOT rejected: abstract_adapter.rb:159 pipes the config
-    // through `type_cast_config_to_boolean`, which maps the string `"false"`
-    // to `false` (abstract_adapter.rb:65-71) so a database.yml value survives.
+  it("passes a non-boolean preparedStatements config through as Rails does", () => {
+    // abstract_adapter.rb:159 pipes the config through
+    // `type_cast_config_to_boolean`, which maps the string `"false"` to `false`
+    // and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
     expect(
-      new BetterSQLite3Adapter(":memory:", { preparedStatements: "false" as unknown as boolean })
-        .preparedStatements,
+      track(
+        new BetterSQLite3Adapter(":memory:", {
+          preparedStatements: "false" as unknown as boolean,
+        }),
+      ).preparedStatements,
     ).toBe(false);
+    // `0` survives the cast and is truthy in Ruby, so
+    // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
     expect(
-      () => new BetterSQLite3Adapter(":memory:", { preparedStatements: 0 as unknown as boolean }),
-    ).toThrow(TypeError);
+      track(new BetterSQLite3Adapter(":memory:", { preparedStatements: 0 as unknown as boolean }))
+        .preparedStatements,
+    ).toBe(true);
 
     const adapter = track(new BetterSQLite3Adapter(":memory:"));
-    expect(() => {
-      (adapter as unknown as { preparedStatements: unknown }).preparedStatements = "true";
-    }).toThrow(TypeError);
+    (adapter as unknown as { preparedStatements: unknown }).preparedStatements = "true";
+    expect(adapter.preparedStatements).toBe(true);
   });
 
   it("clearCacheBang clears the pool without throwing on next query", async () => {

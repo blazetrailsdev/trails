@@ -617,11 +617,11 @@ export class PostgreSQLAdapter
     // so the read sits above the fork to cover both.
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
-      (PostgreSQLAdapter.typeCastConfigToBoolean(
+      PostgreSQLAdapter.typeCastConfigToBoolean(
         "preparedStatements" in this._config
           ? this._config.preparedStatements
           : this.defaultPreparedStatements(),
-      ) as boolean);
+      );
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._sessionVariables = {};

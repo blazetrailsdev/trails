@@ -144,13 +144,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await configured.close();
     });
 
-    it("rejects non-boolean preparedStatements at construction time and via assignment", async () => {
-      // A config value that survives `type_cast_config_to_boolean` without
-      // becoming a boolean still hits the setter's TypeError guard, as direct
-      // assignment does. `"false"` is NOT one of those: abstract_adapter.rb:159
-      // pipes the config through `type_cast_config_to_boolean`, which maps the
-      // string `"false"` to `false` (abstract_adapter.rb:65-71), so a
-      // database.yml value survives.
+    it("passes a non-boolean preparedStatements config through as Rails does", async () => {
+      // abstract_adapter.rb:159 pipes the config through
+      // `type_cast_config_to_boolean`, which maps the string `"false"` to
+      // `false` and returns everything else UNCHANGED (abstract_adapter.rb:65-71).
       const cast = new PostgreSQLAdapter({
         connectionString: PG_TEST_URL,
         preparedStatements: "false" as unknown as boolean,
@@ -160,19 +157,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       } finally {
         await cast.close();
       }
-      expect(
-        () =>
-          new PostgreSQLAdapter({
-            connectionString: PG_TEST_URL,
-            preparedStatements: 0 as unknown as boolean,
-          }),
-      ).toThrow(TypeError);
+      // `0` survives the cast and is truthy in Ruby, so
+      // `prepared_statements?` (abstract_adapter.rb:234-235) answers true.
+      const zero = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        preparedStatements: 0 as unknown as boolean,
+      });
+      try {
+        expect(zero.preparedStatements).toBe(true);
+      } finally {
+        await zero.close();
+      }
 
       const adapter2 = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        expect(() => {
-          (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
-        }).toThrow(TypeError);
+        (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
+        expect(adapter2.preparedStatements).toBe(true);
       } finally {
         // pg.Pool keeps sockets/timers alive — close to avoid Vitest
         // hangs / flakiness from leaked handles.

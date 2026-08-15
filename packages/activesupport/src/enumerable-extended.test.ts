@@ -320,23 +320,25 @@ describe("EnumerableTests", () => {
     expect(compactBlank([1, null, "", 0, false, "hello", undefined])).toEqual([1, 0, "hello"]);
   });
 
-  it("array compact blank!", () => {
-    // In-place compact blank — same behavior as compactBlank but tests that blanks are removed
+  it("array compact blank!", async () => {
+    const { Array: ArrayExt } = await import("./core-ext/array/access.js");
     const arr = [1, null, "", "hello"];
-    const result = compactBlank(arr as any[]);
+    const result = ArrayExt.compactBlankBang(arr);
+    expect(result).toBe(arr);
     expect(result).toEqual([1, "hello"]);
   });
 
   it("hash compact blank", async () => {
-    const { compactBlankObj } = await import("./hash-utils.js");
-    const result = compactBlankObj({ a: 1, b: "", c: null, d: "hi" } as any);
+    const { compactBlank } = await import("./hash-utils.js");
+    const result = compactBlank({ a: 1, b: "", c: null, d: "hi" } as any);
     expect(result).toEqual({ a: 1, d: "hi" });
   });
 
   it("hash compact blank!", async () => {
-    const { compactBlankObj } = await import("./hash-utils.js");
-    const obj = { x: 0, y: "val", z: null };
-    const result = compactBlankObj(obj as any);
+    const { compactBlankBang } = await import("./hash-utils.js");
+    const obj: Record<string, unknown> = { x: 0, y: "val", z: null };
+    const result = compactBlankBang(obj);
+    expect(result).toBe(obj);
     expect(result).toEqual({ x: 0, y: "val" });
   });
 

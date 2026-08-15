@@ -438,11 +438,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // so the read sits above the fork to cover both.
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
-      (Mysql2Adapter.typeCastConfigToBoolean(
+      Mysql2Adapter.typeCastConfigToBoolean(
         "preparedStatements" in this._config
           ? this._config.preparedStatements
           : this.defaultPreparedStatements(),
-      ) as boolean);
+      );
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
       let uri = config;

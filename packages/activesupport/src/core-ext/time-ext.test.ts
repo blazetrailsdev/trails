@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "../hash-utils.js";
 import {
   nextDay,
@@ -505,15 +505,15 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const t = d(2005, 2, 21, 17, 44, 30);
+    const t = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
     const result = toTime(t);
-    expect(result.epochMilliseconds).toBe(t.getTime());
+    expect(result.epochNanoseconds).toBe(t.toTime().epochNanoseconds);
   });
 
   it("to time", () => {
-    const t = d(2005, 2, 21, 17, 44, 30);
+    const t = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
     const result = toTime(t);
-    expect(result.epochMilliseconds).toBe(t.getTime());
+    expect(result.epochNanoseconds).toBe(t.toTime().epochNanoseconds);
   });
 
   it("fp inaccuracy ticket 1836", () => {
