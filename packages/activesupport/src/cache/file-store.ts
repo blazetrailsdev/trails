@@ -172,7 +172,7 @@ export class FileStore extends Store implements CacheStore {
     }
   }
 
-  protected writeEntry(key: string, entry: Entry, options: StoreOptions): boolean {
+  protected writeEntry(key: string, entry: Entry, options: StoreOptions = {}): boolean {
     return this.writeSerializedEntry(key, this.serializeEntry(entry, options) as string, options);
   }
 
@@ -352,7 +352,6 @@ export class FileStore extends Store implements CacheStore {
         this.writeEntry(
           key,
           new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
-          options,
         );
         return num;
       }

@@ -36,28 +36,28 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
   }
 
   protected convert(): string {
+    // Rails keeps the rounded BigDecimal through `number / (10**exponent)`
+    // (number_to_human_converter.rb:12-14); BigDecimal division is unported,
+    // so the value drops to a float for the exponent scaling.
+    this.number = new RoundingHelper(this.options).round(this.number) as BigDecimal;
+    this.number = this.numberAsFloat();
+
+    // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;
     if (!("stripInsignificantZeros" in options)) {
       options.stripInsignificantZeros = true;
     }
 
-    // Rails keeps the rounded BigDecimal through `number / (10**exponent)`
-    // (number_to_human_converter.rb:12-14); BigDecimal division is unported,
-    // so the value drops to a float for the exponent scaling.
-    const roundedValue = new RoundingHelper(options).round(this.number) as BigDecimal;
-    let number = Number(roundedValue.toString("F"));
-
     const units = this.opts.units;
-    const exponent = this.calculateExponent(units, Math.abs(number));
-    number = number / Math.pow(10, exponent);
+    const exponent = this.calculateExponent(units);
+    this.number = (this.number as number) / Math.pow(10, exponent);
 
-    const roundedNumber = NumberToRoundedConverter.convert(number, options);
-    const unit = this.determineUnit(units, exponent, Math.trunc(number));
-    const format = this.getFormat();
-    return format.replaceAll("%n", roundedNumber).replaceAll("%u", String(unit)).trim();
+    const roundedNumber = NumberToRoundedConverter.convert(this.number, options);
+    const unit = this.determineUnit(units, exponent);
+    return this.format().replaceAll("%n", roundedNumber).replaceAll("%u", String(unit)).trim();
   }
 
-  private getFormat(): string {
+  private format(): string {
     return (
       (this.options.format as string) ||
       (this.translateInLocale("human.decimal_units.format") as string)
@@ -67,28 +67,26 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
   private determineUnit(
     units: Record<string, string> | string | undefined,
     exponent: number,
-    count: number,
   ): string {
-    const expName = DECIMAL_UNITS[exponent];
+    const exp = DECIMAL_UNITS[exponent];
     if (typeof units === "object" && units !== null) {
-      return units[expName] ?? "";
+      return units[exp] ?? "";
     }
     if (typeof units === "string") {
-      return I18n.translate(`${units}.${expName}`, {
+      return I18n.translate(`${units}.${exp}`, {
         locale: this.options.locale as string | undefined,
-        count,
+        count: Math.trunc(this.number as number),
       }) as string;
     }
-    return this.translateInLocale(`human.decimal_units.units.${expName}`, { count }) as string;
+    return this.translateInLocale(`human.decimal_units.units.${exp}`, {
+      count: Math.trunc(this.number as number),
+    }) as string;
   }
 
-  private calculateExponent(
-    units: Record<string, string> | string | undefined,
-    abs: number,
-  ): number {
-    const exponent = abs !== 0 ? Math.floor(Math.log10(abs)) : 0;
-    const exponents = this.unitExponents(units);
-    return exponents.find((e) => exponent >= e) ?? 0;
+  private calculateExponent(units: Record<string, string> | string | undefined): number {
+    const exponent =
+      this.number !== 0 ? Math.floor(Math.log10(Math.abs(this.number as number))) : 0;
+    return this.unitExponents(units).find((e) => exponent >= e) ?? 0;
   }
 
   private unitExponents(units: Record<string, string> | string | undefined): number[] {

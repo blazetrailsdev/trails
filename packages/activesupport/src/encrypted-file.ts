@@ -109,21 +109,16 @@ export class EncryptedFile {
     const path = await this.resolveContentPath();
     if (key !== null && (await fs.exists(path))) {
       const raw = (await fs.readFile!(path, "utf8")).trim();
-      return this.decrypt(key, raw);
+      return this.decrypt(raw);
     }
     throw new MissingContentError(path);
   }
 
   async write(contents: string): Promise<void> {
-    const key = await this.key();
-    if (key === null) {
-      // raiseIfMissingKey=false + no key: nothing to encrypt with.
-      throw new MissingKeyError({ keyPath: this.keyPath, envKey: this.envKey });
-    }
     const fs = await getFsAsync();
     const path = await this.resolveContentPath();
     const tmp = `${path}.tmp`;
-    await fs.writeFile!(tmp, this.encrypt(key, contents), { mode: 0o600 });
+    await fs.writeFile!(tmp, await this.encrypt(contents), { mode: 0o600 });
     await fs.rename!(tmp, path);
   }
 
@@ -167,18 +162,18 @@ export class EncryptedFile {
     }
   }
 
-  private encrypt(key: string, contents: string): string {
-    this.checkKeyLength(key);
-    return this.encryptor(key).encryptAndSign(contents);
+  private async encrypt(contents: string): Promise<string> {
+    await this.checkKeyLength();
+    return (await this.encryptor()).encryptAndSign(contents);
   }
 
-  private decrypt(key: string, contents: string): string {
-    return this.encryptor(key).decryptAndVerify(contents) as string;
+  private async decrypt(contents: string): Promise<string> {
+    return (await this.encryptor()).decryptAndVerify(contents) as string;
   }
 
-  private encryptor(key: string): MessageEncryptor {
+  private async encryptor(): Promise<MessageEncryptor> {
     if (this.memoEncryptor) return this.memoEncryptor;
-    this.memoEncryptor = new MessageEncryptor(Buffer.from(key, "hex"), {
+    this.memoEncryptor = new MessageEncryptor(Buffer.from((await this.key()) ?? "", "hex"), {
       cipher: CIPHER,
       serializer: NullSerializer,
     });
@@ -206,8 +201,8 @@ export class EncryptedFile {
     return null;
   }
 
-  private checkKeyLength(key: string): void {
-    if (key.length !== EncryptedFile.expectedKeyLength()) {
+  private async checkKeyLength(): Promise<void> {
+    if ((await this.key())?.length !== EncryptedFile.expectedKeyLength()) {
       throw new InvalidKeyLengthError();
     }
   }

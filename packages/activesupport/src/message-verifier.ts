@@ -133,12 +133,15 @@ export class MessageVerifier extends Codec {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }
 
-  protected override decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
+  protected override decode(
+    encoded: string,
+    { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
+  ): Buffer {
     try {
-      return super.decode(encoded, urlSafe);
+      return super.decode(encoded, { urlSafe });
     } catch (error) {
       if (error instanceof Thrown && error.tag === "invalid_message_format") {
-        return super.decode(encoded, !urlSafe);
+        return super.decode(encoded, { urlSafe: !urlSafe });
       }
       throw error;
     }

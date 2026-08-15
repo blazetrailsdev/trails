@@ -104,7 +104,7 @@
     "call": "module_parent_name",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Rails' `module_parent_name` is an instance method on the reopened `Module`, so it takes its receiver implicitly; a trails core-ext port spells the receiver as the first parameter, which is why the call carries one argument Rails does not write."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   },
   {
     "package": "activesupport",
@@ -113,6 +113,6 @@
     "call": "module_parent_name",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Rails' `module_parent_name` is an instance method on the reopened `Module`, so it takes its receiver implicitly; a trails core-ext port spells the receiver as the first parameter, which is why the call carries one argument Rails does not write."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   }
 ]

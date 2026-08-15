@@ -381,10 +381,11 @@ export class TimeWithZone {
 
   toString(): string {
     const l = this._local();
+    // mimicking Ruby Time#to_s format (time_with_zone.rb:200-202)
     return (
       `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
       `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)} ` +
-      `${this.formattedOffset(false)}`
+      `${this.formattedOffset(false, "UTC")}`
     );
   }
 

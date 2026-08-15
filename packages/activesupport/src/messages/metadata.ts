@@ -42,8 +42,8 @@ export abstract class Metadata {
   ];
 
   protected abstract readonly serializer: MessageSerializer;
-  protected abstract encode(data: string | Buffer, urlSafe?: boolean): string;
-  protected abstract decode(encoded: string, urlSafe?: boolean): Buffer;
+  protected abstract encode(data: string | Buffer, options?: { urlSafe?: boolean }): string;
+  protected abstract decode(encoded: string, options?: { urlSafe?: boolean }): Buffer;
   protected abstract serialize(data: unknown): string;
   protected abstract deserialize(serialized: string): unknown;
 
@@ -184,10 +184,10 @@ export abstract class Metadata {
   }
 
   protected serializeToJsonSafeString(data: unknown): string {
-    return this.encode(this.serialize(data), false);
+    return this.encode(this.serialize(data), { urlSafe: false });
   }
 
   protected deserializeFromJsonSafeString(string: string): unknown {
-    return this.deserialize(this.decode(string, false).toString("latin1"));
+    return this.deserialize(this.decode(string, { urlSafe: false }).toString("latin1"));
   }
 }

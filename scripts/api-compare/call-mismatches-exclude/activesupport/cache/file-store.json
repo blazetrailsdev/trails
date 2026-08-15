@@ -44,7 +44,7 @@
       "ref:fname",
       "const:UTF_8"
     ],
-    "reason": "JS strings are already Unicode, so the decoder takes no Encoding argument — Ruby's Encoding::UTF_8 (file_store.rb:186) has no operand in TS."
+    "reason": "Ruby's second argument is `Encoding::UTF_8`; JS strings are already Unicode and `decodeURIComponent` has no encoding parameter, so `decodeWwwFormComponent` takes the string alone."
   },
   {
     "package": "activesupport",
@@ -70,7 +70,7 @@
       "const:SEPARATOR",
       "num:4"
     ],
-    "reason": "JS String#split's limit truncates the remainder where Ruby's keeps it joined, so `split(SEPARATOR, 4).last.delete(SEPARATOR)` (file_store.rb:186) has no operand-for-operand TS form; the slice(3).join('') chain computes the same string."
+    "reason": "Ruby's `split(File::SEPARATOR, 4)` limit keeps the remainder joined, which the following `delete` then concatenates; JS' split limit discards the remainder instead, so the port splits unlimited and slices off the first three fields (justified at the call site, file-store.ts:261-264)."
   },
   {
     "package": "activesupport",
@@ -78,18 +78,6 @@
     "rubyName": "modify_value",
     "call": "merged_options",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache/file-store.ts",
-    "rubyName": "modify_value",
-    "call": "write_entry",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:key",
-      "ref:entry"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "activesupport",
@@ -107,7 +95,7 @@
     "rubyArgs": [
       "ref:name"
     ],
-    "reason": "trails has no Ruby File: the fs-adapter's existsSync is the File.exist? analogue and carries no matching Ruby name."
+    "reason": "Ruby's `File.directory?(name)` module function is `getFs().statSync(name).isDirectory()` through the fs adapter — the path is `statSync`'s argument, so the `isDirectory` call itself takes none."
   },
   {
     "package": "activesupport",
