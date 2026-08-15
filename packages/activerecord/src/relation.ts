@@ -4532,7 +4532,7 @@ export class Relation<T extends Base> {
       }
     })() as AsyncGenerator<T> & { size(): Promise<number> };
     // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
-    // see findInBatches below for why it lives on the iterator.
+    // see findInBatches above for why it lives on the iterator.
     enumerator.size = async (): Promise<number> => {
       const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
       return _applyLimits(
