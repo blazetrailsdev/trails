@@ -3737,8 +3737,10 @@ export class Relation<T extends Base> {
     }
 
     const columns = this.arelColumns(primaryKeyArray);
+    const relation = this.spawn();
+    relation._selectColumns = columns as (string | Nodes.Node)[];
 
-    const result = this._whereClause.isContradiction()
+    const result = relation._whereClause.isContradiction()
       ? Result.empty()
       : await this.skipQueryCacheIfNecessary(() =>
           this.withConnection(async (c) => {
@@ -3750,9 +3752,7 @@ export class Relation<T extends Base> {
             await (
               this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
             ).ensureSchemaLoaded();
-            await this._materializeDeferredDistinctPkPredicates();
-            const relation = this.spawn();
-            relation._selectColumns = columns as (string | Nodes.Node)[];
+            await relation._materializeDeferredDistinctPkPredicates();
             const manager = relation.arel();
             const [idsSql, idsBinds] = relation._compileAstWithBinds(manager.ast);
             return c.selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
