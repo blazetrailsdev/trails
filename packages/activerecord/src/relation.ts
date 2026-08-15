@@ -4762,6 +4762,16 @@ export class Relation<T extends Base> {
    * relation), the limit/offset materialization guard below is skipped, because
    * Rails only rewrites the relation via `distinct_relation_for_primary_key`
    * when `eager_loading` is truthy.
+   *
+   * The second `using_limitable_reflections?` clause (finder_methods.rb:466-470)
+   * reads `_namedInnerJoins` where Rails reads `joins_values`. Rails'
+   * `select_association_list` (query_methods.rb:1810-1823) keeps only the
+   * `Hash, Symbol, Array` members and drops raw SQL Strings; TypeScript collapses
+   * Ruby's Symbol and String onto one type, so that `when` cannot be spelled by
+   * type — `_namedInnerJoins` is the `joins_values` subset it selects, under the
+   * same discriminator `joins()` itself uses. `left_outer_joins_values` needs no
+   * such subset: `assertValidLeftOuterJoinsBang` already rejects a raw String
+   * there, exactly where Rails raises for it.
    * @internal
    */
   applyJoinDependency({
@@ -5160,7 +5170,9 @@ export class Relation<T extends Base> {
    * must be non-collection. A collection reflection in `joins`/`leftOuterJoins`
    * forces the distinct-parent-id rewrite even when every eager reflection is
    * singular. Sibling of `_applyJoinDependencyIsLimitable`, which resolves the
-   * first clause from specs instead of a built dependency.
+   * first clause from specs instead of a built dependency. See
+   * {@link applyJoinDependency} for why the second clause reads
+   * `_namedInnerJoins` where Rails reads `joins_values`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
