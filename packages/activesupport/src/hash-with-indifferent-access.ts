@@ -296,7 +296,8 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Select — returns new HWIA with pairs where predicate returns true.
+   * Mirror Rails `select` (hash_with_indifferent_access.rb:323-326), which
+   * delegates to `Hash#select!` and so yields `|key, value|`.
    */
   select(fn: (key: string, value: V) => boolean): HashWithIndifferentAccess<V> {
     const result = new HashWithIndifferentAccess<V>();
@@ -309,7 +310,8 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Reject — returns new HWIA with pairs where predicate returns false.
+   * Mirror Rails `reject` (hash_with_indifferent_access.rb:328-331), which
+   * delegates to `Hash#reject!` and so yields `|key, value|`.
    */
   reject(fn: (key: string, value: V) => boolean): HashWithIndifferentAccess<V> {
     return this.select((k, v) => !fn(k, v));
@@ -385,55 +387,60 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * count — count all entries or matching entries.
+   * Ruby `Enumerable#count` over a Hash: the block is yielded the `[key, value]`
+   * pair, not two arguments.
    */
-  count(fn?: (key: string, value: V) => boolean): number {
+  count(fn?: (pair: [string, V]) => boolean): number {
     if (!fn) return this.data.size;
     let n = 0;
-    for (const [k, v] of this.data) {
-      if (fn(k, v)) n++;
+    for (const pair of this.data) {
+      if (fn(pair)) n++;
     }
     return n;
   }
 
   /**
-   * find — returns the first [key, value] pair matching predicate, or undefined.
+   * Ruby `Enumerable#find` over a Hash: the block is yielded the `[key, value]`
+   * pair, and the matching pair is returned.
    */
-  find(fn: (key: string, value: V) => boolean): [string, V] | undefined {
-    for (const [k, v] of this.data) {
-      if (fn(k, v)) return [k, v];
+  find(fn: (pair: [string, V]) => boolean): [string, V] | undefined {
+    for (const pair of this.data) {
+      if (fn(pair)) return pair;
     }
     return undefined;
   }
 
   /**
-   * each — iterate key-value pairs.
+   * Ruby `Hash#each` / `each_pair`: the block is yielded the `[key, value]`
+   * pair.
    */
-  each(fn: (key: string, value: V) => void): this {
-    for (const [k, v] of this.data) {
-      fn(k, v);
+  each(fn: (pair: [string, V]) => void): this {
+    for (const pair of this.data) {
+      fn(pair);
     }
     return this;
   }
 
   /**
-   * map — map over entries, returning an array.
+   * Ruby `Hash#map`: the block is yielded the `[key, value]` pair, so
+   * `hash.map((pair) => pair[0])` is spellable as Ruby's `hash.map(&:first)` is.
    */
-  map<T>(fn: (key: string, value: V) => T): T[] {
+  map<T>(fn: (pair: [string, V]) => T): T[] {
     const result: T[] = [];
-    for (const [k, v] of this.data) {
-      result.push(fn(k, v));
+    for (const pair of this.data) {
+      result.push(fn(pair));
     }
     return result;
   }
 
   /**
-   * flatMap — flatMap over entries, returning a flattened array.
+   * Ruby `Enumerable#flat_map` over a Hash: the block is yielded the
+   * `[key, value]` pair.
    */
-  flatMap<T>(fn: (key: string, value: V) => T[]): T[] {
+  flatMap<T>(fn: (pair: [string, V]) => T[]): T[] {
     const result: T[] = [];
-    for (const [k, v] of this.data) {
-      result.push(...fn(k, v));
+    for (const pair of this.data) {
+      result.push(...fn(pair));
     }
     return result;
   }
@@ -482,32 +489,34 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * minBy — returns the [key, value] pair with the minimum computed value.
+   * Ruby `Enumerable#min_by` over a Hash: the block is yielded the
+   * `[key, value]` pair, and that pair is returned.
    */
-  minBy(fn: (key: string, value: V) => number): [string, V] | undefined {
+  minBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
     let min: number | undefined;
     let minEntry: [string, V] | undefined;
-    for (const [k, v] of this.data) {
-      const n = fn(k, v);
+    for (const pair of this.data) {
+      const n = fn(pair);
       if (min === undefined || n < min) {
         min = n;
-        minEntry = [k, v];
+        minEntry = pair;
       }
     }
     return minEntry;
   }
 
   /**
-   * maxBy — returns the [key, value] pair with the maximum computed value.
+   * Ruby `Enumerable#max_by` over a Hash: the block is yielded the
+   * `[key, value]` pair, and that pair is returned.
    */
-  maxBy(fn: (key: string, value: V) => number): [string, V] | undefined {
+  maxBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
     let max: number | undefined;
     let maxEntry: [string, V] | undefined;
-    for (const [k, v] of this.data) {
-      const n = fn(k, v);
+    for (const pair of this.data) {
+      const n = fn(pair);
       if (max === undefined || n > max) {
         max = n;
-        maxEntry = [k, v];
+        maxEntry = pair;
       }
     }
     return maxEntry;
