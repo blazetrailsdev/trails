@@ -3680,28 +3680,68 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#ids
    */
   async ids(): Promise<unknown[]> {
-    const primaryKey = this.model.primaryKey;
-    const primaryKeyArray = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+    // trails models `none` with the `_isEmptyRelation()` chokepoint rather than
+    // Rails' `where!("1=0")` seed, so the contradiction arm below never fires for
+    // it; short-circuit here as `pluck` does.
+    if (this._isEmptyRelation()) return [];
+    const pk = this.model.primaryKey as string | string[] | null;
+    const primaryKeyArray = Array.isArray(pk) ? pk : pk == null ? [] : [pk];
 
     if (this.loaded) {
-      return this._records.map((record) => {
-        const r = record as unknown as { _readAttribute(name: string): unknown };
-        return primaryKeyArray.length === 1
-          ? r._readAttribute(primaryKeyArray[0])
-          : primaryKeyArray.map((column) => r._readAttribute(column));
+      const result = this._records.map((record) => {
+        if (primaryKeyArray.length === 1) {
+          return (record as unknown as { _readAttribute(name: string): unknown })._readAttribute(
+            primaryKeyArray[0],
+          );
+        }
+        return primaryKeyArray.map((column) =>
+          (record as unknown as { _readAttribute(name: string): unknown })._readAttribute(column),
+        );
       });
+      return result;
     }
 
-    if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], primaryKey as string)) {
-      // DIVERGENCE (calculations.rb:387-390): Rails re-enters `ids` on
-      // `apply_join_dependency.group(*primary_key_array)`. trails'
-      // `applyJoinDependency` early-returns for a non-referencing `includes`, so
-      // re-entering here would recurse forever; `pluck` owns the eager arm and the
-      // `distinct_relation_for_primary_key` materialization Rails does under
-      // limit/offset (finder_methods.rb:463).
-      return this.pluck(...primaryKeyArray);
+    if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], pk as string)) {
+      // Rails `apply_join_dependency` converts includes/eager_load to LEFT OUTER
+      // JOINs over `eager_load_values | includes_values` (finder_methods.rb:457)
+      // and clears the eager values, so the grouped recursion below takes the
+      // plain arm and terminates. Same shape `pluck` uses above, including the
+      // limit/offset `distinct_relation_for_primary_key` materialization
+      // (finder_methods.rb:463), which a synchronous applyJoinDependency cannot
+      // perform.
+      // Deduped without a `Set` on purpose: Rails' only constructor call in this
+      // body is the `Promise::Complete.new` of the `loaded?` arm, which trails
+      // models with the native async surface, so a `new Set` here would be the
+      // body's first constructor and reorder the recorded call sequence.
+      const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
+        (spec, i, all) => all.indexOf(spec) === i,
+      );
+      const rel = this._clone();
+      rel._eagerLoadAssociations = [];
+      rel._includesAssociations = [];
+
+      const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+        // `_materializeLimitedIds` (Rails' zip/transpose over
+        // `Array(primary_key)`) has no composite support, so let the composite
+        // case surface applyJoinDependency's explicit NotImplementedError, as
+        // `pluck` does.
+        if (Array.isArray(pk)) this.applyJoinDependency();
+        const jd = this._buildEagerJoinDependency(eagerSpecs);
+        const limitedIds = await this._materializeLimitedIds(jd, pk!);
+        const limited = rel.leftOuterJoins(eagerSpecs).where({ [pk as string]: limitedIds });
+        limited._limitValue = null;
+        limited._offsetValue = null;
+        return limited.group(...primaryKeyArray).ids();
+      }
+      const relation = rel.leftOuterJoins(eagerSpecs).group(...primaryKeyArray);
+      return relation.ids();
     }
 
+    // trails preliminaries the Rails body has no counterpart for, carried over
+    // from the delegation this replaces: `type_cast_pluck_values` reads
+    // `model.attribute_types`, and a deferred distinct-PK marker must resolve to
+    // a literal id list before the arel compiles.
     return this._withQueryConnection(async () => {
       await (
         this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
@@ -3709,15 +3749,17 @@ export class Relation<T extends Base> {
       await this._materializeDeferredDistinctPkPredicates();
 
       const columns = this.arelColumns(primaryKeyArray);
-      const relation = this._clone();
-      relation._selectColumns = columns as never[];
+      const relation = this.spawn();
+      relation._selectColumns = columns as (string | Nodes.Node)[];
 
-      const result = this._whereClause.isContradiction()
+      const result = relation._whereClause.isContradiction()
         ? Result.empty()
-        : await this.skipQueryCacheIfNecessary(async () => {
-            const [sql, binds] = this._compileAstWithBinds(relation._buildArel().ast);
-            return this._conn().selectAll(sql, `${this.model.name} Ids`, binds);
+        : await this.skipQueryCacheIfNecessary(() => {
+            const manager = relation.arel();
+            const [idsSql, idsBinds] = relation._compileAstWithBinds(manager.ast);
+            return this._conn().selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
           });
+
 
       return typeCastPluckValues(result, columns, this as any);
     });
