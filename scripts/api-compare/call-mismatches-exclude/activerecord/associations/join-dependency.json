@@ -9,18 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/join-dependency.ts",
-    "rubyName": "build",
-    "call": "build",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:right",
-      "ref:klass"
-    ],
-    "reason": "join_dependency.rb:238 `build(right, reflection.klass)` recurses over a nested associations hash and returns a `JoinAssociation` tree. trails builds the tree by mutating a node list keyed by association PATH (for shared-prefix dedup), so the recursion also carries the alias and the parent path. Tracked by the join-dependency fidelity RFC; converging the argument list means porting Rails' tree shape."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/join-dependency.ts",
     "rubyName": "instantiate",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

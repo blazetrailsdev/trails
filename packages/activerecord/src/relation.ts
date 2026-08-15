@@ -2705,8 +2705,7 @@ export class Relation<T extends Base> {
     // materialize the limited parent IDs, then re-queries with `pk IN (ids)`.
     // This avoids `IN (SELECT ... LIMIT n)`, which MariaDB does not support.
     let limitedIds: unknown[] | undefined;
-    const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
+    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       limitedIds = await this._materializeLimitedIds(jd, basePk);
       if (limitedIds.length === 0) {
         this._records = [];
@@ -3115,10 +3114,9 @@ export class Relation<T extends Base> {
     // a scoped source through a composite-PK model JOINs like Rails. The
     // LIMIT+collection+composite gap is trails' remaining capability gap (tracked
     // for convergence — see RFC 0054).
-    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
     const compositePkBypass =
       Array.isArray(basePk) &&
-      hasLimitOrOffset &&
+      this.hasLimitOrOffset &&
       !this._eagerJoinDependencyIsLimitable(
         this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
       );
@@ -3483,8 +3481,7 @@ export class Relation<T extends Base> {
       const basePk = (this._model as any).primaryKey ?? "id";
       const jd = this._buildEagerJoinDependency(eagerSpecs);
 
-      const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+      if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
         // A composite base PK can't be materialized here — `_materializeLimitedIds`
         // (Rails' zip/transpose over `Array(primary_key)`) has no composite
         // support, so it would emit a wrong single-column `"col1,col2"` predicate.
@@ -3636,9 +3633,8 @@ export class Relation<T extends Base> {
       rel._eagerLoadAssociations = [];
       rel._includesAssociations = [];
 
-      const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
       const jd = this._buildEagerJoinDependency(eagerSpecs);
-      if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+      if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
         // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
         // `_eagerLoadAssociations` alone, so `pk` can still be null here (a
         // view), and `_materializeLimitedIds` — Rails' zip/transpose over
@@ -4794,8 +4790,7 @@ export class Relation<T extends Base> {
     if (eagerSpecs.length === 0) return run(this);
     const jd = this._buildEagerJoinDependency(eagerSpecs);
     const basePk = (this._model as any).primaryKey ?? "id";
-    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (eagerLoading && hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+    if (eagerLoading && this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       const limitedIds = await this._materializeLimitedIds(jd, basePk);
       return run(this._applyEagerJoinDependency(jd, basePk, limitedIds));
     }
@@ -4838,7 +4833,7 @@ export class Relation<T extends Base> {
   _isDeferredDistinctPkSubquery(): boolean {
     if (this._groupColumns.length > 0) return false;
     if (!this._eagerLoadingForSql()) return false;
-    if (this._limitValue === null && this._offsetValue === null) return false;
+    if (!this.hasLimitOrOffset) return false;
     return !this._eagerJoinDependencyIsLimitable(
       this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
     );
@@ -5074,8 +5069,7 @@ export class Relation<T extends Base> {
   ): Relation<T> {
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethodBangs.joinsBang.call(rel as any, jd as any);
-    const hasLimit = this._limitValue !== null || this._offsetValue !== null;
-    if (hasLimit && !this._eagerJoinDependencyIsLimitable(jd)) {
+    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       if (Array.isArray(basePk)) {
         // Rails `where!(**Array(primary_key).zip(limited_ids.transpose).to_h)`
         // (schema_statements.rb:1448) — a per-column `IN`, not a tuple `IN`.
@@ -6608,10 +6602,13 @@ export class Relation<T extends Base> {
         const rel = this._clone();
         rel._eagerLoadAssociations = [];
         rel._includesAssociations = [];
-        const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = this._buildEagerJoinDependency(eagerSpecs);
-        if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd) && !Array.isArray(pk)) {
+        if (
+          this.hasLimitOrOffset &&
+          !this._eagerJoinDependencyIsLimitable(jd) &&
+          !Array.isArray(pk)
+        ) {
           // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
           // materialize the limited DISTINCT primary keys, rewrite as
           // `WHERE pk IN (ids)`, and clear limit/offset. Single-column PK only —
@@ -6625,7 +6622,7 @@ export class Relation<T extends Base> {
           collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
           collection._limitValue = null;
           collection._offsetValue = null;
-        } else if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+        } else if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
           // by 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
@@ -6639,7 +6636,7 @@ export class Relation<T extends Base> {
       const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const maxNode = tsColumn.maximum();
 
-      if (collection._limitValue !== null || (collection._offsetValue ?? 0) > 0) {
+      if (collection.hasLimitOrOffset) {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
         const inner = collection._clone();
