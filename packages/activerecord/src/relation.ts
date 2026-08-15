@@ -2534,8 +2534,8 @@ export class Relation<T extends Base> {
    */
   private _joinedIncludesValues(): string[] {
     if (this._includesAssociations.length === 0) return [];
-    if (this._namedInnerJoins.length === 0) return [];
-    const joined = new Set(this._namedInnerJoins.filter((v): v is string => typeof v === "string"));
+    if (this._joinsValues.length === 0) return [];
+    const joined = new Set(this._joinsValues.filter((v): v is string => typeof v === "string"));
     return this._includesAssociations.filter(
       (spec): spec is string => typeof spec === "string" && joined.has(spec),
     );
@@ -2603,10 +2603,15 @@ export class Relation<T extends Base> {
     // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
     const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
-    // _namedInnerJoins holds association names too (joins(:assoc) routed through
-    // JoinDependency with InnerJoin). Resolve to table names so references to
-    // those tables don't spuriously promote includes to eager_load.
-    const namedInnerTables = this._resolveAssocTables(this._namedInnerJoins);
+    // joins_values holds association names too (joins(:assoc) routed through
+    // JoinDependency with InnerJoin). Run them through `select_association_list`
+    // — the same partition build_joins applies — and resolve the surviving specs
+    // to table names so references to those tables don't spuriously promote
+    // includes to eager_load. The raw SQL strings it drops are handled by the
+    // `tablesInString` arm below, exactly as Rails' StringJoin branch does.
+    const namedInnerTables = this._resolveAssocTables(
+      this.selectAssociationList(this._joinsValues, null) as AssociationSpec[],
+    );
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
@@ -3220,9 +3225,9 @@ export class Relation<T extends Base> {
     // left-outer JD and folding it into the stash. This keeps the shape identical
     // to the subquery `from(relation)` path.
     //
-    // The emptiness checks below are Rails' `joins_values.empty?`, which
-    // `_namedInnerJoins` + `_joinValues` partition; `_joinClauses` is trails-only
-    // compensation for raw join clauses living outside `joins_values`.
+    // The emptiness check below is Rails' `joins_values.empty?`; `_joinClauses`
+    // is trails-only compensation for raw join clauses living outside
+    // `joins_values`.
     //
     // Fires whenever left_outer_joins_values is non-empty (Rails' `unless
     // left_outer_joins_values.empty?`, query_methods.rb:1828), even when the
@@ -3230,10 +3235,7 @@ export class Relation<T extends Base> {
     // a CTE symbol, already routed into `joinNodes` above. Rails returns early there
     // too (`buckets[:named_join] = left_joins` with an empty `left_joins`); the
     // empty-named early return emits the same SQL as the stash-fold path.
-    const pureLeftOuter =
-      this._namedInnerJoins.length === 0 &&
-      this._joinValues.length === 0 &&
-      this._joinClauses.length === 0;
+    const pureLeftOuter = this._joinsValues.length === 0 && this._joinClauses.length === 0;
     const leftOuterIsNamed = pureLeftOuter && this._leftOuterJoinsValues.length > 0;
     if (this._leftOuterJoinsValues.length > 0 && !leftOuterIsNamed) {
       // query_methods.rb:1843: `stashed_left_joins.unshift` — unconditional, so
@@ -3248,32 +3250,54 @@ export class Relation<T extends Base> {
       );
     }
 
-    // query_methods.rb:1848-1850: the eager stash is the trailing `joins_values`
-    // JoinDependency whose base_klass is this model — a cross-klass merged JD
-    // fails that test and stays in the stream for `select_named_joins`.
-    const lastJoinsValue = this._joinsValues[this._joinsValues.length - 1];
-    const stashedEagerLoad =
-      lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._model;
-    const hasStashed = stashedEagerLoad || leftStashed.length > 0;
-    // query_methods.rb:1855-1862: only the LEADING run of Join nodes is routed by
-    // `hasStashed`; a raw join BEHIND a named join falls through to
-    // `select_named_joins`, which buckets it as a join_node unconditionally
-    // (query_methods.rb:1866-1867). Iterate the unified `_joinsValues`, which
-    // preserves the raw-vs-named interleaving `_joinValues` alone cannot see.
-    const toJoinNode = (v: string | Nodes.Join): Nodes.Join =>
-      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v;
-    let leading = true;
-    for (const v of this._joinsValues) {
-      if (this._isNamedJoinValue(v)) {
-        leading = false;
-        continue;
+    // query_methods.rb:1847-1876, the `joins_values` half of build_join_buckets,
+    // run only when the pure-left-outer early return above did not fire.
+    const stashedJoins: JoinDependency[] = [];
+    const namedJoins: AssociationSpec[] = [];
+    if (!leftOuterIsNamed) {
+      const joins: unknown[] = [...this._joinsValues];
+      // query_methods.rb:1848-1850: the eager stash is the trailing `joins_values`
+      // JoinDependency whose base_klass is this model — a cross-klass merged JD
+      // fails that test and stays in the stream for `select_named_joins`.
+      const lastJoinsValue = joins[joins.length - 1];
+      const stashedEagerLoad =
+        lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._model
+          ? (joins.pop() as JoinDependency)
+          : undefined;
+
+      // query_methods.rb:1851-1853. Rails wraps every String; trails collapses
+      // Ruby's Symbol and String into one type, so an association-name string
+      // stays a named join value instead of becoming a raw SQL fragment.
+      for (const [i, v] of joins.entries()) {
+        if (typeof v === "string" && !this._isNamedJoinValue(v)) {
+          joins[i] = new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim()));
+        }
       }
-      const node = toJoinNode(v as string | Nodes.Join);
-      if (leading && (node instanceof Nodes.LeadingJoin || !hasStashed)) {
-        leadingJoins.push(node);
-      } else {
-        joinNodes.push(node);
+
+      const hasStashed = stashedEagerLoad !== undefined || leftStashed.length > 0;
+      // query_methods.rb:1855-1862: only the LEADING run of Join nodes is shifted
+      // off and routed by `hasStashed`; a raw join BEHIND a named join falls
+      // through to `select_named_joins`, which buckets it as a join_node
+      // unconditionally (query_methods.rb:1866-1867).
+      while (joins[0] instanceof Nodes.Join) {
+        const joinNode = joins.shift() as Nodes.Join;
+        if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
+          joinNodes.push(joinNode);
+        } else {
+          leadingJoins.push(joinNode);
+        }
       }
+
+      // query_methods.rb:1864-1873.
+      namedJoins.push(
+        ..._qm.selectInnerNamedJoins.call(this as any, joins, stashedJoins, joinNodes),
+      );
+
+      // query_methods.rb:1875-1876 — the eager stash goes in LAST.
+      stashedJoins.push(...leftStashed);
+      if (stashedEagerLoad) stashedJoins.push(stashedEagerLoad);
+    } else {
+      stashedJoins.push(...leftStashed);
     }
 
     // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
@@ -3296,8 +3320,9 @@ export class Relation<T extends Base> {
     _qm.emitJoinPlan.call(this as any, manager, {
       leadingJoins,
       joinNodes,
-      stashedJoins: [...leftStashed],
-      namedJoins: leftOuterIsNamed ? (leftAssociations as any) : [],
+      stashedJoins,
+      namedJoins: leftOuterIsNamed ? (leftAssociations as any) : namedJoins,
+      joinType: leftOuterIsNamed ? Nodes.OuterJoin : Nodes.InnerJoin,
       aliases,
       tracker,
     });
@@ -6345,9 +6370,8 @@ export class Relation<T extends Base> {
       this._groupColumns.length === 0 &&
       this._havingClause.isEmpty() &&
       this._joinClauses.length === 0 &&
-      this._joinValues.length === 0 &&
+      this._joinsValues.length === 0 &&
       this._leftOuterJoinsValues.length === 0 &&
-      this._namedInnerJoins.length === 0 &&
       this._includesAssociations.length === 0 &&
       this._eagerLoadAssociations.length === 0 &&
       this._preloadAssociations.length === 0 &&
