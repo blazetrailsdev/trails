@@ -1678,7 +1678,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /**
    * Returns a list of defined virtual tables, as the
    * `[tableName, [moduleName, arguments]]` pairs Rails' trailing `.to_a`
-   * produces (sqlite3_adapter.rb:296-307).
+   * produces (sqlite3_adapter.rb:296-307). Built through a `Map` because Rails
+   * builds a Hash first (`each_with_object({})`), so a repeated `tableName`
+   * collapses last-write-wins at its first-insertion position.
    *
    * Rails uses `exec_query(query, "SCHEMA")` (sqlite3_adapter.rb:301): the
    * wrapped path — so this dirties — but it still carries the "SCHEMA" name
@@ -1692,13 +1694,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
     const rows = (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][];
-    const memo: Array<[string, [string, string]]> = [];
+    const memo = new Map<string, [string, string]>();
     for (const row of rows) {
       const [tableName, sql] = row as [string, string];
       const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
-      memo.push([tableName, [moduleName, args]]);
+      memo.set(tableName, [moduleName, args]);
     }
-    return memo;
+    return [...memo];
   }
 
   override async createVirtualTable(
