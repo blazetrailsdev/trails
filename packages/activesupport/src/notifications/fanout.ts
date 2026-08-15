@@ -72,7 +72,7 @@ type Delegate = EventedListener | TimedCallback | EventObjectCallback;
  * `listener.method(:call)` whenever the listener is not itself procish
  * (fanout.rb:328), so a plain object with a `call` method subscribes. Ruby then
  * invokes `@delegate.call` uniformly for procs and callable objects
- * (fanout.rb:437, 452); JS has no such uniform invocation, so `Subscribers.new`
+ * (fanout.rb:423, 439); JS has no such uniform invocation, so `Subscribers.new`
  * binds the object's `call` to its receiver and the groups keep calling a
  * function.
  *
@@ -86,7 +86,7 @@ type Delegate = EventedListener | TimedCallback | EventObjectCallback;
 export type CallableListener = { call(...args: never[]): void };
 
 /**
- * Mirrors `Fanout::Subscribers::Matcher` (fanout.rb:337-370).
+ * Mirrors `Fanout::Subscribers::Matcher` (fanout.rb:338-372).
  *
  * Rails' `wrap` returns the String pattern itself and relies on `String#===`;
  * TS has no such polymorphic `===`, so a String pattern is wrapped in
@@ -115,16 +115,19 @@ export class Matcher {
     if (this.pattern.test(name)) this.exclusions.add(name);
   }
 
-  /** Ruby `Matcher#===` (fanout.rb:356-358). */
+  /** Ruby `Matcher#===` (fanout.rb:360-362). */
   matches(name: string): boolean {
     this.pattern.lastIndex = 0;
     return this.pattern.test(name) && !this.exclusions.has(name);
   }
 }
 
-// Ruby's `Matcher.wrap` hands a String pattern back untouched and matches it
-// with `String#===`; this stands in for that arm so the three matcher kinds
-// share one interface.
+// Ruby's `Matcher.wrap` hands a String pattern back untouched (fanout.rb:341-349)
+// and matches it with `String#===`. TS has no polymorphic `===`, so that arm
+// gets an object with the same two methods as the other two matcher kinds.
+// `unsubscribe!` is never reached for a String pattern — Fanout#unsubscribe
+// only walks @other_subscribers (fanout.rb:88) — and answers false as
+// AllMessages#unsubscribe! does (fanout.rb:369-371).
 class StringMatcher {
   constructor(readonly pattern: string) {}
 
@@ -149,7 +152,7 @@ export class AllMessages {
 
 type AnyMatcher = Matcher | StringMatcher | AllMessages;
 
-/** The constructor a subscriber's `groupClass` names (fanout.rb:381, 424, …). */
+/** The constructor a subscriber's `group_class` names (fanout.rb:386, 418, 428, 434). */
 type GroupClass = new (
   listeners: never[],
   name: string,
@@ -487,8 +490,9 @@ export class Fanout {
 }
 
 // Ruby's `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
-// (fanout.rb:183-192) in one pass; `value` picks what the bucket holds, since
-// the silenceable half keeps the subscribers themselves.
+// (fanout.rb:189-197) in one pass — JS has no Enumerable#group_by. `value`
+// picks what the bucket holds, since the silenceable half of groups_for keeps
+// the subscribers themselves (fanout.rb:194-198).
 function groupBy<T>(subscribers: Evented[], value: (s: Evented) => T): Map<GroupClass, T[]> {
   const groups = new Map<GroupClass, T[]>();
   for (const s of subscribers) {
@@ -594,7 +598,7 @@ export class Subscribers {
     }
 
     // Doing this to detect a single argument block or callable
-    // like `proc { |x| }` vs `proc { |*x| }` (fanout.rb:325-332).
+    // like `proc { |x| }` vs `proc { |*x| }` (fanout.rb:325-331).
     const procish = (
       typeof listener === "function" ? listener : (listener.call as (...args: never[]) => void)
     ) as (...args: never[]) => void;
