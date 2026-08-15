@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
-import { Temporal } from "@blazetrails/date";
+
+// notifications_test.rb:535-537 — `random_id` is `SecureRandom.hex(10)`.
+function randomId(): string {
+  return Array.from({ length: 10 }, () =>
+    Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, "0"),
+  ).join("");
+}
 
 beforeEach(() => {
   Notifications.unsubscribeAll();
@@ -177,7 +185,7 @@ describe("SubscribedTest", () => {
 
 describe("InspectTest", () => {
   it("inspect output is small", () => {
-    const e = new Event("test.inspect", Temporal.Now.instant(), { key: "val" });
+    const e = new Event("test.inspect", null, null, randomId(), { key: "val" });
     // inspect equivalent is just checking the object has basic info
     expect(e.name).toBe("test.inspect");
     expect(e.payload).toEqual({ key: "val" });
@@ -352,31 +360,35 @@ describe("InstrumentationTest", () => {
     Notifications.subscribe("no.block", (e) => events.push(e));
     Notifications.instrument("no.block", { a: 1 });
     expect(events).toHaveLength(1);
-    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
+    expect(typeof events[0].end).toBe("number");
   });
 });
 
 describe("EventTest", () => {
   it("events are initialized with details", () => {
-    const start = Temporal.Now.instant();
-    const e = new Event("test.event", start, { key: "val" });
-    expect(e.name).toBe("test.event");
-    expect(e.time).toBe(start);
-    expect(e.payload).toEqual({ key: "val" });
+    const time = Date.now() / 1000.0;
+    const event = new Event("foo", time, time + 0.01, randomId(), {});
+
+    expect(event.name).toBe("foo");
+    expect(event.duration).toBeCloseTo(10.0, 1);
   });
 
   it("event cpu time does not raise error when start or finished not called", () => {
-    const e = new Event("test", Temporal.Now.instant());
-    // duration before finish should return 0, not throw
-    expect(() => e.duration).not.toThrow();
-    expect(e.duration).toBe(0);
+    const time = Date.now() / 1000.0;
+    const event = new Event("foo", time, time + 0.01, randomId(), {});
+
+    expect(event.cpuTime).toBe(0);
   });
 
   it("events consumes information given as payload", () => {
-    const payload = { sql: "SELECT 1", binds: [1, 2] };
-    const e = new Event("sql", Temporal.Now.instant(), payload);
-    expect(e.payload.sql).toBe("SELECT 1");
-    expect(e.payload.binds).toEqual([1, 2]);
+    const event = new Event(
+      "foo",
+      performance.now() / 1000.0,
+      performance.now() / 1000.0 + 1,
+      randomId(),
+      { payload: "bar" },
+    );
+    expect(event.payload).toEqual({ payload: "bar" });
   });
 
   it("subscribe raises error on non supported arguments", () => {
@@ -452,9 +464,9 @@ describe("ActiveSupport::Notifications", () => {
         event = e;
       });
       Notifications.instrument("work", {});
-      expect(event.time).toBeInstanceOf(Temporal.Instant);
-      expect(event.end).toBeInstanceOf(Temporal.Instant);
-      expect(event.end!.epochNanoseconds).toBeGreaterThanOrEqual(event.time.epochNanoseconds);
+      expect(typeof event.time).toBe("number");
+      expect(typeof event.end).toBe("number");
+      expect(event.end!).toBeGreaterThanOrEqual(event.time!);
     });
 
     it("duration reflects elapsed time", async () => {
@@ -529,28 +541,23 @@ describe("ActiveSupport::Notifications", () => {
 
   describe("Event", () => {
     it("has name, time, and payload", () => {
-      const now = Temporal.Now.instant();
-      const e = new Event("foo", now, { x: 1 });
+      const now = Date.now() / 1000.0;
+      const e = new Event("foo", now, null, randomId(), { x: 1 });
       expect(e.name).toBe("foo");
-      expect(e.time).toBe(now);
+      expect(e.time).toBeCloseTo(now, 6);
       expect(e.payload).toEqual({ x: 1 });
     });
 
-    it("duration is 0 before finish", () => {
-      const e = new Event("foo", Temporal.Now.instant());
-      expect(e.duration).toBe(0);
-    });
-
     it("duration is positive after finish", () => {
-      const start = Temporal.Now.instant().subtract({ milliseconds: 100 });
-      const e = new Event("foo", start);
-      e.finish(Temporal.Now.instant());
-      expect(e.duration).toBeGreaterThan(0);
+      const e = new Event("foo", null, null, randomId());
+      e.startBang();
+      e.finishBang();
+      expect(e.duration).toBeGreaterThanOrEqual(0);
     });
 
     it("has unique transactionId", () => {
-      const a = new Event("a", Temporal.Now.instant());
-      const b = new Event("b", Temporal.Now.instant());
+      const a = new Event("a", null, null, randomId());
+      const b = new Event("b", null, null, randomId());
       expect(a.transactionId).not.toBe(b.transactionId);
     });
 
@@ -664,7 +671,7 @@ describe("LegacyHandle", () => {
         published.push(event);
       },
     };
-    const event = new Event("legacy.event", Temporal.Now.instant());
+    const event = new Event("legacy.event", null, null, randomId());
     const handle = new LegacyHandle(event, notifier);
     handle.finish();
     expect(published).toHaveLength(1);

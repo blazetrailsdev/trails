@@ -525,6 +525,21 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "The GC and allocation counters on Notifications::Event " +
+      "(notifications/instrumenter.rb:174-186, :213-227): `gc_time` and " +
+      "`allocations` are differences of `now_gc` / `now_allocations`, which read " +
+      "`GC.total_time` and `GC.stat(:total_allocated_objects)`. A JS engine " +
+      "exposes neither — there is no counter to read without a `node:*` import " +
+      "the trails packages are forbidden — and a port returning a constant would " +
+      "report `0` allocations and `0` GC time for every event, i.e. read as " +
+      "measured when nothing was measured. Scoped to " +
+      "notifications/instrumenter.rb so the names stay expected anywhere a real " +
+      "counter is ported.",
+    names: ["gc_time", "allocations", "now_gc", "now_allocations"],
+    rubyFiles: ["notifications/instrumenter.rb"],
+  },
+  {
+    reason:
       "ActiveSupport::Autoload plumbing that `NumberHelper` gets from " +
       "`extend ActiveSupport::Autoload` (number_helper.rb:8-19): `autoload`, " +
       "`autoload_under`, `autoload_at`, `eager_autoload` and `eager_load!` " +

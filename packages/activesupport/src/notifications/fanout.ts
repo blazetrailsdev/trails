@@ -57,8 +57,8 @@ type EventedListener = {
 
 type TimedCallback = (
   name: string,
-  start: Temporal.Instant | number,
-  finish: Temporal.Instant | number,
+  start: Temporal.Instant | number | null,
+  finish: Temporal.Instant | number | null,
   id: unknown,
   payload: Record<string, unknown>,
 ) => void;
@@ -231,13 +231,14 @@ export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
 
   override start(name: string, id: unknown, payload: Record<string, unknown>): void {
     this._event = this.buildEvent(name, id, payload);
+    this._event.startBang();
   }
 
   override finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
     // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
     // dup with the final object so deletions are reflected (fanout.rb:166-178).
     this._event!.payload = payload;
-    this._event!.finish();
+    this._event!.finishBang();
 
     this.each((s) => {
       s(this._event!);
@@ -245,7 +246,7 @@ export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
   }
 
   private buildEvent(name: string, id: unknown, payload: Record<string, unknown>): Event {
-    return new Event(name, Temporal.Now.instant(), payload, String(id));
+    return new Event(name, null, null, String(id), payload);
   }
 }
 

@@ -7,7 +7,6 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 
@@ -120,17 +119,13 @@ describe("LogSubscriberTest", () => {
   it("schema statements are ignored", () => {
     expect(subscriber.debugs.length).toBe(0);
 
-    subscriber.sql(new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!" }));
+    subscriber.sql(makeEvent({ sql: "hi mom!" }));
     expect(subscriber.debugs.length).toBe(1);
 
-    subscriber.sql(
-      new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!", name: "foo" }),
-    );
+    subscriber.sql(makeEvent({ sql: "hi mom!", name: "foo" }));
     expect(subscriber.debugs.length).toBe(2);
 
-    subscriber.sql(
-      new Event("sql.active_record", Temporal.Now.instant(), { sql: "hi mom!", name: "SCHEMA" }),
-    );
+    subscriber.sql(makeEvent({ sql: "hi mom!", name: "SCHEMA" }));
     expect(subscriber.debugs.length).toBe(2);
   });
 
@@ -405,9 +400,7 @@ describe("LogSubscriberTest", () => {
 });
 
 function makeEvent(payload: Record<string, unknown>, durationMs = 0.9): Event {
-  const start = Temporal.Now.instant();
-  const event = new Event("sql.active_record", start, payload);
-  event.finish(start);
+  const event = new Event("sql.active_record", null, null, "id", payload);
   Object.defineProperty(event, "duration", { get: () => durationMs, configurable: true });
   return event;
 }

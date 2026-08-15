@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "../notifications.js";
 import { Event, Instrumenter } from "./instrumenter.js";
-import { Temporal } from "@blazetrails/date";
 
 // Rails' TestNotifier collects the start/finish calls; trails' notifier surface
 // is a single publish, so `finishes` collects the published events.
@@ -56,7 +55,7 @@ describe("InstrumenterTest", () => {
     const events: Event[] = [];
     Notifications.subscribe("finish.test", (e) => events.push(e));
     Notifications.instrument("finish.test", {});
-    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
+    expect(typeof events[0].end).toBe("number");
   });
 
   it("record", () => {

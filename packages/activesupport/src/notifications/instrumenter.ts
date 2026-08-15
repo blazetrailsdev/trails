@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { getCrypto } from "../crypto-adapter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;
@@ -11,54 +11,120 @@ class ArgumentError extends Error {
   }
 }
 
-let _txCounter = 0;
-function generateTransactionId(): string {
-  return `tx-${Date.now()}-${(++_txCounter).toString(36)}`;
-}
-
 /**
- * Mirrors ActiveSupport::Notifications::Event.
+ * Mirrors ActiveSupport::Notifications::Event (instrumenter.rb:104-228).
+ *
+ * `start` and `ending` are Ruby Times, i.e. float SECONDS — `Time#to_f` — and
+ * are held internally as float milliseconds in `@time`/`@end`, exactly as
+ * instrumenter.rb:110,114 does.
  */
 export class Event {
   readonly name: string;
-  readonly time: Temporal.Instant;
-  end: Temporal.Instant | null;
-  // Writable, mirroring Rails' `attr_accessor :payload`: the event is built with
-  // a dup, then finish replaces it with the final payload object (below).
-  payload: EventPayload;
   readonly transactionId: string;
+  // Writable, mirroring Rails' `attr_accessor :payload`: the event is built with
+  // a dup, then finish! replaces it with the final payload object (below).
+  payload: EventPayload;
+  private _time: number | null;
+  private _end: number | null;
+  private _cpuTimeStart = 0.0;
+  private _cpuTimeFinish = 0.0;
+  // trails threads nested instrumentation through the parent event; Rails'
+  // Event has no such field (see Instrumenter#_nest).
   readonly children: Event[];
 
   constructor(
     name: string,
-    start: Temporal.Instant,
+    start: number | null,
+    ending: number | null,
+    transactionId: string,
     payload: EventPayload = {},
-    transactionId?: string,
   ) {
     this.name = name;
-    this.time = start;
-    this.end = null;
     // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy):
     // the event holds a snapshot until finish replaces it with the final
     // payload object (Fanout's EventObjectGroup#finish: `@event.payload = payload`).
     this.payload = { ...payload };
-    this.transactionId = transactionId ?? generateTransactionId();
+    this._time = start != null ? start * 1_000.0 : start;
+    this.transactionId = transactionId;
+    this._end = ending != null ? ending * 1_000.0 : ending;
     this.children = [];
   }
 
-  /** Duration in milliseconds (like Rails' Event#duration in ms). */
+  get time(): number | null {
+    return this._time != null ? this._time / 1000.0 : null;
+  }
+
+  get end(): number | null {
+    return this._end != null ? this._end / 1000.0 : null;
+  }
+
+  /** @internal */
+  record<T = void>(fn?: (payload: EventPayload) => T): T {
+    this.startBang();
+    try {
+      return fn ? fn(this.payload) : (undefined as unknown as T);
+    } catch (e) {
+      _recordException(this.payload, e);
+      throw e;
+    } finally {
+      this.finishBang();
+    }
+  }
+
+  /** Record information at the time this event starts */
+  startBang(): void {
+    this._time = this.now();
+    this._cpuTimeStart = this.nowCpu();
+  }
+
+  /** Record information at the time this event finishes */
+  finishBang(): void {
+    this._cpuTimeFinish = this.nowCpu();
+    this._end = this.now();
+  }
+
+  /**
+   * Returns the CPU time (in milliseconds) passed between the call to
+   * #startBang and the call to #finishBang.
+   */
+  get cpuTime(): number {
+    return this._cpuTimeFinish - this._cpuTimeStart;
+  }
+
+  /**
+   * Returns the idle time time (in milliseconds) passed between the call to
+   * #startBang and the call to #finishBang.
+   */
+  get idleTime(): number {
+    const diff = this.duration - this.cpuTime;
+    return diff > 0.0 ? diff : 0.0;
+  }
+
+  /**
+   * Returns the difference in milliseconds between when the execution of the
+   * event started and when it ended.
+   *
+   *   Notifications.subscribe("wait", (event) => { theEvent = event; });
+   *
+   *   Notifications.instrument("wait", {}, () => sleep(1));
+   *
+   *   theEvent.duration // => 1000.138
+   */
   get duration(): number {
-    if (!this.end) return 0;
-    return this.end.epochMilliseconds - this.time.epochMilliseconds;
+    return this._end! - this._time!;
   }
 
-  /** Alias: Rails calls it `duration` but measured in ms. */
-  durationMs(): number {
-    return this.duration;
+  // instrumenter.rb:196-198 — `Process.clock_gettime(CLOCK_MONOTONIC, :float_millisecond)`.
+  private now(): number {
+    return performance.now();
   }
 
-  finish(endTime?: Temporal.Instant): void {
-    this.end = endTime ?? Temporal.Now.instant();
+  // instrumenter.rb:200-211 — Ruby defines `now_cpu` from CLOCK_THREAD_CPUTIME_ID
+  // and falls back to the `0.0` arm on platforms without that clock. JS has no
+  // thread CPU clock at all (`performance.now()` is a wall clock, not CPU time),
+  // so this port is Rails' own fallback arm, not a stub of the first one.
+  private nowCpu(): number {
+    return 0.0;
   }
 }
 
@@ -99,6 +165,7 @@ export interface InstrumenterNotifier {
   // publish-only notifier provides `publish` and gets wrapped. One is required.
   publish?(name: string, event: Event): void;
   buildHandle?(name: string, id: unknown, payload: EventPayload): NotificationHandle;
+  finish?(name: string, id: unknown, payload: EventPayload, listenersState?: unknown): void;
 }
 
 /** The low-level start/finish handle returned by `buildHandle`. */
@@ -121,7 +188,7 @@ export class Instrumenter {
 
   constructor(notifier: InstrumenterNotifier) {
     this._notifier = notifier;
-    this.id = generateTransactionId();
+    this.id = this.uniqueId();
   }
 
   private _stack(): Event[] {
@@ -212,6 +279,23 @@ export class Instrumenter {
       },
     );
   }
+
+  /** @internal instrumenter.rb:82-84 */
+  newEvent(name: string, payload: EventPayload = {}): Event {
+    return new Event(name, null, null, this.id, payload);
+  }
+
+  /** instrumenter.rb:96-98 — send a finish notification carrying listener state. */
+  finishWithState(listenersState: unknown, name: string, payload: EventPayload): void {
+    this._notifier.finish?.(name, this.id, payload, listenersState);
+  }
+
+  // instrumenter.rb:100-102 — `SecureRandom.hex(10)`.
+  private uniqueId(): string {
+    return Array.from(getCrypto().randomBytes(10))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
 }
 
 /**
@@ -240,7 +324,8 @@ export class Handle implements NotificationHandle {
       throw new ArgumentError(`expected state to be "initialized" but was "${this._state}"`);
     }
     this._state = "started";
-    this._event = new Event(this._name, Temporal.Now.instant(), this._payload, this._transactionId);
+    this._event = new Event(this._name, null, null, this._transactionId, this._payload);
+    this._event.startBang();
   }
 
   finish(): void {
@@ -253,7 +338,7 @@ export class Handle implements NotificationHandle {
       // between start and finish, e.g. payload.outcome), as Rails'
       // EventObjectGroup#finish does.
       this._event.payload = this._payload;
-      this._event.finish();
+      this._event.finishBang();
       this._notifier.publish(this._event.name, this._event);
     }
   }
@@ -269,7 +354,7 @@ export class LegacyHandle {
   }
 
   finish(): void {
-    this._event.finish();
+    this._event.finishBang();
     this._notifier.publish(this._event.name, this._event);
   }
 }
