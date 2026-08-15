@@ -2038,6 +2038,12 @@ export const QueryMethodBangs = {
   excludingBang,
   constructJoinDependency,
   asyncBang,
+  // query_methods.rb's private column helpers. Rails defines these once, in
+  // QueryMethods, and Relation gets them by `include`; they ride the same
+  // mixin here so `relation.ts` does not redeclare a second copy.
+  isTableNameMatches,
+  arelColumn,
+  arelColumnWithTable,
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@
  * activerecord/lib/active_record/associations/errors.rb
  */
 import { singularize } from "@blazetrails/activesupport";
+import { SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
 /**
@@ -47,28 +48,91 @@ export class AssociationNotFoundError extends ConfigurationError {
   }
 }
 
+/**
+ * The reflection surface `InverseOfAssociationNotFoundError` reads. Structural
+ * so `associations/errors.ts` takes no import on `reflection.ts`, which imports
+ * this file.
+ *
+ * @internal
+ */
+interface InverseOfReflection {
+  readonly name: string;
+  readonly options: Record<string, unknown>;
+  readonly className: string;
+  readonly klass: InverseOfAssociatedClass;
+}
+
+/**
+ * The `associated_class` surface the error reads: its name, and its declared
+ * association names for the `Did you mean?` dictionary.
+ *
+ * @internal
+ */
+interface InverseOfAssociatedClass {
+  readonly name: string;
+  reflections(): Readonly<Record<string, unknown>>;
+}
+
+/**
+ * `reflection.options[:inverse_of].inspect` — a Ruby Symbol inspects with its
+ * leading colon, `nil` as "nil". Shared by the two inverse-of errors, whose
+ * Rails messages both interpolate it (associations/errors.rb:39, :66).
+ *
+ * @internal
+ */
+function inspectInverseOf(reflection: InverseOfReflection): string {
+  const inverseOf = reflection.options["inverseOf"];
+  return inverseOf == null ? "nil" : `:${String(inverseOf)}`;
+}
+
 export class InverseOfAssociationNotFoundError extends ActiveRecordError {
-  readonly reflection: string;
-  readonly inverseOf: string;
-  readonly corrections: string[];
-  readonly associatedClass: string | null;
+  readonly reflection: InverseOfReflection | null;
+  readonly associatedClass: InverseOfAssociatedClass | null;
+  private _corrections?: string[];
 
   constructor(
-    reflection: string,
-    inverseOf: string,
-    corrections: string[] = [],
-    associatedClass: string | null = null,
+    reflection: InverseOfReflection | null = null,
+    associatedClass: InverseOfAssociatedClass | null = null,
   ) {
     super(
-      `Could not find the inverse association for ${reflection} (:${inverseOf}${
-        associatedClass ? ` in ${associatedClass}` : ""
-      })`,
+      reflection
+        ? `Could not find the inverse association for ${reflection.name} (${inspectInverseOf(
+            reflection,
+          )} in ${associatedClass == null ? reflection.className : associatedClass.name})`
+        : "Could not find the inverse association.",
     );
     this.name = "InverseOfAssociationNotFoundError";
     this.reflection = reflection;
-    this.inverseOf = inverseOf;
-    this.corrections = corrections;
-    this.associatedClass = associatedClass;
+    // `associated_class.nil? ? reflection.klass : associated_class`
+    // (associations/errors.rb:38). `klass` is not always resolvable here, where
+    // Ruby would raise NameError: the resolution failure is swallowed to `null`
+    // so the inverse-of error this is already constructing is what surfaces.
+    if (reflection == null) {
+      this.associatedClass = null;
+    } else if (associatedClass != null) {
+      this.associatedClass = associatedClass;
+    } else {
+      let klass: InverseOfAssociatedClass | null = null;
+      try {
+        klass = reflection.klass;
+      } catch {
+        klass = null;
+      }
+      this.associatedClass = klass;
+    }
+  }
+
+  get corrections(): string[] {
+    if (this.reflection && this.associatedClass) {
+      if (!this._corrections) {
+        const maybeThese = Object.keys(this.associatedClass.reflections());
+        this._corrections = new SpellChecker({ dictionary: maybeThese }).correct(
+          String(this.reflection.options["inverseOf"] ?? ""),
+        );
+      }
+      return this._corrections;
+    }
+    return [];
   }
 
   detailedMessage(): string {
@@ -77,18 +141,18 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
 }
 
 export class InverseOfAssociationRecursiveError extends ActiveRecordError {
-  readonly reflection: string;
-  readonly inverseOf: string;
+  readonly reflection: InverseOfReflection | null;
 
-  constructor(reflection: string, inverseOf: string, associatedClass: string | null = null) {
+  constructor(reflection: InverseOfReflection | null = null) {
     super(
-      `Inverse association ${reflection} (:${inverseOf}${
-        associatedClass ? ` in ${associatedClass}` : ""
-      }) is recursive.`,
+      reflection
+        ? `Inverse association ${reflection.name} (${inspectInverseOf(reflection)} in ${
+            reflection.className
+          }) is recursive.`
+        : "Inverse association is recursive.",
     );
     this.name = "InverseOfAssociationRecursiveError";
     this.reflection = reflection;
-    this.inverseOf = inverseOf;
   }
 }
 

@@ -495,6 +495,7 @@ export function resolveAssocClass(
  * @internal
  */
 export function validateInverseOf(
+  owner: typeof Base,
   targetModel: typeof Base,
   assocName: string,
   inverseOf: string,
@@ -503,9 +504,7 @@ export function validateInverseOf(
   if (targetAssocs.length === 0) return;
   if (targetAssocs.some((a) => a.name === inverseOf)) return;
 
-  const dictionary = targetAssocs.map((a) => a.name);
-  const corrections = _correctNames(dictionary, inverseOf);
-  throw new InverseOfAssociationNotFoundError(assocName, inverseOf, corrections, targetModel.name);
+  throw new InverseOfAssociationNotFoundError(owner._reflectOnAssociation(assocName), targetModel);
 }
 
 /**

@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::Tasks::MySQLDatabaseTasks
  */
 
-import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
+import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
@@ -99,13 +99,15 @@ export class MySQLDatabaseTasks {
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const args = this.prepareCommandOptions();
+    args.push(
+      "--execute",
+      `SET FOREIGN_KEY_CHECKS = 0; SOURCE ${filename}; SET FOREIGN_KEY_CHECKS = 1`,
+    );
     args.push("--database", this.dbConfig.database as string);
     if (extraFlags) {
       args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
-    const sqlBody = getFs().readFileSync(filename, "utf8");
-    const stdin = `SET FOREIGN_KEY_CHECKS = 0;\n${sqlBody}\nSET FOREIGN_KEY_CHECKS = 1;\n`;
-    await this.runCmd("mysql", args, "loading", stdin);
+    await this.runCmd("mysql", args, "loading");
   }
 
   /**
@@ -206,11 +208,10 @@ export class MySQLDatabaseTasks {
     return (await Base.connectionPool().leaseConnection()) as Mysql2Adapter;
   }
 
-  private async runCmd(cmd: string, args: string[], action: string, stdin?: string): Promise<void> {
+  private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     const childProcess = await getChildProcessAsync();
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       encoding: "utf8",
-      input: stdin,
     });
     if (result.error || result.status !== 0 || result.signal) {
       const details: string[] = [];

@@ -355,7 +355,7 @@ export class SingularAssociation extends Association {
       }
 
       if (options.inverseOf && !(isBelongsTo && options.polymorphic)) {
-        validateInverseOf(targetModel, assocName, options.inverseOf);
+        validateInverseOf(ctor, targetModel, assocName, options.inverseOf);
       }
 
       if (!isBelongsTo) {
