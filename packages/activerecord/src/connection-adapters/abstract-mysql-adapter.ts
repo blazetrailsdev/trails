@@ -644,7 +644,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
          AND table_name = ${scope.name}`,
       "SCHEMA",
     )) as string | null | undefined;
-    // Rails' `.presence` — a blank/whitespace-only comment reads as nil.
     return presence(value) ?? null;
   }
 
@@ -1749,11 +1748,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<string> {
-    // eslint-disable-next-line prefer-const
-    let [index, algorithm] = await this.addIndexOptions(tableName, columnName, options);
-    if (algorithm) algorithm = `, ${algorithm}`;
+    const [index, algorithm] = await this.addIndexOptions(tableName, columnName, options);
 
-    return `ADD ${this.schemaCreation.accept(index)}${algorithm ?? ""}`;
+    return `ADD ${this.schemaCreation.accept(index)}${algorithm ? `, ${algorithm}` : ""}`;
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter#remove_index_for_alter (abstract_mysql_adapter.rb:887-890) */
@@ -1768,24 +1765,20 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal Mirrors: AbstractMysqlAdapter#column_definitions (abstract_mysql_adapter.rb:962-964) */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
-    return (
-      await this.internalExecQuery(
-        `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
-        "SCHEMA",
-      )
-    ).toArray();
+    const result = await this.internalExecQuery(
+      `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
+      "SCHEMA",
+    );
+    return result.toArray();
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter#create_table_info (abstract_mysql_adapter.rb:966-968) */
   async createTableInfo(tableName: string): Promise<string | null> {
-    return (
-      ((
-        await this.internalExecQuery(
-          `SHOW CREATE TABLE ${this.quoteTableName(tableName)}`,
-          "SCHEMA",
-        )
-      ).first()?.["Create Table"] as string | null | undefined) ?? null
+    const result = await this.internalExecQuery(
+      `SHOW CREATE TABLE ${this.quoteTableName(tableName)}`,
+      "SCHEMA",
     );
+    return (result.first()?.["Create Table"] as string | null | undefined) ?? null;
   }
 
   /** @internal */
