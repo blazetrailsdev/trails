@@ -3759,7 +3759,6 @@ export class Relation<T extends Base> {
             return this._conn().selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
           });
 
-
       return typeCastPluckValues(result, columns, this as any);
     });
   }
