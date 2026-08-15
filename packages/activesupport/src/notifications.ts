@@ -54,15 +54,6 @@ export type NotificationCallback =
 type FanoutListener = Parameters<Fanout["subscribe"]>[1];
 
 /**
- * Mirrors ActiveSupport::Notifications::Instrumenter — the object Rails reaches
- * via `ActiveSupport::Notifications.instrumenter`.
- */
-export interface NotificationInstrumenter {
-  readonly id: string;
-  buildHandle(name: string, payload?: EventPayload): NotificationHandle;
-}
-
-/**
  * ActiveSupport::Notifications — global instrumentation hub.
  *
  * Unlike Rails, this is a static singleton class rather than a module. It owns
@@ -72,7 +63,7 @@ export interface NotificationInstrumenter {
 export class Notifications {
   private static _notifier: Fanout = new Fanout();
 
-  /** Mirrors `mattr_accessor :notifier` (notifications.rb:52). */
+  /** Mirrors `attr_accessor :notifier` in `class << self` (notifications.rb:198). */
   static get notifier(): Fanout {
     return this._notifier;
   }

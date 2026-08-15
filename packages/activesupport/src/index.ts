@@ -451,11 +451,7 @@ export {
   Wrapper as InstrumenterWrapper,
 } from "./notifications/instrumenter.js";
 export type { EventPayload } from "./notifications/instrumenter.js";
-export type {
-  NotificationSubscriber,
-  NotificationHandle,
-  NotificationInstrumenter,
-} from "./notifications.js";
+export type { NotificationSubscriber, NotificationHandle } from "./notifications.js";
 export {
   Fanout,
   InstrumentationSubscriberError,

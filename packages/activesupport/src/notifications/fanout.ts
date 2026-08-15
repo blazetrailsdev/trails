@@ -254,7 +254,7 @@ export class Handle {
   private _id: unknown;
   private _payload: Record<string, unknown>;
   private groups: BaseGroup[];
-  private state: "initialized" | "started" | "finished" = "initialized";
+  private state: ":initialized" | ":started" | ":finished" = ":initialized";
 
   constructor(notifier: Fanout, name: string, id: unknown, payload: Record<string, unknown>) {
     this._name = name;
@@ -278,8 +278,8 @@ export class Handle {
   }
 
   start(): void {
-    this.ensureStateBang("initialized");
-    this.state = "started";
+    this.ensureStateBang(":initialized");
+    this.state = ":started";
 
     iterateGuardingExceptions(this.groups, (group) => {
       group.start(this._name, this._id, this._payload);
@@ -291,8 +291,8 @@ export class Handle {
   }
 
   finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void {
-    this.ensureStateBang("started");
-    this.state = "finished";
+    this.ensureStateBang(":started");
+    this.state = ":finished";
 
     iterateGuardingExceptions(this.groups, (group) => {
       group.finish(name, id, payload);
@@ -301,7 +301,7 @@ export class Handle {
 
   private ensureStateBang(expected: string): void {
     if (this.state !== expected) {
-      throw new ArgumentError(`expected state to be "${expected}" but was "${this.state}"`);
+      throw new ArgumentError(`expected state to be ${expected} but was ${this.state}`);
     }
   }
 }
@@ -315,7 +315,7 @@ export class Fanout {
   private otherSubscribers: Evented[] = [];
   private allListenersForCache = new Map<string, Evented[]>();
   private groupsForCache = new Map<string, Map<GroupClass, Delegate[]>>();
-  private silenceableGroupsForCache = new Map<string, Map<GroupClass, Evented[]>>();
+  private silenceableGroupsForCache = new Map<string, Map<GroupClass, Delegate[]>>();
 
   // Rails keeps the evented start/finish handle stack in
   // `IsolatedExecutionState[:_fanout_handle_stack]` (fanout.rb:277), so
@@ -390,31 +390,25 @@ export class Fanout {
   groupsFor(name: string): Map<GroupClass, Delegate[]> {
     let groups = this.groupsForCache.get(name);
     if (!groups) {
-      groups = groupBy(
-        this.allListenersFor(name).filter((s) => !s.silenceable),
-        (s) => s.delegate,
-      );
+      groups = groupBy(this.allListenersFor(name).filter((s) => !s.silenceable));
       this.groupsForCache.set(name, groups);
     }
 
     let silenceableGroups = this.silenceableGroupsForCache.get(name);
     if (!silenceableGroups) {
-      silenceableGroups = groupBy(
-        this.allListenersFor(name).filter((s) => s.silenceable),
-        (s) => s,
-      );
+      silenceableGroups = groupBy(this.allListenersFor(name).filter((s) => s.silenceable));
       this.silenceableGroupsForCache.set(name, silenceableGroups);
     }
 
     if (silenceableGroups.size > 0) {
       groups = new Map(groups);
       for (const [groupClass, subscriptions] of silenceableGroups) {
-        const activeSubscriptions = subscriptions.filter((s) => !s.isSilenced(name));
+        const activeSubscriptions = subscriptions.filter((s) => {
+          const silenced = (s as unknown as { silenced(name: string): unknown }).silenced(name);
+          return silenced == null || silenced === false;
+        });
         if (activeSubscriptions.length > 0) {
-          groups.set(groupClass, [
-            ...(groups.get(groupClass) ?? []),
-            ...activeSubscriptions.map((s) => s.delegate),
-          ]);
+          groups.set(groupClass, [...(groups.get(groupClass) ?? []), ...activeSubscriptions]);
         }
       }
     }
@@ -433,10 +427,18 @@ export class Fanout {
     handle.start();
   }
 
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
+  finish(
+    name: string,
+    id: unknown,
+    payload: Record<string, unknown>,
+    _listeners: unknown = null,
+  ): void {
     const handleStack = this.handleStack();
     const handle = handleStack.pop();
-    handle?.finishWithValues(name, id, payload);
+    // Rails pops nil off an empty stack and lets finish_with_values raise
+    // NoMethodError (fanout.rb:283-287); the assertion keeps an unbalanced
+    // finish loud rather than silently doing nothing.
+    handle!.finishWithValues(name, id, payload);
   }
 
   publish(name: string, ...args: unknown[]): void {
@@ -490,11 +492,9 @@ export class Fanout {
 }
 
 // Ruby's `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
-// (fanout.rb:189-197) in one pass — JS has no Enumerable#group_by. `value`
-// picks what the bucket holds, since the silenceable half of groups_for keeps
-// the subscribers themselves (fanout.rb:194-198).
-function groupBy<T>(subscribers: Evented[], value: (s: Evented) => T): Map<GroupClass, T[]> {
-  const groups = new Map<GroupClass, T[]>();
+// (fanout.rb:189-197) in one pass — JS has no Enumerable#group_by.
+function groupBy(subscribers: Evented[]): Map<GroupClass, Delegate[]> {
+  const groups = new Map<GroupClass, Delegate[]>();
   for (const s of subscribers) {
     const groupClass = s.groupClass();
     let list = groups.get(groupClass);
@@ -502,7 +502,7 @@ function groupBy<T>(subscribers: Evented[], value: (s: Evented) => T): Map<Group
       list = [];
       groups.set(groupClass, list);
     }
-    list.push(value(s));
+    list.push(s.delegate);
   }
   return groups;
 }
@@ -612,6 +612,7 @@ export class Subscribers {
       : new Timed(pattern, delegate as TimedCallback);
   }
 
+  static readonly Matcher = Matcher;
   static readonly Evented = Evented;
   static readonly Timed = Timed;
   static readonly MonotonicTimed = MonotonicTimed;
