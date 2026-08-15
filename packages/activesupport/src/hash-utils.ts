@@ -397,21 +397,14 @@ export function exceptBang<T extends AnyObject>(hash: T, ...keys: string[]): T {
   return hash;
 }
 
-/**
- * Returns a HashWithIndifferentAccess out of its receiver — Ruby's
- * `Hash#with_indifferent_access` (core_ext/hash/indifferent_access.rb:9). The
- * receiver is the first argument here because TypeScript has no way to define
- * the method on `Object.prototype`.
- */
-export function withIndifferentAccess(obj: AnyObject): HashWithIndifferentAccess<unknown> {
-  return new HashWithIndifferentAccess(obj);
-}
-
-/**
- * `alias nested_under_indifferent_access with_indifferent_access`
- * (core_ext/hash/indifferent_access.rb:23).
- */
-export const nestedUnderIndifferentAccess = withIndifferentAccess;
+// `Hash#with_indifferent_access` and its `nested_under_indifferent_access`
+// alias live in the file Rails puts them in,
+// core_ext/hash/indifferent_access.rb; re-exported here so existing importers
+// are untouched.
+export {
+  withIndifferentAccess,
+  nestedUnderIndifferentAccess,
+} from "./core-ext/hash/indifferent-access.js";
 
 /**
  * Assert that all keys in obj are within the allowed set of validKeys.

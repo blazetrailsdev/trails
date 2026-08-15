@@ -271,7 +271,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/hash/slice.rb": "core-ext/hash/slice.ts",
   "activesupport:core_ext/hash/except.rb": "hash-utils.ts",
   "activesupport:core_ext/hash/deep_merge.rb": "hash-utils.ts",
-  "activesupport:core_ext/hash/indifferent_access.rb": "hash-with-indifferent-access.ts",
   "activesupport:core_ext/array/conversions.rb": "array-utils.ts",
   "activesupport:core_ext/string/exclude.rb": "string-utils.ts",
   "activesupport:core_ext/object/inclusion.rb": "enumerable-utils.ts",

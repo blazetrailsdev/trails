@@ -10,20 +10,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
-    "call": "except",
-    "reason": "Verified per-site (RFC 0106): Rails' `except(:includes, :eager_load, :preload).joins!(join_dependency)` (finder_methods.rb:461) is spelled by `_exceptEagerValues(jd)`, which performs exactly that rewrite; the extraction exists because trails has three apply-join-dependency entry points (sync, async, eager) sharing the one Rails expression."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "select_association_list",
-    "reason": "Verified per-site (RFC 0106): Rails re-selects the association subset of joins_values/left_outer_joins_values here (finder_methods.rb:466-470); trails routes named association joins out at `joins()` time into `_namedInnerJoins`/`_leftOuterJoinsValues`, so the selection is already done and `_joinsReflectionsAreLimitable` reads those lists directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "apply_join_dependency",
     "call": "skip_query_cache_if_necessary",
     "reason": "Verified per-site (RFC 0106): the call sits in Rails' `distinct_relation_for_primary_key` arm (finder_methods.rb:473-477), which executes a query. The synchronous `applyJoinDependency` cannot and throws NotImplementedError instead; the awaitable `_applyJoinDependencyAsync` carries that arm, and the gate matches only the Rails-named method."
   },
