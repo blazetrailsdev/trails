@@ -157,7 +157,7 @@ type GroupClass = new (
   payload: Record<string, unknown>,
 ) => BaseGroup;
 
-export class BaseGroup<L = Delegate> {
+export abstract class BaseGroup<L = Delegate> {
   protected listeners: L[];
 
   constructor(listeners: L[], _name: string, _id: unknown, _payload: Record<string, unknown>) {
@@ -168,9 +168,9 @@ export class BaseGroup<L = Delegate> {
     iterateGuardingExceptions(this.listeners, block);
   }
 
-  start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
+  abstract start(name: string, id: unknown, payload: Record<string, unknown>): void;
 
-  finish(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
+  abstract finish(name: string, id: unknown, payload: Record<string, unknown>): void;
 }
 
 export class BaseTimeGroup extends BaseGroup<TimedCallback> {
