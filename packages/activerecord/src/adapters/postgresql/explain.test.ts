@@ -56,9 +56,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(typeof plan).toBe("string");
       expect(plan.toLowerCase()).toContain("select");
       expect(plan).toContain("ex_relations");
-      // The per-query header from PG buildExplainClause — no " for:", which
-      // belongs only to Explain#build_explain_clause's fallback for adapters
-      // that define no build_explain_clause (explain.rb:56-61).
+      // The per-query header from PG buildExplainClause (no " for:" — that is
+      // Explain#build_explain_clause's fallback only, explain.rb:56-61):
       expect(plan).toMatch(/^EXPLAIN SELECT/m);
     });
 

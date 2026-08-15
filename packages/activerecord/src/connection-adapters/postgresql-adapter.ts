@@ -971,7 +971,7 @@ export class PostgreSQLAdapter
    * (`reloadTypeMap`, `getOidType`, `columns`).
    */
   private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {
-    PostgreSQLAdapter.initializeTypeMap(m);
+    (this.constructor as typeof PostgreSQLAdapter).initializeTypeMap(m);
 
     const timezone = ActiveRecord.defaultTimezone;
     registerClassWithPrecision(m, "time", TimeType, { timezone });
@@ -1304,9 +1304,9 @@ export class PostgreSQLAdapter
    */
   async reloadTypeMap(): Promise<void> {
     // Rails holds `@lock.synchronize` over the whole body
-    // (postgresql_adapter.rb:358-370). The null-then-reload below leaves the
-    // type map absent across an await, so without the lock a concurrent
-    // reader — or a second reloadTypeMap — observes a null map mid-reload.
+    // (postgresql_adapter.rb:359-369). The cleared map stays empty across the
+    // `loadAdditionalTypes` await, so without the lock a concurrent reader —
+    // or a second reloadTypeMap — observes a half-seeded map mid-reload.
     return this.lock.synchronize(async () => {
       if (this._typeMap) {
         this.typeMap.clear();
@@ -3994,8 +3994,10 @@ export class PostgreSQLAdapter
     return new PgSchemaCreation(this);
   }
 
-  // Mirrors: PostgreSQL::SchemaStatements#create_schema_dumper
-  // (postgresql/schema_statements.rb:884) — `PostgreSQL::SchemaDumper.create(self, options)`.
+  /**
+   * Mirrors: PostgreSQL::SchemaStatements#create_schema_dumper
+   * (postgresql/schema_statements.rb:884-886) — `PostgreSQL::SchemaDumper.create(self, options)`.
+   */
   createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {
     return PgSchemaDumper.create(source, options);
   }
