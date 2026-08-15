@@ -21,9 +21,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override async virtualTables(stream: string[]): Promise<void> {
     const connection = this._adapter();
     if (!connection || typeof connection.virtualTables !== "function") return;
-    const virtualTables: Record<string, [string, string]> = await connection.virtualTables();
-    const names = Object.keys(virtualTables).sort();
-    if (names.length === 0) return;
+    const virtualTables: Array<[string, [string, string]]> = await connection.virtualTables();
+    if (virtualTables.length === 0) return;
     stream.push("");
     stream.push("  // Virtual tables defined in this database.");
     stream.push(
@@ -37,8 +36,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
         .map((a) => a.trim())
         .filter((a) => a.length > 0);
     };
-    for (const tableName of names) {
-      const [moduleName, argumentsStr] = virtualTables[tableName];
+    for (const [tableName, options] of [...virtualTables].sort()) {
+      const [moduleName, argumentsStr] = options;
       stream.push(
         `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(splitArgs(argumentsStr))});`,
       );
