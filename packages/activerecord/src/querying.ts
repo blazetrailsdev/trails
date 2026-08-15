@@ -764,9 +764,19 @@ export function findInBatches<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#in_batches — delegates through all(). */
 export function inBatches<T extends typeof Base>(
   this: T,
+  opts: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
+  block: (relation: any) => void | Promise<void>,
+): Promise<void>;
+export function inBatches<T extends typeof Base>(
+  this: T,
   opts?: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
-): ReturnType<ReturnType<T["all"]>["inBatches"]> {
-  return this.all().inBatches(opts) as ReturnType<ReturnType<T["all"]>["inBatches"]>;
+): ReturnType<ReturnType<T["all"]>["inBatches"]>;
+export function inBatches<T extends typeof Base>(
+  this: T,
+  opts?: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
+  block?: (relation: any) => void | Promise<void>,
+): ReturnType<ReturnType<T["all"]>["inBatches"]> | Promise<void> {
+  return (this.all() as any).inBatches(opts, block);
 }
 
 /** Mirrors: ActiveRecord::Querying#includes */

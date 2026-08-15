@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "./notifications.js";
 import { Event as EventClass } from "./notifications/instrumenter.js";
 import type { Event } from "./notifications/instrumenter.js";
-import { Temporal } from "@blazetrails/date";
 
 /**
  * trails-only coverage for the static Notifications surface: the
@@ -274,8 +273,9 @@ describe("Notifications (trails)", () => {
       const received: Event[] = [];
       Notifications.subscribe("prebuilt", (e) => received.push(e));
 
-      const event = new EventClass("prebuilt", Temporal.Now.instant(), { b: 2 }, "id-1");
-      event.finish();
+      const event = new EventClass("prebuilt", null, null, "id-1", { b: 2 });
+      event.startBang();
+      event.finishBang();
       Notifications.publishEvent(event);
 
       expect(received).toHaveLength(1);

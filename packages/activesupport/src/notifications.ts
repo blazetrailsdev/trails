@@ -270,10 +270,11 @@ export class Notifications {
    */
   static publish(name: string, payload?: EventPayload): void {
     const resolved = payload ?? {};
-    const event = new Event(name, Temporal.Now.instant(), resolved, this.instrumenter.id);
+    const event = this.instrumenter.newEvent(name, resolved);
+    event.startBang();
     // Deliver the passed payload object itself, not Event#initialize's dup.
     event.payload = resolved;
-    event.finish();
+    event.finishBang();
     this.notifier.publishEvent(event);
   }
 

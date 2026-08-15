@@ -21,27 +21,51 @@ interface BatchRelation {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BatchEnumerator<T extends BatchRelation> {
-  private _generator: () => AsyncGenerator<T>;
-  readonly ofSize: number;
+  private _of: number;
   readonly start: unknown;
   readonly finish: unknown;
   readonly relation: any;
-  readonly batchSize: number;
+  private _cursor: string[];
+  private _order: "asc" | "desc" | ("asc" | "desc")[];
+  private _useRanges: boolean | null;
+  /**
+   * @internal The async generator that drives this enumerator's batches.
+   * Ruby re-derives them with `@relation.to_enum(:in_batches, ...)`, which
+   * calls `in_batches` with a block; TS has no block-to-enumerator protocol,
+   * so `Relation#inBatches` builds the generator and stows it here. Every
+   * re-enumeration below goes through `relation.inBatches(...)` exactly as
+   * Rails does, and reads the fresh generator off the enumerator it returns.
+   */
+  _generator!: () => AsyncGenerator<T>;
 
-  constructor(
-    generator: () => AsyncGenerator<T>,
-    ofSize: number,
-    options?: { start?: unknown; finish?: unknown; relation?: any },
-  ) {
-    if (!Number.isInteger(ofSize) || ofSize < 1) {
-      throw new Error("Batch size must be a positive integer");
-    }
-    this._generator = generator;
-    this.ofSize = ofSize;
-    this.batchSize = ofSize;
-    this.start = options?.start ?? null;
-    this.finish = options?.finish ?? null;
-    this.relation = options?.relation ?? null;
+  constructor({
+    of = 1000,
+    start = null,
+    finish = null,
+    relation,
+    cursor,
+    order = "asc",
+    useRanges = null,
+  }: {
+    of?: number;
+    start?: unknown;
+    finish?: unknown;
+    relation: any;
+    cursor: string[];
+    order?: "asc" | "desc" | ("asc" | "desc")[];
+    useRanges?: boolean | null;
+  }) {
+    this._of = of;
+    this.relation = relation;
+    this.start = start;
+    this.finish = finish;
+    this._cursor = cursor;
+    this._order = order;
+    this._useRanges = useRanges;
+  }
+
+  get batchSize(): number {
+    return this._of;
   }
 
   /**
@@ -51,42 +75,30 @@ export class BatchEnumerator<T extends BatchRelation> {
    * JS async-iteration protocol — Ruby's Enumerable#each is synchronous
    */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    yield* this._generator();
-  }
-
-  eachBatch(): AsyncGenerator<T>;
-  eachBatch(fn: (batch: T) => void | Promise<void>): Promise<void>;
-  eachBatch(fn?: (batch: T) => void | Promise<void>): AsyncGenerator<T> | Promise<void> {
-    if (!fn) {
-      return this._generator();
-    }
-    return (async () => {
-      for await (const batch of this) {
-        await fn(batch);
-      }
-    })();
+    yield* this.each();
   }
 
   eachRecord(): AsyncGenerator<any>;
   eachRecord(fn: (record: any) => void | Promise<void>): Promise<void>;
   eachRecord(fn?: (record: any) => void | Promise<void>): AsyncGenerator<any> | Promise<void> {
     const self = this;
-    if (!fn) {
-      return (async function* () {
-        for await (const batchRelation of self) {
-          const records = await batchRelation.toArray();
-          for (const record of records) {
-            yield record;
-          }
-        }
-      })();
-    }
+    const records = async function* (): AsyncGenerator<any> {
+      const enumerator = self.relation.inBatches({
+        of: self._of,
+        start: self.start,
+        finish: self.finish,
+        load: true,
+        cursor: self._cursor,
+        order: self._order,
+      });
+      for await (const relation of enumerator._generator()) {
+        yield* await relation.toArray();
+      }
+    };
+    if (!fn) return records();
     return (async () => {
-      for await (const batchRelation of self) {
-        const records = await batchRelation.toArray();
-        for (const record of records) {
-          await fn(record);
-        }
+      for await (const record of records()) {
+        await fn(record);
       }
     })();
   }
@@ -107,15 +119,6 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  async destroyAll(): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      const records = await batchRelation.destroyAll();
-      total += records.filter((r) => r.isDestroyed?.()).length;
-    }
-    return total;
-  }
-
   async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -126,10 +129,39 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
+  async destroyAll(): Promise<number> {
+    let total = 0;
+    for await (const batchRelation of this) {
+      const records = await batchRelation.destroyAll();
+      total += records.filter((r) => r.isDestroyed?.()).length;
+    }
+    return total;
+  }
+
   each(): AsyncGenerator<T>;
   each(fn: (batch: T) => void | Promise<void>): Promise<void>;
   each(fn?: (batch: T) => void | Promise<void>): AsyncGenerator<T> | Promise<void> {
-    return this.eachBatch(fn as any);
+    const enumerator = this.relation.inBatches({
+      of: this._of,
+      start: this.start,
+      finish: this.finish,
+      load: false,
+      cursor: this._cursor,
+      order: this._order,
+      useRanges: this._useRanges,
+    });
+    if (!fn) return enumerator._generator();
+    return (async () => {
+      for await (const batch of enumerator._generator()) {
+        await fn(batch);
+      }
+    })();
+  }
+
+  eachBatch(): AsyncGenerator<T>;
+  eachBatch(fn: (batch: T) => void | Promise<void>): Promise<void>;
+  eachBatch(fn?: (batch: T) => void | Promise<void>): AsyncGenerator<T> | Promise<void> {
+    return this.each(fn as any);
   }
 
   async toArray(): Promise<T[]> {

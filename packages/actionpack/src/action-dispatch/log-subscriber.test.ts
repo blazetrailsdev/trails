@@ -10,18 +10,7 @@ class CaptureLogger {
 }
 
 function makeEvent(payload: Record<string, unknown>, duration = 12): NotificationEvent {
-  const ev = Object.create(NotificationEvent.prototype) as NotificationEvent;
-  const fixedTime = new Date("2026-01-01T00:00:00Z");
-  Object.assign(ev, {
-    name: "redirect.action_dispatch",
-    transactionId: "x",
-    time: fixedTime,
-    endTime: fixedTime,
-    payload,
-    children: [],
-  });
-  Object.defineProperty(ev, "duration", { value: duration, configurable: true });
-  return ev;
+  return new NotificationEvent("redirect.action_dispatch", 0, duration / 1000.0, "x", payload);
 }
 
 describe("ActionDispatch::LogSubscriber#redirect", () => {

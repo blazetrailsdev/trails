@@ -161,6 +161,18 @@ import { AliasTracker } from "./associations/alias-tracker.js";
  */
 export type LoadedRelation<R> = Omit<R, "then">;
 
+/** @internal The keyword arguments of `ActiveRecord::Batches#in_batches`. */
+export type InBatchesOptions = {
+  of?: number;
+  start?: unknown;
+  finish?: unknown;
+  order?: "asc" | "desc" | ("asc" | "desc")[];
+  cursor?: string | string[];
+  errorOnIgnore?: boolean;
+  load?: boolean;
+  useRanges?: boolean | null;
+};
+
 /** @internal */
 export type EnumerablePattern<T extends Base> =
   | ((record: T) => boolean)
@@ -4442,7 +4454,7 @@ export class Relation<T extends Base> {
     cursor?: string | string[];
     errorOnIgnore?: boolean;
   } = {}): AsyncGenerator<T[]> {
-    for await (const batchRel of this.inBatches({
+    const enumerator = this.inBatches({
       of: batchSize,
       start,
       finish,
@@ -4450,7 +4462,8 @@ export class Relation<T extends Base> {
       errorOnIgnore,
       cursor,
       order,
-    })) {
+    });
+    for await (const batchRel of enumerator._generator()) {
       yield ((batchRel as any)._records ?? []) as T[];
     }
   }
@@ -4497,93 +4510,95 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Batches#in_batches
    */
-  inBatches({
-    of = 1000,
-    start,
-    finish,
-    order,
-    cursor,
-    errorOnIgnore,
-    load = false,
-    useRanges,
-  }: {
-    of?: number;
-    start?: unknown;
-    finish?: unknown;
-    order?: "asc" | "desc" | ("asc" | "desc")[];
-    cursor?: string | string[];
-    errorOnIgnore?: boolean;
-    load?: boolean;
-    useRanges?: boolean | null;
-  } = {}): BatchEnumerator<LoadedRelation<Relation<T>>> {
+  inBatches(
+    opts: InBatchesOptions,
+    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+  ): Promise<void>;
+  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T>>>;
+  inBatches(
+    {
+      of = 1000,
+      start,
+      finish,
+      order,
+      cursor: cursorOption,
+      errorOnIgnore,
+      load = false,
+      useRanges,
+    }: InBatchesOptions = {},
+    block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
     const self = this;
-    const pk = this.primaryKey;
-    const effectiveCursor = cursor ?? pk;
-    const cursorArr = Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor];
+    const effectiveCursor = cursorOption ?? this.primaryKey;
+    const cursor = (Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor]).map(
+      String,
+    );
     // `ensure_valid_options_for_batching!` reaches the schema cache, which is
-    // async here, so the validation runs when the enumerator is first pulled
+    // async here, so the validation runs when the batches are first pulled
     // rather than at `in_batches` call time.
     const ensureValidOptions = () =>
-      _ensureValidOptionsForBatchingBang(self, cursorArr, start, finish, (order ?? "asc") as any);
+      _ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
 
     if (this._orderClauses.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
-    const batchOrders = _buildBatchOrders(cursorArr, order as any);
+    const batchOrders = _buildBatchOrders(cursor, order as any);
 
-    let remaining: number | null = null;
-    let effectiveBatchSize = of;
-    if (this._limitValue !== null) {
-      remaining = this._limitValue;
-      if (remaining === 0) {
-        return new BatchEnumerator(async function* () {}, of, {
+    const enumerator = block
+      ? null
+      : new BatchEnumerator<LoadedRelation<Relation<T>>>({
+          of,
           start,
           finish,
           relation: self,
+          cursor,
+          order,
+          useRanges,
         });
-      }
-      if (remaining < effectiveBatchSize) effectiveBatchSize = remaining;
+
+    let remaining: number | null = null;
+    let batchLimit = of;
+    if (this._limitValue !== null) {
+      remaining = this._limitValue;
+      if (remaining < batchLimit) batchLimit = remaining;
     }
 
-    if (this._loaded) {
+    let generator: () => AsyncGenerator<LoadedRelation<Relation<T>>>;
+    if (remaining === 0) {
+      generator = async function* () {};
+    } else if (this._loaded) {
       const loadedBatches = _batchOnLoadedRelation({
         relation: this,
         start,
         finish,
-        cursor: cursorArr,
+        cursor,
         order: (order ?? "asc") as any,
-        batchLimit: effectiveBatchSize,
+        batchLimit,
       });
-      return new BatchEnumerator(
-        async function* () {
-          await ensureValidOptions();
-          for (const batchRows of loadedBatches) {
-            const batchRel = self._clone();
-            batchRel._orderClauses = batchOrders.map(([col, dir]) =>
-              dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
-            );
-            (batchRel as any)._records = batchRows;
-            (batchRel as any)._loaded = true;
-            yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
-          }
-        },
-        effectiveBatchSize,
-        { start, finish, relation: self },
-      );
-    }
-
-    return new BatchEnumerator(
-      async function* () {
+      generator = async function* () {
+        await ensureValidOptions();
+        for (const batchRows of loadedBatches) {
+          const batchRel = self._clone();
+          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
+          );
+          (batchRel as any)._records = batchRows;
+          (batchRel as any)._loaded = true;
+          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
+        }
+      };
+    } else {
+      generator = async function* () {
         await ensureValidOptions();
         for await (const { rows: batchRows, useRanges: batchUseRanges } of _batchOnUnloadedRelation(
           {
             relation: self,
             start,
             finish,
-            cursor: cursorArr,
+            cursor,
             order: (order ?? "asc") as any,
-            batchLimit: effectiveBatchSize,
+            batchLimit,
             load,
             remaining,
             useRanges,
@@ -4593,11 +4608,11 @@ export class Relation<T extends Base> {
           batchRel._orderClauses = batchOrders.map(([col, dir]) =>
             dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );
-          const tuples = batchRows.map((r) => cursorArr.map((c) => r.readAttribute(c)));
-          if (batchUseRanges && !load && cursorArr.length === 1 && tuples.length > 0) {
+          const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
+          if (batchUseRanges && !load && cursor.length === 1 && tuples.length > 0) {
             // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
             // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
-            const col = cursorArr[0];
+            const col = cursor[0];
             const dir = batchOrders[0][1];
             const first = tuples[0][0];
             const last = tuples[tuples.length - 1][0];
@@ -4605,14 +4620,14 @@ export class Relation<T extends Base> {
             const lo = dir === "desc" ? last : first;
             const hi = dir === "desc" ? first : last;
             batchRel._whereClause.predicates.push(attr.gteq(lo).and(attr.lteq(hi)));
-          } else if (cursorArr.length === 1) {
+          } else if (cursor.length === 1) {
             const ids = tuples.map((t) => t[0]);
             batchRel._whereClause.predicates.push(
-              ...self.predicateBuilder.buildFromHash({ [cursorArr[0]]: ids }),
+              ...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids }),
             );
           } else {
             batchRel._whereClause.predicates.push(
-              ...self.predicateBuilder.buildComposite(cursorArr, tuples),
+              ...self.predicateBuilder.buildComposite(cursor, tuples),
             );
           }
           if (load) {
@@ -4621,10 +4636,19 @@ export class Relation<T extends Base> {
           }
           yield stripThenable(batchRel);
         }
-      } as () => AsyncGenerator<LoadedRelation<Relation<T>>>,
-      effectiveBatchSize,
-      { start, finish, relation: self },
-    );
+      } as () => AsyncGenerator<LoadedRelation<Relation<T>>>;
+    }
+
+    if (block) {
+      return (async () => {
+        for await (const batchRelation of generator()) {
+          await block(batchRelation);
+        }
+      })();
+    }
+
+    enumerator!._generator = generator;
+    return enumerator!;
   }
 
   // -- SQL generation --

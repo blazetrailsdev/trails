@@ -6,7 +6,6 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
 
 // Trails-only: integer binds type-cast to BigInt (so SQLite binds them as
 // SQLITE_INTEGER). Rails renders a bound Integer bare via `binds.inspect`,
@@ -32,9 +31,7 @@ class TestSubscriber extends LogSubscriber {
 }
 
 function makeEvent(payload: Record<string, unknown>): Event {
-  const start = Temporal.Now.instant();
-  const event = new Event("sql.active_record", start, payload);
-  event.finish(start);
+  const event = new Event("sql.active_record", null, null, "id", payload);
   Object.defineProperty(event, "duration", { get: () => 0.0, configurable: true });
   return event;
 }

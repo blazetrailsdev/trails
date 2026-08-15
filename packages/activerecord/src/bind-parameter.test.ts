@@ -5,7 +5,6 @@
  */
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
 import { Nodes, Collectors } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
@@ -57,7 +56,7 @@ async function logBinds(
   // `@connection.send(:type_casted_binds, binds)` — use the connection's real
   // type_casted_binds (abstract/quoting.ts) rather than hand-casting.
   const conn = (await Topic.leaseConnection()) as any;
-  const event = new Event("sql.active_record", Temporal.Now.instant(), {
+  const event = new Event("sql.active_record", null, null, "id", {
     name: "SQL",
     sql,
     binds,
