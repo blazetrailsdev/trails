@@ -189,7 +189,7 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  // any / all / none / count / find / each / map / flatMap
+  // any / all / none / count / find / each / map
   it("any — true if any entries exist", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.any()).toBe(true);
@@ -248,32 +248,12 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(result.sort()).toEqual(["a=1", "b=2"]);
   });
 
-  it("flatMap — flatMaps over entries", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const result = h.flatMap(([k, v]) => [k, v]);
-    expect(result).toContain("a");
-    expect(result).toContain(1);
-  });
-
   // invert
   it("invert — swaps keys and values", () => {
     const h = new HashWithIndifferentAccess({ a: "x", b: "y" });
     const inverted = h.invert();
     expect(inverted.get("x")).toBe("a");
     expect(inverted.get("y")).toBe("b");
-  });
-
-  // minBy / maxBy
-  it("minBy — finds entry with minimum value", () => {
-    const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.minBy(([, v]) => v as number);
-    expect(result).toEqual(["b", 1]);
-  });
-
-  it("maxBy — finds entry with maximum value", () => {
-    const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.maxBy(([, v]) => v as number);
-    expect(result).toEqual(["a", 3]);
   });
 
   // store

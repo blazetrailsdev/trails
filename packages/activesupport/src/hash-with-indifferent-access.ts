@@ -429,18 +429,6 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Ruby `Enumerable#flat_map` over a Hash: the block is yielded the
-   * `[key, value]` pair.
-   */
-  flatMap<T>(fn: (pair: [string, V]) => T[]): T[] {
-    const result: T[] = [];
-    for (const pair of this.data) {
-      result.push(...fn(pair));
-    }
-    return result;
-  }
-
-  /**
    * assoc — returns [key, value] pair for the given key, or undefined.
    */
   assoc(key: string): [string, V] | undefined {
@@ -460,40 +448,6 @@ export class HashWithIndifferentAccess<V = unknown> {
       result.set(String(v), k);
     }
     return result;
-  }
-
-  /**
-   * Ruby `Enumerable#min_by` over a Hash: the block is yielded the
-   * `[key, value]` pair, and that pair is returned.
-   */
-  minBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
-    let min: number | undefined;
-    let minEntry: [string, V] | undefined;
-    for (const pair of this.data) {
-      const n = fn(pair);
-      if (min === undefined || n < min) {
-        min = n;
-        minEntry = pair;
-      }
-    }
-    return minEntry;
-  }
-
-  /**
-   * Ruby `Enumerable#max_by` over a Hash: the block is yielded the
-   * `[key, value]` pair, and that pair is returned.
-   */
-  maxBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
-    let max: number | undefined;
-    let maxEntry: [string, V] | undefined;
-    for (const pair of this.data) {
-      const n = fn(pair);
-      if (max === undefined || n > max) {
-        max = n;
-        maxEntry = pair;
-      }
-    }
-    return maxEntry;
   }
 
   /**
