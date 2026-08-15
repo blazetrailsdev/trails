@@ -2607,7 +2607,7 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
     for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
   };
-  addNames(this.joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[]);
+  addNames(this.joinsValues as AssociationSpec[]);
   addNames(this.leftOuterJoinsValues);
   addNames(this._eagerLoadAssociations);
   addNames(this._includesAssociations);
@@ -2687,7 +2687,17 @@ export function selectNamedJoins(
   return selectAssociationList.call(this, associations, stashedJoins, block);
 }
 
-/** @internal */
+/**
+ * Mirrors `select_association_list` (query_methods.rb:1810-1823).
+ *
+ * Its `when Hash, Symbol, Array` arm keeps association specs and drops a raw
+ * SQL String through the `else`. TypeScript collapses Ruby's Symbol and String
+ * onto one type, so that `when` cannot be spelled by type: a string is a Symbol
+ * here only when it names an association (or carries the leading colon), the
+ * same discriminator `joins()` applies at insert time.
+ *
+ * @internal
+ */
 export function selectAssociationList(
   this: QueryMethodsHost,
   associations: unknown[],
@@ -2697,9 +2707,9 @@ export function selectAssociationList(
   const result: unknown[] = [];
   for (const association of associations) {
     if (
-      typeof association === "string" ||
       Array.isArray(association) ||
-      isPlainObject(association)
+      isPlainObject(association) ||
+      (typeof association === "string" && this._isNamedJoinValue(association))
     ) {
       result.push(association);
     } else if (association instanceof JoinDependency) {

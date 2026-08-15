@@ -117,10 +117,6 @@ export class HashWithIndifferentAccess<V = unknown> {
     return this.key(key);
   }
 
-  has(key: string): boolean {
-    return this.key(key);
-  }
-
   /**
    * Mirrors `fetch` (hash_with_indifferent_access.rb:195-197) — `Hash#fetch`
    * semantics over the converted key: a stored value wins over the default
@@ -353,37 +349,36 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * any() — true if any entries exist.
+   * `Enumerable#any?` — with no block, true when any entry exists; with one,
+   * true when it matches at least one `[key, value]` pair.
    */
-  any(): boolean {
-    return this.data.size > 0;
-  }
-
-  /**
-   * anyWith — true if predicate matches at least one pair.
-   */
-  anyWith(fn: (key: string, value: V) => boolean): boolean {
-    for (const [k, v] of this.data) {
-      if (fn(k, v)) return true;
+  any(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return this.data.size > 0;
+    for (const pair of this.data) {
+      if (fn(pair)) return true;
     }
     return false;
   }
 
   /**
-   * allWith — true if predicate matches all pairs.
+   * `Enumerable#all?` — with no block, true when every entry is truthy (a
+   * `[key, value]` pair always is); with one, true when it matches every pair.
    */
-  allWith(fn: (key: string, value: V) => boolean): boolean {
-    for (const [k, v] of this.data) {
-      if (!fn(k, v)) return false;
+  all(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return true;
+    for (const pair of this.data) {
+      if (!fn(pair)) return false;
     }
     return true;
   }
 
   /**
-   * noneWith — true if predicate matches no pairs.
+   * `Enumerable#none?` — with no block, true when the hash is empty; with one,
+   * true when it matches no `[key, value]` pair.
    */
-  noneWith(fn: (key: string, value: V) => boolean): boolean {
-    return !this.anyWith(fn);
+  none(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return this.data.size === 0;
+    return !this.any(fn);
   }
 
   /**
@@ -434,34 +429,12 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Ruby `Enumerable#flat_map` over a Hash: the block is yielded the
-   * `[key, value]` pair.
-   */
-  flatMap<T>(fn: (pair: [string, V]) => T[]): T[] {
-    const result: T[] = [];
-    for (const pair of this.data) {
-      result.push(...fn(pair));
-    }
-    return result;
-  }
-
-  /**
    * assoc — returns [key, value] pair for the given key, or undefined.
    */
   assoc(key: string): [string, V] | undefined {
     key = this.convertKey(key);
     if (this.data.has(key)) {
       return [key, this.data.get(key)!];
-    }
-    return undefined;
-  }
-
-  /**
-   * rassoc — returns [key, value] by value match, or undefined.
-   */
-  rassoc(value: V): [string, V] | undefined {
-    for (const [k, v] of this.data) {
-      if (v === value) return [k, v];
     }
     return undefined;
   }
@@ -475,51 +448,6 @@ export class HashWithIndifferentAccess<V = unknown> {
       result.set(String(v), k);
     }
     return result;
-  }
-
-  /**
-   * flatten — returns all key-value pairs as a flat array.
-   */
-  flatten(): unknown[] {
-    const result: unknown[] = [];
-    for (const [k, v] of this.data) {
-      result.push(k, v);
-    }
-    return result;
-  }
-
-  /**
-   * Ruby `Enumerable#min_by` over a Hash: the block is yielded the
-   * `[key, value]` pair, and that pair is returned.
-   */
-  minBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
-    let min: number | undefined;
-    let minEntry: [string, V] | undefined;
-    for (const pair of this.data) {
-      const n = fn(pair);
-      if (min === undefined || n < min) {
-        min = n;
-        minEntry = pair;
-      }
-    }
-    return minEntry;
-  }
-
-  /**
-   * Ruby `Enumerable#max_by` over a Hash: the block is yielded the
-   * `[key, value]` pair, and that pair is returned.
-   */
-  maxBy(fn: (pair: [string, V]) => number): [string, V] | undefined {
-    let max: number | undefined;
-    let maxEntry: [string, V] | undefined;
-    for (const pair of this.data) {
-      const n = fn(pair);
-      if (max === undefined || n > max) {
-        max = n;
-        maxEntry = pair;
-      }
-    }
-    return maxEntry;
   }
 
   /**

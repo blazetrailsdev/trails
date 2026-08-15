@@ -22,14 +22,14 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("has — reports key presence", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.has("a")).toBe(true);
-    expect(h.has("z")).toBe(false);
+    expect(h.hasKey("a")).toBe(true);
+    expect(h.hasKey("z")).toBe(false);
   });
 
   it("delete — removes key", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.delete("a")).toBe(true);
-    expect(h.has("a")).toBe(false);
+    expect(h.hasKey("a")).toBe(false);
     expect(h.delete("a")).toBe(false);
   });
 
@@ -119,7 +119,7 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
     expect(compacted.toHash()).toEqual({ a: 1, d: 2 });
     // original unchanged
-    expect(h.has("b")).toBe(true);
+    expect(h.hasKey("b")).toBe(true);
   });
 
   it("compact on hash with no nil values returns equivalent hash", () => {
@@ -189,7 +189,7 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  // any / all / none / count / find / each / map / flatMap
+  // any / all / none / count / find / each / map
   it("any — true if any entries exist", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.any()).toBe(true);
@@ -197,22 +197,22 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(empty.any()).toBe(false);
   });
 
-  it("anyWith — true if predicate matches at least one pair", () => {
+  it("any — true if predicate matches at least one pair", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.anyWith((_k, v) => (v as number) > 1)).toBe(true);
-    expect(h.anyWith((_k, v) => (v as number) > 99)).toBe(false);
+    expect(h.any(([, v]) => (v as number) > 1)).toBe(true);
+    expect(h.any(([, v]) => (v as number) > 99)).toBe(false);
   });
 
-  it("allWith — true if predicate matches all pairs", () => {
+  it("all — true if predicate matches all pairs", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.allWith((_k, v) => (v as number) > 0)).toBe(true);
-    expect(h.allWith((_k, v) => (v as number) > 1)).toBe(false);
+    expect(h.all(([, v]) => (v as number) > 0)).toBe(true);
+    expect(h.all(([, v]) => (v as number) > 1)).toBe(false);
   });
 
-  it("noneWith — true if predicate matches no pairs", () => {
+  it("none — true if predicate matches no pairs", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.noneWith((_k, v) => (v as number) > 99)).toBe(true);
-    expect(h.noneWith((_k, v) => (v as number) > 1)).toBe(false);
+    expect(h.none(([, v]) => (v as number) > 99)).toBe(true);
+    expect(h.none(([, v]) => (v as number) > 1)).toBe(false);
   });
 
   it("count — counts all entries when no predicate", () => {
@@ -248,32 +248,12 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(result.sort()).toEqual(["a=1", "b=2"]);
   });
 
-  it("flatMap — flatMaps over entries", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const result = h.flatMap(([k, v]) => [k, v]);
-    expect(result).toContain("a");
-    expect(result).toContain(1);
-  });
-
   // invert
   it("invert — swaps keys and values", () => {
     const h = new HashWithIndifferentAccess({ a: "x", b: "y" });
     const inverted = h.invert();
     expect(inverted.get("x")).toBe("a");
     expect(inverted.get("y")).toBe("b");
-  });
-
-  // minBy / maxBy
-  it("minBy — finds entry with minimum value", () => {
-    const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.minBy(([, v]) => v as number);
-    expect(result).toEqual(["b", 1]);
-  });
-
-  it("maxBy — finds entry with maximum value", () => {
-    const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.maxBy(([, v]) => v as number);
-    expect(result).toEqual(["a", 3]);
   });
 
   // store
@@ -315,7 +295,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("replace — clears and repopulates hash", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 42 });
     h.replace({ b: 12 });
-    expect(h.has("a")).toBe(false);
+    expect(h.hasKey("a")).toBe(false);
     expect(h.get("b")).toBe(12);
   });
 
@@ -334,14 +314,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(dup).toBeInstanceOf(HashWithIndifferentAccess);
     expect(dup).not.toBe(h);
     expect(dup.get("a")).toBe(1);
-  });
-
-  // flatten
-  it("flatten — returns flat array of key-value pairs", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const flat = h.flatten();
-    expect(flat).toContain("a");
-    expect(flat).toContain(1);
   });
 
   it("to options for hash with indifferent access", () => {
@@ -517,14 +489,14 @@ describe("HashWithIndifferentAccessTest", () => {
   it("indifferent replace", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 42 });
     h.replace({ b: 12 });
-    expect(h.has("a")).toBe(false);
+    expect(h.hasKey("a")).toBe(false);
     expect(h.get("b")).toBe(12);
   });
 
   it("replace with to hash conversion", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
     h.replace({ b: 2 });
-    expect(h.has("a")).toBe(false);
+    expect(h.hasKey("a")).toBe(false);
     expect(h.get("b")).toBe(2);
   });
 
@@ -556,7 +528,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("indifferent deleting", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.delete("a")).toBe(true);
-    expect(h.has("a")).toBe(false);
+    expect(h.hasKey("a")).toBe(false);
     expect(h.delete("a")).toBe(false);
   });
 
@@ -626,8 +598,8 @@ describe("HashWithIndifferentAccessTest", () => {
     // transformKeys returns new HWIA, original unchanged
     const h = new HashWithIndifferentAccess({ a: 1 });
     const transformed = h.transformKeys((k) => k.toUpperCase());
-    expect(h.has("a")).toBe(true);
-    expect(transformed.has("A")).toBe(true);
+    expect(h.hasKey("a")).toBe(true);
+    expect(transformed.hasKey("A")).toBe(true);
   });
 
   it("indifferent deep transform keys bang", () => {
@@ -665,7 +637,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const compacted = h.compact();
     expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
     expect(compacted.toHash()).toEqual({ a: 1, d: 2 });
-    expect(h.has("b")).toBe(true);
+    expect(h.hasKey("b")).toBe(true);
   });
 
   it("indifferent to hash", () => {
@@ -679,7 +651,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     const dup = h.withIndifferentAccess();
     dup.set("b", 2);
-    expect(h.has("b")).toBe(false);
+    expect(h.hasKey("b")).toBe(false);
   });
 
   it("indifferent hash with array of hashes", () => {
@@ -741,7 +713,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("argless default with existing nil key", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: null });
     expect(h.get("a")).toBeNull();
-    expect(h.has("a")).toBe(true);
+    expect(h.hasKey("a")).toBe(true);
   });
 
   it("default with argument", () => {
