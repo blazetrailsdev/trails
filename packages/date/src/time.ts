@@ -251,7 +251,11 @@ export class Time {
   /**
    * Ruby `Time.utc(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`.
    * MRI's seventh positional is the microsecond, not a zone — `Time.utc` names
-   * its zone in the method — so it folds into `sec` here.
+   * its zone in the method — so it folds into `sec` here. MRI holds the
+   * sub-second as a `Rational` (`time.c`, `time_s_mkutc` -> `time_new_timew`),
+   * so the fold goes through `Rational` rather than a double, and passing
+   * `usec` truncates `sec` to a whole second exactly as MRI's does:
+   * `Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec` is `5000`.
    */
   static utc(
     year: number,
@@ -260,7 +264,7 @@ export class Time {
     hour = 0,
     min = 0,
     sec: number | Rational = 0,
-    usec = 0,
+    usec?: number,
   ): Time {
     return new Time(
       year,
@@ -268,7 +272,11 @@ export class Time {
       day,
       hour,
       min,
-      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+      usec === undefined
+        ? sec
+        : new Rational(sec instanceof Rational ? sec.toI() : Math.trunc(sec), 1).add(
+            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+          ),
       "UTC",
     );
   }
@@ -276,7 +284,8 @@ export class Time {
   /**
    * Ruby `Time.mktime(year, month, day, hour = 0, min = 0, sec = 0, usec = 0)`,
    * the `Time.local` alias, which builds in the LOCAL zone. As with
-   * {@link Time.utc}, the seventh positional is the microsecond.
+   * {@link Time.utc}, the seventh positional is the microsecond, and passing it
+   * truncates `sec` to a whole second.
    */
   static mktime(
     year: number,
@@ -285,7 +294,7 @@ export class Time {
     hour = 0,
     min = 0,
     sec: number | Rational = 0,
-    usec = 0,
+    usec?: number,
   ): Time {
     return new Time(
       year,
@@ -293,7 +302,11 @@ export class Time {
       day,
       hour,
       min,
-      sec instanceof Rational ? sec.add(new Rational(usec, 1_000_000)) : sec + usec / 1_000_000,
+      usec === undefined
+        ? sec
+        : new Rational(sec instanceof Rational ? sec.toI() : Math.trunc(sec), 1).add(
+            new Rational(Math.round(usec * 1_000), 1_000_000_000),
+          ),
     );
   }
 

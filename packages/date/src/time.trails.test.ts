@@ -120,6 +120,30 @@ describe("Time", () => {
     expect(Time.utc(2008, 3, 1, 6, 0, 7.456789).nsec).toBe(456788999);
   });
 
+  it("the usec positional is exact, matching the Rational spelling", () => {
+    // ruby 3.3.11:
+    //   Time.utc(2005, 2, 27, 23, 50, 19, 275038).nsec  #=> 275038000
+    expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).toTime().epochNanoseconds).toBe(
+      Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toTime().epochNanoseconds,
+    );
+    expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).nsec).toBe(275038000);
+    expect(Time.mktime(2005, 2, 27, 23, 50, 19, 275038).toTime().epochNanoseconds).toBe(
+      Time.mktime(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toTime().epochNanoseconds,
+    );
+  });
+
+  it("a usec positional truncates sec to a whole second, as MRI's does", () => {
+    // ruby 3.3.11:
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec                #=> 5000
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec              #=> 500
+    //   Time.utc(2008, 3, 1, 6, 0, Rational(1, 3), 0).nsec     #=> 0
+    //   Time.utc(2008, 3, 1, 6, 0, 0.3).nsec                   #=> 299999999
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec).toBe(5000);
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec).toBe(500);
+    expect(Time.utc(2008, 3, 1, 6, 0, new Rational(1, 3), 0).nsec).toBe(0);
+    expect(Time.utc(2008, 3, 1, 6, 0, 0.3).nsec).toBe(299999999);
+  });
+
   it("Time.new takes a Rational second, as MRI's does", () => {
     // ruby 3.3.11:
     //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).nsec           #=> 333333333
