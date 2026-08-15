@@ -9,19 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association-scope.ts",
-    "rubyName": "add_constraints",
-    "call": "last_chain_scope",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:scope",
-      "ref:last",
-      "ref:owner"
-    ],
-    "reason": "association_scope.rb:125 `last_chain_scope(scope, chain.last, owner)` reads the target table off `reflection.klass`. For a polymorphic `belongs_to` the target class is not known at definition time and `reflection.klass` raises, so the runtime `klass` is threaded as a fourth argument; see the block comment at association-scope.ts:403-407."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association-scope.ts",
     "rubyName": "get_chain",
     "call": "drop",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

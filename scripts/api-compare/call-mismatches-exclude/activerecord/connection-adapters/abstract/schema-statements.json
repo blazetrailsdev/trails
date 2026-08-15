@@ -79,13 +79,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "index_name_exists?",
-    "call": "detect",
-    "reason": "RFC 0106: Rails' `detect` returns the Index (a value-returning predicate); the TS port returns boolean, so converging the call also changes the return type — filed as follow-up rather than done blind (schema_statements.rb:1524-1527)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "primary_key",
     "call": "primary_keys",
     "reason": "RFC 0106: the TS `primaryKey` switches on `adapterName` instead of delegating to a per-adapter `primaryKeys` — the adapter-layout deviation tracked by RFC 0023 (schema_statements.rb:145-149)."

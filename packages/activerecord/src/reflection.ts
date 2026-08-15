@@ -2205,12 +2205,15 @@ export class RuntimeReflection extends AbstractReflection {
     return this._association.klass;
   }
 
-  aliasedTable(): Table {
+  get aliasedTable(): Table {
     return (this.klass as any).arelTable;
   }
 
   get joinPrimaryKey(): string | string[] {
-    return (this._reflection as any).joinPrimaryKey;
+    // Rails: `def join_primary_key(klass = self.klass); @reflection.join_primary_key(klass); end`
+    // (reflection.rb:1275-1277) — the runtime klass is what makes a polymorphic
+    // belongs_to head resolvable.
+    return this.joinPrimaryKeyFor();
   }
 
   allIncludes(callback: () => any): any {
