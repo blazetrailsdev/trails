@@ -1016,7 +1016,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** Mirrors: AbstractMysqlAdapter#primary_keys (abstract_mysql_adapter.rb:585-598) */
   async primaryKeys(tableName: string): Promise<string[]> {
-    if (!isPresent(tableName)) throw new ArgumentError("");
+    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
 
     const scope = quotedScope.call(this, tableName);
 
