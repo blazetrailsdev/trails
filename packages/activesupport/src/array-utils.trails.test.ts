@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kernelArray } from "./array-utils.js";
+import { kernelArray, toFs } from "./array-utils.js";
 
 describe("KernelArrayTest (trails)", () => {
   it("returns an empty array for nil", () => {
@@ -36,5 +36,18 @@ describe("KernelArrayTest (trails)", () => {
   it("wraps a plain object, which defines neither to_ary nor to_a", () => {
     const obj = { a: 1 };
     expect(kernelArray(obj)).toEqual([obj]);
+  });
+});
+
+describe("ToFsTest (trails)", () => {
+  // Rails' own suite only covers the `:db` arm (core_ext/array/conversions_test.rb
+  // `test_to_fs_db`). The default arm is `Array#to_s`, which is `Array#inspect`
+  // and recurses; the expectation is MRI's own `[1, [2, "a"], {b: 3}, nil].to_s`.
+  it("default format inspects nested arrays and hashes", () => {
+    expect(toFs([1, [2, "a"], { b: 3 }, null])).toBe('[1, [2, "a"], {:b=>3}, nil]');
+  });
+
+  it("default format is the empty brackets for an empty array", () => {
+    expect(toFs([])).toBe("[]");
   });
 });
