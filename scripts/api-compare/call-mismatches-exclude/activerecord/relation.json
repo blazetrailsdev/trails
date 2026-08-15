@@ -262,6 +262,23 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "ids",
+    "call": "type_cast_pluck_values",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:result",
+      "ref:columns"
+    ],
+    "tsArgs": [
+      "ref:result",
+      "ref:columns",
+      "ref:this"
+    ],
+    "reason": "Per-entry verified (calculations.rb:402): Rails calls the private `type_cast_pluck_values` on implicit self. Its trails port is a module function in relation/calculations.ts taking the relation as its trailing parameter — the settled shape for a Ruby private method with no class member to hang on — so the call site carries a `this` the Ruby call has no slot for. The leading arguments match Rails one for one."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "ids",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -404,22 +421,5 @@
     "rubyName": "update_all",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "ids",
-    "call": "type_cast_pluck_values",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:result",
-      "ref:columns"
-    ],
-    "tsArgs": [
-      "ref:result",
-      "ref:columns",
-      "ref:this"
-    ],
-    "reason": "Per-entry verified (calculations.rb:402): Rails calls the private `type_cast_pluck_values` on implicit self. Its trails port is a module function in relation/calculations.ts taking the relation as its trailing parameter — the settled shape for a Ruby private method with no class member to hang on — so the call site carries a `this` the Ruby call has no slot for. The leading arguments match Rails one for one."
   }
 ]

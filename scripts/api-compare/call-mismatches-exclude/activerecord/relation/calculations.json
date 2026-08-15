@@ -174,54 +174,15 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `select_values.empty?` (calculations.rb:646) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_cast_pluck_values",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_cast_pluck_values",
-    "call": "lookup_cast_type_from_join_dependencies",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_cast_pluck_values",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_for",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
     "rubyName": "perform_calculation",
-    "call": "select_for_count",
+    "call": "distinct_select?",
     "kind": "args",
-    "rubyArgs": [],
+    "rubyArgs": [
+      "ref:columnName"
+    ],
     "tsArgs": [
-      "ref:rel"
+      "ref:rel",
+      "ref:columnName"
     ],
     "reason": "Per-entry verified (calculations.rb:434-458): Rails' `perform_calculation` calls these four private siblings on implicit self. Their trails ports are module functions in this same file taking the relation as their first parameter — the settled shape for a Ruby private method with no class member to hang on — so each call site carries a leading `rel` the Ruby call has no slot for. The remaining arguments match Rails one for one."
   },
@@ -237,21 +198,6 @@
     "tsArgs": [
       "ref:rel",
       "ref:selectForCount"
-    ],
-    "reason": "Per-entry verified (calculations.rb:434-458): Rails' `perform_calculation` calls these four private siblings on implicit self. Their trails ports are module functions in this same file taking the relation as their first parameter — the settled shape for a Ruby private method with no class member to hang on — so each call site carries a leading `rel` the Ruby call has no slot for. The remaining arguments match Rails one for one."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "perform_calculation",
-    "call": "distinct_select?",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:columnName"
-    ],
-    "tsArgs": [
-      "ref:rel",
-      "ref:columnName"
     ],
     "reason": "Per-entry verified (calculations.rb:434-458): Rails' `perform_calculation` calls these four private siblings on implicit self. Their trails ports are module functions in this same file taking the relation as their first parameter — the settled shape for a Ruby private method with no class member to hang on — so each call site carries a leading `rel` the Ruby call has no slot for. The remaining arguments match Rails one for one."
   },
@@ -292,5 +238,59 @@
       "ref:distinct"
     ],
     "reason": "Per-entry verified (calculations.rb:434-458): Rails' `perform_calculation` calls these four private siblings on implicit self. Their trails ports are module functions in this same file taking the relation as their first parameter — the settled shape for a Ruby private method with no class member to hang on — so each call site carries a leading `rel` the Ruby call has no slot for. The remaining arguments match Rails one for one."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "perform_calculation",
+    "call": "select_for_count",
+    "kind": "args",
+    "rubyArgs": [],
+    "tsArgs": [
+      "ref:rel"
+    ],
+    "reason": "Per-entry verified (calculations.rb:434-458): Rails' `perform_calculation` calls these four private siblings on implicit self. Their trails ports are module functions in this same file taking the relation as their first parameter — the settled shape for a Ruby private method with no class member to hang on — so each call site carries a leading `rel` the Ruby call has no slot for. The remaining arguments match Rails one for one."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "select_for_count",
+    "call": "empty?",
+    "reason": "Verified per-site (RFC 0106): `select_values.empty?` (calculations.rb:646) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "select_for_count",
+    "call": "with_connection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_cast_pluck_values",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_cast_pluck_values",
+    "call": "lookup_cast_type_from_join_dependencies",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_cast_pluck_values",
+    "call": "size",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_for",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
