@@ -3537,7 +3537,7 @@ export class Relation<T extends Base> {
     // Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
     if (this._whereClause.isContradiction()) {
-      return this.typeCastPluckValues(Result.empty(), columns);
+      return typeCastPluckValues(Result.empty(), columns, this as any);
     }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
