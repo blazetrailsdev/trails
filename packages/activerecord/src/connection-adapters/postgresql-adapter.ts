@@ -1,5 +1,11 @@
 import pg from "pg";
-import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
+import {
+  type Type,
+  ValueType,
+  ArgumentError,
+  BinaryData,
+  TimeType,
+} from "@blazetrails/activemodel";
 import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
@@ -32,7 +38,10 @@ import { Money } from "./postgresql/oid/money.js";
 import {
   initializeInstanceTypeMap,
   initializeTypeMap as staticInitializeTypeMap,
+  registerClassWithPrecision,
 } from "./postgresql/type-map-init.js";
+import { Timestamp } from "./postgresql/oid/timestamp.js";
+import { TimestampWithTimeZone } from "./postgresql/oid/timestamp-with-time-zone.js";
 import { inspectExplainOption } from "./abstract/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -921,7 +930,7 @@ export class PostgreSQLAdapter
    * guard narrows soundly to that type — no cast — mirroring Ruby's implicit
    * assumption that PG always builds its type_map as a HashLookupTypeMap.
    */
-  static initializeTypeMap(m: TypeMap): void {
+  static initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
     if (!(m instanceof HashLookupTypeMap)) {
       throw new TypeError("initializeTypeMap expects a HashLookupTypeMap");
     }
@@ -947,6 +956,29 @@ export class PostgreSQLAdapter
       initializeInstanceTypeMap(this._typeMap, ActiveRecord.defaultTimezone);
     }
     return this._typeMap;
+  }
+
+  /**
+   * Mirrors: PostgreSQLAdapter#initialize_type_map (postgresql_adapter.rb:744-751)
+   * — the private instance initializer that layers the timezone-aware
+   * `time` / `timestamp` / `timestamptz` registrations on top of the
+   * class-level seed and then pulls the connection's user-defined types.
+   *
+   * Async where Rails is sync: `load_additional_types` is a pg_type query, so
+   * the tail of the body is a Promise. That is why the `type_map` getter —
+   * which must stay sync — seeds only the sync half (`initializeInstanceTypeMap`)
+   * and leaves the `loadAdditionalTypes` tail to the async callers
+   * (`reloadTypeMap`, `getOidType`, `columns`).
+   */
+  private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {
+    PostgreSQLAdapter.initializeTypeMap(m);
+
+    const timezone = ActiveRecord.defaultTimezone;
+    registerClassWithPrecision(m, "time", TimeType, { timezone });
+    registerClassWithPrecision(m, "timestamp", Timestamp, { timezone });
+    registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);
+
+    await this.loadAdditionalTypes();
   }
 
   /**
@@ -1276,8 +1308,13 @@ export class PostgreSQLAdapter
     // type map absent across an await, so without the lock a concurrent
     // reader — or a second reloadTypeMap — observes a null map mid-reload.
     return this.lock.synchronize(async () => {
-      this._typeMap = null;
-      await this.loadAdditionalTypes();
+      if (this._typeMap) {
+        this.typeMap.clear();
+      } else {
+        this._typeMap = new HashLookupTypeMap();
+      }
+
+      await this.initializeTypeMap();
       // A type-map reload signals the database's type universe changed — an
       // extension or user type (hstore, enum, composite) was created or dropped,
       // reassigning OIDs. A cached prepared statement that bound or returned one
@@ -2279,24 +2316,29 @@ export class PostgreSQLAdapter
     binds: unknown[] = [],
     options: ExplainOption[] = [],
   ): Promise<string> {
-    const clause = await this._explainStatementClause(options);
-    const result = await this.internalExecQuery(`${clause} ${sql}`, "EXPLAIN", binds);
+    const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(sql, binds);
+    const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
     return printer.pp(result.toArray());
   }
 
   /**
-   * Build the printed header prefix used by `Relation#explain`. PG
-   * accepts the boolean flags in `EXPLAIN_FLAGS` plus a `format`
-   * keyword (`{ format: "json" }`), composed into the same clause shape
-   * the adapter sends to the server: `EXPLAIN (ANALYZE, FORMAT JSON) for:`.
+   * The EXPLAIN clause — both the statement PG executes and the header
+   * `Relation#explain` prints, exactly as in Rails, where `explain` composes
+   * its SQL out of this same method (`postgresql/database_statements.rb:8`).
+   * The trailing `" for:"` belongs only to `ActiveRecord::Explain`'s fallback
+   * for adapters that do not define `build_explain_clause`
+   * (`explain.rb:56-61`) — an adapter that defines it must not append it.
+   * PG accepts the boolean flags in `EXPLAIN_FLAGS` plus a `format` keyword
+   * (`{ format: "json" }`): `EXPLAIN (ANALYZE, FORMAT JSON)`.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#build_explain_clause
+   * (postgresql/database_statements.rb:96-100)
    */
   override async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
-    if (options.length === 0) return "EXPLAIN for:";
+    if (options.length === 0) return "EXPLAIN";
     const parts = this._validateExplainOptions(options);
-    return `EXPLAIN (${parts.join(", ")}) for:`;
+    return `EXPLAIN (${parts.join(", ")})`;
   }
 
   /**
@@ -2356,18 +2398,6 @@ export class PostgreSQLAdapter
       seenFormat = true;
     }
     return parts;
-  }
-
-  /**
-   * Compose the actual `EXPLAIN ...` SQL statement clause that prefixes
-   * the query — distinct from `buildExplainClause`, which builds the
-   * printed header. Options are validated against the adapter's
-   * allowlist before interpolation.
-   */
-  private async _explainStatementClause(options: ExplainOption[]): Promise<string> {
-    if (options.length === 0) return "EXPLAIN";
-    const validated = this._validateExplainOptions(options);
-    return `EXPLAIN (${validated.join(", ")})`;
   }
 
   // Mirrors: PostgreSQLAdapter.native_database_types (postgresql_adapter.rb:404)
@@ -2435,7 +2465,7 @@ export class PostgreSQLAdapter
 
   // Mirrors: PostgreSQLAdapter#set_standard_conforming_strings (postgresql_adapter.rb:412)
   async setStandardConformingStrings(): Promise<void> {
-    await this.execute("SET standard_conforming_strings = on");
+    await this.internalExecute("SET standard_conforming_strings = on", "SCHEMA");
   }
 
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
@@ -2467,12 +2497,8 @@ export class PostgreSQLAdapter
    */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
-      const rows = (
-        await this.internalExecQuery("SHOW max_identifier_length", "SCHEMA")
-      ).toArray() as Array<{
-        max_identifier_length: string;
-      }>;
-      this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
+      const value = await this.queryValue("SHOW max_identifier_length", "SCHEMA");
+      this._maxIdentifierLength = parseInt(String(value ?? "63"), 10);
     }
     return this._maxIdentifierLength;
   }
@@ -2482,7 +2508,9 @@ export class PostgreSQLAdapter
   async sessionAuth(user: string): Promise<void> {
     await this.clearCacheBang();
     const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
-    await this.execute(`SET SESSION AUTHORIZATION ${quoted}`);
+    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, {
+      materializeTransactions: true,
+    });
   }
 
   // Mirrors: PostgreSQLAdapter#use_insert_returning? (postgresql_adapter.rb:630)
@@ -3356,10 +3384,8 @@ export class PostgreSQLAdapter
    * @internal
    */
   async lookupCastType(sqlType: string | null): Promise<Type> {
-    const rows = (
-      await this.internalExecQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`, "SCHEMA")
-    ).toArray();
-    return this.typeMap.lookup(Number(rows[0]?.oid));
+    const oid = await this.queryValue(`SELECT ${this.quote(sqlType)}::regtype::oid`, "SCHEMA");
+    return this.typeMap.lookup(Number(oid));
   }
 
   /**
@@ -3968,8 +3994,10 @@ export class PostgreSQLAdapter
     return new PgSchemaCreation(this);
   }
 
+  // Mirrors: PostgreSQL::SchemaStatements#create_schema_dumper
+  // (postgresql/schema_statements.rb:884) — `PostgreSQL::SchemaDumper.create(self, options)`.
   createSchemaDumper(source: SchemaSource, options: Record<string, unknown> = {}): PgSchemaDumper {
-    return new PgSchemaDumper(source, options);
+    return PgSchemaDumper.create(source, options);
   }
 
   /** @internal */
