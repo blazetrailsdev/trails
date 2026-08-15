@@ -303,7 +303,7 @@ export class GID {
 
   /** @internal Mirrors URI::GID#set_path — re-parses model components from path. */
   protected setPath(path: string): void {
-    if (!this.modelName || !this.modelId) this.setModelComponents(path);
+    if (!("modelName" in this._components) || !this.modelId) this.setModelComponents(path);
   }
   /** @internal Mirrors URI::GID#query= — assigns parsed params via a setter. */
   protected set query(query: string | undefined) {
