@@ -139,7 +139,7 @@ export class InsertAll {
     let message = `${this.model.name} `;
     if (this.inserts.length > 1) message += "Bulk ";
     message += this.onDuplicate === "update" ? "Upsert" : "Insert";
-    return this.connection.execInsertAll(this.toSql(), message);
+    return this.connection.execInsertAll(await this.toSql(), message);
   }
 
   /**
@@ -147,7 +147,7 @@ export class InsertAll {
    * dialect-specific statement from the Builder's fragments.
    * @internal
    */
-  toSql(): string {
+  async toSql(): Promise<string> {
     return this.connection.buildInsertSql(
       new Builder(this, this.connection.adapterName as AdapterName),
     );
@@ -582,6 +582,8 @@ export class InsertAll {
  * step but isn't part of this contract.
  */
 export interface InsertBuilder {
+  /** Mirrors Rails `InsertAll::Builder`’s `attr_reader :model` (insert_all.rb:226). */
+  readonly model: ModelClass;
   into(): string;
   conflictTarget(): string;
   returning(): string | undefined;

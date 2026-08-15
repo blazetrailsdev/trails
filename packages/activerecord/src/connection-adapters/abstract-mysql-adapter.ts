@@ -87,7 +87,13 @@ import {
   tableAliasLength as mysqlTableAliasLength,
   MysqlSchemaStatements,
 } from "./mysql/schema-statements.js";
-import { compactBlank, include, isPresent, presence } from "@blazetrails/activesupport";
+import {
+  compactBlank,
+  include,
+  isPresent,
+  parameterize,
+  presence,
+} from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
 import {
@@ -1096,25 +1102,56 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_insert_sql.
-  override buildInsertSql(insert: InsertBuilder): string {
-    let sql = `INSERT ${insert.into()}`;
+  override async buildInsertSql(insert: InsertBuilder): Promise<string> {
+    // Can use any column as it will be assigned to itself.
     const noOpColumn = insert.firstColumn();
 
-    if (insert.skipDuplicates()) {
-      if (noOpColumn) {
-        sql += ` ON DUPLICATE KEY UPDATE ${noOpColumn}=${noOpColumn}`;
+    // MySQL 8.0.19 replaces `VALUES(<expression>)` clauses with row and column alias names, see https://dev.mysql.com/worklog/task/?id=6312 .
+    // then MySQL 8.0.20 deprecates the `VALUES(<expression>)` see https://dev.mysql.com/worklog/task/?id=13325 .
+    let sql: string;
+    if (await this.supportsInsertRawAliasSyntax()) {
+      const quotedTableName = insert.model.quotedTableName();
+      const valuesAlias = this.quoteTableName(`${parameterize(insert.model.tableName)}_values`);
+      sql = `INSERT ${insert.into()} AS ${valuesAlias}`;
+
+      if (insert.skipDuplicates()) {
+        if (noOpColumn) {
+          sql += ` ON DUPLICATE KEY UPDATE ${noOpColumn}=${quotedTableName}.${noOpColumn}`;
+        }
+      } else if (insert.updateDuplicates()) {
+        const raw = insert.rawUpdateSql();
+        if (raw) {
+          sql = `INSERT ${insert.into()} ON DUPLICATE KEY UPDATE ${raw.value}`;
+        } else {
+          sql += " ON DUPLICATE KEY UPDATE ";
+          sql += insert.touchModelTimestampsUnless(
+            (column) => `${quotedTableName}.${column}<=>${valuesAlias}.${column}`,
+          );
+          sql += insert
+            .updatableColumns()
+            .map((column) => `${column}=${valuesAlias}.${column}`)
+            .join(",");
+        }
       }
-    } else if (insert.updateDuplicates()) {
-      const raw = insert.rawUpdateSql();
-      if (raw) {
-        sql += ` ON DUPLICATE KEY UPDATE ${raw.value}`;
-      } else {
+    } else {
+      sql = `INSERT ${insert.into()}`;
+
+      if (insert.skipDuplicates()) {
+        if (noOpColumn) {
+          sql += ` ON DUPLICATE KEY UPDATE ${noOpColumn}=${noOpColumn}`;
+        }
+      } else if (insert.updateDuplicates()) {
         sql += " ON DUPLICATE KEY UPDATE ";
-        sql += insert.touchModelTimestampsUnless((column) => `${column}<=>VALUES(${column})`);
-        sql += insert
-          .updatableColumns()
-          .map((column) => `${column}=VALUES(${column})`)
-          .join(",");
+        const raw = insert.rawUpdateSql();
+        if (raw) {
+          sql += raw.value;
+        } else {
+          sql += insert.touchModelTimestampsUnless((column) => `${column}<=>VALUES(${column})`);
+          sql += insert
+            .updatableColumns()
+            .map((column) => `${column}=VALUES(${column})`)
+            .join(",");
+        }
       }
     }
 

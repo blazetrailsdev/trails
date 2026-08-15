@@ -1958,7 +1958,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#build_insert_sql.
-  override buildInsertSql(insert: InsertBuilder): string {
+  override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     let sql = `INSERT ${insert.into()}`;
 
     if (insert.skipDuplicates()) {
