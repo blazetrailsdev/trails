@@ -1,62 +1,35 @@
 /**
  * Transliterate accented/special characters to ASCII approximations.
- * Mirrors ActiveSupport::Inflector.transliterate behavior.
+ *
+ * Mirrors: ActiveSupport::Inflector (inflector/transliterate.rb).
  */
 
-// Map of characters that NFD decomposition doesn't handle well
-const APPROXIMATIONS: Record<string, string> = {
-  Æ: "AE",
-  æ: "ae",
-  Œ: "OE",
-  œ: "oe",
-  Ð: "D",
-  ð: "d",
-  Þ: "Th",
-  þ: "th",
-  ß: "ss",
-  Ø: "O",
-  ø: "o",
-  Ł: "L",
-  ł: "l",
-  Đ: "D",
-  đ: "d",
-  Ħ: "H",
-  ħ: "h",
-  Ŋ: "N",
-  ŋ: "n",
-  Ŧ: "T",
-  ŧ: "t",
-  ĸ: "k",
-  Ĳ: "IJ",
-  ĳ: "ij",
-  ﬁ: "fi",
-  ﬂ: "fl",
-};
+import { I18n } from "./i18n.js";
 
 /**
- * Replaces non-ASCII characters with ASCII approximations.
- * Characters that can't be approximated are replaced with `replacement`.
+ * Replaces non-ASCII characters with an ASCII approximation, or if none
+ * exists, a replacement character which defaults to "?".
+ *
+ * This method is I18n aware, so you can set up custom approximations for a
+ * locale by storing them under the `i18n.transliterate.rule` key
+ * (inflector/transliterate.rb:19-52).
+ *
+ * Mirrors: `Inflector.transliterate` (inflector/transliterate.rb:64-95).
+ * Ruby's encoding arms (ALLOWED_ENCODINGS_FOR_TRANSLITERATE, `force_encoding`,
+ * `tidy_bytes`, and the closing re-encode) have no analogue: a JS string has no
+ * encoding to check, transcode, or restore, and no invalid bytes to tidy — the
+ * `unicode_normalize(:nfc)` is all that survives of that pipeline.
  */
-export function transliterate(str: string | null | undefined, replacement = "?"): string {
-  if (str == null) return "";
-  const s = String(str);
-  if (s.length === 0) return s;
+export function transliterate(
+  string: string | null | undefined,
+  replacement = "?",
+  { locale = null }: { locale?: string | null } = {},
+): string {
+  if (string == null) return "";
+  string = String(string);
+  if (string.length === 0) return string;
 
-  // First apply manual approximations
-  let result = s;
-  for (const [char, approx] of Object.entries(APPROXIMATIONS)) {
-    result = result.split(char).join(approx);
-  }
-
-  // Then use NFD normalization to decompose accented chars,
-  // then strip combining marks
-  result = result.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  // Replace any remaining non-ASCII chars with replacement
-  // eslint-disable-next-line no-control-regex
-  result = result.replace(/[^\x00-\x7F]/g, replacement);
-
-  return result;
+  return I18n.transliterate(string.normalize("NFC"), { replacement, locale }) as string;
 }
 
 /**
@@ -64,17 +37,18 @@ export function transliterate(str: string | null | undefined, replacement = "?")
  * "pretty" URL.
  *
  * Mirrors: `Inflector.parameterize`
- * (`inflector/transliterate.rb:123-147`). Rails forwards a `locale:` kwarg to
- * `transliterate`, which selects that locale's `i18n.transliterate.rule`;
- * trails' `transliterate` has no locale arm yet, so there is nothing to
- * forward it to.
+ * (`inflector/transliterate.rb:123-147`).
  */
 export function parameterize(
   string: string,
-  { separator = "-", preserveCase = false }: { separator?: string; preserveCase?: boolean } = {},
+  {
+    separator = "-",
+    preserveCase = false,
+    locale = null,
+  }: { separator?: string; preserveCase?: boolean; locale?: string | null } = {},
 ): string {
   // Replace accented chars with their ASCII equivalents.
-  let parameterizedString = transliterate(string);
+  let parameterizedString = transliterate(string, "?", { locale });
 
   // Turn unwanted chars into the separator.
   parameterizedString = parameterizedString.replace(/[^a-z0-9\-_]+/gi, separator);

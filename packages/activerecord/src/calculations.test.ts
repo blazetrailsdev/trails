@@ -1911,15 +1911,31 @@ describe("CalculationsTest", () => {
   });
 
   it("#skip_query_cache! for a simple calculation", async () => {
-    const r1 = await Account.calculate("sum", "credit_limit");
-    const r2 = await Account.all().calculate("sum", "credit_limit");
-    expect(r1).toBe(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.calculate("sum", "credit_limit");
+        await Account.calculate("sum", "credit_limit");
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
+        await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
+      });
+    });
   });
 
   it("#skip_query_cache! for a grouped calculation", async () => {
-    const r1 = await Account.group("firm_id").calculate("sum", "credit_limit");
-    const r2 = await Account.all().group("firm_id").calculate("sum", "credit_limit");
-    expect(r1).toEqual(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.group("firm_id").calculate("sum", "credit_limit");
+        await Account.group("firm_id").calculate("sum", "credit_limit");
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
+        await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
+      });
+    });
   });
 
   it("group alias is properly quoted", async () => {

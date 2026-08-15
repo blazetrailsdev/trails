@@ -1,8 +1,23 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
+import { I18n } from "./i18n.js";
 import { transliterate } from "./transliterate.js";
 
 describe("TransliterateTest", () => {
+  // abstract_unit.rb:35 — Active Support's suite runs with
+  // `I18n.enforce_available_locales = false`, which is what lets a locale
+  // carrying nothing but an `i18n.transliterate.rule` be looked up at all
+  // (a translations hash holding only `:i18n` is not an available locale —
+  // i18n/backend/simple.rb#available_locales).
+  let enforceAvailableLocales: boolean;
+  beforeAll(() => {
+    enforceAvailableLocales = I18n.config().enforceAvailableLocales;
+    I18n.config().enforceAvailableLocales = false;
+  });
+  afterAll(() => {
+    I18n.config().enforceAvailableLocales = enforceAvailableLocales;
+  });
+
   it("transliterate should not change ascii chars", () => {
     expect(transliterate("Hello World")).toBe("Hello World");
     expect(transliterate("abc123!@#")).toBe("abc123!@#");
@@ -16,8 +31,23 @@ describe("TransliterateTest", () => {
     expect(transliterate("Ö")).toBe("O");
   });
 
-  it.skip("transliterate should work with custom i18n rules and uncomposed utf8");
-  it.skip("transliterate respects the locale argument");
+  it("transliterate should work with custom i18n rules and uncomposed utf8", () => {
+    const char = "\u0075\u0308"; // "ü" as ASCII "u" plus COMBINING DIAERESIS
+    I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
+    const defaultLocale = I18n.locale();
+    I18n.setLocale("de");
+    try {
+      expect(transliterate(char)).toBe("ue");
+    } finally {
+      I18n.setLocale(defaultLocale);
+    }
+  });
+
+  it("transliterate respects the locale argument", () => {
+    const char = "\u0075\u0308"; // "ü" as ASCII "u" plus COMBINING DIAERESIS
+    I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
+    expect(transliterate(char, "?", { locale: "de" })).toBe("ue");
+  });
 
   it("transliterate should allow a custom replacement char", () => {
     expect(transliterate("hello 日本語 world", "*")).toBe("hello *** world");
