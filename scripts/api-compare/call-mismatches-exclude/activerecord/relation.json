@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "_increment_attribute",
-    "call": "build_bind_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "_substitute_values",
     "call": "build_bind_attribute",
     "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
@@ -116,13 +109,6 @@
     "tsFile": "relation.ts",
     "rubyName": "batch_on_unloaded_relation",
     "call": "where",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "bind_attribute",
-    "call": "build_bind_attribute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -297,13 +283,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_main_query",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -320,13 +299,6 @@
     "rubyName": "exec_queries",
     "call": "preload_associations",
     "reason": "Newly comparable (RFC 0072 arity sweep): relation.ts has no `execQueries` — Rails' exec_queries body is split across `load`/`_executeEagerLoad`, which DO call preloadAssociations. Converge by porting exec_queries as one method."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_queries",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -451,13 +423,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exists?",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exists?",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -502,13 +467,6 @@
     "rubyName": "ids",
     "call": "empty",
     "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "ids",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -651,13 +609,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "pluck",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "pluck",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -701,13 +652,6 @@
     "tsFile": "relation.ts",
     "rubyName": "select_for_count",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "skip_query_cache_if_necessary",
-    "call": "uncached",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -134,9 +134,9 @@ export class EncryptedFile {
   ): Promise<void> {
     const fs = await getFsAsync();
     const path = await getPathAsync();
-    const resolved = await this.resolveContentPath();
-    const base = path.basename(resolved).replace(/\.enc$/, "");
-    const dir = await fs.mkdtemp!(`${path.dirname(resolved)}${path.sep}encfile-`);
+    const contentPath = await this.resolveContentPath();
+    const base = path.basename(contentPath).replace(/\.enc$/, "");
+    const dir = await fs.mkdtemp!(`${path.dirname(contentPath)}${path.sep}encfile-`);
     const tmpPath = path.join(dir, `-${base}`);
     try {
       // Rails uses Ruby `Tempfile.create`, which defaults to mode 0600.

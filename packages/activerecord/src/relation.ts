@@ -3657,7 +3657,9 @@ export class Relation<T extends Base> {
     this._applyCtesAndAnnotationsToManager(manager);
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
-    const result = await this._conn().selectAll(pluckSql, `${this.model.name} Pluck`, pluckBinds);
+    const result = await this.skipQueryCacheIfNecessary(() =>
+      this._conn().selectAll(pluckSql, `${this.model.name} Pluck`, pluckBinds),
+    );
 
     // Type-cast results positionally through each result column's type
     // (model attribute type → join dependency → driver OID → identity),
@@ -3713,17 +3715,18 @@ export class Relation<T extends Base> {
     await this._materializeDeferredDistinctPkPredicates();
 
     const table = this.table;
+    // Mirrors Rails relation.rb:593-599: bump locking_column when omitted, into
+    // the updates hash, so _substituteValues sees it on its arel-node arm.
+    if (
+      this.model.lockingEnabled &&
+      !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
+    ) {
+      const attr = table.get(this.model.lockingColumn);
+      updates[attr.name] = this._incrementAttribute(attr);
+    }
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = this._substituteValues(
       Object.entries(updates),
     );
-    // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
-    // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
-    if (this.model.lockingEnabled) {
-      const lockingCol = this.model.lockingColumn;
-      if (!Object.prototype.hasOwnProperty.call(updates, lockingCol)) {
-        updateValues.push([table.get(lockingCol), this._incrementAttribute(lockingCol)]);
-      }
-    }
     return this._execUpdateAll(updateValues);
   }
 
@@ -6392,8 +6395,21 @@ export class Relation<T extends Base> {
     return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
   }
 
-  bindAttribute(column: string, value: unknown): unknown {
-    return this.predicateBuilder.build(this.table.get(column), value);
+  // Mirrors relation.rb:102-111.
+  bindAttribute<R>(name: string, value: unknown, block: (attr: any, bind: any) => R): R {
+    const reflection = this.model._reflectOnAssociation(name);
+    if (reflection) {
+      name = reflection.foreignKey as string;
+      if (value != null) {
+        value = (value as { readAttribute(n: string): unknown }).readAttribute(
+          reflection.associationPrimaryKey as string,
+        );
+      }
+    }
+
+    const attr = this.table.get(name);
+    const bind = this.predicateBuilder.buildBindAttribute(attr.name, value);
+    return block(attr, bind);
   }
 
   /**
@@ -6918,25 +6934,34 @@ export class Relation<T extends Base> {
     });
   }
 
+  // Mirrors relation.rb:1396-1401.
   private _incrementAttribute(attribute: any, value = 1): any {
-    const unqual = new Nodes.UnqualifiedColumn(
-      typeof attribute === "string" ? this.table.get(attribute) : attribute,
-    );
-    const coalesced = new Nodes.NamedFunction("COALESCE", [unqual, new Nodes.Quoted(0)]);
-    const bind = new Nodes.Quoted(Math.abs(value));
-    return value < 0 ? new Nodes.Subtraction(coalesced, bind) : new Nodes.Addition(coalesced, bind);
+    const bind = this.predicateBuilder.buildBindAttribute(attribute.name, Math.abs(value));
+    // Rails passes the bare Integer `0`; the to_sql visitor dispatches on the
+    // Ruby class, and trails' visitor does the same for a JS number.
+    const expr = this.table.coalesce(
+      new Nodes.UnqualifiedColumn(attribute),
+      0 as unknown as Nodes.Node,
+    ) as Nodes.Node;
+    // Arel's `-`/`+` wrap the operation in a Grouping; Rails unwraps it again
+    // with `.expr`, so build the bare operation node here.
+    return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
   private async execQueries(): Promise<T[]> {
-    const rows = await this.execMainQuery();
-    return this.instantiateRecords(rows);
+    return this.skipQueryCacheIfNecessary(async () => {
+      const rows = await this.execMainQuery();
+      return this.instantiateRecords(rows);
+    });
   }
 
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
     if (this._isNone) return [];
-    const sql = this._toSql();
-    const result = await this._conn().execute(sql, this._lastSelectBinds);
-    return result;
+    return this.skipQueryCacheIfNecessary(async () => {
+      const sql = this._toSql();
+      const result = await this._conn().execute(sql, this._lastSelectBinds);
+      return result;
+    });
   }
 
   private instantiateRecords(rows: Record<string, unknown>[]): T[] {
@@ -6944,7 +6969,11 @@ export class Relation<T extends Base> {
     return rows.map((row) => this.model._instantiate(row) as T);
   }
 
-  private skipQueryCacheIfNecessary<R>(block: () => R): R {
+  // Mirrors relation.rb:1466-1472.
+  private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
+    if (this.skipQueryCacheValue) {
+      return this.model.uncached(block);
+    }
     return block();
   }
 

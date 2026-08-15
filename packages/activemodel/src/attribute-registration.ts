@@ -278,8 +278,8 @@ export function applyPendingAttributeModifications(
   cls: AttributeHostInternals,
   attributeSet: AttributeSet,
 ): void {
-  for (const mod of collectPendingModifications(cls)) {
-    mod.applyTo(attributeSet, cls);
+  for (const modification of collectPendingModifications(cls)) {
+    modification.applyTo(attributeSet, cls);
   }
 }
 

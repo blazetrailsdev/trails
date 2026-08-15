@@ -5,7 +5,7 @@ export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions
   protected convert(): string {
     const { areaCode = false, extension, countryCode } = this.opts;
     let str = this.countryCode(countryCode);
-    str += this.convertToPhoneNumber(String(this.number).replace(/\D/g, ""));
+    str += this.convertToPhoneNumber(String(this.number).trim());
     str += this.phoneExt(extension);
     return str;
   }
