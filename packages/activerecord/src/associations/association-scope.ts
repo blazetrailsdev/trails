@@ -1014,7 +1014,8 @@ export class AssociationScope {
     if (namedInner.length > 0) {
       if (sameKlass) {
         for (const v of namedInner)
-          if (!target.joinsValues.includes(v)) target._joinsValues.push(v);
+          if (!target.joinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+            target._joinsValues.push(v);
       } else {
         target._joinsValues.push(
           constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
