@@ -9,7 +9,7 @@
       "ref:fields",
       "ref:toA"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "mysql2/database_statements.rb:119 `ActiveRecord::Result.new(fields, raw_result.to_a)` leaves column types to the adapter's type map, which is keyed by the MySQL type name the C driver exposes on the result. node's mysql2 surfaces per-field type metadata only on the raw result, so `buildColumnTypes(rawResult.fields, ...)` resolves them here and passes them as Result's third (optional) argument."
   },
   {
     "package": "activerecord",

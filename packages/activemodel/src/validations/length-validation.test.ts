@@ -202,7 +202,9 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({});
-    // null is skipped by length validator
+    expect(await p.isInvalid()).toBe(true);
+
+    p.title = "";
     expect(await p.isValid()).toBe(true);
   });
 

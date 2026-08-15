@@ -25,18 +25,18 @@ describe("ImmutableStringTest", () => {
     assertSame(s, type.deserialize(s));
   });
 
-  it("custom trueString is returned for true", () => {
-    const type = new ImmutableStringType({ trueString: "aye" });
+  it("custom true is returned for true", () => {
+    const type = new ImmutableStringType({ true: "aye" });
     expect(type.cast(true)).toBe("aye");
   });
 
-  it("custom falseString is returned for false", () => {
-    const type = new ImmutableStringType({ falseString: "nay" });
+  it("custom false is returned for false", () => {
+    const type = new ImmutableStringType({ false: "nay" });
     expect(type.cast(false)).toBe("nay");
   });
 
-  it("custom trueString and falseString both work", () => {
-    const type = new ImmutableStringType({ trueString: "aye", falseString: "nay" });
+  it("custom true and false both work", () => {
+    const type = new ImmutableStringType({ true: "aye", false: "nay" });
     expect(type.cast(true)).toBe("aye");
     expect(type.cast(false)).toBe("nay");
   });
@@ -58,7 +58,7 @@ describe("ImmutableStringTest", () => {
   });
 
   it("cast then serialize of custom-true value preserves the string", () => {
-    const type = new ImmutableStringType({ trueString: "aye" });
+    const type = new ImmutableStringType({ true: "aye" });
     const cast = type.cast(true);
     expect(type.serialize(cast)).toBe("aye");
   });

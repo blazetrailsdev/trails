@@ -95,10 +95,14 @@ export class AttributeMethodPattern {
   readonly parameters: string;
   readonly method_missing_target: string;
 
-  constructor(prefix: string = "", suffix: string = "", parameters?: string) {
+  constructor({
+    prefix = "",
+    suffix = "",
+    parameters = null,
+  }: { prefix?: string; suffix?: string; parameters?: string | null } = {}) {
     this.prefix = prefix;
     this.suffix = suffix;
-    this.parameters = parameters === undefined ? "..." : parameters;
+    this.parameters = parameters === null ? "..." : parameters;
     this.proxyTarget = `${prefix}attribute${suffix}`;
     this.method_missing_target = `attribute_${prefix}${suffix ? `${suffix}` : ""}`;
   }
@@ -243,21 +247,33 @@ export function _readAttribute(
   return this._attributes?.fetchValue(attr, block) ?? null;
 }
 
-// -- Public ClassMethods (use `this`, assigned to Model directly) -----------
-
-export function attributeMethodPrefix(this: AttributeMethodHost, ...prefixes: string[]): void {
+/**
+ * Mirrors Rails' `attribute_method_prefix(*prefixes, parameters: nil)`. TS
+ * forbids a keyword after a rest element, so the trailing `parameters:` hash
+ * rides in the splat and is peeled off — the same shape `touch(*names, time:)`
+ * uses in `activerecord/timestamp.ts`.
+ */
+export function attributeMethodPrefix(
+  this: AttributeMethodHost,
+  ...prefixes: Array<string | { parameters?: string | null }>
+): void {
+  const parameters = extractParameters(prefixes);
   ensureOwnPatterns(this);
-  for (const prefix of prefixes) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern(prefix, ""));
+  for (const prefix of prefixes as string[]) {
+    this._attributeMethodPatterns.push(new AttributeMethodPattern({ prefix, parameters }));
   }
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
 }
 
-export function attributeMethodSuffix(this: AttributeMethodHost, ...suffixes: string[]): void {
+export function attributeMethodSuffix(
+  this: AttributeMethodHost,
+  ...suffixes: Array<string | { parameters?: string | null }>
+): void {
+  const parameters = extractParameters(suffixes);
   ensureOwnPatterns(this);
-  for (const suffix of suffixes) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern("", suffix));
+  for (const suffix of suffixes as string[]) {
+    this._attributeMethodPatterns.push(new AttributeMethodPattern({ suffix, parameters }));
   }
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
@@ -268,8 +284,8 @@ export function attributeMethodAffix(
   ...affixes: Array<{ prefix: string; suffix: string }>
 ): void {
   ensureOwnPatterns(this);
-  for (const { prefix, suffix } of affixes) {
-    this._attributeMethodPatterns.push(new AttributeMethodPattern(prefix, suffix));
+  for (const affix of affixes) {
+    this._attributeMethodPatterns.push(new AttributeMethodPattern(affix));
   }
   undefineAttributeMethods.call(this);
   defineAttributeMethods.call(this, ...Array.from(this._attributeDefinitions.keys()));
@@ -360,12 +376,6 @@ export function defineAttributeMethods(this: AttributeMethodHost, ...attrNames: 
   });
 }
 
-// ---------------------------------------------------------------------------
-// Class-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
-
 // -- Internal helpers (take explicit host arg) --------------------------------
 
 export function defineAttributeMethod(
@@ -383,6 +393,12 @@ export function defineAttributeMethod(
     attributeMethodPatternsCache.call(this).clear();
   });
 }
+
+// ---------------------------------------------------------------------------
+// Class-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
 
 /**
  * Mirrors: ClassMethods#define_attribute_method_pattern
@@ -545,16 +561,6 @@ export function attributeMethodPatternsMatching(
   return matches;
 }
 
-// ---------------------------------------------------------------------------
-// Instance-level Rails privates (attribute_methods.rb)
-// ---------------------------------------------------------------------------
-
-export type InstanceHost = {
-  _attributes?: { has(name: string): boolean };
-  _attributeMethodPatterns?: AttributeMethodPattern[];
-  constructor: AttributeMethodHost;
-};
-
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#define_proxy_call
  *
@@ -589,6 +595,16 @@ export function defineProxyCall(
     as: options.as ?? name,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Instance-level Rails privates (attribute_methods.rb)
+// ---------------------------------------------------------------------------
+
+export type InstanceHost = {
+  _attributes?: { has(name: string): boolean };
+  _attributeMethodPatterns?: AttributeMethodPattern[];
+  constructor: AttributeMethodHost;
+};
 
 /**
  * @internal Rails-private helper. Mirrors: ClassMethods#build_mangled_name
@@ -634,6 +650,21 @@ export function defineCall(
       });
     });
   });
+}
+
+// -- Public ClassMethods (use `this`, assigned to Model directly) -----------
+
+/**
+ * @noRailsEquivalent Peels Ruby's trailing `parameters:` keyword back off the
+ * splat that carries it — the arg-shape half of `attribute_method_prefix` /
+ * `attribute_method_suffix`, which TS cannot spell as a real keyword after a
+ * rest element.
+ */
+function extractParameters(affixes: Array<string | { parameters?: string | null }>): string | null {
+  const last = affixes[affixes.length - 1];
+  if (last === undefined || typeof last === "string") return null;
+  affixes.pop();
+  return last.parameters ?? null;
 }
 
 /**

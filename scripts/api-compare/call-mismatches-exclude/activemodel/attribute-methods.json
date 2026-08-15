@@ -29,29 +29,7 @@
     "rubyArgs": [
       "kwargs{initialCapacity=num:4}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_method_prefix",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{parameters=ref:parameters,prefix=ref:prefix}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_method_suffix",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "kwargs{parameters=ref:parameters,suffix=ref:suffix}"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "attribute_methods.rb:418 `Concurrent::Map.new(initial_capacity: 4)` — a JS `Map` has no capacity hint, so the kwarg has no counterpart to pass. Same language shortcoming as the `initial_capacity: 2` row on connection-handler.ts."
   },
   {
     "package": "activemodel",

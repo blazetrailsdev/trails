@@ -1,6 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { camelize } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -12,6 +13,31 @@ import { resolveValue } from "./resolve-value.js";
  *     CHECKS = { is: :==, minimum: :>=, maximum: :<= }.freeze
  *     ...
  */
+
+type CheckKey = "is" | "minimum" | "maximum";
+
+/**
+ * Mirrors: LengthValidator::MESSAGES (length.rb:10). Ruby Symbol values keep
+ * their leading colon.
+ * @internal
+ */
+const MESSAGES: Record<CheckKey, string> = {
+  is: ":wrong_length",
+  minimum: ":too_short",
+  maximum: ":too_long",
+};
+
+/**
+ * Mirrors: LengthValidator::CHECKS (length.rb:11). Ruby dispatches the
+ * comparison by symbol through `public_send`; JS has no operator methods, so
+ * each check is the same comparison as a function.
+ * @internal
+ */
+const CHECKS: Record<CheckKey, (valueLength: number, checkValue: number) => boolean> = {
+  is: (valueLength, checkValue) => valueLength === checkValue,
+  minimum: (valueLength, checkValue) => valueLength >= checkValue,
+  maximum: (valueLength, checkValue) => valueLength <= checkValue,
+};
 
 /** Rails-style range object accepted by the `:in` / `:within` option. */
 export interface LengthRange {
@@ -93,60 +119,44 @@ export class LengthValidator extends EachValidator {
     // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
     // For nil → 0 (nil.to_s.length); for non-nil values without a .length
     // (numbers, booleans, plain objects) → String(value).length.
-    let length: number;
+    let valueLength: number;
     if (typeof value === "string" || Array.isArray(value)) {
-      length = value.length;
+      valueLength = value.length;
     } else if (
       typeof value === "object" &&
       value !== null &&
       "length" in value &&
       typeof (value as { length: unknown }).length === "number"
     ) {
-      length = (value as { length: number }).length;
+      valueLength = (value as { length: number }).length;
     } else if (value == null) {
-      length = 0;
+      valueLength = 0;
     } else {
-      length = String(value).length;
+      valueLength = String(value).length;
     }
 
     // Rails length.rb:49 — `errors_options = options.except(*RESERVED_OPTIONS)`
-    const baseOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
+    const errorsOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
 
-    // Rails length.rb:51-65 — iterate CHECKS, skip absent constraints.
-    const valueIsNil = value === null || value === undefined;
+    for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
+      [CheckKey, (valueLength: number, checkValue: number) => boolean]
+    >) {
+      let checkValue = this.options[key];
+      if (checkValue == null) continue;
 
-    const rawMin = this.options.minimum;
-    const rawMax = this.options.maximum;
-    const rawIs = this.options.is;
-
-    // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`
-    const min = resolveLengthOpt.call(this, record, rawMin);
-    const max = resolveLengthOpt.call(this, record, rawMax);
-    const is = resolveLengthOpt.call(this, record, rawIs);
-
-    if (min !== undefined && length < min) {
-      if (!valueIsNil || this.skipNilCheck("minimum")) {
-        const opts = { ...baseOptions, count: min } as Record<string, unknown>;
-        const defaultMsg = this.options.tooShort ?? this.options.message;
-        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, ":too_short", opts);
+      if (value != null || this.skipNilCheck(key)) {
+        checkValue = resolveLengthOpt.call(this, record, checkValue);
+        if (validityCheck(valueLength, checkValue as number)) continue;
       }
-    }
-    if (max !== undefined && length > max) {
-      if (!valueIsNil || this.skipNilCheck("maximum")) {
-        const opts = { ...baseOptions, count: max } as Record<string, unknown>;
-        const defaultMsg = this.options.tooLong ?? this.options.message;
-        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, ":too_long", opts);
+
+      errorsOptions["count"] = checkValue;
+
+      const defaultMessage = this.options[camelize(MESSAGES[key].slice(1), false)];
+      if (defaultMessage != null && errorsOptions["message"] == null) {
+        errorsOptions["message"] = defaultMessage;
       }
-    }
-    if (is !== undefined && length !== is) {
-      if (!valueIsNil || this.skipNilCheck("is")) {
-        const opts = { ...baseOptions, count: is } as Record<string, unknown>;
-        const defaultMsg = this.options.wrongLength ?? this.options.message;
-        if (defaultMsg != null && !opts["message"]) opts["message"] = defaultMsg;
-        record.errors.add(attribute, ":wrong_length", opts);
-      }
+
+      record.errors.add(attribute, MESSAGES[key], { ...errorsOptions });
     }
   }
 

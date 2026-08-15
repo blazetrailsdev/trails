@@ -15,7 +15,7 @@
     "rubyArgs": [
       "ref:this"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "output_safety.rb:226 `ActiveSupport::SafeBuffer.new(self)` — Ruby's SafeBuffer is a String subclass whose `html_safe?` is true by construction. A JS class cannot subclass the primitive `string`, so trails' SafeBuffer carries an explicit `safe` flag and `htmlSafe()` passes `true` for it. Language shortcoming."
   },
   {
     "package": "activesupport",

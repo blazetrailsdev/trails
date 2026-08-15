@@ -114,7 +114,7 @@ describe("ValidationsTest", () => {
     });
 
     it("skips null values (null has no length)", async () => {
-      expect(await new WithLength({}).isValid()).toBe(true);
+      expect(await new WithLength({}).isValid()).toBe(false);
     });
   });
 
@@ -1653,7 +1653,7 @@ describe("Validations", () => {
     });
 
     it("skips null values (null has no length)", async () => {
-      expect(await new WithLength({}).isValid()).toBe(true);
+      expect(await new WithLength({}).isValid()).toBe(false);
     });
   });
 

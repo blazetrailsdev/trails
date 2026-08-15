@@ -38,6 +38,6 @@
       "ref:args",
       "str:loading"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "mysql_database_tasks.rb:65 `run_cmd(\"mysql\", args, \"loading\")` hands the script to the client through `--execute \"... SOURCE #{filename} ...\"` (line 61). trails reads the file and feeds it on stdin instead — `SOURCE` is a mysql-client REPL builtin — so the script rides as `runCmd`'s fourth argument rather than inside `args`."
   }
 ]

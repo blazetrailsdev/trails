@@ -1597,7 +1597,8 @@ function replaceCommonRecordsInMemory(
 ): void {
   const common = diffHooks(assoc).intersection(newTarget, originalTarget);
   for (const record of common) {
-    assoc.replaceOnTarget(record, true, { replace: true }) as Base | null;
+    const skipCallbacks = true;
+    assoc.replaceOnTarget(record, skipCallbacks, { replace: true }) as Base | null;
   }
 }
 

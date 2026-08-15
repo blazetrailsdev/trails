@@ -43,7 +43,7 @@
     "rubyArgs": [
       "ref:this"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "reflection.rb:267 `InverseOfAssociationNotFoundError.new(self)` derives the message and the `Did you mean?` corrections from the reflection. trails' error takes the already-derived `(name, inverseOf, corrections, className)` because `reflection.klass` is not always resolvable at this point; see the block comment at reflection.ts:425-441."
   },
   {
     "package": "activerecord",

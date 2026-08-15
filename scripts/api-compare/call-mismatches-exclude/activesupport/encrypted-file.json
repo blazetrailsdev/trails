@@ -9,7 +9,7 @@
       "ref:pack",
       "kwargs{cipher=const:CIPHER,serializer=const:Marshal}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "encrypted_file.rb:113 `MessageEncryptor.new([key].pack(\"H*\"), cipher: CIPHER, serializer: Marshal)` — `Buffer.from(key, \"hex\")` is the `pack(\"H*\")`, and Ruby's `Marshal` has no JS equivalent: the file body is already a string, so trails passes `NullSerializer`, the settled substitute. Language shortcoming."
   },
   {
     "package": "activesupport",

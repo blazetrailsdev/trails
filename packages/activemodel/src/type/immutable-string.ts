@@ -4,19 +4,19 @@ export interface ImmutableStringTypeOptions {
   precision?: number;
   scale?: number;
   limit?: number;
-  trueString?: string;
-  falseString?: string;
+  true?: string;
+  false?: string;
 }
 
 export class ImmutableStringType extends ValueType<string> {
   readonly name: string = "immutable_string";
-  readonly trueString: string;
-  readonly falseString: string;
+  readonly true: string;
+  readonly false: string;
 
   constructor(options?: ImmutableStringTypeOptions) {
     super(options);
-    this.trueString = options?.trueString ?? "t";
-    this.falseString = options?.falseString ?? "f";
+    this.true = options?.true ?? "t";
+    this.false = options?.false ?? "f";
   }
 
   type(): string {
@@ -44,8 +44,8 @@ export class ImmutableStringType extends ValueType<string> {
    * @internal Rails-private helper.
    */
   protected castValue(value: unknown): string | null {
-    if (value === true) return Object.freeze(this.trueString);
-    if (value === false) return Object.freeze(this.falseString);
+    if (value === true) return Object.freeze(this.true);
+    if (value === false) return Object.freeze(this.false);
     const str = String(value);
     return Object.freeze(str);
   }

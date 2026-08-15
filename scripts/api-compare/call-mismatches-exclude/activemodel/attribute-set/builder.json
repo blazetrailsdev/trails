@@ -18,7 +18,7 @@
       "ref:additionalTypes",
       "ref:defaultAttributes"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "builder.rb:16 `LazyAttributeSet.new(values, types, additional_types, default_attributes)` — trails has no LazyAttributeSet/LazyAttributeHash; `buildFromDatabase` materializes the attributes eagerly, so the only `new` in the body is the `AttributeSet(attrs)` it returns. Blocked on porting LazyAttributeSet, not on the argument list."
   },
   {
     "package": "activemodel",

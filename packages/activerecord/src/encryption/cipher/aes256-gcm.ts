@@ -74,9 +74,9 @@ export class Aes256Gcm {
     });
     // Rails' `clear_text.empty? ? clear_text.dup : cipher.update(clear_text)`
     // (aes256_gcm.rb:46) — an empty input never reaches `update`.
-    const encryptedData =
+    let encryptedData =
       inputBuf.length === 0 ? Buffer.from(inputBuf) : Buffer.from(cipher.update(inputBuf));
-    const encrypted = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
+    encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
     if (!cipher.getAuthTag) {
       throw new Configuration("Crypto adapter does not support GCM auth tags (getAuthTag)");
     }
@@ -84,7 +84,7 @@ export class Aes256Gcm {
 
     // Store raw bytes as Buffers, like MRI keeps binary Strings on the Message;
     // the serializer then does a single base64 hop, byte-identical to Rails.
-    const message = new Message({ payload: encrypted });
+    const message = new Message({ payload: encryptedData });
     message.headers.iv = iv;
     message.headers.authTag = authTag;
     return message;

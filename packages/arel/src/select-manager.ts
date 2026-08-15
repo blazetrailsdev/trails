@@ -39,10 +39,7 @@ export class SelectManager extends TreeManager {
 
   constructor(table?: Table | null) {
     super();
-    this.ast = new SelectStatement();
-    if (table) {
-      this.from(table);
-    }
+    this.ast = new SelectStatement(table ?? null);
   }
 
   /**

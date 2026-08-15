@@ -25,7 +25,7 @@
       "ref:role",
       "ref:shard"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "connection_handler.rb:118 `resolve_pool_config(config, owner_name, role, shard)` — Rails resolves the adapter class from `db_config.adapter` by requiring it at connect time. ESM has no autoload-by-name, so the factory is threaded as an `adapterFactory` kwarg; this is the same cause already reviewed on this file's `resolve_pool_config -> new` row."
   },
   {
     "package": "activerecord",
