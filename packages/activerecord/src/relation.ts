@@ -2195,7 +2195,10 @@ export class Relation<T extends Base> {
   /**
    * Create and persist a new record with the relation's scoped conditions.
    *
-   * Mirrors: ActiveRecord::Relation#create
+   * Mirrors: ActiveRecord::Relation#create (relation.rb:154-161) —
+   * `block = current_scope_restoring_block(&block); scoping { _create(attributes, &block) }`,
+   * so the record is built under this relation's scope while the user block
+   * runs with the prior scope restored.
    */
   async create(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async create(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -2210,9 +2213,6 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    // Rails: `block = current_scope_restoring_block(&block); scoping { _create(attributes, &block) }`
-    // (relation.rb:158-159) — the record is built by `model.create` *under* this
-    // relation's scope, while the user block runs with the PRIOR scope restored.
     const restoring = this.currentScopeRestoringBlock(block);
     return await this.scoping(() => this._create(attrs, restoring));
   }
@@ -2220,7 +2220,8 @@ export class Relation<T extends Base> {
   /**
    * Create and persist a new record, raising on validation failure.
    *
-   * Mirrors: ActiveRecord::Relation#create!
+   * Mirrors: ActiveRecord::Relation#create! (relation.rb:169-176) — the
+   * `_create!` arm of the same `current_scope_restoring_block` + `scoping` shape.
    */
   async createBang(attrs: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
   async createBang(attrs?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
@@ -2235,8 +2236,6 @@ export class Relation<T extends Base> {
       }
       return records;
     }
-    // Rails: `block = current_scope_restoring_block(&block); scoping { _create!(attributes, &block) }`
-    // (relation.rb:173-174).
     const restoring = this.currentScopeRestoringBlock(block);
     return await this.scoping(() => this._createBang(attrs, restoring));
   }
@@ -2463,11 +2462,6 @@ export class Relation<T extends Base> {
   }
 
   private async _toArrayInner(): Promise<T[]> {
-    // Rails wraps the whole of `exec_queries` — the main query, the record
-    // instantiation and `preload_associations` alike — in one
-    // `skip_query_cache_if_necessary` block (relation.rb:1403-1419), so a
-    // `skip_query_cache!` relation bypasses the cache for its preload queries
-    // too, not just for its own SELECT.
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
@@ -3393,7 +3387,10 @@ export class Relation<T extends Base> {
   /**
    * Check if any records exist, optionally with conditions.
    *
-   * Mirrors: ActiveRecord::Relation#exists?
+   * Mirrors: ActiveRecord::Relation#exists? — ending in
+   * `skip_query_cache_if_necessary { with_connection { |c|
+   * c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
+   * (finder_methods.rb:377-381), the cached read path.
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
@@ -3453,13 +3450,6 @@ export class Relation<T extends Base> {
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = this._compileAstWithBinds(probe.toArel().ast);
-    // Rails: `skip_query_cache_if_necessary { with_connection { |c|
-    // c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
-    // (finder_methods.rb:377-381) — the cached read path (select_rows →
-    // select_all), so repeated `exists?` probes inside a `cache` block are
-    // served from the query cache, and `skip_query_cache!` bypasses it.
-    // With LIMIT 1 the probe returns at most one row, so a non-empty result
-    // means a match.
     return await this.skipQueryCacheIfNecessary(() =>
       this.withConnection(
         async (c) =>

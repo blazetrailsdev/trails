@@ -773,8 +773,6 @@ export function civilFromFormat(
 ): Temporal.ZonedDateTime {
   let offset: number;
   if (utcOrLocal === "local") {
-    // Rails: `::Time.local(year, month, day).utc_offset.to_r / 86400`
-    // (conversions.rb:70) — a bare ruby/date `Time`, not a TimeZone.
     offset = RubyTime.local(year, month, day).utcOffset;
   } else {
     offset = 0;
