@@ -1,5 +1,6 @@
 import { NumberConverter } from "./number-converter.js";
 import type { NumberToPhoneOptions } from "../number-helper.js";
+import { isBlank } from "../core-ext/object/blank.js";
 
 export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions> {
   protected convert(): string {
@@ -47,7 +48,7 @@ export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions
   }
 
   private phoneExt(ext: string | number | undefined): string {
-    if (ext === undefined || ext === null || ext === "") return "";
+    if (isBlank(ext)) return "";
     return ` x ${ext}`;
   }
 }

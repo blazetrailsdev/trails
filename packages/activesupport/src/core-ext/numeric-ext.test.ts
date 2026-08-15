@@ -151,11 +151,21 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs phone", () => {
-    expect(NumericWithFormat.toFs(5551234, ":phone")).toBe("555-1234");
+    const toFs = NumericWithFormat.toFs;
+    expect(toFs(5551234, ":phone")).toBe("555-1234");
     expect(NumericWithFormat.toFormattedS(5551234, ":phone")).toBe("555-1234");
-    expect(NumericWithFormat.toFs(8005551212, ":phone")).toBe("800-555-1212");
-    expect(NumericWithFormat.toFs(8005551212, ":phone", { areaCode: true })).toBe("(800) 555-1212");
-    expect(NumericWithFormat.toFs(8005551212, ":phone", { delimiter: " " })).toBe("800 555 1212");
+    expect(toFs(8005551212, ":phone")).toBe("800-555-1212");
+    expect(toFs(8005551212, ":phone", { areaCode: true })).toBe("(800) 555-1212");
+    expect(toFs(8005551212, ":phone", { delimiter: " " })).toBe("800 555 1212");
+    expect(toFs(8005551212, ":phone", { areaCode: true, extension: 123 })).toBe(
+      "(800) 555-1212 x 123",
+    );
+    expect(toFs(8005551212, ":phone", { extension: "  " })).toBe("800-555-1212");
+    expect(toFs(5551212, ":phone", { delimiter: "." })).toBe("555.1212");
+    expect(toFs(8005551212, ":phone", { countryCode: 1 })).toBe("+1-800-555-1212");
+    expect(toFs(8005551212, ":phone", { countryCode: 1, delimiter: "" })).toBe("+18005551212");
+    expect(toFs(225551212, ":phone")).toBe("22-555-1212");
+    expect(toFs(225551212, ":phone", { countryCode: 45 })).toBe("+45-22-555-1212");
   });
 
   it("to fs currency", () => {
@@ -221,6 +231,7 @@ describe("NumericExtFormattingTest", () => {
     expect(rounded(5.3923, { precision: 1, significant: true })).toBe("5");
     expect(rounded(1.232, { precision: 1, significant: true })).toBe("1");
     expect(rounded(7, { precision: 1, significant: true })).toBe("7");
+    expect(rounded(1, { precision: 1, significant: true })).toBe("1");
     expect(rounded(52.7923, { precision: 2, significant: true })).toBe("53");
     expect(rounded(9775, { precision: 6, significant: true })).toBe("9775.00");
     expect(rounded(5.3929, { precision: 7, significant: true })).toBe("5.392900");
