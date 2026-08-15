@@ -27,7 +27,7 @@
       "ref:tableAliasLength",
       "ref:aliases"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "alias_tracker.rb:24 `new(connection.table_alias_length, aliases)` — the alias counts Rails computes lazily through the Hash `default_proc` installed at lines 13-22 have no `Map` analogue, so trails carries `joins` and the quoter onto the tracker and computes the initial count in `_getCount` instead. The two extra arguments ARE the default_proc. Language shortcoming."
   },
   {
     "package": "activerecord",

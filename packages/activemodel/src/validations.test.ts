@@ -114,7 +114,9 @@ describe("ValidationsTest", () => {
     });
 
     it("skips null values (null has no length)", async () => {
-      expect(await new WithLength({}).isValid()).toBe(true);
+      // length.rb:54 — the nil guard only skips the comparison for `:maximum`
+      // (skip_nil_check?), so a nil value still fails the `:minimum` check.
+      expect(await new WithLength({}).isValid()).toBe(false);
     });
   });
 
@@ -1653,7 +1655,9 @@ describe("Validations", () => {
     });
 
     it("skips null values (null has no length)", async () => {
-      expect(await new WithLength({}).isValid()).toBe(true);
+      // length.rb:54 — the nil guard only skips the comparison for `:maximum`
+      // (skip_nil_check?), so a nil value still fails the `:minimum` check.
+      expect(await new WithLength({}).isValid()).toBe(false);
     });
   });
 

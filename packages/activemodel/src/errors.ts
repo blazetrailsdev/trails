@@ -188,7 +188,7 @@ export class Errors<TBase extends object = object> {
    * `.get()` returns the singleton frozen `[]`. Mirrors Rails `errors.rb:268-273`.
    */
   get messages(): Map<string, readonly string[]> {
-    return mapWithDefault(this.toHash(false), EMPTY_ARRAY);
+    return mapWithDefault(this.toHash(), EMPTY_ARRAY);
   }
 
   /**

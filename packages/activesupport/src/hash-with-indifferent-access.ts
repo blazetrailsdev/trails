@@ -14,10 +14,14 @@ type AnyObject = Record<string, unknown>;
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
 
-  constructor(constructor?: AnyObject | Map<string, V>) {
+  constructor(constructor?: AnyObject | Map<string, V> | HashWithIndifferentAccess<V>) {
     this.data = new Map();
     if (constructor) {
-      if (constructor instanceof Map) {
+      if (constructor instanceof HashWithIndifferentAccess) {
+        for (const [key, value] of constructor.data) {
+          this.data.set(key, value);
+        }
+      } else if (constructor instanceof Map) {
         for (const [key, value] of constructor) {
           this.data.set(String(key), value);
         }
@@ -424,7 +428,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * withIndifferentAccess — returns a dup of self (already HWIA).
    */
   withIndifferentAccess(): HashWithIndifferentAccess<V> {
-    return this.merge(new HashWithIndifferentAccess<V>());
+    return new HashWithIndifferentAccess<V>(this);
   }
 
   /**

@@ -9,6 +9,6 @@
       "ref:name",
       "ref:right"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "binary.rb:44 `Arel::Nodes::Cte.new(left.name, right)` — importing `Cte` from `binary.ts` closes a module cycle, so the constructor arrives through the `_registerCteFactory` slot and is called as `cteFactory(name, right)` with the same two arguments. The `new` the comparator sees in this body is the registry guard's Error."
   }
 ]

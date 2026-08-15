@@ -171,12 +171,7 @@ export class AttributeSet {
 
   writeCastValue(name: string, value: unknown): void {
     this.assertNotFrozen();
-    const attr = this.attributes.get(name);
-    if (attr) {
-      attr.overrideCastValue(value);
-    } else {
-      this.attributes.set(name, Attribute.withCastValue(name, value, typeRegistry.lookup("value")));
-    }
+    this.attributes.set(name, this.getAttribute(name).withCastValue(value));
   }
 
   deepDup(): AttributeSet {

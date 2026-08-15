@@ -38,7 +38,7 @@
     "rubyArgs": [
       "str:merge"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "through_association.rb:89 `.reduce(:merge)` takes a Symbol as its ONLY argument and answers nil for an empty collection. JS `Array#reduce` takes a function and THROWS on an empty array with no initial value, so the seed is what stands in for Ruby's nil answer. Language shortcoming."
   },
   {
     "package": "activerecord",
@@ -49,6 +49,6 @@
     "rubyArgs": [
       "str:merge"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "through_association.rb:93 `.reduce(:merge)` takes a Symbol as its ONLY argument and answers nil for an empty collection. JS `Array#reduce` takes a function and THROWS on an empty array with no initial value, so the seed is what stands in for Ruby's nil answer. Language shortcoming."
   }
 ]

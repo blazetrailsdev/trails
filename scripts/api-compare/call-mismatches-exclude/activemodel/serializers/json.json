@@ -16,6 +16,6 @@
       "ref:this",
       "ref:namespace"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "Same as activemodel/model.ts's `model_name` row: `ActiveModel::Name.new(self, namespace)` (naming.rb:275) resolves the namespace from the Ruby constant path, which a JS class does not have."
   }
 ]

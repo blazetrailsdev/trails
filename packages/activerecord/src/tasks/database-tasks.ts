@@ -1686,7 +1686,7 @@ export async function checkCurrentProtectedEnvironmentBang(
       }
 
       if (stored && stored !== current) {
-        throw new EnvironmentMismatchError(current, stored);
+        throw new EnvironmentMismatchError({ current, stored });
       }
     } catch (error) {
       if (error instanceof NoDatabaseError) return;

@@ -17,7 +17,7 @@
       "ref:last",
       "ref:owner"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "association_scope.rb:125 `last_chain_scope(scope, chain.last, owner)` reads the target table off `reflection.klass`. For a polymorphic `belongs_to` the target class is not known at definition time and `reflection.klass` raises, so the runtime `klass` is threaded as a fourth argument; see the block comment at association-scope.ts:403-407."
   },
   {
     "package": "activerecord",

@@ -101,7 +101,10 @@ export class Config {
 
   /** Cached as a Set for faster available-locales enforce checks. */
   get availableLocalesSet(): Set<Locale> {
-    availableLocalesSet ??= new Set(this.availableLocales);
+    availableLocalesSet ??= this.availableLocales.reduce(
+      (set, locale) => set.add(locale),
+      new Set<Locale>(),
+    );
     return availableLocalesSet;
   }
 

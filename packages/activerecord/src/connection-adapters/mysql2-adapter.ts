@@ -2065,15 +2065,15 @@ Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
 // through `Type.lookup(:string, adapter: :mysql2)`.
 Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
   return new ImmutableStringType({
-    trueString: "1",
-    falseString: "0",
+    true: "1",
+    false: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });
 Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
   return new StringType({
-    trueString: "1",
-    falseString: "0",
+    true: "1",
+    false: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });

@@ -123,7 +123,7 @@ export function decorateAttributes(
   names = names?.map((name) => this.resolveAttributeName(name)) ?? null;
 
   // Push to pending queue so _defaultAttributes replays in declaration order.
-  pushPendingDecorator(this, names, decorator);
+  pendingAttributeModifications.call(this).push(new PendingDecorator(names, decorator));
 
   // Also apply immediately to _attributeDefinitions for backward compat and
   // so guards like `def.type instanceof EncryptedAttributeType` work without

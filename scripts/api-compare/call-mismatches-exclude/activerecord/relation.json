@@ -533,7 +533,7 @@
     "rubyArgs": [
       "kwargs{cursor=ref:cursor,finish=ref:finish,of=ref:of,order=ref:order,relation=ref:this,start=ref:start,useRanges=ref:useRanges}"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "batches.rb:268 `BatchEnumerator.new(of:, start:, finish:, relation:, cursor:, order:, use_ranges:)` is a lazy Enumerable that re-derives each batch from the relation on demand. trails' BatchEnumerator wraps an async generator built here, so it takes `(generator, of, { start, finish, relation })`; Ruby's lazy-Enumerator protocol has no async equivalent."
   },
   {
     "package": "activerecord",

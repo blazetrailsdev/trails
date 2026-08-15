@@ -144,9 +144,20 @@ export function hasSecurePassword(
         record.errors.add(attribute, ":blank");
       }
 
+      const challenge = challengeCache.get(record) ?? null;
+      if (challenge !== null) {
+        // Rails secure_password.rb:141-147: read digest_was from dirty tracking
+        // so DB-loaded records (no setter call) work correctly.
+        // Error fires when digestWas is blank OR doesn't match challenge.
+        const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
+        if (!digestWas || !bcrypt.compareSync(challenge, digestWas)) {
+          record.errors.add(challengeAttr);
+        }
+      }
+
       if (pwd !== null && pwd !== undefined) {
         if (textEncoder.encode(pwd).length > 72) {
-          record.errors.add(attribute, ":password_too_long", { count: 72 });
+          record.errors.add(attribute, ":password_too_long");
         }
 
         const humanAttr = modelClass.humanAttributeName
@@ -155,17 +166,6 @@ export function hasSecurePassword(
         const confirmation = record.readAttribute(confirmationAttr);
         if (confirmation !== undefined && confirmation !== null && pwd !== confirmation) {
           record.errors.add(attribute, ":confirmation", { attribute: humanAttr });
-        }
-      }
-
-      const challenge = challengeCache.get(record) ?? null;
-      if (challenge !== null) {
-        // Rails secure_password.rb:141-147: read digest_was from dirty tracking
-        // so DB-loaded records (no setter call) work correctly.
-        // Error fires when digestWas is blank OR doesn't match challenge.
-        const digestWas = record.attributeWas(digestAttr) as string | null | undefined;
-        if (!digestWas || !bcrypt.compareSync(challenge, digestWas)) {
-          record.errors.add(challengeAttr, ":invalid");
         }
       }
     });

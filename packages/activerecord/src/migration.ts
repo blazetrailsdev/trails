@@ -275,20 +275,12 @@ export class ProtectedEnvironmentError extends MigrationError {
 }
 
 export class EnvironmentMismatchError extends MigrationError {
-  /**
-   * Accept either a prebuilt message (one-arg) or `(current, stored)`
-   * separately (two-arg) matching Rails'
-   * `EnvironmentMismatchError.new(current:, stored:)`.
-   */
-  constructor(currentOrMessage?: string, stored?: string) {
-    const message =
-      stored !== undefined && currentOrMessage !== undefined
-        ? `You are attempting to modify a database that was last run in \`${stored}\` environment.\n` +
-          `You are running in \`${currentOrMessage}\` environment. ` +
-          `If you are sure you want to continue, first set the environment using:\n\n` +
-          `        trails db environment:set\n`
-        : (currentOrMessage ?? "The environment does not match the stored environment.");
-    super(message);
+  constructor({ current, stored }: { current?: string; stored?: string } = {}) {
+    let msg = `You are attempting to modify a database that was last run in \`${stored ?? ""}\` environment.\n`;
+    msg += `You are running in \`${current ?? ""}\` environment. `;
+    msg += `If you are sure you want to continue, first set the environment using:\n\n`;
+    msg += `        trails db environment:set`;
+    super(`${msg}\n\n`);
     this.name = "EnvironmentMismatchError";
   }
 }

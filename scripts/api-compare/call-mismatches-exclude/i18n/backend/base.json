@@ -9,7 +9,7 @@
       "str:.",
       "str:"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "base.rb:241 `File.extname(filename).tr('.', '')` — `tr` is a String instance method. JS strings have none, so activesupport exposes it as the free function `tr(type, \".\", \"\")`. Receiver-as-first-argument, not an extra argument."
   },
   {
     "package": "i18n",
@@ -18,6 +18,6 @@
     "call": "nil?",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "base.rb:35 `entry.nil?` — Ruby `nil?` is an ordinary method any object may override (base.ts:216-226 documents the two receivers that do), so trails renders it as the free function `isNil(entry)`. Receiver-as-first-argument."
   }
 ]

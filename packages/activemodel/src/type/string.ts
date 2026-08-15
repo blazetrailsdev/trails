@@ -11,11 +11,11 @@ export class StringType extends ImmutableStringType {
 
   toImmutableString(): ImmutableStringType {
     return new ImmutableStringType({
+      true: this.true,
+      false: this.false,
+      limit: this.limit,
       precision: this.precision,
       scale: this.scale,
-      limit: this.limit,
-      trueString: this.trueString,
-      falseString: this.falseString,
     });
   }
 

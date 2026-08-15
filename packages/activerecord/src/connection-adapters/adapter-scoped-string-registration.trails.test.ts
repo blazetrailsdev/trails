@@ -20,15 +20,15 @@ it("mysql2 :string coerces booleans to 1/0 and threads limit", () => {
   const type = lookup("string", { adapter: "mysql2", limit: 255 }) as StringType;
   expect(type).toBeInstanceOf(StringType);
   expect(type.limit).toBe(255);
-  expect(type.trueString).toBe("1");
-  expect(type.falseString).toBe("0");
+  expect(type.true).toBe("1");
+  expect(type.false).toBe("0");
 });
 
 it("mysql2 :immutable_string coerces booleans to 1/0", () => {
   const type = lookup("immutable_string", { adapter: "mysql2" }) as ImmutableString;
   expect(type).toBeInstanceOf(ImmutableString);
-  expect(type.trueString).toBe("1");
-  expect(type.falseString).toBe("0");
+  expect(type.true).toBe("1");
+  expect(type.false).toBe("0");
 });
 
 it("mysql2 :unsigned_integer resolves to UnsignedInteger", () => {

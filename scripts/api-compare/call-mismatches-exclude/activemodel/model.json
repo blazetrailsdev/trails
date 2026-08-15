@@ -16,7 +16,7 @@
       "ref:this",
       "ref:namespace"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "naming.rb:275 `ActiveModel::Name.new(self, namespace)` derives the bare name and namespace from the Ruby constant path. A JS class carries no module path, so trails' `ModelName(name, { klass, namespace })` takes the demodulized name and the `moduleName` carrier explicitly (see the block comment at model.ts:1532). Language shortcoming; the namespace-carrier design, not the call, is what would have to change."
   },
   {
     "package": "activemodel",
