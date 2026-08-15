@@ -27,7 +27,8 @@ export function transliterate(
 ): string {
   if (string == null) return "";
   string = String(string);
-  if (string.length === 0) return string;
+  // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (transliterate.rb:69)
+  if (/^[\x00-\x7f]*$/.test(string)) return string;
 
   return I18n.transliterate(string.normalize("NFC"), { replacement, locale }) as string;
 }

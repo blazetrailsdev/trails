@@ -2890,10 +2890,13 @@ export class Relation<T extends Base> {
     if (this.loaded && isAllAttributes(this as any, columnNames as unknown as string[])) {
       const records = await this.records();
       if (records.length === 0) return null;
-      const first = records[0] as unknown as { readAttribute(name: string): unknown };
+      const first = records[0] as unknown as {
+        valuesAt(...keys: string[]): unknown[];
+        get(attrName: string): unknown;
+      };
       return columnNames.length > 1
-        ? columnNames.map((columnName) => first.readAttribute(String(columnName)))
-        : first.readAttribute(String(columnNames[0]));
+        ? first.valuesAt(...columnNames.map(String))
+        : first.get(String(columnNames[0]));
     }
 
     const values = await this.limit(1).pluck(...columnNames);
