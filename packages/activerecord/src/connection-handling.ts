@@ -50,7 +50,7 @@ const QUERY_CONNECTION_KEY = Symbol.for("ar_query_connection");
 
 /**
  * The connection yielded by the enclosing internal `with_connection` wrap
- * ({@link withQueryConnection}), or `null` outside one. Internal query and
+ * ({@link withConnection}), or `null` outside one. Internal query and
  * transaction code reads this *threaded* connection instead of the deprecated
  * `Model.connection` getter, so it never flips the lease permanent — mirroring
  * Rails, which threads the `with_connection` block's `connection` parameter
@@ -383,6 +383,15 @@ export function releaseConnection(this: typeof Base): boolean {
  * and the block runs inline on the connection the getter resolves. Keeping that
  * arm here, rather than at each internal call site, is what lets those sites
  * spell Rails' `with_connection`.
+ *
+ * The leased connection is also threaded through {@link currentQueryConnection}
+ * for the duration of the block, so the internal build/execute/callback path
+ * reads *it* rather than the deprecated `Model.connection` getter — which would
+ * otherwise flip the lease permanent under `permanent_connection_checkout =
+ * :deprecated | :disallowed`. That stands in for Ruby's block parameter `c`,
+ * which Rails' own callers thread by hand down a shorter path. A user who
+ * explicitly calls `Model.lease_connection` inside the block still makes the
+ * lease permanent (matching Rails), because that path goes through the getter.
  */
 export function withConnection<T>(
   this: typeof Base,
@@ -392,36 +401,16 @@ export function withConnection<T>(
   try {
     const pool = leasablePool(this);
     if (!pool) return Promise.resolve(fn(connection.call(this))) as Promise<T>;
-    return Promise.resolve(pool.withConnection(fn, options)) as Promise<T>;
+    return Promise.resolve(
+      pool.withConnection(
+        (conn) =>
+          IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, () => Promise.resolve(fn(conn))),
+        options,
+      ),
+    ) as Promise<T>;
   } catch (err) {
     return Promise.reject(err);
   }
-}
-
-/**
- * Run an internal query/transaction inside plain `with_connection` (matching
- * Rails' `with_connection`) so the pool releases its connection afterwards. The
- * yielded connection is threaded through {@link currentQueryConnection} so the
- * internal build/execute/callback path reads *it* rather than the deprecated
- * `Model.connection` getter — which would otherwise flip the lease permanent
- * under `permanent_connection_checkout = :deprecated | :disallowed`. A user who
- * explicitly calls `Model.lease_connection` inside the block still makes the
- * lease permanent (matching Rails), because that path goes through the getter.
- *
- * Runs the block inline (no wrap) when there is no lease to manage: a model
- * backed by a directly-assigned adapter (`Model.adapter = x`), or one without a
- * handler-registered pool (e.g. HABTM join models, whose `.connection` delegates
- * to the owner and whose `connectionPool()` therefore throws for a direct-adapter
- * owner).
- *
- * @internal
- */
-export function withQueryConnection<T>(modelClass: typeof Base, run: () => Promise<T>): Promise<T> {
-  const pool = leasablePool(modelClass);
-  if (!pool) return run();
-  return Promise.resolve(
-    pool.withConnection((conn) => IsolatedExecutionState.scope(QUERY_CONNECTION_KEY, conn, run)),
-  ) as Promise<T>;
 }
 
 /**

@@ -9,7 +9,7 @@ import {
   DeleteManager,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor } from "./connection-handling.js";
 import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
 import {
   ActiveRecordError,
@@ -2453,12 +2453,12 @@ export class Relation<T extends Base> {
     }
     // Run the query inside `with_connection` so the pool releases the connection
     // afterwards instead of holding it permanently. The build / execute path
-    // reads the threaded connection via `_conn()` (see {@link withQueryConnection})
+    // reads the threaded connection via `_conn()` (see {@link withConnection})
     // rather than the deprecated `.connection` getter, so it never flips the lease
     // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
     // Mirrors Rails, whose read paths run inside `with_connection` and thread the
     // yielded connection.
-    return this._withQueryConnection(() => this._toArrayInner());
+    return this.withConnection(() => this._toArrayInner());
   }
 
   private async _toArrayInner(): Promise<T[]> {
@@ -2958,7 +2958,7 @@ export class Relation<T extends Base> {
     const wasLoaded = this._loaded;
     const priorRecords = this._records;
     try {
-      await this._withQueryConnection(() => this._toArrayInner());
+      await this.withConnection(() => this._toArrayInner());
     } finally {
       this._loaded = wasLoaded;
       this._records = priorRecords;
@@ -3521,7 +3521,7 @@ export class Relation<T extends Base> {
   ): Promise<unknown[]> {
     // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
     if (this._isEmptyRelation()) return [];
-    return this._withQueryConnection(() => this._pluckInner(...columns));
+    return this.withConnection(() => this._pluckInner(...columns));
   }
 
   private async _pluckInner(
@@ -3736,30 +3736,30 @@ export class Relation<T extends Base> {
       return relation.ids();
     }
 
-    // trails preliminaries the Rails body has no counterpart for, carried over
-    // from the delegation this replaces: `type_cast_pluck_values` reads
-    // `model.attribute_types`, and a deferred distinct-PK marker must resolve to
-    // a literal id list before the arel compiles.
-    return this._withQueryConnection(async () => {
-      await (
-        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
-      ).ensureSchemaLoaded();
-      await this._materializeDeferredDistinctPkPredicates();
+    const columns = this.arelColumns(primaryKeyArray);
+    const relation = this.spawn();
+    relation._selectColumns = columns as (string | Nodes.Node)[];
 
-      const columns = this.arelColumns(primaryKeyArray);
-      const relation = this.spawn();
-      relation._selectColumns = columns as (string | Nodes.Node)[];
-
-      const result = relation._whereClause.isContradiction()
-        ? Result.empty()
-        : await this.skipQueryCacheIfNecessary(() => {
+    const result = relation._whereClause.isContradiction()
+      ? Result.empty()
+      : await this.skipQueryCacheIfNecessary(() =>
+          this.withConnection(async (c) => {
+            // trails preliminaries the Rails body has no counterpart for,
+            // carried over from the delegation this replaces:
+            // `type_cast_pluck_values` reads `model.attribute_types`, and a
+            // deferred distinct-PK marker must resolve to a literal id list
+            // before the arel compiles.
+            await (
+              this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
+            ).ensureSchemaLoaded();
+            await relation._materializeDeferredDistinctPkPredicates();
             const manager = relation.arel();
             const [idsSql, idsBinds] = relation._compileAstWithBinds(manager.ast);
-            return this._conn().selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
-          });
+            return c.selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
+          }),
+        );
 
-      return typeCastPluckValues(result, columns, this as any);
-    });
+    return typeCastPluckValues(result, columns, this as any);
   }
 
   /**
@@ -4963,7 +4963,7 @@ export class Relation<T extends Base> {
     const basePk = (this._model as any).primaryKey ?? "id";
     const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
     if (jd.nodes.length === 0) return [];
-    return this._withQueryConnection(() => this._materializeLimitedIds(jd, basePk));
+    return this.withConnection(() => this._materializeLimitedIds(jd, basePk));
   }
 
   /**
@@ -5461,14 +5461,9 @@ export class Relation<T extends Base> {
     }
   }
 
-  /** Run an internal read query inside `with_connection`; see {@link withQueryConnection}. */
-  private _withQueryConnection<R>(run: () => Promise<R>): Promise<R> {
-    return withQueryConnection(this._model as unknown as typeof Base, run);
-  }
-
   /**
    * The connection for internal query execution: the one threaded by the
-   * enclosing `withQueryConnection` wrap when it belongs to this model's pool,
+   * enclosing `withConnection` wrap when it belongs to this model's pool,
    * else the model's public `.connection`. Mirrors Rails threading the
    * `with_connection` block parameter so internal reads don't re-lease via the
    * deprecated `.connection` getter. The pool-identity guard in

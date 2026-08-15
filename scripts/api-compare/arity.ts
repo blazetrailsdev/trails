@@ -143,7 +143,7 @@ export function stripThis(params: ParamInfo[]): ParamInfo[] {
 
 /** Is this leading param an explicit receiver — a known/`*Host` type, a `*Class`
  *  receiver, or a conventional receiver name? */
-function isReceiverParam(first: ParamInfo): boolean {
+export function isReceiverParam(first: ParamInfo): boolean {
   const leaf = leafTypeName(first.type);
   if (leaf && (HOST_PARAM_TYPES.has(leaf) || leaf.endsWith("Host"))) return true;
   if (RECEIVER_PARAM_NAMES.has(first.name)) return true;

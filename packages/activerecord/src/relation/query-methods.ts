@@ -2056,7 +2056,7 @@ function escapeRegex(s: string): string {
 
 /**
  * Resolve the active connection for a model on a relation-build read. Prefers
- * the connection threaded by the enclosing `withQueryConnection` wrap (Rails
+ * the connection threaded by the enclosing `withConnection` wrap (Rails
  * threads the `with_connection` connection through query building) so the read
  * stays off the deprecated `.connection` getter — which would flip the lease
  * permanent under `permanent_connection_checkout = :deprecated|:disallowed` when

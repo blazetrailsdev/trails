@@ -30,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "with_connection",
-    "reason": "Verified per-site (RFC 0106): same arm as the `skip_query_cache_if_necessary` row — `model.with_connection { |c| c.distinct_relation_for_primary_key(relation) }` (finder_methods.rb:474-476) is only reachable from the awaitable `_applyJoinDependencyAsync`, since the synchronous entry point cannot run the query."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "arel",
     "call": "build_arel",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -79,23 +72,9 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "compute_cache_version",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "create",
     "call": "relation_class_for",
     "reason": "Verified per-site (RFC 0106): homonym. `relation_class_for` is called by `Relation::ClassMethods.create(model, ...)` (delegation.rb:139-141), the relation-class constructor; relation.ts's `create` ports the unrelated `Relation#create(attributes, &block)` (relation.rb:154-161), which makes no such call."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "create_or_find_by",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -123,13 +102,6 @@
     "tsFile": "relation.ts",
     "rubyName": "exec_explain",
     "call": "render_bind",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_explain",
-    "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -184,30 +156,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "ids",
-    "call": "type_cast_pluck_values",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:result",
-      "ref:columns"
-    ],
-    "tsArgs": [
-      "ref:result",
-      "ref:columns",
-      "ref:this"
-    ],
-    "reason": "Per-entry verified (calculations.rb:402): Rails calls the private `type_cast_pluck_values` on implicit self. Its trails port is a module function in relation/calculations.ts taking the relation as its trailing parameter — the settled shape for a Ruby private method with no class member to hang on — so the call site carries a `this` the Ruby call has no slot for. The leading arguments match Rails one for one."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "ids",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "in_batches",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
@@ -217,13 +165,6 @@
     "tsFile": "relation.ts",
     "rubyName": "instantiate_records",
     "call": "instantiate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "load_async",
-    "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -245,13 +186,6 @@
     "tsFile": "relation.ts",
     "rubyName": "pluck",
     "call": "all_attributes?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "pluck",
-    "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -295,13 +229,6 @@
     "rubyName": "to_sql",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "to_sql",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

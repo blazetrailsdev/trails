@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Rollback } from "./errors.js";
 export { Rollback };
-import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor } from "./connection-handling.js";
 
 import { Transaction } from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
@@ -94,14 +94,12 @@ export async function transaction<T>(
 
   // Mirrors Rails `ActiveRecord::Transactions::ClassMethods#transaction`, which
   // runs inside `with_connection { |c| c.transaction(...) }` and threads the
-  // yielded connection. Reading `threadedConnectionFor()` (the threaded
+  // yielded connection. Taking the yielded connection (the block parameter
   // connection) instead of the deprecated `.connection` getter keeps the build/
   // callback path from flipping the lease permanent under
   // `permanent_connection_checkout = :deprecated | :disallowed`, so the pool
   // releases the connection once the transaction completes.
-  return withQueryConnection(modelClass, async () => {
-    const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
-
+  return modelClass.withConnection(async (adapter) => {
     const result = await dbTransaction.call(
       adapter as any,
       async (userTx?: unknown) => {
@@ -572,11 +570,10 @@ export async function withTransactionReturningStatus<T>(
   // Wrap in `with_connection` so the `ensure_finalize` connection probe and the
   // nested transaction don't permanently lease a connection under
   // `permanent_connection_checkout = :deprecated | :disallowed`. The yielded
-  // connection is threaded via `threadedConnectionFor()` rather than re-read
-  // off the deprecated `.connection` getter (matching Rails' block parameter).
-  await withQueryConnection(modelClass, async () => {
+  // connection is taken from the block parameter rather than re-read off the
+  // deprecated `.connection` getter, matching Rails.
+  await modelClass.withConnection(async (adapter) => {
     // Mirrors Rails' `ensure_finalize = !connection.transaction_open?`.
-    const adapter = threadedConnectionFor(modelClass) ?? modelClass.connection;
     const hadOuterTransaction = currentTransaction() !== null || adapter.inTransaction;
 
     await transaction(modelClass, async () => {

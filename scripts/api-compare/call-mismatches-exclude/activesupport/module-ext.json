@@ -96,23 +96,5 @@
     "rubyName": "mattr_writer",
     "call": "module_eval",
     "reason": "Same as `mattr_reader`: Rails `module_eval`s a source string (module/attribute_accessors.rb:138), trails defines a property descriptor."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "module_parent",
-    "call": "module_parent_name",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "module_parents",
-    "call": "module_parent_name",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   }
 ]

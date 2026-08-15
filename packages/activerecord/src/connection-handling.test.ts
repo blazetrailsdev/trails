@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
-import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecord } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
@@ -190,6 +190,12 @@ describe("ConnectionHandlingTest", () => {
     expect(Post.connectionPool().activeConnection).toBeNull();
 
     await Post.count();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.all().ids();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.all().pluck("title");
     expect(Post.connectionPool().activeConnection).toBeNull();
   });
 
@@ -854,7 +860,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
 });
 
 // trails-internal mechanism (no Rails counterpart): the connection threaded by
-// `withQueryConnection` is only adopted by a model's internal reads when it
+// `withConnection` is only adopted by a model's internal reads when it
 // belongs to *that model's own pool*, so a statement for a different-pool model
 // running inside an outer wrap (cross-database eager-load, or `update_columns`
 // inside another model's `transaction` block) resolves against its own pool
@@ -882,7 +888,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
   });
 
   it("adopts the threaded connection for its own pool but not a foreign pool", async () => {
-    await withQueryConnection(Base, async () => {
+    await Base.withConnection(async () => {
       const threaded = Base.connectionPool().activeConnection;
       expect(threaded).toBeTruthy();
       // Same pool: the threaded connection is adopted.
@@ -894,7 +900,7 @@ describe("threadedConnectionFor pool-identity guard", () => {
     });
   });
 
-  it("returns null outside any withQueryConnection wrap", async () => {
+  it("returns null outside any withConnection wrap", async () => {
     expect(threadedConnectionFor(Base)).toBeNull();
   });
 });
