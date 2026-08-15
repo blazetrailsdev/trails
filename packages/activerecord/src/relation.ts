@@ -6395,7 +6395,11 @@ export class Relation<T extends Base> {
     return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
   }
 
-  bindAttribute<R>(name: string, value: unknown, block: (attr: any, bind: any) => R): R {
+  bindAttribute<R>(
+    name: string,
+    value: unknown,
+    block: (attr: Nodes.Attribute, bind: QueryAttribute) => R,
+  ): R {
     const reflection = this.model._reflectOnAssociation(name);
     if (reflection) {
       name = reflection.foreignKey as string;
