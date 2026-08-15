@@ -1,6 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { camelize } from "@blazetrails/activesupport";
 import { resolveValue } from "./resolve-value.js";
 
 /**
@@ -36,16 +37,6 @@ const CHECKS: Record<CheckKey, (valueLength: number, checkValue: number) => bool
   is: (valueLength, checkValue) => valueLength === checkValue,
   minimum: (valueLength, checkValue) => valueLength >= checkValue,
   maximum: (valueLength, checkValue) => valueLength <= checkValue,
-};
-
-/**
- * `options[MESSAGES[key]]` (length.rb:61) under the camelCase option spelling.
- * @internal
- */
-const DEFAULT_MESSAGE_OPTIONS: Record<CheckKey, string> = {
-  is: "wrongLength",
-  minimum: "tooShort",
-  maximum: "tooLong",
 };
 
 /** Rails-style range object accepted by the `:in` / `:within` option. */
@@ -128,27 +119,24 @@ export class LengthValidator extends EachValidator {
     // Rails length.rb:50 — `value.respond_to?(:length) ? value.length : value.to_s.length`.
     // For nil → 0 (nil.to_s.length); for non-nil values without a .length
     // (numbers, booleans, plain objects) → String(value).length.
-    let length: number;
+    let valueLength: number;
     if (typeof value === "string" || Array.isArray(value)) {
-      length = value.length;
+      valueLength = value.length;
     } else if (
       typeof value === "object" &&
       value !== null &&
       "length" in value &&
       typeof (value as { length: unknown }).length === "number"
     ) {
-      length = (value as { length: number }).length;
+      valueLength = (value as { length: number }).length;
     } else if (value == null) {
-      length = 0;
+      valueLength = 0;
     } else {
-      length = String(value).length;
+      valueLength = String(value).length;
     }
 
     // Rails length.rb:49 — `errors_options = options.except(*RESERVED_OPTIONS)`
-    const baseOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
-
-    // Rails length.rb:51-65 — iterate CHECKS, skip absent constraints.
-    const errorsOptions = baseOptions;
+    const errorsOptions = this.filteredErrorOptions([...RESERVED_OPTIONS]);
 
     for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
       [CheckKey, (valueLength: number, checkValue: number) => boolean]
@@ -158,12 +146,12 @@ export class LengthValidator extends EachValidator {
 
       if (value != null || this.skipNilCheck(key)) {
         checkValue = resolveLengthOpt.call(this, record, checkValue);
-        if (validityCheck(length, checkValue as number)) continue;
+        if (validityCheck(valueLength, checkValue as number)) continue;
       }
 
       errorsOptions["count"] = checkValue;
 
-      const defaultMessage = this.options[DEFAULT_MESSAGE_OPTIONS[key]];
+      const defaultMessage = this.options[camelize(MESSAGES[key].slice(1), false)];
       if (defaultMessage != null && errorsOptions["message"] == null) {
         errorsOptions["message"] = defaultMessage;
       }

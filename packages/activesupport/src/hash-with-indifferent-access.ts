@@ -17,11 +17,7 @@ export class HashWithIndifferentAccess<V = unknown> {
   constructor(constructor?: AnyObject | Map<string, V> | HashWithIndifferentAccess<V>) {
     this.data = new Map();
     if (constructor) {
-      if (constructor instanceof HashWithIndifferentAccess) {
-        for (const [key, value] of constructor.data) {
-          this.data.set(key, value);
-        }
-      } else if (constructor instanceof Map) {
+      if (constructor instanceof Map) {
         for (const [key, value] of constructor) {
           this.data.set(String(key), value);
         }
