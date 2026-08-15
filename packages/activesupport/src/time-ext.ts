@@ -758,8 +758,9 @@ export function toDate(date: Date): Temporal.PlainDate {
  * Mirrors: `DateTime.civil_from_format`
  * (`core_ext/date_time/conversions.rb:69-76`). Ruby's `offset` is a Rational
  * fraction of a day, which is how `civil` takes it; `Temporal` takes the same
- * offset as the zone the wall clock is read in, so the `Time.local(...)
- * .utc_offset` the `:local` arm reads is `TimeZone#local`'s own offset.
+ * offset as the zone the wall clock is read in, so the `:local` arm reads
+ * `Time.local(year, month, day).utc_offset` off a bare ruby/date `Time`,
+ * exactly as Ruby does.
  */
 export function civilFromFormat(
   utcOrLocal: string,
@@ -772,7 +773,7 @@ export function civilFromFormat(
 ): Temporal.ZonedDateTime {
   let offset: number;
   if (utcOrLocal === "local") {
-    offset = TimeZone.find(Temporal.Now.timeZoneId())!.local(year, month, day).utcOffset;
+    offset = RubyTime.local(year, month, day).utcOffset;
   } else {
     offset = 0;
   }

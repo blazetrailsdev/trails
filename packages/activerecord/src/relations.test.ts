@@ -2569,8 +2569,18 @@ describe("RelationTest", () => {
     });
   });
 
-  it("#skip_query_cache! with a preload", () => {
-    expect(Post.all()).toBeInstanceOf(Relation);
+  it("#skip_query_cache! with a preload", async () => {
+    await Post.cache(async () => {
+      await assertQueriesCount(2, false, async () => {
+        await Post.preload("comments").load();
+        await Post.preload("comments").load();
+      });
+
+      await assertQueriesCount(4, false, async () => {
+        await Post.preload("comments").skipQueryCacheBang().load();
+        await Post.preload("comments").skipQueryCacheBang().load();
+      });
+    });
   });
 
   it("#where with set", async () => {

@@ -15,15 +15,17 @@ import { ArgumentError } from "../../time-zone-config.js";
  * Mirrors: `Date#to_time` (`core_ext/date/conversions.rb:83-86`) —
  * `::Time.public_send(form, year, month, day)`.
  *
- * **The bare-`Time` equivalence, recorded once.** Ruby answers a bare `Time`:
- * the day's midnight read in the system zone (`:local`) or in UTC. trails has
- * no bare-`Time` receiver — `time-ext.ts` is a free-function module over JS
- * `Date`, not a class — so the value is carried by a `TimeWithZone` on that
- * same zone. `TimeZone#local` builds exactly `Time.local`'s wall clock in the
- * zone it names, so this answers Ruby's instant with Ruby's components; the
- * receiver's class is the only difference. Callers that delegate to `to_time`
- * (`Date#in_time_zone`'s `else` arm, `date/calculations.rb:55-87`) therefore
- * keep Rails' single delegating expression instead of a two-arm dispatch.
+ * **The bare-`Time` equivalence, narrowed to this call site.** Ruby answers a
+ * bare `Time`: the day's midnight read in the system zone (`:local`) or in UTC.
+ * Here the value is carried by a `TimeWithZone` on that same zone, because the
+ * `Date#to_time` callers in this package consume a zone-carrying receiver —
+ * `Date#in_time_zone`'s `else` arm (`date/calculations.rb:55-87`) delegates
+ * straight through, so keeping Rails' single delegating expression means
+ * answering it here. `TimeZone#local` builds exactly `Time.local`'s wall clock
+ * in the zone it names, so this answers Ruby's instant with Ruby's components;
+ * the receiver's class is the only difference. It is no longer a stand-in for a
+ * missing constructor: `@blazetrails/date`'s `Time.local` (the `Time.mktime`
+ * alias) is what `DateTime.civil_from_format` reads its offset off.
  */
 export function toTime(date: Temporal.PlainDate, form: string = "local"): TimeWithZone {
   if (!["local", "utc"].includes(form)) {
