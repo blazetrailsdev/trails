@@ -99,19 +99,9 @@ import {
   Calculations,
   type CalculationMethods,
   groupColumnToArel,
-  aggregateColumn as _aggregateColumn,
-  isAllAttributes as _isAllAttributes,
+  isAllAttributes,
   hasInclude as _hasInclude,
-  isDistinctSelect as _isDistinctSelect,
-  operationOverAggregateColumn as _operationOverAggregateColumn,
-  executeSimpleCalculation as _executeSimpleCalculation,
-  executeGroupedCalculation as _executeGroupedCalculation,
-  typeFor as _typeFor,
-  lookupCastTypeFromJoinDependencies as _lookupCastTypeFromJoinDependencies,
-  typeCastPluckValues as _typeCastPluckValues,
-  typeCastCalculatedValue as _typeCastCalculatedValue,
-  selectForCount as _selectForCount,
-  isBuildCountSubquery as _isBuildCountSubquery,
+  typeCastPluckValues,
 } from "./relation/calculations.js";
 import * as _fm from "./relation/finder-methods.js";
 import { FinderMethods } from "./relation/finder-methods.js";
@@ -2895,9 +2885,18 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#pick
    */
   async pick(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown> {
-    const values = await this.limit(1).pluck(...columns);
+    if (this.loaded && isAllAttributes(this as any, columnNames as unknown as string[])) {
+      const records = await this.records();
+      if (records.length === 0) return null;
+      const first = records[0] as unknown as { get(attrName: string): unknown };
+      return columnNames.length > 1
+        ? columnNames.map((columnName) => first.get(String(columnName)))
+        : first.get(String(columnNames[0]));
+    }
+
+    const values = await this.limit(1).pluck(...columnNames);
     return values[0] ?? null;
   }
 
@@ -3538,7 +3537,7 @@ export class Relation<T extends Base> {
     // Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
     if (this._whereClause.isContradiction()) {
-      return this.typeCastPluckValues(Result.empty(), columns);
+      return typeCastPluckValues(Result.empty(), columns, this as any);
     }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
@@ -3672,7 +3671,7 @@ export class Relation<T extends Base> {
     // Type-cast results positionally through each result column's type
     // (model attribute type → join dependency → driver OID → identity),
     // mirroring Rails' Calculations#type_cast_pluck_values.
-    return this.typeCastPluckValues(result, columns);
+    return typeCastPluckValues(result, columns, this as any);
   }
 
   /**
@@ -3681,7 +3680,47 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#ids
    */
   async ids(): Promise<unknown[]> {
-    return this.pluck(this.model.primaryKey as string);
+    const primaryKey = this.model.primaryKey;
+    const primaryKeyArray = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+
+    if (this.loaded) {
+      return this._records.map((record) => {
+        const r = record as unknown as { _readAttribute(name: string): unknown };
+        return primaryKeyArray.length === 1
+          ? r._readAttribute(primaryKeyArray[0])
+          : primaryKeyArray.map((column) => r._readAttribute(column));
+      });
+    }
+
+    if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], primaryKey as string)) {
+      // DIVERGENCE (calculations.rb:387-390): Rails re-enters `ids` on
+      // `apply_join_dependency.group(*primary_key_array)`. trails'
+      // `applyJoinDependency` early-returns for a non-referencing `includes`, so
+      // re-entering here would recurse forever; `pluck` owns the eager arm and the
+      // `distinct_relation_for_primary_key` materialization Rails does under
+      // limit/offset (finder_methods.rb:463).
+      return this.pluck(...primaryKeyArray);
+    }
+
+    return this._withQueryConnection(async () => {
+      await (
+        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
+      ).ensureSchemaLoaded();
+      await this._materializeDeferredDistinctPkPredicates();
+
+      const columns = this.arelColumns(primaryKeyArray);
+      const relation = this._clone();
+      relation._selectColumns = columns as never[];
+
+      const result = this._whereClause.isContradiction()
+        ? Result.empty()
+        : await this.skipQueryCacheIfNecessary(async () => {
+            const [sql, binds] = this._compileAstWithBinds(relation._buildArel().ast);
+            return this._conn().selectAll(sql, `${this.model.name} Ids`, binds);
+          });
+
+      return typeCastPluckValues(result, columns, this as any);
+    });
   }
 
   /**
@@ -7182,95 +7221,6 @@ export class Relation<T extends Base> {
   /** @internal */
   private structurallyIncompatibleValuesFor(other: unknown): string[] {
     return _qm.structurallyIncompatibleValuesFor(this as any, other as any);
-  }
-
-  // ---------------------------------------------------------------------------
-  // PR 37b — calculation privates (delegates to relation/calculations.ts)
-  // Mirrors: ActiveRecord::Calculations private helpers
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  private aggregateColumn(columnName: string): unknown {
-    return _aggregateColumn(this as any, columnName);
-  }
-
-  /** @internal */
-  private isAllAttributes(columnNames: string[]): boolean {
-    return _isAllAttributes(this as any, columnNames);
-  }
-
-  /** @internal */
-  private hasInclude(columnName: string | null): boolean {
-    return _hasInclude(this as any, columnName);
-  }
-
-  /** @internal */
-  private isDistinctSelect(columnName: string): boolean {
-    return _isDistinctSelect(this as any, columnName);
-  }
-
-  /** @internal */
-  private operationOverAggregateColumn(
-    column: unknown,
-    operation: string,
-    distinct: boolean,
-  ): unknown {
-    return _operationOverAggregateColumn(column, operation, distinct);
-  }
-
-  /** @internal */
-  private async executeSimpleCalculation(
-    operation: string,
-    columnName: Parameters<typeof _executeSimpleCalculation>[2],
-    distinct: boolean,
-  ): Promise<unknown> {
-    return _executeSimpleCalculation(this as any, operation, columnName, distinct);
-  }
-
-  /** @internal */
-  private async executeGroupedCalculation(
-    operation: string,
-    columnName: Parameters<typeof _executeGroupedCalculation>[2],
-    distinct: boolean,
-  ): Promise<Record<string, unknown> | Map<unknown, unknown>> {
-    return _executeGroupedCalculation(this as any, operation, columnName, distinct);
-  }
-
-  /** @internal */
-  private typeFor(field: string): unknown {
-    return _typeFor(this as any, field);
-  }
-
-  /** @internal */
-  private lookupCastTypeFromJoinDependencies(name: string): unknown {
-    return _lookupCastTypeFromJoinDependencies(this as any, name);
-  }
-
-  /** @internal */
-  private typeCastPluckValues(
-    result: import("./result.js").Result,
-    columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral | unknown>,
-  ): unknown[] {
-    return _typeCastPluckValues(result, columns, this as any);
-  }
-
-  /** @internal */
-  private typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
-    return _typeCastCalculatedValue(value, operation, type);
-  }
-
-  /** @internal */
-  private selectForCount(): string {
-    return _selectForCount(this as any);
-  }
-
-  /** @internal */
-  private isBuildCountSubquery(
-    operation: string,
-    columnName: string | string[] | Nodes.Node | null,
-    distinct: boolean,
-  ): boolean {
-    return _isBuildCountSubquery(this as any, operation, columnName, distinct);
   }
 
   // ---------------------------------------------------------------------------

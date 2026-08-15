@@ -1653,34 +1653,40 @@ describe("CalculationsTest", () => {
   });
 
   it("pick loaded relation", async () => {
-    const companies = await Company.order("id").limit(3);
-    const rel = Company.order("id").limit(3);
-    await rel;
-    const name = await rel.pick("name");
-    expect(name).toBe("37signals");
-    void companies;
+    const companies = Company.order("id").limit(3);
+    await companies.load();
+
+    await assertNoQueries(false, async () => {
+      expect(await companies.pick("name")).toBe("37signals");
+    });
   });
 
   it("pick loaded relation multiple columns", async () => {
-    const rel = Company.order("id").limit(3);
-    await rel;
-    const result = (await rel.pick("id", "name")) as [unknown, string];
-    expect([Number(result[0]), result[1]]).toEqual([1, "37signals"]);
+    const companies = Company.order("id").limit(3);
+    await companies.load();
+
+    await assertNoQueries(false, async () => {
+      const result = (await companies.pick("id", "name")) as [unknown, string];
+      expect([Number(result[0]), result[1]]).toEqual([1, "37signals"]);
+    });
   });
 
   it("pick loaded relation sql fragment", async () => {
-    const rel = Company.order("name").limit(3);
-    await rel;
-    const name = await rel.pick(arelSql("DISTINCT name"));
-    expect(name).toBe("37signals");
+    const companies = Company.order("name").limit(3);
+    await companies.load();
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await companies.pick(arelSql("DISTINCT name"))).toBe("37signals");
+    });
   });
 
   it("pick loaded relation aliased attribute", async () => {
-    // Rails: pick(:new_name) uses aliasAttribute new_name→name.
-    const rel = Company.order("id").limit(3);
-    await rel;
-    const name = await rel.pick("name");
-    expect(name).toBe("37signals");
+    const companies = Company.order("id").limit(3);
+    await companies.load();
+
+    await assertNoQueries(false, async () => {
+      expect(await companies.pick("newName")).toBe("37signals");
+    });
   });
 
   it("grouped calculation with polymorphic relation", async () => {
@@ -1911,15 +1917,31 @@ describe("CalculationsTest", () => {
   });
 
   it("#skip_query_cache! for a simple calculation", async () => {
-    const r1 = await Account.calculate("sum", "credit_limit");
-    const r2 = await Account.all().calculate("sum", "credit_limit");
-    expect(r1).toBe(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.calculate("sum", "credit_limit");
+        await Account.calculate("sum", "credit_limit");
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
+        await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
+      });
+    });
   });
 
   it("#skip_query_cache! for a grouped calculation", async () => {
-    const r1 = await Account.group("firm_id").calculate("sum", "credit_limit");
-    const r2 = await Account.all().group("firm_id").calculate("sum", "credit_limit");
-    expect(r1).toEqual(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.group("firm_id").calculate("sum", "credit_limit");
+        await Account.group("firm_id").calculate("sum", "credit_limit");
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
+        await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
+      });
+    });
   });
 
   it("group alias is properly quoted", async () => {

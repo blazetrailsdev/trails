@@ -429,7 +429,14 @@ async function groupedAggregate(
       ? wrapBigintAgg(rawSql, aliases, aggAlias)
       : rawSql;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-  const queryResult = await rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds);
+  // calculations.rb:521: the grouped SELECT runs inside
+  // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
+  // bypass the query cache exactly as the simple arm does.
+  const queryResult = await (
+    rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
+  ).skipQueryCacheIfNecessary(() =>
+    rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds),
+  );
   const rows = queryResult.toArray();
 
   // calculations.rb:591: every group's aggregate folds through the same
@@ -842,46 +849,25 @@ export function performCalculation(
   // Arel.star — calculations.rb:414-423).
   let distinct: boolean | null = rel._isDistinct;
   if (operation === "count") {
-    columnName ??= (rel as any).selectForCount();
+    columnName ??= selectForCount(rel);
     if (columnName === "*" || columnName === "all") {
       if (!distinct) {
-        if (rel._groupColumns.length === 0)
-          distinct = (rel as any).isDistinctSelect((rel as any).selectForCount());
+        if (rel._groupColumns.length === 0) distinct = isDistinctSelect(rel, selectForCount(rel));
       } else if (
         any(rel.groupValues) ||
         (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
       ) {
         columnName = rel.primaryKey;
       }
-    } else if ((rel as any).isDistinctSelect(columnName)) {
+    } else if (isDistinctSelect(rel, columnName)) {
       distinct = null;
     }
   }
 
   if (any(rel.groupValues)) {
-    return dispatchTarget(rel).executeGroupedCalculation(operation, columnName, distinct);
+    return executeGroupedCalculation(rel, operation, columnName, distinct);
   }
-  return dispatchTarget(rel).executeSimpleCalculation(operation, columnName, distinct);
-}
-
-// Rails' `perform_calculation` calls its two private siblings directly
-// (calculations.rb:455-457). They are `private` on `Relation` too, and a TS
-// `private` member cannot satisfy a public interface member, so the dispatch
-// reaches them through this structural view rather than `any` — the column name
-// keeps the type `perform_calculation` resolved it to.
-function dispatchTarget(rel: CalculationRelation): {
-  executeSimpleCalculation(
-    operation: string,
-    columnName: string | string[] | Nodes.Node | number | null,
-    distinct: boolean | null,
-  ): Promise<unknown>;
-  executeGroupedCalculation(
-    operation: string,
-    columnName: string | string[] | Nodes.Node | number | null,
-    distinct: boolean | null,
-  ): Promise<unknown>;
-} {
-  return rel as never;
+  return executeSimpleCalculation(rel, operation, columnName, distinct);
 }
 
 /** @internal */
