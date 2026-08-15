@@ -4,7 +4,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "can_remove_index_by_name?",
     "call": "empty?",
-    "reason": "RFC 0106: Ruby Hash#empty? — trails has no `isEmpty` object helper, so the port counts remaining keys (schema_statements.rb:1829-1831)."
+    "reason": "Pre-existing divergence, newly SURFACED (not introduced) by story call-args-ar-select-all-empty-async-row: `Result.empty` gained Rails' `async:` kwarg (result.rb:94-100), which flips `isPortedWithArgs(\"empty\")` true, so compare.ts gate 2 stops suppressing every `empty`/`empty?` call whose TS spelling is a zero-arg reader. The TS bodies are unchanged."
   },
   {
     "package": "activerecord",
@@ -53,7 +53,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "foreign_keys_enabled?",
     "call": "fetch",
-    "reason": "RFC 0106: Ruby Hash#fetch(:foreign_keys, true) — the port reads `_config` with a nullish default; converging needs the Hash#fetch idiom class of RFC 0082 (schema_statements.rb:1783-1785)."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_statements.rb:1783-1785 is `@config.fetch(:foreign_keys, true)` — key-present semantics, so an explicitly configured nil stays falsy; trails schema-statements.ts:2487-2493 reads `adapter._config?.foreignKeys !== false`, which coerces null (and any non-false value) to true. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
   },
   {
     "package": "activerecord",
