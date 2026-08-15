@@ -3530,8 +3530,8 @@ export class Relation<T extends Base> {
     // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
     await this._materializeDeferredDistinctPkPredicates();
     // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
-    // an empty `IN`) returns `ActiveRecord::Result.empty` — i.e. `[]` — without
-    // issuing SQL. Checked after materialization so a deferred distinct-PK
+    // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
+    // Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
     if (this._whereClause.isContradiction()) {
       return this.typeCastPluckValues(Result.empty(), columns);

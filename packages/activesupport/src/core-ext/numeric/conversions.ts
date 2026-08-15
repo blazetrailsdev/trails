@@ -22,6 +22,13 @@ export namespace NumericWithFormat {
    *     toFs(1234567890.5, ":currency")            // => "$1,234,567,890.50"
    *     toFs(12345678, ":delimited")               // => "12,345,678"
    *     toFs(1234, ":human_size")                  // => "1.21 KB"
+   *
+   * Ruby's `when Integer, String` arm passes the format to `Integer#to_s` as a
+   * base; a Ruby Symbol is a colon-prefixed string in trails, which is what
+   * separates that arm from the format Symbols below. Ruby's trailing
+   * `else to_s(format)` arm takes a format that is none of those three types,
+   * which this parameter type excludes, so the `when Symbol` fallback to `to_s`
+   * is the last arm here.
    */
   export function toFs(
     self: number,
@@ -30,9 +37,6 @@ export namespace NumericWithFormat {
   ): string {
     if (format === null) return String(self);
 
-    // `when Integer, String` — a base for `Integer#to_s`. A Ruby Symbol is a
-    // colon-prefixed string in trails, which is what separates this arm from
-    // the format arms below (a String format never carries the colon).
     if (typeof format === "number" || !format.startsWith(":")) {
       return self.toString(format as number);
     }
@@ -53,13 +57,10 @@ export namespace NumericWithFormat {
       case ":human_size":
         return NumberHelper.numberToHumanSize(self, options ?? {});
       default:
-        // `when Symbol` — an unrecognized format Symbol falls back to `to_s`.
-        // Ruby's trailing `else to_s(format)` arm takes a non-Symbol,
-        // non-Integer, non-String format, which this parameter type excludes.
         return String(self);
     }
   }
 
-  // `alias_method :to_formatted_s, :to_fs` — conversions.rb:145.
+  /** `alias_method :to_formatted_s, :to_fs` — conversions.rb:145. */
   export const toFormattedS = toFs;
 }
