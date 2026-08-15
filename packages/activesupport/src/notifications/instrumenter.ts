@@ -69,6 +69,23 @@ export class Event {
     }
   }
 
+  /**
+   * @internal trails splits Ruby's one blocking `Event#record` into a sync and
+   * an awaiting form, as it does for `Notifications.instrument` /
+   * `instrumentAsync` (instrumenter.rb:59-67).
+   */
+  async recordAsync<T = void>(fn?: (payload: EventPayload) => Promise<T>): Promise<T> {
+    this.startBang();
+    try {
+      return fn ? await fn(this.payload) : (undefined as unknown as T);
+    } catch (e) {
+      _recordException(this.payload, e);
+      throw e;
+    } finally {
+      this.finishBang();
+    }
+  }
+
   /** Record information at the time this event starts */
   startBang(): void {
     this._time = this.now();

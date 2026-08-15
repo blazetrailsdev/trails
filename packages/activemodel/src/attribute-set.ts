@@ -9,7 +9,7 @@ const LAZY_ATTR = Symbol("lazyAttr");
  * Mirrors: ActiveModel::AttributeSet
  */
 export class AttributeSet {
-  private attributes: Map<string, Attribute>;
+  protected _attributes: Map<string, Attribute>;
   private _frozen = false;
 
   /**
@@ -19,7 +19,7 @@ export class AttributeSet {
    * backing attribute map (every entry, initialized or not).
    */
   eachValue(fn: (attr: Attribute) => void): void {
-    for (const attr of this.attributes.values()) fn(attr);
+    for (const attr of this.attributes().values()) fn(attr);
   }
 
   /**
@@ -30,7 +30,7 @@ export class AttributeSet {
    * Mirrors: `delegate :fetch, to: :attributes`.
    */
   fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
-    const attr = this.attributes.get(name);
+    const attr = this.attributes().get(name);
     if (attr !== undefined) return attr;
     if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
@@ -47,26 +47,26 @@ export class AttributeSet {
   except(...names: string[]): Map<string, Attribute> {
     const drop = new Set(names);
     const result = new Map<string, Attribute>();
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       if (!drop.has(name)) result.set(name, attr);
     }
     return result;
   }
 
   constructor(attributes: Map<string, Attribute> = new Map()) {
-    this.attributes = attributes;
+    this._attributes = attributes;
   }
 
   /**
    * Get the Attribute instance for a name.
    */
   getAttribute(name: string): Attribute {
-    return this.attributes.get(name) ?? this.defaultAttribute(name);
+    return this._attributes.get(name) ?? this.defaultAttribute(name);
   }
 
   castTypes(): Record<string, import("./type/value.js").Type> {
     const result: Record<string, import("./type/value.js").Type> = {};
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       result[name] = attr.type;
     }
     return result;
@@ -74,7 +74,7 @@ export class AttributeSet {
 
   valuesBeforeTypeCast(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       if (attr.isInitialized()) {
         result[name] = attr.valueBeforeTypeCast;
       }
@@ -84,7 +84,7 @@ export class AttributeSet {
 
   valuesForDatabase(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       if (attr.isInitialized()) {
         result[name] = attr.valueForDatabase;
       }
@@ -93,7 +93,7 @@ export class AttributeSet {
   }
 
   isKey(name: string): boolean {
-    const attr = this.attributes.get(name);
+    const attr = this.attributes().get(name);
     return attr !== undefined && attr.isInitialized();
   }
 
@@ -108,7 +108,7 @@ export class AttributeSet {
 
   keys(): string[] {
     const result: string[] = [];
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       if (attr.isInitialized()) result.push(name);
     }
     return result;
@@ -138,9 +138,9 @@ export class AttributeSet {
     type?: { deserialize(value: unknown): unknown },
   ): void {
     this.assertNotFrozen();
-    const existing = this.attributes.get(name);
+    const existing = this._attributes.get(name);
     if (existing) {
-      this.attributes.set(name, existing.withValueFromDatabase(value));
+      this._attributes.set(name, existing.withValueFromDatabase(value));
     } else {
       // An unknown column (e.g. a computed/aliased extra `select`) is not in the
       // schema, so there is no declared cast type. Rails type-casts it with the
@@ -152,7 +152,7 @@ export class AttributeSet {
       // exercised for an unknown column — one localized cast here keeps the
       // public param structural and the call sites cast-free.
       const colType = (type as import("./type/value.js").Type) ?? typeRegistry.lookup("value");
-      this.attributes.set(name, Attribute.fromDatabase(name, value, colType));
+      this._attributes.set(name, Attribute.fromDatabase(name, value, colType));
     }
   }
 
@@ -165,20 +165,20 @@ export class AttributeSet {
     // always warm at construction (RFC 0031), every real column — selected or
     // not — is already in the set, so map-absence now reliably means "unknown
     // column" and the Null fallthrough raises exactly like Rails.
-    this.attributes.set(name, this.getAttribute(name).withValueFromUser(value));
+    this._attributes.set(name, this.getAttribute(name).withValueFromUser(value));
     return value;
   }
 
   writeCastValue(name: string, value: unknown): void {
     this.assertNotFrozen();
-    this.attributes.set(name, this.getAttribute(name).withCastValue(value));
+    this._attributes.set(name, this.getAttribute(name).withCastValue(value));
   }
 
   deepDup(): AttributeSet {
     const newAttrs = new Map<string, Attribute>();
     const cache = new Map<Attribute, Attribute>();
 
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       newAttrs.set(name, this.cloneAttribute(attr, cache));
     }
 
@@ -193,7 +193,7 @@ export class AttributeSet {
 
   accessed(): string[] {
     const result: string[] = [];
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       if (attr.hasBeenRead()) result.push(name);
     }
     return result;
@@ -201,7 +201,7 @@ export class AttributeSet {
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
     const newAttributes = new Map<string, Attribute>();
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       newAttributes.set(name, fn(attr));
     }
     return new AttributeSet(newAttributes);
@@ -212,10 +212,20 @@ export class AttributeSet {
     const cache = new Map<Attribute, Attribute>();
     target.forEach((attr, name) => {
       if (!this.isKey(name)) {
-        this.attributes.set(name, this.cloneAttribute(attr, cache));
+        this._attributes.set(name, this.cloneAttribute(attr, cache));
       }
     });
     return this;
+  }
+
+  /**
+   * The backing attribute map.
+   *
+   * Mirrors: `protected attr_reader :attributes` — the seam LazyAttributeSet
+   * overrides to materialize its lazy values before any bulk read.
+   */
+  protected attributes(): Map<string, Attribute> {
+    return this._attributes;
   }
 
   /** @internal */
@@ -239,7 +249,7 @@ export class AttributeSet {
     type: { deserialize(value: unknown): unknown },
   ): void {
     this.assertNotFrozen();
-    this.attributes.set(
+    this._attributes.set(
       name,
       Attribute.fromDatabase(name, value, type as import("./type/value.js").Type),
     );
@@ -258,9 +268,9 @@ export class AttributeSet {
    */
   rebindFromDatabaseValue(name: string, value: unknown): void {
     this.assertNotFrozen();
-    const existing = this.attributes.get(name);
+    const existing = this._attributes.get(name);
     const type = existing ? existing.type : typeRegistry.lookup("value");
-    this.attributes.set(name, Attribute.fromDatabase(name, value, type, value));
+    this._attributes.set(name, Attribute.fromDatabase(name, value, type, value));
   }
 
   /**
@@ -289,7 +299,7 @@ export class AttributeSet {
    * Get the cast value of an attribute (backward-compatible with Map.get).
    */
   get(name: string): unknown {
-    const attr = this.attributes.get(name);
+    const attr = this._attributes.get(name);
     if (!attr) return undefined;
     return attr.value;
   }
@@ -297,11 +307,11 @@ export class AttributeSet {
   set(name: string, attrOrValue: Attribute | unknown): void {
     this.assertNotFrozen();
     if (attrOrValue instanceof Attribute) {
-      this.attributes.set(name, attrOrValue);
+      this._attributes.set(name, attrOrValue);
     } else {
-      const existing = this.attributes.get(name);
+      const existing = this._attributes.get(name);
       const type = existing ? existing.type : typeRegistry.lookup("value");
-      this.attributes.set(name, Attribute.withCastValue(name, attrOrValue, type));
+      this._attributes.set(name, Attribute.withCastValue(name, attrOrValue, type));
     }
   }
 
@@ -320,7 +330,7 @@ export class AttributeSet {
   }
 
   has(name: string): boolean {
-    const attr = this.attributes.get(name);
+    const attr = this._attributes.get(name);
     return attr !== undefined && attr.isInitialized();
   }
 
@@ -348,10 +358,10 @@ export class AttributeSet {
   ): void {
     this.assertNotFrozen();
     const keep = names instanceof Set ? names : new Set(names);
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this._attributes) {
       if (keep.has(name)) continue;
       const type = (overrideTypes?.[name] as import("./type/value.js").Type) ?? attr.type;
-      this.attributes.set(name, Attribute.uninitialized(name, type));
+      this._attributes.set(name, Attribute.uninitialized(name, type));
     }
   }
 
@@ -371,7 +381,7 @@ export class AttributeSet {
    */
   snapshotValues(): Map<string, unknown> {
     const result = new Map<string, unknown>();
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this._attributes) {
       if (attr.isInitialized()) {
         if (attr.hasBeenRead()) {
           result.set(name, attr.value);
@@ -398,7 +408,7 @@ export class AttributeSet {
 
   delete(name: string): boolean {
     this.assertNotFrozen();
-    return this.attributes.delete(name);
+    return this._attributes.delete(name);
   }
 
   protected cloneAttribute(attr: Attribute, cache: Map<Attribute, Attribute>): Attribute {
@@ -424,7 +434,7 @@ export class AttributeSet {
   }
 
   forEach(fn: (attr: Attribute, name: string) => void): void {
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this.attributes()) {
       fn(attr, name);
     }
   }
@@ -435,7 +445,7 @@ export class AttributeSet {
 
   /** Whether `name` is present in the internal map (initialized or not). */
   protected hasAttribute(name: string): boolean {
-    return this.attributes.has(name);
+    return this._attributes.has(name);
   }
 
   /**
@@ -449,9 +459,9 @@ export class AttributeSet {
    */
   forgetAssignmentsBang(): void {
     this.assertNotFrozen();
-    for (const [name, attr] of this.attributes) {
+    for (const [name, attr] of this._attributes) {
       const next = attr.forgettingAssignment();
-      if (next !== attr) this.attributes.set(name, next);
+      if (next !== attr) this._attributes.set(name, next);
     }
   }
 }

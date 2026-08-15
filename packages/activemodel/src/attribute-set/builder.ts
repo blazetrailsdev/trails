@@ -1,4 +1,4 @@
-import { Attribute } from "../attribute.js";
+import { Attribute, Uninitialized } from "../attribute.js";
 import { Type } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
@@ -15,23 +15,7 @@ export class Builder {
     values: Record<string, unknown> = {},
     additionalTypes: Map<string, Type> = new Map(),
   ): AttributeSet {
-    const attrs = new Map<string, Attribute>();
-
-    for (const [name, type] of this.types) {
-      const effectiveType = additionalTypes.get(name) ?? type;
-      if (Object.prototype.hasOwnProperty.call(values, name)) {
-        attrs.set(name, Attribute.fromDatabase(name, values[name], effectiveType));
-      } else {
-        const defaultAttr = this.defaultAttributes.get(name);
-        if (defaultAttr) {
-          attrs.set(name, dupAttribute(defaultAttr));
-        } else {
-          attrs.set(name, Attribute.uninitialized(name, effectiveType));
-        }
-      }
-    }
-
-    return new AttributeSet(attrs);
+    return new LazyAttributeSet(values, this.types, additionalTypes, this.defaultAttributes);
   }
 }
 
@@ -47,56 +31,130 @@ function dupAttribute(attr: Attribute): Attribute {
   return Object.assign(Object.create(Object.getPrototypeOf(attr)), attr);
 }
 
-/**
- * Lazy variant of AttributeSet that carries an extra `additionalTypes` map and
- * supports on-demand materialization of those entries into the internal store.
- *
- * Mirrors: ActiveModel::LazyAttributeSet
- */
+/** Mirrors: ActiveModel::LazyAttributeSet */
 export class LazyAttributeSet extends AttributeSet {
-  private _additionalTypes: Map<string, Type>;
+  private values: Record<string, unknown>;
+  private types: Map<string, Type>;
+  private additionalTypes: Map<string, Type>;
+  private defaultAttributes: Map<string, Attribute>;
+  private castedValues: Map<string, unknown>;
+  private materialized: boolean;
 
   constructor(
+    values: Record<string, unknown>,
+    types: Map<string, Type>,
+    additionalTypes: Map<string, Type>,
+    defaultAttributes: Map<string, Attribute>,
     attributes: Map<string, Attribute> = new Map(),
-    additionalTypes: Map<string, Type> = new Map(),
   ) {
     super(attributes);
-    this._additionalTypes = additionalTypes;
+    this.values = values;
+    this.types = types;
+    this.additionalTypes = additionalTypes;
+    this.defaultAttributes = defaultAttributes;
+    this.castedValues = new Map();
+    this.materialized = false;
   }
 
-  /** @internal Rails-private helper. Mirrors: LazyAttributeSet#additional_types (attr_reader) */
-  additionalTypes(): Map<string, Type> {
-    return this._additionalTypes;
+  override isKey(name: string): boolean {
+    return (
+      (Object.prototype.hasOwnProperty.call(this.values, name) ||
+        this.types.has(name) ||
+        this._attributes.has(name)) &&
+      this.getAttribute(name).isInitialized()
+    );
   }
 
-  override deepDup(): LazyAttributeSet {
-    const cache = new Map<Attribute, Attribute>();
-    const newAttrs = new Map<string, Attribute>();
-    this.forEach((attr, name) => newAttrs.set(name, this.cloneAttribute(attr, cache)));
-    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
+  override keys(): string[] {
+    const keys = new Set([
+      ...Object.keys(this.values),
+      ...this.types.keys(),
+      ...this._attributes.keys(),
+    ]);
+    return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
-  /**
-   * @internal Rails-private helper. Mirrors: LazyAttributeSet#materialize (protected)
-   * Materializes the lazy set by resolving all keys into the attribute map.
-   */
-  protected materialize(): Map<string, Attribute> {
-    // Write additionalTypes-only keys into the internal store so that
-    // subsequent getAttribute/has/forEach calls can see them — mirrors
-    // Rails' @additional_types.each_key { |name| self[name] } side-effect.
-    for (const [name, type] of this._additionalTypes) {
-      if (!this.hasAttribute(name)) this.set(name, Attribute.uninitialized(name, type));
+  override fetchValue(name: string, block?: (name: string) => unknown): unknown {
+    const attr = this._attributes.get(name);
+    if (attr) {
+      return blockOrValue(attr, block);
     }
-    const result = new Map<string, Attribute>();
-    this.forEach((attr, name) => result.set(name, attr));
-    return result;
+
+    if (this.castedValues.has(name)) return this.castedValues.get(name);
+
+    let valuePresent = true;
+    let value: unknown;
+    if (Object.prototype.hasOwnProperty.call(this.values, name)) {
+      value = this.values[name];
+    } else {
+      valuePresent = false;
+    }
+
+    if (valuePresent) {
+      const type = this.additionalTypes.get(name) ?? this.types.get(name)!;
+      const casted = type.deserialize(value);
+      this.castedValues.set(name, casted);
+      return casted;
+    } else {
+      return blockOrValue(this.defaultAttribute(name, valuePresent, value), block);
+    }
   }
 
-  override map(fn: (attr: Attribute) => Attribute): LazyAttributeSet {
-    const newAttrs = new Map<string, Attribute>();
-    this.forEach((attr, name) => newAttrs.set(name, fn(attr)));
-    return new LazyAttributeSet(newAttrs, new Map(this._additionalTypes));
+  protected override attributes(): Map<string, Attribute> {
+    if (!this.materialized) {
+      for (const key of Object.keys(this.values)) this.getAttribute(key);
+      for (const key of this.types.keys()) this.getAttribute(key);
+      this.materialized = true;
+    }
+    return this._attributes;
   }
+
+  protected override defaultAttribute(
+    name: string,
+    valuePresent?: boolean,
+    value?: unknown,
+  ): Attribute {
+    // Rails defaults `value` to `values.fetch(name) { value_present = false }`,
+    // evaluated only when the caller omits it (builder.rb:69-73).
+    if (valuePresent === undefined) {
+      valuePresent = Object.prototype.hasOwnProperty.call(this.values, name);
+      value = valuePresent ? this.values[name] : undefined;
+    }
+
+    const type = this.additionalTypes.get(name) ?? this.types.get(name);
+
+    if (valuePresent) {
+      // `Attribute#initialize` keeps the computed-value slot empty when the
+      // 4th argument is nil (attribute.rb:37), so only thread a cached cast
+      // through when one exists.
+      const castedValue = this.castedValues.get(name);
+      const attr =
+        castedValue === undefined
+          ? Attribute.fromDatabase(name, value, type!)
+          : Attribute.fromDatabase(name, value, type!, castedValue);
+      this._attributes.set(name, attr);
+      return attr;
+    } else if (this.types.has(name)) {
+      const attr = this.defaultAttributes.get(name);
+      const built = attr ? dupAttribute(attr) : Attribute.uninitialized(name, type!);
+      this._attributes.set(name, built);
+      return built;
+    } else {
+      return Attribute.null(name);
+    }
+  }
+}
+
+/**
+ * Ruby's `attr.value(&block)`: an Uninitialized attribute yields its name to
+ * the block, every other attribute ignores it (attribute.rb `Uninitialized#value`).
+ *
+ * @noRailsEquivalent Ruby passes the block through `value(&block)`; trails'
+ *   `Attribute#value` is a getter, so the block arm lives at the call site.
+ */
+function blockOrValue(attr: Attribute, block?: (name: string) => unknown): unknown {
+  if (block !== undefined && attr instanceof Uninitialized) return block(attr.name);
+  return attr.value;
 }
 
 /**

@@ -25,76 +25,47 @@ describe("LazyAttributeSet", () => {
   const strType = typeRegistry.lookup("string");
   const intType = typeRegistry.lookup("integer");
 
-  it("additionalTypes returns the map passed at construction", () => {
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(new Map(), extra);
-    expect(lazy.additionalTypes()).toBe(extra);
+  it("only materializes an attribute when it is first read", () => {
+    const types = new Map([["name", strType]]);
+    const lazy = new LazyAttributeSet({ name: "Alice" }, types, new Map(), new Map());
+    expect((lazy as any)._attributes.size).toBe(0);
+    expect(lazy.fetchValue("name")).toBe("Alice");
+    expect(lazy.keys()).toEqual(["name"]);
+    expect((lazy as any)._attributes.has("name")).toBe(true);
   });
 
-  it("materialize includes initialized attributes", () => {
-    const attrs = new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]);
-    const lazy = new LazyAttributeSet(attrs);
-    const result = (lazy as any).materialize() as Map<string, Attribute>;
-    expect(result.get("name")).toBeDefined();
-    expect(result.get("name")!.value).toBe("Alice");
+  it("key? reports values, types and materialized attributes", () => {
+    const types = new Map([["name", strType]]);
+    const lazy = new LazyAttributeSet({ score: "42" }, types, new Map(), new Map());
+    expect(lazy.isKey("score")).toBe(true);
+    expect(lazy.isKey("name")).toBe(false);
+    expect(lazy.isKey("missing")).toBe(false);
   });
 
-  it("materialize includes uninitialized attributes", () => {
-    const attrs = new Map<string, Attribute>([
-      ["name", Attribute.fromDatabase("name", "Alice", strType)],
-      ["age", Attribute.uninitialized("age", intType)],
-    ]);
-    const lazy = new LazyAttributeSet(attrs);
-    const result = (lazy as any).materialize() as Map<string, Attribute>;
-    expect(result.has("age")).toBe(true);
-    expect(result.get("age")!.isInitialized()).toBe(false);
+  it("uses additional_types over the declared type", () => {
+    const types = new Map([["score", strType]]);
+    const additional = new Map([["score", intType]]);
+    const lazy = new LazyAttributeSet({ score: "42" }, types, additional, new Map());
+    expect(lazy.fetchValue("score")).toBe(42);
   });
 
-  it("materialize includes additionalTypes keys not in the attribute map", () => {
-    const attrs = new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]);
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(attrs, extra);
-    const result = (lazy as any).materialize() as Map<string, Attribute>;
-    expect(result.has("score")).toBe(true);
-    expect(result.get("score")!.isInitialized()).toBe(false);
+  it("falls back to a default attribute when the value is absent", () => {
+    const types = new Map([["status", strType]]);
+    const defaults = new Map([["status", Attribute.fromDatabase("status", "draft", strType)]]);
+    const lazy = new LazyAttributeSet({}, types, new Map(), defaults);
+    expect(lazy.fetchValue("status")).toBe("draft");
   });
 
-  it("materialize mutates the instance so additionalTypes keys are accessible via getAttribute", () => {
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(new Map(), extra);
-    // Before materialize: getAttribute returns a null Attribute (unknown name).
-    expect(lazy.getAttribute("score").type.name).toBe("value");
-    (lazy as any).materialize();
-    // After materialize: entry is written into the internal map with the correct type.
-    expect(lazy.getAttribute("score").type.name).toBe("integer");
-    expect(lazy.getAttribute("score").isInitialized()).toBe(false);
+  it("returns an uninitialized attribute for a known type with no value or default", () => {
+    const types = new Map([["name", strType]]);
+    const lazy = new LazyAttributeSet({}, types, new Map(), new Map());
+    expect(lazy.getAttribute("name").isInitialized()).toBe(false);
+    expect(lazy.keys()).toEqual([]);
   });
 
-  it("materialize does not overwrite existing attributes when additionalTypes shares a key", () => {
-    const existingAttr = Attribute.fromDatabase("score", "42", strType);
-    const attrs = new Map<string, Attribute>([["score", existingAttr]]);
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(attrs, extra);
-    (lazy as any).materialize();
-    // The existing string attribute must be preserved — not replaced by intType.
-    expect(lazy.getAttribute("score")).toBe(existingAttr);
-  });
-
-  it("deepDup preserves additionalTypes", () => {
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(new Map(), extra);
-    const dup = lazy.deepDup();
-    expect(dup).toBeInstanceOf(LazyAttributeSet);
-    expect(dup.additionalTypes()).toEqual(extra);
-    expect(dup.additionalTypes()).not.toBe(extra);
-  });
-
-  it("map preserves additionalTypes", () => {
-    const extra = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet(new Map(), extra);
-    const mapped = lazy.map((a) => a);
-    expect(mapped).toBeInstanceOf(LazyAttributeSet);
-    expect(mapped.additionalTypes()).toEqual(extra);
+  it("returns a null attribute for an unknown name", () => {
+    const lazy = new LazyAttributeSet({}, new Map(), new Map(), new Map());
+    expect(lazy.fetchValue("nope")).toBe(null);
   });
 });
 
