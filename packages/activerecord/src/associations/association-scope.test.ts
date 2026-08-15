@@ -587,9 +587,9 @@ describe("AssociationScope", () => {
   it("polymorphic belongsTo uses runtime klass's primary key (non-id PK)", () => {
     // BelongsToReflection#joinPrimaryKey hard-codes "id" for polymorphic
     // associations because the target klass isn't known at definition
-    // time. AssociationScope must route through joinPrimaryKeyFor(klass)
-    // so a target with a non-default PK (e.g. "uuid") gets the right
-    // WHERE column. Regression for Copilot review on PR #618.
+    // time. The chain head resolves its own runtime klass, so a target
+    // with a non-default PK (e.g. "uuid") gets the right WHERE column.
+    // Regression for Copilot review on PR #618.
     class UuidTarget extends Base {
       declare uuid: string | null;
 

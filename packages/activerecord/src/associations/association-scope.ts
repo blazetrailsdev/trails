@@ -108,7 +108,6 @@ export class ReflectionProxy {
     klass: typeof Base;
     name: string;
     scope?: ((rel: unknown) => unknown) | null;
-    joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
     scopeFor?: (rel: unknown, owner?: unknown) => unknown;
   } {
     return this.reflection as unknown as ReturnType<() => ReflectionProxy["_r"]>;
@@ -116,18 +115,6 @@ export class ReflectionProxy {
 
   get joinPrimaryKey(): string | string[] {
     return this._r.joinPrimaryKey;
-  }
-
-  /**
-   * Forwarding `joinPrimaryKeyFor(klass)` so AssociationScope's
-   * runtime-klass path (polymorphic belongsTo) finds the correct
-   * primary key column on the resolved target. Falls back to the
-   * static `joinPrimaryKey` if the reflection doesn't expose it.
-   */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    return typeof this._r.joinPrimaryKeyFor === "function"
-      ? this._r.joinPrimaryKeyFor(klass)
-      : this._r.joinPrimaryKey;
   }
 
   get joinForeignKey(): string | string[] {
@@ -295,7 +282,7 @@ export class AssociationScope {
         ...extensions,
       );
     }
-    scope = this.addConstraints(scope, owner, chain, klass);
+    scope = this.addConstraints(scope, owner, chain);
     if (!reflection.isCollection()) {
       scope = (scope as { limit: (n: number) => unknown }).limit(1);
     }
@@ -521,12 +508,10 @@ export class AssociationScope {
     scope: unknown,
     reflection: AbstractReflection | ReflectionProxy,
     nextReflection: AbstractReflection | ReflectionProxy,
-    klass?: typeof Base,
   ): unknown {
     const r = reflection as {
       joinPrimaryKey: string | string[];
       joinForeignKey: string | string[];
-      joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
       klass?: { tableName?: string };
       type?: string | null;
     };
@@ -536,16 +521,7 @@ export class AssociationScope {
       klass?: { tableName?: string };
       aliasedTable?: string | { name?: string };
     };
-    // For polymorphic belongsTo sources, reflection.joinPrimaryKey is
-    // hard-coded to "id" — but the resolved sourceType class may use a
-    // different PK. Route through joinPrimaryKeyFor(klass) when the
-    // reflection exposes it (ThroughReflection / BelongsToReflection
-    // both do) so the JOIN uses the right target PK column.
-    const rawJoinPk =
-      typeof r.joinPrimaryKeyFor === "function"
-        ? r.joinPrimaryKeyFor(klass ?? (r.klass as typeof Base | undefined))
-        : r.joinPrimaryKey;
-    const joinPks = Array.isArray(rawJoinPk) ? rawJoinPk : [rawJoinPk];
+    const joinPks = Array.isArray(r.joinPrimaryKey) ? r.joinPrimaryKey : [r.joinPrimaryKey];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     if (joinPks.length !== joinFks.length) {
       // Unwrap ReflectionProxy so activeRecord/name come from the
@@ -568,12 +544,19 @@ export class AssociationScope {
         foreignKey: joinFks,
       });
     }
-    // For polymorphic belongsTo-through with sourceType, r.klass may
-    // throw (polymorphic) or resolve to the wrong class; prefer the
-    // explicit runtime klass passed in when available.
+    // Rails: `table = reflection.aliased_table` (association_scope.rb:85).
+    // `_arelTableFor` uses the node verbatim when there is one; `tableName` is
+    // only the string/duck-typed fallback.
+    const rAliased = (reflection as ReflectionProxy).aliasedTable as
+      | string
+      | { name?: string }
+      | null
+      | undefined;
     let tableName: string;
-    if (klass && typeof klass.tableName === "string") {
-      tableName = klass.tableName;
+    if (typeof rAliased === "string") {
+      tableName = rAliased;
+    } else if (rAliased && typeof rAliased === "object" && typeof rAliased.name === "string") {
+      tableName = rAliased.name;
     } else {
       try {
         tableName = r.klass?.tableName ?? "";
@@ -673,7 +656,6 @@ export class AssociationScope {
     scope: unknown,
     owner: Base,
     chain: Array<AbstractReflection | ReflectionProxy>,
-    klass?: typeof Base,
   ): unknown {
     const last = chain[chain.length - 1];
     scope = this.lastChainScope(scope, last, owner);
@@ -681,7 +663,7 @@ export class AssociationScope {
     // `chain.each_cons(2) { |r, nr| next_chain_scope(scope, r, nr) }`
     // (association_scope.rb:128-130).
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this.nextChainScope(scope, chain[i], chain[i + 1], klass);
+      scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
     }
     // Rails' chain.reverse_each over reflection.constraints (Rails:
     // association_scope.rb:131-156) merges scope-chain items into the
@@ -748,8 +730,9 @@ export class AssociationScope {
     // `source_reflection.constraints`, so a scope declared on the polymorphic
     // belongsTo source (e.g. `belongs_to :taggable, -> { where(...) },
     // polymorphic: true`) must still merge. The resolved source class is the
-    // runtime `klass` threaded into this call (the source_type target), so pass
-    // it as an override and avoid touching the uncomputable polymorphic `klass`.
+    // runtime `klass` off the chain head (a RuntimeReflection, whose `klass` IS
+    // the live `association.klass`, reflection.rb:1265), so pass it as an
+    // override and avoid touching the uncomputable polymorphic `klass`.
     // (The THROUGH/join-model scope on a source_type association is carried by a
     // `PolymorphicReflection` chain entry already merged by the reverse_each loop
     // above — e.g. Tag's `null_taggings -> { none }` — independent of this.)
@@ -762,7 +745,7 @@ export class AssociationScope {
           scope,
           sourceRefl,
           owner,
-          sourceType ? klass : undefined,
+          sourceType ? (chain[0] as { klass?: typeof Base }).klass : undefined,
         );
       }
     }
