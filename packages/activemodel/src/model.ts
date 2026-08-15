@@ -1521,10 +1521,13 @@ export class Model {
    */
   declare static moduleName?: string;
 
+  /**
+   * Mirrors Rails `model_name` (naming.rb:270-277). The namespace is the
+   * enclosing module, carried as `moduleName` because a JS class has no module
+   * path; `@_model_name ||=` is a per-class ivar, so the memo is an own
+   * property rather than an inherited one.
+   */
   static get modelName(): ModelName {
-    // Mirrors Rails naming.rb:270-277 — the namespace is the enclosing module,
-    // carried here as `moduleName` because a JS class has no module path, and
-    // `@_model_name ||=` is a per-class ivar, i.e. an own property.
     if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
       const namespace = this.moduleName?.split("::");
       // Model satisfies ModelLike but TS can't prove it due to circular types.

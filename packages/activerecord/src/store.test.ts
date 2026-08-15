@@ -229,8 +229,6 @@ describe("StoreTest", () => {
         "jenny",
       ),
     ).toBe("blue");
-    // `user.color` is the store accessor, which reads the raw serialized value
-    // rather than the HashWithIndifferentAccess the store holds.
     expect(user.color).toMatchObject({ jenny: "blue" });
   });
 

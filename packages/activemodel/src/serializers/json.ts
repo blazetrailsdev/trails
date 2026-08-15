@@ -56,9 +56,13 @@ export class JSON {
   declare protected static _modelName?: ModelName;
 
   /**
-   * Optional `::`-joined Ruby module path for a namespaced model; the
-   * `module_parents` stand-in `model_name` passes as Rails' namespace
-   * argument (naming.rb:271-275). See `Model.moduleName`.
+   * Optional `::`-joined Ruby module path for a namespaced model — the
+   * namespace `model_name` passes to `ActiveModel::Name.new`
+   * (naming.rb:271-275).
+   *
+   * @noRailsEquivalent Ruby reads the module path off the constant itself
+   * (`module_parents`); a JS class name carries no module path, so a
+   * namespaced host declares it. Same carrier as `Model.moduleName`.
    */
   declare static moduleName?: string;
 
@@ -130,12 +134,14 @@ export class JSON {
     return this;
   }
 
-  // Rails: included do; extend ActiveModel::Naming; end — surfaces
-  // model_name on the host class. Subclasses override to customize.
+  /**
+   * Rails: `included do; extend ActiveModel::Naming; end` — surfaces
+   * `model_name` on the host class (naming.rb:270-277). `@_model_name ||=` is
+   * a per-class ivar, so the memo is an own property; the namespace is the
+   * enclosing module, carried as `moduleName` because a JS class has no
+   * module path.
+   */
   static get modelName(): ModelName {
-    // Mirrors Rails naming.rb:270-277 — `@_model_name ||=` is a per-class
-    // ivar (an own property here), and the namespace is the enclosing
-    // module, carried as `moduleName` because a JS class has no module path.
     if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
       const namespace = this.moduleName?.split("::");
       this._modelName = new ModelName(this, namespace);

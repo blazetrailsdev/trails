@@ -270,7 +270,8 @@ describe("NamingUsingRelativeModelNameTest", () => {
 
 // Ports Rails `NamingWithNamespacedModelInIsolatedNamespaceTest`
 // (activemodel/test/cases/naming_test.rb:51-87). Rails' setup passes
-// `namespace: Blog` explicitly; our equivalent is `namespace: "Blog"`. Result fields identical to Rails.
+// `namespace: Blog` explicitly; our equivalent is `namespace: "Blog"`.
+// Result fields identical to Rails.
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
   const namespace = "Blog";
   it("singular", () => {

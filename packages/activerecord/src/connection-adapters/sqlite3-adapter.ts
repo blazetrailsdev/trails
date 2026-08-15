@@ -82,6 +82,7 @@ import {
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
   performQuery as sqlitePerformQuery,
+  highPrecisionCurrentTimestamp as sqliteHighPrecisionCurrentTimestamp,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -552,6 +553,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @internal
    */
   declare performQuery: typeof sqlitePerformQuery;
+
+  /**
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#high_precision_current_timestamp
+   * (sqlite3/database_statements.rb:49-51).
+   */
+  declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
 
   /**
    * Rows affected by the most recent write. Rails takes the statement result
@@ -1946,10 +1953,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (raw) {
         sql += raw.value;
       } else {
-        sql += insert.touchModelTimestampsUnless(
-          (column) => `${column} IS excluded.${column}`,
-          "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')",
-        );
+        sql += insert.touchModelTimestampsUnless((column) => `${column} IS excluded.${column}`);
         sql += insert
           .updatableColumns()
           .map((column) => `${column}=excluded.${column}`)
@@ -3175,6 +3179,7 @@ dirtiesQueryCache(SQLite3Adapter, "execute");
 // instance method of the adapter, so `raw_execute`'s `this.performQuery(...)`
 // dispatch resolves here (sqlite3/database_statements.rb:78).
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
+SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**

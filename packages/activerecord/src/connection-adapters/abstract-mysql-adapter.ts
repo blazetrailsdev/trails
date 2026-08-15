@@ -1110,10 +1110,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         sql += ` ON DUPLICATE KEY UPDATE ${raw.value}`;
       } else {
         sql += " ON DUPLICATE KEY UPDATE ";
-        sql += insert.touchModelTimestampsUnless(
-          (col) => `${col}<=>VALUES(${col})`,
-          "CURRENT_TIMESTAMP(6)",
-        );
+        sql += insert.touchModelTimestampsUnless((col) => `${col}<=>VALUES(${col})`);
         sql += insert
           .updatableColumns()
           .map((col) => `${col}=VALUES(${col})`)

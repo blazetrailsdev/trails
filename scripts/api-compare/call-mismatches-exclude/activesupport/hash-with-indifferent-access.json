@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "hash-with-indifferent-access.ts",
-    "rubyName": "merge",
-    "call": "update",
-    "reason": "Rails' HashWithIndifferentAccess#merge is `dup.update(*hashes, &block)` (activesupport/lib/active_support/hash_with_indifferent_access.rb:274); trails' merge copies entries inline instead of delegating to the ported `update`. Unmasked by the RFC 0025 same-file-closure fix, not introduced by it."
-  }
-]

@@ -252,9 +252,6 @@ export class ModelName {
     locale = "en",
   ) {
     this._klass = typeof klass === "string" ? null : klass;
-    // Rails `@name = name || klass.name`, then `demodulize` for `@element`.
-    // The JS class name is already demodulized (`_demodulizedName` restores
-    // the Rails spelling where the class was flattened to avoid a collision).
     name ??= typeof klass === "string" ? klass : (klass._demodulizedName ?? klass.name);
     const rawNs = namespace ?? null;
     const invalidNamespace = (): ArgumentError =>

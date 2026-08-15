@@ -10,7 +10,7 @@
  * Rails' own name.
  */
 
-import { deepMerge as deepMergeObj, symbolizeKeysBang } from "./hash-utils.js";
+import { deepMerge as deepMergeObj, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { KeyError } from "./core-ext/key-error.js";
 
 type AnyObject = Record<string, unknown>;
@@ -20,13 +20,6 @@ type AnyObject = Record<string, unknown>;
  * called with the key, the receiver's value and the other hash's value.
  */
 type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
-
-/** Ruby `value.is_a? Hash` for a plain JS object literal. */
-function isHash(value: unknown): boolean {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value) as object | null;
-  return proto === Object.prototype || proto === null;
-}
 
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
@@ -99,8 +92,8 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Mirrors `key?` (hash_with_indifferent_access.rb:150-152). `has` is the
-   * Map-shaped spelling this class' receiver already uses.
+   * Mirrors `key?` (hash_with_indifferent_access.rb:150-152) — checks the hash
+   * for a key in either spelling.
    */
   key(key: string): boolean {
     return this.data.has(this.convertKey(key));
@@ -174,23 +167,14 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Merge another object or HashWithIndifferentAccess, returning a new instance.
+   * Mirrors `merge` (hash_with_indifferent_access.rb:274-276) — the same
+   * semantics as `update`, but returns a new hash instead of modifying the
+   * receiver.
    */
-  merge(other: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
-    const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this.data) {
-      result.set(k, v);
-    }
-    if (other instanceof HashWithIndifferentAccess) {
-      for (const [k, v] of other.entries()) {
-        result.set(k, v);
-      }
-    } else {
-      for (const key of Object.keys(other)) {
-        result.set(key, other[key] as V);
-      }
-    }
-    return result;
+  merge(
+    ...hashes: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]
+  ): HashWithIndifferentAccess<V> {
+    return new HashWithIndifferentAccess<V>(this).update(...hashes);
   }
 
   /**
@@ -198,12 +182,11 @@ export class HashWithIndifferentAccess<V = unknown> {
    * given hashes in place, respecting indifferent access; a block resolves
    * duplicated keys.
    */
-  update(...otherHashes: (AnyObject | HashWithIndifferentAccess<V>)[]): this;
-  update(...args: [...(AnyObject | HashWithIndifferentAccess<V>)[], BlockFn<V>]): this;
-  update(...args: unknown[]): this {
+  update(...args: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]): this {
+    const rest = [...args];
     const block =
-      typeof args[args.length - 1] === "function" ? (args.pop() as BlockFn<V>) : undefined;
-    const otherHashes = args as (AnyObject | HashWithIndifferentAccess<V>)[];
+      typeof rest[rest.length - 1] === "function" ? (rest.pop() as BlockFn<V>) : undefined;
+    const otherHashes = rest as (AnyObject | HashWithIndifferentAccess<V>)[];
     if (otherHashes.length === 1) {
       this.updateWithSingleArgument(otherHashes[0], block);
     } else {
@@ -216,7 +199,7 @@ export class HashWithIndifferentAccess<V = unknown> {
 
   /** `alias_method :merge!, :update` (hash_with_indifferent_access.rb:143). */
   mergeBang(...args: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]): this {
-    return (this.update as (...a: unknown[]) => this)(...args);
+    return this.update(...args);
   }
 
   /**
@@ -593,7 +576,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * trails (see CLAUDE.md), so `Symbol#name` is the string without its colon.
    */
   private convertKey(key: string): string {
-    return typeof key === "string" && key.startsWith(":") ? key.slice(1) : key;
+    return key.startsWith(":") ? key.slice(1) : key;
   }
 
   /**
@@ -604,7 +587,7 @@ export class HashWithIndifferentAccess<V = unknown> {
   private convertValue(value: V, conversion?: string): V {
     if (value instanceof HashWithIndifferentAccess) {
       return value.nestedUnderIndifferentAccess() as V;
-    } else if (isHash(value)) {
+    } else if (isPlainObject(value)) {
       return new HashWithIndifferentAccess(value as AnyObject) as V;
     } else if (Array.isArray(value)) {
       let array = value as unknown[];
