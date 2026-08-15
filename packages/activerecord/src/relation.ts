@@ -4722,8 +4722,7 @@ export class Relation<T extends Base> {
    *
    * The two-clause `using_limitable_reflections?` test Rails spells inline here
    * (finder_methods.rb:463-470) lives in `_eagerJoinDependencyIsLimitable`, its
-   * single home — see there for why the second clause reads `_namedInnerJoins`
-   * where Rails reads `joins_values`.
+   * single home.
    * @internal
    */
   applyJoinDependency({
@@ -5111,15 +5110,6 @@ export class Relation<T extends Base> {
    * `_isDeferredDistinctPkSubquery`) pending the sync/async collapse tracked by
    * `converge-relation-subquery-distinct-pk-materialization`, so the guard has
    * exactly ONE home here and every entry point calls it — never a second copy.
-   *
-   * The second clause reads `_namedInnerJoins` where Rails reads `joins_values`:
-   * `select_association_list` (query_methods.rb:1810-1823) keeps only the
-   * `Hash, Symbol, Array` members and drops raw SQL Strings, and TypeScript
-   * collapses Ruby's Symbol and String onto one type, so that `when` cannot be
-   * spelled by type — `_namedInnerJoins` is the `joins_values` subset it selects,
-   * under the same discriminator `joins()` itself uses. `left_outer_joins_values`
-   * needs no such subset: `assertValidLeftOuterJoinsBang` already rejects a raw
-   * String there, exactly where Rails raises for it.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
@@ -5128,7 +5118,7 @@ export class Relation<T extends Base> {
         QueryMethodBangs.constructJoinDependency.call(
           this as any,
           _qm.selectAssociationList
-            .call(this as any, this._namedInnerJoins, null)
+            .call(this as any, this.joinsValues, null)
             .concat(
               _qm.selectAssociationList.call(this as any, this._leftOuterJoinsValues, null),
             ) as AssociationSpec[],

@@ -24,13 +24,6 @@
     "package": "activesupport",
     "tsFile": "module-ext.ts",
     "rubyName": "descendants",
-    "call": "flat_map",
-    "reason": "Same one-line delegation to `DescendantsTracker.descendants` — the recursion, and its `flat_map`, live there."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "module-ext.ts",
-    "rubyName": "descendants",
     "call": "subclasses",
     "reason": "Same delegation; the tracker reads the subclass set directly, not through this file's `subclasses`."
   },

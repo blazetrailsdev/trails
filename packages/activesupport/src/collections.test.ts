@@ -531,10 +531,10 @@ describe("HashWithIndifferentAccess", () => {
   it("supports get/set/has/delete", () => {
     const h = new HashWithIndifferentAccess<number>();
     h.set("x", 10);
-    expect(h.has("x")).toBe(true);
+    expect(h.hasKey("x")).toBe(true);
     expect(h.get("x")).toBe(10);
     h.delete("x");
-    expect(h.has("x")).toBe(false);
+    expect(h.hasKey("x")).toBe(false);
   });
 
   it("reports size", () => {
@@ -547,7 +547,7 @@ describe("HashWithIndifferentAccess", () => {
     const h2 = h1.merge({ b: 2 });
     expect(h2.get("a")).toBe(1);
     expect(h2.get("b")).toBe(2);
-    expect(h1.has("b")).toBe(false);
+    expect(h1.hasKey("b")).toBe(false);
   });
 
   it("merge with another HashWithIndifferentAccess", () => {

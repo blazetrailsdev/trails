@@ -2696,10 +2696,16 @@ export function selectAssociationList(
 ): unknown[] {
   const result: unknown[] = [];
   for (const association of associations) {
+    // query_methods.rb:1813-1815 `when Hash, Symbol, Array`. TypeScript
+    // collapses Ruby's Symbol and String onto one type, so the `when` cannot be
+    // spelled by type: a string is a Symbol here only when it names an
+    // association (or carries the leading colon), which is the same
+    // discriminator `joins()` applies at insert time. A raw SQL String is
+    // dropped, exactly as Rails' `else` arm drops it.
     if (
-      typeof association === "string" ||
       Array.isArray(association) ||
-      isPlainObject(association)
+      isPlainObject(association) ||
+      (typeof association === "string" && this._isNamedJoinValue(association))
     ) {
       result.push(association);
     } else if (association instanceof JoinDependency) {

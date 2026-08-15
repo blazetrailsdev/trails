@@ -117,10 +117,6 @@ export class HashWithIndifferentAccess<V = unknown> {
     return this.key(key);
   }
 
-  has(key: string): boolean {
-    return this.key(key);
-  }
-
   /**
    * Mirrors `fetch` (hash_with_indifferent_access.rb:195-197) — `Hash#fetch`
    * semantics over the converted key: a stored value wins over the default
@@ -353,37 +349,36 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * any() — true if any entries exist.
+   * `Enumerable#any?` — with no block, true when any entry exists; with one,
+   * true when it matches at least one `[key, value]` pair.
    */
-  any(): boolean {
-    return this.data.size > 0;
-  }
-
-  /**
-   * anyWith — true if predicate matches at least one pair.
-   */
-  anyWith(fn: (key: string, value: V) => boolean): boolean {
-    for (const [k, v] of this.data) {
-      if (fn(k, v)) return true;
+  any(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return this.data.size > 0;
+    for (const pair of this.data) {
+      if (fn(pair)) return true;
     }
     return false;
   }
 
   /**
-   * allWith — true if predicate matches all pairs.
+   * `Enumerable#all?` — with no block, true when every entry is truthy (a
+   * `[key, value]` pair always is); with one, true when it matches every pair.
    */
-  allWith(fn: (key: string, value: V) => boolean): boolean {
-    for (const [k, v] of this.data) {
-      if (!fn(k, v)) return false;
+  all(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return true;
+    for (const pair of this.data) {
+      if (!fn(pair)) return false;
     }
     return true;
   }
 
   /**
-   * noneWith — true if predicate matches no pairs.
+   * `Enumerable#none?` — with no block, true when the hash is empty; with one,
+   * true when it matches no `[key, value]` pair.
    */
-  noneWith(fn: (key: string, value: V) => boolean): boolean {
-    return !this.anyWith(fn);
+  none(fn?: (pair: [string, V]) => boolean): boolean {
+    if (!fn) return this.data.size === 0;
+    return !this.any(fn);
   }
 
   /**
@@ -457,33 +452,12 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * rassoc — returns [key, value] by value match, or undefined.
-   */
-  rassoc(value: V): [string, V] | undefined {
-    for (const [k, v] of this.data) {
-      if (v === value) return [k, v];
-    }
-    return undefined;
-  }
-
-  /**
    * invert — swaps keys and values, returning a new HWIA.
    */
   invert(): HashWithIndifferentAccess<string> {
     const result = new HashWithIndifferentAccess<string>();
     for (const [k, v] of this.data) {
       result.set(String(v), k);
-    }
-    return result;
-  }
-
-  /**
-   * flatten — returns all key-value pairs as a flat array.
-   */
-  flatten(): unknown[] {
-    const result: unknown[] = [];
-    for (const [k, v] of this.data) {
-      result.push(k, v);
     }
     return result;
   }
