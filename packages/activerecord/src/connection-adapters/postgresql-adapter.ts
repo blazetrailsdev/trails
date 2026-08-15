@@ -973,6 +973,15 @@ export class PostgreSQLAdapter
   private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {
     (this.constructor as typeof PostgreSQLAdapter).initializeTypeMap(m);
 
+    // Rails spells these `self.class.register_class_with_precision`
+    // (postgresql_adapter.rb:747-749), the same dispatch used for
+    // `initialize_type_map` above. Ours cannot: `AbstractAdapter`'s static is
+    // `TypeMap`-shaped and reads the sql_type as `args.at(-1)`, while
+    // `HashLookupTypeMap` — the map PG registers into — forwards
+    // `(lookupKey, ...args)`, so a keyless `lookup(oid)` would hand it the OID
+    // as the sql_type. `postgresql/type-map-init.ts` carries the
+    // HashLookupTypeMap-shaped port, which is what the class-level seeder uses
+    // too. Unifying the two is `pg-register-class-with-precision-one-impl`.
     const timezone = ActiveRecord.defaultTimezone;
     registerClassWithPrecision(m, "time", TimeType, { timezone });
     registerClassWithPrecision(m, "timestamp", Timestamp, { timezone });
