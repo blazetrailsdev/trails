@@ -15,7 +15,8 @@ import {
   minimum,
   maximum,
 } from "../enumerable-utils.js";
-import { compactBlankObj } from "../hash-utils.js";
+import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
+import { Array as ArrayExt } from "./array/access.js";
 
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
@@ -109,17 +110,20 @@ describe("EnumerableTests", () => {
 
   it("array compact blank!", () => {
     const arr = [1, null, "", 2];
-    const result = compactBlank(arr);
+    const result = ArrayExt.compactBlankBang(arr);
+    expect(result).toBe(arr);
     expect(result).toEqual([1, 2]);
   });
 
   it("hash compact blank", () => {
-    expect(compactBlankObj({ a: 1, b: null, c: "", d: 0 })).toEqual({ a: 1, d: 0 });
+    expect(hashCompactBlank({ a: 1, b: null, c: "", d: 0 })).toEqual({ a: 1, d: 0 });
   });
 
   it("hash compact blank!", () => {
-    const obj = { a: 1, b: undefined, c: "value" };
-    expect(compactBlankObj(obj)).toEqual({ a: 1, c: "value" });
+    const obj: Record<string, unknown> = { a: 1, b: undefined, c: "value" };
+    const result = compactBlankBang(obj);
+    expect(result).toBe(obj);
+    expect(result).toEqual({ a: 1, c: "value" });
   });
 
   it("in order of", () => {

@@ -17,12 +17,12 @@ import {
   change,
   toFs,
   xmlschema,
-  toTime,
   toDate,
   isPast,
   isFuture,
   isToday,
 } from "../time-ext.js";
+import { toTime } from "./date/conversions.js";
 import * as DateExt from "./date/calculations.js";
 import { setZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -94,9 +94,9 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to time", () => {
-    const date = d(2005, 2, 21);
+    const date = Temporal.PlainDate.from("2005-02-21");
     const result = toTime(date);
-    expect(asDate(result).getFullYear()).toBe(2005);
+    expect(result.year).toBe(2005);
   });
 
   it("compare to time", () => {
@@ -106,12 +106,11 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const date = d(2005, 2, 21);
+    const date = Temporal.PlainDate.from("2005-02-21");
     const result = toTime(date);
-    const back = asDate(result);
-    expect(back.getFullYear()).toBe(2005);
-    expect(back.getMonth()).toBe(1); // February
-    expect(back.getDate()).toBe(21);
+    expect(result.year).toBe(2005);
+    expect(result.month).toBe(2);
+    expect(result.day).toBe(21);
   });
 
   it("to date", () => {

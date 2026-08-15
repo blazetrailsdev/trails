@@ -180,7 +180,7 @@ export {
   _resetConstants,
   foreignKey,
   humanize,
-  parameterize,
+  constRegexp,
   ordinal,
   ordinalize,
   upcaseFirst,
@@ -224,7 +224,7 @@ export {
 
 export {
   deepMerge,
-  deepMergeInPlace,
+  deepMergeBang,
   deepDup,
   slice,
   except,
@@ -260,7 +260,11 @@ export {
   toQuery,
   isPlainObject,
   compact,
-  compactBlankObj,
+  // `compactBlank` is Hash#compact_blank (core_ext/enumerable.rb:222-224);
+  // the barrel already exports Enumerable#compact_blank under the bare name
+  // from enumerable-utils.ts, and one ESM namespace cannot hold both.
+  compactBlank as compactBlankObj,
+  compactBlankBang,
   valuesAt,
 } from "./hash-utils.js";
 
@@ -500,7 +504,7 @@ export type {
   RecordOptions,
 } from "./error-reporter.js";
 export type { ParameterFilterOptions } from "./parameter-filter.js";
-export { transliterate } from "./transliterate.js";
+export { transliterate, parameterize } from "./transliterate.js";
 export { TagStack, Formatter, LocalTagStorage } from "./tagged-logging.js";
 export { TaggedLogging } from "./tagged-logging.js";
 export { DeepMergeable } from "./deep-mergeable.js";

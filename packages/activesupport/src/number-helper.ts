@@ -86,11 +86,29 @@ export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {
   return NumberToPhoneConverter.convert(number, options);
 }
 
-export function numberWithDelimiter(
+/**
+ * Formats a `number` with grouped thousands using `delimiter`.
+ *
+ * Mirrors: `NumberHelper#number_to_delimited` (`number_helper.rb:264-266`) —
+ * `NumberToDelimitedConverter.convert(number, options)`.
+ */
+export function numberToDelimited(
   number: unknown,
   options: NumberWithDelimiterOptions = {},
 ): string {
   return NumberToDelimitedConverter.convert(number, options);
+}
+
+/**
+ * ActionView's helper of the same name
+ * (`actionview/lib/action_view/helpers/number_helper.rb:75-77`), which is
+ * `delegate_number_helper_method(:number_to_delimited, number, options)`.
+ */
+export function numberWithDelimiter(
+  number: unknown,
+  options: NumberWithDelimiterOptions = {},
+): string {
+  return numberToDelimited(number, options);
 }
 
 export function numberToRounded(number: unknown, options: NumberToRoundedOptions = {}): string {
@@ -120,6 +138,7 @@ const _helpers = {
   numberToPhone,
   numberToCurrency,
   numberToPercentage,
+  numberToDelimited,
   numberWithDelimiter,
   numberToRounded,
   numberToHumanSize,
@@ -130,6 +149,7 @@ export namespace NumberHelper {
   export const numberToPhone = _helpers.numberToPhone;
   export const numberToCurrency = _helpers.numberToCurrency;
   export const numberToPercentage = _helpers.numberToPercentage;
+  export const numberToDelimited = _helpers.numberToDelimited;
   export const numberWithDelimiter = _helpers.numberWithDelimiter;
   export const numberToRounded = _helpers.numberToRounded;
   export const numberToHumanSize = _helpers.numberToHumanSize;

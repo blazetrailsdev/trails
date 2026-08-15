@@ -525,6 +525,21 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "ActiveSupport::Autoload plumbing that `NumberHelper` gets from " +
+      "`extend ActiveSupport::Autoload` (number_helper.rb:8-19): `autoload`, " +
+      "`autoload_under`, `autoload_at`, `eager_autoload` and `eager_load!` " +
+      "register a constant name against a file for Zeitwerk to resolve on first " +
+      "reference, and `eager_load!` forces the whole set in production. ESM has " +
+      "no autoload — every converter module is a static `import` at the top of " +
+      "number-helper.ts, resolved before the module body runs — so there is " +
+      "nothing to register and nothing to force. Same reason as the " +
+      "dependencies.rb group below; scoped to number_helper.rb so the names stay " +
+      "expected wherever a real autoload surface is ported.",
+    names: ["autoload", "autoload_under", "autoload_at", "eager_autoload", "eager_load!"],
+    rubyFiles: ["number_helper.rb"],
+  },
+  {
+    reason:
       "Ruby's Marshal hooks on TimeWithZone (time_with_zone.rb:529-535): " +
       "`marshal_dump` answers the `[utc, time_zone.name, time]` triple " +
       "`Marshal.dump` writes and `marshal_load` rebuilds the receiver from it. " +

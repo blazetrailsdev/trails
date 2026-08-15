@@ -335,44 +335,33 @@ export function foreignKey(className: string, separateWithUnderscore: boolean = 
   return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
 }
 
-export function parameterize(
-  str: string,
-  options: { separator?: string; preserveCase?: boolean } = {},
-): string {
-  const { separator = "-", preserveCase = false } = options;
+/**
+ * Ruby `Regexp.escape` (`re.c` `rb_reg_s_quote`), which escapes every character
+ * `Regexp` gives a meaning to plus whitespace. JS has no `RegExp.escape`.
+ */
+function regexpEscape(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\\-#\s]/g, "\\$&");
+}
 
-  // Mirrors Rails' transliterate: NFD-decompose to strip combining diacritical
-  // marks (U+0300–U+036F), then drop any remaining non-ASCII characters.
-  // This converts café→cafe, Müller→muller, matching Rails' default behavior.
-  let result = str
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[^\x00-\x7F]/g, "");
+/**
+ * Mirrors: `Inflector.const_regexp` (`inflector/methods.rb:357-367`) — a
+ * `Regexp` source that will match part by part the given constant.
+ *
+ *   constRegexp("Foo::Bar::Baz") // => "Foo(::Bar(::Baz)?)?"
+ *   constRegexp("::")            // => "::"
+ */
+export function constRegexp(camelCasedWord: string): string {
+  // Ruby's `String#split` drops trailing empty fields, so `"::".split("::")`
+  // is `[]` where JS's is `["", ""]` — that empty result is what selects the
+  // `Regexp.escape` arm below.
+  const parts = camelCasedWord.split("::");
+  while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
 
-  if (separator === "") {
-    const words = result.split(/[^a-z0-9]+/gi).filter((w) => w.length > 0);
-    if (words.length === 0) return "";
-    result = words.join("");
-    if (!preserveCase) result = result.toLowerCase();
-    return result;
-  }
+  if (parts.length === 0) return regexpEscape(camelCasedWord);
 
-  // Replace non-alphanumeric, non-dash, non-underscore with separator
-  result = result.replace(/[^a-z0-9\-_]+/gi, separator);
+  const last = parts.pop()!;
 
-  if (separator.length > 0) {
-    const escaped = separator.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-    // Remove leading/trailing separators and collapse duplicates
-    result = result.replace(new RegExp(`${escaped}{2,}`, "g"), separator);
-    result = result.replace(new RegExp(`^${escaped}|${escaped}$`, "g"), "");
-  }
-
-  if (!preserveCase) {
-    result = result.toLowerCase();
-  }
-
-  return result;
+  return parts.reverse().reduce((acc, part) => (part === "" ? acc : `${part}(::${acc})?`), last);
 }
 
 export function ordinal(number: number): string {

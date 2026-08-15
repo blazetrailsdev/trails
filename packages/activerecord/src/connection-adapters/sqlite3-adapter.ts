@@ -420,11 +420,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     // `SQLite3Adapter` inherits the abstract `default_prepared_statements`.
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
-      (SQLite3Adapter.typeCastConfigToBoolean(
+      SQLite3Adapter.typeCastConfigToBoolean(
         options.preparedStatements !== undefined
           ? options.preparedStatements
           : this.defaultPreparedStatements(),
-      ) as boolean);
+      );
     // Apply adapter-level options FIRST so invalid values fail before
     // the native driver opens a file handle that would otherwise leak.
     if (options.statementLimit !== undefined) {

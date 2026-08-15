@@ -3,6 +3,13 @@
     "package": "activesupport",
     "tsFile": "inflector.ts",
     "rubyName": "safe_constantize",
+    "call": "const_regexp",
+    "reason": "Same `rescue LoadError` arm as this file's `safe_constantize` → `match?` row: `const_regexp` is only interpolated into the \"Unable to autoload constant\" pattern that arm matches. trails has no Ruby autoload and `constantize` never raises LoadError, so the arm has no analogue — `constRegexp` itself is ported (inflector/methods.rb:357-367)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector.ts",
+    "rubyName": "safe_constantize",
     "call": "match?",
     "reason": "Rails' `match?` here is in the `rescue LoadError` arm, matching the \"Unable to autoload constant\" message. trails has no Ruby autoload and `constantize` never raises LoadError, so the arm — and its `match?` — has no analogue."
   }

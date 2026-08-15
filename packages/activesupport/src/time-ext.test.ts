@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   beginningOfDay,
   middleOfDay,
@@ -59,6 +59,7 @@ import {
   toTime,
   formattedOffset,
 } from "./time-ext.js";
+import { toTime as dateToTime } from "./core-ext/date/conversions.js";
 
 // Helper: make a local date
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -434,15 +435,15 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const t = d(2005, 2, 4, 10, 10, 10);
+    const t = new RubyTime(2005, 2, 4, 10, 10, 10, 3600);
     const result = toTime(t);
-    expect(result.epochMilliseconds).toBe(t.getTime());
+    expect(result.epochNanoseconds).toBe(t.toTime().epochNanoseconds);
   });
 
   it("to time", () => {
-    const t = d(2005, 2, 4, 10, 10, 10);
+    const t = new RubyTime(2005, 2, 4, 10, 10, 10, 3600);
     const result = toTime(t);
-    expect(result.epochMilliseconds).toBe(t.getTime());
+    expect(result.epochNanoseconds).toBe(t.toTime().epochNanoseconds);
   });
 
   it("formatted offset with utc", () => {
@@ -753,15 +754,17 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to time", () => {
-    const date = d(2005, 2, 21);
-    const result = toTime(date);
-    expect(result.epochMilliseconds).toBe(date.getTime());
+    const date = Temporal.PlainDate.from("2005-02-21");
+    const result = dateToTime(date);
+    expect(result.year).toBe(2005);
+    expect(result.month).toBe(2);
+    expect(result.day).toBe(21);
   });
 
   it("to datetime", () => {
-    const date = d(2005, 2, 21);
-    const result = toTime(date);
-    expect(asDate(result).getFullYear()).toBe(2005);
+    const date = Temporal.PlainDate.from("2005-02-21");
+    const result = dateToTime(date);
+    expect(result.year).toBe(2005);
   });
 
   it("to date", () => {
@@ -1124,21 +1127,21 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("to datetime", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochMilliseconds).toBe(dt.getTime());
+    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
   });
 
   it("to time", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochMilliseconds).toBe(dt.getTime());
+    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
   });
 
   it("to time preserves fractional seconds", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
+    const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
     const result = toTime(dt);
-    expect(asDate(result).getMilliseconds()).toBe(500);
+    expect(result.millisecond).toBe(500);
   });
 
   it("middle of day", () => {

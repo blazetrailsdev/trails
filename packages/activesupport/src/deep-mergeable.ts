@@ -48,7 +48,7 @@ export namespace DeepMergeable {
     return deepMergeObjects(target, other, block);
   }
 
-  export function deepMergeInPlace(
+  export function deepMergeBang(
     target: Record<string, unknown>,
     other: Record<string, unknown>,
     block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
@@ -58,7 +58,7 @@ export namespace DeepMergeable {
       const otherVal = other[key];
 
       if (Object.hasOwn(target, key) && isPlainObject(thisVal) && isPlainObject(otherVal)) {
-        deepMergeInPlace(thisVal, otherVal, block);
+        deepMergeBang(thisVal, otherVal, block);
       } else if (block && Object.hasOwn(target, key)) {
         target[key] = block(key, thisVal, otherVal);
       } else {

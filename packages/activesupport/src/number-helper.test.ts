@@ -3,7 +3,7 @@ import {
   numberToPhone,
   numberToCurrency,
   numberToPercentage,
-  numberWithDelimiter,
+  numberToDelimited,
   numberToRounded,
   numberToHumanSize,
   numberToHuman,
@@ -88,28 +88,28 @@ describe("NumberHelperTest", () => {
   });
 
   it("to delimited", () => {
-    expect(numberWithDelimiter(12345678)).toBe("12,345,678");
-    expect(numberWithDelimiter(0)).toBe("0");
-    expect(numberWithDelimiter(123)).toBe("123");
-    expect(numberWithDelimiter(123456)).toBe("123,456");
-    expect(numberWithDelimiter(123456.78)).toBe("123,456.78");
-    expect(numberWithDelimiter(1234567890.5)).toBe("1,234,567,890.5");
-    expect(numberWithDelimiter("123456.789")).toBe("123,456.789");
-    expect(numberWithDelimiter(123456.78901)).toBe("123,456.78901");
-    expect(numberWithDelimiter(123456789.78901)).toBe("123,456,789.78901");
-    expect(numberWithDelimiter(0.78901)).toBe("0.78901");
-    expect(numberWithDelimiter("123456.78")).toBe("123,456.78");
+    expect(numberToDelimited(12345678)).toBe("12,345,678");
+    expect(numberToDelimited(0)).toBe("0");
+    expect(numberToDelimited(123)).toBe("123");
+    expect(numberToDelimited(123456)).toBe("123,456");
+    expect(numberToDelimited(123456.78)).toBe("123,456.78");
+    expect(numberToDelimited(1234567890.5)).toBe("1,234,567,890.5");
+    expect(numberToDelimited("123456.789")).toBe("123,456.789");
+    expect(numberToDelimited(123456.78901)).toBe("123,456.78901");
+    expect(numberToDelimited(123456789.78901)).toBe("123,456,789.78901");
+    expect(numberToDelimited(0.78901)).toBe("0.78901");
+    expect(numberToDelimited("123456.78")).toBe("123,456.78");
     expect(
-      numberWithDelimiter("123456.78", { delimiterPattern: /(\d+?)(?=(\d\d)+(\d)(?!\d))/ }),
+      numberToDelimited("123456.78", { delimiterPattern: /(\d+?)(?=(\d\d)+(\d)(?!\d))/ }),
     ).toBe("1,23,456.78");
-    expect(numberWithDelimiter("123456789012345678.91")).toBe("123,456,789,012,345,678.91");
+    expect(numberToDelimited("123456789012345678.91")).toBe("123,456,789,012,345,678.91");
   });
 
   it("to delimited with options hash", () => {
-    expect(numberWithDelimiter(12345678, { delimiter: "." })).toBe("12.345.678");
-    expect(numberWithDelimiter(12345678, { delimiter: "," })).toBe("12,345,678");
-    expect(numberWithDelimiter(12345678.05, { separator: "." })).toBe("12,345,678.05");
-    expect(numberWithDelimiter(12345678.05, { delimiter: ".", separator: "," })).toBe(
+    expect(numberToDelimited(12345678, { delimiter: "." })).toBe("12.345.678");
+    expect(numberToDelimited(12345678, { delimiter: "," })).toBe("12,345,678");
+    expect(numberToDelimited(12345678.05, { separator: "." })).toBe("12,345,678.05");
+    expect(numberToDelimited(12345678.05, { delimiter: ".", separator: "," })).toBe(
       "12.345.678,05",
     );
   });
@@ -248,7 +248,7 @@ describe("NumberHelperTest", () => {
     // null is not numeric, so helpers return the string representation
     expect(numberToPhone(null as unknown as number)).toBe("null");
     expect(numberToCurrency(null as unknown as number)).toBe("null");
-    expect(numberWithDelimiter(null as unknown as number)).toBe("null");
+    expect(numberToDelimited(null as unknown as number)).toBe("null");
     expect(numberToRounded(null as unknown as number)).toBe("null");
     expect(numberToHumanSize(null as unknown as number)).toBe("null");
     expect(numberToHuman(null as unknown as number)).toBe("null");
@@ -264,7 +264,7 @@ describe("NumberHelperTest", () => {
   it("number helpers should return non numeric param unchanged", () => {
     expect(numberToRounded("x")).toBe("x");
     expect(numberToPercentage("x%")).toBe("x%%");
-    expect(numberWithDelimiter("abc")).toBe("abc");
+    expect(numberToDelimited("abc")).toBe("abc");
     expect(numberToHuman("x")).toBe("x");
     expect(numberToHumanSize("x")).toBe("x");
   });

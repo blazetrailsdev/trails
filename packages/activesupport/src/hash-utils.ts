@@ -57,12 +57,12 @@ export function deepMerge<T extends AnyObject>(target: T, source: AnyObject): T 
  * Deep merge `source` into `target` in place (mutating `target`).
  * Mirrors Ruby's Hash#deep_merge!.
  */
-export function deepMergeInPlace<T extends AnyObject>(target: T, source: AnyObject): T {
+export function deepMergeBang<T extends AnyObject>(target: T, source: AnyObject): T {
   for (const key of Object.keys(source)) {
     const targetVal = target[key as keyof T];
     const sourceVal = source[key];
     if (isPlainObject(targetVal) && isPlainObject(sourceVal)) {
-      deepMergeInPlace(targetVal as AnyObject, sourceVal);
+      deepMergeBang(targetVal as AnyObject, sourceVal);
     } else {
       (target as AnyObject)[key] = sourceVal;
     }
@@ -550,10 +550,10 @@ export function compact<T extends AnyObject>(obj: T): Partial<T> {
 }
 
 /**
- * Remove blank values from a plain object (Rails' compact_blank for hashes).
- * Blank: null, undefined, empty string, empty array, empty object, false.
+ * Mirrors: `Hash#compact_blank` (`core_ext/enumerable.rb:222-224`) —
+ * `reject { |_k, v| v.blank? }`.
  */
-export function compactBlankObj<T extends AnyObject>(obj: T): Partial<T> {
+export function compactBlank<T extends AnyObject>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj)) {
     const val = obj[key];
@@ -562,6 +562,20 @@ export function compactBlankObj<T extends AnyObject>(obj: T): Partial<T> {
     }
   }
   return result;
+}
+
+/**
+ * Removes all blank values from the `Hash` in place and returns self.
+ *
+ * Mirrors: `Hash#compact_blank!` (`core_ext/enumerable.rb:232-235`) —
+ * `delete_if { |_k, v| v.blank? }`, which Rails uses rather than `reject!`
+ * because it always returns self even if nothing changed.
+ */
+export function compactBlankBang<T extends AnyObject>(hash: T): T {
+  for (const key of Object.keys(hash)) {
+    if (_isBlankValue(hash[key])) delete hash[key];
+  }
+  return hash;
 }
 
 function _isBlankValue(value: unknown): boolean {

@@ -867,7 +867,11 @@ export class AbstractAdapter implements Quoting {
   protected _connection: AbstractAdapter | null = null;
   private _owner: string | null = null;
   private _inUse = false;
-  private _preparedStatements = false;
+  // Rails' `@prepared_statements` holds whatever `type_cast_config_to_boolean`
+  // left (abstract_adapter.rb:65-71, :159) — only the string `"false"` becomes
+  // `false`; every other config value passes through unchanged, so a
+  // `prepared_statements: 0` stays `0` and reads as truthy.
+  private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Date.now();
   protected _lastActivity = 0;
@@ -1202,15 +1206,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   get preparedStatements(): boolean {
-    return this._preparedStatements && !this.preparedStatementsDisabledCache.has(this);
+    return (
+      this._preparedStatements != null &&
+      this._preparedStatements !== false &&
+      !this.preparedStatementsDisabledCache.has(this)
+    );
   }
 
-  set preparedStatements(value: boolean) {
-    if (typeof value !== "boolean") {
-      throw new TypeError(
-        `preparedStatements must be a boolean; got ${typeof value}: ${String(value)}`,
-      );
-    }
+  set preparedStatements(value: unknown) {
     // Rails has no writer here — `@prepared_statements` is assigned once, in
     // `initialize` (abstract_adapter.rb:159), where the global
     // `ActiveRecord.disable_prepared_statements` is folded in. This setter is
@@ -1429,7 +1432,7 @@ export class AbstractAdapter implements Quoting {
         : this.defaultPreparedStatements();
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
-      ((this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(configured) as boolean);
+      (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(configured);
   }
 
   disconnectBang(): void {
@@ -1648,7 +1651,11 @@ export class AbstractAdapter implements Quoting {
     // exit. JS has no `object_id`: the Set is keyed by the adapter instance
     // itself, which is the same identity `object_id` stands for in Ruby.
     let cache: Set<unknown> | undefined;
-    if (this._preparedStatements && !this.preparedStatementsDisabledCache.has(this)) {
+    if (
+      this._preparedStatements != null &&
+      this._preparedStatements !== false &&
+      !this.preparedStatementsDisabledCache.has(this)
+    ) {
       cache = this.preparedStatementsDisabledCache.add(this);
     }
     try {

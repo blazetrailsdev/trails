@@ -3,7 +3,7 @@ import { I18n } from "./i18n.js";
 import {
   numberToCurrency,
   numberToRounded,
-  numberWithDelimiter,
+  numberToDelimited,
   numberToPercentage,
   numberToHumanSize,
   numberToHuman,
@@ -126,11 +126,11 @@ describe("NumberHelperI18nTest", () => {
   });
 
   it("number with i18n delimiter", () => {
-    expect(numberWithDelimiter(1000000.234, { locale: "ts" })).toBe("1,000,000.234");
+    expect(numberToDelimited(1000000.234, { locale: "ts" })).toBe("1,000,000.234");
   });
 
   it("number with i18n delimiter and empty i18n store", () => {
-    expect(numberWithDelimiter(1000000.234, { locale: "empty" })).toBe("1,000,000.234");
+    expect(numberToDelimited(1000000.234, { locale: "empty" })).toBe("1,000,000.234");
   });
 
   it("number to i18n percentage", () => {

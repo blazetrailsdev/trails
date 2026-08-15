@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import {
+  constRegexp,
   pluralize,
   singularize,
   camelize,
@@ -639,5 +640,13 @@ describe("InflectorTest", () => {
   it("humanize with international characters", () => {
     expect(humanize("é_employee")).toBe("É employee");
     expect(humanize("ü_user")).toBe("Ü user");
+  });
+
+  // Self-built: Rails has no test for `const_regexp`, whose documented
+  // examples (inflector/methods.rb:353-356) are the assertions here.
+  it("const regexp", () => {
+    expect(constRegexp("Foo::Bar::Baz")).toBe("Foo(::Bar(::Baz)?)?");
+    expect(constRegexp("::")).toBe("::");
+    expect(constRegexp("Foo")).toBe("Foo");
   });
 });
