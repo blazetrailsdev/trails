@@ -359,8 +359,7 @@ export function moduleParentName(klass: { name: string }): string | null {
  * Mirrors: Module#module_parent (`core_ext/module/introspection.rb:36-38`).
  */
 export function moduleParent(klass: { name: string }): unknown {
-  const parentName = moduleParentName(klass);
-  return parentName != null ? constantize(parentName) : Object;
+  return moduleParentName(klass) != null ? constantize(moduleParentName(klass)!) : Object;
 }
 
 /**

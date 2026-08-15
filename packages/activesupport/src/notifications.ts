@@ -230,14 +230,13 @@ export class Notifications {
    */
   static instrument<T>(
     name: string,
-    payload?: EventPayload,
+    payload: EventPayload = {},
     block?: (payload: EventPayload) => T,
   ): T extends undefined ? void : T {
-    const resolved = payload ?? {};
     if (!this.notifier.listening(name)) {
-      return (block ? block(resolved) : undefined) as any;
+      return (block ? block(payload) : undefined) as any;
     }
-    return this.instrumenter.instrument(name, resolved, block) as any;
+    return this.instrumenter.instrument(name, payload, block) as any;
   }
 
   /**

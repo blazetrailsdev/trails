@@ -305,14 +305,13 @@ export class Errors<TBase extends object = object> {
       | string
       | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
   ): boolean {
-    let normType: string;
-    [attribute, normType] = this.normalizeArguments(attribute, type);
-    if (normType.startsWith(":")) {
+    [attribute, type] = this.normalizeArguments(attribute, type);
+    if (type.startsWith(":")) {
       // Symbol branch: check for errors of this exact type.
-      return this.where(attribute, normType).length > 0;
+      return this.where(attribute, type).length > 0;
     }
     // String branch: full-message lookup (Rails else clause).
-    return this.messagesFor(attribute).includes(normType);
+    return this.messagesFor(attribute).includes(type);
   }
 
   get fullMessages(): string[] {

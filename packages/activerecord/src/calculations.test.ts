@@ -6,7 +6,7 @@ import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { StatementInvalid } from "./errors.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { assertNoQueries } from "./testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
@@ -1883,15 +1883,31 @@ describe("CalculationsTest", () => {
   });
 
   it("#skip_query_cache! for #pluck", async () => {
-    const r1 = await Account.pluck("credit_limit");
-    const r2 = await Account.all().pluck("credit_limit");
-    expect(r1).toEqual(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.pluck("credit_limit");
+        await Account.pluck("credit_limit");
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().pluck("credit_limit");
+        await Account.all().skipQueryCacheBang().pluck("credit_limit");
+      });
+    });
   });
 
   it("#skip_query_cache! for #ids", async () => {
-    const r1 = await Account.ids();
-    const r2 = await Account.all().ids();
-    expect(r1).toEqual(r2);
+    await Account.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Account.ids();
+        await Account.ids();
+      });
+
+      await assertQueriesCount(2, false, async () => {
+        await Account.all().skipQueryCacheBang().ids();
+        await Account.all().skipQueryCacheBang().ids();
+      });
+    });
   });
 
   it("#skip_query_cache! for a simple calculation", async () => {
