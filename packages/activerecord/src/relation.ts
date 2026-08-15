@@ -4006,7 +4006,6 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#first_or_initialize
    */
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
-    // Rails: `first || new(attributes, &block)` (relation.rb:186-188).
     return (await this.first()) ?? this.new(extra);
   }
 
@@ -6558,8 +6557,6 @@ export class Relation<T extends Base> {
   async cacheKey(timestampColumn = "updated_at"): Promise<string> {
     this._cacheKeys ??= new Map();
     if (!this._cacheKeys.has(timestampColumn)) {
-      // Rails: `@cache_keys[timestamp_column] ||= model.collection_cache_key(self,
-      // timestamp_column)` (relation.rb:440).
       this._cacheKeys.set(timestampColumn, this.model.collectionCacheKey(this, timestampColumn));
     }
     return this._cacheKeys.get(timestampColumn)!;
@@ -6567,8 +6564,6 @@ export class Relation<T extends Base> {
 
   /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
-    // Rails: `"#{model.model_name.cache_key}/query-#{query_signature}"`
-    // (relation.rb:445).
     const key = `${this.model.modelName.cacheKey}/query-${hexdigest(this.toSql())}`;
     if (this.model.collectionCacheVersioning) {
       return key;

@@ -2210,9 +2210,6 @@ export class RuntimeReflection extends AbstractReflection {
   }
 
   get joinPrimaryKey(): string | string[] {
-    // Rails: `def join_primary_key(klass = self.klass); @reflection.join_primary_key(klass); end`
-    // (reflection.rb:1275-1277) — the runtime klass is what makes a polymorphic
-    // belongs_to head resolvable.
     return this.joinPrimaryKeyFor();
   }
 

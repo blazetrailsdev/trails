@@ -231,9 +231,6 @@ export function collectionCacheKey(
   collection?: any,
   timestampColumn = "updated_at",
 ): Promise<string> {
-  // Rails: `collection.send(:compute_cache_key, timestamp_column)`
-  // (integration.rb:163-165) — the private compute, not the memoized reader,
-  // which is what routes back here.
   const rel = collection ?? this.all();
   return Promise.resolve(rel.computeCacheKey(timestampColumn));
 }

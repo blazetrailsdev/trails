@@ -398,11 +398,6 @@ export class AssociationScope {
       joinForeignKey: string | string[];
       type?: string | null;
     };
-    // For multi-step chains the reflection is wrapped in ReflectionProxy with an
-    // aliasedTable set; for chain length 1 the head is a RuntimeReflection whose
-    // `aliasedTable` is `klass.arelTable` off the live association
-    // (reflection.rb:1271-1273), which is what makes a polymorphic belongs_to
-    // resolvable without threading the runtime klass through the caller.
     const aliased = (reflection as ReflectionProxy).aliasedTable as
       | string
       | { name?: string }
@@ -420,9 +415,6 @@ export class AssociationScope {
         tableName = null;
       }
     }
-    // Rails: `Array(reflection.join_primary_key)` (association_scope.rb:59) —
-    // RuntimeReflection#join_primary_key defaults its klass to the runtime one,
-    // so the polymorphic belongs_to case is resolved reflection-side.
     const joinPk = r.joinPrimaryKey;
     const joinPks = Array.isArray(joinPk) ? joinPk : [joinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
