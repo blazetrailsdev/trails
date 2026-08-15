@@ -179,11 +179,24 @@ export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[
  * one is spelled out here.
  */
 function toS(self: unknown[]): string {
-  const inspect = (e: unknown): string => {
-    if (e == null) return "nil";
-    return typeof e === "string" ? JSON.stringify(e) : String(e);
-  };
   return `[${self.map(inspect).join(", ")}]`;
+}
+
+/**
+ * Ruby `Object#inspect`, which `Array#to_s` calls on each element and which
+ * recurses through nested Arrays and Hashes. JS has no `inspect`: `String(x)`
+ * is `to_s`, which for a nested Array is the comma-joined form and for a
+ * plain object is `[object Object]`.
+ */
+function inspect(value: unknown): string {
+  if (value == null) return "nil";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return toS(value);
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    return `{${entries.map(([k, v]) => `:${k}=>${inspect(v)}`).join(", ")}}`;
+  }
+  return String(value);
 }
 
 /**
