@@ -4717,8 +4717,11 @@ export class Relation<T extends Base> {
     // materialized-ID shape and ordered-distinct handling — so rather than
     // claim parity we reject this combination explicitly. Tracked by the
     // `converge-relation-subquery-distinct-pk-materialization` continuation story.
-    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    if (eagerLoading && hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(joinDependency)) {
+    if (
+      eagerLoading &&
+      this.hasLimitOrOffset &&
+      !this._eagerJoinDependencyIsLimitable(joinDependency)
+    ) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
@@ -5137,11 +5140,6 @@ export class Relation<T extends Base> {
     // shared `AliasTracker` spanning the eager JoinDependency and the manual
     // joins, deduping coinciding nodes via `walk` — same threading as the
     // relation `_applyEagerJoinDependency` yields.
-    // Rails `apply_join_dependency` hands the eager JoinDependency to the query
-    // builder by pushing it into `joins_values`
-    // (`joins!(construct_join_dependency(...))`, finder_methods.rb:461) — not as
-    // a side-channel argument — so `build_joins` picks it up through the same
-    // `select_named_joins` partition that stashes any other JoinDependency there.
     const joined = this._clone();
     QueryMethodBangs.joinsBang.call(joined as any, jd as any);
     joined._applyJoinsToManager(idSubquery);
