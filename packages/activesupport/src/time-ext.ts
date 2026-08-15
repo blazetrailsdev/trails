@@ -9,7 +9,7 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Temporal, Time as RubyTime, cCivilToJd } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
@@ -328,7 +328,23 @@ export function advance(
 // Seconds calculations
 // ---------------------------------------------------------------------------
 
-export function secondsSinceMidnight(date: Date): number {
+/**
+ * `DateTime#seconds_since_midnight` (`core_ext/date_time/calculations.rb:20-22`)
+ * is `sec + (min * 60) + (hour * 3600)` — a whole-second count, with none of
+ * the sub-second arithmetic `Time#seconds_since_midnight`
+ * (`core_ext/time/calculations.rb:64-66`) does.
+ */
+export function secondsSinceMidnight(
+  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): number;
+export function secondsSinceMidnight(date: Date): number;
+export function secondsSinceMidnight(
+  receiver: Date | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): number {
+  if (!(receiver instanceof Date)) {
+    return receiver.second + receiver.minute * 60 + receiver.hour * 3600;
+  }
+  const date = receiver;
   return (
     Math.floor(date.getTime() / 1000) -
     Math.floor(change(date, { hour: 0 }).epochMilliseconds / 1000) +
@@ -630,10 +646,21 @@ export function ceil(date: Date, ms: number): Temporal.Instant {
 }
 
 /**
- * secFraction — returns the sub-second fraction of a Date as a float.
+ * secFraction — returns the sub-second fraction of the receiver as a float.
  */
-export function secFraction(date: Date): number {
-  return date.getMilliseconds() / 1000;
+export function secFraction(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number;
+export function secFraction(date: Date): number;
+export function secFraction(
+  receiver: Date | Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): number {
+  if (!(receiver instanceof Date)) {
+    return (
+      receiver.millisecond / 1_000 +
+      receiver.microsecond / 1_000_000 +
+      receiver.nanosecond / 1_000_000_000
+    );
+  }
+  return receiver.getMilliseconds() / 1000;
 }
 
 // `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38); the
@@ -725,19 +752,125 @@ export function toDate(date: Date): Temporal.PlainDate {
 }
 
 /**
- * toTime — Rails `Time#to_time`. Returns the instant the Date refers to.
+ * Returns DateTime with local offset for given year if format is local else
+ * offset is zero.
  *
- * @missingRailsCall preserve_timezone — `Time#to_time` is `preserve_timezone ?
- * self : getlocal` (`core_ext/time/compatibility.rb:13-15`) and `DateTime#to_time`
- * the same switch over two `getlocal` forms (`date_time/compatibility.rb:15-17`).
- * Both arms answer one value for this receiver: a JS `Date` is an absolute
- * instant carrying no offset of its own, so there is no receiver offset to
- * preserve and nothing for `getlocal` to convert. The switch is consulted where
- * the receiver does carry one — `preserveTimezone` below, over a ruby/date
- * `Time`, which `String#to_time` reads.
+ * Mirrors: `DateTime.civil_from_format`
+ * (`core_ext/date_time/conversions.rb:69-76`). Ruby's `offset` is a Rational
+ * fraction of a day, which is how `civil` takes it; `Temporal` takes the same
+ * offset as the zone the wall clock is read in, so the `Time.local(...)
+ * .utc_offset` the `:local` arm reads is `TimeZone#local`'s own offset.
  */
-export function toTime(date: Date): Temporal.Instant {
-  return instantFrom(date);
+export function civilFromFormat(
+  utcOrLocal: string,
+  year: number,
+  month = 1,
+  day = 1,
+  hour = 0,
+  min = 0,
+  sec = 0,
+): Temporal.ZonedDateTime {
+  let offset: number;
+  if (utcOrLocal === "local") {
+    offset = TimeZone.find(Temporal.Now.timeZoneId())!.local(year, month, day).utcOffset;
+  } else {
+    offset = 0;
+  }
+  const offsetHours = String(Math.trunc(Math.abs(offset) / 3600)).padStart(2, "0");
+  const offsetMinutes = String(Math.trunc((Math.abs(offset) % 3600) / 60)).padStart(2, "0");
+  const offsetId = `${offset < 0 ? "-" : "+"}${offsetHours}:${offsetMinutes}`;
+  return Temporal.PlainDateTime.from({
+    year,
+    month,
+    day,
+    hour,
+    minute: min,
+    second: sec,
+  }).toZonedDateTime(offsetId);
+}
+
+/**
+ * Returns the fraction of a second as microseconds.
+ *
+ * Mirrors: `DateTime#usec` (`core_ext/date_time/conversions.rb:89-91`) —
+ * `(sec_fraction * 1_000_000).to_i`.
+ */
+export function usec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
+  return Math.trunc(secFraction(datetime) * 1_000_000);
+}
+
+/**
+ * Returns the fraction of a second as nanoseconds.
+ *
+ * Mirrors: `DateTime#nsec` (`core_ext/date_time/conversions.rb:94-96`) —
+ * `(sec_fraction * 1_000_000_000).to_i`.
+ */
+export function nsec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
+  return Math.trunc(secFraction(datetime) * 1_000_000_000);
+}
+
+/**
+ * Mirrors: `DateTime#offset_in_seconds`
+ * (`core_ext/date_time/conversions.rb:99-101`) — `(offset * 86400).to_i`,
+ * where Ruby's `offset` is the fraction of a day. A `PlainDateTime` stands in
+ * for the `+00:00` a `DateTime` defaults to (date.rb's `civil`).
+ */
+export function offsetInSeconds(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
+  if (datetime instanceof Temporal.PlainDateTime) return 0;
+  return Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
+}
+
+/**
+ * Mirrors: `DateTime#seconds_since_unix_epoch`
+ * (`core_ext/date_time/conversions.rb:103-105`) — `(jd - 2440588) * 86400 -
+ * offset_in_seconds + seconds_since_midnight`.
+ */
+export function secondsSinceUnixEpoch(
+  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): number {
+  const jd = cCivilToJd(datetime.year, datetime.month, datetime.day);
+  return (jd - 2440588) * 86400 - offsetInSeconds(datetime) + secondsSinceMidnight(datetime);
+}
+
+/**
+ * Either return `self` or the time in the local system timezone depending on
+ * the setting of `ActiveSupport.to_time_preserves_timezone`.
+ *
+ * Mirrors: `Time#to_time` (`core_ext/time/compatibility.rb:13-15`) —
+ * `preserve_timezone ? self : getlocal` — over a ruby/date `Time`, and
+ * `DateTime#to_time` (`core_ext/date_time/compatibility.rb:15-17`) —
+ * `preserve_timezone ? getlocal(utc_offset) : getlocal` — over the
+ * `PlainDateTime | ZonedDateTime` `@blazetrails/date`'s `DateTime` answers.
+ * Both receivers carry an offset, which is what the switch chooses between;
+ * `getlocal` re-reads the same instant in the system zone, and
+ * `getlocal(utc_offset)` in the receiver's own offset.
+ *
+ * The JS-`Date` arm is neither Ruby method: a `Date` is an absolute instant
+ * with no offset of its own, so both branches answer the same value and the
+ * switch has nothing to choose between.
+ */
+export function toTime(time: RubyTime): Temporal.ZonedDateTime;
+export function toTime(
+  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
+): Temporal.ZonedDateTime;
+export function toTime(date: Date): Temporal.Instant;
+export function toTime(
+  receiver: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime | Date,
+): Temporal.ZonedDateTime | Temporal.Instant {
+  if (receiver instanceof Date) return instantFrom(receiver);
+
+  if (receiver instanceof RubyTime) {
+    const self = receiver.toTime();
+    return preserveTimezone(receiver) ? self : self.withTimeZone(Temporal.Now.timeZoneId());
+  }
+
+  // A Ruby `DateTime` without an explicit offset is `+00:00` (date.rb's
+  // `civil`), which is the offset a `PlainDateTime` stands in for here.
+  const zoned =
+    receiver instanceof Temporal.PlainDateTime ? receiver.toZonedDateTime("UTC") : receiver;
+  return compatibilityPreserveTimezone()
+    ? zoned.withTimeZone(zoned.offset)
+    : zoned.withTimeZone(Temporal.Now.timeZoneId());
 }
 
 /**

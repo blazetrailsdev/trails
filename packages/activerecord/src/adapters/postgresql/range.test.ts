@@ -8,7 +8,7 @@ import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/date";
-import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
+import { TimeWithZone, TimeZone, setZone, BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../../test-fixtures.js";
 
 beforeAll(() => {
@@ -89,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     PostgresqlRangesTz = PostgresqlRangesTzCls;
   });
   afterEach(() => {
-    resetZone();
+    setZone(null);
   });
   afterEach(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS postgresql_ranges`);

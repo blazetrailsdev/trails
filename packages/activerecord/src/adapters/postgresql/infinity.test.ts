@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../index.js";
-import { setZone, resetZone } from "@blazetrails/activesupport";
+import { setZone } from "@blazetrails/activesupport";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
 
 beforeAll(() => {
@@ -115,7 +115,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("assigning 'infinity' on a datetime column with TZ aware attributes", async () => {
-      // setZone is the first statement inside try{} so the finally{} resetZone()
+      // setZone is the first statement inside try{} so the finally{} setZone(null)
       // always restores it, even if a later await throws (mirrors Rails'
       // in_time_zone ensure block).
       try {
@@ -152,7 +152,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         // only infinity literal, so that input-type variant has no TS counterpart.
       } finally {
         // setting time_zone_aware_attributes causes the types to change.
-        resetZone();
+        setZone(null);
       }
     });
 

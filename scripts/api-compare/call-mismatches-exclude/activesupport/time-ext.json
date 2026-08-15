@@ -16,6 +16,13 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
+    "rubyName": "offset_in_seconds",
+    "call": "offset",
+    "reason": "Ruby's `DateTime#offset` is a Rational fraction of a day; Temporal's `offset` on the same receiver is a `+HH:MM` string, so the seconds come from `offsetNanoseconds` instead of a same-named reader."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
     "rubyName": "sec_fraction",
     "call": "subsec",
     "reason": "`Time#sec_fraction` is `subsec` (time/calculations.rb:107-109) and `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38) — the two are each other's body in Ruby only because the receivers differ. trails has one `secFraction` function exported under both names, so neither call site exists."
@@ -33,13 +40,6 @@
     "rubyName": "since",
     "call": "warn",
     "reason": "Time#since's `warn` is reached only from its `rescue TypeError` arm, which deprecates passing a non-numeric (time/calculations.rb:126-133). time-ext.ts's `since` takes `seconds: number`, so the deprecated call shape is unrepresentable and the arm has nothing to warn about."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "subsec",
-    "call": "sec_fraction",
-    "reason": "See the `sec_fraction` → `subsec` row: one `secFraction` function is exported under both names, so neither delegates to the other."
   },
   {
     "package": "activesupport",

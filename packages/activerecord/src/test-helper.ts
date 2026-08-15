@@ -5,7 +5,7 @@
  */
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
-import { zone, setZone, resetZone, isZoneExplicit } from "@blazetrails/activesupport";
+import { zone, setZone } from "@blazetrails/activesupport";
 
 interface TimezoneConfig {
   /** Mirrors Rails' `default_timezone` — "utc" or "local". */
@@ -36,7 +36,6 @@ export async function withTimezoneConfig(
   const oldAwareAttributes = base.timeZoneAwareAttributes;
   const hadAwareTypes = "timeZoneAwareTypes" in base;
   const oldAwareTypes = base.timeZoneAwareTypes;
-  const wasZoneExplicit = isZoneExplicit();
   const oldZone = zone();
 
   try {
@@ -60,12 +59,6 @@ export async function withTimezoneConfig(
     } else {
       delete base.timeZoneAwareTypes;
     }
-    if (!wasZoneExplicit) {
-      resetZone();
-    } else if (oldZone) {
-      setZone(oldZone);
-    } else {
-      resetZone();
-    }
+    setZone(oldZone);
   }
 }

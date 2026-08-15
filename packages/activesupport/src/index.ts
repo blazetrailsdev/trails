@@ -435,8 +435,6 @@ export type { ChangeOptions, AdvanceOptions } from "./time-with-zone.js";
 export {
   zone,
   setZone,
-  resetZone,
-  isZoneExplicit,
   zoneDefault,
   setZoneDefault,
   useZone,

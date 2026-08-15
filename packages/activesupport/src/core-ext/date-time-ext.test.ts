@@ -5,6 +5,7 @@ import { setFrozenTime } from "../time-travel.js";
 import { setZone } from "../time-zone-config.js";
 import {
   advance,
+  civilFromFormat,
   ago,
   beginningOfDay,
   beginningOfHour,
@@ -24,6 +25,7 @@ import {
   lastWeek,
   middleOfDay,
   nextDay,
+  nsec,
   prevDay,
   secondsSinceMidnight,
   secondsUntilEndOfDay,
@@ -31,6 +33,7 @@ import {
   toDate,
   toFs,
   toTime,
+  usec,
   xmlschema,
 } from "../time-ext.js";
 
@@ -102,7 +105,12 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(asDate(result).getMilliseconds()).toBe(500);
   });
 
-  it.skip("civil from format");
+  it("civil from format", () => {
+    expect(civilFromFormat("local", 2010, 5, 4).toPlainDateTime().toString()).toBe(
+      "2010-05-04T00:00:00",
+    );
+    expect(civilFromFormat("utc", 2010, 5, 4).epochMilliseconds).toBe(Date.UTC(2010, 4, 4));
+  });
 
   it("middle of day", () => {
     const dt = d(2005, 2, 4, 10, 10, 10);
@@ -366,13 +374,17 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("usec", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
-    expect(dt.getMilliseconds() * 1000).toBe(500000);
+    expect(usec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1 }))).toBe(0);
+    expect(
+      usec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1, millisecond: 500 })),
+    ).toBe(500000);
   });
 
   it("nsec", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
-    expect(dt.getMilliseconds() * 1000000).toBe(500000000);
+    expect(nsec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1 }))).toBe(0);
+    expect(
+      nsec(Temporal.PlainDateTime.from({ year: 2000, month: 1, day: 1, millisecond: 500 })),
+    ).toBe(500000000);
   });
 
   it("subsec", () => {

@@ -13,13 +13,7 @@ import "../sqlite/better-sqlite3.js";
 import { afterAll, afterEach, expect } from "vitest";
 import { Base } from "../base.js";
 import { I18n } from "@blazetrails/activemodel";
-import {
-  afterTeardown,
-  zone as timeZone,
-  setZone,
-  resetZone,
-  isZoneExplicit,
-} from "@blazetrails/activesupport";
+import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { ActiveRecord } from "../ar-config.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
@@ -222,19 +216,16 @@ export async function inTimeZone(
   zone: string | null,
   fn: () => Promise<void> | void,
 ): Promise<void> {
-  const wasExplicit = isZoneExplicit();
   const oldZone = timeZone();
   const oldAware = Base.timeZoneAwareAttributes;
 
-  if (zone != null) setZone(zone);
-  else resetZone();
+  setZone(zone);
   Base.timeZoneAwareAttributes = zone != null;
 
   try {
     await fn();
   } finally {
-    if (wasExplicit && oldZone) setZone(oldZone);
-    else resetZone();
+    setZone(oldZone);
     Base.timeZoneAwareAttributes = oldAware;
   }
 }

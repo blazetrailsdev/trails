@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { TimeZone, TimeWithZone, setZone, resetZone } from "@blazetrails/activesupport";
+import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
 import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "./date-time.js";
@@ -8,7 +8,7 @@ import { ActiveRecord } from "../ar-config.js";
 
 afterEach(() => {
   ActiveRecord.defaultTimezone = "utc";
-  resetZone();
+  setZone(null);
 });
 
 describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
