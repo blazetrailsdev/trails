@@ -1,4 +1,3 @@
-import { getCrypto } from "../crypto-adapter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;
@@ -301,9 +300,16 @@ export class Instrumenter {
     this._notifier.finish?.(name, this.id, payload, listenersState);
   }
 
-  /** instrumenter.rb:100-102 — `SecureRandom.hex(10)`. */
+  /**
+   * instrumenter.rb:100-102 — `SecureRandom.hex(10)`. Reads the platform's Web
+   * Crypto global rather than the `CryptoAdapter` seam: the adapter's Node
+   * auto-registration is async-only, and an Instrumenter is built on the
+   * instrumentation path itself, before any host has had a chance to warm it.
+   */
   private uniqueId(): string {
-    return getCrypto().randomBytes(10).toString("hex");
+    const bytes = new Uint8Array(10);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   }
 }
 
