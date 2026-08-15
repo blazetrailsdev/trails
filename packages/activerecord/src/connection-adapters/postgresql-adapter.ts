@@ -3059,11 +3059,12 @@ export class PostgreSQLAdapter
         sql += raw.value;
       } else {
         sql += insert.touchModelTimestampsUnless(
-          (col) => `${insert.quotedTableName()}.${col} IS NOT DISTINCT FROM excluded.${col}`,
+          (column) =>
+            `${insert.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
         );
         sql += insert
           .updatableColumns()
-          .map((col) => `${col}=excluded.${col}`)
+          .map((column) => `${column}=excluded.${column}`)
           .join(",");
       }
     }
