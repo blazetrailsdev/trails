@@ -65,12 +65,14 @@ type TimedCallback = (
 
 type EventObjectCallback = (event: Event) => void;
 
+type Delegate = EventedListener | TimedCallback | EventObjectCallback;
+
 /**
  * Any object responding to `call` — Rails' `Subscribers.new` reaches for
  * `listener.method(:call)` whenever the listener is not itself procish
  * (fanout.rb:328), so a plain object with a `call` method subscribes. Ruby then
  * invokes `@delegate.call` uniformly for procs and callable objects
- * (fanout.rb:437, 452); JS has no such uniform invocation, so `createSubscriber`
+ * (fanout.rb:437, 452); JS has no such uniform invocation, so `Subscribers.new`
  * binds the object's `call` to its receiver and the groups keep calling a
  * function.
  *
@@ -83,205 +85,182 @@ type EventObjectCallback = (event: Event) => void;
  */
 export type CallableListener = { call(...args: never[]): void };
 
-export interface Matcher {
-  matches(name: string): boolean;
-  unsubscribe(name: string): void;
-}
+/**
+ * Mirrors `Fanout::Subscribers::Matcher` (fanout.rb:337-370).
+ *
+ * Rails' `wrap` returns the String pattern itself and relies on `String#===`;
+ * TS has no such polymorphic `===`, so a String pattern is wrapped in
+ * `StringMatcher` — the same three-way dispatch, spelled through one method.
+ */
+export class Matcher {
+  readonly pattern: RegExp;
+  readonly exclusions = new Set<string>();
 
-class StringMatcher implements Matcher {
-  constructor(readonly pattern: string) {}
-  matches(name: string): boolean {
-    return this.pattern === name;
+  static wrap(pattern: string | RegExp | null): AnyMatcher {
+    if (typeof pattern === "string") {
+      return new StringMatcher(pattern);
+    } else if (pattern == null) {
+      return new AllMessages();
+    } else {
+      return new Matcher(pattern);
+    }
   }
-  unsubscribe(_name: string): void {}
-}
 
-class RegExpMatcher implements Matcher {
-  private exclusions = new Set<string>();
-  constructor(readonly pattern: RegExp) {}
+  constructor(pattern: RegExp) {
+    this.pattern = pattern;
+  }
+
+  unsubscribeBang(name: string): void {
+    this.pattern.lastIndex = 0;
+    if (this.pattern.test(name)) this.exclusions.add(name);
+  }
+
+  /** Ruby `Matcher#===` (fanout.rb:356-358). */
   matches(name: string): boolean {
     this.pattern.lastIndex = 0;
     return this.pattern.test(name) && !this.exclusions.has(name);
   }
-  unsubscribe(name: string): void {
-    this.pattern.lastIndex = 0;
-    if (this.pattern.test(name)) {
-      this.exclusions.add(name);
-    }
+}
+
+// Ruby's `Matcher.wrap` hands a String pattern back untouched and matches it
+// with `String#===`; this stands in for that arm so the three matcher kinds
+// share one interface.
+class StringMatcher {
+  constructor(readonly pattern: string) {}
+
+  unsubscribeBang(_name: string): boolean {
+    return false;
+  }
+
+  matches(name: string): boolean {
+    return this.pattern === name;
   }
 }
 
-export class AllMessages implements Matcher {
+export class AllMessages {
+  unsubscribeBang(_name: string): boolean {
+    return false;
+  }
+
   matches(_name: string): boolean {
     return true;
   }
-  unsubscribe(_name: string): void {}
 }
 
-const AllMatcher = AllMessages;
+type AnyMatcher = Matcher | StringMatcher | AllMessages;
 
-function wrapMatcher(pattern: string | RegExp | null): Matcher {
-  if (typeof pattern === "string") return new StringMatcher(pattern);
-  if (pattern instanceof RegExp) return new RegExpMatcher(pattern);
-  return new AllMatcher();
+/** The constructor a subscriber's `groupClass` names (fanout.rb:381, 424, …). */
+type GroupClass = new (
+  listeners: never[],
+  name: string,
+  id: unknown,
+  payload: Record<string, unknown>,
+) => BaseGroup;
+
+export class BaseGroup<L = Delegate> {
+  protected listeners: L[];
+
+  constructor(listeners: L[], _name: string, _id: unknown, _payload: Record<string, unknown>) {
+    this.listeners = listeners;
+  }
+
+  each(block: (listener: L) => void): void {
+    iterateGuardingExceptions(this.listeners, block);
+  }
+
+  start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
+
+  finish(_name: string, _id: unknown, _payload: Record<string, unknown>): void {}
 }
 
-type SubscriberKind = "evented" | "timed" | "monotonic" | "event_object";
+export class BaseTimeGroup extends BaseGroup<TimedCallback> {
+  private startTime: Temporal.Instant | number = 0;
 
-interface Subscriber {
-  readonly matcher: Matcher;
-  readonly kind: SubscriberKind;
-  readonly delegate: EventedListener | TimedCallback | EventObjectCallback;
-  /** Mirrors: `Subscribers::Evented#silenceable` (fanout.rb:376, 381). */
-  readonly silenceable: boolean;
-  subscribed(name: string): boolean;
-  /** Mirrors: `Subscribers::Evented#silenced?` (fanout.rb:404-406). */
-  silenced(name: string): boolean;
-}
-
-function createSubscriber(
-  pattern: string | RegExp | null,
-  listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
-  monotonic: boolean,
-): Subscriber {
-  const matcher = wrapMatcher(pattern);
-  let kind: SubscriberKind;
-  let delegate = listener as EventedListener | TimedCallback | EventObjectCallback;
-
-  if (
-    typeof listener === "object" &&
-    listener !== null &&
-    "start" in listener &&
-    "finish" in listener
-  ) {
-    kind = "evented";
-  } else {
-    kind = monotonic ? "monotonic" : "timed";
-    const procish = typeof listener === "function" ? listener : listener.call;
-    if (procish.length === 1) {
-      kind = "event_object";
-    }
-    if (typeof listener !== "function") {
-      delegate = procish.bind(listener) as TimedCallback;
-    }
+  override start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
+    this.startTime = this.now();
   }
 
-  const silenceable =
-    listener != null && typeof (listener as { silenced?: unknown }).silenced === "function";
-
-  return {
-    matcher,
-    kind,
-    delegate,
-    silenceable,
-    subscribed(name: string) {
-      return matcher.matches(name);
-    },
-    silenced(name: string) {
-      if (!silenceable) return false;
-      const result = (listener as unknown as { silenced(name: string): unknown }).silenced(name);
-      return result != null && result !== false;
-    },
-  };
-}
-
-export abstract class BaseGroup {
-  abstract start(name: string, id: unknown, payload: Record<string, unknown>): void;
-  abstract finish(name: string, id: unknown, payload: Record<string, unknown>): void;
-}
-
-export abstract class BaseTimeGroup extends BaseGroup {}
-
-type Group = BaseGroup;
-
-export class EventedGroup extends BaseGroup {
-  constructor(private listeners: EventedListener[]) {
-    super();
+  override finish(name: string, id: unknown, payload: Record<string, unknown>): void {
+    const stopTime = this.now();
+    this.each((listener) => {
+      listener(name, this.startTime, stopTime, id, payload);
+    });
   }
 
-  start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    iterateGuardingExceptions(this.listeners, (l) => l.start(name, id, payload));
-  }
-
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    iterateGuardingExceptions(this.listeners, (l) => l.finish(name, id, payload));
-  }
-}
-
-export class TimedGroup extends BaseTimeGroup {
-  private startTime: Temporal.Instant | null = null;
-  constructor(private listeners: TimedCallback[]) {
-    super();
-  }
-
-  start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
-    this.startTime = Temporal.Now.instant();
-  }
-
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const stopTime = Temporal.Now.instant();
-    iterateGuardingExceptions(this.listeners, (l) =>
-      l(name, this.startTime!, stopTime, id, payload),
-    );
+  protected now(): Temporal.Instant | number {
+    return Temporal.Now.instant();
   }
 }
 
 export class MonotonicTimedGroup extends BaseTimeGroup {
-  private startTime = 0;
-  constructor(private listeners: TimedCallback[]) {
-    super();
-  }
-
-  start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
-    this.startTime = performance.now();
-  }
-
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const stopTime = performance.now();
-    iterateGuardingExceptions(this.listeners, (l) =>
-      l(name, this.startTime, stopTime, id, payload),
-    );
+  protected override now(): number {
+    return performance.now();
   }
 }
 
-export class EventObjectGroup extends BaseGroup {
-  private _event: Event | null = null;
-  constructor(private listeners: EventObjectCallback[]) {
-    super();
+export class TimedGroup extends BaseTimeGroup {
+  protected override now(): Temporal.Instant {
+    return Temporal.Now.instant();
   }
+}
+
+export class EventedGroup extends BaseGroup<EventedListener> {
+  override start(name: string, id: unknown, payload: Record<string, unknown>): void {
+    this.each((s) => {
+      s.start(name, id, payload);
+    });
+  }
+
+  override finish(name: string, id: unknown, payload: Record<string, unknown>): void {
+    this.each((s) => {
+      s.finish(name, id, payload);
+    });
+  }
+}
+
+export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
+  private _event: Event | null = null;
 
   /** The Event built at #start — trails threads child-event nesting through it. */
   get event(): Event | null {
     return this._event;
   }
 
-  start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    this._event = new Event(name, Temporal.Now.instant(), payload, String(id));
+  override start(name: string, id: unknown, payload: Record<string, unknown>): void {
+    this._event = this.buildEvent(name, id, payload);
   }
 
-  finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
-    if (this._event) {
-      // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
-      // dup with the final object so deletions are reflected (fanout.rb:166-178).
-      this._event.payload = payload;
-      this._event.finish();
-      iterateGuardingExceptions(this.listeners, (l) => l(this._event!));
-    }
+  override finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
+    // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
+    // dup with the final object so deletions are reflected (fanout.rb:166-178).
+    this._event!.payload = payload;
+    this._event!.finish();
+
+    this.each((s) => {
+      s(this._event!);
+    });
+  }
+
+  private buildEvent(name: string, id: unknown, payload: Record<string, unknown>): Event {
+    return new Event(name, Temporal.Now.instant(), payload, String(id));
   }
 }
 
 export class Handle {
-  protected state: "initialized" | "started" | "finished" = "initialized";
-  protected groups: Group[];
-  protected _name: string;
-  protected _id: unknown;
-  protected _payload: Record<string, unknown>;
+  private _name: string;
+  private _id: unknown;
+  private _payload: Record<string, unknown>;
+  private groups: BaseGroup[];
+  private state: "initialized" | "started" | "finished" = "initialized";
 
-  constructor(groups: Group[], name: string, id: unknown, payload: Record<string, unknown>) {
-    this.groups = groups;
+  constructor(notifier: Fanout, name: string, id: unknown, payload: Record<string, unknown>) {
     this._name = name;
     this._id = id;
     this._payload = payload;
+    this.groups = [...notifier.groupsFor(name)].map(
+      ([groupKlass, groupedListeners]) =>
+        new groupKlass(groupedListeners as never[], name, id, payload),
+    );
   }
 
   /**
@@ -296,11 +275,12 @@ export class Handle {
   }
 
   start(): void {
-    if (this.state !== "initialized") {
-      throw new ArgumentError(`expected state to be "initialized" but was "${this.state}"`);
-    }
+    this.ensureStateBang("initialized");
     this.state = "started";
-    iterateGuardingExceptions(this.groups, (g) => g.start(this._name, this._id, this._payload));
+
+    iterateGuardingExceptions(this.groups, (group) => {
+      group.start(this._name, this._id, this._payload);
+    });
   }
 
   finish(): void {
@@ -308,20 +288,31 @@ export class Handle {
   }
 
   finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void {
-    if (this.state !== "started") {
-      throw new ArgumentError(`expected state to be "started" but was "${this.state}"`);
-    }
+    this.ensureStateBang("started");
     this.state = "finished";
-    iterateGuardingExceptions(this.groups, (g) => g.finish(name, id, payload));
+
+    iterateGuardingExceptions(this.groups, (group) => {
+      group.finish(name, id, payload);
+    });
+  }
+
+  private ensureStateBang(expected: string): void {
+    if (this.state !== expected) {
+      throw new ArgumentError(`expected state to be "${expected}" but was "${this.state}"`);
+    }
   }
 }
 
-class FanoutHandle extends Handle {}
-
+/**
+ * This is a default queue implementation that ships with Notifications.
+ * It just pushes events to all registered log subscribers.
+ */
 export class Fanout {
-  private stringSubscribers = new Map<string, Subscriber[]>();
-  private otherSubscribers: Subscriber[] = [];
-  private listenersCache = new Map<string, Subscriber[]>();
+  private stringSubscribers = new Map<string, Evented[]>();
+  private otherSubscribers: Evented[] = [];
+  private allListenersForCache = new Map<string, Evented[]>();
+  private groupsForCache = new Map<string, Map<GroupClass, Delegate[]>>();
+  private silenceableGroupsForCache = new Map<string, Map<GroupClass, Evented[]>>();
 
   // Rails keeps the evented start/finish handle stack in
   // `IsolatedExecutionState[:_fanout_handle_stack]` (fanout.rb:277), so
@@ -329,16 +320,16 @@ export class Fanout {
   // notifiers can't collide.
   private readonly _handleStackKey = Symbol("as_fanout_handle_stack");
 
-  private handleStack(): FanoutHandle[] {
-    return IsolatedExecutionState.fetch<FanoutHandle[]>(this._handleStackKey, () => []);
+  private handleStack(): Handle[] {
+    return IsolatedExecutionState.fetch<Handle[]>(this._handleStackKey, () => []);
   }
 
   subscribe(
     pattern: string | RegExp | null,
     listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
     monotonic = false,
-  ): Subscriber {
-    const sub = createSubscriber(pattern, listener, monotonic);
+  ): Evented {
+    const subscriber = Subscribers.new(pattern, listener, monotonic);
 
     if (typeof pattern === "string") {
       let list = this.stringSubscribers.get(pattern);
@@ -346,26 +337,26 @@ export class Fanout {
         list = [];
         this.stringSubscribers.set(pattern, list);
       }
-      list.push(sub);
+      list.push(subscriber);
       this.clearCache(pattern);
     } else {
-      this.otherSubscribers.push(sub);
+      this.otherSubscribers.push(subscriber);
       this.clearCache();
     }
 
-    return sub;
+    return subscriber;
   }
 
-  unsubscribe(subscriberOrName: Subscriber | string): void {
+  unsubscribe(subscriberOrName: Evented | string): void {
     if (typeof subscriberOrName === "string") {
       const list = this.stringSubscribers.get(subscriberOrName);
       if (list) list.length = 0;
       this.clearCache(subscriberOrName);
       for (const sub of this.otherSubscribers) {
-        sub.matcher.unsubscribe(subscriberOrName);
+        sub.unsubscribeBang(subscriberOrName);
       }
     } else {
-      const pattern = subscriberOrName.matcher;
+      const pattern = subscriberOrName.pattern;
       if (pattern instanceof StringMatcher) {
         const list = this.stringSubscribers.get(pattern.pattern);
         if (list) {
@@ -381,140 +372,243 @@ export class Fanout {
     }
   }
 
-  start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const handle = this.buildHandle(name, id, payload);
-    this.handleStack().push(handle);
-    handle.start();
-  }
-
-  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const handle = this.handleStack().pop();
-    if (handle) {
-      handle.finishWithValues(name, id, payload);
+  clearCache(key?: string): void {
+    if (key) {
+      this.allListenersForCache.delete(key);
+      this.groupsForCache.delete(key);
+      this.silenceableGroupsForCache.delete(key);
+    } else {
+      this.allListenersForCache.clear();
+      this.groupsForCache.clear();
+      this.silenceableGroupsForCache.clear();
     }
   }
 
-  buildHandle(name: string, id: unknown, payload: Record<string, unknown>): Handle {
-    const groups = this.groupsFor(name);
-    return new FanoutHandle(groups, name, id, payload);
-  }
+  groupsFor(name: string): Map<GroupClass, Delegate[]> {
+    let groups = this.groupsForCache.get(name);
+    if (!groups) {
+      groups = groupBy(
+        this.allListenersFor(name).filter((s) => !s.silenceable),
+        (s) => s.delegate,
+      );
+      this.groupsForCache.set(name, groups);
+    }
 
-  /**
-   * Routes an already-built Event to matching subscribers — Rails'
-   * `Fanout#publish_event` (fanout.rb:293-295): run every matching listener under
-   * `iterate_guarding_exceptions` (run all, then re-raise/aggregate). Each kind
-   * consumes the event as its subscriber class' `publish_event` does (fanout.rb:
-   * 396-441): event-object gets the Event; timed/monotonic convert to the 5-arg
-   * `(name, start, finish, id, payload)` form off the event's own times; an
-   * evented delegate delegates to its own `publishEvent`/`publish` if it has one
-   * (fanout.rb:396-401), and a plain start/finish-only listener no-ops.
-   */
-  publishEvent(event: Event): void {
-    const start = event.time;
-    const finish = event.end ?? event.time;
-    const { name, transactionId: id, payload } = event;
+    let silenceableGroups = this.silenceableGroupsForCache.get(name);
+    if (!silenceableGroups) {
+      silenceableGroups = groupBy(
+        this.allListenersFor(name).filter((s) => s.silenceable),
+        (s) => s,
+      );
+      this.silenceableGroupsForCache.set(name, silenceableGroups);
+    }
 
-    iterateGuardingExceptions(this.listenersFor(name), (s) => {
-      if (s.kind === "event_object") {
-        (s.delegate as EventObjectCallback)(event);
-      } else if (s.kind === "timed" || s.kind === "monotonic") {
-        (s.delegate as TimedCallback)(name, start, finish, id, payload);
-      } else {
-        const d = s.delegate as EventedListener & {
-          publishEvent?: (event: Event) => void;
-          publish?: TimedCallback;
-        };
-        // Call the method on its own receiver, as Rails' `@delegate.publish`
-        // does — an evented object's publish may read instance state.
-        if (typeof d.publishEvent === "function") d.publishEvent(event);
-        else if (typeof d.publish === "function") d.publish(name, start, finish, id, payload);
+    if (silenceableGroups.size > 0) {
+      groups = new Map(groups);
+      for (const [groupClass, subscriptions] of silenceableGroups) {
+        const activeSubscriptions = subscriptions.filter((s) => !s.isSilenced(name));
+        if (activeSubscriptions.length > 0) {
+          groups.set(groupClass, [
+            ...(groups.get(groupClass) ?? []),
+            ...activeSubscriptions.map((s) => s.delegate),
+          ]);
+        }
       }
-    });
-  }
-
-  /** Drop every subscriber and reset cached state. Used by unsubscribeAll. */
-  clear(): void {
-    this.stringSubscribers.clear();
-    this.otherSubscribers.length = 0;
-    this.listenersCache.clear();
-  }
-
-  private allListenersFor(name: string): Subscriber[] {
-    let cached = this.listenersCache.get(name);
-    if (cached) return cached;
-
-    const stringList = this.stringSubscribers.get(name) ?? [];
-    const matching = this.otherSubscribers.filter((s) => s.subscribed(name));
-    cached = [...stringList, ...matching];
-    this.listenersCache.set(name, cached);
-    return cached;
-  }
-
-  /** Mirrors: `listeners_for` (fanout.rb:306-308). */
-  private listenersFor(name: string): Subscriber[] {
-    return this.allListenersFor(name).filter((s) => !s.silenced(name));
-  }
-
-  /** Mirrors: `listening?` (fanout.rb:310-312). */
-  listening(name: string): boolean {
-    return this.allListenersFor(name).some((s) => !s.silenced(name));
-  }
-
-  private groupsFor(name: string): Group[] {
-    const listeners = this.allListenersFor(name);
-    const byKind = new Map<SubscriberKind, Subscriber[]>();
-
-    for (const sub of listeners) {
-      let list = byKind.get(sub.kind);
-      if (!list) {
-        list = [];
-        byKind.set(sub.kind, list);
-      }
-      list.push(sub);
-    }
-
-    const groups: Group[] = [];
-    const evented = byKind.get("evented");
-    if (evented) {
-      groups.push(new EventedGroup(evented.map((s) => s.delegate as EventedListener)));
-    }
-    const timed = byKind.get("timed");
-    if (timed) {
-      groups.push(new TimedGroup(timed.map((s) => s.delegate as TimedCallback)));
-    }
-    const monotonic = byKind.get("monotonic");
-    if (monotonic) {
-      groups.push(new MonotonicTimedGroup(monotonic.map((s) => s.delegate as TimedCallback)));
-    }
-    const eventObj = byKind.get("event_object");
-    if (eventObj) {
-      groups.push(new EventObjectGroup(eventObj.map((s) => s.delegate as EventObjectCallback)));
     }
 
     return groups;
   }
 
-  private clearCache(key?: string): void {
-    if (key) {
-      this.listenersCache.delete(key);
-    } else {
-      this.listenersCache.clear();
+  buildHandle(name: string, id: unknown, payload: Record<string, unknown>): Handle {
+    return new Handle(this, name, id, payload);
+  }
+
+  start(name: string, id: unknown, payload: Record<string, unknown>): void {
+    const handleStack = this.handleStack();
+    const handle = this.buildHandle(name, id, payload);
+    handleStack.push(handle);
+    handle.start();
+  }
+
+  finish(name: string, id: unknown, payload: Record<string, unknown>): void {
+    const handleStack = this.handleStack();
+    const handle = handleStack.pop();
+    handle?.finishWithValues(name, id, payload);
+  }
+
+  publish(name: string, ...args: unknown[]): void {
+    iterateGuardingExceptions(this.listenersFor(name), (s) => {
+      s.publish(name, ...args);
+    });
+  }
+
+  publishEvent(event: Event): void {
+    iterateGuardingExceptions(this.listenersFor(event.name), (s) => {
+      s.publishEvent(event);
+    });
+  }
+
+  allListenersFor(name: string): Evented[] {
+    let listeners = this.allListenersForCache.get(name);
+    if (!listeners) {
+      listeners = [
+        ...(this.stringSubscribers.get(name) ?? []),
+        ...this.otherSubscribers.filter((s) => s.isSubscribedTo(name)),
+      ];
+      this.allListenersForCache.set(name, listeners);
     }
+    return listeners;
+  }
+
+  listenersFor(name: string): Evented[] {
+    return this.allListenersFor(name).filter((s) => !s.isSilenced(name));
+  }
+
+  /** Mirrors: `listening?` (fanout.rb:310-312). */
+  listening(name: string): boolean {
+    return this.allListenersFor(name).some((s) => !s.isSilenced(name));
+  }
+
+  // This is a sync queue, so there is no waiting.
+  wait(): void {}
+
+  /**
+   * Drop every subscriber and reset cached state. Used by unsubscribeAll.
+   *
+   * @noRailsEquivalent Rails' test suite reaches into the notifier's ivars to
+   * reset it; trails has no such reflection, so the reset is a method.
+   */
+  clear(): void {
+    this.stringSubscribers.clear();
+    this.otherSubscribers.length = 0;
+    this.clearCache();
   }
 }
 
-export class Evented<D = EventedListener> {
-  readonly pattern: Matcher;
+// Ruby's `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
+// (fanout.rb:183-192) in one pass; `value` picks what the bucket holds, since
+// the silenceable half keeps the subscribers themselves.
+function groupBy<T>(subscribers: Evented[], value: (s: Evented) => T): Map<GroupClass, T[]> {
+  const groups = new Map<GroupClass, T[]>();
+  for (const s of subscribers) {
+    const groupClass = s.groupClass();
+    let list = groups.get(groupClass);
+    if (!list) {
+      list = [];
+      groups.set(groupClass, list);
+    }
+    list.push(value(s));
+  }
+  return groups;
+}
+
+export class Evented<D = Delegate> {
+  readonly pattern: AnyMatcher;
   readonly delegate: D;
+  readonly silenceable: boolean;
+  private canPublish: boolean;
+  private canPublishEvent: boolean;
 
   constructor(pattern: string | RegExp | null, delegate: D) {
-    this.pattern = wrapMatcher(pattern);
+    this.pattern = Matcher.wrap(pattern);
     this.delegate = delegate;
+    this.silenceable = typeof (delegate as { silenced?: unknown })?.silenced === "function";
+    this.canPublish = typeof (delegate as { publish?: unknown })?.publish === "function";
+    this.canPublishEvent =
+      typeof (delegate as { publishEvent?: unknown })?.publishEvent === "function";
+  }
+
+  groupClass(): GroupClass {
+    return EventedGroup as GroupClass;
+  }
+
+  publish(name: string, ...args: unknown[]): void {
+    if (this.canPublish) {
+      (this.delegate as { publish(name: string, ...args: unknown[]): void }).publish(name, ...args);
+    }
+  }
+
+  publishEvent(event: Event): void {
+    if (this.canPublishEvent) {
+      (this.delegate as { publishEvent(event: Event): void }).publishEvent(event);
+    } else {
+      this.publish(event.name, event.time, event.end, event.transactionId, event.payload);
+    }
+  }
+
+  isSilenced(name: string): boolean {
+    if (!this.silenceable) return false;
+    const silenced = (this.delegate as { silenced(name: string): unknown }).silenced(name);
+    return silenced != null && silenced !== false;
+  }
+
+  isSubscribedTo(name: string): boolean {
+    return this.pattern.matches(name);
+  }
+
+  unsubscribeBang(name: string): void {
+    this.pattern.unsubscribeBang(name);
   }
 }
 
-export class Timed extends Evented<TimedCallback> {}
-export class MonotonicTimed extends Timed {}
-export class EventObject extends Evented<EventObjectCallback> {}
+export class Timed extends Evented<TimedCallback> {
+  override groupClass(): GroupClass {
+    return TimedGroup as GroupClass;
+  }
 
-export const Subscribers = { Evented, Timed, MonotonicTimed, EventObject };
+  override publish(name: string, ...args: unknown[]): void {
+    (this.delegate as (...args: unknown[]) => void)(name, ...args);
+  }
+}
+
+export class MonotonicTimed extends Timed {
+  override groupClass(): GroupClass {
+    return MonotonicTimedGroup as GroupClass;
+  }
+}
+
+export class EventObject extends Evented<EventObjectCallback> {
+  override groupClass(): GroupClass {
+    return EventObjectGroup as GroupClass;
+  }
+
+  override publishEvent(event: Event): void {
+    this.delegate(event);
+  }
+}
+
+export const Subscribers = {
+  new(
+    pattern: string | RegExp | null,
+    listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
+    monotonic: boolean,
+  ): Evented {
+    if (
+      typeof listener === "object" &&
+      listener !== null &&
+      "start" in listener &&
+      "finish" in listener
+    ) {
+      return new Evented(pattern, listener);
+    }
+
+    // Doing this to detect a single argument block or callable
+    // like `proc { |x| }` vs `proc { |*x| }` (fanout.rb:325-332).
+    const procish = (
+      typeof listener === "function" ? listener : (listener.call as (...args: never[]) => void)
+    ) as (...args: never[]) => void;
+    const delegate = typeof listener === "function" ? procish : procish.bind(listener);
+
+    if (procish.length === 1) {
+      return new EventObject(pattern, delegate as EventObjectCallback);
+    }
+    return monotonic
+      ? new MonotonicTimed(pattern, delegate as TimedCallback)
+      : new Timed(pattern, delegate as TimedCallback);
+  },
+
+  Evented,
+  Timed,
+  MonotonicTimed,
+  EventObject,
+};

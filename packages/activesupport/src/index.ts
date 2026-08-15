@@ -466,6 +466,7 @@ export {
   EventedGroup,
   EventObjectGroup,
   Handle,
+  Matcher,
   AllMessages,
   Evented,
   Timed,
@@ -473,7 +474,6 @@ export {
   EventObject,
   Subscribers,
 } from "./notifications/fanout.js";
-export type { Matcher } from "./notifications/fanout.js";
 
 export { ParameterFilter } from "./parameter-filter.js";
 export {
