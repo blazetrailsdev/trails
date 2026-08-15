@@ -3685,48 +3685,42 @@ export class Relation<T extends Base> {
 
     if (this.loaded) {
       return this._records.map((record) => {
-        const r = record as unknown as { readAttribute(name: string): unknown };
+        const r = record as unknown as { _readAttribute(name: string): unknown };
         return primaryKeyArray.length === 1
-          ? r.readAttribute(primaryKeyArray[0])
-          : primaryKeyArray.map((column) => r.readAttribute(column));
+          ? r._readAttribute(primaryKeyArray[0])
+          : primaryKeyArray.map((column) => r._readAttribute(column));
       });
     }
 
     if (_hasInclude(this as unknown as Parameters<typeof _hasInclude>[0], primaryKey as string)) {
       // DIVERGENCE (calculations.rb:387-390): Rails re-enters `ids` on
-      // `apply_join_dependency.group(*primary_key_array)`, which always builds the
-      // LEFT OUTER JOIN and, under limit/offset, replaces the relation via
-      // `distinct_relation_for_primary_key`. trails' `applyJoinDependency`
-      // early-returns for a non-referencing `includes` (so re-entering here would
-      // recurse forever) and that materialization lives in `pluck`'s has_include?
-      // arm, so the eager primary-key read routes through it instead.
+      // `apply_join_dependency.group(*primary_key_array)`. trails'
+      // `applyJoinDependency` early-returns for a non-referencing `includes`, so
+      // re-entering here would recurse forever; `pluck` owns the eager arm and the
+      // `distinct_relation_for_primary_key` materialization Rails does under
+      // limit/offset (finder_methods.rb:463).
       return this.pluck(...primaryKeyArray);
     }
 
-    return this._withQueryConnection(() => this._idsInner(primaryKeyArray));
-  }
+    return this._withQueryConnection(async () => {
+      await (
+        this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
+      ).ensureSchemaLoaded();
+      await this._materializeDeferredDistinctPkPredicates();
 
-  /**
-   * The connection-bound tail of {@link ids} — Rails keeps it inline inside
-   * `model.with_connection` (calculations.rb:392-402); trails needs a callback
-   * for `_withQueryConnection`, which is that block.
-   */
-  private async _idsInner(primaryKeyArray: string[]): Promise<unknown[]> {
-    await (this._model as unknown as { ensureSchemaLoaded(): Promise<void> }).ensureSchemaLoaded();
-    await this._materializeDeferredDistinctPkPredicates();
+      const columns = this.arelColumns(primaryKeyArray);
+      const relation = this._clone();
+      relation._selectColumns = columns as never[];
 
-    const columns = this.arelColumns(primaryKeyArray);
-    const relation = this._clone();
-    relation._selectColumns = columns as never[];
+      const result = this._whereClause.isContradiction()
+        ? Result.empty()
+        : await this.skipQueryCacheIfNecessary(async () => {
+            const [sql, binds] = this._compileAstWithBinds(relation._buildArel().ast);
+            return this._conn().selectAll(sql, `${this.model.name} Ids`, binds);
+          });
 
-    const result = this._whereClause.isContradiction()
-      ? Result.empty()
-      : await this.skipQueryCacheIfNecessary(async () => {
-          const [sql, binds] = this._compileAstWithBinds(relation._buildArel().ast);
-          return this._conn().selectAll(sql, `${this.model.name} Ids`, binds);
-        });
-
-    return typeCastPluckValues(result, columns, this as any);
+      return typeCastPluckValues(result, columns, this as any);
+    });
   }
 
   /**

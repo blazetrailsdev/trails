@@ -432,9 +432,6 @@ async function groupedAggregate(
   // calculations.rb:521: the grouped SELECT runs inside
   // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
   // bypass the query cache exactly as the simple arm does.
-  // calculations.rb:521: the grouped SELECT runs inside
-  // skip_query_cache_if_necessary, so `uncached`/`skip_query_cache!` relations
-  // bypass the query cache exactly as the simple arm does.
   const queryResult = await (
     rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
   ).skipQueryCacheIfNecessary(() =>

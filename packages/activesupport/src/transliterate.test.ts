@@ -4,11 +4,7 @@ import { I18n } from "./i18n.js";
 import { transliterate } from "./transliterate.js";
 
 describe("TransliterateTest", () => {
-  // abstract_unit.rb:35 — Active Support's suite runs with
-  // `I18n.enforce_available_locales = false`, which is what lets a locale
-  // carrying nothing but an `i18n.transliterate.rule` be looked up at all
-  // (a translations hash holding only `:i18n` is not an available locale —
-  // i18n/backend/simple.rb#available_locales).
+  // abstract_unit.rb:35
   let enforceAvailableLocales: boolean;
   beforeAll(() => {
     enforceAvailableLocales = I18n.config().enforceAvailableLocales;
