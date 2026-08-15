@@ -64,12 +64,16 @@ describe("AssociationErrors", () => {
   it("InverseOfAssociationNotFoundError exposes associatedClass when provided", () => {
     // Rails parity: errors.rb InverseOfAssociationNotFoundError has
     // `attr_reader :reflection, :associated_class`.
-    const err = new InverseOfAssociationNotFoundError("posts", "author", [], "User");
-    expect(err.associatedClass).toBe("User");
+    const user = { name: "User", reflections: () => ({}) };
+    const err = new InverseOfAssociationNotFoundError(
+      { name: "posts", options: { inverseOf: "author" }, className: "Post", klass: user },
+      user,
+    );
+    expect(err.associatedClass).toBe(user);
   });
 
   it("InverseOfAssociationNotFoundError.associatedClass defaults to null", () => {
-    const err = new InverseOfAssociationNotFoundError("posts", "author");
+    const err = new InverseOfAssociationNotFoundError();
     expect(err.associatedClass).toBeNull();
   });
 

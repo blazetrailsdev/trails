@@ -463,13 +463,55 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
 });
 
 describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
-  // Rails pins the exact `mysql` argv (`mysql2_rake_test.rb:391-400`), whose
-  // payload is `--execute "SET FOREIGN_KEY_CHECKS = 0; SOURCE <file>; SET
-  // FOREIGN_KEY_CHECKS = 1"` (`mysql_database_tasks.rb:58-65`). trails' loader
-  // reads the file itself and pipes it on stdin instead
-  // (`mysql-database-tasks.ts:103-112`), so no `--execute` argument exists to
-  // assert on — a production divergence, not a test-porting gap.
-  it.skip("structure load", () => {});
-  it.skip("structure load with hash extra flags for a different driver", () => {});
-  it.skip("structure load with hash extra flags for the correct driver", () => {});
+  const filename = "awesome-file.sql";
+  const configuration = new HashConfig("default_env", "primary", {
+    adapter: "mysql2",
+    database: "test-db",
+  });
+  const executeArg = `SET FOREIGN_KEY_CHECKS = 0; SOURCE ${filename}; SET FOREIGN_KEY_CHECKS = 1`;
+  let spawnSync: ReturnType<typeof vi.fn>;
+  let previousFlags: typeof DatabaseTasks.structureLoadFlags;
+
+  beforeEach(async () => {
+    MySQLDatabaseTasks.register();
+    previousFlags = DatabaseTasks.structureLoadFlags;
+    const childProcess = await activesupport.getChildProcessAsync();
+    spawnSync = vi
+      .spyOn(childProcess, "spawnSync")
+      .mockReturnValue({ status: 0, signal: null, stdout: "", stderr: "" }) as ReturnType<
+      typeof vi.fn
+    >;
+  });
+
+  afterEach(() => {
+    DatabaseTasks.structureLoadFlags = previousFlags;
+    vi.restoreAllMocks();
+  });
+
+  it("structure load", async () => {
+    const expectedCommand = ["--noop", "--execute", executeArg, "--database", "test-db"];
+    DatabaseTasks.structureLoadFlags = ["--noop"];
+
+    await DatabaseTasks.structureLoad(configuration, filename);
+
+    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+  });
+
+  it("structure load with hash extra flags for a different driver", async () => {
+    const expectedCommand = ["--execute", executeArg, "--database", "test-db"];
+    DatabaseTasks.structureLoadFlags = { postgresql: ["--noop"] };
+
+    await DatabaseTasks.structureLoad(configuration, filename);
+
+    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+  });
+
+  it("structure load with hash extra flags for the correct driver", async () => {
+    const expectedCommand = ["--noop", "--execute", executeArg, "--database", "test-db"];
+    DatabaseTasks.structureLoadFlags = { mysql2: ["--noop"] };
+
+    await DatabaseTasks.structureLoad(configuration, filename);
+
+    expect(spawnSync).toHaveBeenCalledWith("mysql", expectedCommand, expect.anything());
+  });
 });

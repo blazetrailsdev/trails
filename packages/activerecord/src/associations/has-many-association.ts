@@ -650,6 +650,7 @@ async function findTarget(
   if (options.inverseOf) {
     const className = options.className ?? camelize(singularize(assocName));
     validateInverseOf(
+      ctor,
       resolveAssocClass(record, assocName, className),
       assocName,
       options.inverseOf,

@@ -45,6 +45,7 @@ import {
   singularize as _singularize,
   pluralize as _pluralize,
   isPlainObject as _isPlainObject,
+  wrap,
 } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
@@ -52,15 +53,11 @@ export { Range };
 import {
   WhereChain,
   QueryMethodBangs,
-  areStructurallyCompatible,
   EXCEPT_ONLY_KEYS,
   argumentError,
   assertModifiableBang as _assertModifiableBang,
   checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
-  isTableNameMatches as _isTableNameMatches,
-  arelColumn as _arelColumn,
   arelColumns as _arelColumns,
-  arelColumnWithTable as _arelColumnWithTable,
   arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
   type UnscopeType,
@@ -129,7 +126,6 @@ import {
   touchAttributesWithTime,
   parseTouchAllArgs,
   type TouchAllArgs,
-  parseCounterCacheTouch,
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
@@ -1166,6 +1162,15 @@ export class Relation<T extends Base> {
 
     const rel = this._clone();
 
+    // Mirrors Rails: `references = column_references([column]);
+    // self.references_values |= references unless references.empty?`
+    // (query_methods.rb:721-722) — recorded on the spawn, which trails clones
+    // up-front rather than at Rails' `spawn.order!`.
+    const references = _qm.columnReferences([column]);
+    for (const reference of references) {
+      if (!rel._referencesValues.includes(reference)) rel._referencesValues.push(reference);
+    }
+
     // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
     // Cast each value to its database form so the CASE/IN predicates match a typed
     // column (e.g. enum integer mappings, date/time serialization) instead of the
@@ -1187,24 +1192,14 @@ export class Relation<T extends Base> {
         ? column
         : (_qm.orderColumn.call(rel as any, String(column)) as any);
 
-    // Build CASE WHEN col = v1 THEN 1 ... END ASC (searched form, 1-indexed).
-    // Mirrors Rails' build_case_for_value_position: Arel::Nodes::Case.new (no operand)
-    // with column.eq(value) predicates. With filter=false, an ELSE clause places
-    // non-matching rows last instead of dropping them.
-    const caseNode = new Nodes.Case();
-    normalized.forEach((v, i) => {
-      caseNode.when(arelCol.eq(v), new Nodes.Quoted(i + 1));
+    // Mirrors Rails: `scope = spawn.order!(build_case_for_value_position(arel_column,
+    // values, filter: filter))` (query_methods.rb:727). The Arel CASE node is
+    // pushed as a node (not pre-rendered SQL) so its embedded bind values thread
+    // through the outer collector when the statement is compiled.
+    const caseNode = _qm.buildCaseForValuePosition.call(rel as any, arelCol, normalized, {
+      filter,
     });
-    if (!filter) {
-      caseNode.else(new Nodes.Quoted(values.length + 1));
-    }
-    const orderNode = new Nodes.Ascending(caseNode);
-
-    // Push the Arel CASE node directly (not pre-rendered SQL) so its embedded
-    // bind values thread through the outer collector when the statement is
-    // compiled, matching Rails' parameterized `build_case_for_value_position`.
-    // _applyOrderToManager emits an `instanceof Nodes.Node` clause verbatim.
-    rel._orderClauses.push(orderNode);
+    QueryMethodBangs.orderBang.call(rel as any, caseNode as any);
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
     // The values were already database-cast above via type_cast_for_database, and `in`
@@ -1215,9 +1210,12 @@ export class Relation<T extends Base> {
     if (filter) {
       const hasNull = normalized.includes(null);
       const nonNull = normalized.filter((v) => v !== null);
-      let whereNode: Nodes.Node = arelCol.in(nonNull);
-      if (hasNull) whereNode = new Nodes.Or(whereNode, arelCol.eq(null));
-      rel._whereClause.predicates.push(hasNull ? new Nodes.Grouping(whereNode) : whereNode);
+      // Mirrors Rails: `arel_column.in(values.compact).or(arel_column.eq(nil))`
+      // (query_methods.rb:732) — Arel's `or` wraps the pair in a Grouping itself.
+      const whereNode: Nodes.Node = hasNull
+        ? (arelCol.in(nonNull) as Nodes.Node).or(arelCol.eq(null))
+        : arelCol.in(nonNull);
+      rel._whereClause.predicates.push(whereNode);
     }
 
     return rel;
@@ -1549,18 +1547,16 @@ export class Relation<T extends Base> {
   joins(...args: Array<JoinSpec>): Relation<T>;
   joins(...args: Array<JoinSpec>): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":joins", args as unknown[]);
-    const rel = this._clone();
-    // Rails joins! uses `joins_values |= args` — one array union over the whole
-    // set, deduplicating by eql?/hash (structural for Arel `Nodes.Binary`, plain
-    // strings, and Hash specs alike). structuralUnionEq mirrors that (=== first,
-    // then eql/structural), and a single unified store preserves insertion order
-    // across named and raw joins. The named-vs-raw partition the builders need is
+    // Rails `spawn.joins!(*args)` (query_methods.rb:868-871). `joins!` unions
+    // with `|=` — one array union over the whole set, deduplicating by
+    // eql?/hash (structural for Arel `Nodes.Binary`, plain strings, and Hash
+    // specs alike). A single unified store preserves insertion order across
+    // named and raw joins; the named-vs-raw partition the builders need is
     // derived on read (see `_namedInnerJoins` / `_joinValues`).
-    for (const arg of args) {
-      if (!rel._joinsValues.some((v) => _qm.structuralUnionEq(v, arg)))
-        rel._joinsValues.push(arg as AssociationSpec | string | Nodes.Join);
-    }
-    return rel;
+    return QueryMethodBangs.joinsBang.call(
+      this._clone() as any,
+      ...(args as (string | Nodes.Join)[]),
+    ) as Relation<T>;
   }
 
   /**
@@ -1612,19 +1608,15 @@ export class Relation<T extends Base> {
     args: Array<AssociationSpec | AssociationSpec[]>,
   ): Relation<T> {
     this.checkIfMethodHasArgumentsBang(callee, args);
-    const rel = this._clone();
-    // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
-    // raises for a non-Hash/Symbol/Array arg lazily at SQL-build time, in
+    // Rails `spawn.left_outer_joins!(*args)` stores args verbatim
+    // (`left_outer_joins_values |= args`) and only raises for a
+    // non-Hash/Symbol/Array arg lazily at SQL-build time, in
     // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
     // `buildJoinBuckets` for the raise.
-    for (const spec of args) {
-      // Rails' left_outer_joins! unions with `|=` (eql?/hash), so a Hash spec
-      // passed twice folds structurally — not by JS reference identity.
-      if (!rel._leftOuterJoinsValues.some((v) => _qm.structuralUnionEq(v, spec))) {
-        rel._leftOuterJoinsValues.push(spec as AssociationSpec);
-      }
-    }
-    return rel;
+    return QueryMethodBangs.leftOuterJoinsBang.call(
+      this._clone() as any,
+      ...(args as AssociationSpec[]),
+    ) as Relation<T>;
   }
 
   /**
@@ -2371,7 +2363,7 @@ export class Relation<T extends Base> {
    */
   structurallyCompatible(other: Relation<T>): boolean {
     if (this._model !== other._model) return false;
-    return areStructurallyCompatible(this, other);
+    return this.structurallyIncompatibleValuesFor(other).length === 0;
   }
 
   /**
@@ -4005,8 +3997,11 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#first_or_initialize
    */
-  async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
-    return (await this.first()) ?? this.new(extra);
+  async firstOrInitialize(
+    attributes?: Record<string, unknown>,
+    block?: (r: T) => void,
+  ): Promise<T> {
+    return (await this.first()) || this.new(attributes, block);
   }
 
   /**
@@ -5594,35 +5589,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Rails `Relation#table_name_matches?`. Delegates to the canonical
-   * helper in `relation/query-methods.ts` (handles arel/relation toSql
-   * conversion + adapter-quoted forms).
-   * @internal
-   */
-  isTableNameMatches(from: unknown): boolean {
-    return _isTableNameMatches.call(this as any, from);
-  }
-
-  /**
-   * Rails `Relation#arel_column_with_table`. Delegates to the canonical
-   * helper, which handles schema-qualified names and predicateBuilder
-   * resolution.
-   * @internal
-   */
-  arelColumnWithTable(tableName: string, columnName: string): unknown {
-    return _arelColumnWithTable.call(this as any, tableName, columnName);
-  }
-
-  /**
-   * Rails `Relation#arel_column`. Delegates to the canonical helper.
-   * @internal
-   */
-  arelColumn(field: string | Nodes.Node, fallback?: (attr: string) => unknown): unknown {
-    if (field instanceof Nodes.Node) return field;
-    return _arelColumn.call(this as any, field, fallback);
-  }
-
-  /**
    * Rails `Relation#arel_columns_from_hash`. Delegates to the canonical
    * helper.
    * @internal
@@ -5819,18 +5785,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#extract_associated
    */
-  async extractAssociated(name: string): Promise<Base[]> {
-    const records = await this.toArray();
-    const results: Base[] = [];
-    for (const record of records) {
-      const associated = await (record as any)[name]();
-      if (Array.isArray(associated)) {
-        results.push(...associated);
-      } else if (associated) {
-        results.push(associated);
-      }
-    }
-    return results;
+  async extractAssociated(association: string): Promise<Base[]> {
+    const records = await this.preload(association);
+    return Promise.all(records.map((record) => (record as any)[association]()));
   }
 
   /**
@@ -5998,13 +5955,23 @@ export class Relation<T extends Base> {
       updates[attr.name] = this._incrementAttribute(attr, value);
     }
 
-    const touchOption = touchFromCounters as CounterCacheTouchOption | undefined;
-    if (touchOption) {
-      // Mirror Rails relation.rb: parse touch into names + time (`{ time: }`
-      // hash form; `touch: []` → no names), then touch the update-timestamp
-      // columns via touchAttributesWithTime — same call Rails makes.
-      const { names, time } = parseCounterCacheTouch(touchOption);
-      const touchUpdates = touchAttributesWithTime.call(this.model, ...names, time);
+    const touch = touchFromCounters as CounterCacheTouchOption | undefined;
+    if (touch) {
+      // Mirrors relation.rb:935-941 verbatim: `names = touch if touch != true`,
+      // `names = Array.wrap(names)`, then `options = names.extract_options!` —
+      // a trailing plain-object arg is the `{ time: }` keyword hash, not a
+      // column name.
+      let names = wrap(touch !== true ? touch : undefined) as Array<
+        string | { time?: Temporal.Instant }
+      >;
+      const last = names[names.length - 1];
+      const options = last !== undefined && typeof last === "object" ? last : {};
+      if (last !== undefined && typeof last === "object") names = names.slice(0, -1);
+      const touchUpdates = touchAttributesWithTime.call(
+        this.model,
+        ...(names as string[]),
+        options.time,
+      );
       for (const [col, t] of Object.entries(touchUpdates)) {
         updates[col] = new Nodes.Quoted(t);
       }
