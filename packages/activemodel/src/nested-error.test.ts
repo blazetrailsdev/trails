@@ -1,33 +1,61 @@
 import { describe, it, expect } from "vitest";
-import { NestedError } from "./index.js";
+import { Model, NestedError } from "./index.js";
+import { Error as ActiveModelError } from "./error.js";
+
+class Topic extends Model {
+  static {
+    this.attribute("title", "string");
+    this.attribute("author_name", "string");
+  }
+}
+
+class Reply extends Topic {}
 
 describe("NestedErrorTest", () => {
   it("initialize", () => {
-    const base = {};
-    const innerError = { attribute: "title", type: "not_enough", message: "not enough" };
-    const nested = new NestedError(base, innerError);
-    expect(nested.base).toBe(base);
-    expect(nested.attribute).toBe("title");
-    expect(nested.type).toBe("not_enough");
+    const topic = new Topic({});
+    const innerError = new ActiveModelError(topic, "title", ":not_enough", { count: 2 });
+    const reply = new Reply({});
+    const error = new NestedError(reply, innerError);
+
+    expect(error.base).toEqual(reply);
+    expect(error.attribute).toEqual(innerError.attribute);
+    expect(error.type).toEqual(innerError.type);
+    expect(error.options).toEqual(innerError.options);
   });
 
   it("initialize with overriding attribute and type", () => {
-    const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
-    const nested = new NestedError({}, inner, { attribute: "author" });
-    expect(nested.attribute).toBe("author");
-    expect(nested.type).toBe("blank");
+    const topic = new Topic({});
+    const innerError = new ActiveModelError(topic, "title", ":not_enough", { count: 2 });
+    const reply = new Reply({});
+    const error = new NestedError(reply, innerError, { attribute: "parent", type: ":foo" });
+
+    expect(error.base).toEqual(reply);
+    expect(error.attribute).toEqual("parent");
+    expect(error.type).toEqual(":foo");
+    expect(error.options).toEqual(innerError.options);
   });
 
   it("message", () => {
-    const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
-    const nested = new NestedError({}, inner);
-    expect(nested.message).toBe("can't be blank");
+    const topic = new Topic({ author_name: "Bruce" });
+    const innerError = new ActiveModelError(topic, "title", ":not_enough", {
+      message: (model: Topic) => `not good enough for ${model.readAttribute("author_name")}`,
+    });
+    const reply = new Reply({ author_name: "Mark" });
+    const error = new NestedError(reply, innerError);
+
+    expect(error.message).toEqual("not good enough for Bruce");
   });
 
   it("full message", () => {
-    const inner: any = { attribute: "name", type: "blank", message: "can't be blank" };
-    const nested = new NestedError({}, inner);
-    expect(nested.fullMessage).toBe("Name can't be blank");
+    const topic = new Topic({ author_name: "Bruce" });
+    const innerError = new ActiveModelError(topic, "title", ":not_enough", {
+      message: (model: Topic) => `not good enough for ${model.readAttribute("author_name")}`,
+    });
+    const reply = new Reply({ author_name: "Mark" });
+    const error = new NestedError(reply, innerError);
+
+    expect(error.fullMessage).toEqual("Title not good enough for Bruce");
   });
 
   it("NestedError initialize", () => {

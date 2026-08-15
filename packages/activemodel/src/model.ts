@@ -22,6 +22,7 @@ import {
   resetCallbacks as asResetCallbacks,
   withOptions,
   include,
+  wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
@@ -2534,14 +2535,16 @@ export class Model {
   }
 
   /**
-   * Return a unique key for this model, or null if not persisted.
+   * Return an array of all key attributes if any of the attributes is set,
+   * whether or not the object is persisted.
    *
    * Mirrors: ActiveModel::Conversion#to_key
    */
   toKey(): unknown[] | null {
-    if (!this.isPersisted()) return null;
-    const id = this.readAttribute("id");
-    return id != null ? [id] : null;
+    // conversion.rb:67-70 — `key = respond_to?(:id) && id; key ? Array(key) : nil`.
+    // `Array(key)` is what keeps a composite `id` from being double-wrapped.
+    const key = this.respondTo("id") ? this.readAttribute("id") : false;
+    return key != null && key !== false ? wrap(key) : null;
   }
 
   /**

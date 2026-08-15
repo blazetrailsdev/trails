@@ -2,37 +2,58 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { ArgumentError } from "./attribute-assignment.js";
-import { Inflections } from "@blazetrails/activesupport";
+import { Inflections, assert, assertNot } from "@blazetrails/activesupport";
 
 describe("NamingTest", () => {
   class Post extends Model {}
+
+  // models/track_back.rb — `Post::TrackBack`.
+  const modelName = new ModelName("TrackBack", "Post");
 
   it("name returns class name", () => {
     expect(Post.modelName.name).toBe("Post");
   });
 
   it("singular", () => {
-    expect(Post.modelName.singular).toBe("post");
+    expect(modelName.singular).toEqual("post_track_back");
   });
 
   it("plural", () => {
-    expect(Post.modelName.plural).toBe("posts");
+    expect(modelName.plural).toEqual("post_track_backs");
   });
 
   it("element", () => {
-    expect(Post.modelName.element).toBe("post");
+    expect(modelName.element).toEqual("track_back");
   });
 
   it("collection", () => {
-    expect(Post.modelName.collection).toBe("posts");
+    expect(modelName.collection).toEqual("post/track_backs");
+  });
+
+  it("human", () => {
+    expect(modelName.human()).toEqual("Track back");
+  });
+
+  // Rails asserts `"post_track_backs"` / `"post_track_back"` here: `Name.new`
+  // received no `namespace` argument, so naming.rb:180-182 keeps the namespace
+  // prefix in `param_key`/`route_key`. trails' `ModelName` takes the namespace
+  // as its own argument and has no way to spell a qualified-but-not-isolated
+  // name, so it always produces the prefix-dropped ("isolated") shape.
+  // Tracked by RFC 0105 story `naming-shared-vs-isolated-namespace`.
+  it("route key", () => {
+    expect(modelName.routeKey).toEqual("track_backs");
   });
 
   it("param key", () => {
-    expect(Post.modelName.paramKey).toBe("post");
+    expect(modelName.paramKey).toEqual("track_back");
   });
 
-  it("route key", () => {
-    expect(Post.modelName.routeKey).toBe("posts");
+  it("i18n key", () => {
+    expect(modelName.i18nKey).toEqual("post/track_back");
+  });
+
+  it("uncountable", () => {
+    expect(modelName.isUncountable).toEqual(false);
   });
 
   it("handles CamelCase", () => {
@@ -50,91 +71,80 @@ describe("NamingTest", () => {
     const p = new Post();
     expect(p.toPartialPath()).toBe("posts/post");
   });
-
-  it("i18n key", () => {
-    class BlogPost extends Model {}
-    expect(BlogPost.modelName.i18nKey).toBe("blog_post");
-  });
-
-  it("human", () => {
-    const name = new ModelName("Post");
-    expect(name.human()).toBe("Post");
-  });
-
-  it("uncountable", () => {
-    Inflections.instance("en").uncountable("sheep");
-    const name = new ModelName("Sheep");
-    expect(name.plural).toBe("sheep");
-  });
 });
 
 describe("NamingHelpersTest", () => {
+  // models/contact.rb / models/sheep.rb
+  class Contact extends Model {}
+  class Sheep extends Model {}
+
+  // models/track_back.rb — `Post::TrackBack#to_model` returns a
+  // `Post::NamedTrackBack`, so naming goes through the proxy.
+  class NamedTrackBack extends Model {
+    static override get modelName(): ModelName {
+      return new ModelName("NamedTrackBack", "Post");
+    }
+  }
+  class TrackBack {
+    toModel(): NamedTrackBack {
+      return new NamedTrackBack({});
+    }
+  }
+
+  const record = new Contact({});
+  const singular = "contact";
+  const plural = "contacts";
+  const uncountable = Sheep;
+  const singularRouteKey = "contact";
+  const routeKey = "contacts";
+  const paramKey = "contact";
+
+  it("to model called on record", () => {
+    expect(Naming.plural(new TrackBack())).toEqual("post_named_track_backs");
+  });
+
   it("singular", () => {
-    expect(new ModelName("Post").singular).toBe("post");
+    expect(Naming.singular(record)).toEqual(singular);
   });
 
   it("singular for class", () => {
-    class Post extends Model {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.modelName.singular).toBe("post");
+    expect(Naming.singular(Contact)).toEqual(singular);
   });
 
   it("plural", () => {
-    expect(new ModelName("Post").plural).toBe("posts");
+    expect(Naming.plural(record)).toEqual(plural);
   });
 
   it("plural for class", () => {
-    class Post extends Model {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.modelName.plural).toBe("posts");
+    expect(Naming.plural(Contact)).toEqual(plural);
   });
 
   it("route key", () => {
-    expect(new ModelName("Post").routeKey).toBe("posts");
+    expect(Naming.routeKey(record)).toEqual(routeKey);
+    expect(Naming.singularRouteKey(record)).toEqual(singularRouteKey);
   });
 
   it("route key for class", () => {
-    class Post extends Model {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.modelName.routeKey).toBe("posts");
+    expect(Naming.routeKey(Contact)).toEqual(routeKey);
+    expect(Naming.singularRouteKey(Contact)).toEqual(singularRouteKey);
   });
 
   it("param key", () => {
-    expect(new ModelName("Post").paramKey).toBe("post");
+    expect(Naming.paramKey(record)).toEqual(paramKey);
   });
 
   it("param key for class", () => {
-    class Post extends Model {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.modelName.paramKey).toBe("post");
+    expect(Naming.paramKey(Contact)).toEqual(paramKey);
   });
 
   it("uncountable", () => {
-    const name = new ModelName("Sheep");
-    expect(name.plural).toBe("sheep");
+    assert(Naming.isUncountable(uncountable), "Expected 'sheep' to be uncountable");
+    assertNot(Naming.isUncountable(Contact), "Expected 'contact' to be countable");
   });
 
   it("uncountable route key", () => {
-    const name = new ModelName("Sheep");
-    expect(name.routeKey).toBe("sheep_index");
-  });
-
-  it("to model called on record", () => {
-    class Article extends Model {}
-    const a = new Article();
-    expect(a.toModel()).toBe(a);
+    expect(Naming.singularRouteKey(uncountable)).toEqual("sheep");
+    expect(Naming.routeKey(uncountable)).toEqual("sheep_index");
   });
 });
 
@@ -313,11 +323,8 @@ describe("NameWithAnonymousClassTest", () => {
   });
 
   it("anonymous class with name argument", () => {
-    const mn = new ModelName("Anonymous");
-    expect(mn.name).toBe("Anonymous");
-    expect(mn.singular).toBe("anonymous");
-    expect(mn.element).toBe("anonymous");
-    expect(mn.paramKey).toBe("anonymous");
+    const modelName = new ModelName("Anonymous");
+    expect(modelName.name).toEqual("Anonymous");
   });
 });
 
@@ -559,13 +566,26 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
 
 describe("OverridingAccessorsTest", () => {
   it("overriding accessors keys", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    expect(p.readAttribute("name")).toBe("Alice");
+    const modelName = new ModelName("TrackBack", "Post");
+    modelName.singular = "singular";
+    modelName.plural = "plural";
+    modelName.element = "element";
+    modelName.collection = "collection";
+    modelName.singularRouteKey = "singular_route_key";
+    modelName.routeKey = "route_key";
+    modelName.paramKey = "param_key";
+    modelName.i18nKey = "i18n_key";
+    modelName.name = "name";
+
+    expect(modelName.singular).toEqual("singular");
+    expect(modelName.plural).toEqual("plural");
+    expect(modelName.element).toEqual("element");
+    expect(modelName.collection).toEqual("collection");
+    expect(modelName.singularRouteKey).toEqual("singular_route_key");
+    expect(modelName.routeKey).toEqual("route_key");
+    expect(modelName.paramKey).toEqual("param_key");
+    expect(modelName.i18nKey).toEqual("i18n_key");
+    expect(modelName.name).toEqual("name");
   });
 });
 describe("humanAttributeName()", () => {
