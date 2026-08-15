@@ -2758,7 +2758,7 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
  *
  * @internal
  */
-function selectInnerNamedJoins(
+export function selectInnerNamedJoins(
   this: QueryMethodsHost,
   values: unknown[],
   stashedJoins: unknown[],
@@ -2899,20 +2899,13 @@ export interface JoinEmissionPlan {
    * When no named/left-outer association join exists, the first is the primary.
    */
   stashedJoins: JoinDependency[];
-  /**
-   * `buckets[:named_join]`. On the live path (which does not go through
-   * `buildJoinBuckets`) this carries only the pure left-outer-only association
-   * names and `joinType` is absent, so the named inner joins are partitioned
-   * out of `_namedInnerJoins` here instead.
-   */
+  /** `buckets[:named_join]`, already partitioned by the caller. */
   namedJoins: AssociationSpec[];
   /**
    * The join type `build_join_buckets` returned alongside the buckets
-   * (query_methods.rb:1841/1878). Present only when the caller ran
-   * `buildJoinBuckets`, in which case `namedJoins` is already the partitioned
-   * `buckets[:named_join]` and must not be re-derived.
+   * (query_methods.rb:1841/1878).
    */
-  joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
+  joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   /** Tracker threaded in from `build_from`; absent on the live path. */
   aliases?: AliasTracker;
   /**
@@ -2992,48 +2985,20 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // mirrors `unless named_joins.empty? && stashed_joins.empty?`; when named_joins
   // is empty but the stash is not, Rails still builds an empty
   // `construct_join_dependency([], InnerJoin)` and folds the stash into it.
-  //
-  // Rails build_join_buckets (query_methods.rb:1865-1873) runs the inner
-  // joins_values through select_named_joins, whose block routes a CTEJoin — a
-  // joins() symbol matching a with(...) CTE name — to build_with_join_node(name)
-  // (an InnerJoin node), while ordinary association names fold into the named
-  // JoinDependency. Mirror it here so BOTH the live path (_applyJoinsToManager)
-  // and the subquery path (buildJoins) route the CTE symbol; without the
-  // partition the bare Symbol reaches the arel visitor and raises
-  // "Unknown node type: Symbol".
-  const cteInnerJoinNodes: Nodes.Join[] = [];
-  const innerNamed =
-    plan.joinType === undefined && this._namedInnerJoins.length > 0
-      ? selectInnerNamedJoins.call(
-          this,
-          this._namedInnerJoins,
-          plan.stashedJoins,
-          cteInnerJoinNodes,
-        )
-      : ([] as AssociationSpec[]);
-  const [namedJoins, joinType] =
-    plan.joinType !== undefined
-      ? ([plan.namedJoins, plan.joinType] as const)
-      : innerNamed.length > 0
-        ? ([innerNamed, Nodes.InnerJoin] as const)
-        : plan.namedJoins.length > 0
-          ? ([plan.namedJoins, Nodes.OuterJoin] as const)
-          : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
+  const namedJoins = plan.namedJoins;
+  const joinType = plan.joinType;
   if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, joinType);
     for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker(), references))
       manager.appendJoinNode(node);
   }
 
-  // Rails' single `buckets[:join_node]` array is populated raw joins_values Join
-  // nodes FIRST (the `while joins.first.is_a?(Arel::Nodes::Join)` loop,
-  // query_methods.rb:1856-1863), THEN CTE nodes appended by the select_named_joins
-  // block (query_methods.rb:1865-1873); `build_joins` concats the whole array once
-  // (query_methods.rb:1899). Preserve that order: raw `plan.joinNodes` before the
-  // partitioned `cteInnerJoinNodes`.
+  // `build_joins` concats `buckets[:join_node]` once (query_methods.rb:1899);
+  // both callers filled it in Rails' order — raw joins_values Join nodes from
+  // the `while joins.first.is_a?(Arel::Nodes::Join)` loop
+  // (query_methods.rb:1856-1863) before the CTE nodes the select_named_joins
+  // block appends (query_methods.rb:1865-1873).
   for (const node of plan.joinNodes) manager.appendJoinNode(node);
-
-  for (const node of cteInnerJoinNodes) manager.appendJoinNode(node);
 
   // When a tracker was threaded in (Rails passes the alias HASH itself to
   // `join_scope.arel(alias_tracker.aliases)`, so claims made while building this
