@@ -3718,14 +3718,17 @@ export class Relation<T extends Base> {
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
       if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
-        // `_materializeLimitedIds` (Rails' zip/transpose over
-        // `Array(primary_key)`) has no composite support, so let the composite
-        // case surface applyJoinDependency's explicit NotImplementedError, as
-        // `pluck` does.
-        if (Array.isArray(pk)) this.applyJoinDependency();
+        // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
+        // `_eagerLoadAssociations` alone, so `pk` can still be null here (a
+        // view), and `_materializeLimitedIds` — Rails' zip/transpose over
+        // `Array(primary_key)` (schema_statements.rb:1448) — has neither a null
+        // nor a composite arm, so the composite case surfaces
+        // applyJoinDependency's explicit NotImplementedError instead.
+        const basePk = pk ?? "id";
+        if (Array.isArray(basePk)) this.applyJoinDependency();
         const jd = this._buildEagerJoinDependency(eagerSpecs);
-        const limitedIds = await this._materializeLimitedIds(jd, pk!);
-        const limited = rel.leftOuterJoins(eagerSpecs).where({ [pk as string]: limitedIds });
+        const limitedIds = await this._materializeLimitedIds(jd, basePk);
+        const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
         limited._limitValue = null;
         limited._offsetValue = null;
         return limited.group(...primaryKeyArray).ids();
