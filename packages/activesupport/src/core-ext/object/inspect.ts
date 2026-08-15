@@ -34,6 +34,11 @@ const SYMBOL_RE = /^:[A-Za-z_][A-Za-z0-9_]*[?!=]?$/;
 /**
  * Ruby `Object#inspect` — `[1, [2, "a"], {:b=>3}, nil]` for
  * `[1, [2, "a"], {b: 3}, nil]`, verified against MRI 3.3.
+ *
+ * The default arm is `to_s`, not Ruby's `#<Foo:0x… @a=1>`: reproducing that
+ * needs an object id JS does not expose. Both callers hand this plain data
+ * structures only, so the arm is unreached today — a caller that does pass a
+ * class instance gets its `to_s`.
  */
 export function inspect(value: unknown): string {
   // Ruby `nil.inspect` is "nil"; `undefined` is trails' other spelling of nil.
