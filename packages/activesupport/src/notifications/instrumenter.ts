@@ -165,6 +165,7 @@ export interface InstrumenterNotifier {
   // publish-only notifier provides `publish` and gets wrapped. One is required.
   publish?(name: string, event: Event): void;
   buildHandle?(name: string, id: unknown, payload: EventPayload): NotificationHandle;
+  start?(name: string, id: unknown, payload: EventPayload): void;
   finish?(name: string, id: unknown, payload: EventPayload, listenersState?: unknown): void;
 }
 
@@ -285,6 +286,16 @@ export class Instrumenter {
     return new Event(name, null, null, this.id, payload);
   }
 
+  /** Send a start notification with +name+ and +payload+ (instrumenter.rb:86-88). */
+  start(name: string, payload: EventPayload): void {
+    this._notifier.start?.(name, this.id, payload);
+  }
+
+  /** Send a finish notification with +name+ and +payload+ (instrumenter.rb:91-93). */
+  finish(name: string, payload: EventPayload): void {
+    this._notifier.finish?.(name, this.id, payload);
+  }
+
   /** instrumenter.rb:96-98 — send a finish notification carrying listener state. */
   finishWithState(listenersState: unknown, name: string, payload: EventPayload): void {
     this._notifier.finish?.(name, this.id, payload, listenersState);
@@ -292,9 +303,7 @@ export class Instrumenter {
 
   /** instrumenter.rb:100-102 — `SecureRandom.hex(10)`. */
   private uniqueId(): string {
-    return Array.from(getCrypto().randomBytes(10))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    return getCrypto().randomBytes(10).toString("hex");
   }
 }
 
