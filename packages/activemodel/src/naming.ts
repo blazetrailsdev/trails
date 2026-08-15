@@ -111,8 +111,8 @@ export class ModelName {
   /** Path form — `"blog/posts"`. */
   collection: string;
   /**
-   * URL / form param key. Drops the namespace prefix — matches Rails'
-   * isolated-namespace `param_key = _singularize(@unnamespaced)` semantic.
+   * URL / form param key — `singular`, or the prefix-dropped name when the
+   * namespace is isolated (`useRelativeModelNaming`).
    */
   paramKey: string;
   /** Plural form of `paramKey` (plus `_index` for uncountables). */
@@ -258,7 +258,11 @@ export class ModelName {
    */
   constructor(
     klass: ModelLike | string,
-    namespace?: string | readonly string[] | { name: string } | null,
+    namespace?:
+      | string
+      | readonly string[]
+      | { name: string; useRelativeModelNaming?: boolean }
+      | null,
     name?: string,
     /** Rails' fourth positional argument (naming.rb:166), `:en` by default. */
     locale = "en",
@@ -271,6 +275,7 @@ export class ModelName {
         "namespace must be a non-blank string, an array of non-blank strings, or an object with a non-blank string `name`",
       );
     let segments: string[];
+    let isolated = false;
     if (rawNs == null) {
       segments = [];
     } else if (typeof rawNs === "string") {
@@ -283,6 +288,11 @@ export class ModelName {
       typeof (rawNs as { name?: unknown }).name === "string"
     ) {
       segments = [(rawNs as { name: string }).name];
+      // naming.rb:271-276 — `model_name` passes a `namespace` only for a module
+      // that answers `use_relative_model_naming?` truthily, and naming.rb:171
+      // `@unnamespaced` (hence the prefix-dropped `param_key`/`route_key`) is
+      // derived only when that argument is present.
+      isolated = (rawNs as { useRelativeModelNaming?: boolean }).useRelativeModelNaming === true;
     } else {
       throw invalidNamespace();
     }
@@ -346,14 +356,15 @@ export class ModelName {
         : pluralize(bareUnderscored, locale);
     }
     this.collection = [...segmentsUnderscored, collectionTail].join("/");
-    // Rails `@param_key = namespace ? _singularize(@unnamespaced) : @singular`.
-    // In TS we require an explicit namespace, so the isolated shape is the
-    // only one expressible — `paramKey` drops the prefix when present.
-    this.paramKey = segments.length > 0 ? this.element : this.singular;
+    // Rails `@param_key = namespace ? _singularize(@unnamespaced) : @singular`
+    // (naming.rb:180). `@unnamespaced` is the name with the isolated
+    // namespace's prefix removed (naming.rb:171), which is the bare element
+    // for a one-segment namespace.
+    this.paramKey = isolated ? this.element : this.singular;
     // Rails `@i18n_key = @name.underscore.to_sym` — path form with bare name.
     this.i18nKey = [...segmentsUnderscored, bareUnderscored].join("/");
     // Rails `@route_key = namespace ? pluralize(@param_key) : @plural.dup`.
-    let routeKey = segments.length > 0 ? pluralize(this.paramKey, locale) : this.plural;
+    let routeKey = isolated ? pluralize(this.paramKey, locale) : this.plural;
     // naming.rb:182-184 — `singular_route_key` singularizes the route key
     // BEFORE the uncountable `_index` suffix is appended, so an uncountable
     // model's singular route key stays `"sheep"`, not `"sheep_index"`.

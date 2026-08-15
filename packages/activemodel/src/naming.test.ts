@@ -34,18 +34,12 @@ describe("NamingTest", () => {
     expect(modelName.human()).toEqual("Track back");
   });
 
-  // Rails asserts `"post_track_backs"` / `"post_track_back"` here: `Name.new`
-  // received no `namespace` argument, so naming.rb:180-182 keeps the namespace
-  // prefix in `param_key`/`route_key`. trails' `ModelName` takes the namespace
-  // as its own argument and has no way to spell a qualified-but-not-isolated
-  // name, so it always produces the prefix-dropped ("isolated") shape.
-  // Tracked by RFC 0105 story `naming-shared-vs-isolated-namespace`.
   it("route key", () => {
-    expect(modelName.routeKey).toEqual("track_backs");
+    expect(modelName.routeKey).toEqual("post_track_backs");
   });
 
   it("param key", () => {
-    expect(modelName.paramKey).toEqual("track_back");
+    expect(modelName.paramKey).toEqual("post_track_back");
   });
 
   it("i18n key", () => {
@@ -156,13 +150,8 @@ describe("NamingMethodDelegationTest", () => {
 });
 
 // Ports Rails `NamingWithNamespacedModelInSharedNamespaceTest`
-// (activemodel/test/cases/naming_test.rb:89-125). Rails reaches that
-// state by passing `Blog::Post` directly (namespace inferred from the
-// class's own `::`-shaped `.name`); TS has no `::` in JS class names,
-// so the only way to express namespace membership is the `namespace` argument.
-// That path always drops the prefix from `paramKey`/`routeKey` (Rails'
-// "isolated" semantic) — we don't expose the Rails "shared" shape
-// because it's purely an artifact of Ruby constant-name strings.
+// (activemodel/test/cases/naming_test.rb:87-125): `Name.new(Blog::Post)` with
+// no namespace argument, so `param_key`/`route_key` keep the prefix.
 describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
   const namespace = "Blog";
 
@@ -187,11 +176,11 @@ describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
   });
 
   it("route key", () => {
-    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
+    expect(new ModelName("Post", namespace).routeKey).toBe("blog_posts");
   });
 
   it("param key", () => {
-    expect(new ModelName("Post", namespace).paramKey).toBe("post");
+    expect(new ModelName("Post", namespace).paramKey).toBe("blog_post");
   });
 
   it("i18n key", () => {
@@ -246,12 +235,11 @@ describe("NamingWithSuppliedLocaleTest", () => {
 });
 
 // Ports Rails `NamingUsingRelativeModelNameTest`
-// (activemodel/test/cases/naming_test.rb:184-221). Rails' setup is
-// `Blog::Post.model_name` (namespace inferred from Ruby constant scope).
-// TS has no such inference, so membership is declared with
-// the `namespace` argument. Results match Rails exactly.
+// (activemodel/test/cases/naming_test.rb:183-221). Rails' setup is
+// `Blog::Post.model_name`, and `Blog.use_relative_model_naming?` is true
+// (test/models/blog_post.rb), so `model_name` passes `Blog` as the namespace.
 describe("NamingUsingRelativeModelNameTest", () => {
-  const namespace = "Blog";
+  const namespace = { name: "Blog", useRelativeModelNaming: true };
   it("singular", () => {
     expect(new ModelName("Post", namespace).singular).toBe("blog_post");
   });
@@ -279,11 +267,9 @@ describe("NamingUsingRelativeModelNameTest", () => {
 });
 
 // Ports Rails `NamingWithNamespacedModelInIsolatedNamespaceTest`
-// (activemodel/test/cases/naming_test.rb:51-87). Rails' setup passes
-// `namespace: Blog` explicitly; our equivalent is `namespace: "Blog"`.
-// Result fields identical to Rails.
+// (activemodel/test/cases/naming_test.rb:51-86): `Name.new(Blog::Post, Blog)`.
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
-  const namespace = "Blog";
+  const namespace = { name: "Blog", useRelativeModelNaming: true };
   it("singular", () => {
     expect(new ModelName("Post", namespace).singular).toBe("blog_post");
   });
@@ -341,8 +327,8 @@ describe("ModelName deeply-nested namespace", () => {
     expect(name.element).toBe("post");
     expect(name.collection).toBe("admin/blog/posts");
     expect(name.i18nKey).toBe("admin/blog/post");
-    expect(name.paramKey).toBe("post"); // isolated — drops the full prefix
-    expect(name.routeKey).toBe("posts");
+    expect(name.paramKey).toBe("admin_blog_post");
+    expect(name.routeKey).toBe("admin_blog_posts");
   });
 });
 
@@ -380,7 +366,7 @@ describe("ModelName singularRouteKey", () => {
     expect(name.routeKey).toBe("posts");
   });
   it("namespaced: singularizes the prefix-dropped routeKey", () => {
-    const name = new ModelName("Post", "Blog");
+    const name = new ModelName("Post", { name: "Blog", useRelativeModelNaming: true });
     expect(name.routeKey).toBe("posts");
     expect(name.singularRouteKey).toBe("post");
   });
