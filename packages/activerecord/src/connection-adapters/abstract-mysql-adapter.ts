@@ -1750,7 +1750,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<string> {
     const [index, algorithm] = await this.addIndexOptions(tableName, columnName, options);
 
-    return `ADD ${this.schemaCreation.accept(index)}${algorithm ? `, ${algorithm}` : ""}`;
+    return `ADD ${await this.schemaCreation.accept(index)}${algorithm ? `, ${algorithm}` : ""}`;
   }
 
   /** @internal Mirrors: AbstractMysqlAdapter#remove_index_for_alter (abstract_mysql_adapter.rb:887-890) */
