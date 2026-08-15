@@ -53,7 +53,7 @@ export function inspect(value: unknown): string {
  * other value — a String above all, which `to_s` returns unquoted — is its own
  * `to_s`.
  *
- * @noRailsEquivalent Ruby core, not Rails: `Object#to_s` is defined in object.c,
+ * @noRailsEquivalent PERMANENT — Ruby core, not Rails: `Object#to_s` is defined in object.c,
  * so no `.rb` in the vendored corpus declares it. JS `String(x)` is not the same
  * function — it gives the comma-joined form for a nested Array and
  * `[object Object]` for a Hash — so the Ruby one is spelled out here rather than
