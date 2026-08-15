@@ -5,6 +5,7 @@ import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { Table as PgTable } from "./schema-definitions.js";
 import { Name } from "./utils.js";
+import { Result } from "../../result.js";
 
 // The bodies under test are prototype methods on the adapter, so give the fake
 // adapter that prototype and call them the way production does.
@@ -18,7 +19,7 @@ function withSchemaStatements(adapter: DatabaseAdapter): PostgreSQLAdapter {
 
 interface FakeOptions {
   logger?: { warn: (msg: string) => void };
-  schemaQuery?: (sql: string) => Promise<Record<string, unknown>[]>;
+  internalExecQuery?: (sql: string) => Promise<Record<string, unknown>[]>;
   query?: (sql: string) => Promise<unknown[][]>;
   queryValue?: (sql: string) => Promise<unknown>;
   maxIdentifierLength?: number;
@@ -51,9 +52,11 @@ function makeAdapter(options: FakeOptions = {}) {
       const parts = name.split(".").map((p) => p.replace(/^"|"$/g, ""));
       return parts.length > 1 ? [parts[0], parts[1]] : [null, parts[0]];
     },
-    schemaQuery: vi.fn(async (text: string) => {
+    internalExecQuery: vi.fn(async (text: string) => {
       sql.push(text);
-      return options.schemaQuery ? await options.schemaQuery(text) : [];
+      return Result.fromRowHashes(
+        options.internalExecQuery ? await options.internalExecQuery(text) : [],
+      );
     }),
     query: vi.fn(async (text: string) => {
       sql.push(text);
@@ -310,7 +313,7 @@ describe("SchemaStatements#indexes", () => {
 describe("SchemaStatements#columns delegates to newColumnFromField", () => {
   function columnsAdapter() {
     const { adapter, sql } = makeAdapter({
-      schemaQuery: async () => [
+      internalExecQuery: async () => [
         {
           name: "id",
           type: "integer",

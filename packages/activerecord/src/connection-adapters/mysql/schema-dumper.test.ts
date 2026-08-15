@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
+import { Result } from "../../result.js";
 
 const stubSource: SchemaSource = { tables: () => [], columns: () => [], indexes: () => [] };
 const make = () => SchemaDumper.create(stubSource);
@@ -214,7 +215,7 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({ charset: "utf8mb4" }),
-        schemaQuery: async () => [{ Collation: "utf8mb4_general_ci" }],
+        internalExecQuery: async () => Result.fromRowHashes([{ Collation: "utf8mb4_general_ci" }]),
         quote: (v) => `'${String(v)}'`,
       };
       await (d as any).fetchTableOptions("users");
@@ -227,10 +228,11 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       d.connection = {
         tableOptions: async () => ({}),
-        schemaQuery: async () => [
-          { name: "upper_name", expr: "upper(`name`)" },
-          { name: "name_length", expr: "length(`name`)" },
-        ],
+        internalExecQuery: async () =>
+          Result.fromRowHashes([
+            { name: "upper_name", expr: "upper(`name`)" },
+            { name: "name_length", expr: "length(`name`)" },
+          ]),
         quote: (v) => `'${String(v)}'`,
       };
       await (d as any).populateVirtualExpressionCache("t");
@@ -247,9 +249,10 @@ describe("MySQL::SchemaDumper", () => {
         // MySQL escapes single quotes inside string literals in generation_expression,
         // e.g. a JSON path. The `\\'` below is a literal backslash-quote, exactly what
         // the engine reports for json_extract(`profile`,_utf8mb4'$.email').
-        schemaQuery: async () => [
-          { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
-        ],
+        internalExecQuery: async () =>
+          Result.fromRowHashes([
+            { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
+          ]),
         quote: (v) => `'${String(v)}'`,
       };
       await (d as any).populateVirtualExpressionCache("t");
@@ -264,9 +267,9 @@ describe("MySQL::SchemaDumper", () => {
       let calls = 0;
       d.connection = {
         tableOptions: async () => ({}),
-        schemaQuery: async () => {
+        internalExecQuery: async () => {
           calls++;
-          return [];
+          return Result.fromRowHashes([]);
         },
         quote: (v) => `'${String(v)}'`,
       };

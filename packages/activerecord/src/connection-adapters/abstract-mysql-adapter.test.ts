@@ -696,7 +696,7 @@ describe("AbstractMysqlAdapter#foreignKeys", () => {
       typeof AbstractMysqlAdapter
     >;
     Object.assign(adapter, {
-      schemaQuery: async () => rows,
+      internalExecQuery: async () => Result.fromRowHashes(rows),
     });
     return adapter;
   }

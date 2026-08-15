@@ -70,24 +70,10 @@ describe("EachTest", () => {
 
   it("each should return a sized enumerator", async () => {
     const total = Number(await Post.count());
-    let count = 0;
-    for await (const _post of Post.findEach({ batchSize: 1 })) {
-      count++;
-    }
-    expect(count).toBe(total);
-
-    const posts7 = await Post.order("id asc").where("id >= ?", 7);
-    let count7 = 0;
-    for await (const _post of Post.findEach({ batchSize: 2, start: 7 })) {
-      count7++;
-    }
-    expect(count7).toBe(posts7.length);
-
-    let countAll = 0;
-    for await (const _post of Post.findEach({ batchSize: 10000 })) {
-      countAll++;
-    }
-    expect(countAll).toBe(total);
+    const from7 = Number(await Post.where("id >= ?", 7).count());
+    expect(await Post.findEach({ batchSize: 1 }).size()).toBe(total);
+    expect(await Post.findEach({ batchSize: 2, start: 7 }).size()).toBe(from7);
+    expect(await Post.findEach({ batchSize: 10000 }).size()).toBe(total);
   });
 
   it("each enumerator should execute one query per batch", async () => {
@@ -1005,17 +991,12 @@ describe("EachTest", () => {
 
   it("find in batches should return a sized enumerator", async () => {
     const total = Number(await Post.count());
-    let c1 = 0;
-    for await (const _b of Post.findInBatches({ batchSize: 1 })) {
-      c1++;
-    }
-    expect(c1).toBe(total);
-
-    let c2 = 0;
-    for await (const _b of Post.findInBatches({ batchSize: 2 })) {
-      c2++;
-    }
-    expect(c2).toBe(Math.ceil(total / 2));
+    const from4 = Number(await Post.where("id >= ?", 4).count());
+    expect(await Post.findInBatches({ batchSize: 1 }).size()).toBe(total);
+    expect(await Post.findInBatches({ batchSize: 2 }).size()).toBe(Math.ceil(total / 2));
+    expect(await Post.findInBatches({ batchSize: 2, start: 4 }).size()).toBe(Math.ceil(from4 / 2));
+    expect(await Post.findInBatches({ batchSize: 3 }).size()).toBe(Math.ceil(total / 3));
+    expect(await Post.findInBatches({ batchSize: 10000 }).size()).toBe(1);
   });
 
   it("in_batches should return limit records when limit is less than batch size and load is", async () => {

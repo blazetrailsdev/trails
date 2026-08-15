@@ -587,11 +587,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * Mirrors AbstractMysqlAdapter#current_database — `query_value("SELECT database()", "SCHEMA")`.
-   * The Ruby form returns a single scalar; we project the first column off the schemaQuery
-   * row and coerce a null DATABASE() (no current schema) to "".
+   * The Ruby form returns a single scalar; we project the first column off the
+   * result row and coerce a null DATABASE() (no current schema) to "".
    */
   async currentDatabase(): Promise<string> {
-    const rows = (await this.schemaQuery("SELECT database() AS name")) as Array<{
+    const rows = (
+      await this.internalExecQuery("SELECT database() AS name", "SCHEMA")
+    ).toArray() as Array<{
       name?: string | null;
       NAME?: string | null;
     }>;
@@ -640,10 +642,13 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async tableComment(tableName: string): Promise<string | null> {
     const scope = quotedScope.call(this, tableName);
     if (!scope.name) return null;
-    const rows = await this.schemaQuery(
-      `SELECT table_comment FROM information_schema.tables` +
-        ` WHERE table_schema = ${scope.schema} AND table_name = ${scope.name}`,
-    );
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT table_comment FROM information_schema.tables` +
+          ` WHERE table_schema = ${scope.schema} AND table_name = ${scope.name}`,
+        "SCHEMA",
+      )
+    ).toArray();
     const row = rows[0] ?? {};
     const val = (row["table_comment"] ?? row["TABLE_COMMENT"]) as string | null | undefined;
     // Mirrors Rails' `.presence` — a blank/whitespace-only comment reads as nil.
@@ -955,7 +960,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // additionally filters cc.table_name (mirrors Rails).
     if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
-    const rows = await this.schemaQuery(sql);
+    const rows = (await this.internalExecQuery(sql, "SCHEMA")).toArray();
 
     return Promise.all(
       rows.map(async (row) => {
@@ -995,7 +1000,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   async showVariable(name: string): Promise<string | null> {
     if (!/^\w+$/.test(name)) return null;
     try {
-      const rows = await this.schemaQuery(`SELECT @@${name}`);
+      const rows = (await this.internalExecQuery(`SELECT @@${name}`, "SCHEMA")).toArray();
       if (rows.length === 0) return null;
       const row = rows[0];
       const val = row[Object.keys(row)[0]];
@@ -1831,12 +1836,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
-    return this.schemaQuery(`SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`);
+    return (
+      await this.internalExecQuery(
+        `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
+        "SCHEMA",
+      )
+    ).toArray();
   }
 
   /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {
-    const rows = await this.schemaQuery(`SHOW CREATE TABLE ${this.quoteTableName(tableName)}`);
+    const rows = (
+      await this.internalExecQuery(`SHOW CREATE TABLE ${this.quoteTableName(tableName)}`, "SCHEMA")
+    ).toArray();
     return (rows[0]?.["Create Table"] as string | null | undefined) ?? null;
   }
 

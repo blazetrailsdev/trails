@@ -44,13 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "foreign_keys",
-    "call": "internal_exec_query",
-    "reason": "Per-entry verified (RFC 0106 sqlite3 introspection cluster), sqlite3_adapter.rb:419: `internal_exec_query(\"PRAGMA foreign_key_list(...)\", \"SCHEMA\")`. Same rename as the `table_info` row: `schemaQuery` is trails' `internal_exec_query(sql, \"SCHEMA\")`, and the PRAGMA rows are read as plain records here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "get_database_version",
     "call": "query_value",
     "reason": "Per-entry verified (RFC 0106 sqlite3 introspection cluster), sqlite3_adapter.rb:477: Rails reads the version through `query_value(..., \"SCHEMA\")`, whose trails counterpart is `async`, while `getDatabaseVersion` must be able to answer synchronously for an in-process driver (the pool memo at pool_config.rb:39-41 fills `databaseVersion` on demand and callers read it synchronously). The query is therefore issued straight on the driver; the deviation is documented on the method's JSDoc."
@@ -100,13 +93,6 @@
     "rubyName": "shared_cache?",
     "call": "fetch",
     "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:473: Rails reads `@config.fetch(:flags, 0).anybits?(SHAREDCACHE)`. There is no `flags` bitmask in trails' config — no JS sqlite driver exposes SQLITE_OPEN_SHAREDCACHE — so `isSharedCache` inspects the `cache=shared` query parameter of the database URI instead, which is the only way shared cache can be requested here. Tracked by RFC 0094."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "table_info",
-    "call": "internal_exec_query",
-    "reason": "Per-entry verified (RFC 0106 sqlite3 introspection cluster), sqlite3_adapter.rb:792-794: `internal_exec_query(sql, \"SCHEMA\")`. `AbstractAdapter#schemaQuery` (abstract-adapter.ts) IS that call in trails — it routes the pre-`dirtiesQueryCache` unwrapped `execute` under the \"SCHEMA\" name — and returns plain rows rather than a `Result`, which is what every reader of `tableInfo` consumes. The comparator cannot see through the rename."
   },
   {
     "package": "activerecord",

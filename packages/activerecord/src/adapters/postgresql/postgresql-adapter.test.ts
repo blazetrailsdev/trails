@@ -805,17 +805,17 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("only check for insensitive comparison capability once", async () => {
       await adapter.execute(`CREATE DOMAIN example_type AS integer`);
-      const schemaQuerySpy = vi.spyOn(adapter, "schemaQuery");
+      const internalExecQuerySpy = vi.spyOn(adapter, "internalExecQuery");
       try {
-        // canPerformCaseInsensitiveComparisonFor does the pg_proc lookup via schemaQuery.
-        // Spy on schemaQuery to verify the cache prevents a second DB round-trip.
+        // canPerformCaseInsensitiveComparisonFor does the pg_proc lookup via
+        // internalExecQuery. Spy on it to verify the cache prevents a second DB round-trip.
         const col = { sqlType: "example_type" };
         await adapter.canPerformCaseInsensitiveComparisonFor(col);
-        const callsAfterFirst = schemaQuerySpy.mock.calls.length;
+        const callsAfterFirst = internalExecQuerySpy.mock.calls.length;
         await adapter.canPerformCaseInsensitiveComparisonFor(col);
-        expect(schemaQuerySpy.mock.calls.length).toBe(callsAfterFirst);
+        expect(internalExecQuerySpy.mock.calls.length).toBe(callsAfterFirst);
       } finally {
-        schemaQuerySpy.mockRestore();
+        internalExecQuerySpy.mockRestore();
         await adapter.execute(`DROP DOMAIN example_type CASCADE`);
       }
     });

@@ -18,7 +18,7 @@ import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
   AdapterError,
@@ -1309,11 +1309,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `data_source_sql(type: "BASE TABLE")` shape.
    */
   async tables(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT table_name AS name FROM information_schema.tables
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT table_name AS name FROM information_schema.tables
          WHERE table_schema = database() AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-    );
+        "SCHEMA",
+      )
+    ).toArray();
     return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
   }
 
@@ -1322,11 +1325,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `data_source_sql(type: "VIEW")`.
    */
   async views(): Promise<string[]> {
-    const rows = await this.schemaQuery(
-      `SELECT table_name AS name FROM information_schema.tables
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT table_name AS name FROM information_schema.tables
          WHERE table_schema = database() AND table_type = 'VIEW'
          ORDER BY table_name`,
-    );
+        "SCHEMA",
+      )
+    ).toArray();
     return rows.map((r) => (r.name ?? r.NAME ?? r.TABLE_NAME) as string);
   }
 
@@ -1337,14 +1343,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { schema, table } = mysqlParseName(name);
     // Use `schema_placeholder OR database()` via COALESCE so the same
     // query shape serves qualified + unqualified callers.
-    const rows = await this.schemaQuery(
-      `SELECT 1 AS one FROM information_schema.tables
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT 1 AS one FROM information_schema.tables
          WHERE table_schema = COALESCE(?, database())
          AND table_name = ?
          AND table_type = 'BASE TABLE'
          LIMIT 1`,
-      [schema ?? null, table],
-    );
+        "SCHEMA",
+        [schema ?? null, table],
+      )
+    ).toArray();
     return rows.length > 0;
   }
 
@@ -1356,14 +1365,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, table } = mysqlParseName(tableName);
-    const rows = (await this.schemaQuery(
-      `SELECT column_name AS name FROM information_schema.statistics
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT column_name AS name FROM information_schema.statistics
          WHERE index_name = 'PRIMARY'
          AND table_schema = COALESCE(?, database())
          AND table_name = ?
          ORDER BY seq_in_index`,
-      [schema ?? null, table],
-    )) as Array<{ name?: string; NAME?: string; COLUMN_NAME?: string }>;
+        "SCHEMA",
+        [schema ?? null, table],
+      )
+    ).toArray() as Array<{ name?: string; NAME?: string; COLUMN_NAME?: string }>;
     const names = rows.map((r) => (r.name ?? r.NAME ?? r.COLUMN_NAME) as string);
     if (names.length === 0) return null;
     if (names.length === 1) return names[0];
@@ -2047,10 +2059,6 @@ function isMysql2ConnectionError(e: unknown): boolean {
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
-// Snapshot the unwrapped `execute` first: schema reflection routes through it
-// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
-// `internal_exec_query`.
-captureUnwrappedExecute(Mysql2Adapter);
 dirtiesQueryCache(Mysql2Adapter, "execute");
 
 // Mirrors `include Mysql2::DatabaseStatements` — `perform_query` is an instance

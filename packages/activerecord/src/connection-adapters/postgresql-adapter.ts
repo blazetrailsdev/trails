@@ -61,7 +61,7 @@ import {
 } from "../errors.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { SchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
@@ -858,7 +858,7 @@ export class PostgreSQLAdapter
     // the store — no deferral path needed.
     //
     // The pg_type queries run DIRECTLY on `client` (like the SET statements
-    // above), NOT through schemaQuery/withRawConnection. configure runs while
+    // above), NOT through internalExecQuery/withRawConnection. configure runs while
     // the acquire machinery still holds `_acquiring` (and, on resetBang, while
     // the reset holds the connection lock); routing these queries back through
     // the connection-readiness stack would re-enter connectBang/verify and
@@ -875,7 +875,7 @@ export class PostgreSQLAdapter
 
   /**
    * Run Rails' full `load_additional_types` reload directly on the raw
-   * connection `client`, bypassing schemaQuery/withRawConnection. Used only
+   * connection `client`, bypassing internalExecQuery/withRawConnection. Used only
    * from `_maybeConfigureConnection`, where re-entering the acquire stack would
    * deadlock. Rebuilds the base type map first (mirroring reload_type_map's
    * clear) so the registrations layer onto a fresh map.
@@ -1056,7 +1056,7 @@ export class PostgreSQLAdapter
             AND castsource = ${this.quote(sqlType)}::regtype
         )
       ) AS can_lower`;
-    const rows = await this.schemaQuery(sql);
+    const rows = (await this.internalExecQuery(sql, "SCHEMA")).toArray();
     const result = (rows[0]?.can_lower as boolean) === true;
     this._caseInsensitiveCache.set(sqlType, result);
     return result;
@@ -2467,7 +2467,9 @@ export class PostgreSQLAdapter
    */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
-      const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
+      const rows = (
+        await this.internalExecQuery("SHOW max_identifier_length", "SCHEMA")
+      ).toArray() as Array<{
         max_identifier_length: string;
       }>;
       this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
@@ -3354,7 +3356,9 @@ export class PostgreSQLAdapter
    * @internal
    */
   async lookupCastType(sqlType: string | null): Promise<Type> {
-    const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
+    const rows = (
+      await this.internalExecQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`, "SCHEMA")
+    ).toArray();
     return this.typeMap.lookup(Number(rows[0]?.oid));
   }
 
@@ -4909,10 +4913,6 @@ const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
-// Snapshot the unwrapped `execute` first: schema reflection routes through it
-// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
-// `internal_exec_query`.
-captureUnwrappedExecute(PostgreSQLAdapter);
 dirtiesQueryCache(PostgreSQLAdapter, "execute");
 
 // Rails: `include PostgreSQL::SchemaStatements` (postgresql_adapter.rb:185).

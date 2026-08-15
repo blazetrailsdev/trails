@@ -17,6 +17,7 @@ import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-defini
 import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { SchemaStatementsLike } from "../abstract/schema-definitions.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
+import type { Result } from "../../result.js";
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
@@ -45,7 +46,9 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     let rows: Array<Record<string, unknown>>;
     try {
-      rows = await this.schemaQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`);
+      rows = (
+        await this.internalExecQuery(`SHOW KEYS FROM ${this.quoteTableName(tableName)}`, "SCHEMA")
+      ).toArray();
     } catch (e) {
       // Mirrors Rails' `rescue StatementInvalid` — a missing table yields []
       // rather than propagating ER_NO_SUCH_TABLE.
@@ -690,7 +693,7 @@ export function parseMysqlName(name: string): { schema?: string; table: string }
 /** @internal Host surface for {@link foreignKeys}: scopes the catalog query to the
  * current database and maps RESTRICT/CASCADE/SET NULL referential actions. */
 interface ForeignKeysHost {
-  schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
+  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   quote(value: unknown): string;
   /** @internal */
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined;
@@ -709,8 +712,9 @@ export async function foreignKeys(
   tableName: string,
 ): Promise<ForeignKeyDefinition[]> {
   const scope = quotedScope.call(this, tableName);
-  const rows = await this.schemaQuery(
-    `SELECT fk.referenced_table_name AS to_table,
+  const rows = (
+    await this.internalExecQuery(
+      `SELECT fk.referenced_table_name AS to_table,
             fk.referenced_column_name AS primary_key,
             fk.column_name AS \`column\`,
             fk.constraint_name AS name,
@@ -726,7 +730,9 @@ export async function foreignKeys(
        AND rc.constraint_schema = ${scope.schema}
        AND rc.table_name = ${scope.name}
      ORDER BY fk.constraint_name, fk.ordinal_position`,
-  );
+      "SCHEMA",
+    )
+  ).toArray();
 
   const grouped = new Map<string, Array<Record<string, unknown>>>();
   for (const row of rows) {

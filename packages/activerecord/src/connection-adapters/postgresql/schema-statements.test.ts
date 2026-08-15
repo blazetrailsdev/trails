@@ -156,12 +156,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result).not.toBeNull();
       const [, seq] = result!;
       const seqName = seq!.toString();
-      await adapter.schemaQuery(`SELECT setval($1::regclass, 123)`, [seqName]);
-      const before = await adapter.schemaQuery(`SELECT nextval($1::regclass) AS n`, [seqName]);
-      expect(Number(before[0].n)).toBe(124);
+      await adapter.internalExecQuery(`SELECT setval($1::regclass, 123)`, "SCHEMA", [seqName]);
+      const before = await adapter.internalExecQuery(
+        `SELECT nextval($1::regclass) AS n`,
+        "SCHEMA",
+        [seqName],
+      );
+      expect(Number(before.at(0)!.n)).toBe(124);
       await adapter.resetPkSequenceBang(tableName);
-      const after = await adapter.schemaQuery(`SELECT nextval($1::regclass) AS n`, [seqName]);
-      expect(Number(after[0].n)).toBe(1);
+      const after = await adapter.internalExecQuery(`SELECT nextval($1::regclass) AS n`, "SCHEMA", [
+        seqName,
+      ]);
+      expect(Number(after.at(0)!.n)).toBe(1);
     });
 
     it("set pk sequence", async () => {
@@ -171,8 +177,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const [, seq] = result!;
       const seqName = seq!.toString();
       await adapter.setPkSequenceBang(tableName, 123);
-      const rows = await adapter.schemaQuery(`SELECT nextval($1::regclass) AS n`, [seqName]);
-      expect(Number(rows[0].n)).toBe(124);
+      const rows = await adapter.internalExecQuery(`SELECT nextval($1::regclass) AS n`, "SCHEMA", [
+        seqName,
+      ]);
+      expect(Number(rows.at(0)!.n)).toBe(124);
       await adapter.resetPkSequenceBang(tableName);
     });
 
@@ -211,12 +219,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("drop table removes a table", async () => {
       await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.tmp_drop_test (id int)`);
       await adapter.dropTable(`${SCHEMA_NAME}.tmp_drop_test`);
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.tables
          WHERE table_schema = $1 AND table_name = $2`,
+        "SCHEMA",
         [SCHEMA_NAME, "tmp_drop_test"],
       );
-      expect(Number(rows[0].c)).toBe(0);
+      expect(Number(rows.at(0)!.c)).toBe(0);
     });
 
     it("drop table with if exists does not throw for missing table", async () => {
@@ -232,18 +241,20 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await expect(adapter.dropTable(`${SCHEMA_NAME}.parent_tbl`)).rejects.toThrow();
       await adapter.dropTable(`${SCHEMA_NAME}.parent_tbl`, { force: "cascade" });
-      const parentRows = await adapter.schemaQuery(
+      const parentRows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.tables
          WHERE table_schema = $1 AND table_name = 'parent_tbl'`,
+        "SCHEMA",
         [SCHEMA_NAME],
       );
-      expect(Number(parentRows[0].c)).toBe(0);
-      const fkRows = await adapter.schemaQuery(
+      expect(Number(parentRows.at(0)!.c)).toBe(0);
+      const fkRows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.table_constraints
          WHERE constraint_schema = $1 AND table_name = 'child_tbl' AND constraint_type = 'FOREIGN KEY'`,
+        "SCHEMA",
         [SCHEMA_NAME],
       );
-      expect(Number(fkRows[0].c)).toBe(0);
+      expect(Number(fkRows.at(0)!.c)).toBe(0);
       await adapter.exec(`DROP TABLE IF EXISTS ${SCHEMA_NAME}.child_tbl`);
     });
 
@@ -251,12 +262,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.t1 (id int)`);
       await adapter.exec(`CREATE TABLE ${SCHEMA_NAME}.t2 (id int)`);
       await adapter.dropTable(`${SCHEMA_NAME}.t1`, `${SCHEMA_NAME}.t2`);
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT COUNT(*) AS c FROM information_schema.tables
          WHERE table_schema = $1 AND table_name IN ('t1','t2')`,
+        "SCHEMA",
         [SCHEMA_NAME],
       );
-      expect(Number(rows[0].c)).toBe(0);
+      expect(Number(rows.at(0)!.c)).toBe(0);
     });
 
     it("drop database removes the database", { timeout: 30000 }, async () => {
@@ -265,14 +277,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
-        const before = await rootAdapter.schemaQuery(
+        const before = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
+          "SCHEMA",
           [tmpDb],
         );
         expect(before.length).toBe(1);
         await rootAdapter.dropDatabase(tmpDb);
-        const after = await rootAdapter.schemaQuery(
+        const after = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
+          "SCHEMA",
           [tmpDb],
         );
         expect(after.length).toBe(0);
@@ -288,14 +302,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await rootAdapter.exec(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
-        const existsBefore = await rootAdapter.schemaQuery(
+        const existsBefore = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
+          "SCHEMA",
           [tmpDb],
         );
         expect(existsBefore.length).toBe(1);
         await rootAdapter.recreateDatabase(tmpDb);
-        const existsAfter = await rootAdapter.schemaQuery(
+        const existsAfter = await rootAdapter.internalExecQuery(
           `SELECT 1 AS ok FROM pg_database WHERE datname = $1`,
+          "SCHEMA",
           [tmpDb],
         );
         expect(existsAfter.length).toBe(1);
@@ -309,11 +325,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("ColumnDDLTest", () => {
     it("add column", async () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "score", "integer");
-      const cols = await adapter.schemaQuery(
+      const cols = await adapter.internalExecQuery(
         `SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2`,
+        "SCHEMA",
         [SCHEMA_NAME, TABLE_NAME],
       );
-      expect(cols.map((r) => r.column_name)).toContain("score");
+      expect(cols.toArray().map((r: Record<string, unknown>) => r.column_name)).toContain("score");
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS score`);
     });
 
@@ -321,27 +338,29 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "bio", "text", {
         comment: "user bio",
       });
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT col_description(c.oid, a.attnum) AS comment
          FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
          JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'bio'
          WHERE c.relname = $1 AND n.nspname = $2`,
+        "SCHEMA",
         [TABLE_NAME, SCHEMA_NAME],
       );
-      expect(rows[0].comment).toBe("user bio");
+      expect(rows.at(0)!.comment).toBe("user bio");
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS bio`);
     });
 
     it("change column default", async () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", "integer");
       await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "rating", 5);
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT column_default FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = $2 AND column_name = 'rating'`,
+        "SCHEMA",
         [SCHEMA_NAME, TABLE_NAME],
       );
-      expect(rows[0].column_default).toMatch(/5/);
+      expect(rows.at(0)!.column_default).toMatch(/5/);
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
     });
 
@@ -353,12 +372,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         from: 3,
         to: 7,
       });
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT column_default FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = $2 AND column_name = 'rating'`,
+        "SCHEMA",
         [SCHEMA_NAME, TABLE_NAME],
       );
-      expect(rows[0].column_default).toMatch(/7/);
+      expect(rows.at(0)!.column_default).toMatch(/7/);
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
     });
 
@@ -368,38 +388,41 @@ describeIfPg("PostgreSQLAdapter", () => {
       // default, not a changes hash (schema_statements.rb:1820).
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", "json");
       await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", { to: 1 });
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT column_default FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = $2 AND column_name = 'config'`,
+        "SCHEMA",
         [SCHEMA_NAME, TABLE_NAME],
       );
-      expect(rows[0].column_default).toMatch(/"to":\s*1/);
+      expect(rows.at(0)!.column_default).toMatch(/"to":\s*1/);
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS config`);
     });
 
     it("change column null", async () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", "integer");
       await adapter.changeColumnNull(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", false);
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT is_nullable FROM information_schema.columns
          WHERE table_schema = $1 AND table_name = $2 AND column_name = 'flag'`,
+        "SCHEMA",
         [SCHEMA_NAME, TABLE_NAME],
       );
-      expect(rows[0].is_nullable).toBe("NO");
+      expect(rows.at(0)!.is_nullable).toBe("NO");
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS flag`);
     });
 
     it("change column comment", async () => {
       await adapter.changeColumnComment(`${SCHEMA_NAME}.${TABLE_NAME}`, "name", "full name");
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT col_description(c.oid, a.attnum) AS comment
          FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
          JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'name'
          WHERE c.relname = $1 AND n.nspname = $2`,
+        "SCHEMA",
         [TABLE_NAME, SCHEMA_NAME],
       );
-      expect(rows[0].comment).toBe("full name");
+      expect(rows.at(0)!.comment).toBe("full name");
       await adapter.changeColumnComment(`${SCHEMA_NAME}.${TABLE_NAME}`, "name", null);
     });
 
@@ -500,12 +523,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("columnNamesFromColumnNumbers", async () => {
-      const rows = await adapter.schemaQuery(
+      const rows = await adapter.internalExecQuery(
         `SELECT c.oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          WHERE c.relname = $1 AND n.nspname = $2`,
+        "SCHEMA",
         [TABLE_NAME, SCHEMA_NAME],
       );
-      const oid = Number(rows[0].oid);
+      const oid = Number(rows.at(0)!.oid);
       const names = await adapter.columnNamesFromColumnNumbers(oid, [1, 2]);
       expect(Array.isArray(names)).toBe(true);
       expect(names.length).toBe(2);
