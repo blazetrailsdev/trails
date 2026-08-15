@@ -3701,12 +3701,14 @@ export class Relation<T extends Base> {
       // `eager_load_values | includes_values`, and materialize the limited
       // DISTINCT primary keys (`distinct_relation_for_primary_key`, :463) that
       // a synchronous applyJoinDependency cannot execute.
-      // Deduped without a `Set` (unlike `pluck`, whose Ruby body has no `new`):
-      // the only `new` Rails records for `ids` is `Promise::Complete.new` in the
-      // `loaded?` arm (calculations.rb:382), which trails models with the native
-      // async surface, so a `new Set` here is the body's FIRST constructor and
-      // lands after `hasInclude` — measured as a new
-      // `ids order:hasInclude,constructor` call-order row.
+      // Deduped without a `Set`: the `new` Rails records for `ids` is
+      // `Promise::Complete.new` in the `loaded?` arm (calculations.rb:382),
+      // which trails models with the native async surface, so a `new Set` here
+      // would be the body's first constructor and land after `hasInclude`.
+      // Measured, not assumed: spelling it `[...new Set([...])]` adds a
+      // `relation.ts ids order:hasInclude,constructor` row to
+      // `pnpm parity:api:calls`. `pluck`'s arm keeps its `Set` because its body
+      // is compared through the `_pluckInner` helper union, not directly.
       const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
         (spec, i, all) => all.indexOf(spec) === i,
       );
