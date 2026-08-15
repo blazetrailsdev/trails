@@ -168,7 +168,12 @@ describe("ExplainTest", () => {
 
   it("prints one EXPLAIN block per collected query with the header prefix", async () => {
     const plan = await Car.where({ name: "honda" }).explain();
-    expect(plan).toMatch(/EXPLAIN.*for:/);
+    // The header is whatever the adapter's build_explain_clause returns, which
+    // is adapter-specific: PG returns a bare "EXPLAIN" / "EXPLAIN (...)"
+    // (postgresql/database_statements.rb:96-100), while an adapter that defines
+    // none falls back to "EXPLAIN for:" (explain.rb:56-61). Assert the part
+    // they share — every block is prefixed by the clause.
+    expect(plan).toMatch(/^EXPLAIN\b/m);
     expect(plan.toLowerCase()).toContain("select");
   });
 
