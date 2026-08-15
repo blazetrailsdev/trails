@@ -1,15 +1,32 @@
 /**
- * HashWithIndifferentAccess — a Map-like class where string keys are
- * normalized so that camelCase and snake_case (or any variation) are NOT
- * conflated. This mirrors Rails' HashWithIndifferentAccess where string
- * and symbol keys are interchangeable. In TypeScript, since we only have
- * strings, the main value is the consistent Map-based API with merge,
- * slice, except, and deepMerge support.
+ * Mirrors: ActiveSupport::HashWithIndifferentAccess
+ * (activesupport/lib/active_support/hash_with_indifferent_access.rb).
+ *
+ * Rails' class subclasses `Hash`, so its readers and writers are spelled with
+ * the `[]` / `[]=` operators. Those two have no parity:api counterpart — see
+ * the Operators table in docs/ruby-ts-conventions.md, which maps them to
+ * `get()` / `set()` — so this class keeps that spelling and the `key?` family
+ * hangs off it under the conventions' predicate names. Everything else keeps
+ * Rails' own name.
  */
 
 import { deepMerge as deepMergeObj, symbolizeKeysBang } from "./hash-utils.js";
+import { KeyError } from "./core-ext/key-error.js";
 
 type AnyObject = Record<string, unknown>;
+
+/**
+ * The `update`/`merge!` duplicate-key block (hash_with_indifferent_access.rb:127-131):
+ * called with the key, the receiver's value and the other hash's value.
+ */
+type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
+
+/** Ruby `value.is_a? Hash` for a plain JS object literal. */
+function isHash(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value) as object | null;
+  return proto === Object.prototype || proto === null;
+}
 
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
@@ -37,26 +54,103 @@ export class HashWithIndifferentAccess<V = unknown> {
     return true;
   }
 
+  /**
+   * Mirrors `[]` (hash_with_indifferent_access.rb:166-168) — the reader that
+   * takes either spelling of the key.
+   */
   get(key: string): V | undefined {
-    return this.data.get(key);
+    return this.data.get(this.convertKey(key));
   }
 
+  /**
+   * Mirrors `[]=` (hash_with_indifferent_access.rb:98-100).
+   */
   set(key: string, value: V): this {
-    this.data.set(key, value);
-    return this;
+    return this.regularWriter(this.convertKey(key), this.convertValue(value, "assignment"));
   }
 
-  /** Alias for set — Rails store method. */
+  /** `alias_method :store, :[]=` (hash_with_indifferent_access.rb:102). */
   store(key: string, value: V): this {
     return this.set(key, value);
   }
 
+  /**
+   * `alias_method :regular_writer, :[]=` (hash_with_indifferent_access.rb:91)
+   * — the un-converting `Hash#[]=` the converting writer delegates to.
+   */
+  regularWriter(key: string, value: V): this {
+    this.data.set(key, value);
+    return this;
+  }
+
+  /**
+   * `alias_method :regular_update, :update` (hash_with_indifferent_access.rb:92)
+   * — the un-converting `Hash#update`.
+   */
+  regularUpdate(other: HashWithIndifferentAccess<V>, block?: BlockFn<V>): this {
+    for (const [k, v] of other.entries()) {
+      this.data.set(k, block && this.data.has(k) ? block(k, this.data.get(k)!, v) : v);
+    }
+    return this;
+  }
+
   delete(key: string): boolean {
-    return this.data.delete(key);
+    return this.data.delete(this.convertKey(key));
+  }
+
+  /**
+   * Mirrors `key?` (hash_with_indifferent_access.rb:150-152). `has` is the
+   * Map-shaped spelling this class' receiver already uses.
+   */
+  key(key: string): boolean {
+    return this.data.has(this.convertKey(key));
+  }
+
+  /** `alias_method :include?, :key?` (hash_with_indifferent_access.rb:154). */
+  include(key: string): boolean {
+    return this.key(key);
+  }
+
+  /** `alias_method :has_key?, :key?` (hash_with_indifferent_access.rb:155). */
+  hasKey(key: string): boolean {
+    return this.key(key);
+  }
+
+  /** `alias_method :member?, :key?` (hash_with_indifferent_access.rb:156). */
+  member(key: string): boolean {
+    return this.key(key);
   }
 
   has(key: string): boolean {
-    return this.data.has(key);
+    return this.key(key);
+  }
+
+  /**
+   * Mirrors `fetch` (hash_with_indifferent_access.rb:195-197) — `Hash#fetch`
+   * semantics over the converted key: a stored value wins over the default
+   * (including a stored `null`), an absent key without a default raises
+   * `KeyError`.
+   */
+  fetch(key: string, ...extras: V[]): V {
+    key = this.convertKey(key);
+    if (this.data.has(key)) return this.data.get(key)!;
+    if (extras.length > 0) return extras[0];
+    throw new KeyError(`key not found: "${key}"`);
+  }
+
+  /**
+   * Mirrors `values_at` (hash_with_indifferent_access.rb:239-242).
+   */
+  valuesAt(...keys: string[]): (V | undefined)[] {
+    return keys.map((key) => this.data.get(this.convertKey(key)));
+  }
+
+  /**
+   * Mirrors `fetch_values` (hash_with_indifferent_access.rb:251-254) — like
+   * `values_at`, but raises for a key that is not there.
+   */
+  fetchValues(...indices: string[]): V[] {
+    return indices.map((key) => this.fetch(key));
   }
 
   get size(): number {
@@ -100,30 +194,59 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Update (merge!) — mutates self by merging other objects into it. Returns self.
-   * Mirrors Rails HashWithIndifferentAccess#update.
+   * Mirrors `update` (hash_with_indifferent_access.rb:132-141) — merges the
+   * given hashes in place, respecting indifferent access; a block resolves
+   * duplicated keys.
    */
-  update(...others: (AnyObject | HashWithIndifferentAccess<V>)[]): this {
-    for (const other of others) {
-      if (other instanceof HashWithIndifferentAccess) {
-        for (const [k, v] of other.entries()) {
-          this.data.set(k, v);
-        }
-      } else {
-        for (const key of Object.keys(other)) {
-          this.data.set(key, other[key] as V);
-        }
+  update(...otherHashes: (AnyObject | HashWithIndifferentAccess<V>)[]): this;
+  update(...args: [...(AnyObject | HashWithIndifferentAccess<V>)[], BlockFn<V>]): this;
+  update(...args: unknown[]): this {
+    const block =
+      typeof args[args.length - 1] === "function" ? (args.pop() as BlockFn<V>) : undefined;
+    const otherHashes = args as (AnyObject | HashWithIndifferentAccess<V>)[];
+    if (otherHashes.length === 1) {
+      this.updateWithSingleArgument(otherHashes[0], block);
+    } else {
+      for (const otherHash of otherHashes) {
+        this.updateWithSingleArgument(otherHash, block);
       }
     }
     return this;
   }
 
+  /** `alias_method :merge!, :update` (hash_with_indifferent_access.rb:143). */
+  mergeBang(...args: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]): this {
+    return (this.update as (...a: unknown[]) => this)(...args);
+  }
+
   /**
-   * Replace — clears and repopulates with the given object. Returns self.
+   * Mirrors `update_with_single_argument`
+   * (hash_with_indifferent_access.rb:424-434).
    */
-  replace(other: AnyObject | HashWithIndifferentAccess<V>): this {
+  private updateWithSingleArgument(
+    otherHash: AnyObject | HashWithIndifferentAccess<V>,
+    block?: BlockFn<V>,
+  ): void {
+    if (otherHash instanceof HashWithIndifferentAccess) {
+      this.regularUpdate(otherHash, block);
+    } else {
+      for (const [key, value] of Object.entries(otherHash)) {
+        let v = value as V;
+        if (block && this.key(key)) {
+          v = block(this.convertKey(key), this.get(key)!, v);
+        }
+        this.regularWriter(this.convertKey(key), this.convertValue(v));
+      }
+    }
+  }
+
+  /**
+   * Mirrors `replace` (hash_with_indifferent_access.rb:298-300) — replaces the
+   * contents of this hash with `otherHash`, under indifferent access.
+   */
+  replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
     this.data.clear();
-    return this.update(other);
+    return this.update(new HashWithIndifferentAccess<V>(otherHash));
   }
 
   /**
@@ -444,13 +567,69 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Convert back to a plain object.
+   * Mirrors `nested_under_indifferent_access`
+   * (hash_with_indifferent_access.rb:66-68) — already indifferent, so a hash
+   * nested under one being converted is returned as-is.
+   */
+  nestedUnderIndifferentAccess(): this {
+    return this;
+  }
+
+  /**
+   * Mirrors `to_hash` (hash_with_indifferent_access.rb:376-381) — the values
+   * are converted back out of indifferent access too.
    */
   toHash(): AnyObject {
-    const result: AnyObject = {};
+    const copy: AnyObject = {};
     for (const [k, v] of this.data) {
-      result[k] = v;
+      copy[k] = this.convertValueToHash(v);
     }
-    return result;
+    return copy;
+  }
+
+  /**
+   * Mirrors `convert_key` (hash_with_indifferent_access.rb:388-390) —
+   * `Symbol === key ? key.name : key`. A Ruby Symbol is a `":name"` string in
+   * trails (see CLAUDE.md), so `Symbol#name` is the string without its colon.
+   */
+  private convertKey(key: string): string {
+    return typeof key === "string" && key.startsWith(":") ? key.slice(1) : key;
+  }
+
+  /**
+   * Mirrors `convert_value` (hash_with_indifferent_access.rb:392-403) — a
+   * nested Hash goes under indifferent access, an Array is mapped element by
+   * element, anything else is stored as-is.
+   */
+  private convertValue(value: V, conversion?: string): V {
+    if (value instanceof HashWithIndifferentAccess) {
+      return value.nestedUnderIndifferentAccess() as V;
+    } else if (isHash(value)) {
+      return new HashWithIndifferentAccess(value as AnyObject) as V;
+    } else if (Array.isArray(value)) {
+      let array = value as unknown[];
+      if (conversion !== "assignment" || Object.isFrozen(array)) {
+        array = [...array];
+      }
+      for (let i = 0; i < array.length; i++) {
+        array[i] = this.convertValue(array[i] as V, conversion);
+      }
+      return array as V;
+    } else {
+      return value;
+    }
+  }
+
+  /**
+   * Mirrors `convert_value_to_hash` (hash_with_indifferent_access.rb:405-413).
+   */
+  private convertValueToHash(value: V): unknown {
+    if (value instanceof HashWithIndifferentAccess) {
+      return value.toHash();
+    } else if (Array.isArray(value)) {
+      return (value as unknown[]).map((e) => this.convertValueToHash(e as V));
+    } else {
+      return value;
+    }
   }
 }

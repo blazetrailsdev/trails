@@ -74,6 +74,11 @@ const MISSING_TRANSLATION = -(2 ** 60);
 
 export interface ModelLike {
   readonly name: string;
+  /**
+   * Rails-spelled bare constant name for a class whose JS name was flattened
+   * to stay collision-free; stands in for Ruby's `klass.name.demodulize`.
+   */
+  readonly _demodulizedName?: string;
   i18nScope?: string;
   lookupAncestors?: () => Array<ModelLike & { modelName: ModelName }>;
   modelName?: ModelName;
@@ -222,37 +227,39 @@ export class ModelName {
   }
 
   /**
-   * Construct a ModelName.
+   * Mirrors Rails `ActiveModel::Name#initialize`
+   * (activemodel/lib/active_model/naming.rb:166-185), same four positional
+   * arguments: `(klass, namespace = nil, name = nil, locale = :en)`.
    *
-   * `name` must be a bare class identifier. The Ruby `::` separator has no
-   * JavaScript equivalent, so namespace membership is declared explicitly
-   * via `options.namespace` — either a single string (`"Blog"`), a segment
-   * array for arbitrary nesting (`["Admin", "Blog"]`), or a module-like
-   * object with a string `name` field (`{ name: "Blog" }`, Rails-porting
-   * ergonomics). `klass` lets the human-name / I18n lookup walk the class's
-   * ancestors.
+   * Rails derives the bare name from `klass.name` — the fully-qualified Ruby
+   * constant path — with `demodulize`. A JS class name carries no module
+   * path, so the demodulized name comes from the `_demodulizedName` carrier
+   * when the class has one, and the namespace is passed in as segments: a
+   * single string (`"Blog"`), a segment array (`["Admin", "Blog"]`), or a
+   * module-like object with a string `name` (`{ name: "Blog" }`). `klass` may
+   * also be a bare name string, standing in for Rails' `name` argument for a
+   * `ModelName` built without a class.
    *
-   * Field math follows Rails' `ActiveModel::Name#initialize`
-   * (activemodel/lib/active_model/naming.rb:166-185) but operates on the
-   * namespace segments directly rather than round-tripping through a
-   * Ruby-shaped `::`-joined string — equivalent output, no Ruby-ism in
-   * TS code.
+   * Field math follows naming.rb:173-184 but operates on the namespace
+   * segments directly rather than round-tripping through a Ruby-shaped
+   * `::`-joined string — equivalent output, no Ruby-ism in TS code.
    */
   constructor(
-    name: string,
-    options?: {
-      namespace?: string | readonly string[] | { name: string };
-      klass?: ModelLike;
-      /** Rails' fourth positional argument (naming.rb:166), `:en` by default. */
-      locale?: string;
-    },
+    klass: ModelLike | string,
+    namespace?: string | readonly string[] | { name: string } | null,
+    name?: string,
+    /** Rails' fourth positional argument (naming.rb:166), `:en` by default. */
+    locale = "en",
   ) {
-    this._klass = options?.klass ?? null;
-    const locale = options?.locale ?? "en";
-    const rawNs = options?.namespace ?? null;
+    this._klass = typeof klass === "string" ? null : klass;
+    // Rails `@name = name || klass.name`, then `demodulize` for `@element`.
+    // The JS class name is already demodulized (`_demodulizedName` restores
+    // the Rails spelling where the class was flattened to avoid a collision).
+    name ??= typeof klass === "string" ? klass : (klass._demodulizedName ?? klass.name);
+    const rawNs = namespace ?? null;
     const invalidNamespace = (): ArgumentError =>
       new ArgumentError(
-        "options.namespace must be a non-blank string, an array of non-blank strings, or an object with a non-blank string `name`",
+        "namespace must be a non-blank string, an array of non-blank strings, or an object with a non-blank string `name`",
       );
     let segments: string[];
     if (rawNs == null) {
@@ -288,7 +295,7 @@ export class ModelName {
     const hasRubySeparator = (s: string): boolean => s.includes("::");
     if (hasRubySeparator(name) || segments.some(hasRubySeparator)) {
       throw new ArgumentError(
-        'ModelName arguments must not contain "::" — pass namespace segments as options.namespace (string, string[], or { name: string })',
+        'ModelName arguments must not contain "::" — pass namespace segments as the namespace argument (string, string[], or { name: string })',
       );
     }
 

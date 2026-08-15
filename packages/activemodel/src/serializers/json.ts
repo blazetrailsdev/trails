@@ -53,7 +53,14 @@ export class JSON {
   // Per-class memo so the static getter can be inherited without
   // recomputing or sharing state across subclasses (matches Model's
   // model.ts:1179-1185 pattern).
-  protected static _modelName?: ModelName;
+  declare protected static _modelName?: ModelName;
+
+  /**
+   * Optional `::`-joined Ruby module path for a namespaced model; the
+   * `module_parents` stand-in `model_name` passes as Rails' namespace
+   * argument (naming.rb:271-275). See `Model.moduleName`.
+   */
+  declare static moduleName?: string;
 
   /** Plain attribute store for lightweight adopters; subclasses override with their storage shape. */
   declare attributes: Record<string, unknown>;
@@ -126,8 +133,12 @@ export class JSON {
   // Rails: included do; extend ActiveModel::Naming; end — surfaces
   // model_name on the host class. Subclasses override to customize.
   static get modelName(): ModelName {
-    if (!this._modelName || this._modelName.name !== this.name) {
-      this._modelName = new ModelName(this.name, { klass: this });
+    // Mirrors Rails naming.rb:270-277 — `@_model_name ||=` is a per-class
+    // ivar (an own property here), and the namespace is the enclosing
+    // module, carried as `moduleName` because a JS class has no module path.
+    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
+      const namespace = this.moduleName?.split("::");
+      this._modelName = new ModelName(this, namespace);
     }
     return this._modelName;
   }

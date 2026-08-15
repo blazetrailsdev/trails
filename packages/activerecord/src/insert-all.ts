@@ -758,11 +758,11 @@ export class Builder implements InsertBuilder {
         // is quoted (insert_all.rb:284): `#{column_name}=(CASE WHEN (...) THEN
         // #{model.quoted_table_name}.#{column_name} ELSE ...)`.
         parts.push(
-          `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END)`,
+          `${col}=(CASE WHEN (${conditions}) THEN ${tableName}.${col} ELSE ${nowValue} END),`,
         );
       }
     }
-    return parts.join(",");
+    return parts.join("");
   }
 
   /** @internal Mirrors Rails `insert.model.quoted_table_name`. */

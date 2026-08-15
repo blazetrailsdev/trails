@@ -149,43 +149,43 @@ describe("NamingMethodDelegationTest", () => {
 // (activemodel/test/cases/naming_test.rb:89-125). Rails reaches that
 // state by passing `Blog::Post` directly (namespace inferred from the
 // class's own `::`-shaped `.name`); TS has no `::` in JS class names,
-// so the only way to express namespace membership is `options.namespace`.
+// so the only way to express namespace membership is the `namespace` argument.
 // That path always drops the prefix from `paramKey`/`routeKey` (Rails'
 // "isolated" semantic) — we don't expose the Rails "shared" shape
 // because it's purely an artifact of Ruby constant-name strings.
 describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
-  const opts = { namespace: "Blog" };
+  const namespace = "Blog";
 
   it("singular", () => {
-    expect(new ModelName("Post", opts).singular).toBe("blog_post");
+    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
   });
 
   it("plural", () => {
-    expect(new ModelName("Post", opts).plural).toBe("blog_posts");
+    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
   });
 
   it("element", () => {
-    expect(new ModelName("Post", opts).element).toBe("post");
+    expect(new ModelName("Post", namespace).element).toBe("post");
   });
 
   it("collection", () => {
-    expect(new ModelName("Post", opts).collection).toBe("blog/posts");
+    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
   });
 
   it("human", () => {
-    expect(new ModelName("Post", opts).human()).toBe("Post");
+    expect(new ModelName("Post", namespace).human()).toBe("Post");
   });
 
   it("route key", () => {
-    expect(new ModelName("Post", opts).routeKey).toBe("posts");
+    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
   });
 
   it("param key", () => {
-    expect(new ModelName("Post", opts).paramKey).toBe("post");
+    expect(new ModelName("Post", namespace).paramKey).toBe("post");
   });
 
   it("i18n key", () => {
-    expect(new ModelName("Post", opts).i18nKey).toBe("blog/post");
+    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
   });
 });
 
@@ -239,64 +239,63 @@ describe("NamingWithSuppliedLocaleTest", () => {
 // (activemodel/test/cases/naming_test.rb:184-221). Rails' setup is
 // `Blog::Post.model_name` (namespace inferred from Ruby constant scope).
 // TS has no such inference, so membership is declared with
-// `options.namespace`. Results match Rails exactly.
+// the `namespace` argument. Results match Rails exactly.
 describe("NamingUsingRelativeModelNameTest", () => {
-  const opts = { namespace: "Blog" };
+  const namespace = "Blog";
   it("singular", () => {
-    expect(new ModelName("Post", opts).singular).toBe("blog_post");
+    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
   });
   it("plural", () => {
-    expect(new ModelName("Post", opts).plural).toBe("blog_posts");
+    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Post", opts).element).toBe("post");
+    expect(new ModelName("Post", namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Post", opts).collection).toBe("blog/posts");
+    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
   });
   it("human", () => {
-    expect(new ModelName("Post", opts).human()).toBe("Post");
+    expect(new ModelName("Post", namespace).human()).toBe("Post");
   });
   it("route key", () => {
-    expect(new ModelName("Post", opts).routeKey).toBe("posts");
+    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Post", opts).paramKey).toBe("post");
+    expect(new ModelName("Post", namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Post", opts).i18nKey).toBe("blog/post");
+    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
   });
 });
 
 // Ports Rails `NamingWithNamespacedModelInIsolatedNamespaceTest`
 // (activemodel/test/cases/naming_test.rb:51-87). Rails' setup passes
-// `namespace: Blog` explicitly; our equivalent is `options.namespace:
-// "Blog"`. Result fields identical to Rails.
+// `namespace: Blog` explicitly; our equivalent is `namespace: "Blog"`. Result fields identical to Rails.
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
-  const opts = { namespace: "Blog" };
+  const namespace = "Blog";
   it("singular", () => {
-    expect(new ModelName("Post", opts).singular).toBe("blog_post");
+    expect(new ModelName("Post", namespace).singular).toBe("blog_post");
   });
   it("human", () => {
-    expect(new ModelName("Post", opts).human()).toBe("Post");
+    expect(new ModelName("Post", namespace).human()).toBe("Post");
   });
   it("plural", () => {
-    expect(new ModelName("Post", opts).plural).toBe("blog_posts");
+    expect(new ModelName("Post", namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Post", opts).element).toBe("post");
+    expect(new ModelName("Post", namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Post", opts).collection).toBe("blog/posts");
+    expect(new ModelName("Post", namespace).collection).toBe("blog/posts");
   });
   it("route key", () => {
-    expect(new ModelName("Post", opts).routeKey).toBe("posts");
+    expect(new ModelName("Post", namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Post", opts).paramKey).toBe("post");
+    expect(new ModelName("Post", namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Post", opts).i18nKey).toBe("blog/post");
+    expect(new ModelName("Post", namespace).i18nKey).toBe("blog/post");
   });
 });
 
@@ -326,7 +325,7 @@ describe("NameWithAnonymousClassTest", () => {
 // output, no Ruby-shaped strings in the TS API.
 describe("ModelName deeply-nested namespace", () => {
   it("multi-segment namespace array produces full prefix on derived fields", () => {
-    const name = new ModelName("Post", { namespace: ["Admin", "Blog"] });
+    const name = new ModelName("Post", ["Admin", "Blog"]);
     expect(name.name).toBe("Admin::Blog::Post");
     expect(Array.from(name.namespace ?? [])).toEqual(["Admin", "Blog"]);
     expect(name.singular).toBe("admin_blog_post");
@@ -344,26 +343,22 @@ describe("ModelName rejects Ruby-shaped strings", () => {
     expect(() => new ModelName("Blog::Post")).toThrow(/must not contain/);
   });
   it("throws when namespace contains ::", () => {
-    expect(() => new ModelName("Post", { namespace: "Admin::Blog" })).toThrow(/must not contain/);
+    expect(() => new ModelName("Post", "Admin::Blog")).toThrow(/must not contain/);
   });
 });
 
 describe("ModelName rejects malformed namespace option", () => {
   it("throws ArgumentError on object without a string .name", () => {
-    expect(() => new ModelName("Post", { namespace: {} as unknown as { name: string } })).toThrow(
-      ArgumentError,
-    );
+    expect(() => new ModelName("Post", {} as unknown as { name: string })).toThrow(ArgumentError);
   });
   it("throws ArgumentError on array with non-string elements", () => {
-    expect(() => new ModelName("Post", { namespace: ["Blog", 42 as unknown as string] })).toThrow(
-      ArgumentError,
-    );
+    expect(() => new ModelName("Post", ["Blog", 42 as unknown as string])).toThrow(ArgumentError);
   });
   it("throws ArgumentError on empty-string namespace", () => {
-    expect(() => new ModelName("Post", { namespace: "" })).toThrow(ArgumentError);
+    expect(() => new ModelName("Post", "")).toThrow(ArgumentError);
   });
   it("throws ArgumentError on whitespace-only segment in an array", () => {
-    expect(() => new ModelName("Post", { namespace: ["Blog", "   "] })).toThrow(ArgumentError);
+    expect(() => new ModelName("Post", ["Blog", "   "])).toThrow(ArgumentError);
   });
   it("throws ArgumentError on blank name", () => {
     expect(() => new ModelName("   ")).toThrow(ArgumentError);
@@ -377,7 +372,7 @@ describe("ModelName singularRouteKey", () => {
     expect(name.routeKey).toBe("posts");
   });
   it("namespaced: singularizes the prefix-dropped routeKey", () => {
-    const name = new ModelName("Post", { namespace: "Blog" });
+    const name = new ModelName("Post", "Blog");
     expect(name.routeKey).toBe("posts");
     expect(name.singularRouteKey).toBe("post");
   });
@@ -392,7 +387,7 @@ describe("ModelName singularRouteKey", () => {
     expect(name.singularRouteKey.length).toBeGreaterThan(0);
   });
   it("Naming.singularRouteKey delegates to ModelName.singularRouteKey", () => {
-    const name = new ModelName("Post", { namespace: "Blog" });
+    const name = new ModelName("Post", "Blog");
     expect(Naming.singularRouteKey(name)).toBe(name.singularRouteKey);
   });
 });
@@ -403,14 +398,14 @@ describe("ModelName collection is derived from plural", () => {
   // whatever), `collection` follows the same decision instead of
   // independently pluralizing.
   it("namespaced normal word: collection tail === bare pluralization", () => {
-    const name = new ModelName("Post", { namespace: "Blog" });
+    const name = new ModelName("Post", "Blog");
     expect(name.plural).toBe("blog_posts");
     expect(name.collection).toBe("blog/posts");
   });
 
   it("addUncountable on full singular keeps plural and collection in sync", () => {
     Inflections.instance("en").uncountable("legal_status");
-    const name = new ModelName("Status", { namespace: "Legal" });
+    const name = new ModelName("Status", "Legal");
     expect(name.singular).toBe("legal_status");
     expect(name.plural).toBe("legal_status"); // uncountable per local table
     expect(name.collection).toBe("legal/status"); // tail follows plural
@@ -419,8 +414,8 @@ describe("ModelName collection is derived from plural", () => {
 
 describe("ModelName namespace accepts Module-like {name}", () => {
   it("an object with a string `name` property is equivalent to the string form", () => {
-    const asObject = new ModelName("Post", { namespace: { name: "Blog" } });
-    const asString = new ModelName("Post", { namespace: "Blog" });
+    const asObject = new ModelName("Post", { name: "Blog" });
+    const asString = new ModelName("Post", "Blog");
     expect(asObject.singular).toBe(asString.singular);
     expect(asObject.paramKey).toBe(asString.paramKey);
     expect(asObject.routeKey).toBe(asString.routeKey);
@@ -498,9 +493,9 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
   it("equals / compare distinguish namespaced models with the same bare name", () => {
     // Two ModelName instances share the same `name: "Post"` but differ
     // in namespace — must not compare equal, must sort deterministically.
-    const blogPost = new ModelName("Post", { namespace: "Blog" });
-    const adminPost = new ModelName("Post", { namespace: "Admin" });
-    const blogPost2 = new ModelName("Post", { namespace: "Blog" });
+    const blogPost = new ModelName("Post", "Blog");
+    const adminPost = new ModelName("Post", "Admin");
+    const blogPost2 = new ModelName("Post", "Blog");
     const barePost = new ModelName("Post");
 
     expect(blogPost.equals(adminPost)).toBe(false);
@@ -526,8 +521,8 @@ describe("ModelName is string-ish (Rails String-inheritance analog)", () => {
     // the full namespace+name path as a single string — so a model
     // under an earlier-sorting namespace outranks a later-sorting
     // namespace even when its bare name comes later alphabetically.
-    const adminOther = new ModelName("Other", { namespace: "Admin" });
-    const blogPost = new ModelName("Post", { namespace: "Blog" });
+    const adminOther = new ModelName("Other", "Admin");
+    const blogPost = new ModelName("Post", "Blog");
     // "Admin/Other" < "Blog/Post"
     expect(adminOther.compare(blogPost)).toBe(-1);
     expect(blogPost.compare(adminOther)).toBe(1);
@@ -599,14 +594,14 @@ describe("ModelName locale", () => {
   it("pluralizes and looks up uncountables through the locale's inflections", () => {
     Inflections.instance("es").plural(/$/, "es");
     Inflections.instance("es").singular(/es$/, "");
-    const name = new ModelName("Ley", { locale: "es" });
+    const name = new ModelName("Ley", undefined, undefined, "es");
     expect(name.plural).toBe("leyes");
     expect(name.collection).toBe("leyes");
     expect(name.routeKey).toBe("leyes");
     expect(name.singularRouteKey).toBe("ley");
     expect(new ModelName("Ley").plural).toBe("leys");
     Inflections.instance("es").uncountable("dinero");
-    const uncountable = new ModelName("Dinero", { locale: "es" });
+    const uncountable = new ModelName("Dinero", undefined, undefined, "es");
     expect(uncountable.plural).toBe("dinero");
     expect(uncountable.routeKey).toBe("dinero_index");
   });

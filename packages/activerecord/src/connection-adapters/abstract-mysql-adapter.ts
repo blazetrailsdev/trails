@@ -1110,14 +1110,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         sql += ` ON DUPLICATE KEY UPDATE ${raw.value}`;
       } else {
         sql += " ON DUPLICATE KEY UPDATE ";
-        const assignments: string[] = [];
-        const touch = insert.touchModelTimestampsUnless(
+        sql += insert.touchModelTimestampsUnless(
           (col) => `${col}<=>VALUES(${col})`,
           "CURRENT_TIMESTAMP(6)",
         );
-        if (touch) assignments.push(touch);
-        for (const col of insert.updatableColumns()) assignments.push(`${col}=VALUES(${col})`);
-        sql += assignments.join(",");
+        sql += insert
+          .updatableColumns()
+          .map((col) => `${col}=VALUES(${col})`)
+          .join(",");
       }
     }
 

@@ -224,10 +224,13 @@ describe("StoreTest", () => {
     });
 
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(((user.settings as HashWithIndifferentAccess).get("color") as any).jenny).toBe("blue");
-    expect((user.settings as HashWithIndifferentAccess).get("color")).toMatchObject({
-      jenny: "blue",
-    });
+    expect(
+      ((user.settings as HashWithIndifferentAccess).get("color") as HashWithIndifferentAccess).get(
+        "jenny",
+      ),
+    ).toBe("blue");
+    // `user.color` is the store accessor, which reads the raw serialized value
+    // rather than the HashWithIndifferentAccess the store holds.
     expect(user.color).toMatchObject({ jenny: "blue" });
   });
 

@@ -560,7 +560,11 @@ describe("HashWithIndifferentAccess", () => {
   it("deepMerge merges nested objects", () => {
     const h1 = new HashWithIndifferentAccess({ a: { b: 1, c: 2 } });
     const h2 = h1.deepMerge({ a: { c: 3, d: 4 } });
-    expect(h2.get("a")).toEqual({ b: 1, c: 3, d: 4 });
+    expect((h2.get("a") as HashWithIndifferentAccess<unknown>).toHash()).toEqual({
+      b: 1,
+      c: 3,
+      d: 4,
+    });
   });
 
   it("slice picks keys", () => {

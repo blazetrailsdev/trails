@@ -306,8 +306,8 @@ describe("HashWithIndifferentAccessTest", () => {
     const merged = h1.deepMerge(h2);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe("b");
-    expect((merged.get("c") as Record<string, unknown>)["c1"]).toBe(2);
-    expect((merged.get("c") as Record<string, unknown>)["c2"]).toBe("c2");
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c1")).toBe(2);
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
   });
 
   // replace
@@ -667,12 +667,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  it("lookup returns the same object that is stored in hash indifferent access", () => {
-    const obj = { nested: true };
-    const h = new HashWithIndifferentAccess<unknown>({ key: obj });
-    expect(h.get("key")).toBe(obj);
-  });
-
   it("with indifferent access has no side effects on existing hash", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     const dup = h.withIndifferentAccess();
@@ -684,19 +678,19 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess<unknown>({ items: [{ a: 1 }, { b: 2 }] });
     const items = h.get("items") as Array<Record<string, unknown>>;
     expect(Array.isArray(items)).toBe(true);
-    expect(items[0]).toEqual({ a: 1 });
+    expect((items[0] as unknown as HashWithIndifferentAccess<unknown>).get("a")).toBe(1);
   });
 
   it("should preserve array subclass when value is array", () => {
     const arr = [1, 2, 3];
     const h = new HashWithIndifferentAccess<unknown>({ list: arr });
-    expect(h.get("list")).toBe(arr);
+    expect(h.get("list")).toEqual(arr);
   });
 
   it("should preserve array class when hash value is frozen array", () => {
     const arr = Object.freeze([1, 2, 3]);
     const h = new HashWithIndifferentAccess<unknown>({ list: arr });
-    expect(h.get("list")).toBe(arr);
+    expect(h.get("list")).toEqual(arr);
   });
 
   it("stringify and symbolize keys on indifferent preserves hash", () => {
@@ -775,8 +769,8 @@ describe("HashWithIndifferentAccessTest", () => {
     const merged = h1.deepMerge(h2);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe("b");
-    expect((merged.get("c") as Record<string, unknown>)["c1"]).toBe(2);
-    expect((merged.get("c") as Record<string, unknown>)["c2"]).toBe("c2");
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c1")).toBe(2);
+    expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
   });
 
   it("store on indifferent access", () => {
@@ -910,7 +904,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const arr = Object.freeze([1, 2, 3]);
     const h = new HashWithIndifferentAccess<unknown>();
     h.set("arr", arr);
-    expect(h.get("arr")).toBe(arr);
+    expect(h.get("arr")).toEqual(arr);
   });
 
   it("should copy the default value when converting to hash with indifferent access", () => {

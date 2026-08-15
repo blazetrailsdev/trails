@@ -296,7 +296,7 @@ export class Model {
   // `static { this.validates(...) }` blocks at class-definition time);
   // only the "defined but never written to" window diverges from Rails.
   static _validators: Map<string | null, Array<ValidatorLike>> = new Map();
-  private static _modelName: ModelName | null = null;
+  declare private static _modelName: ModelName | null;
 
   // -- Attributes (Phase 1000) --
 
@@ -1522,25 +1522,13 @@ export class Model {
   declare static moduleName?: string;
 
   static get modelName(): ModelName {
-    const moduleName = this.moduleName;
-    if (!moduleName) {
-      if (!this._modelName || this._modelName.name !== this.name) {
-        // Model satisfies ModelLike but TS can't prove it due to circular types.
-        this._modelName = new ModelName(this.name, { klass: this as unknown as ModelLike });
-      }
-      return this._modelName;
-    }
-    // Namespaced: the bare element is the demodulized Rails name (the JS class
-    // is flattened to a collision-free name), and the namespace prefix comes
-    // from `moduleName`. See `qualifiedName` in activerecord/inheritance.ts.
-    const bare = (this as unknown as { _demodulizedName?: string })._demodulizedName ?? this.name;
-    const segments = moduleName.split("::");
-    const qualified = `${moduleName}::${bare}`;
-    if (!this._modelName || this._modelName.name !== qualified) {
-      this._modelName = new ModelName(bare, {
-        klass: this as unknown as ModelLike,
-        namespace: segments,
-      });
+    // Mirrors Rails naming.rb:270-277 — the namespace is the enclosing module,
+    // carried here as `moduleName` because a JS class has no module path, and
+    // `@_model_name ||=` is a per-class ivar, i.e. an own property.
+    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
+      const namespace = this.moduleName?.split("::");
+      // Model satisfies ModelLike but TS can't prove it due to circular types.
+      this._modelName = new ModelName(this as unknown as ModelLike, namespace);
     }
     return this._modelName;
   }

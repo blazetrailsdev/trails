@@ -1946,22 +1946,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (raw) {
         sql += raw.value;
       } else {
-        // Rails concatenates the two fragments directly (sqlite3_adapter.rb:463-464)
-        // because `touch_model_timestamps_unless` terminates every entry it emits
-        // with a comma (insert_all.rb:284). trails' `touchModelTimestampsUnless`
-        // joins on "," with no trailing separator instead, so the two fragments are
-        // joined here rather than appended. Converging that builder changes all
-        // three adapters at once: story insert-all-touch-timestamps-trailing-comma.
-        const assignments: string[] = [];
-        const touch = insert.touchModelTimestampsUnless(
+        sql += insert.touchModelTimestampsUnless(
           (column) => `${column} IS excluded.${column}`,
           "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')",
         );
-        if (touch) assignments.push(touch);
-        assignments.push(
-          ...insert.updatableColumns().map((column) => `${column}=excluded.${column}`),
-        );
-        sql += assignments.join(",");
+        sql += insert
+          .updatableColumns()
+          .map((column) => `${column}=excluded.${column}`)
+          .join(",");
       }
     }
 

@@ -962,7 +962,7 @@ export class PostRecord extends Base {
   declare comments: AssociationProxy<Comment>;
 
   static get modelName(): ModelName {
-    return new ModelName("Post", { klass: this as unknown as ModelLike });
+    return new ModelName(this as unknown as ModelLike, null, "Post");
   }
 
   static {
