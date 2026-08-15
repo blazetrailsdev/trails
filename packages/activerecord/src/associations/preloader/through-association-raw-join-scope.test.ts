@@ -19,7 +19,7 @@
  *
  * So the fidelity behavior is to raise the same `ConfigurationError`, not to
  * silently carry the join (which would be a deviation Rails itself rejects). We
- * mirror Rails by nesting the scope's raw `_joinValues` under the source
+ * mirror Rails by nesting the scope's raw joins_values under the source
  * reflection name; trails' join builder rejects `{source => [<raw string>]}`
  * with the identical `ConfigurationError`. Symbol-association joins (the `general`
  * scope's `left_joins(:category)`) are the only `joins` case Rails supports in

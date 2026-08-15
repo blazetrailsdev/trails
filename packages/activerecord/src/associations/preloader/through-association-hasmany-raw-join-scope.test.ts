@@ -22,7 +22,7 @@
  * So the fidelity behavior is to raise, not to silently defer the raw join to the
  * source-preloader stage (where it is valid SQL against the source base table) — a
  * lenient deviation Rails itself rejects. We mirror Rails by nesting the scope's raw
- * `_joinValues` under the source reflection name; trails' join builder rejects
+ * raw joins_values under the source reflection name; trails' join builder rejects
  * `{source => [<raw string>]}` with the identical `ConfigurationError`.
  *
  * No canonical has_many-through model scope uses a raw join, so this pins the

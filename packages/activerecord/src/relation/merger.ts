@@ -147,13 +147,11 @@ export class Merger {
     const joinsValues = other.joinsValues ?? [];
     if (joinsValues.length === 0) return;
     if (other.model === rel.model) {
+      // merger.rb:121 `relation.joins_values |= other.joins_values` — one union
+      // over the whole store, named and raw alike.
       for (const v of joinsValues) {
-        if (!other._isNamedJoinValue(v)) {
-          if (!rel._joinValues.some((existing: unknown) => structuralUnionEq(existing, v)))
-            rel._joinsValues.push(v);
-        } else if (!rel._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v))) {
+        if (!rel.joinsValues.some((existing: unknown) => structuralUnionEq(existing, v)))
           rel._joinsValues.push(v);
-        }
       }
       return;
     }

@@ -976,9 +976,9 @@ export class AssociationScope {
   private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
     const item = evaluated as {
       _referencesValues?: string[];
-      _joinValues?: unknown[];
+      joinsValues?: unknown[];
+      _isNamedJoinValue?: (v: unknown) => boolean;
       _joinClauses?: unknown[];
-      _namedInnerJoins?: unknown[];
       _leftOuterJoinsValues?: unknown[];
       _includesAssociations?: unknown[];
       _eagerLoadAssociations?: unknown[];
@@ -988,9 +988,8 @@ export class AssociationScope {
     if (refs.length === 0) return;
     const target = scope as {
       _joinsValues: unknown[];
-      _joinValues: unknown[];
+      joinsValues: unknown[];
       _joinClauses: unknown[];
-      _namedInnerJoins: unknown[];
       _leftOuterJoinsValues: unknown[];
       _model?: typeof Base;
     };
@@ -999,20 +998,29 @@ export class AssociationScope {
     // straight across, then union named association joins (same-klass) or build
     // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
     for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
-    for (const jv of item._joinValues ?? []) target._joinsValues.push(jv);
-    const namedInner = (item._namedInnerJoins ?? []).filter((v) => !(v instanceof JoinDependency));
-    const innerDeps = (item._namedInnerJoins ?? []).filter((v) => v instanceof JoinDependency);
+    // merger.rb:123-126 — `other.joins_values.partition { |join| case join when
+    // Hash, Symbol, Array; true end }`: association specs on one side, raw SQL /
+    // Arel nodes and stashed JoinDependencies on the other.
+    const namedInner: unknown[] = [];
+    const others: unknown[] = [];
+    for (const v of item.joinsValues ?? []) {
+      if (!(v instanceof JoinDependency) && item._isNamedJoinValue?.(v) === true) {
+        namedInner.push(v);
+      } else {
+        others.push(v);
+      }
+    }
+    for (const v of others) target._joinsValues.push(v);
     if (namedInner.length > 0) {
       if (sameKlass) {
         for (const v of namedInner)
-          if (!target._namedInnerJoins.includes(v)) target._joinsValues.push(v);
+          if (!target.joinsValues.includes(v)) target._joinsValues.push(v);
       } else {
         target._joinsValues.push(
           constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
         );
       }
     }
-    target._joinsValues.push(...innerDeps);
     const namedLeft = (item._leftOuterJoinsValues ?? []).filter(
       (v) => !(v instanceof JoinDependency),
     );

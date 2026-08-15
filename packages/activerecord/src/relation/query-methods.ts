@@ -196,20 +196,19 @@ interface QueryMethodsHost {
     klass?: unknown;
   }>;
   // Unified insertion-ordered `joins_values` backing store; `joinsValues`
-  // exposes it (Rails' `@values[:joins]`). `_joinValues` / `_namedInnerJoins`
-  // are read-only getters derived from it via `_isNamedJoinValue`.
+  // exposes it (Rails' `@values[:joins]`). The named-vs-raw split is derived on
+  // read by `select_association_list` / `select_named_joins`, which discriminate
+  // with `_isNamedJoinValue`.
   _joinsValues: (AssociationSpec | string | Nodes.Join)[];
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
   // Converged Rails `Relation#alias_tracker(joins, aliases)` (relation.rb:1307);
   // `buildJoins` reads it to build the shared `build_joins` tracker.
   aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
   _isNamedJoinValue(v: unknown): boolean;
-  readonly _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
   // Public `left_outer_joins_values` value method (relation.ts getter); reads it
   // over the backing field so extractCalls credits the Rails value-method read.
   leftOuterJoinsValues: AssociationSpec[];
-  readonly _namedInnerJoins: AssociationSpec[];
   _includesAssociations: AssociationSpec[];
   _preloadAssociations: AssociationSpec[];
   _eagerLoadAssociations: AssociationSpec[];
@@ -997,7 +996,7 @@ function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): an
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   // Mirrors Rails left_outer_joins! which stores into left_outer_joins_values
-  // (separate from joins_values / _joinValues which is the inner-join path).
+  // (separate from joins_values, which is the inner-join path).
   // |= dedups by eql?/hash — structural for Hash specs, not JS reference.
   for (const arg of args) {
     if (!this._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
@@ -1207,9 +1206,8 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
   ["order", "_orderClauses"],
   ["rawOrder", "_rawOrderClauses"],
   ["joins", "_joinClauses"],
-  ["joinValues", "_joinValues"],
+  ["joins", "_joinsValues"],
   ["leftOuterJoinsValues", "_leftOuterJoinsValues"],
-  ["namedInnerJoins", "_namedInnerJoins"],
   ["limit", "_limitValue"],
   ["offset", "_offsetValue"],
   ["lock", "_lockValue"],
@@ -1241,13 +1239,17 @@ export function structurallyIncompatibleValuesFor(
     // "never set" and "unscoped" as an empty array, so an empty `b` always
     // stands in for that `nil`. Matching populated values are compared after
     // `uniq` (see relation/or_test.rb `test_or_with_unscope_order`).
+    // Rails' `:joins` is one value method; trails splits its storage across the
+    // joins_values store and the trails-only `_joinClauses`, so two rows carry
+    // the same label and the name must not be reported twice.
     if (Array.isArray(a)) {
       if (!Array.isArray(b)) continue;
       if (b.length === 0) continue;
-      if (!deepEqual(uniqArray(a), uniqArray(b as unknown[]))) incompat.push(label);
+      if (!deepEqual(uniqArray(a), uniqArray(b as unknown[])) && !incompat.includes(label))
+        incompat.push(label);
       continue;
     }
-    if (!deepEqual(a, b)) incompat.push(label);
+    if (!deepEqual(a, b) && !incompat.includes(label)) incompat.push(label);
   }
   return incompat;
 }
@@ -1557,7 +1559,7 @@ const UNIQ_BANG_FIELDS: Partial<Record<string, keyof QueryMethodsHost>> = {
   select: "_selectColumns",
   group: "_groupColumns",
   order: "_orderClauses",
-  joins: "_joinValues",
+  joins: "_joinsValues",
   left_outer_joins: "_leftOuterJoinsValues",
   references: "_referencesValues",
   extending: "_extending",
@@ -2889,9 +2891,9 @@ export function buildJoinBuckets(
  * @internal
  */
 export interface JoinEmissionPlan {
-  /** LeadingJoin nodes (and, when no stash exists, all `_joinValues`), prepended. */
+  /** LeadingJoin nodes (and, when no stash exists, all raw join nodes), prepended. */
   leadingJoins: Nodes.Join[];
-  /** Non-leading `_joinValues` nodes, appended last. */
+  /** Non-leading raw join nodes, appended last. */
   joinNodes: Nodes.Join[];
   /**
    * JoinDependencies folded into the primary named/left JD's `joinConstraints`
