@@ -222,33 +222,35 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("count with predicate — counts matching entries", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
-    expect(h.count((_k, v) => (v as number) > 1)).toBe(2);
+    expect(h.count(([, v]) => (v as number) > 1)).toBe(2);
   });
 
   it("find — returns first matching [key, value] pair", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const found = h.find((_k, v) => (v as number) === 2);
+    const found = h.find(([, v]) => (v as number) === 2);
     expect(found).toEqual(["b", 2]);
-    expect(h.find((_k, v) => (v as number) === 99)).toBeUndefined();
+    expect(h.find(([, v]) => (v as number) === 99)).toBeUndefined();
   });
 
   it("each — iterates key-value pairs", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const result: [string, unknown][] = [];
-    h.each((k, v) => result.push([k, v]));
+    h.each((pair) => {
+      result.push(pair);
+    });
     expect(result).toContainEqual(["a", 1]);
     expect(result).toContainEqual(["b", 2]);
   });
 
   it("map — maps over entries returning array", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const result = h.map((k, v) => `${k}=${v}`);
+    const result = h.map(([k, v]) => `${k}=${v}`);
     expect(result.sort()).toEqual(["a=1", "b=2"]);
   });
 
   it("flatMap — flatMaps over entries", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    const result = h.flatMap((k, v) => [k, v]);
+    const result = h.flatMap(([k, v]) => [k, v]);
     expect(result).toContain("a");
     expect(result).toContain(1);
   });
@@ -264,13 +266,13 @@ describe("HashWithIndifferentAccessTest", () => {
   // minBy / maxBy
   it("minBy — finds entry with minimum value", () => {
     const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.minBy((_k, v) => v as number);
+    const result = h.minBy(([, v]) => v as number);
     expect(result).toEqual(["b", 1]);
   });
 
   it("maxBy — finds entry with maximum value", () => {
     const h = new HashWithIndifferentAccess({ a: 3, b: 1, c: 2 });
-    const result = h.maxBy((_k, v) => v as number);
+    const result = h.maxBy(([, v]) => v as number);
     expect(result).toEqual(["a", 3]);
   });
 

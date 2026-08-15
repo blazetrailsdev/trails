@@ -3119,7 +3119,9 @@ export class Relation<T extends Base> {
     const compositePkBypass =
       Array.isArray(basePk) &&
       hasLimitOrOffset &&
-      !this._applyJoinDependencyIsLimitable(this._deferredDistinctPkEagerSpecs());
+      !this._eagerJoinDependencyIsLimitable(
+        this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
+      );
     return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 
@@ -3157,29 +3159,11 @@ export class Relation<T extends Base> {
     new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
   }
 
-  /**
-   * Rails `apply_join_dependency` hands the eager JoinDependency to the query
-   * builder by pushing it into `joins_values`
-   * (`joins!(construct_join_dependency(...))`, finder_methods.rb:457-461) — not
-   * as a side-channel argument. Mirror that for the eager SELECT/calculation
-   * paths, which construct their JoinDependency locally: spawn a relation whose
-   * `joins_values` carries the JD, so `build_joins` picks it up through the same
-   * `select_named_joins` partition that stashes any other JoinDependency in
-   * `joins_values`.
-   * @internal
-   */
-  _withEagerJoinDependency(jd?: JoinDependency): Relation<T> {
-    if (jd === undefined) return this;
-    const rel = this._clone();
-    QueryMethodBangs.joinsBang.call(rel as any, jd as any);
-    return rel;
-  }
-
   private _applyJoinsToManager(manager: SelectManager, aliases?: AliasTracker): void {
     // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
     // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
     // `from(relation)` subquery path) also delegates to. An eager JoinDependency
-    // rides in `joins_values` (see `_withEagerJoinDependency`) exactly as Rails
+    // rides in `joins_values` exactly as Rails
     // `apply_join_dependency` puts it there, so `emitJoinPlan`'s
     // `select_named_joins` partition folds it into `stashedJoins`: the manual
     // joins AND the eager JD emit through ONE `build_joins` call with ONE shared
@@ -3500,7 +3484,7 @@ export class Relation<T extends Base> {
       const jd = this._buildEagerJoinDependency(eagerSpecs);
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+      if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
         // A composite base PK can't be materialized here — `_materializeLimitedIds`
         // (Rails' zip/transpose over `Array(primary_key)`) has no composite
         // support, so it would emit a wrong single-column `"col1,col2"` predicate.
@@ -3653,7 +3637,8 @@ export class Relation<T extends Base> {
       rel._includesAssociations = [];
 
       const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-      if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+      const jd = this._buildEagerJoinDependency(eagerSpecs);
+      if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
         // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
         // `_eagerLoadAssociations` alone, so `pk` can still be null here (a
         // view), and `_materializeLimitedIds` — Rails' zip/transpose over
@@ -3662,7 +3647,6 @@ export class Relation<T extends Base> {
         // applyJoinDependency's explicit NotImplementedError instead.
         const basePk = pk ?? "id";
         if (Array.isArray(basePk)) this.applyJoinDependency();
-        const jd = this._buildEagerJoinDependency(eagerSpecs);
         const limitedIds = await this._materializeLimitedIds(jd, basePk);
         const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
         limited._limitValue = null;
@@ -4736,15 +4720,10 @@ export class Relation<T extends Base> {
    * Rails only rewrites the relation via `distinct_relation_for_primary_key`
    * when `eager_loading` is truthy.
    *
-   * The second `using_limitable_reflections?` clause (finder_methods.rb:466-470)
-   * reads `_namedInnerJoins` where Rails reads `joins_values`. Rails'
-   * `select_association_list` (query_methods.rb:1810-1823) keeps only the
-   * `Hash, Symbol, Array` members and drops raw SQL Strings; TypeScript collapses
-   * Ruby's Symbol and String onto one type, so that `when` cannot be spelled by
-   * type — `_namedInnerJoins` is the `joins_values` subset it selects, under the
-   * same discriminator `joins()` itself uses. `left_outer_joins_values` needs no
-   * such subset: `assertValidLeftOuterJoinsBang` already rejects a raw String
-   * there, exactly where Rails raises for it.
+   * The two-clause `using_limitable_reflections?` test Rails spells inline here
+   * (finder_methods.rb:463-470) lives in `_eagerJoinDependencyIsLimitable`, its
+   * single home — see there for why the second clause reads `_namedInnerJoins`
+   * where Rails reads `joins_values`.
    * @internal
    */
   applyJoinDependency({
@@ -4775,21 +4754,11 @@ export class Relation<T extends Base> {
     // materialized-ID shape and ordered-distinct handling — so rather than
     // claim parity we reject this combination explicitly. Tracked by the
     // `converge-relation-subquery-distinct-pk-materialization` continuation story.
-    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    const isLimitable =
-      this.usingLimitableReflections(joinDependency.reflections as never) &&
-      this.usingLimitableReflections(
-        QueryMethodBangs.constructJoinDependency.call(
-          this as any,
-          _qm.selectAssociationList
-            .call(this as any, this._namedInnerJoins, null)
-            .concat(
-              _qm.selectAssociationList.call(this as any, this._leftOuterJoinsValues, null),
-            ) as AssociationSpec[],
-          null,
-        ).reflections as never,
-      );
-    if (eagerLoading && hasLimitOrOffset && !isLimitable) {
+    if (
+      eagerLoading &&
+      this.hasLimitOrOffset &&
+      !this._eagerJoinDependencyIsLimitable(joinDependency)
+    ) {
       // @nie disposition=TODO
       throw new NotImplementedError(
         "Using an eager-loaded relation with a limit/offset over a collection " +
@@ -4836,17 +4805,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirror Rails' two-clause `using_limitable_reflections?` test in
-   * `apply_join_dependency` (finder_methods.rb:464-470) for the callers that
-   * hold the eager specs rather than the built dependency: resolve them through
-   * a JoinDependency, as `construct_join_dependency(eager_load_values |
-   * includes_values, …)` does, and apply the same guard.
-   */
-  private _applyJoinDependencyIsLimitable(eagerSpecs: AssociationSpec[]): boolean {
-    return this._eagerJoinDependencyIsLimitable(this._buildEagerJoinDependency(eagerSpecs));
-  }
-
-  /**
    * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
    * `reflections.none?(&:collection?)` — a set of reflections is limitable
    * when none of them is a collection association.
@@ -4881,7 +4839,9 @@ export class Relation<T extends Base> {
     if (this._groupColumns.length > 0) return false;
     if (!this._eagerLoadingForSql()) return false;
     if (this._limitValue === null && this._offsetValue === null) return false;
-    return !this._applyJoinDependencyIsLimitable(this._deferredDistinctPkEagerSpecs());
+    return !this._eagerJoinDependencyIsLimitable(
+      this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
+    );
   }
 
   /**
@@ -5142,10 +5102,24 @@ export class Relation<T extends Base> {
    * `select_association_list(joins_values) ∪ select_association_list(left_outer_joins_values)`
    * must be non-collection. A collection reflection in `joins`/`leftOuterJoins`
    * forces the distinct-parent-id rewrite even when every eager reflection is
-   * singular. Sibling of `_applyJoinDependencyIsLimitable`, which resolves the
-   * first clause from specs instead of a built dependency. See
-   * {@link applyJoinDependency} for why the second clause reads
-   * `_namedInnerJoins` where Rails reads `joins_values`.
+   * singular.
+   *
+   * Rails spells this guard inline in `apply_join_dependency` because that one
+   * block-form method is its only entry point; trails still has several
+   * (`applyJoinDependency`, `_applyJoinDependencyAsync`,
+   * `_applyEagerJoinDependency`, `_executeEagerLoad`,
+   * `_isDeferredDistinctPkSubquery`) pending the sync/async collapse tracked by
+   * `converge-relation-subquery-distinct-pk-materialization`, so the guard has
+   * exactly ONE home here and every entry point calls it — never a second copy.
+   *
+   * The second clause reads `_namedInnerJoins` where Rails reads `joins_values`:
+   * `select_association_list` (query_methods.rb:1810-1823) keeps only the
+   * `Hash, Symbol, Array` members and drops raw SQL Strings, and TypeScript
+   * collapses Ruby's Symbol and String onto one type, so that `when` cannot be
+   * spelled by type — `_namedInnerJoins` is the `joins_values` subset it selects,
+   * under the same discriminator `joins()` itself uses. `left_outer_joins_values`
+   * needs no such subset: `assertValidLeftOuterJoinsBang` already rejects a raw
+   * String there, exactly where Rails raises for it.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
@@ -5203,7 +5177,9 @@ export class Relation<T extends Base> {
     // shared `AliasTracker` spanning the eager JoinDependency and the manual
     // joins, deduping coinciding nodes via `walk` — same threading as the
     // relation `_applyEagerJoinDependency` yields.
-    this._withEagerJoinDependency(jd)._applyJoinsToManager(idSubquery);
+    const joined = this._clone();
+    QueryMethodBangs.joinsBang.call(joined as any, jd as any);
+    joined._applyJoinsToManager(idSubquery);
     this._applyWheresToManager(idSubquery, table);
     this._applyOrderToManager(idSubquery);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
@@ -6635,11 +6611,7 @@ export class Relation<T extends Base> {
         const hasLimitOrOffset = this._limitValue !== null || (this._offsetValue ?? 0) > 0;
         const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = this._buildEagerJoinDependency(eagerSpecs);
-        if (
-          hasLimitOrOffset &&
-          !this._applyJoinDependencyIsLimitable(eagerSpecs) &&
-          !Array.isArray(pk)
-        ) {
+        if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd) && !Array.isArray(pk)) {
           // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
           // materialize the limited DISTINCT primary keys, rewrite as
           // `WHERE pk IN (ids)`, and clear limit/offset. Single-column PK only —
@@ -6653,7 +6625,7 @@ export class Relation<T extends Base> {
           collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
           collection._limitValue = null;
           collection._offsetValue = null;
-        } else if (hasLimitOrOffset && !this._applyJoinDependencyIsLimitable(eagerSpecs)) {
+        } else if (hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
           // by 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
