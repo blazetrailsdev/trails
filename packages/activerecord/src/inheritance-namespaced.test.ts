@@ -80,7 +80,9 @@ describe("NamingTest (Admin::User model_name)", () => {
   });
 
   it("param key drops the namespace prefix", () => {
-    expect(AdminUser.modelName.paramKey).toBe("user");
+    // naming.rb:180 — `@param_key = namespace ? _singularize(@unnamespaced) : @singular`.
+    // `Admin` is not an isolated engine namespace, so Rails keeps the prefix.
+    expect(AdminUser.modelName.paramKey).toBe("admin_user");
   });
 });
 
