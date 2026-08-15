@@ -881,9 +881,8 @@ export function _canRouteThroughViaAssociationScope(
   if (typeof reflection.isNested === "function" && reflection.isNested()) return true;
   // Polymorphic has_many / has_one source (rare): the chain walker
   // would need inversion machinery not present in PR 3c. Polymorphic
-  // belongsTo source WITH sourceType is routed — AssociationScope's
-  // nextChainScope now uses ThroughReflection#joinPrimaryKeyFor(klass)
-  // so the resolved sourceType class's PK drives the JOIN.
+  // belongsTo source WITH sourceType is routed — the chain head resolves
+  // its own runtime klass, so the sourceType class's PK drives the JOIN.
   if (
     typeof src.isPolymorphic === "function" &&
     src.isPolymorphic() &&

@@ -108,7 +108,6 @@ export class ReflectionProxy {
     klass: typeof Base;
     name: string;
     scope?: ((rel: unknown) => unknown) | null;
-    joinPrimaryKeyFor?: (klass?: typeof Base) => string | string[];
     scopeFor?: (rel: unknown, owner?: unknown) => unknown;
   } {
     return this.reflection as unknown as ReturnType<() => ReflectionProxy["_r"]>;
@@ -116,18 +115,6 @@ export class ReflectionProxy {
 
   get joinPrimaryKey(): string | string[] {
     return this._r.joinPrimaryKey;
-  }
-
-  /**
-   * Forwarding `joinPrimaryKeyFor(klass)` so AssociationScope's
-   * runtime-klass path (polymorphic belongsTo) finds the correct
-   * primary key column on the resolved target. Falls back to the
-   * static `joinPrimaryKey` if the reflection doesn't expose it.
-   */
-  joinPrimaryKeyFor(klass?: typeof Base): string | string[] {
-    return typeof this._r.joinPrimaryKeyFor === "function"
-      ? this._r.joinPrimaryKeyFor(klass)
-      : this._r.joinPrimaryKey;
   }
 
   get joinForeignKey(): string | string[] {
@@ -534,13 +521,7 @@ export class AssociationScope {
       klass?: { tableName?: string };
       aliasedTable?: string | { name?: string };
     };
-    // Rails reads `reflection.join_primary_key` straight off the chain entry
-    // (association_scope.rb:83): RuntimeReflection resolves its own runtime
-    // klass (reflection.rb:1271-1277) and ReflectionProxy is a SimpleDelegator
-    // onto the wrapped reflection, so the polymorphic belongs_to target needs
-    // no klass threaded down from `scope`.
-    const rawJoinPk = r.joinPrimaryKey;
-    const joinPks = Array.isArray(rawJoinPk) ? rawJoinPk : [rawJoinPk];
+    const joinPks = Array.isArray(r.joinPrimaryKey) ? r.joinPrimaryKey : [r.joinPrimaryKey];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
     if (joinPks.length !== joinFks.length) {
       // Unwrap ReflectionProxy so activeRecord/name come from the
@@ -563,11 +544,9 @@ export class AssociationScope {
         foreignKey: joinFks,
       });
     }
-    // Rails: `table = reflection.aliased_table` (association_scope.rb:85) —
-    // resolved the same way `lastChainScope` resolves it, so a polymorphic
-    // belongs_to head reads its target off the live association rather than a
-    // klass threaded from `scope`. `_arelTableFor` uses the node verbatim when
-    // there is one; `tableName` is only the string/duck-typed fallback.
+    // Rails: `table = reflection.aliased_table` (association_scope.rb:85).
+    // `_arelTableFor` uses the node verbatim when there is one; `tableName` is
+    // only the string/duck-typed fallback.
     const rAliased = (reflection as ReflectionProxy).aliasedTable as
       | string
       | { name?: string }
@@ -751,11 +730,9 @@ export class AssociationScope {
     // `source_reflection.constraints`, so a scope declared on the polymorphic
     // belongsTo source (e.g. `belongs_to :taggable, -> { where(...) },
     // polymorphic: true`) must still merge. The resolved source class is the
-    // runtime `klass` threaded into this call (the source_type target), so pass
-    // it as an override and avoid touching the uncomputable polymorphic `klass`.
-    // The chain head is the RuntimeReflection, whose `klass` IS the live
-    // `association.klass` (reflection.rb:1265), so the override is read off the
-    // chain rather than threaded down from `scope`.
+    // runtime `klass` off the chain head (a RuntimeReflection, whose `klass` IS
+    // the live `association.klass`, reflection.rb:1265), so pass it as an
+    // override and avoid touching the uncomputable polymorphic `klass`.
     // (The THROUGH/join-model scope on a source_type association is carried by a
     // `PolymorphicReflection` chain entry already merged by the reverse_each loop
     // above — e.g. Tag's `null_taggings -> { none }` — independent of this.)
