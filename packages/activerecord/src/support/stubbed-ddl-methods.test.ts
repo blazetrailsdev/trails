@@ -23,6 +23,10 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "validateCreateTableOptionsBang",
     "option validation — raises on an unknown key, emits no DDL of its own",
   ],
+  [
+    "validateTableLengthBang",
+    "name validation — raises on an over-long table name, emits no DDL of its own",
+  ],
   ["schemaCache", "cache-bust — clearDataSourceCacheBang around a create"],
   ["pool", "argument to clearDataSourceCacheBang, not a DDL emitter"],
   ["clearCacheBang", "post-lay prepared-statement reset (PG stale-plan 0A000)"],

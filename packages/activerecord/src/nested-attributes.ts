@@ -6,7 +6,7 @@ import {
   association as collectionProxyFor,
 } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
-import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
+import { singularize, camelize, underscore, isBlank, except } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";
@@ -418,7 +418,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
   (record as any)._pendingNestedAttributes = null;
 }
 
-const UNASSIGNABLE_KEYS = new Set(["id", "_destroy"]);
+const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;
 
 /** @internal Stateless; one instance shared across all calls. */
 const _booleanType = new BooleanType();
@@ -475,11 +475,7 @@ export function assignToOrMarkForDestruction(
   attributes: Record<string, unknown>,
   allowDestroy: boolean,
 ): Promise<void> | void {
-  const assignable: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(attributes)) {
-    if (!UNASSIGNABLE_KEYS.has(k)) assignable[k] = v;
-  }
-  const pending = childRecord.assignAttributes(assignable);
+  const pending = childRecord.assignAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
   const markIfRequested = (): void => {
     if (hasDestroyFlag(attributes) && allowDestroy) {
       childRecord.markForDestruction();
@@ -598,28 +594,13 @@ export function isPolymorphicBelongsTo(record: Base, associationName: string): b
 }
 
 /**
- * Plain-object copy of `attributes` with the nested-attribute control keys
- * (`id`, `_destroy`) removed — the assignable set passed to a built/updated
- * child. Iterates own enumerable entries so strong-params wrappers
- * (`ProtectedParams`) work transparently.
- * @internal
- */
-function assignableNestedAttributes(attributes: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(attributes)) {
-    if (!UNASSIGNABLE_KEYS.has(k)) out[k] = v;
-  }
-  return out;
-}
-
-/**
  * Rails builds a nested record via `association.build(attributes)` →
  * `assign_attributes`, which raises `UnknownAttributeError` for any key with no
  * writer. trails' `Model.new`/build silently drops unknown keys (the base-level
  * constructor leniency tracked by RFC 0046), so the nested build path guards
  * explicitly — mirroring the same check the collection flush path already runs.
  * Control keys (`_destroy`, the addressing `id`) are stripped by
- * `assignableNestedAttributes` before this sees them; the primary key is always
+ * `except(*UNASSIGNABLE_KEYS)` before this sees them; the primary key is always
  * assignable. When the target schema isn't loaded (`_attributeDefinitions`
  * empty) there is nothing to validate against, so the check is skipped.
  */
@@ -642,7 +623,7 @@ function assertNestedAttributesAreKnown(
   if (!attrDefs || attrDefs.size === 0) return;
   const pk = (targetModel as any).primaryKey;
   const pkColumns = new Set<string>((Array.isArray(pk) ? pk : [pk]).map(String));
-  // `assignable` comes from `assignableNestedAttributes`, which already strips
+  // `assignable` comes from `except(*UNASSIGNABLE_KEYS)`, which already strips
   // the `id` addressing key (UNASSIGNABLE_KEYS), so only a non-`id` primary key
   // needs an explicit exemption here.
   for (const key of keys) {
@@ -848,7 +829,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 
   // Rails nested_attributes.rb:443 — build a new record (no matching id).
   if (!isRejectNewRecord.call(record, associationName, attributes)) {
-    const assignable = assignableNestedAttributes(attributes);
+    const assignable = except(attributes, ...UNASSIGNABLE_KEYS);
     const targetModel = resolveCollectionTargetModel(record, associationName);
     if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
     if (existingRecord && existingRecord.isNewRecord()) {
@@ -1017,10 +998,11 @@ export function assignNestedAttributesForCollectionAssociation(
   for (const a of attrs) {
     if (!hasNestedId(a)) {
       if (!isRejectNewRecord.call(record, associationName, a)) {
-        const assignable = assignableNestedAttributes(a);
         if (collectionTargetModel)
-          assertNestedAttributesAreKnown(collectionTargetModel, assignable);
-        nestedTarget.push(collectionProxyFor(record, associationName).build(assignable));
+          assertNestedAttributesAreKnown(collectionTargetModel, except(a, ...UNASSIGNABLE_KEYS));
+        nestedTarget.push(
+          collectionProxyFor(record, associationName).build(except(a, ...UNASSIGNABLE_KEYS)),
+        );
       } else {
         nestedTarget.push(null);
       }

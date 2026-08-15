@@ -4,97 +4,83 @@
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "backoff",
     "call": "sleep",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "case_insensitive_comparison",
-    "call": "can_perform_case_insensitive_comparison_for?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "case_insensitive_comparison",
-    "call": "column_for_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: Ruby's Kernel#sleep has no TS counterpart — the body is the setTimeout promise that is the only way to suspend an async chain (abstract_adapter.rb:1078-1080)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_delete",
     "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — the matched TS member is the bodiless `execDelete` signature on the DatabaseStatements surface in abstract-adapter.ts; the ported body lives in abstract/database-statements.ts and is RFC 0076's execute-primitive work (abstract/database_statements.rb:191-193)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_delete",
     "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — bodiless `execDelete` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:191-193)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_insert",
     "call": "internal_exec_query",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — bodiless `execInsert` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:157-170)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_insert",
     "call": "sql_for_insert",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — bodiless `execInsert` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:157-170)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_update",
     "call": "affected_rows",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — bodiless `execUpdate` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:186-188)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "exec_update",
     "call": "internal_execute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: recorder shape — bodiless `execUpdate` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:186-188)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "build_statement_pool",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: the base ctor takes no config (concrete adapters assign `_config`), so Rails' config-derived initialize tail has nowhere to run here; converging it is the constructor reshape owned by RFC 0094 (abstract_adapter.rb:155-172)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: config-derived initialize tail — see the build_statement_pool row; blocked on the RFC 0094 constructor reshape (abstract_adapter.rb:159-166)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "type_cast_config_to_boolean",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: config-derived initialize tail — see the build_statement_pool row; blocked on the RFC 0094 constructor reshape (abstract_adapter.rb:159-166)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "validate_default_timezone",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: config-derived initialize tail — see the build_statement_pool row; blocked on the RFC 0094 constructor reshape (abstract_adapter.rb:167)."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "log",
     "call": "instrument",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "RFC 0106: the receiver now converges to `this.instrumenter`; the method is `instrumentAsync` because Rails' sync `Instrumenter#instrument` cannot await the query block (abstract_adapter.rb:1134-1146)."
   }
 ]

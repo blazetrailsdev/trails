@@ -291,7 +291,7 @@ export interface AbstractAdapter {
   removeColumn(
     tableName: string,
     columnName: string,
-    type?: string,
+    type?: ColumnType,
     options?: { ifExists?: boolean },
   ): Promise<void>;
   removeColumns(tableName: string, ...columns: string[]): Promise<void>;
@@ -2242,13 +2242,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  caseInsensitiveComparison(
-    attribute: Nodes.Attribute,
-    value: unknown,
-  ): Nodes.Node | Promise<Nodes.Node> {
-    // Default: canPerformCaseInsensitiveComparisonFor returns true, so always LOWER.
-    // Adapters that need async column inspection (e.g. PG) override this whole method.
-    return attribute.lower().eq(attribute.relation.lower(value));
+  async caseInsensitiveComparison(attribute: Nodes.Attribute, value: unknown): Promise<Nodes.Node> {
+    const column = await this.columnForAttribute(attribute);
+
+    if (await this.canPerformCaseInsensitiveComparisonFor(column)) {
+      return attribute.lower().eq(attribute.relation.lower(value));
+    } else {
+      return attribute.eq(value);
+    }
   }
 
   /** @internal */
@@ -2696,7 +2697,7 @@ export class AbstractAdapter implements Quoting {
       // transaction reports as nil rather than as itself.
       const userTx = this.currentTransaction().userTransaction;
       const presentTx = userTx.isBlank() ? null : userTx;
-      return (await Notifications.instrumentAsync(
+      return (await this.instrumenter.instrumentAsync(
         "sql.active_record",
         {
           sql,
