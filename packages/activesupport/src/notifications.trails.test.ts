@@ -200,9 +200,9 @@ describe("Notifications (trails)", () => {
     it("raises when start/finish are called out of order", () => {
       Notifications.subscribe("span", () => {});
       const handle = Notifications.buildHandle("span", {});
-      expect(() => handle.finish()).toThrow(/expected state to be "started"/);
+      expect(() => handle.finish()).toThrow(/expected state to be :started/);
       handle.start();
-      expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
+      expect(() => handle.start()).toThrow(/expected state to be :initialized/);
     });
   });
 

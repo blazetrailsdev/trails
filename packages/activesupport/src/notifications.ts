@@ -11,12 +11,15 @@ import { Temporal } from "@blazetrails/date";
 import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import type { CallableListener } from "./notifications/fanout.js";
 
 // The concrete subscriber handle the notifier hands back. Kept internal (not the
 // public `NotificationSubscriber`) so the `Fanout` subscriber's members don't
 // leak into this module's exported API surface.
 type FanoutSubscriber = ReturnType<Fanout["subscribe"]>;
+
+const ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY = Symbol("active_support_notifications_registry");
 
 declare const notificationSubscriberBrand: unique symbol;
 /**
@@ -51,15 +54,6 @@ export type NotificationCallback =
 type FanoutListener = Parameters<Fanout["subscribe"]>[1];
 
 /**
- * Mirrors ActiveSupport::Notifications::Instrumenter — the object Rails reaches
- * via `ActiveSupport::Notifications.instrumenter`.
- */
-export interface NotificationInstrumenter {
-  readonly id: string;
-  buildHandle(name: string, payload?: EventPayload): NotificationHandle;
-}
-
-/**
  * ActiveSupport::Notifications — global instrumentation hub.
  *
  * Unlike Rails, this is a static singleton class rather than a module. It owns
@@ -67,8 +61,28 @@ export interface NotificationInstrumenter {
  * `Notifications.notifier` / `Notifications.instrumenter`.
  */
 export class Notifications {
-  private static readonly _notifier = new Fanout();
-  private static readonly _boundInstrumenter = new Instrumenter(Notifications._notifier);
+  private static _notifier: Fanout = new Fanout();
+
+  /** Mirrors `attr_accessor :notifier` in `class << self` (notifications.rb:198). */
+  static get notifier(): Fanout {
+    return this._notifier;
+  }
+
+  static set notifier(notifier: Fanout) {
+    this._notifier = notifier;
+  }
+
+  /**
+   * Mirrors the private `registry` (notifications.rb:274-276): the
+   * instrumenter-per-notifier map lives in the isolated execution state, so
+   * each task gets its own instrumenter rather than sharing one id.
+   */
+  private static get registry(): Map<Fanout, Instrumenter> {
+    return IsolatedExecutionState.fetch<Map<Fanout, Instrumenter>>(
+      ACTIVE_SUPPORT_NOTIFICATIONS_REGISTRY,
+      () => new Map(),
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Subscription
@@ -93,8 +107,8 @@ export class Notifications {
   ): NotificationSubscriber {
     const sub =
       typeof callback === "function"
-        ? this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event))
-        : this._notifier.subscribe(pattern ?? null, callback);
+        ? this.notifier.subscribe(pattern ?? null, (event: Event) => callback(event))
+        : this.notifier.subscribe(pattern ?? null, callback);
     return sub as unknown as NotificationSubscriber;
   }
 
@@ -128,7 +142,7 @@ export class Notifications {
       pattern = null;
       callback = patternOrCallback;
     }
-    const sub = this._notifier.subscribe(pattern, callback as FanoutListener, true);
+    const sub = this.notifier.subscribe(pattern, callback as FanoutListener, true);
     return sub as unknown as NotificationSubscriber;
   }
 
@@ -168,7 +182,7 @@ export class Notifications {
       block = blockOrOptions as () => T | Promise<T>;
       options = maybeOptions ?? {};
     }
-    const subscriber = this._notifier.subscribe(
+    const subscriber = this.notifier.subscribe(
       pattern,
       callback as FanoutListener,
       options.monotonic ?? false,
@@ -176,7 +190,7 @@ export class Notifications {
     try {
       return await block();
     } finally {
-      this._notifier.unsubscribe(subscriber);
+      this.notifier.unsubscribe(subscriber);
     }
   }
 
@@ -185,8 +199,8 @@ export class Notifications {
     pattern: string | RegExp | null | undefined,
     callback: (event: Event) => void,
   ): NotificationSubscriber {
-    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => {
-      this._notifier.unsubscribe(sub);
+    const sub = this.notifier.subscribe(pattern ?? null, (event: Event) => {
+      this.notifier.unsubscribe(sub);
       callback(event);
     });
     return sub as unknown as NotificationSubscriber;
@@ -194,12 +208,12 @@ export class Notifications {
 
   /** Remove a previously registered subscriber. */
   static unsubscribe(subscriberOrName: NotificationSubscriber | string): void {
-    this._notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
+    this.notifier.unsubscribe(subscriberOrName as unknown as FanoutSubscriber);
   }
 
   /** Remove all subscribers. Useful in tests. */
   static unsubscribeAll(): void {
-    this._notifier.clear();
+    this.notifier.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -220,10 +234,10 @@ export class Notifications {
     block?: (payload: EventPayload) => T,
   ): T extends undefined ? void : T {
     const resolved = payload ?? {};
-    if (!this._notifier.listening(name)) {
+    if (!this.notifier.listening(name)) {
       return (block ? block(resolved) : undefined) as any;
     }
-    return this._boundInstrumenter.instrument(name, resolved, block) as any;
+    return this.instrumenter.instrument(name, resolved, block) as any;
   }
 
   /**
@@ -244,10 +258,10 @@ export class Notifications {
     block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T extends undefined ? void : T> {
     const resolved = payload ?? {};
-    if (!this._notifier.listening(name)) {
+    if (!this.notifier.listening(name)) {
       return (block ? await block(resolved) : undefined) as any;
     }
-    return (await this._boundInstrumenter.instrumentAsync(name, resolved, block)) as any;
+    return (await this.instrumenter.instrumentAsync(name, resolved, block)) as any;
   }
 
   /**
@@ -257,11 +271,11 @@ export class Notifications {
    */
   static publish(name: string, payload?: EventPayload): void {
     const resolved = payload ?? {};
-    const event = new Event(name, Temporal.Now.instant(), resolved, this._boundInstrumenter.id);
+    const event = new Event(name, Temporal.Now.instant(), resolved, this.instrumenter.id);
     // Deliver the passed payload object itself, not Event#initialize's dup.
     event.payload = resolved;
     event.finish();
-    this._notifier.publishEvent(event);
+    this.notifier.publishEvent(event);
   }
 
   /**
@@ -270,7 +284,7 @@ export class Notifications {
    * `notifier.publish_event(event)`.
    */
   static publishEvent(event: Event): void {
-    this._notifier.publishEvent(event);
+    this.notifier.publishEvent(event);
   }
 
   /**
@@ -282,11 +296,17 @@ export class Notifications {
    * `payload.outcome = ...`) are re-synced onto the event before publishing.
    */
   static buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
-    return this._boundInstrumenter.buildHandle(name, payload);
+    return this.instrumenter.buildHandle(name, payload);
   }
 
-  /** Mirrors `ActiveSupport::Notifications.instrumenter`. */
-  static get instrumenter(): NotificationInstrumenter {
-    return this._boundInstrumenter;
+  /** Mirrors `ActiveSupport::Notifications.instrumenter` (notifications.rb:270-272). */
+  static get instrumenter(): Instrumenter {
+    const registry = this.registry;
+    let instrumenter = registry.get(this.notifier);
+    if (!instrumenter) {
+      instrumenter = new Instrumenter(this.notifier);
+      registry.set(this.notifier, instrumenter);
+    }
+    return instrumenter;
   }
 }

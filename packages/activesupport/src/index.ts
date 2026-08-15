@@ -451,11 +451,7 @@ export {
   Wrapper as InstrumenterWrapper,
 } from "./notifications/instrumenter.js";
 export type { EventPayload } from "./notifications/instrumenter.js";
-export type {
-  NotificationSubscriber,
-  NotificationHandle,
-  NotificationInstrumenter,
-} from "./notifications.js";
+export type { NotificationSubscriber, NotificationHandle } from "./notifications.js";
 export {
   Fanout,
   InstrumentationSubscriberError,
@@ -466,6 +462,7 @@ export {
   EventedGroup,
   EventObjectGroup,
   Handle,
+  Matcher,
   AllMessages,
   Evented,
   Timed,
@@ -473,7 +470,6 @@ export {
   EventObject,
   Subscribers,
 } from "./notifications/fanout.js";
-export type { Matcher } from "./notifications/fanout.js";
 
 export { ParameterFilter } from "./parameter-filter.js";
 export {
