@@ -1559,9 +1559,17 @@ export class SchemaStatements {
     return new CreateIndexDefinition(index, algorithm, ifNotExists);
   }
 
-  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    const idxs = await this.indexes(tableName);
-    return idxs.some((idx) => idx.name === indexName);
+  // Rails' `index_name_exists?` is a value-returning predicate: `detect` hands
+  // back the IndexDefinition, not a boolean (schema_statements.rb:1011-1014).
+  // The return type is widened to include `boolean` because the PostgreSQL
+  // override answers with a COUNT(*) comparison (postgresql/schema_statements.rb
+  // :68-79) — Ruby needs no common type across the two bodies, TypeScript does.
+  async indexNameExists(
+    tableName: string,
+    indexName: string,
+  ): Promise<IndexDefinition | boolean | undefined> {
+    indexName = String(indexName);
+    return (await this.indexes(tableName)).find((i) => i.name === indexName);
   }
 
   foreignKeyColumnFor(tableName: string, columnName = "id"): string {

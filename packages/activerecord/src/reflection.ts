@@ -2205,12 +2205,12 @@ export class RuntimeReflection extends AbstractReflection {
     return this._association.klass;
   }
 
-  aliasedTable(): Table {
+  get aliasedTable(): Table {
     return (this.klass as any).arelTable;
   }
 
   get joinPrimaryKey(): string | string[] {
-    return (this._reflection as any).joinPrimaryKey;
+    return this.joinPrimaryKeyFor();
   }
 
   allIncludes(callback: () => any): any {

@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { hexdigest, Notifications } from "@blazetrails/activesupport";
+import { except, hexdigest, Notifications } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -4006,9 +4006,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#first_or_initialize
    */
   async firstOrInitialize(extra?: Record<string, unknown>): Promise<T> {
-    const records = await this.limit(1);
-    if (records.length > 0) return records[0];
-    return new (this._model as any)({ ...this.scopeForCreate(), ...extra }) as T;
+    return (await this.first()) ?? this.new(extra);
   }
 
   /**
@@ -6341,8 +6339,7 @@ export class Relation<T extends Base> {
    *  the canonical key the preloader uses to decide whether two loaders
    *  coalesce (Preloader::Association::LoaderQuery#eql?/#hash). */
   valuesForQueries(): Record<string, unknown> {
-    const { extending: _extending, strictLoading: _strictLoading, ...rest } = this.values();
-    return rest;
+    return except(this.values(), "extending", "skipQueryCache", "strictLoading");
   }
 
   /** True when this relation's WHERE equals the model's unscoped baseline —
@@ -6560,14 +6557,14 @@ export class Relation<T extends Base> {
   async cacheKey(timestampColumn = "updated_at"): Promise<string> {
     this._cacheKeys ??= new Map();
     if (!this._cacheKeys.has(timestampColumn)) {
-      this._cacheKeys.set(timestampColumn, this.computeCacheKey(timestampColumn));
+      this._cacheKeys.set(timestampColumn, this.model.collectionCacheKey(this, timestampColumn));
     }
     return this._cacheKeys.get(timestampColumn)!;
   }
 
   /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
-    const key = `${this.model.tableName}/query-${hexdigest(this.toSql())}`;
+    const key = `${this.model.modelName.cacheKey}/query-${hexdigest(this.toSql())}`;
     if (this.model.collectionCacheVersioning) {
       return key;
     }

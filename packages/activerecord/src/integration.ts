@@ -232,10 +232,7 @@ export function collectionCacheKey(
   timestampColumn = "updated_at",
 ): Promise<string> {
   const rel = collection ?? this.all();
-  if (typeof rel.cacheKey === "function") {
-    return Promise.resolve(rel.cacheKey(timestampColumn));
-  }
-  return Promise.resolve("");
+  return Promise.resolve(rel.computeCacheKey(timestampColumn));
 }
 
 // Matches DB timestamp strings in the form "YYYY-MM-DD HH:MM:SS" or
