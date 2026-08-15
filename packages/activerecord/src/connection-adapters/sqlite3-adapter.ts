@@ -1682,11 +1682,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * builds a Hash first (`each_with_object({})`), so a repeated `tableName`
    * collapses last-write-wins at its first-insertion position.
    *
-   * Rails uses `exec_query(query, "SCHEMA")` (sqlite3_adapter.rb:301): the
-   * wrapped path — so this dirties — but it still carries the "SCHEMA" name
-   * for LogSubscriber/ExplainSubscriber filtering. Rails' `arguments` local is
-   * `args` here — `arguments` is not a legal binding name in a strict-mode
-   * module.
+   * Rails' `arguments` local is `args` here — `arguments` is not a legal
+   * binding name in a strict-mode module.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
    */
