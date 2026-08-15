@@ -16,7 +16,7 @@
       "const:Time",
       "str:now"
     ],
-    "reason": "TS language shortcoming: time_helpers.rb:178 stubs the singleton method `Time.now` itself; JS has no per-object method table to alias a built-in constructor's static through, so the port stubs the module-level `clock` seam (time-helpers.ts:200) instead. Same call, same method name, receiver forced to differ."
+    "reason": "trails routes `Time.now`/`Date.today`/`DateTime.now` through a single `clock` object, so the stubbed receiver is that value rather than the `Time` constant, and the Ruby block is the trailing function parameter."
   },
   {
     "package": "activesupport",
@@ -28,6 +28,6 @@
       "const:Time",
       "str:now"
     ],
-    "reason": "TS language shortcoming: the `stubbing(Time, :now)` probe (time_helpers.rb:177) reads back the same `clock` seam the stub is installed on — see the `stub_object` row above."
+    "reason": "trails routes `Time.now`/`Date.today`/`DateTime.now` through a single `clock` object, so the stubbed receiver is that value rather than the `Time` constant."
   }
 ]

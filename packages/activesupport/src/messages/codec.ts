@@ -42,12 +42,18 @@ export class Codec extends Metadata {
     this.forceLegacyMetadataSerializer = options.forceLegacyMetadataSerializer ?? false;
   }
 
-  protected override encode(data: string | Buffer, urlSafe: boolean = this.urlSafe): string {
+  protected override encode(
+    data: string | Buffer,
+    { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
+  ): string {
     const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
     return urlSafe ? buf.toString("base64url") : buf.toString("base64");
   }
 
-  protected override decode(encoded: string, urlSafe: boolean = this.urlSafe): Buffer {
+  protected override decode(
+    encoded: string,
+    { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
+  ): Buffer {
     try {
       let str = encoded;
       if (urlSafe && !str.endsWith("=") && str.length % 4 !== 0) {

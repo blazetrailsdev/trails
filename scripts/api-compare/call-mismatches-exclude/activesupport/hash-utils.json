@@ -13,7 +13,7 @@
     "call": "deep_transform_keys",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   },
   {
     "package": "activesupport",
@@ -22,7 +22,7 @@
     "call": "deep_transform_keys!",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   },
   {
     "package": "activesupport",
@@ -31,7 +31,7 @@
     "call": "deep_transform_keys!",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Ruby passes the key transform as a BLOCK, which contributes no positional argument; TypeScript has no block syntax, so the port passes it as a trailing function parameter (and the receiver as the leading one, the settled trails core_ext convention). Same call, same order, one extra positional."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   },
   {
     "package": "activesupport",
@@ -63,6 +63,6 @@
     "rubyArgs": [
       "ref:otherHash"
     ],
-    "reason": "Ruby's `reverse_merge(other_hash)` is called on the receiver; trails' core_ext functions take the receiver as the leading positional, so the same call carries one extra argument."
+    "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
   }
 ]

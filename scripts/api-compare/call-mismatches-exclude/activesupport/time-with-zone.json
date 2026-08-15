@@ -71,19 +71,7 @@
     "rubyArgs": [
       "ref:formatter"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-with-zone.ts",
-    "rubyName": "to_s",
-    "call": "formatted_offset",
-    "kind": "args",
-    "rubyArgs": [
-      "bool:false",
-      "str:UTC"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "trails has no `Time::DATE_FORMATS` registry, so `to_fs` switches on the format name and passes that entry's format string literally where Rails passes the looked-up `formatter`. Porting the registry is tracked as its own story (0023-surfaced-deviations/port-time-date-formats-registry)."
   },
   {
     "package": "activesupport",
