@@ -7,12 +7,10 @@ import type { Base } from "./base.js";
 
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
-import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { Result } from "./result.js";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
-type AdapterDialect = AdapterName;
 
 const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
 const UPDATE_TIMESTAMP_COLUMNS = ["updated_at", "updated_on"] as const;
@@ -615,26 +613,22 @@ export interface InsertBuilder {
 export class Builder implements InsertBuilder {
   readonly model: ModelClass;
   private _insertAll: InsertAll;
-  private _dialect: AdapterDialect;
+  private _connection: ModelClass["connection"];
 
-  // Rails: `@insert_all, @model, @connection = insert_all, insert_all.model,
-  // insert_all.connection` (insert_all.rb:229-231). `_dialect` stands in for
-  // `@connection`, which the SQL fragments below only ever consult for its
-  // adapter name.
   constructor(insertAll: InsertAll) {
     this._insertAll = insertAll;
     this.model = insertAll.model;
-    this._dialect = insertAll.connection.adapterName as AdapterDialect;
+    this._connection = insertAll.connection;
   }
 
   /** Mirrors Rails `quote_column` → `connection.quote_column_name`. @internal */
   private quoteColumn(name: string): string {
-    return this._insertAll.connection.quoteColumnName(name);
+    return this._connection.quoteColumnName(name);
   }
 
   /** Mirrors Rails `connection.quote_table_name`. @internal */
   private quoteTable(name: string): string {
-    return this._insertAll.connection.quoteTableName(name);
+    return this._connection.quoteTableName(name);
   }
 
   returning(): string | undefined {
@@ -669,7 +663,7 @@ export class Builder implements InsertBuilder {
       if (this._insertAll.inserts.length > 1) {
         throw new Error("Bulk insert with no explicit columns is not supported");
       }
-      if (this._dialect === "mysql2") {
+      if (this._connection.adapterName === "mysql2") {
         return `INTO ${tableName} () VALUES ()`;
       }
       return `INTO ${tableName} DEFAULT VALUES`;
@@ -755,7 +749,7 @@ export class Builder implements InsertBuilder {
           `${columnName}=(CASE WHEN (${this.updatableColumns()
             .map(block)
             .join(" AND ")}) THEN ${this.quotedTableName()}.${columnName} ELSE ${String(
-            this._insertAll.connection.highPrecisionCurrentTimestamp(),
+            this._connection.highPrecisionCurrentTimestamp(),
           )} END),`,
       )
       .join("");
@@ -776,11 +770,11 @@ export class Builder implements InsertBuilder {
   }
 
   private _visitor(): Visitors.ToSql {
-    const v = this._insertAll.connection.visitor;
+    const v = this._connection.visitor;
     if (v) return v;
-    const q = this._insertAll.connection as unknown as Visitors.ArelConnection;
-    if (this._dialect === "mysql2") return new Visitors.MySQL(q);
-    if (this._dialect === "postgres") return new Visitors.PostgreSQL(q);
+    const q = this._connection as unknown as Visitors.ArelConnection;
+    if (this._connection.adapterName === "mysql2") return new Visitors.MySQL(q);
+    if (this._connection.adapterName === "postgres") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
   }
 

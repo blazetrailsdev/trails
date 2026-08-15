@@ -6489,7 +6489,6 @@ export class Relation<T extends Base> {
    */
   async findByTokenFor(purpose: string, token: string): Promise<T | null> {
     const primaryKey = this.model.primaryKey as string | string[] | null;
-    // Rails raises with the RELATION, not its model (token_for.rb:42).
     if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
     const record = await this.model.tokenDefinitions.fetch(purpose).resolveToken(token, (id) => {
       // Rails passes `model.primary_key => [id]`; with a composite key that
