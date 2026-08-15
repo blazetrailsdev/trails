@@ -1101,7 +1101,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return index.using == null || index.using.toUpperCase() === "BTREE";
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_insert_sql.
+  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#build_insert_sql
+  // (abstract_mysql_adapter.rb:638-682). Async where Rails is sync: the arm is
+  // selected by `supports_insert_raw_alias_syntax?` (rb:892-894), which reads
+  // `database_version` — a server round-trip trails can only await.
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     // Can use any column as it will be assigned to itself.
     const noOpColumn = insert.firstColumn();
