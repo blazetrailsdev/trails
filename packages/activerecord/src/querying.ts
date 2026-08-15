@@ -39,7 +39,7 @@ export async function findBySql<T extends typeof Base>(
   // `permanent_connection_checkout = :deprecated | :disallowed`. Widening the
   // wrap to cover the load keeps the release behavior faithful; it issues no
   // extra SQL, so the query semantics are unchanged.
-  return (this as unknown as typeof Base).withConnection(async () => {
+  return this.withConnection(async () => {
     const result = await _queryBySql.call(this, sql, binds, {
       allowRetry: resolvedOpts.allowRetry,
       preparable: resolvedOpts.preparable,
@@ -95,8 +95,7 @@ export async function countBySql(
   const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   // Rails: connection.select_value(sanitize_sql(sql)).to_i
   // Our adapters return rows; extract the first scalar value.
-  return this.withConnection(async () => {
-    const adapter = threadedConnectionFor(this) ?? this.connection;
+  return this.withConnection(async (adapter) => {
     const rows = await adapter.execute(sanitized);
     if (!rows[0]) return 0;
     const firstValue = Object.values(rows[0])[0];

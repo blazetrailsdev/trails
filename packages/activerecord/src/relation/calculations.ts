@@ -1177,7 +1177,7 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 }
 
 /** @internal */
-export function selectForCount(rel: CalculationRelation): Promise<string> | string {
+export async function selectForCount(rel: CalculationRelation): Promise<string> {
   // "*" is the JS analogue of Rails' `:all` symbol (calculations.rb:646-654).
   if (rel.selectValues.length === 0) return "*";
   return rel.withConnection((conn) =>

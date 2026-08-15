@@ -191,6 +191,12 @@ describe("ConnectionHandlingTest", () => {
 
     await Post.count();
     expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.all().ids();
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.all().pluck("title");
+    expect(Post.connectionPool().activeConnection).toBeNull();
   });
 
   it("connected_to switches role for block", async () => {
