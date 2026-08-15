@@ -93,13 +93,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "except",
-    "call": "relation_with",
-    "reason": "Verified per-site (RFC 0106): `relation_with values.except(*skips)` (spawn_methods.rb:59-61) writes a whole `@values` hash back onto a spawned clone. trails keeps query state in typed fields, not a `@values` hash — `values()` is a read-only snapshot with no writable counterpart — so the clone is reset key by key via `_resetExceptValue`, which is the same per-key erasure."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "exec_explain",
     "call": "render_bind",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -166,20 +159,6 @@
     "rubyName": "instantiate_records",
     "call": "instantiate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "only",
-    "call": "relation_with",
-    "reason": "Verified per-site (RFC 0106): `relation_with values.slice(*onlies)` (spawn_methods.rb:66-68) writes a whole `@values` hash back onto a spawned clone; trails' relation state lives in typed fields with no writable `@values`, so the clone resets the complement of `onlies` via `_resetExceptValue`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "only",
-    "call": "slice",
-    "reason": "Verified per-site (RFC 0106): `values.slice(*onlies)` (spawn_methods.rb:67) selects hash keys; with no `@values` hash to slice, trails iterates `EXCEPT_ONLY_KEYS` and resets every key not in `onlies` — the complement of the same selection."
   },
   {
     "package": "activerecord",

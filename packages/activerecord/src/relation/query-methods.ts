@@ -230,6 +230,7 @@ interface QueryMethodsHost {
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
   _skipQueryCache: boolean | undefined;
+  _reverseOrderValue: boolean | undefined;
   _model: typeof import("../base.js").Base;
   model: QueryMethodsHost["_model"];
   /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
@@ -722,11 +723,15 @@ export type ExceptSkip = ExceptKey | (string & {});
  * Reset a single value-key to its default, with no merge-replay side effect.
  *
  * Shared by `unscope!` (which additionally records the key in
- * `_unscopeValues` so a later merge re-applies the reset) and
- * `SpawnMethods#except` (which removes the value only, mirroring Rails'
- * `relation_with values.except(*skips)` — no `unscope_values` directive).
+ * `_unscopeValues` so a later merge re-applies the reset) and by `setValues`
+ * (the write half of the `@values` hash, which `relation_with` replaces
+ * wholesale): a `Relation::VALUE_METHODS` key that is absent from the hash
+ * reads back as its default, which here means resetting the field(s) that back
+ * it. `unscope!` validates against `VALID_UNSCOPING_VALUES` first, so the arms
+ * below that key has no `unscope` equivalent are reachable only from
+ * `setValues`.
  */
-export function resetValueForScope(host: QueryMethodsHost, scope: UnscopeType): void {
+export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): void {
   switch (scope) {
     case "where":
       host._whereClause = WhereClause.empty();
@@ -791,6 +796,150 @@ export function resetValueForScope(host: QueryMethodsHost, scope: UnscopeType): 
       break;
     case "with":
       host._ctes = [];
+      break;
+    case "distinct":
+      host._isDistinct = false;
+      break;
+    case "strictLoading":
+      // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
+      // the key reads back as unset, distinct from an explicit `false`.
+      host._isStrictLoading = undefined;
+      break;
+    case "references":
+      // `:references` is a single Rails value key; trails splits its local
+      // representation into the values list and the manual-vs-derived marker,
+      // so both must be cleared together.
+      host._referencesValues = [];
+      host._manualReferences = [];
+      break;
+    case "extending":
+      host._extending = [];
+      break;
+    case "unscope":
+      host._unscopeValues = [];
+      break;
+    case "reordering":
+      host._reordering = undefined;
+      break;
+    case "skipQueryCache":
+      host._skipQueryCache = undefined;
+      break;
+    case "reverseOrder":
+      // `:reverse_order` is in VALUE_METHODS, so `values.except`/`values.slice`
+      // touch it; but trails (like the pinned Rails' `reverse_order!`) flips
+      // order eagerly and leaves `_reverseOrderValue` vestigial-nil, so this
+      // reset is a faithful no-op — the flipped order lives in `_orderClauses`
+      // (the `order` key).
+      host._reverseOrderValue = undefined;
+      break;
+  }
+}
+
+/**
+ * The write half of the `@values` hash: assign each `Relation::VALUE_METHODS`
+ * key present in `values`, and reset the ones that are absent.
+ *
+ * Ruby's `relation_with` replaces `@values` wholesale
+ * (`spawn_methods.rb:71-74`), so a key `values.except`/`values.slice` deleted
+ * simply reads back as its default. trails keeps the values in typed fields
+ * rather than a hash, so the wholesale replacement is spelled as a per-key
+ * assign-or-reset over the same key set — the TypeScript counterpart of the
+ * `VALUE_METHODS.each`-generated writers (`query_methods.rb:162-172`).
+ *
+ * @internal
+ */
+export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
+  for (const key of EXCEPT_ONLY_KEYS) {
+    if (!(key in values)) {
+      resetValueForScope(host, key);
+      continue;
+    }
+    setValueForScope(host, key, values[key]);
+  }
+}
+
+function setValueForScope(host: QueryMethodsHost, scope: ExceptKey, value: any): void {
+  switch (scope) {
+    case "where":
+      host._whereClause = value;
+      break;
+    case "having":
+      host._havingClause = value;
+      break;
+    case "from":
+      host._fromClause = value;
+      break;
+    case "order":
+      host._orderClauses = value;
+      break;
+    case "limit":
+      host._limitValue = value;
+      break;
+    case "offset":
+      host._offsetValue = value;
+      break;
+    case "group":
+      host._groupColumns = value;
+      break;
+    case "select":
+      host._selectColumns = value;
+      break;
+    case "lock":
+      host._lockValue = value;
+      break;
+    case "readonly":
+      host._isReadonly = value;
+      break;
+    case "joins":
+      host._joinClauses = value;
+      break;
+    case "leftOuterJoins":
+      host._leftOuterJoinsValues = value;
+      break;
+    case "includes":
+      host._includesAssociations = value;
+      break;
+    case "preload":
+      host._preloadAssociations = value;
+      break;
+    case "eagerLoad":
+      host._eagerLoadAssociations = value;
+      break;
+    case "createWith":
+      host._createWithAttrs = value;
+      break;
+    case "optimizerHints":
+      host._optimizerHints = value;
+      break;
+    case "annotate":
+      host._annotations = value;
+      break;
+    case "with":
+      host._ctes = value;
+      break;
+    case "distinct":
+      host._isDistinct = value;
+      break;
+    case "strictLoading":
+      host._isStrictLoading = value;
+      break;
+    case "references":
+      host._referencesValues = value;
+      break;
+    case "extending":
+      host._extending = value;
+      break;
+    case "unscope":
+      host._unscopeValues = value;
+      break;
+    case "reordering":
+      host._reordering = value;
+      break;
+    case "skipQueryCache":
+      host._skipQueryCache = value;
+      break;
+    case "reverseOrder":
+      host._reverseOrderValue = value;
       break;
   }
 }

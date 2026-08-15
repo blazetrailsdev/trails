@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, Notifications } from "@blazetrails/activesupport";
+import { except, hexdigest, Notifications, slice } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -53,7 +53,6 @@ export { Range };
 import {
   WhereChain,
   QueryMethodBangs,
-  EXCEPT_ONLY_KEYS,
   argumentError,
   assertModifiableBang as _assertModifiableBang,
   checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
@@ -1412,11 +1411,7 @@ export class Relation<T extends Base> {
    * (the complement of `values.slice`).
    */
   only(...onlies: Array<ExceptSkip>): Relation<T> {
-    const rel = this._clone();
-    for (const key of EXCEPT_ONLY_KEYS) {
-      if (!onlies.includes(key)) this._resetExceptValue(rel, key);
-    }
-    return rel;
+    return this.relationWith(slice(this.values(), ...onlies));
   }
 
   /**
@@ -1448,66 +1443,7 @@ export class Relation<T extends Base> {
    * other relation.
    */
   except(...skips: Array<ExceptSkip>): Relation<T> {
-    const rel = this._clone();
-    for (const skip of skips) {
-      this._resetExceptValue(rel, skip);
-    }
-    return rel;
-  }
-
-  /**
-   * Reset a single `Relation::VALUE_METHODS` value key to its default on `rel`,
-   * with no `unscope_values` merge-replay side effect. Shared by `except`
-   * (reset the named keys) and `only` (reset the complement).
-   *
-   * @internal
-   */
-  private _resetExceptValue(rel: Relation<T>, key: ExceptSkip): void {
-    switch (key) {
-      // Value keys that have no `unscope` equivalent (they are not in
-      // VALID_UNSCOPING_VALUES) but are part of Rails' `Relation::VALUE_METHODS`.
-      case "distinct":
-        rel._isDistinct = false;
-        break;
-      case "strictLoading":
-        // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
-        // the key reads back as unset, distinct from an explicit `false`.
-        rel._isStrictLoading = undefined;
-        break;
-      case "references":
-        // `:references` is a single Rails value key; trails splits its local
-        // representation into the values list and the manual-vs-derived
-        // marker, so both must be cleared together.
-        rel._referencesValues = [];
-        rel._manualReferences = [];
-        break;
-      case "extending":
-        rel._extending = [];
-        break;
-      case "unscope":
-        rel._unscopeValues = [];
-        break;
-      case "reordering":
-        // `values.except(:reordering)` deletes the key → unset (`nil`).
-        rel._reordering = undefined;
-        break;
-      case "skipQueryCache":
-        rel._skipQueryCache = undefined;
-        break;
-      case "reverseOrder":
-        // `:reverse_order` is in VALUE_METHODS, so `values.except`/`values.slice`
-        // touch it; but trails (like the pinned Rails' `reverse_order!`) flips
-        // order eagerly and leaves `_reverseOrderValue` vestigial-nil, so this
-        // reset is a faithful no-op — the flipped order lives in `_orderClauses`
-        // (the `order` key).
-        rel._reverseOrderValue = undefined;
-        break;
-      default:
-        // Rails' `values` slice/except silently ignores unknown keys;
-        // resetValueForScope's switch no-ops on any non-UnscopeType string.
-        _qm.resetValueForScope(rel as any, key as UnscopeType);
-        break;
-    }
+    return this.relationWith(except(this.values(), ...skips));
   }
 
   /**
@@ -6355,6 +6291,7 @@ export class Relation<T extends Base> {
       group: [...this._groupColumns],
       order: [...this._orderClauses],
       joins: [...this._joinClauses],
+      leftOuterJoins: [...this._leftOuterJoinsValues],
       where: this._whereClause.clone(),
       having: this._havingClause.clone(),
       limit: this._limitValue,
@@ -6364,7 +6301,10 @@ export class Relation<T extends Base> {
       distinct: this._isDistinct,
       strictLoading: this._isStrictLoading,
       from: this._fromClause,
-      annotations: [...this._annotations],
+      reordering: this._reordering,
+      reverseOrder: this._reverseOrderValue,
+      skipQueryCache: this._skipQueryCache,
+      annotate: [...this._annotations],
       optimizerHints: [...this._optimizerHints],
       references: [...this._referencesValues],
       extending: [...this._extending],
@@ -7362,7 +7302,7 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  private relationWith(values: Partial<Relation<T>>): Relation<T> {
+  private relationWith(values: Record<string, unknown>): Relation<T> {
     return _sm.relationWith(this as any, values as any);
   }
 }
