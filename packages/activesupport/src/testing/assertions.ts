@@ -542,6 +542,28 @@ export function assertPredicate<T>(
 }
 
 /**
+ * @noRailsEquivalent PERMANENT — Minitest's `assert_empty` (minitest/assertions.rb),
+ * which sends `empty?` to the collection. Rails inherits it from Minitest, so
+ * there is no Ruby counterpart in a mapped file. JS has no `empty?` protocol, so
+ * the check is `length`/`size`, whichever the collection carries.
+ */
+export function assertEmpty(actual: unknown, message?: string): void {
+  assert(collectionSize(actual) === 0, message ?? `Expected ${inspect(actual)} to be empty`);
+}
+
+/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_empty` / `refute_empty`. */
+export function assertNotEmpty(actual: unknown, message?: string): void {
+  assert(collectionSize(actual) !== 0, message ?? `Expected ${inspect(actual)} to not be empty`);
+}
+
+function collectionSize(actual: unknown): number {
+  const collection = actual as { length?: number; size?: number };
+  if (typeof collection?.length === "number") return collection.length;
+  if (typeof collection?.size === "number") return collection.size;
+  return Object.keys(actual as object).length;
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Minitest's `assert_same`
  * (minitest/assertions.rb), object identity rather than value equality.
  */
