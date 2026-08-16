@@ -6,7 +6,7 @@ import {
   BinaryData,
   TimeType,
 } from "@blazetrails/activemodel";
-import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
+import { singularize, runLoadHooks, include, KeyError } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
@@ -2168,9 +2168,11 @@ export class PostgreSQLAdapter
 
   // Mirrors: DatabaseStatements#begin_isolated_db_transaction (database_statements.rb:68)
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    const levels = transactionIsolationLevels();
-    const level = levels[isolation];
-    if (!level) throw new Error(`Unknown isolation level: ${isolation}`);
+    // Rails: `transaction_isolation_levels.fetch(isolation)`
+    // (postgresql/database_statements.rb:69) — an unknown level raises Ruby's
+    // `KeyError: key not found: :bogus`, not a bespoke message.
+    const level = transactionIsolationLevels()[isolation];
+    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
     this._client = await this._acquireFreshClient();
     try {
       await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", {

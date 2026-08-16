@@ -1009,6 +1009,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.commit();
       }
     });
+
+    // Rails: `transaction_isolation_levels.fetch(isolation)`
+    // (postgresql/database_statements.rb:69) raises Ruby's KeyError.
+    it("beginIsolatedDbTransaction raises KeyError for an unknown isolation level", async () => {
+      await expect(adapter.beginIsolatedDbTransaction("bogus")).rejects.toThrow(
+        "key not found: :bogus",
+      );
+    });
   });
 
   describe("PostgreSQLAdapter top-level methods", () => {

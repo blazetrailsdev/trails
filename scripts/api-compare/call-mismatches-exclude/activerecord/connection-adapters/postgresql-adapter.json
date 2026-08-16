@@ -4,7 +4,7 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "begin_isolated_db_transaction",
     "call": "fetch",
-    "reason": "trails' transactionIsolationLevels() returns a plain object, not a Ruby Hash, so the level lookup is `levels[isolation]` with an explicit throw where Rails relies on Hash#fetch's KeyError."
+    "reason": "Verified per-site (RFC 0106): Ruby core `Hash#fetch` (postgresql/database_statements.rb:69) on the plain object `transactionIsolationLevels()` returns; the port now reproduces `fetch`'s semantics exactly — an absent level raises `KeyError: key not found: :bogus` — but the JS spelling (`levels[isolation]` + the KeyError throw) emits no callee named `fetch`, so no TS call can credit the Ruby one."
   },
   {
     "package": "activerecord",
