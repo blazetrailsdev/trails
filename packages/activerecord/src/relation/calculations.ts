@@ -82,28 +82,6 @@ interface AliasingConnection {
   tableAliasLength(): number;
 }
 
-/**
- * Qualify a GROUP BY column string as an Arel attribute node when it is a
- * plain SQL identifier (letters, digits, underscores), mirroring Rails'
- * `arel_columns` / `build_group` behaviour. Positional args ("1"), cast
- * expressions ("created_at::date"), and SQL expressions pass through as
- * SqlLiteral.
- *
- * @internal exported so Relation can share the implementation.
- */
-export function groupColumnToArel(col: string | Nodes.Node, table: Table): Nodes.Node {
-  if (col instanceof Nodes.Node) return col;
-  const trimmed = col.trim();
-  // Plain identifier → qualify via model table (e.g. "created_at" → "orders"."created_at").
-  if (/^[A-Za-z_]\w*$/.test(trimmed)) return table.get(trimmed);
-  // Simple table.column → create a cross-table Attribute (e.g. "authors.name" → "authors"."name").
-  // Mirrors Rails' arel_columns which calls table[column] on the referenced table.
-  const dotMatch = trimmed.match(/^([A-Za-z_]\w*)\.([A-Za-z_]\w*)$/);
-  if (dotMatch) return new Table(dotMatch[1]).get(dotMatch[2]);
-  // SQL expressions, casts, positional args, etc. pass through as raw SQL.
-  return new Nodes.SqlLiteral(trimmed);
-}
-
 interface CalculationConnection {
   adapterName: AdapterName;
   visitor?: { compile(node: any): string; compileWithBinds?(node: any): [string, unknown[]] };

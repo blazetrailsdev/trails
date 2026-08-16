@@ -78,11 +78,7 @@ import { Result } from "./result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import {
-  Calculations,
-  type CalculationMethods,
-  groupColumnToArel,
-} from "./relation/calculations.js";
+import { Calculations, type CalculationMethods } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
