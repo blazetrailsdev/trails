@@ -18,7 +18,12 @@ import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
-import { arelColumn, arelColumns, eachJoinDependencies } from "./query-methods.js";
+import {
+  arelColumn,
+  arelColumns,
+  buildJoinDependencies,
+  eachJoinDependencies,
+} from "./query-methods.js";
 
 /**
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
@@ -1102,13 +1107,16 @@ export function typeCastPluckValues(
     }
     return result.castValues(overrides);
   }
+  let joinDependencies: JoinDependency[] | undefined;
   const castTypes = result.columns.map((name, i) => {
     // Rails' `model.attribute_types.fetch(name) { ... }` (calculations.rb:611):
-    // the block runs only when the model owns no such attribute.
+    // the block runs only when the model owns no such attribute, and it builds
+    // the join dependencies at most once for the whole column list.
     const known = pluckCastTypeForKnownColumn(rel.model, name);
     if (known) return known;
+    joinDependencies ??= buildJoinDependencies.call(rel as any);
     return (
-      (lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null) ??
+      (lookupCastTypeFromJoinDependencies(rel, name, joinDependencies) as ColumnType | null) ??
       // Driver OID type (e.g. PostgreSQL) or identity fallback.
       columnType(result, name, i, {})
     );
