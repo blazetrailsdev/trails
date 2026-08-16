@@ -873,8 +873,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Rails: AssociationRelation#exec_queries runs set_strict_loading per
     // record, then Relation#exec_queries applies strict_loading_value
     // (including false) to all records afterward (unless nil).
-    const sv = (this as any).strictLoadingValue as boolean | undefined;
-    if (sv !== undefined) {
+    const sv = (this as any).strictLoadingValue as boolean | null;
+    if (sv != null) {
       for (const r of results) (r as any)._strictLoading = sv;
     }
     return results;

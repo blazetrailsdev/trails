@@ -14,6 +14,7 @@ import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
+import { WhereClause } from "./where-clause.js";
 
 fixtures([]);
 /** The split join-storage and group fields the reader semantics build on. */
@@ -109,6 +110,22 @@ describe("Relation value accessor Rails semantics", () => {
   it("select_values returns the shared frozen empty array when unset", () => {
     expect(relation().selectValues).toBe(relation().selectValues);
     expect(relation().selectValues).toEqual([]);
+  });
+
+  it("an unset clause reader hands back a fresh clause, so only the writer persists", () => {
+    // `where_clause` defaults to `Relation::WhereClause.empty` — a NEW instance
+    // per call while the `:where` key is absent, unlike the array readers'
+    // shared FROZEN_EMPTY_ARRAY. Callers that append must go through the writer
+    // (Rails' `scope.where_clause += item.where_clause`,
+    // association_scope.rb:153); mutating the value a reader returned is lost.
+    const rel = relation();
+    expect(rel.whereClause).not.toBe(rel.whereClause);
+
+    rel.whereClause.predicates.push(new Nodes.SqlLiteral("1=0"));
+    expect(rel.whereClause.predicates).toEqual([]);
+
+    rel.whereClause = rel.whereClause.plus(new WhereClause([new Nodes.SqlLiteral("1=0")]));
+    expect(rel.whereClause.predicates).toHaveLength(1);
   });
 
   it("values() covers exactly the Relation::VALUE_METHODS key set", () => {

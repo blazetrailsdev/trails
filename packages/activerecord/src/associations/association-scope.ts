@@ -7,6 +7,7 @@ import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js"
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { JoinDependency } from "./join-dependency.js";
+import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
 
 /**
@@ -924,22 +925,16 @@ export class AssociationScope {
     const evalOrders = (evaluated as { orderValues?: unknown[] }).orderValues ?? [];
     const evalRawOrders = (evaluated as { _rawOrderClauses?: string[] })._rawOrderClauses ?? [];
     const merged = scope as {
-      whereClause?: { predicates?: unknown[] };
+      whereClause: WhereClause;
       orderValues?: unknown[];
       _rawOrderClauses?: string[];
     };
-    // Mutate the existing whereClause's predicates array in place —
-    // appending all entry predicates in one shot — instead of looping
-    // with `.where()` which would clone the relation per-predicate.
-    // Safe because `scope` here is owned by this addConstraints call
-    // (built fresh from klass.unscoped + per-step .where clones; not
-    // shared externally).
+    // Rails: `scope.where_clause += item.where_clause` (association_scope.rb:153).
+    // The assignment matters: the preceding `unscope!` deletes the `:where` key,
+    // and an unset clause reader returns a fresh `WhereClause.empty()` per call,
+    // so appending to the read value would never reach `@values`.
     if (evalPredicates.length > 0) {
-      const existingPredicates = merged.whereClause?.predicates ?? [];
-      existingPredicates.push(...evalPredicates);
-      if (merged.whereClause) {
-        merged.whereClause.predicates = existingPredicates;
-      }
+      merged.whereClause = merged.whereClause.plus(new WhereClause(evalPredicates as Nodes.Node[]));
     }
     // Rails: `scope.order_values = item.order_values | scope.order_values`
     // (association_scope.rb:153). Chain-entry-first + structural dedup.

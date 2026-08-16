@@ -8,6 +8,7 @@ import {
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { disableJoinsAssociationRelationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
+import type { WhereClause } from "../relation/where-clause.js";
 import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
@@ -341,11 +342,14 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         keyCols.length === 1
           ? new Ctor(klass, keyCols[0], joinIds as unknown[])
           : new Ctor(klass, keyCols, joinIds as unknown[][]);
-      const sourceWhere = (scope as { whereClause?: { predicates?: unknown[] } }).whereClause;
-      const splitWhere = (split as unknown as { whereClause?: { predicates: unknown[] } })
-        .whereClause;
-      if (sourceWhere?.predicates && splitWhere) {
-        splitWhere.predicates.push(...sourceWhere.predicates);
+      // Rails' `where_clause +=` shape (association_scope.rb:153): assign through
+      // the writer rather than appending to the read value — an unset `:where`
+      // key hands back a fresh `WhereClause.empty()` on every getter call, so an
+      // in-place push would never reach `split`'s own `@values`.
+      const sourceWhere = (scope as { whereClause?: WhereClause }).whereClause;
+      if (sourceWhere && sourceWhere.predicates.length > 0) {
+        const target = split as unknown as { whereClause: WhereClause };
+        target.whereClause = target.whereClause.plus(sourceWhere);
       }
       return split;
     }
