@@ -24,7 +24,6 @@ export function _setAssociationRelationCtor(
 }
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
-  findNth as baseFindNth,
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
   performLast as basePerformLast,
@@ -2304,28 +2303,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return loaded.some((r) => this._identityFor(r) === targetId);
     }
     return loaded.includes(record);
-  }
-
-  /**
-   * Return the first associated record.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#first
-   */
-  override first(): Promise<T | null>;
-  override first(n: number): Promise<T[]>;
-  override async first(n?: number): Promise<T | T[] | null> {
-    if (n !== undefined) assertValidLimit(n);
-    // Rails' CollectionProxy has no `first` override at all: `Relation#first`
-    // runs with `self` = the proxy and reaches the target through the overridden
-    // `find_nth_with_limit` (collection_proxy.rb:1140-1143), which is where the
-    // `load_target if find_from_target?` lives. We keep a body only for the
-    // limit validation and to skip `Relation#first`'s `_isEmptyRelation`
-    // short-circuit, which has no Rails counterpart and would swallow a loaded
-    // target sitting on a new-owner `1=0` seed. Everything else is
-    // `performFirst` verbatim: `first(n)` → `find_nth_with_limit(0, n)`,
-    // no-arg → `find_nth(0)` and its `@offsets` memo (finder_methods.rb:173-179).
-    if (n !== undefined) return this.findNthWithLimit(0, n);
-    return baseFindNth.call(this as any, 0);
   }
 
   /**
