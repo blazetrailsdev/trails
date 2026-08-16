@@ -623,6 +623,20 @@ describe("DatabaseStatements", () => {
       // conversion at all (`Integer(nil)`).
       expect(() => sanitizeLimit("abc")).toThrow(ArgumentError);
       expect(() => sanitizeLimit(null)).toThrow(TypeError);
+      // `Integer(nil)` / `Integer([1])` / `Integer(true)` name the value's class
+      // (nil/true/false render as themselves); `Integer(Float::NAN)` and
+      // `Integer(Float::INFINITY)` raise FloatDomainError, not TypeError.
+      expect(() => sanitizeLimit(null)).toThrow("can't convert nil into Integer");
+      expect(() => sanitizeLimit([1])).toThrow("can't convert Array into Integer");
+      expect(() => sanitizeLimit(true)).toThrow("can't convert true into Integer");
+      expect(() => sanitizeLimit(NaN)).toThrow(
+        expect.objectContaining({ name: "FloatDomainError", message: "NaN" }),
+      );
+      expect(() => sanitizeLimit(Infinity)).toThrow(
+        expect.objectContaining({ name: "FloatDomainError", message: "Infinity" }),
+      );
+      expect(sanitizeLimit(3.9)).toBe(3);
+      expect(sanitizeLimit(-3.9)).toBe(-3);
     });
 
     it("with yaml fallback passes scalar through", () => {

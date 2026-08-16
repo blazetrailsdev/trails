@@ -1328,10 +1328,35 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
   if (typeof limit === "string") {
     throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(limit)}`);
   }
-  if (typeof limit === "number" && Number.isFinite(limit)) {
+  if (typeof limit === "number") {
+    if (!Number.isFinite(limit)) throw new FloatDomainError(String(limit));
     return Math.trunc(limit);
   }
-  throw new TypeError(`can't convert ${limit === null ? "nil" : typeof limit} into Integer`);
+  throw new TypeError(`can't convert ${rubyClassName(limit)} into Integer`);
+}
+
+/**
+ * Ruby core's `FloatDomainError` (a `RangeError` subclass) — what
+ * `Integer(Float::NAN)` / `Integer(Float::INFINITY)` raise, message `"NaN"` /
+ * `"Infinity"`. Spelled locally rather than exported: it is reachable only
+ * through `Integer()`'s Float arm, as in Ruby.
+ */
+class FloatDomainError extends globalThis.RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
+  }
+}
+
+/**
+ * The name Ruby's `TypeError` message uses for an unconvertible value:
+ * `nil`/`true`/`false` render as themselves, everything else as its class
+ * (`can't convert Array into Integer`).
+ */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "boolean") return String(value);
+  return (value as object)?.constructor?.name ?? typeof value;
 }
 
 /**
