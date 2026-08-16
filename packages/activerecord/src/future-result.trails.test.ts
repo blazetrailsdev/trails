@@ -449,7 +449,7 @@ describe("FutureResult::EventBuffer", () => {
     expect(events[0].payload.lock_wait as number).toBeGreaterThan(0);
   });
 
-  it("reports 0.0 on an uncontended read", async () => {
+  it("holds the events back until an uncontended read, which reports 0.0", async () => {
     const events: NotificationEvent[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: NotificationEvent) =>
       events.push(e),
@@ -462,27 +462,6 @@ describe("FutureResult::EventBuffer", () => {
       pool.finish();
       await new Promise((resolve) => setTimeout(resolve, 5));
       expect(futureResult.pending()).toBe(false);
-      await futureResult.result();
-    } finally {
-      Notifications.unsubscribe(sub);
-    }
-
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.lock_wait).toBe(0.0);
-  });
-
-  it("holds the events back until the foreground reads the result", async () => {
-    const events: NotificationEvent[] = [];
-    const sub = Notifications.subscribe("sql.active_record", (e: NotificationEvent) =>
-      events.push(e),
-    );
-    const pool = instrumentedDeferredPool(new Result(["id"], [[1]]));
-    const futureResult = new FutureResult(pool, ["SELECT 1", null, []]);
-
-    try {
-      futureResult.scheduleBang(new AsynchronousQueriesTracker.Session());
-      pool.finish();
-      await new Promise((resolve) => setTimeout(resolve, 5));
       expect(events).toEqual([]);
       await futureResult.result();
     } finally {
@@ -490,6 +469,7 @@ describe("FutureResult::EventBuffer", () => {
     }
 
     expect(events).toHaveLength(1);
+    expect(events[0].payload.lock_wait).toBe(0.0);
   });
 });
 
