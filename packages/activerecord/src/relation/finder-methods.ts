@@ -541,7 +541,6 @@ export async function performSole(this: FinderRelation): Promise<any> {
 
 /** @internal */
 export async function performTake(this: FinderRelation, limit?: number): Promise<any> {
-  // Rails: `limit ? find_take_with_limit(limit) : find_take` (finder_methods.rb:129).
   return limit !== undefined ? findTakeWithLimit(this, limit) : findTake(this);
 }
 
@@ -939,8 +938,8 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 /** @internal */
 export async function findTake(rel: FinderRelation): Promise<any | null> {
   if (rel.isLoaded) return (await rel.records())[0] ?? null;
-  // Rails memoizes with `@take ||=` (finder_methods.rb:586): a nil result is
-  // not memoized, so the query re-runs until it finds a record.
+  // `@take ||=` (finder_methods.rb:586): a nil result is not memoized, so the
+  // query re-runs until a record exists.
   (rel as any)._take ??= (await (rel as any).limit(1).records())[0] ?? null;
   return (rel as any)._take;
 }
@@ -953,8 +952,8 @@ export async function findTakeWithLimit(rel: FinderRelation, limit: number): Pro
 
 /** @internal */
 export async function findNth(rel: FinderRelation, index: number): Promise<any | null> {
-  // Rails: `@offsets ||= {}; @offsets[index] ||= find_nth_with_limit(index, 1).first`
-  // (finder_methods.rb:598-601) — a nil hit is not memoized, so it re-queries.
+  // `@offsets[index] ||=` (finder_methods.rb:600): as with `@take`, a nil hit
+  // is not memoized and re-queries.
   const offsets = ((rel as any)._offsets ??= new Map<number, any>());
   let record = offsets.get(index) ?? null;
   if (record == null) {
