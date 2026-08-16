@@ -232,7 +232,21 @@ export async function saveCollectionAssociation(
   reflection: any,
 ): Promise<void> {
   const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
-  if (!association) return;
+  if (!association) {
+    // `association_instance_get` is a bare `@association_cache[name]` read in
+    // Rails, so an association merely *built* (by a `person.pets` reader) is
+    // truthy here and still gets its `reset_scope` below
+    // (autosave_association.rb:428). trails' `associationInstanceGet`
+    // additionally gates on cached target data, so an association with no
+    // loaded records would otherwise never have its scope reconstructed once
+    // the owner's id is known — reset the built instance directly.
+    (
+      (this as unknown as Base)._associationInstances.get(reflection.name) as
+        | { resetScope?(): void }
+        | undefined
+    )?.resetScope?.();
+    return;
+  }
   const autosave = reflection.options?.autosave;
 
   // By saving the instance variable in a local variable,

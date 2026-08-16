@@ -607,7 +607,7 @@ describe("OptimisticLockingTest", () => {
     const car = await Car.createBang({});
 
     const wheels = association(car, "wheels");
-    const beforeCreate = await wheels.count();
+    const beforeCreate = (await wheels.count()) as number;
     await wheels.create({});
     expect(await wheels.count()).toBe(beforeCreate + 1);
 

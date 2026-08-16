@@ -4,6 +4,7 @@ import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js"
 import { disableJoinsAssociationRelationClassFor } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import type { Base } from "./base.js";
+import type { Nodes } from "@blazetrails/arel";
 
 /**
  * Module-private token for the DJAR fast-clone path. Unexported — only
@@ -431,6 +432,78 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       }
     ).count;
     return baseCount.call(this, column);
+  }
+
+  /**
+   * Calculate over the deferred chain, mirroring `count` above: run the
+   * intermediate plucks, then hand the final-step Relation the calculation.
+   * Rails needs no override — its `DisableJoinsAssociationScope#scope` plucks
+   * the chain ids eagerly (disable_joins_association_scope.rb:8-26), so the
+   * relation it returns already carries `key IN (ids)` and inherited
+   * `Calculations#calculate` is correct on it. trails resolves that chain
+   * asynchronously, so the constraint only exists after the walk.
+   */
+  override async calculate(
+    operation: "count",
+    column?: string,
+  ): Promise<number | Map<unknown, number>>;
+  override async calculate(
+    operation: "sum",
+    column: string | Nodes.Node | number | null,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  override async calculate(
+    operation: "average" | "minimum" | "maximum",
+    column: string,
+  ): Promise<unknown | null | Map<unknown, unknown>>;
+  override async calculate(
+    operation: string,
+    columnName?: string | Nodes.Node | number | null,
+  ): Promise<unknown>;
+  override async calculate(
+    operation: string,
+    columnName?: string | Nodes.Node | number | null,
+  ): Promise<unknown> {
+    // A `none!`d scope (new-owner null scope, collection_association.rb:300) must
+    // answer from the empty relation without running the chain walk — the walk
+    // would fire the intermediate SELECTs Rails never issues for a null scope.
+    if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
+      const { relation } = await this._walkOnce();
+      const merged = this._composeChainedState(relation);
+      return merged.calculate(operation, columnName as string);
+    }
+    return (
+      Relation.prototype as unknown as {
+        calculate: (
+          this: unknown,
+          operation: string,
+          columnName?: string | Nodes.Node | number | null,
+        ) => Promise<unknown>;
+      }
+    ).calculate.call(this, operation, columnName);
+  }
+
+  /**
+   * Pluck over the deferred chain — same rationale as `calculate` above.
+   */
+  override async pluck(
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]> {
+    // A `none!`d scope (new-owner null scope, collection_association.rb:300) must
+    // answer from the empty relation without running the chain walk — the walk
+    // would fire the intermediate SELECTs Rails never issues for a null scope.
+    if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
+      const { relation } = await this._walkOnce();
+      const merged = this._composeChainedState(relation);
+      return merged.pluck(...columnNames);
+    }
+    return (
+      Relation.prototype as unknown as {
+        pluck: (
+          this: unknown,
+          ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+        ) => Promise<unknown[]>;
+      }
+    ).pluck.call(this, ...columnNames);
   }
 
   /**

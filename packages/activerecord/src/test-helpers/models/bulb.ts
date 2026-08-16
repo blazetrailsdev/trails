@@ -37,7 +37,7 @@ export class Bulb extends Base {
     this.afterCreate(async (record: Bulb) => {
       record.countAfterCreate = await Bulb.unscoped(async () => {
         const car = (await associationInstance.call(record, "car").loadTarget()) as Car | null;
-        return car ? await association(car, "bulbs").count() : undefined;
+        return car ? ((await association(car, "bulbs").count()) as number) : undefined;
       });
     });
   }

@@ -885,7 +885,16 @@ export class CollectionAssociation extends Association {
   override scope(): any {
     const s = super.scope();
     if (this.isNullScope() && s && typeof s.none === "function") {
-      return s.none();
+      const nulled = s.none();
+      // Trails-only seed marker (no Rails counterpart): a relation spawned off
+      // this `1=0` scope — or the `CollectionProxy` memoizing it as `@scope` —
+      // must be able to rebase onto the live association scope once the owner
+      // is saved. Rails needs no marker because `reader` runs
+      // `@proxy.reset_scope` on every read (collection_association.rb:42), so a
+      // stale scope is never observed there.
+      nulled._seededNoneNewOwner = true;
+      nulled._seedWherePredicates = [...nulled.whereClause.predicates];
+      return nulled;
     }
     return s;
   }

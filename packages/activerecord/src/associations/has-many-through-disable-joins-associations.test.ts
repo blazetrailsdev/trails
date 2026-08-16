@@ -122,14 +122,14 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("appending on disable joins through", async () => {
-    const before = await association(author, "noJoinsComments").count();
+    const before = (await association(author, "noJoinsComments").count()) as number;
     await (post as any).comments.create({ body: "text" });
     const after = await association(author, "noJoinsComments").count();
     expect(after).toBe(before + 1);
   });
 
   it("appending on disable joins through using custom foreign key", async () => {
-    const before = await association(author, "noJoinsCommentsWithForeignKey").count();
+    const before = (await association(author, "noJoinsCommentsWithForeignKey").count()) as number;
     await (post as any).comments.create({ body: "text" });
     const after = await association(author, "noJoinsCommentsWithForeignKey").count();
     expect(after).toBe(before + 1);
