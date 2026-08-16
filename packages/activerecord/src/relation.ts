@@ -211,7 +211,7 @@ function validateExplainOptions(options: ExplainOption[]): void {
 /**
  * Sentinel preload scope threaded into the preloader when the parent relation
  * is strict-loading. The preloader's `cascade_strict_loading` reads
- * `isStrictLoading` to propagate strictness onto the derived scope, while
+ * `strictLoadingValue` to propagate strictness onto the derived scope, while
  * `isEmptyScope` keeps it from being merged like a real scope.
  *
  * Rails nests this `:nodoc:` inside `Relation`; kept module-private here.
@@ -221,7 +221,7 @@ function validateExplainOptions(options: ExplainOption[]): void {
  */
 const StrictLoadingScope = {
   isEmptyScope: true,
-  isStrictLoading: true,
+  strictLoadingValue: true,
 } as const;
 
 /**
@@ -537,7 +537,8 @@ export class Relation<T extends Base> {
       (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
     );
   }
-  private _skipPreloading = false;
+  /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
+  skipPreloadingValue = false;
   private _loaded = false;
   // Rails `@delegate_to_model` (relation.rb:90) — true only while a scope body
   // runs via `_exec_scope`, which is what makes `already_in_scope?` (and hence
@@ -682,13 +683,14 @@ export class Relation<T extends Base> {
       // buildWhereClause spreads buildFromHash's result, so a single tuple stays
       // flat (`WHERE c1 = ? AND c2 = ?`, no wrapping Grouping) like Rails.
       //
-      // Thread the join-dependency fallback (Rails' block to `build_where_clause`
-      // / `predicate_builder.rb:71-73`) so a qualified col naming a manual-join
-      // table binds through the joined model's column type.
+      // Rails passes `lookup_table_klass_from_join_dependencies` as the block to
+      // `predicate_builder.build_from_hash` (query_methods.rb:1643-1645) so a
+      // qualified col naming a manual-join table binds through the joined
+      // model's column type.
       const nodes = this.predicateBuilder.buildComposite(
         cols,
         tuples,
-        this.joinDependencyFallback(),
+        (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
       );
       if (nodes.length === 0) return this._clone().noneBang();
       const rel = this._clone();
@@ -908,13 +910,14 @@ export class Relation<T extends Base> {
           "Relation#whereNot(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
         );
       }
-      // Thread the join-dependency fallback (see `where`'s composite branch)
-      // so a qualified col naming a manual-join table binds through the joined
-      // model's type rather than the generic `TypeCasterConnection`.
+      // The `lookup_table_klass_from_join_dependencies` block (see `where`'s
+      // composite branch) so a qualified col naming a manual-join table binds
+      // through the joined model's type rather than the generic
+      // `TypeCasterConnection` (query_methods.rb:1643-1645).
       const nodes = this.predicateBuilder.buildComposite(
         conditions as string[],
         tuples,
-        this.joinDependencyFallback(),
+        (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
       );
       // Empty/all-filtered → NOT (no rows) = ALL rows = no predicate added
       // (matches Rails' `where.not(...)` no-op for empty hashes).
@@ -1359,33 +1362,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Returns a relation that will always produce an empty result.
-   *
-   * Mirrors: ActiveRecord::Relation#none
-   */
-  none(): Relation<T> {
-    return this._clone().noneBang();
-  }
-
-  /**
-   * Add a lock clause (FOR UPDATE by default).
-   *
-   * Mirrors: ActiveRecord::Relation#lock
-   */
-  lock(locks: string | boolean = true): Relation<T> {
-    return this._clone().lockBang(locks);
-  }
-
-  /**
-   * Mark loaded records as readonly.
-   *
-   * Mirrors: ActiveRecord::Relation#readonly
-   */
-  readonly(value = true): Relation<T> {
-    return this._clone().readonlyBang(value);
-  }
-
-  /**
    * Check if this relation is marked readonly.
    *
    * Mirrors: ActiveRecord::Relation#readonly?
@@ -1404,53 +1380,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * The relation's lock clause, or null when unlocked.
-   *
-   * Mirrors: ActiveRecord::Relation#lock_value (SINGLE_VALUE_METHODS).
-   */
-  get lockValue(): string | null {
-    return this.lockValue;
-  }
-
-  /**
-   * Check if this relation has strict loading enabled.
-   *
-   * Mirrors: ActiveRecord::Relation#strict_loading?
-   */
-  get isStrictLoading(): boolean {
-    return this.strictLoadingValue ?? false;
-  }
-
-  /**
-   * Enable strict loading — lazily-loaded associations will raise.
-   *
-   * Mirrors: ActiveRecord::Relation#strict_loading
-   */
-  strictLoading(value = true): Relation<T> {
-    return this._clone().strictLoadingBang(value);
-  }
-
-  /**
-   * Add SQL comments to the query.
-   *
-   * Mirrors: ActiveRecord::Relation#annotate
-   */
-  annotate(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":annotate", args);
-    return this._clone().annotateBang(...args);
-  }
-
-  /**
-   * Add optimizer hints to the query.
-   *
-   * Mirrors: ActiveRecord::Relation#optimizer_hints
-   */
-  optimizerHints(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":optimizer_hints", args);
-    return this._clone().optimizerHintsBang(...args);
-  }
-
-  /**
    * Return a fresh unscoped relation for the model, discarding any
    * WHERE/ORDER/etc. conditions on this relation.
    *
@@ -1461,53 +1390,6 @@ export class Relation<T extends Base> {
   }
 
   // merge and spawn are mixed in from spawn-methods.ts
-
-  /**
-   * Change the FROM clause (for subqueries or alternate table names).
-   *
-   * Mirrors: ActiveRecord::Relation#from
-   */
-  from(value: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T> {
-    return this._clone().fromBang(value, subqueryName);
-  }
-
-  /**
-   * Set default attributes for create operations on this relation.
-   *
-   * Mirrors: ActiveRecord::Relation#create_with
-   */
-  createWith(value: Record<string, unknown> | null): Relation<T> {
-    return this._clone().createWithBang(value);
-  }
-
-  /**
-   * Remove specific query parts.
-   *
-   * Mirrors: ActiveRecord::Relation#unscope
-   */
-  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":unscope", args as unknown[]);
-    return this._clone().unscopeBang(...args);
-  }
-
-  /**
-   * Add custom methods to this relation instance.
-   * Accepts an object with methods, or a function that receives the relation.
-   *
-   * Mirrors: ActiveRecord::Relation#extending
-   */
-  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T> & M;
-  extending<M extends Record<string, (...args: any[]) => any>>(
-    mod: M | undefined,
-  ): Relation<T> & Partial<M>;
-  extending(fn: (rel: Relation<T>) => void): Relation<T>;
-  extending(): Relation<T>;
-  extending(
-    mod?: Record<string, (...args: any[]) => any> | ((rel: Relation<T>) => void),
-  ): Relation<T> | (Relation<T> & Record<string, (...args: any[]) => any>) {
-    if (!mod) return this._clone();
-    return this._clone().extendingBang(mod);
-  }
 
   /**
    * Add one or more INNER JOINs. Accepts:
@@ -3793,9 +3675,9 @@ export class Relation<T extends Base> {
         .trim()
         .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
         .trim();
-      return /^[A-Za-z_$][\w$]*$/.test(bare) && this._isKnownColumn(bare)
-        ? table.get(bare)
-        : new Nodes.SqlLiteral(raw);
+      if (!/^[A-Za-z_$][\w$]*$/.test(bare)) return new Nodes.SqlLiteral(raw);
+      // Rails' `arel_column(field) { ... }` (query_methods.rb:1990-2005).
+      return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as Nodes.Node;
     });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
     return Array.isArray(values) ? values.join(", ") : values;
@@ -3891,16 +3773,6 @@ export class Relation<T extends Base> {
    */
   arelColumns(columns: ReadonlyArray<unknown>): unknown[] {
     return _arelColumns.call(this as any, columns as unknown[]);
-  }
-
-  // Returns true when `col` is a known schema attribute OR is (part of) the
-  // model's primary key. The PK check is needed because `_attributeDefinitions`
-  // may not yet contain `id` (before schema reflection), but it must still be
-  // table-qualified to avoid ambiguous-column errors on joined relations.
-  private _isKnownColumn(col: string): boolean {
-    if (this._model._attributeDefinitions.has(col)) return true;
-    const pk = this._model.primaryKey;
-    return Array.isArray(pk) ? pk.includes(col) : pk === col;
   }
 
   /**
@@ -4416,10 +4288,6 @@ export class Relation<T extends Base> {
     return pb;
   }
 
-  get skipPreloadingValue(): boolean {
-    return this._skipPreloading;
-  }
-
   get isScheduled(): boolean {
     return false;
   }
@@ -4931,7 +4799,7 @@ export class Relation<T extends Base> {
         }
       }
     }
-    this._skipPreloading = source._skipPreloading;
+    this.skipPreloadingValue = source.skipPreloadingValue;
     this._seededNoneNewOwner = source._seededNoneNewOwner;
     this._seedWherePredicates = [...source._seedWherePredicates];
     // `_delegateToModel` is deliberately NOT copied: Rails' `initialize_copy`
@@ -5063,15 +4931,6 @@ export class Relation<T extends Base> {
       return this.model.uncached(block);
     }
     return block();
-  }
-
-  // The `associated_table` block Rails threads from `build_where_clause`
-  // (`predicate_builder.rb:71-73`): resolves a table name that exists only as a
-  // join-dependency (a manual join, an alias) — not a direct reflection — to its
-  // model, so a qualified col binds through that model's column type. Shared by
-  // `where` / `whereNot`'s composite branches.
-  private joinDependencyFallback(): (name: string) => typeof Base | null {
-    return (name) => this.lookupTableKlassFromJoinDependencies(name) as typeof Base | null;
   }
 }
 
@@ -5224,6 +5083,24 @@ export interface Relation<T extends Base>
     key?: string,
     notFoundIds?: unknown[],
   ): never;
+  // QueryMethods' flag / annotation / scope-shaping methods (query-methods.ts),
+  // whose mixin signatures return `any` — declared here with the relation's own
+  // element type.
+  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;
+  lock(locks?: string | boolean): Relation<T>;
+  none(): Relation<T>;
+  readonly(value?: boolean): Relation<T>;
+  strictLoading(value?: boolean): Relation<T>;
+  createWith(value: Record<string, unknown> | null): Relation<T>;
+  from(value: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T>;
+  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T> & M;
+  extending<M extends Record<string, (...args: any[]) => any>>(
+    mod: M | undefined,
+  ): Relation<T> & Partial<M>;
+  extending(fn: (rel: Relation<T>) => void): Relation<T>;
+  extending(): Relation<T>;
+  optimizerHints(...args: string[]): Relation<T>;
+  annotate(...args: string[]): Relation<T>;
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;

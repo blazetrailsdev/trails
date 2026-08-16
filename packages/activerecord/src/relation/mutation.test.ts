@@ -194,7 +194,7 @@ describe("RelationMutationTest", () => {
   it("skip_preloading!", () => {
     const rel = relation();
     expect(rel.skipPreloadingBang()).toBe(rel);
-    expect(rel._skipPreloading).toBe(true);
+    expect(rel.skipPreloadingValue).toBe(true);
   });
 
   it("#regroup!", () => {

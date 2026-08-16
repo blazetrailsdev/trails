@@ -19,16 +19,10 @@ describeIfSqlite("SQLite3ExplainTest", () => {
   // from the template clone.
   const { authors } = fixtures(["authors", "authorAddresses"]);
 
-  // The `[[nil, 1]]` alternative is trails-only. Rails' `sql.active_record`
-  // payload carries QueryAttribute binds, so `render_bind` (explain.rb:40-51)
-  // emits `[["id", 1]]`; trails' adapters instrument plain bind VALUES, so the
-  // non-Attribute arm of `render_bind` fires and the name comes out `nil`.
-  // Tracked by `explain-payload-binds-carry-query-attributes`.
-
   it("explain for one query", async () => {
     const explain = await Author.where({ id: authors("david").id }).explain();
     expect(explain).toMatch(
-      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|\? \[\[nil, 1\]\]|1)/,
+      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
     );
     expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
   });
@@ -38,11 +32,11 @@ describeIfSqlite("SQLite3ExplainTest", () => {
       .includes("posts")
       .explain();
     expect(explain).toMatch(
-      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|\? \[\[nil, 1\]\]|1)/,
+      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
     );
     expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
     expect(explain).toMatch(
-      /EXPLAIN for: SELECT "posts"\.\* FROM "posts" WHERE "posts"\."author_id" = (?:\? \[\["author_id", 1\]\]|\? \[\[nil, 1\]\]|1)/,
+      /EXPLAIN for: SELECT "posts"\.\* FROM "posts" WHERE "posts"\."author_id" = (?:\? \[\["author_id", 1\]\]|1)/,
     );
     expect(explain).toMatch(/(SEARCH |(SCAN )?(TABLE ))posts/);
   });

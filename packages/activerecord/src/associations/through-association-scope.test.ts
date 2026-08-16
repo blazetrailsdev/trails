@@ -225,6 +225,6 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
 
     const loader = throughLoader([david], "annotatedComments", Comment.all().strictLoading());
     const scope = (loader as any).throughScope();
-    expect(scope.isStrictLoading).toBe(true);
+    expect(scope.strictLoadingValue).toBe(true);
   });
 });
