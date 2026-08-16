@@ -25,6 +25,7 @@ export function _setAssociationRelationCtor(
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
   findNthFromLast as baseFindNthFromLast,
+  findNth as baseFindNth,
   findNthWithLimit as baseFindNthWithLimit,
   performLast as basePerformLast,
   findTake as baseFindTake,
@@ -197,11 +198,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _assocDef: AssociationDefinition;
   private _target: T[] = [];
   private _targetLoaded = false;
-  // Rails' Relation#@offsets memo: find_nth(index) caches the single record at a
-  // given offset so repeated `first`/`last`/`take` (no-arg) return the SAME object
-  // without re-querying, until `reset`/`reload`/mutation clears it (finder_methods.rb,
-  // collection_proxy.rb#reset). Keyed "first"/"last"/"take".
-  private _offsetMemo = new Map<string, T | null>();
   // Rails' `CollectionProxy#@scope` memo (collection_proxy.rb:949-951), cleared
   // by `reset_scope` (collection_proxy.rb:1113-1117).
   private _scope: unknown;
@@ -774,11 +770,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       Object.defineProperty(this, name, {
         value: function (this: CollectionProxy<T>, ...args: unknown[]) {
           (this as unknown as { _cpMutated: boolean })._cpMutated = true;
-          // Rails Relation#reset clears @offsets alongside loaded state
-          // (relation.rb:1194). The Relation.prototype.reset below doesn't see
-          // our subclass field, so drop the find_nth memo here too — otherwise a
-          // memoized first()/last()/take() row would survive the scope mutation.
-          (this as unknown as { _offsetMemo: Map<string, unknown> })._offsetMemo.clear();
           // Use Relation#reset so all inherited load-state — including
           // `_loadToken` — is invalidated atomically. Bumping the token
           // lets in-flight super.toArray() completions detect that
@@ -1945,7 +1936,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
-    this._offsetMemo.clear();
+    // `@offsets = @take = nil` (collection_proxy.rb:1113) — the collection just
+    // changed, so the find_nth/find_take memos are stale.
+    this._offsets = undefined;
+    this._take = undefined;
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
       assocInstance._associationIds = null;
@@ -2317,10 +2311,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (finder_methods.rb:590,:603) — a bounded `limit` query, not a full load
     // then slice. The no-arg case keeps Relation#find_nth's @offsets memo.
     if (n !== undefined) return this.findNthWithLimit(0, n);
-    if (this._offsetMemo.has("first")) return this._offsetMemo.get("first")!;
-    const record = (await this.findNthWithLimit(0, 1))[0] ?? null;
-    this._offsetMemo.set("first", record);
-    return record;
+    // `find_nth(0)` (finder_methods.rb:598-601). Rails' CollectionProxy#first is
+    // a bare `super`, so the `@offsets` memo lands on the proxy itself; the query
+    // still routes through `_finderScope` via our `findNthWithLimit` override.
+    return baseFindNth(this as any, 0);
   }
 
   /**
@@ -2347,7 +2341,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (collection_proxy.rb:289). Unlike first/take, Relation#last is NOT memoized
     // — it builds a temporary `reverse_order` relation and reads `.first` off it
     // (finder_methods.rb:202), so there is no @offsets/@take cache here. We
-    // deliberately do NOT consult/populate _offsetMemo for last().
+    // deliberately do NOT consult/populate the `@take`/`@offsets` memos for last().
     if (this.isFindFromTarget()) {
       const records = await this.loadTarget();
       if (n === undefined) return records[records.length - 1] ?? null;
@@ -2403,12 +2397,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (this._targetLoaded) return this._target.slice(0, n);
       return baseFindTakeWithLimit(this._finderScope() as any, n);
     }
-    if (this._offsetMemo.has("take")) return this._offsetMemo.get("take")!;
-    const record = this._targetLoaded
-      ? (this._target[0] ?? null)
-      : await baseFindTake(this._finderScope() as any);
-    this._offsetMemo.set("take", record);
-    return record;
+    if (this._targetLoaded) return this._target[0] ?? null;
+    // `@take ||=` (finder_methods.rb:586). Rails' CollectionProxy#take is a bare
+    // `super`, so the memo lands on the proxy itself; only the query goes through
+    // `_finderScope`. A nil result is not memoized, matching `||=`.
+    this._take ??= await baseFindTake(this._finderScope() as any);
+    return this._take ?? null;
   }
 
   /**
@@ -3324,7 +3318,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#reset_scope
    */
   resetScope(): this {
-    this._offsetMemo.clear();
+    // `@offsets = @take = nil` (collection_proxy.rb:1113).
+    this._offsets = undefined;
+    this._take = undefined;
     this._scope = undefined;
     return this;
   }
