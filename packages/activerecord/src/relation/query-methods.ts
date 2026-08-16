@@ -1222,10 +1222,9 @@ export function structurallyIncompatibleValuesFor(
   this: QueryMethodsHost,
   other: QueryMethodsHost,
 ): string[] {
-  const self = this;
   const incompat: string[] = [];
   for (const [label, field] of STRUCTURAL_FIELDS) {
-    const a = self[field] as unknown;
+    const a = this[field] as unknown;
     const b = other[field] as unknown;
     // Mirrors Rails' structurally_incompatible_values_for (query_methods.rb):
     // for Array-valued methods it does `next true unless v2.is_a?(Array)` —
