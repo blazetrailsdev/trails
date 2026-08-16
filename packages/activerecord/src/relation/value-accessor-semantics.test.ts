@@ -3,7 +3,7 @@
  * accessors (query_methods.rb:162-181): the `joins_values=` split-routing
  * writer, the nil-vs-false tri-state of the single-value flags, and the
  * stored-reference reader semantics of the array readers. These exercise
- * trails-specific storage details (the `_namedInnerJoins`/`_joinValues` split,
+ * trails-specific storage details (the unified `joins_values` store,
  * the `boolean | undefined` flag fields), so the names are descriptive rather
  * than mirrored from a metaprogrammed Rails test.
  */
@@ -18,8 +18,7 @@ import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
 fixtures([]);
 /** The split join-storage and group fields the reader semantics build on. */
 type JoinInternals = {
-  _namedInnerJoins: unknown[];
-  _joinValues: unknown[];
+  _joinsValues: unknown[];
   _groupColumns: string[];
   _orderClauses: unknown[];
 };
@@ -36,8 +35,8 @@ describe("Relation value accessor Rails semantics", () => {
   it("joins_values= split-routes association hashes and raw joins", () => {
     const rel = relation();
     rel.joinsValues = [{ category: {} }, "LEFT JOIN comments ON comments.post_id = posts.id"];
-    expect(internals(rel)._namedInnerJoins).toEqual([{ category: {} }]);
-    expect(internals(rel)._joinValues).toEqual([
+    expect(internals(rel)._joinsValues).toEqual([
+      { category: {} },
       "LEFT JOIN comments ON comments.post_id = posts.id",
     ]);
   });
@@ -52,8 +51,7 @@ describe("Relation value accessor Rails semantics", () => {
     const rel = relation();
     rel.joinsValues = [{ category: {} }];
     rel.joinsValues = ["RAW JOIN x"];
-    expect(internals(rel)._namedInnerJoins).toEqual([]);
-    expect(internals(rel)._joinValues).toEqual(["RAW JOIN x"]);
+    expect(internals(rel)._joinsValues).toEqual(["RAW JOIN x"]);
   });
 
   it("readonly_value defaults to nil (undefined) when unset", () => {

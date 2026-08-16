@@ -399,7 +399,7 @@ export class Relation<T extends Base> {
   // order — Arel join nodes and raw SQL strings alongside association names and
   // nested-association hashes — so `joins_values=`/`joins_values` round-trip
   // faithfully with no named-before-raw reorder. The named-vs-raw split the
-  // builders need is derived on read (`_namedInnerJoins` / `_joinValues`), not
+  // builders need is derived on read by `select_association_list`, not
   // stored separately.
   private _joinsValues: (AssociationSpec | string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
@@ -409,28 +409,14 @@ export class Relation<T extends Base> {
   // `joins(":name")` — or a string naming an association; everything else (Arel
   // join nodes, raw SQL strings) is a raw join value. The two derived getters
   // below partition `_joinsValues` by this rule — the same rule `joins` uses at
-  // insert time. A raw Symbol misrouted to `_joinValues` would reach the arel
-  // visitor and raise "Unknown node type: Symbol", so Symbols must land in
-  // `_namedInnerJoins`.
+  // insert time. A raw Symbol routed to the raw-join bucket would reach the arel
+  // visitor and raise "Unknown node type: Symbol", so Symbols must be named.
   private _isNamedJoinValue(v: unknown): boolean {
     return (
       _isPlainObject(v) ||
       v instanceof JoinDependency ||
       (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
     );
-  }
-  // INNER `joins(:assoc)` association names (and nested hash/through specs),
-  // resolved through JoinDependency — mirroring Rails' joins_values, which feed
-  // build_join_dependencies so every node in the chain carries its base_klass
-  // and shares Rails' AliasTracker self-join aliasing. Derived from the unified
-  // store so insertion order is preserved.
-  get _namedInnerJoins(): AssociationSpec[] {
-    return this._joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[];
-  }
-  // Raw join values (Arel `Nodes.Join` and non-association SQL strings). Derived
-  // from the unified store; the complement of `_namedInnerJoins`.
-  get _joinValues(): (string | Nodes.Join)[] {
-    return this._joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (string | Nodes.Join)[];
   }
   private _includesAssociations: AssociationSpec[] = [];
   private _preloadAssociations: AssociationSpec[] = [];
@@ -1473,7 +1459,7 @@ export class Relation<T extends Base> {
     // eql?/hash (structural for Arel `Nodes.Binary`, plain strings, and Hash
     // specs alike). A single unified store preserves insertion order across
     // named and raw joins; the named-vs-raw partition the builders need is
-    // derived on read (see `_namedInnerJoins` / `_joinValues`).
+    // derived on read by `select_association_list`.
     return QueryMethodBangs.joinsBang.call(
       this._clone() as any,
       ...(args as (string | Nodes.Join)[]),
@@ -2609,14 +2595,17 @@ export class Relation<T extends Base> {
     // to table names so references to those tables don't spuriously promote
     // includes to eager_load. The raw SQL strings it drops are handled by the
     // `tablesInString` arm below, exactly as Rails' StringJoin branch does.
+    const rawJoinValues: (string | Nodes.Join)[] = [];
     const namedInnerTables = this._resolveAssocTables(
-      this.selectAssociationList(this._joinsValues, null) as AssociationSpec[],
+      this.selectAssociationList(this._joinsValues, null, (join) =>
+        rawJoinValues.push(join as string | Nodes.Join),
+      ) as AssociationSpec[],
     );
     const joinedTables = new Set<string>([
       ...this._joinClauses.map((j) => j.table.toLowerCase()),
       ...leftOuterTables,
       ...namedInnerTables,
-      ...this._joinValues.flatMap((v) => {
+      ...rawJoinValues.flatMap((v) => {
         if (typeof v === "string") {
           const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
           return this.tablesInString(join.left);
@@ -4222,7 +4211,7 @@ export class Relation<T extends Base> {
    * array. trails backs that directly with `_joinsValues`, so the reader returns
    * the stored array (a copy) and preserves the exact order in which joins were
    * added. The named-vs-raw split the builders need is derived from this store
-   * on read (`_namedInnerJoins` / `_joinValues`).
+   * on read by `select_association_list`.
    */
   get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
     return [...this._joinsValues];

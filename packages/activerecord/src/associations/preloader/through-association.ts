@@ -421,10 +421,8 @@ export class ThroughAssociation extends Association {
 
         // joins!(source_reflection.name => joins) (rb:132-134): Rails applies the
         // whole flattened `values[:joins]` bucket ONCE, nested under the source
-        // reflection name. trails splits that bucket into `_namedInnerJoins`
-        // (symbol association joins) and `_joinValues` (raw string / Arel-node
-        // joins), so their UNION is Rails' single `values[:joins]` — applied here
-        // exactly once. A raw string / Arel join anywhere in the FLATTENED chain
+        // reflection name — trails reads the same single `joins_values` store, in
+        // insertion order. A raw string / Arel join anywhere in the FLATTENED chain
         // scope raises `ConfigurationError` in Rails (`JoinDependency` rejects the
         // bogus association name symbolized from the raw string), regardless of
         // the collection/nested strategy — nesting it under the source reflection
@@ -434,10 +432,9 @@ export class ThroughAssociation extends Association {
         // Rails means raising here too — a raw join declared only on a deeper
         // sub-chain link is NOT deferred to its own recursive stage (verified
         // against a live Rails nested-through repro).
-        const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
-        const nestedJoins: any[] = reflScope?._namedInnerJoins ?? [];
-        if (nestedRawJoinValues.length > 0 || nestedJoins.length > 0) {
-          scope = scope.joins({ [sourceName]: [...nestedRawJoinValues, ...nestedJoins] });
+        const nestedJoins: any[] = reflScope?.joinsValues ?? [];
+        if (nestedJoins.length > 0) {
+          scope = scope.joins({ [sourceName]: nestedJoins });
         }
 
         // left_outer_joins!(source_reflection.name => left_outer_joins) (rb:136-137).

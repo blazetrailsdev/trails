@@ -32,7 +32,7 @@ describe("RelationMutationTest", () => {
       ["eagerLoadBang", "_eagerLoadAssociations"],
       ["preloadBang", "_preloadAssociations"],
       ["groupBang", "_groupColumns"],
-      ["joinsBang", "_joinValues"],
+      ["joinsBang", "_joinsValues"],
       ["leftOuterJoinsBang", "_leftOuterJoinsValues"],
       ["referencesBang", "_referencesValues"],
       ["optimizerHintsBang", "_optimizerHints"],

@@ -115,7 +115,7 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 
   fixtures(["topics", "authors"]);
 
-  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
+  // A plain `joins(:assoc)` now feeds buildJoinDependencies (via joins_values),
   // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type
   // through the join-dependency walk — no `_joinClauses`-klass fallback. Replaces
   // the unit tests that asserted the (removed) `_joinClauses.klass` recovery.

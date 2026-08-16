@@ -23,11 +23,9 @@ import { Author } from "../test-helpers/models/author.js";
 
 interface JoinValueHost {
   // Public Rails-mirrored accessor for `left_outer_joins_values`
-  // (relation.ts get leftOuterJoinsValues, ~:4578). `_namedInnerJoins` has no
-  // public accessor — it is a trails-internal storage split of `joins_values`
-  // for association-name specs, so it is read through the underscore field.
+  // (relation.ts get leftOuterJoinsValues, ~:4578), alongside `joins_values`.
   leftOuterJoinsValues: unknown[];
-  _namedInnerJoins: unknown[];
+  joinsValues: unknown[];
   toSql(): string;
 }
 
@@ -46,10 +44,10 @@ describe("join value union structural dedup", () => {
   });
 
   it("emits a single INNER JOIN for a structurally-equal Hash spec joined twice", () => {
-    // The inner-joins Hash path previously pushed to _namedInnerJoins with no
-    // dedup at all; joins_values |= folds the structurally-equal spec in Rails.
+    // The inner-joins Hash path previously pushed with no dedup at all;
+    // joins_values |= folds the structurally-equal spec in Rails.
     const rel = Author.joins({ posts: "comments" }).joins({ posts: "comments" });
-    expect(asHost(rel)._namedInnerJoins).toHaveLength(1);
+    expect(asHost(rel).joinsValues).toHaveLength(1);
     const sql = asHost(rel).toSql();
     expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(2); // posts + comments, no dup
   });
@@ -65,6 +63,6 @@ describe("join value union structural dedup", () => {
     // Rails merge_joins unions via joins! (joins_values |=), so a same-klass
     // merge dedups the equal spec structurally rather than by reference.
     const rel = Author.joins({ posts: "comments" }).merge(Author.joins({ posts: "comments" }));
-    expect(asHost(rel)._namedInnerJoins).toHaveLength(1);
+    expect(asHost(rel).joinsValues).toHaveLength(1);
   });
 });

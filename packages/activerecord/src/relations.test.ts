@@ -807,7 +807,7 @@ describe("RelationTest", () => {
   // Rails compact_blank!s blank join specs before joins!/left_outer_joins!, so a
   // blank hash/array must not linger in relation state (query_methods.rb:868-890).
   it("blank join arguments are not retained in relation state", () => {
-    expect((Topic as any).joins({})._namedInnerJoins).toEqual([]);
+    expect((Topic as any).joins({}).joinsValues).toEqual([]);
     expect((Topic as any).leftJoins({})._leftOuterJoinsValues).toEqual([]);
     expect((Topic as any).leftJoins([])._leftOuterJoinsValues).toEqual([]);
   });

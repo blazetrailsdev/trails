@@ -344,7 +344,7 @@ describe("RelationTest", () => {
   });
 
   it("eagerLoad + leftJoins: buildJoinBuckets short-circuit does not drop eager stash", () => {
-    // Regression: when _joinValues and _joinClauses are empty, buildJoinBuckets
+    // Regression: when joins_values and _joinClauses are empty, buildJoinBuckets
     // short-circuits for the left-outer-only path. If _eagerLoadAssociations is
     // also present, the short-circuit must not fire — eager stash would be skipped.
     class Author extends Base {
@@ -361,7 +361,7 @@ describe("RelationTest", () => {
     }
     registerModel("EagerLeftAuthor", Author);
     registerModel("EagerLeftPost", Post);
-    // Both eagerLoad and leftJoins present, no explicit _joinValues/_joinClauses
+    // Both eagerLoad and leftJoins present, no explicit joins_values/_joinClauses
     const rel = Author.leftJoins("posts").eagerLoad("posts");
     expect((rel as any)._eagerLoadAssociations).toContain("posts");
     expect((rel as any)._leftOuterJoinsValues).toContain("posts");
@@ -381,7 +381,7 @@ describe("RelationTest", () => {
       new Nodes.On(new Nodes.SqlLiteral("books.author_id = authors.id")),
     );
     const relation = Book.joins(node);
-    const joinValues = (relation as any)._joinValues as unknown[];
+    const joinValues = relation.joinsValues as unknown[];
     expect(relation.toSql()).toContain("INNER JOIN");
     expect(relation.toSql()).toContain("authors");
     expect(joinValues).toHaveLength(1);
