@@ -669,7 +669,7 @@ describe("finder not-found message fidelity", () => {
       primaryKey: carModelStub.primaryKey,
       raiseRecordNotFoundExceptionBang,
       _whereClause: { isEmpty: () => true },
-      findBy: async () => null,
+      where: () => ({ take: async () => null }),
     };
     try {
       await findOne.call(rel, 0);

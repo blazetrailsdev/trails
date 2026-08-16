@@ -9,6 +9,7 @@
  */
 
 import { Nodes } from "@blazetrails/arel";
+import { wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   RangeError as ActiveModelRangeError,
@@ -738,7 +739,8 @@ export function raiseRecordNotFoundExceptionBang(
     );
   }
 
-  const wrapped = Array.isArray(ids) ? ids : [ids];
+  // Rails: `elsif Array.wrap(ids).size == 1` (finder_methods.rb:428).
+  const wrapped = wrap(ids);
   if (wrapped.length === 1) {
     // Rails: `"...'#{key}'=#{ids}"`. `${ids}` relies on JS coercing the lone
     // value to its bare string — and a 1-element array to the same (`${[1]}`
@@ -876,17 +878,23 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
 export async function findWithIds(this: FinderRelation, ids: unknown[]): Promise<any> {
   const normalized = normalizeFindArgs(this.model.name, this.primaryKey, ids);
   if (normalized.emptyArray) return [];
-  if (normalized.wantArray) {
-    return (this as any).findSome(normalized.ids);
+  // Rails' `case ids.size` reaches the `when 1` arm (`find_one`) before the
+  // `else` arm (`find_some`) — finder_methods.rb:519-523.
+  if (!normalized.wantArray) {
+    return findOne.call(this, normalized.ids[0]);
   }
-  return findOne.call(this, normalized.ids[0]);
+  return (this as any).findSome(normalized.ids);
 }
 
 /** @internal */
 export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
   const pk = this.primaryKey;
-  const conditions = Array.isArray(pk) ? buildPkWhere(pk, id as unknown[]) : { [pk]: id };
-  const record = await (this as any).findBy(conditions);
+  // Rails find_one (finder_methods.rb:534-540): `where(primary_key.zip(id).to_h)`
+  // for a composite key, `where(primary_key => id)` otherwise, then `.take`.
+  const relation = Array.isArray(pk)
+    ? (this as any).where(buildPkWhere(pk, id as unknown[]))
+    : (this as any).where({ [pk]: id });
+  const record = await relation.take();
   if (!record) {
     // Rails find_one: raise_record_not_found_exception!(id, 0, 1)
     (this as any).raiseRecordNotFoundExceptionBang(id, 0, 1);
