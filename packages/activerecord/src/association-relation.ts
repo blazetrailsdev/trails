@@ -84,8 +84,16 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    */
   _maybeRebaseAssociationSeed(): void {
     if (!this._seededNoneNewOwner) return;
-    const assoc = this._association as unknown as { scope?: () => { _isNone: boolean } };
+    const assoc = this._association as unknown as {
+      scope?: () => { _isNone: boolean };
+      resetScope?: () => void;
+    };
     if (typeof assoc.scope !== "function") return;
+    // The association memoized its `@association_scope` while the owner was
+    // still new (that memo is what seeded this relation), so it carries the
+    // unresolved FK too — drop it before rebuilding, exactly as Rails'
+    // `reset_scope` does when the target goes stale (association.rb:198-201).
+    assoc.resetScope?.();
     const fresh = assoc.scope();
     if (fresh._isNone) return;
     rebaseNewOwnerSeed(
@@ -148,7 +156,18 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       return records;
     }
     const merged = { ...this.scopeForCreate(), ...attrs };
-    const proxy = this._association as CollectionProxy<T> & { _pendingThroughScope?: unknown };
+    // `_association` is the owner's `CollectionProxy` when this relation was
+    // spawned off the proxy, and the OO association when it came from
+    // `Association#scope` (the `delegate(*QueryMethods, to: :scope)` path,
+    // collection_proxy.rb:1128-1137). `HasManyThroughAssociation#build_record`
+    // reads the in-flight scope back off the owner's cached proxy, so resolve
+    // that proxy here rather than stamping the association object.
+    const assoc = this._association as unknown as {
+      owner?: { _collectionProxies?: Map<string, unknown> };
+      reflection?: { name: string };
+    };
+    const proxy = (assoc.owner?._collectionProxies?.get(assoc.reflection?.name ?? "") ??
+      this._association) as CollectionProxy<T> & { _pendingThroughScope?: unknown };
     const prev = proxy._pendingThroughScope;
     proxy._pendingThroughScope = this;
     try {
