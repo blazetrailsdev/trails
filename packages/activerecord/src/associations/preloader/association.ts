@@ -392,7 +392,7 @@ export class Association {
    * @internal
    */
   protected cascadeStrictLoading(scope: any): any {
-    return this.preloadScope?.isStrictLoading ? (scope.strictLoading?.() ?? scope) : scope;
+    return this.preloadScope?.strictLoadingValue ? (scope.strictLoading?.() ?? scope) : scope;
   }
 
   private _uniqueOwners(owners: Base[]): Base[] {

@@ -286,7 +286,10 @@ interface QueryMethodsHost {
   // leading-colon string — or a string naming an association; everything else
   // (Arel join nodes, raw SQL strings) is a raw join value.
   _isNamedJoinValue(v: unknown): boolean;
-  _skipPreloading: boolean;
+  /** Rails' `clone` behind `spawn` (spawn_methods.rb:9-11). */
+  _clone(): any;
+  /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
+  skipPreloadingValue: boolean;
   _model: typeof import("../base.js").Base;
   model: QueryMethodsHost["_model"];
   /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
@@ -695,6 +698,19 @@ export function setValues(host: QueryMethodsHost, values: Record<string, unknown
   for (const scope of SIDECAR_BACKED_KEYS) {
     if (!(scope in values)) resetValueForScope(host, scope);
   }
+}
+
+/**
+ * Remove specific query parts.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#unscope (query_methods.rb:806-809)
+ */
+function unscope(
+  this: QueryMethodsHost,
+  ...args: Array<UnscopeType | { where: string | string[] }>
+): any {
+  checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
+  return unscopeBang.apply(this._clone(), args as any);
 }
 
 function unscopeBang(
@@ -1159,6 +1175,15 @@ function offsetBang(this: QueryMethodsHost, value: number | string | null): any 
   return this;
 }
 
+/**
+ * Add a lock clause (FOR UPDATE by default).
+ *
+ * Mirrors: ActiveRecord::QueryMethods#lock (query_methods.rb:1238-1240)
+ */
+function lock(this: QueryMethodsHost, locks: string | boolean = true): any {
+  return lockBang.call(this._clone(), locks);
+}
+
 function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
   if (typeof locks === "string") {
     this.lockValue = locks;
@@ -1166,6 +1191,15 @@ function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
     this.lockValue = locks ? "FOR UPDATE" : null;
   }
   return this;
+}
+
+/**
+ * Returns a relation that will always produce an empty result.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#none (query_methods.rb:1281-1283)
+ */
+function none(this: QueryMethodsHost): any {
+  return noneBang.call(this._clone());
 }
 
 function noneBang(this: QueryMethodsHost): any {
@@ -1180,14 +1214,41 @@ function isNullRelation(this: QueryMethodsHost): boolean {
   return this._isNone;
 }
 
+/**
+ * Mark loaded records as readonly.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#readonly (query_methods.rb:1309-1311)
+ */
+function readonly(this: QueryMethodsHost, value = true): any {
+  return readonlyBang.call(this._clone(), value);
+}
+
 function readonlyBang(this: QueryMethodsHost, value = true): any {
   this.readonlyValue = value;
   return this;
 }
 
+/**
+ * Enable strict loading — lazily-loaded associations will raise.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#strict_loading (query_methods.rb:1324-1326)
+ */
+function strictLoading(this: QueryMethodsHost, value = true): any {
+  return strictLoadingBang.call(this._clone(), value);
+}
+
 function strictLoadingBang(this: QueryMethodsHost, value = true): any {
   this.strictLoadingValue = value;
   return this;
+}
+
+/**
+ * Set default attributes for create operations on this relation.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#create_with (query_methods.rb:1346-1348)
+ */
+function createWith(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
+  return createWithBang.call(this._clone(), value);
 }
 
 function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
@@ -1201,6 +1262,15 @@ function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> |
   return this;
 }
 
+/**
+ * Change the FROM clause (for subqueries or alternate table names).
+ *
+ * Mirrors: ActiveRecord::QueryMethods#from (query_methods.rb:1391-1393)
+ */
+function from(this: QueryMethodsHost, value: any, subqueryName?: string): any {
+  return fromBang.call(this._clone(), value, subqueryName);
+}
+
 function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): any {
   this.fromClause = new FromClause(value ?? null, subqueryName ?? null);
   return this;
@@ -1209,6 +1279,20 @@ function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): an
 function distinctBang(this: QueryMethodsHost, value = true): any {
   this.distinctValue = value;
   return this;
+}
+
+/**
+ * Add custom methods to this relation instance.
+ * Accepts an object with methods, or a function that receives the relation.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#extending (query_methods.rb:1456-1462)
+ */
+function extending(
+  this: QueryMethodsHost,
+  mod?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
+): any {
+  if (!mod) return this._clone();
+  return extendingBang.call(this._clone(), mod);
 }
 
 function extendingBang(
@@ -1231,6 +1315,16 @@ function extendingBang(
     }
   }
   return this;
+}
+
+/**
+ * Add optimizer hints to the query.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#optimizer_hints (query_methods.rb:1485-1488)
+ */
+function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":optimizer_hints", args);
+  return optimizerHintsBang.apply(this._clone(), args);
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
@@ -1320,8 +1414,18 @@ function skipQueryCacheBang(this: QueryMethodsHost, value = true): any {
 }
 
 function skipPreloadingBang(this: QueryMethodsHost): any {
-  this._skipPreloading = true;
+  this.skipPreloadingValue = true;
   return this;
+}
+
+/**
+ * Add SQL comments to the query.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#annotate (query_methods.rb:1529-1532)
+ */
+function annotate(this: QueryMethodsHost, ...args: string[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":annotate", args);
+  return annotateBang.apply(this._clone(), args);
 }
 
 function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {
@@ -1932,6 +2036,7 @@ export const QueryMethodBangs = {
   regroupBang,
   orderBang,
   reorderBang,
+  unscope,
   unscopeBang,
   joinsBang,
   leftOuterJoinsBang,
@@ -1942,19 +2047,28 @@ export const QueryMethodBangs = {
   havingBang,
   limitBang,
   offsetBang,
+  lock,
   lockBang,
+  none,
   noneBang,
   isNullRelation,
+  readonly,
   readonlyBang,
+  strictLoading,
   strictLoadingBang,
+  createWith,
   createWithBang,
+  from,
   fromBang,
   distinctBang,
+  extending,
   extendingBang,
+  optimizerHints,
   optimizerHintsBang,
   reverseOrderBang,
   skipQueryCacheBang,
   skipPreloadingBang,
+  annotate,
   annotateBang,
   uniqBang,
   excludingBang,
