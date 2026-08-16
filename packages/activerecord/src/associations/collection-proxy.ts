@@ -29,7 +29,6 @@ import {
   performLast as basePerformLast,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
-import type { SumBlock } from "../relation/calculations.js";
 import { underscore, singularize, camelize, constantize } from "@blazetrails/activesupport";
 import {
   RecordNotSaved,
@@ -55,7 +54,6 @@ import {
   autoloadModel,
   resolveAssocClass,
   _routeThroughViaAssociationScope,
-  ownerHasUnresolvedThroughKey,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
@@ -727,6 +725,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   private _maybeRebaseProxySeed(): void {
     if (!this._seededNoneNewOwner) return;
+    // Both memo levels were populated while the owner was still new, so both
+    // carry the unresolved FK — drop them before rebuilding, exactly as Rails'
+    // two `reset_scope`s do (`CollectionProxy#reset_scope`,
+    // collection_proxy.rb:1112-1116, clearing `@scope`; `Association#reset_scope`,
+    // association.rb:119-121, clearing `@association_scope`). Mirrors the same
+    // pair in `AssociationRelation#_maybeRebaseAssociationSeed`.
+    this.resetScope();
+    (
+      this._record.association(this._assocName) as unknown as { resetScope?(): void }
+    ).resetScope?.();
     const fresh = this.scope() as unknown as { _isNone: boolean };
     if (fresh._isNone) return;
     rebaseNewOwnerSeed(
@@ -1227,170 +1235,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Build a DJAR for the disable-joins-through count fast path —
-   * mirrors `_loadThroughViaDisableJoinsScope`'s setup but stops
-   * after constructing the DJAR. Returns `null` when
-   * `ownerHasUnresolvedThroughKey` fires (unsaved owner / null
-   * PK) so the caller short-circuits to 0 — same correctness
-   * guard the loader uses.
-   */
-  private async _djarForCount(): Promise<{ djar: unknown } | null> {
-    const reflection = this.reflection;
-    // No registered reflection: the macro-definition fallback carries no `klass`.
-    if (reflection.klass == null) return null;
-    if (ownerHasUnresolvedThroughKey(this._record, reflection as any)) return null;
-    const { DisableJoinsAssociationScope } = await import("./disable-joins-association-scope.js");
-    const klass = (reflection as { klass: typeof Base }).klass;
-    // Box the DJAR so awaiting this helper doesn't unwrap it via
-    // `Relation.then` (which resolves to the records array). Callers
-    // read `.djar` off the resolved value.
-    const djar = DisableJoinsAssociationScope.create().scope({
-      owner: this._record,
-      reflection: reflection as any,
-      klass,
-    });
-    return { djar };
-  }
-
-  /**
-   * Count associated records.
-   */
-  async count(column?: string): Promise<number> {
-    // Rails' CollectionProxy#count delegates to scope/relation which always
-    // issues a SQL COUNT — it does NOT use the loaded-target cache (that is
-    // `size`'s job). Remove any _targetLoaded fast-path here to stay faithful.
-    // Strict loading only blocks paths that actually hit the DB —
-    // a loaded target above returns without querying, matching
-    // `size()`'s loaded-target fast path.
-    this._checkStrictLoading();
-    // Through-associations:
-    //   * disable_joins: route through DJAS' chain walker and emit a
-    //     single COUNT(*) on the final-step relation
-    //     (DisableJoinsAssociationRelation#count). The intermediate
-    //     plucks happen either way; this just avoids hydrating rows.
-    //   * non-disable-joins shapes AssociationScope can route (the
-    //     shared predicate already excludes nested-through and the
-    //     polymorphic-without-sourceType cases): fall through to the
-    //     scope().count() fast path below — `_buildThroughScope()`
-    //     produces a COUNT-able JOIN/subquery relation.
-    //   * Other through shapes (nested-through non-DJAS,
-    //     polymorphic-has_many sources): scope() / _buildThroughScope
-    //     produces SQL that references columns the target FROM
-    //     doesn't have. Fall back to the loader for those (task #25
-    //     covers the underlying scope-build issue).
-    if (this._assocDef.options.through) {
-      const refl = this.reflection as any;
-      // Disable-joins through: fast path goes through DJAR's
-      // deferred walker + final-step COUNT.
-      if (this._assocDef.options.disableJoins) {
-        const box = await this._djarForCount();
-        if (!box) return 0;
-        const djar = (box as { djar: unknown }).djar as {
-          count: (column?: string) => Promise<number | Map<unknown, number>>;
-        };
-        const c = await djar.count(column);
-        if (typeof c !== "number") {
-          throw new Error("Grouped counts are not supported for association collection counts");
-        }
-        return c;
-      }
-      // Non-disable-joins through shapes AssociationScope can't
-      // route (nested / polymorphic-has_many / polymorphic-
-      // belongsTo-without-sourceType): fall back to the loader.
-      // Disable-joins diverged case also falls through here — the
-      // generic Relation.prototype.count path below honors the
-      // proxy's in-place mutations. A persisted nested-through
-      // shape IS COUNT-able via `_buildThroughScope`'s JOIN, so it stays
-      // on the scope().count() fast path below rather than the loader.
-      if (
-        !this._assocDef.options.disableJoins &&
-        !_routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
-      ) {
-        const results = await this._findTargetViaAssociation();
-        return results.length;
-      }
-      // Routed shapes fall through to `countFn.call(this.scope())` below;
-      // `_buildThroughScope` returns the JOIN relation for them, so the count
-      // matches Rails' `scope.count(:all)` (join-row multiplicity preserved).
-    }
-    // On the diverged path `this` carries in-place proxy mutations
-    // (whereBang etc.), so route through Relation.prototype.count to
-    // avoid re-entering CP#count. On the non-diverged path route
-    // through the underlying scoped Relation so it emits the same
-    // `COUNT(*)` Rails would.
-    const countFn = (
-      Relation.prototype as unknown as {
-        count: (this: unknown, column?: string) => Promise<number | Map<unknown, number>>;
-      }
-    ).count;
-    const counted = await countFn.call(this.scope(), column);
-    // A grouped count (Map) would mean the caller added a
-    // `groupBang(...)` on the proxy — ambiguous for CP#count (which
-    // returns a single number). Fail loudly instead of silently
-    // collapsing to the group count.
-    if (typeof counted !== "number") {
-      throw new Error("Grouped counts are not supported for association collection counts");
-    }
-    return counted;
-  }
-
-  // Aggregate SQL entry points inherited from Relation (via the
-  // Calculations mixin) need the same divergence + strict-loading
-  // treatment as pluck/pick/count. Without overriding, cp.sum('x') /
-  // cp.whereBang({...}); cp.average('y') would both bypass the gate
-  // and drop in-place mutations.
-  sum(block: SumBlock): Promise<number | bigint>;
-  sum(initialValue: number, block: SumBlock): Promise<number | bigint>;
-  sum(
-    initialValueOrColumn?: string | Nodes.Node | number,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  async sum(
-    initialValueOrColumn?: string | Nodes.Node | number | SumBlock,
-    block?: SumBlock,
-  ): Promise<number | bigint | Map<unknown, number | bigint>> {
-    this._checkStrictLoading();
-    const s = this.scope();
-    return (
-      s as unknown as {
-        sum: (
-          col?: string | Nodes.Node | number | SumBlock,
-          block?: SumBlock,
-        ) => Promise<number | bigint | Map<unknown, number | bigint>>;
-      }
-    ).sum(initialValueOrColumn, block);
-  }
-
-  async average(column: string): Promise<unknown | null | Map<unknown, unknown>> {
-    this._checkStrictLoading();
-    const s = this.scope();
-    return (
-      s as unknown as {
-        average: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).average(column);
-  }
-
-  async minimum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
-    this._checkStrictLoading();
-    const s = this.scope();
-    return (
-      s as unknown as {
-        minimum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).minimum(column);
-  }
-
-  async maximum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
-    this._checkStrictLoading();
-    const s = this.scope();
-    return (
-      s as unknown as {
-        maximum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).maximum(column);
-  }
-
-  /**
    * Alias for count.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#size
@@ -1440,7 +1284,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       readCounterAttribute: (col) => this._record.readAttribute(col),
       // has_many_association.rb:84 `scope.count(:all)`: the `:all` keeps a
       // `select` declared on the association off the COUNT.
-      countViaScope: () => this.count("all"),
+      countViaScope: () => this.count("all") as Promise<number>,
       // Rails clamps by `association_scope.limit_value` — the association's own
       // scope, not any in-place proxy (`whereBang`/`limitBang`) mutation. So we
       // read the limit from the rebuilt scope even on the diverged count path,
@@ -2220,7 +2064,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Rails Relation#many? uses records.many? when loaded (no query),
     // otherwise limited_count > 1.
     if (this._targetLoaded) return this._target.length > 1;
-    return (await this.count()) > 1;
+    return ((await this.count()) as number) > 1;
   }
 
   /**
@@ -2469,50 +2313,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     ).idsWriter(ids);
   }
 
-  async pluck(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#pluck
+   * (collection_proxy.rb:728-730) — `null_scope? ? scope.pluck(*column_names) : super`.
+   */
+  override async pluck(
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
-    // Rails: `null_scope? ? scope.pluck(*column_names) : super`
-    // (collection_proxy.rb:728-730). A fidelity pin, not a bug fix: the paths
-    // below already return nothing for a null scope, but only incidentally —
-    // the loaded-target arm happens to filter new records, and the `super` arm
-    // happens to sit on the new-owner `1=0` seed. Routing
-    // explicitly through the `none!`d scope makes the guarantee structural, so
-    // neither of those incidental properties can be refactored away silently.
-    if (this.isNullScope()) return this.scope().pluck(...columns);
-    // Loaded-target fast path only handles bare string column names —
-    // readAttribute can't resolve Arel nodes. For any non-string arg,
-    // fall through to scope().pluck(...) so Relation's SQL path runs.
-    const allStrings = columns.every((c) => typeof c === "string");
-    if (allStrings && (this._isThrough || this._targetLoaded)) {
-      const stringCols = columns;
-      const records = (this._isThrough ? await this.toArray() : this._target).filter(
-        (r) => !r.isNewRecord(),
-      );
-      if (stringCols.length === 1) {
-        return records.map((r) => r._readAttribute(stringCols[0]));
-      }
-      return records.map((r) => stringCols.map((c) => r._readAttribute(c)));
+    // `disable_joins` deviation, not a Rails arm: Rails' `DisableJoinsAssociationScope`
+    // plucks the chain ids eagerly, so `scope` is authoritative and `super` — whose
+    // `spawn` is delegated to `scope` (collection_proxy.rb:1128-1137) — plucks
+    // against a constrained relation. trails resolves the chain asynchronously, so
+    // `scope()` carries no constraint until awaited and `super` would pluck over
+    // the whole table. Route those through the DJAR, which resolves the walk first.
+    // Convergence story: 0106-wide-call-set-direct-burndown/
+    // djar-eager-chain-ids-drop-disable-joins-arms.
+    if (this.isNullScope()) return this.scope().pluck(...columnNames);
+    if (this._assocDef.options.disableJoins) {
+      return this.scope().pluck(...columnNames);
     }
-    this._checkStrictLoading();
-    return this.scope().pluck(...columns);
-  }
-
-  async pick(
-    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
-  ): Promise<unknown> {
-    const allStrings = columns.every((c) => typeof c === "string");
-    if (allStrings && (this._isThrough || this._targetLoaded)) {
-      const stringCols = columns;
-      const records = (this._isThrough ? await this.toArray() : this._target).filter(
-        (r) => !r.isNewRecord(),
-      );
-      if (records.length === 0) return null;
-      if (stringCols.length === 1) return records[0]._readAttribute(stringCols[0]);
-      return stringCols.map((c) => records[0]._readAttribute(c));
-    }
-    this._checkStrictLoading();
-    return this.scope().pick(...columns);
+    return super.pluck(...columnNames);
   }
 
   async reload(): Promise<Omit<this, "then">> {
@@ -2577,26 +2397,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return built;
   }
 
+  /**
+   * Returns a Relation object for the records in this association.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#scope
+   * (collection_proxy.rb:948-950) — `@scope ||= @association.scope`. The memo is
+   * cleared by `reset_scope`, which the collection reader runs on every read
+   * (collection_association.rb:42, mirrored in `associations.ts`'s cached-proxy
+   * path) and which `reload` runs, so a scope built while the owner was still a
+   * new record never survives to a post-save call.
+   */
   scope(): any {
-    const assoc = this._record.association(this._assocName) as {
+    const assoc = this._record.association(this._assocName) as unknown as {
       scope(): unknown;
-      resetScope?(): void;
     };
-    // A scope built while the owner is still new carries an unresolved foreign
-    // key. Rails discards it twice over — `reader` runs `@proxy.reset_scope` on
-    // every collection read (collection_association.rb:42) and the owner's save
-    // runs `association.reset_scope` (autosave_association.rb:428) — so it never
-    // survives to a post-save call there. trails has no `reader` seam, so skip
-    // the memo (on the proxy AND on the association) for exactly that case.
-    if (this._record.isNewRecord()) {
-      const fresh = assoc.scope() as any;
-      assoc.resetScope?.();
-      if (fresh?._isNone === true) {
-        fresh._seededNoneNewOwner = true;
-        fresh._seedWherePredicates = [...fresh.whereClause.predicates];
-      }
-      return fresh;
-    }
     return (this._scope ??= assoc.scope() as any);
   }
 
@@ -2906,70 +2720,40 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Perform a calculation on the association scope.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#calculate
+   * (collection_proxy.rb:724-726) — `null_scope? ? scope.calculate(operation,
+   * column_name) : super`. On a non-null scope Rails runs `Calculations#calculate`
+   * with `self` = the proxy, so the proxy's own relation state answers; only the
+   * `none!`d new-owner scope is redirected to `scope`.
    */
-  async calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
-  async calculate(
+  override async calculate(
+    operation: "count",
+    column?: string,
+  ): Promise<number | Map<unknown, number>>;
+  override async calculate(
     operation: "sum",
-    column: string,
+    column: string | Nodes.Node | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  async calculate(
-    operation: "average",
+  override async calculate(
+    operation: "average" | "minimum" | "maximum",
     column: string,
   ): Promise<unknown | null | Map<unknown, unknown>>;
-  async calculate(
-    operation: "minimum" | "maximum",
-    column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
-  async calculate(operation: string, columnName?: string): Promise<unknown> {
-    operation =
-      operation === "avg"
-        ? "average"
-        : operation === "min"
-          ? "minimum"
-          : operation === "max"
-            ? "maximum"
-            : operation;
-
-    if (operation !== "count" && columnName == null) {
-      throw new Error(`Column name is required for calculation operation: ${operation}`);
+  override async calculate(
+    operation: string,
+    columnName?: string | Nodes.Node | number | null,
+  ): Promise<unknown> {
+    // `disable_joins` deviation, not a Rails arm: Rails' `DisableJoinsAssociationScope`
+    // plucks the chain ids eagerly, so `scope` is authoritative and `super` — whose
+    // `spawn` is delegated to `scope` (collection_proxy.rb:1128-1137) — calculates
+    // against a constrained relation. trails resolves the chain asynchronously, so
+    // `scope()` carries no constraint until awaited and `super` would calculate over
+    // the whole table. Route those through the DJAR, which resolves the walk first.
+    // Convergence story: 0106-wide-call-set-direct-burndown/
+    // djar-eager-chain-ids-drop-disable-joins-arms.
+    if (this.isNullScope()) return this.scope().calculate(operation, columnName);
+    if (this._assocDef.options.disableJoins) {
+      return this.scope().calculate(operation, columnName);
     }
-    const s = this.scope();
-    // Rails: `null_scope? ? scope.calculate(operation, column_name) : super`
-    // (collection_proxy.rb:724-726). As in `pluck`, a fidelity pin rather than
-    // a bug fix — the arms below also reach `scope`. It matters for the
-    // in-memory fallback at the bottom of this method, which counts loaded
-    // records with no rows behind them and must stay unreachable for a null
-    // scope no matter what `scope()` grows the ability to answer.
-    if (this.isNullScope()) return s.calculate(operation, columnName);
-    if (operation === "count" && columnName == null && typeof s.count === "function") {
-      return s.count();
-    }
-    if (typeof s.calculate === "function") {
-      return s.calculate(operation, columnName);
-    }
-    // Fallback: compute in-memory from loaded records
-    const records = await this.loadTarget();
-    if (operation === "count") return records.length;
-    if (columnName == null) {
-      throw new Error(`Column name is required for calculation operation: ${operation}`);
-    }
-    const values = records
-      .map((r) => r.readAttribute(columnName))
-      .filter((v) => v != null) as number[];
-    switch (operation) {
-      case "sum":
-        return values.reduce((a, b) => Number(a) + Number(b), 0);
-      case "average":
-        return values.length > 0
-          ? values.reduce((a, b) => Number(a) + Number(b), 0) / values.length
-          : null;
-      case "minimum":
-        return values.length > 0 ? Math.min(...values.map(Number)) : null;
-      case "maximum":
-        return values.length > 0 ? Math.max(...values.map(Number)) : null;
-      default:
-        throw new Error(`Unknown calculation operation: ${operation}`);
-    }
+    return super.calculate(operation, columnName);
   }
 
   /**

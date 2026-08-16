@@ -592,7 +592,7 @@ export async function performCount(
   if (rest.length > 0) {
     throw new ArgumentError(`wrong number of arguments (given ${rest.length + 1}, expected 0..1)`);
   }
-  return calculate.call(this, "count", columnName) as Promise<number | Map<unknown, number>>;
+  return this.calculate("count", columnName as string) as Promise<number | Map<unknown, number>>;
 }
 
 /**
@@ -615,7 +615,7 @@ export async function performAverage(
   // similarly polymorphic (BigDecimal for integer/decimal, Duration for
   // interval, etc.). Numeric averages still narrow to JS number at the
   // call site.
-  return calculate.call(this, "average", column);
+  return this.calculate("average", column as string);
 }
 
 /**
@@ -632,7 +632,7 @@ export async function performMinimum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "minimum", column);
+  return this.calculate("minimum", column as string);
 }
 
 /**
@@ -649,7 +649,7 @@ export async function performMaximum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "maximum", column);
+  return this.calculate("maximum", column as string);
 }
 
 /**
@@ -721,7 +721,7 @@ export async function performSum(
     const records = await this.toArray();
     return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
   }
-  const sum = await calculate.call(this, "sum", initialValueOrColumn);
+  const sum = await this.calculate("sum", initialValueOrColumn as string);
   if (this.groupValues.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
 }

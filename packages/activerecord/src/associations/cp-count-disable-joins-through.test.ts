@@ -113,7 +113,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
     });
     let n: number;
     try {
-      n = await association(author, "noJoinsCdComments").count();
+      n = (await association(author, "noJoinsCdComments").count()) as number;
     } finally {
       Notifications.unsubscribe(sub);
     }

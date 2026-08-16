@@ -90,7 +90,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     });
     let n: number;
     try {
-      n = await association(author, "cpcPosts").count();
+      n = (await association(author, "cpcPosts").count()) as number;
     } finally {
       Notifications.unsubscribe(sub);
     }
