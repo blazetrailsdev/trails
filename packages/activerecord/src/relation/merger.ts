@@ -29,12 +29,6 @@ export class Merger {
     this.values = typeof other.values === "function" ? other.values() : {};
   }
 
-  // Rails' Merger#merge mutates the relation it is given and returns it
-  // (merger.rb) — it does NOT clone. Non-destructive `merge` gets its fresh copy
-  // from `spawn` before ever reaching here (SpawnMethods#merge = `spawn.merge!`),
-  // while `merge!` hands `self` straight in. Mirroring that in-place contract is
-  // what lets both entry points share this single algorithm; see mergeBang /
-  // performMerge in spawn-methods.ts.
   /**
    * Mirrors: `ActiveRecord::Relation::Merger::NORMAL_VALUES`
    * (merger.rb:52-56) — `Relation::VALUE_METHODS - Relation::CLAUSE_METHODS -
@@ -63,6 +57,12 @@ export class Merger {
     return Relation.VALUE_METHODS.filter((name) => !excluded.includes(name));
   }
 
+  // Rails' Merger#merge mutates the relation it is given and returns it
+  // (merger.rb) — it does NOT clone. Non-destructive `merge` gets its fresh copy
+  // from `spawn` before ever reaching here (SpawnMethods#merge = `spawn.merge!`),
+  // while `merge!` hands `self` straight in. Mirroring that in-place contract is
+  // what lets both entry points share this single algorithm; see mergeBang /
+  // performMerge in spawn-methods.ts.
   merge(): any {
     const rel = this.relation;
     for (const name of Merger.NORMAL_VALUES) {
@@ -254,9 +254,7 @@ export class Merger {
     }
   }
 
-  // Mirrors merge_single_values (merger.rb:169-174): every other single value
-  // rides the NORMAL_VALUES loop; only `lock` (`||=`, so the receiver wins) and
-  // `create_with` (hash-wise, the other side winning) need their own arm.
+  // Mirrors merge_single_values (merger.rb:169-174).
   private mergeSingleValues(rel: any): void {
     if (this.other.lockValue) rel.lockValue ||= this.other.lockValue;
 

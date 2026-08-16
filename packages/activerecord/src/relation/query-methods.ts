@@ -502,14 +502,12 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>
           : `type ${typeof cte}`;
       throw argumentError(`Unsupported argument type: ${typeName}`);
     }
-    // A `with_values` entry fed back in — Rails' `with_values` holds the raw
-    // args, so `relation.with!(*with_values)` round-trips through Merger's
-    // NORMAL_VALUES loop (merger.rb:57-66); trails resolves at `with!` time, so
-    // the already-resolved entry is upserted as-is rather than re-parsed.
+    // `self.with_values |= args` (query_methods.rb:500-504). Rails stores the
+    // raw args, so `relation.with!(*with_values)` round-trips through Merger's
+    // NORMAL_VALUES loop (merger.rb:57-66) and two CTEs sharing an alias both
+    // survive, leaving the database to object. trails resolves at `with!` time,
+    // so a fed-back entry is unioned in as-is rather than re-parsed.
     if (isCteEntry(cte)) {
-      // `self.with_values |= args` (query_methods.rb) — a union of the raw
-      // args, so two CTEs sharing an alias both survive a merge and the
-      // database is the one that objects.
       if (!this.withValues.includes(cte)) this.withValues = [...this.withValues, cte];
       continue;
     }
