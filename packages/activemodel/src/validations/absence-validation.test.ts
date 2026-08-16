@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 
-// Mirrors: activemodel/test/models/topic.rb
+// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
 class Topic extends Model {
   static {
     this.attribute("title", "string");
@@ -10,15 +10,14 @@ class Topic extends Model {
   }
 }
 
-// Mirrors: activemodel/test/models/person.rb
+// Mirrors: activemodel/test/models/person.rb — the subset this file exercises.
 class Person extends Model {
   static {
     this.attribute("karma", "string");
   }
 }
 
-// Mirrors: activemodel/test/models/custom_reader.rb — validation reads through
-// `read_attribute_for_validation`, and `p[:karma] = x` writes the backing hash.
+// Mirrors: activemodel/test/models/custom_reader.rb
 class CustomReader extends Model {
   data: Record<string, unknown> = {};
 
