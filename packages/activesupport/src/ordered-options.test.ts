@@ -136,7 +136,7 @@ describe("OrderedOptionsTest", () => {
     expect(child.get("val")).toBe("child");
     expect(child.isOverridden("val")).toBe(true);
     expect(child.isOverridden("other")).toBe(false);
-    expect(child.has("val")).toBe(true);
+    expect(child.isKey("val")).toBe(true);
     expect(new InheritableOptions(parent).isOverridden("val")).toBe(false);
   });
 
@@ -158,6 +158,7 @@ describe("OrderedOptionsTest", () => {
   it("inheritable options to a", () => {
     const opts = new InheritableOptions(null, { x: 1 });
     expect(opts.entries()).toEqual([["x", 1]]);
+    expect(opts.toA()).toEqual([["x", 1]]);
   });
 
   it("inheritable options count", () => {

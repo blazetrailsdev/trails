@@ -483,11 +483,11 @@ export class PredicateBuilder {
       : Object.entries(conditions);
     for (const [key, value] of entries) {
       if (isPlainObject(value)) {
-        refs.push(arelSql(key));
+        refs.push(arelSql(key, { retryable: true }));
       } else {
         const dot = key.lastIndexOf(".");
         if (dot !== -1) {
-          refs.push(arelSql(key.slice(0, dot)));
+          refs.push(arelSql(key.slice(0, dot), { retryable: true }));
         }
       }
     }

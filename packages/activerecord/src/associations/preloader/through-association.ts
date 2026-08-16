@@ -1,3 +1,4 @@
+import type { Nodes } from "@blazetrails/arel";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -412,7 +413,7 @@ export class ThroughAssociation extends Association {
         // instance) — so this is intentionally NOT wrapped: it must fail loudly
         // the way Rails does rather than silently degrade to an unreferenced
         // `includes` (a differently-shaped query). This branch is a direct port.
-        const refs: string[] = reflScope?.referencesValues ?? [];
+        const refs: Array<string | Nodes.SqlLiteral> = reflScope?.referencesValues ?? [];
         if (refs.length > 0) {
           scope = scope.references(...refs);
         } else {

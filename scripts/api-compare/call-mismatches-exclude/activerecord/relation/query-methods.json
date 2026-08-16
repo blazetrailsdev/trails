@@ -3,8 +3,8 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "arel_column_with_table",
-    "call": "order:quoteTableName,sql",
-    "reason": "Verified per-site (RFC 0106): the `sql` and `quote_table_name` set rows this replaces were converged — the body now calls `Arel.sql(...)` and `connectionFor(model).quoteTableName(...)` where query_methods.rb:1986 does. The residual inversion is Rails' FIRST `Arel.sql` (`self.references_values |= [Arel.sql(table_name, retryable: true)]`, query_methods.rb:1979), which trails cannot emit: `_referencesValues` stores bare strings, and only auto-derived SqlLiteral references seed JoinDependency's alias map. Converging that store is its own change; every call Rails makes in this body is made here."
+    "call": "order:quoteTableName,resolveArelAttribute",
+    "reason": "Every call Rails makes is made here, in Rails' order; the inversion is the extra schema-qualified guard trails keeps ahead of query_methods.rb:1981 — a dotted `table_name` (\"schema.table\") must be quoted segment-by-segment through `quote_table_name` rather than handed to Arel::Table, which quotes the whole string as one identifier. Removing that branch is a separate change from converging the references_values store (RFC 0106)."
   },
   {
     "package": "activerecord",
@@ -103,13 +103,6 @@
     "rubyName": "build_with_join_node",
     "call": "order:table,constructor",
     "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "column_references",
-    "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

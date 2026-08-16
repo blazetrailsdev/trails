@@ -970,7 +970,7 @@ export class AssociationScope {
    */
   private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
     const item = evaluated as {
-      referencesValues?: string[];
+      referencesValues?: Array<string | Nodes.SqlLiteral>;
       joinsValues?: unknown[];
       _isNamedJoinValue?: (v: unknown) => boolean;
       _joinClauses?: unknown[];
