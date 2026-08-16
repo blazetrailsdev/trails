@@ -25,8 +25,6 @@ import {
   buildJoinDependencies,
   eachJoinDependencies,
 } from "./query-methods.js";
-import { disallowRawSqlBang } from "../sanitization.js";
-import { columnNameMatcher as abstractColumnNameMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 
 /**
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
@@ -117,6 +115,8 @@ interface CalculationRelation {
     connection: CalculationConnection;
     /** Mirrors `Model.load_schema` — `type_cast_pluck_values` needs attribute_types. */
     ensureSchemaLoaded(): Promise<void>;
+    /** Rails `model.disallow_raw_sql!` (calculations.rb:313). */
+    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
     /** Mirrors `Model.attribute_names` — stands in for `columns_hash.key?`. */
     attributeNames(): string[];
   };
@@ -228,7 +228,7 @@ interface CalculationRelation {
   /** @internal trails: `distinct_relation_for_primary_key`'s executed half. */
   _materializeLimitedIds(jd: JoinDependency, primaryKey: string | string[]): Promise<unknown[]>;
   /** @internal Rails `build_arel` (query_methods.rb:1750). */
-  buildArel(connection?: unknown, aliases?: unknown): SelectManager;
+  toArel(aliases?: unknown): SelectManager;
   /** @internal trails: compiles an AST to `[sql, binds]`. */
   _compileAstWithBinds(ast: unknown): [string, unknown[]];
 }
@@ -883,15 +883,7 @@ export async function pluck(
     // raw query (no toArray()), so it must trigger the load itself.
     await this._model.ensureSchemaLoaded();
 
-    // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
-    // Uses the broader column_name_matcher (allows functions like UPPER(col))
-    // rather than column_name_with_order_matcher (which is stricter, for order).
-    const stringColumns = this.flattenedArgs(columns).filter(
-      (c): c is string => typeof c === "string",
-    );
-    if (stringColumns.length > 0) {
-      disallowRawSqlBang(stringColumns, { permit: resolveColumnNameMatcher(this._conn()) });
-    }
+    this._model.disallowRawSqlBang(this.flattenedArgs(columns) as (string | symbol | Nodes.Node)[]);
 
     const table = this.table;
     // Rails columns_hash.key? — qualify a bare known column to the base table.
@@ -941,7 +933,7 @@ export async function pluck(
     // (adding joins Rails would not add for the pluck columns).
     const rel = this._clone();
     delete rel._values.select;
-    const manager = rel.buildArel();
+    const manager = rel.toArel();
     manager.projections = projections as any;
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
@@ -1232,13 +1224,6 @@ function hasTopLevelComma(s: string): boolean {
     else if (ch === "," && depth === 0) return true;
   }
   return false;
-}
-
-/** @internal */
-function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
-  // lookup on the concrete adapter class.
-  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
 }
 
 /** @internal */

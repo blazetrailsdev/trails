@@ -48,8 +48,8 @@ import {
   CompositePrimaryKeyMismatchError,
   AssociationNotFoundError,
 } from "./errors.js";
-import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
+import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
   autoloadModel,
@@ -207,19 +207,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // `self` (push / concat / append) hand this back so callers get the same
   // object they hold, since `this` is the raw target, not the wrapper.
   private _proxySelf?: this;
-  // Flag flipped by ANY post-ctor bang-style mutation on the inherited
-  // Relation state (whereBang / orderBang / reorderBang / regroupBang /
-  // reverseOrderBang / rewhereBang / limitBang / offsetBang / ... — all
-  // of them). Set by instance-level method wrappers installed at the
-  // end of the ctor (see `_installMutationTracker`). `toArray()`
-  // consults this flag to decide between the association-cache path
-  // (seed-only) and delegating to super.toArray() (mutated).
-  //
-  // Single-boolean check per toArray call — O(1) vs serializing the
-  // entire Relation state. Content-aware implicitly: any bang that
-  // touches state passes through the wrapper, regardless of whether
-  // it changes array length or only content.
-  private _cpMutated = false;
 
   // An `ArgumentError` raised while deriving the has_many foreign key
   // (e.g. an owner whose `query_constraints` list has >2 attributes, so the FK
@@ -619,9 +606,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // validated upfront; only adapter/schema failures fall to the
     // fail-closed `_isNone` path.
     const ctor = record.constructor as typeof Base;
+    // The seeding bangs must land on the proxy's OWN inherited Relation state,
+    // not on the memoized `scope()` the prototype delegation would forward them
+    // to (collection_proxy.rb:1128-1137) — and `scope()` is not even buildable
+    // yet mid-construction. Invoke them through `Relation.prototype` directly.
     const proxySelf = this as unknown as {
       initializeCopy: (other: Relation<T>) => void;
-      noneBang: () => unknown;
+    };
+    const relationProto = Relation.prototype as unknown as {
+      noneBang: (this: unknown) => unknown;
+      extendingBang: (this: unknown, ...mods: unknown[]) => unknown;
     };
     if (assocDef.options.through) {
       // Config validation FIRST, outside the try — missing through
@@ -645,8 +639,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const throughRel = this._buildThroughScope() as Relation<T>;
       proxySelf.initializeCopy(throughRel);
       // A new owner's through/HABTM scope collapses to `none()` (unresolvable
-      // FK) — mark it so a mutated finder rebases onto the resolved join scope
-      // once the owner is saved (see `_seededNoneNewOwner`).
+      // FK) — mark it so a mutation terminal run on the proxy rebases onto the
+      // resolved join scope once the owner is saved (see `_maybeRebaseProxySeed`).
       if ((throughRel as unknown as { _isNone: boolean })._isNone) {
         this._seededNoneNewOwner = true;
       }
@@ -671,7 +665,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       } catch (err) {
         if (err instanceof ArgumentError) {
           this._deferredFkError = err;
-          proxySelf.noneBang();
+          relationProto.noneBang.call(this);
           seedRel = null;
         } else {
           throw err;
@@ -679,9 +673,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       if (seedRel === null) {
         if (this._deferredFkError === undefined) {
-          proxySelf.noneBang();
+          relationProto.noneBang.call(this);
           // New-owner seed: the `1=0` base must be rebased onto the resolved
-          // scope once the owner is saved (see `_seededNoneNewOwner`).
+          // scope once the owner is saved (see `_maybeRebaseProxySeed`).
           this._seededNoneNewOwner = true;
         }
       } else {
@@ -700,10 +694,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const ext = assocDef.options.extend;
     if (ext) {
       const extensions = Array.isArray(ext) ? ext : [ext];
-      this.extendingBang(...extensions);
+      relationProto.extendingBang.call(this, ...extensions);
     }
-
-    this._installMutationTracker();
 
     // Capture the seed WHERE predicates so a later rebase (new-owner `1=0`
     // seed, owner then saved) can separate them from mutation predicates.
@@ -713,105 +705,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Install instance-level wrappers for every `*Bang` method reachable
-   * via the prototype chain. Each wrapper flips `_cpMutated` and
-   * forwards to the original. Runs once per CP instance at ctor end,
-   * AFTER seeding — so `noneBang()` / `whereBang()` calls from the
-   * ctor itself don't trip the flag. The cost of a single O(N) walk
-   * over the prototype chain (N ~ 25 bang methods) is amortized over
-   * the proxy's lifetime; every subsequent `toArray()` / divergence
-   * check is a single boolean read.
-   */
-  private _installMutationTracker(): void {
-    // Explicit allowlist of SCOPE-mutator bangs — everything exported
-    // from query-methods.ts (the `*Bang` chain mutators) plus
-    // `mergeBang` from spawn-methods. Deliberately excludes finder
-    // bangs (firstBang / lastBang / takeBang / findByBang) which
-    // raise-on-missing but don't mutate scope, and save/persistence
-    // bangs (saveBang / updateBang / destroyBang). Previously we
-    // wrapped every `*Bang` name from the prototype chain, which
-    // caused finder-bang calls to flip `_cpMutated` and force
-    // toArray() to bypass the association cache.
-    const SCOPE_MUTATOR_BANGS: readonly string[] = [
-      "whereBang",
-      "rewhereBang",
-      "invertWhereBang",
-      "orderBang",
-      "reorderBang",
-      "reverseOrderBang",
-      "groupBang",
-      "regroupBang",
-      "havingBang",
-      "limitBang",
-      "offsetBang",
-      "selectBang",
-      "reselectBang",
-      "distinctBang",
-      "lockBang",
-      "readonlyBang",
-      "strictLoadingBang",
-      "noneBang",
-      "nullBang",
-      "joinsBang",
-      "leftOuterJoinsBang",
-      "includesBang",
-      "eagerLoadBang",
-      "preloadBang",
-      "referencesBang",
-      "withBang",
-      "withRecursiveBang",
-      "fromBang",
-      "createWithBang",
-      "extendingBang",
-      "optimizerHintsBang",
-      "annotateBang",
-      "uniqBang",
-      "unscopeBang",
-      "skipQueryCacheBang",
-      "skipPreloadingBang",
-      "excludingBang",
-      "andBang",
-      "orBang",
-      "mergeBang",
-    ];
-    for (const name of SCOPE_MUTATOR_BANGS) {
-      const original = (this as unknown as Record<string, unknown>)[name];
-      if (typeof original !== "function") continue;
-      Object.defineProperty(this, name, {
-        value: function (this: CollectionProxy<T>, ...args: unknown[]) {
-          (this as unknown as { _cpMutated: boolean })._cpMutated = true;
-          // Use Relation#reset so all inherited load-state — including
-          // `_loadToken` — is invalidated atomically. Bumping the token
-          // lets in-flight super.toArray() completions detect that
-          // they're stale and skip committing results; manually
-          // clearing a subset of fields would race on the
-          // diverged-toArray / load code paths. `_target` (the
-          // association-local in-memory state) is NOT touched —
-          // that's the owner's proxy state and survives scope
-          // mutations.
-          (
-            Relation.prototype as unknown as { reset: (this: CollectionProxy<T>) => void }
-          ).reset.call(this);
-          return (original as (...a: unknown[]) => unknown).apply(this, args);
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
-
-  /** Whether any `*Bang` mutator has run on the proxy since seeding. */
-  private _relationStateDiverged(): boolean {
-    return this._cpMutated;
-  }
-
-  /**
    * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`), overridden
    * so mutation terminals invoked on the PROXY itself resolve a stale new-owner
-   * `1=0` seed once the owner is saved. `updateAll`/`touchAll`/`updateCounters`
+   * `1=0` seed once the owner is saved. `updateAll` / `touchAll` / `updateCounters`
    * have no `CollectionProxy` override — they run `Relation`'s with `this` = the
-   * proxy — and `deleteAll`'s diverged branch calls `super.deleteAll()` on the
-   * proxy; all reach this before building SQL. Rebasing here (mirroring the
+   * proxy — so they reach this before building SQL. Rebasing here (mirroring the
    * `AssociationRelation` override) gives the mutation side the same rebase that
    * reads already get through the `scope` delegation, from one place.
    */
@@ -857,17 +755,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // the underivable-FK `ArgumentError` surfaces at load time (Rails'
     // `load_target`), not when the proxy was built.
     if (this._deferredFkError !== undefined) throw this._deferredFkError;
-    const queryExecutor = this._cpMutated
-      ? (): Promise<Base[]> =>
-          // Route through AssociationRelation#toArray (not plain Relation#toArray) so
-          // inverse wiring (set_inverse_instance_from_queries) and set_strict_loading are
-          // applied — mirrors Rails' CollectionProxy → AssociationRelation#exec_queries path.
-          // `_association` returns `this` so AR#toArray can read owner/reflection off the CP.
-          (
-            _AssociationRelationCtor!.prototype as unknown as { toArray(): Promise<Base[]> }
-          ).toArray.call(this)
-      : undefined;
-    const results = (await this._findTargetViaAssociation(queryExecutor)) as T[];
+    const results = (await this._findTargetViaAssociation()) as T[];
     this._cascadeStrictLoading(results);
     // Relation's strict_loading wins over cascade — applied last to match
     // Rails: AssociationRelation#exec_queries runs set_strict_loading per
@@ -922,7 +810,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // OR-ing on a bare `!_findTarget()` would send *every* post-load `toArray()`
     // back down the re-query path and defeat caching entirely. `load()` is the
     // hydrate/cache chokepoint for the already-loaded case (including staleness).
-    if (this._cpMutated || (!this._targetLoaded && !this._findTarget())) {
+    if (!this._targetLoaded && !this._findTarget()) {
       const results = await this._execLoad();
       return this._mergeTargetLists(results);
     }
@@ -1393,12 +1281,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._assocDef.options.through) {
       const refl = this.reflection as any;
       // Disable-joins through: fast path goes through DJAR's
-      // deferred walker + final-step COUNT. The divergence-aware
-      // Relation.prototype.count fallthrough below handles any
-      // in-place proxy mutations (whereBang / groupBang / etc.) —
-      // DJAR construction here ignores those, so route diverged
-      // proxies through the generic path instead.
-      if (this._assocDef.options.disableJoins && !this._relationStateDiverged()) {
+      // deferred walker + final-step COUNT.
+      if (this._assocDef.options.disableJoins) {
         const box = await this._djarForCount();
         if (!box) return 0;
         const djar = (box as { djar: unknown }).djar as {
@@ -1439,9 +1323,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         count: (this: unknown, column?: string) => Promise<number | Map<unknown, number>>;
       }
     ).count;
-    const counted = this._relationStateDiverged()
-      ? await countFn.call(this, column)
-      : await countFn.call(this.scope(), column);
+    const counted = await countFn.call(this.scope(), column);
     // A grouped count (Map) would mean the caller added a
     // `groupBang(...)` on the proxy — ambiguous for CP#count (which
     // returns a single number). Fail loudly instead of silently
@@ -1467,15 +1349,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     block?: SumBlock,
   ): Promise<number | bigint | Map<unknown, number | bigint>> {
     this._checkStrictLoading();
-    const fn = (
-      Relation.prototype as unknown as {
-        sum: (
-          col?: string | Nodes.Node | number | SumBlock,
-          block?: SumBlock,
-        ) => Promise<number | bigint | Map<unknown, number | bigint>>;
-      }
-    ).sum;
-    if (this._relationStateDiverged()) return fn.call(this, initialValueOrColumn, block);
     const s = this.scope();
     return (
       s as unknown as {
@@ -1489,12 +1362,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   async average(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
-    const fn = (
-      Relation.prototype as unknown as {
-        average: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).average;
-    if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
@@ -1505,12 +1372,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   async minimum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
-    const fn = (
-      Relation.prototype as unknown as {
-        minimum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).minimum;
-    if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
@@ -1521,12 +1382,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   async maximum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
-    const fn = (
-      Relation.prototype as unknown as {
-        maximum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
-      }
-    ).maximum;
-    if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
@@ -2169,19 +2024,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const dep = this._assocDef.options.dependent as string | undefined;
       const deleteRows =
         dep === "destroy" || dep === "delete" || dep === "delete_all" || dep === "deleteAll";
-      // Mirror `deleteAll`'s divergence guard: when in-place proxy mutations
-      // (whereBang / ...) have run, `scope()` would rebuild the unmutated
-      // association scope and remove MORE rows than the caller constrained, so
-      // go through `super.*`.
-      const diverged = this._relationStateDiverged();
       let count: number;
       if (deleteRows) {
-        count = await (diverged ? super.deleteAll() : this.scope().deleteAll());
+        count = await this.scope().deleteAll();
       } else {
-        const nullUpdates = this._buildNullifyUpdates();
-        count = await (diverged
-          ? super.updateAll(nullUpdates)
-          : this.scope().updateAll(nullUpdates));
+        count = await this.scope().updateAll(this._buildNullifyUpdates());
       }
       // Rails `delete_records` else-branch: update_counter(-delete_count). The
       // bulk DELETE/UPDATE bypasses the child's belongs_to callbacks, so decrement
@@ -2648,12 +2495,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return records.map((r) => stringCols.map((c) => r._readAttribute(c)));
     }
     this._checkStrictLoading();
-    // Scope bangs on the proxy itself: scope() rebuilds the unmutated
-    // association relation and would drop the mutation. super.pluck
-    // uses the inherited (mutated) Relation state instead.
-    if (this._relationStateDiverged()) {
-      return super.pluck(...columns);
-    }
     return this.scope().pluck(...columns);
   }
 
@@ -2671,10 +2512,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stringCols.map((c) => records[0]._readAttribute(c));
     }
     this._checkStrictLoading();
-    // Same divergence gate as pluck().
-    if (this._relationStateDiverged()) {
-      return super.pick(...columns);
-    }
     return this.scope().pick(...columns);
   }
 
@@ -2741,22 +2578,26 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    const scope = (this._scope ??= (
-      this._record.association(this._assocName) as { scope(): unknown }
-    ).scope() as any);
-    // A new owner has no primary key yet, so the association scope collapses to
-    // the `1=0` NullRelation. Mark it, so a relation spawned off it
-    // (`owner.things.where(...)`, now built by the `scope` delegation above)
-    // rebases onto the resolved scope once the owner is saved — see
-    // `AssociationRelation#_maybeRebaseAssociationSeed`. The proxy's own `@scope`
-    // memo is dropped on the next read by `reader`'s `@proxy.reset_scope`
-    // (collection_association.rb:41) and the owner's save by
-    // `association.reset_scope` (autosave_association.rb:428).
-    if (scope?._isNone === true && this._record.isNewRecord()) {
-      scope._seededNoneNewOwner = true;
-      scope._seedWherePredicates = [...scope.whereClause.predicates];
+    const assoc = this._record.association(this._assocName) as {
+      scope(): unknown;
+      resetScope?(): void;
+    };
+    // A scope built while the owner is still new carries an unresolved foreign
+    // key. Rails discards it twice over — `reader` runs `@proxy.reset_scope` on
+    // every collection read (collection_association.rb:42) and the owner's save
+    // runs `association.reset_scope` (autosave_association.rb:428) — so it never
+    // survives to a post-save call there. trails has no `reader` seam, so skip
+    // the memo (on the proxy AND on the association) for exactly that case.
+    if (this._record.isNewRecord()) {
+      const fresh = assoc.scope() as any;
+      assoc.resetScope?.();
+      if (fresh?._isNone === true) {
+        fresh._seededNoneNewOwner = true;
+        fresh._seedWherePredicates = [...fresh.whereClause.predicates];
+      }
+      return fresh;
     }
-    return scope;
+    return (this._scope ??= assoc.scope() as any);
   }
 
   private _buildThroughScope(): any {
@@ -3312,11 +3153,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 // keeping them as standalone modules, so their `public_instance_methods(false)`
 // can't be reflected off a module object — the two name lists below stand in for
 // that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
-// The bang builders are NOT delegated: `CollectionProxy`'s constructor seeds its
-// own inherited `Relation` state through `noneBang` / `extendingBang` /
-// `initializeCopy`, and `toSql` / `toArray` read that state, so a proxy-wide
-// bang delegation would send the seed to the memoized scope instead of the proxy —
-// converging that half is story `collection-proxy-delegate-query-method-bangs-to-scope`.
+// Both halves of each module are listed: `public_instance_methods(false)` includes
+// the bang builders (`where!`, `limit!`, `none!`, …), so Rails delegates those to
+// `scope` too — a Rails `CollectionProxy` owns no relation state of its own. The
+// constructor's own seeding calls (`noneBang` / `extendingBang`) run BEFORE the
+// prototype delegation is consulted only in the sense that they must target the
+// proxy's inherited state, so they are invoked through `Relation.prototype`
+// directly (see the ctor).
 const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "includes",
   "all",
@@ -3360,9 +3203,56 @@ const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
   "excluding",
   "arel",
   "constructJoinDependency",
+  // The bang half of `QueryMethods.public_instance_methods(false)`
+  // (query_methods.rb) — Rails delegates these to `scope` as well.
+  "includesBang",
+  "eagerLoadBang",
+  "preloadBang",
+  "referencesBang",
+  "selectBang",
+  "withBang",
+  "withRecursiveBang",
+  "reselectBang",
+  "groupBang",
+  "regroupBang",
+  "orderBang",
+  "reorderBang",
+  "unscopeBang",
+  "joinsBang",
+  "leftOuterJoinsBang",
+  "whereBang",
+  "rewhereBang",
+  "invertWhereBang",
+  "havingBang",
+  "limitBang",
+  "offsetBang",
+  "lockBang",
+  "noneBang",
+  "nullBang",
+  "readonlyBang",
+  "strictLoadingBang",
+  "createWithBang",
+  "fromBang",
+  "distinctBang",
+  "extendingBang",
+  "optimizerHintsBang",
+  "reverseOrderBang",
+  "annotateBang",
+  "excludingBang",
+  "uniqBang",
+  "skipQueryCacheBang",
+  "skipPreloadingBang",
+  "andBang",
+  "orBang",
 ] as const;
 
-const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = ["spawn", "merge", "except", "only"] as const;
+const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = [
+  "spawn",
+  "merge",
+  "mergeBang",
+  "except",
+  "only",
+] as const;
 
 const delegateMethods = (
   [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]

@@ -563,6 +563,8 @@ export interface AbstractAdapter {
   dataSources(): Promise<string[]>;
   dataSourceExists(name: string): Promise<boolean>;
   // --- DatabaseStatements ---
+  /** Mirrors `DatabaseStatements#sanitize_limit` (abstract/database_statements.rb). */
+  sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
   /**
    * Reset the transaction manager, discarding any open transactions. With a
    * callback, reconfigures the connection in a fresh transaction context and

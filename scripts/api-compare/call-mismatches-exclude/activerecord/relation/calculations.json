@@ -161,18 +161,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "pluck",
-    "call": "disallow_raw_sql!",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:model",
-      "ref:flattenedArgs"
-    ],
-    "reason": "Rails' `model.disallow_raw_sql!(flattened_args(column_names))` (calculations.rb:315) is spelled here as the free `disallowRawSqlBang(stringColumns, { permit: … })` from sanitization.ts, which takes the permit matcher explicitly rather than reading it off the model; the string filter is the flattened_args result narrowed to strings."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "pluck",
     "call": "empty",
     "kind": "args",
     "rubyArgs": [
