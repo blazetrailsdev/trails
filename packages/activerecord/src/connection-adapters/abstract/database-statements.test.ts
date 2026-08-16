@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import {
   buildFixtureSql,
@@ -617,7 +618,11 @@ describe("DatabaseStatements", () => {
     });
 
     it("sanitize limit with invalid value", () => {
-      expect(() => sanitizeLimit("abc")).toThrow(TypeError);
+      // `Integer("abc")` (database_statements.rb:512) raises ArgumentError, not
+      // TypeError — TypeError is Ruby's arm for a value with no integer
+      // conversion at all (`Integer(nil)`).
+      expect(() => sanitizeLimit("abc")).toThrow(ArgumentError);
+      expect(() => sanitizeLimit(null)).toThrow(TypeError);
     });
 
     it("with yaml fallback passes scalar through", () => {

@@ -252,7 +252,7 @@ interface QueryMethodsHost {
   withValues: Array<Record<string, unknown>>;
   /** Mirrors Rails' `@with_is_recursive` (query_methods.rb:527). */
   _withIsRecursive: boolean;
-  limitValue: number | null;
+  limitValue: number | string | null;
   offsetValue: number | string | null;
   lockValue: string | null;
   readonlyValue: boolean | null;
@@ -1145,16 +1145,10 @@ function havingBang(
   return this;
 }
 
-function limitBang(this: QueryMethodsHost, value: number | null): any {
-  if (value == null) {
-    this.limitValue = null;
-    return this;
-  }
-  const num = Number(value);
-  if (!Number.isSafeInteger(num) || num < 0) {
-    throw new Error(`Invalid limit value: ${String(value)}`);
-  }
-  this.limitValue = num;
+function limitBang(this: QueryMethodsHost, value: number | string | null): any {
+  // Mirrors `limit!` (query_methods.rb:1215-1218): the raw value is stored and
+  // sanitized later, by `build_arel`'s `connection.sanitize_limit` (:1757).
+  this.limitValue = value;
   return this;
 }
 
@@ -2255,7 +2249,13 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
     const subArel =
-      typeof resolved.toArel === "function" ? resolved.toArel() : resolved.buildArel();
+      typeof resolved.toArel === "function"
+        ? resolved.toArel()
+        : // A duck-typed relation with no `toArel` acquisition seam: this
+          // subquery build is one of the connectionless paths, so pass the
+          // abstract `sanitize_limit` (abstract/database_statements.rb)
+          // explicitly rather than letting `buildArel` degrade internally.
+          resolved.buildArel({ sanitizeLimit });
     return subArel.as(alias);
   }
   return opts;
@@ -2404,13 +2404,10 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
 export function buildArel(
   this: QueryMethodsHost,
   // Rails threads the `with_connection` connection into every `build_arel`
-  // call (query_methods.rb:1595, relation.rb:1023) and reads it for
-  // `connection.sanitize_limit` (query_methods.rb:1757). trails' Arel building
-  // is reachable on a model with no established connection (subquery/CTE
-  // construction in tests), where `_conn()` raises — so a null connection
-  // degrades to the same `sanitize_limit` as a module function, exactly as
-  // `_annotationComments` degrades to the abstract `sanitizeAsSqlComment`.
-  connection?: { sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral } | null,
+  // call (query_methods.rb:1595, relation.rb:1023), so the body never sees a
+  // missing one. Callers acquire before calling; the connectionless Arel build
+  // is named at the acquisition point (`Relation#toArel`), not tolerated here.
+  connection: { sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral },
   aliases?: AliasTracker,
 ): any {
   const table: any = this.table;
@@ -2422,14 +2419,7 @@ export function buildArel(
   if (!this.havingClause.isEmpty()) arel.having(this.havingClause.ast);
 
   if (this.limitValue !== null)
-    arel.take(
-      buildCastValue(
-        "LIMIT",
-        connection?.sanitizeLimit
-          ? connection.sanitizeLimit(this.limitValue)
-          : sanitizeLimit(this.limitValue),
-      ),
-    );
+    arel.take(buildCastValue("LIMIT", connection.sanitizeLimit(this.limitValue)));
   if (this.offsetValue !== null) arel.skip(buildCastValue("OFFSET", toI(this.offsetValue)));
 
   if (this.groupValues.length > 0)

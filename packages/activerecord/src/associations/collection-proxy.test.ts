@@ -849,11 +849,11 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
 });
 
 // The mutation terminals invoked on the PROXY itself (not a spawned relation)
-// route through `Relation`'s implementations with `this` = the proxy, so
-// they hit the base `_isEmptyRelation()` chokepoint on the proxy. The
-// `CollectionProxy#_isEmptyRelation` override rebases the stale new-owner
-// `1=0` seed there, giving the mutation side the same rebase reads already
-// get through `_finderScope`.
+// route through `scope()`, which the association rebuilds against the resolved
+// FK — so the proxy's own stale new-owner `1=0` seed is never read. Rails gets
+// this from `delegate(*delegate_methods, to: :scope)`
+// (collection_proxy.rb:1128-1137) sending the QueryMethods value readers the
+// inherited `update_all` uses to `@association.scope`.
 describe("CollectionProxy — mutation terminals invoked on the proxy itself on stale new-owner seed", () => {
   fixtures(["authors", "posts"]);
 

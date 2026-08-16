@@ -16,7 +16,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError, ArgumentError } from "@blazetrails/activemodel";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -1314,16 +1314,24 @@ export function emptyInsertStatementValue(_primaryKey?: string | null): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#sanitize_limit
  */
 export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
-  if (typeof limit === "number" && Number.isInteger(limit)) {
+  if ((typeof limit === "number" && Number.isInteger(limit)) || limit instanceof Nodes.SqlLiteral) {
     return limit;
   }
-  if (limit instanceof Nodes.SqlLiteral) {
-    return limit;
-  }
+  // Ruby's `Integer(limit)` (database_statements.rb:512): a decimal-integer
+  // string converts, a Float truncates toward zero, and anything else raises —
+  // ArgumentError for a String Ruby cannot parse (which is what the SQL-injection
+  // strings in `base_test.rb:187-205` hit), TypeError for a value that has no
+  // integer conversion at all.
   if (typeof limit === "string" && /^[+-]?\d+$/.test(limit.trim())) {
     return Number(limit.trim());
   }
-  throw new TypeError(`Invalid LIMIT: ${limit}`);
+  if (typeof limit === "string") {
+    throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(limit)}`);
+  }
+  if (typeof limit === "number" && Number.isFinite(limit)) {
+    return Math.trunc(limit);
+  }
+  throw new TypeError(`can't convert ${limit === null ? "nil" : typeof limit} into Integer`);
 }
 
 /**

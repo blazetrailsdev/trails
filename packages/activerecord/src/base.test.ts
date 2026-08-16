@@ -725,13 +725,18 @@ describe("BasicsTest", () => {
     const pkTypes = pk?.type == null ? [ref.type] : [pk.type];
     expect(pkTypes[0]).toBe(ref.type);
   });
+  // `limit!` stores the raw value (query_methods.rb:1215-1218); the value is
+  // only vetted when `build_arel` runs it through `connection.sanitize_limit`
+  // (:1757, database_statements.rb:508-514), so — as in Rails, where these
+  // tests raise from `to_a` — the throw lands at query-build time, not at
+  // `limit(...)`.
   it("invalid limit", () => {
     class User extends Base {
       static {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit(-1)).toThrow(/invalid limit/i);
+    expect(() => User.limit("asdfadf" as any).toSql()).toThrow(/invalid value for Integer/i);
   });
   it("limit should sanitize sql injection for limit without commas", () => {
     class User extends Base {
@@ -739,7 +744,9 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit("1 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
+    expect(() => User.limit("1 select * from schema" as any).toSql()).toThrow(
+      /invalid value for Integer/i,
+    );
   });
   it("limit should sanitize sql injection for limit with commas", () => {
     class User extends Base {
@@ -747,7 +754,9 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit("1, 7 ; DROP TABLE users" as any)).toThrow(/invalid limit/i);
+    expect(() => User.limit("1, 7 procedure help()" as any).toSql()).toThrow(
+      /invalid value for Integer/i,
+    );
   });
   it("preserving time objects", async () => {
     class Topic extends Base {

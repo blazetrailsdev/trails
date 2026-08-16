@@ -47,7 +47,6 @@ import {
   CompositePrimaryKeyMismatchError,
   AssociationNotFoundError,
 } from "./errors.js";
-import { rebaseNewOwnerSeed } from "./new-owner-seed-rebase.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import {
@@ -143,21 +142,6 @@ export type AssociationProxy<
  */
 function sameRecordList(a: Base[], b: Base[]): boolean {
   return a.length === b.length && a.every((record, i) => record.equals(b[i]));
-}
-
-/**
- * Validate a numeric limit (safe non-negative integer) and raise the
- * same error shape as Relation#limitBang. Rails' `first(n)` / `last(n)`
- * / `take(n)` all route through `limit(limit)` which validates; our
- * TS finder methods bypass validation for first/take via
- * `limitValue = n` (a TS-internal shortcut that diverges from Rails).
- * For Rails fidelity at the CollectionProxy layer we validate all
- * three.
- */
-function assertValidLimit(n: number): void {
-  if (!Number.isSafeInteger(Number(n)) || Number(n) < 0) {
-    throw new Error(`Invalid limit value: ${String(n)}`);
-  }
 }
 
 /** @internal */
@@ -641,12 +625,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // errors — worse than letting construction fail.
       const throughRel = this._buildThroughScope() as Relation<T>;
       proxySelf.initializeCopy(throughRel);
-      // A new owner's through/HABTM scope collapses to `none()` (unresolvable
-      // FK) — mark it so a mutation terminal run on the proxy rebases onto the
-      // resolved join scope once the owner is saved (see `_maybeRebaseProxySeed`).
-      if ((throughRel as unknown as { _isNone: boolean })._isNone) {
-        this._seededNoneNewOwner = true;
-      }
     } else {
       // Build via the `scope()` seam so CP's inherited Relation
       // state matches `scope()` / direct Relation callers: default
@@ -677,9 +655,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       if (seedRel === null) {
         if (this._deferredFkError === undefined) {
           seedNone();
-          // New-owner seed: the `1=0` base must be rebased onto the resolved
-          // scope once the owner is saved (see `_maybeRebaseProxySeed`).
-          this._seededNoneNewOwner = true;
         }
       } else {
         proxySelf.initializeCopy(seedRel);
@@ -699,62 +674,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const extensions = Array.isArray(ext) ? ext : [ext];
       relationProto.extendingBang.call(this, ...extensions);
     }
-
-    // Capture the seed WHERE predicates so a later rebase (new-owner `1=0`
-    // seed, owner then saved) can separate them from mutation predicates. Read
-    // through `Relation.prototype` for the same reason the seeding bangs above
-    // are called that way: `where_clause` is one of the readers delegated to
-    // `scope` (collection_proxy.rb:1128-1137), and the seed lives in the
-    // proxy's OWN inherited state — going through the delegation here would
-    // also force an eager `scope()` build, which Rails defers to load time.
-    const ownWhereClause = Object.getOwnPropertyDescriptor(
-      Relation.prototype,
-      "whereClause",
-    )?.get?.call(this) as { predicates: unknown[] } | undefined;
-    this._seedWherePredicates = [...(ownWhereClause?.predicates ?? [])];
-  }
-
-  /**
-   * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`), overridden
-   * so mutation terminals invoked on the PROXY itself resolve a stale new-owner
-   * `1=0` seed once the owner is saved. `updateAll` / `touchAll` / `updateCounters`
-   * have no `CollectionProxy` override — they run `Relation`'s with `this` = the
-   * proxy — so they reach this before building SQL. Rebasing here (mirroring the
-   * `AssociationRelation` override) gives the mutation side the same rebase that
-   * reads already get through the `scope` delegation, from one place.
-   */
-  _isEmptyRelation(): boolean {
-    this._maybeRebaseProxySeed();
-    return super._isEmptyRelation();
-  }
-
-  /**
-   * @internal Rebase this proxy in place when it still carries a stale new-owner
-   * `1=0` seed and the owner has since been saved (so `scope()` resolves a real
-   * FK). Mirrors `AssociationRelation`'s rebase, but mutates `this` — a mutation
-   * terminal runs against the proxy's own relation state, so the resolved FK
-   * must land there. Clears the seed marker so it runs exactly once.
-   */
-  private _maybeRebaseProxySeed(): void {
-    if (!this._seededNoneNewOwner) return;
-    // Both memo levels were populated while the owner was still new, so both
-    // carry the unresolved FK — drop them before rebuilding, exactly as Rails'
-    // two `reset_scope`s do (`CollectionProxy#reset_scope`,
-    // collection_proxy.rb:1112-1116, clearing `@scope`; `Association#reset_scope`,
-    // association.rb:119-121, clearing `@association_scope`). Mirrors the same
-    // pair in `AssociationRelation#_maybeRebaseAssociationSeed`.
-    this.resetScope();
-    (
-      this._record.association(this._assocName) as unknown as { resetScope?(): void }
-    ).resetScope?.();
-    const fresh = this.scope() as unknown as { _isNone: boolean };
-    if (fresh._isNone) return;
-    rebaseNewOwnerSeed(
-      this as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
-      fresh as unknown,
-      this._seedWherePredicates,
-    );
-    this._seededNoneNewOwner = false;
   }
 
   /**
@@ -1982,7 +1901,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(): Promise<T | null>;
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
-    if (n !== undefined) assertValidLimit(n);
     // `load_target if find_from_target?; super` (collection_proxy.rb:259-262).
     // `super` is `Relation#last`, whose `loaded?` arm (finder_methods.rb:203)
     // fires on the proxy via the `isLoaded` / `records` overrides; the
@@ -2011,7 +1929,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(): Promise<T | null>;
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
-    if (n !== undefined) assertValidLimit(n);
     // `load_target if find_from_target?; super` (collection_proxy.rb:289-292).
     // `super` is `Relation#take`, which dispatches to the `findTake` /
     // `findTakeWithLimit` seams below; the `@take` memo and the loaded arm are
