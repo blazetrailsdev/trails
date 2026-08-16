@@ -34,7 +34,6 @@ import {
 } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { isStiSubclass } from "./inheritance.js";
-import { isBaseInstance } from "./relation/predicate-builder/is-base-instance.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   underscore as _toUnderscore,
@@ -2143,13 +2142,13 @@ export class Relation<T extends Base> {
   /**
    * Check if there are any matching records.
    *
-   * Mirrors: ActiveRecord::Relation#any?
+   * Mirrors: ActiveRecord::Relation#any? (relation.rb:391-396) — `!empty?`;
+   * the `loaded?` short-circuit lives in `empty?` (relation.rb:362-370).
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
     if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
-    if (this._loaded) return this._records.length > 0;
-    return this.exists();
+    return !(await this.isEmpty());
   }
 
   /**
@@ -2903,80 +2902,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Check if any records exist, optionally with conditions.
-   *
-   * Mirrors: ActiveRecord::Relation#exists? — ending in
-   * `skip_query_cache_if_necessary { with_connection { |c|
-   * c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
-   * (finder_methods.rb:377-381), the cached read path.
-   */
-  async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
-    if (this._isEmptyRelation()) return false;
-    // Rails FinderMethods#exists?: `return false if !conditions` — treats an
-    // explicit `false` / `null` argument as "no match possible". This precedes
-    // the `if eager_loading?` branch, so it short-circuits before the
-    // eager-load validation below (finder_methods.rb:367-369).
-    if (conditions === false || conditions === null) return false;
-    // Rails FinderMethods#exists?: `return false if !conditions || limit_value == 0`
-    // (finder_methods.rb:367). A relation limited to zero rows can never match, so
-    // short-circuit to false without emitting any query.
-    if (this.limitValue === 0) return false;
-    // Rails FinderMethods#exists? (finder_methods.rb:360-364): reject an
-    // ActiveRecord instance argument with `if Base === conditions` before any
-    // query is built. Detect it via the inherited `_isActiveRecordBase` marker
-    // so a model of any class (not just this relation's) is caught.
-    // Rails runs this Base check just *before* `return false if !conditions`;
-    // we run it just after. The branches are mutually exclusive (an AR instance
-    // is never `false`/`null`), so the order is behaviorally identical.
-    if (isBaseInstance(conditions)) {
-      throw new ArgumentError(
-        "You are passing an instance of ActiveRecord::Base to `exists?`. " +
-          "Please pass the id of the object by calling `.id`.",
-      );
-    }
-    // Rails exists? then routes through apply_join_dependency when eager
-    // loading, raising EagerLoadPolymorphicError for polymorphic specs.
-    this._checkEagerLoadable();
-    // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
-    // the eager-load check precedes construct_relation_for_exists, and conditions
-    // thread through to the recursion (`apply_join_dependency(eager_loading: false)
-    // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
-    if (this._eagerLoadingForSql()) {
-      return this.applyJoinDependency({ eagerLoading: false }).exists(conditions);
-    }
-    // Mirrors Rails FinderMethods#construct_relation_for_exists
-    // (finder_methods.rb:438): shape the existence probe and apply the argument's
-    // `case conditions` (Array/Hash → where!, else → where!(primary_key =>
-    // conditions)) in one place — `exists?` no longer reimplements that
-    // case-analysis. When `distinct_value && offset_value` keep the relation's
-    // select/distinct/group/having/offset and drop only the order
-    // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
-    // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive.
-    // `undefined` is our `:none` sentinel, so the helper adds no where!. Building
-    // the probe through the real relation reuses the shared select-list builder,
-    // so the distinct+offset branch's default `*` projection is `ignoredColumns`-
-    // aware, matching Rails' `build_select`.
-    const probe: Relation<T> = this.constructRelationForExists(conditions);
-    // Resolve any deferred distinct-PK subquery markers to a literal id list
-    // before compiling the probe (Rails materializes at `.where()`-build time).
-    await probe._materializeDeferredDistinctPkPredicates();
-    // Rails: `return false if relation.where_clause.contradiction?`
-    // (finder_methods.rb:375) — evaluated on the post-construct relation.
-    if (probe.whereClause.isContradiction()) return false;
-    // Tag the probe query `<Model> Exists?` — the name Rails passes to its
-    // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
-    // finder_methods.rb) — so LogSubscriber labels it instead of falling back
-    // to the adapter's generic "SQL" default.
-    const [existsSql, existsBinds] = this._compileAstWithBinds(probe.toArel().ast);
-    return await this.skipQueryCacheIfNecessary(() =>
-      this.withConnection(
-        async (c) =>
-          (await c.selectRows(existsSql, `${this.model.name} Exists?`, existsBinds)).length === 1,
-      ),
-    );
-  }
-
-  /**
    * Update all matching records.
    *
    * Mirrors: ActiveRecord::Relation#update_all
@@ -3502,17 +3427,6 @@ export class Relation<T extends Base> {
     const relation = this.except("includes", "eagerLoad", "preload");
     QueryMethodBangs.joinsBang.call(relation as any, jd as any);
     return run(relation);
-  }
-
-  /**
-   * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
-   * `reflections.none?(&:collection?)` — a set of reflections is limitable
-   * when none of them is a collection association.
-   *
-   * @internal
-   */
-  usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean {
-    return reflections.every((r) => !r.isCollection());
   }
 
   /** Eager-load specs that `apply_join_dependency` would join (eager_load ∪ includes). */
@@ -4703,51 +4617,6 @@ export class Relation<T extends Base> {
     return this;
   }
 
-  /**
-   * Check if the given record is present in the relation.
-   *
-   * Mirrors: ActiveRecord::Relation#include? (finder_methods.rb:389-407).
-   * A non-model argument short-circuits to `false` without querying. A loaded
-   * relation — or one carrying offset/limit/having — compares in memory; an
-   * unloaded relation without those issues a cheap `exists?(id)` rather than
-   * materializing every row.
-   */
-  async include(record: T): Promise<boolean> {
-    if (!(record instanceof this.model)) return false;
-    if (
-      this.isLoaded ||
-      this.offsetValue !== null ||
-      this.limitValue !== null ||
-      !this.havingClause.isEmpty()
-    ) {
-      const records = await this.toArray();
-      return records.some((r) => r.equals(record));
-    }
-    // Unloaded fast path: probe existence by primary key. The composite-PK arm
-    // (Rails `record.class.composite_primary_key?`) is a `primary_key.zip(id)`
-    // hash rather than the tuple, which exists()'s array branch would read as
-    // `[sql, ...binds]`.
-    const recordClass = record.constructor as typeof Base;
-    const id = recordClass.compositePrimaryKey
-      ? Object.fromEntries(
-          (recordClass.primaryKey as string[]).map((column, index) => [
-            column,
-            (record.id as unknown[])[index],
-          ]),
-        )
-      : record.id;
-
-    return this.exists(id);
-  }
-
-  /**
-   * Alias of {@link include} — mirrors `alias :member? :include?`
-   * (finder_methods.rb:407).
-   */
-  member(record: T): Promise<boolean> {
-    return this.include(record);
-  }
-
   // ---------------------------------------------------------------------------
   // Missing relation.rb methods — accessors, cache keys, scoping
   // ---------------------------------------------------------------------------
@@ -5579,6 +5448,9 @@ export interface Relation<T extends Base>
   fortyTwoBang(): Promise<T>;
   secondToLastBang(): Promise<T>;
   thirdToLastBang(): Promise<T>;
+  exists(conditions?: Record<string, unknown> | unknown): Promise<boolean>;
+  include(record: T): Promise<boolean>;
+  member(record: T): Promise<boolean>;
   findOrCreateByBang(
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
@@ -5602,6 +5474,8 @@ export interface Relation<T extends Base>
   relationWith(values: Record<string, unknown>): Relation<T>;
   /** @internal */
   constructRelationForExists(conditions: unknown): Relation<T>;
+  /** @internal */
+  usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   /** @internal */
   findWithIds(ids: unknown[]): Promise<T | T[]>;
   /** @internal */

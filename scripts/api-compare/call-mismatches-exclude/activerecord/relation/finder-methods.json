@@ -2,6 +2,13 @@
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
+    "rubyName": "exists?",
+    "call": "size",
+    "reason": "Verified per-site (RFC 0106): Ruby `Array#size` on the plain Array `select_rows` returns (finder_methods.rb:379 — `c.select_rows(relation.arel, \"#{model.name} Exists?\").size == 1`, ported as `(await c.selectRows(...)).length === 1`), whose faithful JS spelling emits no callee, so no TS call can ever credit the Ruby one — nothing in the TS body was dropped."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_last",
     "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
