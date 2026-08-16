@@ -2456,8 +2456,10 @@ export function selectNamedJoins(
     if (
       isRubySymbol(joinName) &&
       // Rails: `with_values.any? { _1.key?(join_name) }` (query_methods.rb:1800).
-      // The hash keys are the Symbols `with(...)` was called with, so compare
-      // against the Symbol itself and against its bare name.
+      // The store keeps whatever key `with(...)` was called with, and a trails
+      // Ruby Symbol is a ":name" string — so `with({ ":x": rel })` and
+      // `with({ x: rel })` are the same Ruby `{ x: rel }`. Both arms are that
+      // one `key?(join_name)`, not a widened lookup.
       any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte)
     ) {
       cteJoins.push(symbolToName(joinName));
