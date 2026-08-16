@@ -233,6 +233,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // stash it here, and re-throw from the single load chokepoint (`_execLoad`).
   private _deferredFkError?: Error;
 
+  /**
+   * Mirrors: ActiveRecord::Associations::CollectionProxy#loaded?
+   * (`@association.loaded?`, collection_proxy.rb:53) — the proxy's loadedness is
+   * the association target's, NOT `Relation`'s `_loaded`. Overriding the
+   * inherited getter is what lets the base `FinderMethods` bodies (`find_take`,
+   * `find_nth_with_limit`, `find_last`) take their `loaded?` arm on a proxy and
+   * read the target through `records()` (`load_target`, :1024), exactly as they
+   * do in Rails.
+   */
+  override get isLoaded(): boolean {
+    return this._targetLoaded;
+  }
+
   get loaded(): boolean {
     return this._targetLoaded;
   }
@@ -809,6 +822,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * proxy's own diverged state is the intended target, so we keep it.
    */
   private _finderScope(): this {
+    // A loaded proxy never reaches the scope at all: in Rails only the query
+    // builders (`limit`, `reverse_order`, …) delegate to `scope`, and the
+    // `loaded?` arm of `find_take` / `find_nth_with_limit` / `find_last` returns
+    // before any of them runs. Handing back `this` keeps that arm reading the
+    // target through the proxy's `loaded?` / `records` overrides.
+    if (this.isLoaded) return this;
     if (!this._cpMutated) return this.scope() as unknown as this;
     // A diverged proxy keeps its own clauses — UNLESS they sit on a stale
     // new-owner `1=0` seed and the owner has since been saved. Then rebase the
@@ -1936,9 +1955,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
-    // `@offsets = @take = nil` (collection_proxy.rb:1113).
-    this._offsets = undefined;
-    this._take = undefined;
+    // `@offsets = @take = nil; @scope = nil` (collection_proxy.rb:1113-1117) —
+    // all three slots, since the `@take` memo now lives on the memoized scope
+    // that `_finderScope()` hands the base `find_take`.
+    this.resetScope();
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
       assocInstance._associationIds = null;
@@ -2295,24 +2315,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override first(n: number): Promise<T[]>;
   override async first(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    // Rails CollectionProxy#first: `load_target if find_from_target?; super`
-    // (collection_proxy.rb:259). When find_from_target? the loaded @target is
-    // used; otherwise super runs a bounded finder query WITHOUT marking the
-    // association loaded (so n_plus_one_only `loaded?` stays false). The no-arg
-    // case mirrors Relation#find_nth's @offsets memo (finder_methods.rb) so
-    // repeated `first` returns the same object until reset/reload clears it.
-    if (this.isFindFromTarget()) {
-      const records = await this.loadTarget();
-      if (n === undefined) return records[0] ?? null;
-      return records.slice(0, n);
-    }
-    // Rails delegates to `find_nth_with_limit(0, n)` / `find_take_with_limit`
-    // (finder_methods.rb:590,:603) — a bounded `limit` query, not a full load
-    // then slice. The no-arg case keeps Relation#find_nth's @offsets memo.
+    // Rails' CollectionProxy has no `first` override at all: `Relation#first`
+    // runs with `self` = the proxy and reaches the target through the overridden
+    // `find_nth_with_limit` (collection_proxy.rb:1155-1158), which is where the
+    // `load_target if find_from_target?` lives. We keep a body only for the
+    // limit validation and to skip `Relation#first`'s `_isEmptyRelation`
+    // short-circuit, which has no Rails counterpart and would swallow a loaded
+    // target sitting on a new-owner `1=0` seed. Everything else is
+    // `performFirst` verbatim: `first(n)` → `find_nth_with_limit(0, n)`,
+    // no-arg → `find_nth(0)` and its `@offsets` memo (finder_methods.rb:135-141).
     if (n !== undefined) return this.findNthWithLimit(0, n);
-    // `find_nth(0)` (finder_methods.rb:598-601). Rails' CollectionProxy#first is
-    // a bare `super`, so the `@offsets` memo lands on the proxy itself; the query
-    // still routes through `_finderScope` via our `findNthWithLimit` override.
     return baseFindNth.call(this as any, 0);
   }
 
@@ -2337,24 +2349,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
     // Rails CollectionProxy#last: `load_target if find_from_target?; super`
-    // (collection_proxy.rb:289). Unlike first/take, Relation#last is NOT memoized
-    // — it builds a temporary `reverse_order` relation and reads `.first` off it
-    // (finder_methods.rb:202), so there is no @offsets/@take cache here. We
-    // deliberately do NOT consult/populate the `@take`/`@offsets` memos for last().
-    if (this.isFindFromTarget()) {
-      const records = await this.loadTarget();
-      if (n === undefined) return records[records.length - 1] ?? null;
-      return records.slice(Math.max(0, records.length - n));
-    }
-    // Rails Relation#last builds a `reverse_order` relation and reads the tail
-    // via a bounded query (finder_methods.rb:202), not a full load then slice.
-    // When the target is already loaded, read from it (mirrors performLast's
-    // loaded branch — the proxy keeps loaded state in `_target`/`_targetLoaded`).
-    if (this._targetLoaded) {
-      const records = this._target;
-      if (n === undefined) return records[records.length - 1] ?? null;
-      return n === 0 ? [] : records.slice(-n);
-    }
+    // (collection_proxy.rb:259-262). `super` is `Relation#last`, whose `loaded?`
+    // arm (finder_methods.rb:158) now fires on the proxy via the `isLoaded` /
+    // `records` overrides, so the tail read is the base body's. `_finderScope()`
+    // stands in for Rails' `delegate(*QueryMethods, to: :scope)` — it returns
+    // `this` once loaded, so only the reverse-order query goes to the scope.
+    if (this.isFindFromTarget()) await this.loadTarget();
     return basePerformLast.call(this._finderScope() as any, n);
   }
 
@@ -2378,30 +2378,36 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override take(limit: number): Promise<T[]>;
   override async take(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    // Mirrors first()'s find_from_target?/memo split.
-    if (this.isFindFromTarget()) {
-      const records = await this.loadTarget();
-      if (n === undefined) return records[0] ?? null;
-      return records.slice(0, n);
-    }
-    // Rails' `take(n)` runs `find_take_with_limit` (`limit(n).to_a`,
-    // finder_methods.rb:590); no-arg `take` is `find_take` (`limit(1).records.first`,
-    // finder_methods.rb:582), memoized via @take. Both are bounded queries that
-    // deliberately SKIP `ordered_relation` — unlike `first`, `take` is an
-    // arbitrary-order fetch, so we use the plain `findTake*` helpers rather than
-    // `findNthWithLimit` (which would add an implicit `ORDER BY pk`). The proxy
-    // keeps loaded state in `_target`/`_targetLoaded`, not Relation's `_loaded`,
-    // so the loaded branch is handled here.
-    if (n !== undefined) {
-      if (this._targetLoaded) return this._target.slice(0, n);
-      return baseFindTakeWithLimit.call(this._finderScope() as any, n);
-    }
-    if (this._targetLoaded) return this._target[0] ?? null;
-    // `@take ||=` (finder_methods.rb:586). Rails' CollectionProxy#take is a bare
-    // `super`, so the memo lands on the proxy itself; only the query goes through
-    // `_finderScope`. A nil result is not memoized, matching `||=`.
-    this._take ??= await baseFindTake.call(this._finderScope() as any);
-    return this._take ?? null;
+    // `load_target if find_from_target?; super` (collection_proxy.rb:289-292).
+    // `super` is `Relation#take`, which dispatches to the `findTake` /
+    // `findTakeWithLimit` seams below; the `@take` memo and the loaded arm are
+    // the base `FinderMethods` bodies'.
+    if (this.isFindFromTarget()) await this.loadTarget();
+    return super.take(n as number);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#find_take. Rails has no
+   * `CollectionProxy` override — the base body runs with `self` = the proxy and
+   * reaches the association scope because `limit` is one of the
+   * `delegate(*QueryMethods, to: :scope)` methods (collection_proxy.rb:1128-1131).
+   * `_finderScope()` is that delegation, applied at the one place the base body
+   * builds a query, so the `@take` memo still lands on the (memoized) scope and
+   * survives until `resetScope` drops it, exactly as Rails' `reset_scope`
+   * clears `@scope` and `@take` together (:1113-1117).
+   * @internal
+   */
+  protected override async findTake(): Promise<T | null> {
+    return baseFindTake.call(this._finderScope() as any);
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::FinderMethods#find_take_with_limit; see
+   * `findTake` for why the query is routed through `_finderScope()`.
+   * @internal
+   */
+  protected override async findTakeWithLimit(limit: number): Promise<T[]> {
+    return baseFindTakeWithLimit.call(this._finderScope() as any, limit);
   }
 
   /**
@@ -2417,18 +2423,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_with_limit
-   * (`load_target if find_from_target?; super`). Once the target is loaded the
-   * base FinderMethods implementation reads it (the proxy keeps loaded state in
-   * `_target`/`_targetLoaded` rather than Relation's `_records`/`_loaded`, so we
-   * branch on `_targetLoaded` here); otherwise it falls through to the same
-   * ordered `LIMIT`/`OFFSET` query the base issues. This is the single override
+   * (`load_target if find_from_target?; super`, collection_proxy.rb:1155-1158).
+   * Once the target is loaded the base FinderMethods body reads it through the
+   * proxy's `isLoaded` / `records` overrides (`_finderScope()` hands back `this`
+   * then); otherwise it falls through to the same ordered `LIMIT`/`OFFSET`
+   * query, built against the live association scope. This is the single override
    * point that makes the inherited `second`/`third`/`fourth`/`fifth` (and their
    * bang variants) read a loaded/dirty target without re-querying.
    * @internal
    */
   protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    if (this._targetLoaded) return this._target.slice(index, index + limit);
     return baseFindNthWithLimit.call(this._finderScope() as any, index, limit);
   }
 
@@ -2440,7 +2445,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   protected override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    if (this._targetLoaded) return this._target[this._target.length - 1 - index] ?? null;
     return baseFindNthFromLast.call(this._finderScope() as any, index);
   }
 

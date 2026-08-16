@@ -309,6 +309,10 @@ interface FinderRelation {
   isLoaded: boolean;
   records(): Promise<any[]>;
   /** @internal */
+  findTake(): Promise<any | null>;
+  /** @internal */
+  findTakeWithLimit(limit: number): Promise<any[]>;
+  /** @internal */
   findNthWithLimit(index: number, limit: number): Promise<any[]>;
   /** @internal */
   findNthFromLast(index: number): Promise<any | null>;
@@ -479,25 +483,19 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 
 /** @internal */
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
-  // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
-  // reporting the none short-circuit.
-  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
-  // Rails: `return find_last(limit) if loaded? || has_limit_or_offset?`. When
-  // the relation is already loaded — or carries a `limit`/`offset` that a
-  // reverse-order query would otherwise discard — Rails materializes the
-  // records and reads the tail in Ruby (`records.last` / `records.last(n)`)
-  // rather than issuing a fresh reversed query. `toArray()` reuses the loaded
-  // cache when present and runs the bounded query otherwise, matching both.
-  if (
-    (this as any)._loaded ||
-    (this as any)._limitValue != null ||
-    (this as any)._offsetValue != null
-  ) {
-    const records: any[] = await (this as any).toArray();
-    if (n === undefined) return records[records.length - 1] ?? null;
-    // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
-    return n === 0 ? [] : records.slice(-n);
+  // `return find_last(limit) if loaded? || has_limit_or_offset?`
+  // (finder_methods.rb:203). When the relation is already loaded — or carries a
+  // `limit`/`offset` that a reverse-order query would otherwise discard — Rails
+  // materializes the records and reads the tail in Ruby rather than issuing a
+  // fresh reversed query. This arm runs BEFORE the none short-circuit below, as
+  // in Rails, so a loaded relation reports its records even when its (stale)
+  // clauses would build an empty query.
+  if (this.isLoaded || (this as any)._limitValue != null || (this as any)._offsetValue != null) {
+    return findLast.call(this, n);
   }
+  // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
+  // reporting the none short-circuit. Rails has no counterpart.
+  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
   let rel: any;
   if (!hasReversibleOrder(this)) {
     rel = orderByPk(this, "desc");
@@ -541,7 +539,11 @@ export async function performSole(this: FinderRelation): Promise<any> {
 
 /** @internal */
 export async function performTake(this: FinderRelation, limit?: number): Promise<any> {
-  return limit !== undefined ? findTakeWithLimit.call(this, limit) : findTake.call(this);
+  // Rails: `limit ? find_take_with_limit(limit) : find_take` (finder_methods.rb
+  // :129). Both go through `this`, so a subclass that overrides either seam —
+  // `CollectionProxy`, which points them at the live association scope — is
+  // reached from the inherited `take`.
+  return limit !== undefined ? this.findTakeWithLimit(limit) : this.findTake();
 }
 
 /** @internal */
@@ -981,7 +983,11 @@ export async function findNth(this: FinderRelation, index: number): Promise<any 
 
 /** @internal */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
-  return performLast.call(this, limit);
+  // `limit ? records.last(limit) : records.last` (finder_methods.rb:636-638).
+  const records: any[] = await this.records();
+  if (limit === undefined) return records[records.length - 1] ?? null;
+  // Ruby `records.last(0) == []`; `slice(-0)` would return the whole array.
+  return limit === 0 ? [] : records.slice(-limit);
 }
 
 /** @internal */
