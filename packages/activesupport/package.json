@@ -115,6 +115,7 @@
   },
   "dependencies": {
     "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "tinyglobby": "^0.2.16"
   },
