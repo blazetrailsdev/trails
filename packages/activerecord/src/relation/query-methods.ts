@@ -287,7 +287,7 @@ interface QueryMethodsHost {
   // (Arel join nodes, raw SQL strings) is a raw join value.
   _isNamedJoinValue(v: unknown): boolean;
   /** Rails' `clone` behind `spawn` (spawn_methods.rb:9-11). */
-  _clone(): any;
+  clone(): any;
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue: boolean;
   _model: typeof import("../base.js").Base;
@@ -710,7 +710,7 @@ function unscope(
   ...args: Array<UnscopeType | { where: string | string[] }>
 ): any {
   checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
-  return unscopeBang.apply(this._clone(), args as any);
+  return unscopeBang.apply(this.clone(), args as any);
 }
 
 function unscopeBang(
@@ -1181,7 +1181,7 @@ function offsetBang(this: QueryMethodsHost, value: number | string | null): any 
  * Mirrors: ActiveRecord::QueryMethods#lock (query_methods.rb:1238-1240)
  */
 function lock(this: QueryMethodsHost, locks: string | boolean = true): any {
-  return lockBang.call(this._clone(), locks);
+  return lockBang.call(this.clone(), locks);
 }
 
 function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
@@ -1199,7 +1199,7 @@ function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
  * Mirrors: ActiveRecord::QueryMethods#none (query_methods.rb:1281-1283)
  */
 function none(this: QueryMethodsHost): any {
-  return noneBang.call(this._clone());
+  return noneBang.call(this.clone());
 }
 
 function noneBang(this: QueryMethodsHost): any {
@@ -1210,6 +1210,18 @@ function noneBang(this: QueryMethodsHost): any {
   return this;
 }
 
+/**
+ * Mirrors: ActiveRecord::QueryMethods#null_relation? (query_methods.rb:1293) —
+ * `@none`.
+ *
+ * This is also the single none-short-circuit chokepoint consulted by every
+ * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and
+ * by the mutation terminals (`updateAll`/`deleteAll`) BEFORE returning an empty
+ * result. `AssociationRelation` overrides it to first rebase a stale new-owner
+ * `1=0` seed onto the live association scope, so a relation spawned off a new
+ * owner (`owner.things.where(...)`) resolves the persisted FK once the owner is
+ * saved.
+ */
 function isNullRelation(this: QueryMethodsHost): boolean {
   return this._isNone;
 }
@@ -1220,7 +1232,7 @@ function isNullRelation(this: QueryMethodsHost): boolean {
  * Mirrors: ActiveRecord::QueryMethods#readonly (query_methods.rb:1309-1311)
  */
 function readonly(this: QueryMethodsHost, value = true): any {
-  return readonlyBang.call(this._clone(), value);
+  return readonlyBang.call(this.clone(), value);
 }
 
 function readonlyBang(this: QueryMethodsHost, value = true): any {
@@ -1234,7 +1246,7 @@ function readonlyBang(this: QueryMethodsHost, value = true): any {
  * Mirrors: ActiveRecord::QueryMethods#strict_loading (query_methods.rb:1324-1326)
  */
 function strictLoading(this: QueryMethodsHost, value = true): any {
-  return strictLoadingBang.call(this._clone(), value);
+  return strictLoadingBang.call(this.clone(), value);
 }
 
 function strictLoadingBang(this: QueryMethodsHost, value = true): any {
@@ -1248,7 +1260,7 @@ function strictLoadingBang(this: QueryMethodsHost, value = true): any {
  * Mirrors: ActiveRecord::QueryMethods#create_with (query_methods.rb:1346-1348)
  */
 function createWith(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
-  return createWithBang.call(this._clone(), value);
+  return createWithBang.call(this.clone(), value);
 }
 
 function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
@@ -1268,7 +1280,7 @@ function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> |
  * Mirrors: ActiveRecord::QueryMethods#from (query_methods.rb:1391-1393)
  */
 function from(this: QueryMethodsHost, value: any, subqueryName?: string): any {
-  return fromBang.call(this._clone(), value, subqueryName);
+  return fromBang.call(this.clone(), value, subqueryName);
 }
 
 function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): any {
@@ -1291,8 +1303,8 @@ function extending(
   this: QueryMethodsHost,
   mod?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
 ): any {
-  if (!mod) return this._clone();
-  return extendingBang.call(this._clone(), mod);
+  if (!mod) return this.clone();
+  return extendingBang.call(this.clone(), mod);
 }
 
 function extendingBang(
@@ -1324,7 +1336,7 @@ function extendingBang(
  */
 function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":optimizer_hints", args);
-  return optimizerHintsBang.apply(this._clone(), args);
+  return optimizerHintsBang.apply(this.clone(), args);
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
@@ -1425,7 +1437,7 @@ function skipPreloadingBang(this: QueryMethodsHost): any {
  */
 function annotate(this: QueryMethodsHost, ...args: string[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":annotate", args);
-  return annotateBang.apply(this._clone(), args);
+  return annotateBang.apply(this.clone(), args);
 }
 
 function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {
@@ -2223,14 +2235,6 @@ export function arelColumnWithTable(
   const isSymbol = isRubySymbol(columnName);
   if (isSymbol) columnName = symbolToName(columnName);
   const modelClass: any = this.model;
-  // Schema-qualified table names (e.g. "schema.table") must not be passed to
-  // ArelTable — the visitor quotes the whole string as one identifier, producing
-  // "schema.table"."col" instead of "schema"."table"."col".
-  if (tableName.includes(".")) {
-    return Arel.sql(
-      `${connectionFor(modelClass).quoteTableName(tableName)}.${connectionFor(modelClass).quoteColumnName(columnName)}`,
-    );
-  }
   if (isSymbol || !/\W/.test(columnName)) {
     const builder = (this as any).predicateBuilder;
     // Rails passes `lookup_table_klass_from_join_dependencies` as the block

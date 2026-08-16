@@ -8,7 +8,11 @@ import {
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
-import { associationRelationClassFor, collectionProxyClassFor } from "../relation/delegation.js";
+import {
+  associationRelationClassFor,
+  collectionProxyClassFor,
+  wrapWithScopeProxy,
+} from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
@@ -2849,15 +2853,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * AR still routes writes through `_association` (this CP) so the FK,
    * inverse, and loaded target stay wired up.
    */
-  protected override _newRelation(): Relation<T> {
+  override clone(): Relation<T> {
     if (!_AssociationRelationCtor) {
       throw new ConfigurationError(
-        "CollectionProxy._newRelation: AssociationRelation constructor not set — " +
+        "CollectionProxy.clone: AssociationRelation constructor not set — " +
           "association-relation.ts must be loaded first",
       );
     }
     const Ctor = associationRelationClassFor(this.model);
-    return new Ctor(this.model, this) as Relation<T>;
+    const rel = new Ctor(this.model, this) as Relation<T>;
+    rel.initializeCopy(this as unknown as Relation<T>);
+    return wrapWithScopeProxy(rel);
   }
 }
 

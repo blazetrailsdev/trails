@@ -21,7 +21,7 @@ registerModel([Post]);
 /** The relation internals these tests reach into. */
 interface ScopeInternals {
   isAlreadyInScope(registry: ScopeRegistryLike): boolean;
-  _clone(): ScopeInternals;
+  clone(): ScopeInternals;
   spawn(): ScopeInternals;
   where(conditions: Record<string, unknown>): ScopeInternals;
   toSql(): Promise<string>;
@@ -127,7 +127,7 @@ describe("SpawnAlreadyInScopeTest", () => {
     let clonedFlag: boolean | undefined;
 
     defineAndCallScope("clonedInBody", (rel) => {
-      const cloned = rel._clone();
+      const cloned = rel.clone();
       withCurrentScope(cloned, (registry) => {
         clonedFlag = cloned.isAlreadyInScope(registry);
       });

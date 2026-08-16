@@ -6,7 +6,7 @@ import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import { associationRelationClassFor } from "./relation/delegation.js";
+import { associationRelationClassFor, wrapWithScopeProxy } from "./relation/delegation.js";
 import { rebaseNewOwnerSeed } from "./associations/new-owner-seed-rebase.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -51,17 +51,22 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Preserve the AssociationRelation subclass across `_clone()` so chains
-   * like `blog.posts.where(...).order(...).create(...)` still route writes
-   * through the association.
+   * Preserve the AssociationRelation subclass across `clone()` — Ruby's
+   * `Object#clone` allocates the receiver's own class — so chains like
+   * `blog.posts.where(...).order(...).create(...)` still route writes through
+   * the association.
+   *
+   * @internal
    */
-  protected _newRelation(): Relation<T> {
+  override clone(): Relation<T> {
     const Ctor = associationRelationClassFor(this.model);
-    return new Ctor(this.model, this._association);
+    const rel = new Ctor(this.model, this._association) as Relation<T>;
+    rel.initializeCopy(this);
+    return wrapWithScopeProxy(rel);
   }
 
   /**
-   * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`): every
+   * The none-short-circuit chokepoint (see `Relation#isNullRelation`): every
    * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and
    * the mutation terminals (`updateAll`/`deleteAll`, plus `touchAll`/
    * `updateCounters` via their `updateAll` delegation) consult this before
@@ -69,10 +74,13 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * covers all of them from one place. Reports the (possibly rebased)
    * `_isNone`.
    */
-  _isEmptyRelation(): boolean {
+  override isNullRelation = (): boolean => {
     this._maybeRebaseAssociationSeed();
-    return super._isEmptyRelation();
-  }
+    // `super.isNullRelation()` is not available: the base definition comes from
+    // the QueryMethods mixin (query_methods.rb:1293), so it lands as a property
+    // on `Relation.prototype` rather than as a class method.
+    return Relation.prototype.isNullRelation.call(this);
+  };
 
   /**
    * @internal Rebase a relation spawned off a stale new-owner `1=0` seed onto
@@ -89,19 +97,26 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       resetScope?: () => void;
     };
     if (typeof assoc.scope !== "function") return;
+    // Clear the marker BEFORE rebuilding: the rebuild runs the merger, which
+    // itself consults `isNullRelation()` (merger.rb:70), and that would re-enter
+    // this hook. Restored below if the rebuilt scope is still unresolved, so a
+    // later call retries.
+    this._seededNoneNewOwner = false;
     // The association memoized its `@association_scope` while the owner was
     // still new (that memo is what seeded this relation), so it carries the
     // unresolved FK too — drop it before rebuilding, exactly as Rails'
     // `reset_scope` does (association.rb:119-121).
     assoc.resetScope?.();
     const fresh = assoc.scope();
-    if (fresh._isNone) return;
+    if (fresh._isNone) {
+      this._seededNoneNewOwner = true;
+      return;
+    }
     rebaseNewOwnerSeed(
       this as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
       fresh as unknown,
       this._seedWherePredicates,
     );
-    this._seededNoneNewOwner = false;
   }
 
   /**
@@ -285,7 +300,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    */
   async toArray(): Promise<T[]> {
     // The stale new-owner seed rebase runs in `super.toArray()` via the shared
-    // `_isEmptyRelation()` chokepoint, before the query is built.
+    // `isNullRelation()` chokepoint, before the query is built.
     const owner = this._association.owner;
     const reflection = this._association.reflection;
     // Resolve the inverse association name via the registered Reflection,

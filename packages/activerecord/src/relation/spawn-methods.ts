@@ -10,7 +10,7 @@ import { argumentError, setValues } from "./query-methods.js";
 import type { ExceptSkip } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
-  _clone(): T;
+  clone(): T;
   isAlreadyInScope(registry: unknown): boolean;
   values(): Record<string, unknown>;
   /** @internal */
@@ -32,7 +32,7 @@ interface SpawnRelation<T = unknown> {
  * fidelity with `spawn_methods.rb:9-11`.
  */
 export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
-  return this.isAlreadyInScope(this._model.scopeRegistry()) ? this._model.all() : this._clone();
+  return this.isAlreadyInScope(this._model.scopeRegistry()) ? this._model.all() : this.clone();
 }
 
 /**

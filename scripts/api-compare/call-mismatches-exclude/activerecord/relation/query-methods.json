@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
-    "rubyName": "arel_column_with_table",
-    "call": "order:quoteTableName,resolveArelAttribute",
-    "reason": "Every call Rails makes is made here, in Rails' order; the inversion is the extra schema-qualified guard trails keeps ahead of query_methods.rb:1981 — a dotted `table_name` (\"schema.table\") must be quoted segment-by-segment through `quote_table_name` rather than handed to Arel::Table, which quotes the whole string as one identifier. Removing that branch is a separate change from converging the references_values store (RFC 0106)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
     "call": "include?",
     "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."

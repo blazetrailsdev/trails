@@ -2384,7 +2384,7 @@ export class Base extends Model {
       // merge the inherited scope into it, rather than cloning the parent's
       // type-unconstrained relation.
       if (scope._model === this) {
-        return scope._clone();
+        return scope.clone();
       }
       return this._buildUnscopedRelation().merge(scope);
     }

@@ -792,7 +792,7 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
 
   it("resolves the persisted FK on updateAll/updateCounters after save", async () => {
     // The mutation terminals carry their own none short-circuits, so they must
-    // consult the same `_isEmptyRelation()` chokepoint the read terminals do.
+    // consult the same `isNullRelation()` chokepoint the read terminals do.
     const author = new Author({ name: "New Owner Four" });
     const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
 

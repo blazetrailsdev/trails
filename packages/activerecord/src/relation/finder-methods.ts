@@ -287,7 +287,7 @@ interface FinderRelation {
   };
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
-  _isEmptyRelation(): boolean;
+  isNullRelation(): boolean;
   limitValue: number | null;
   offsetValue: number | null;
   orderValues: unknown[];
@@ -295,7 +295,7 @@ interface FinderRelation {
   createWithValue: Record<string, unknown>;
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
-  _clone(): any;
+  clone(): any;
   whereClause: { isEmpty(): boolean; isContradiction(): boolean };
   havingClause: { isEmpty(): boolean };
   /** Relation#arel — the built SelectManager (relation.ts). */
@@ -517,7 +517,7 @@ export async function performLastBang(this: FinderRelation): Promise<any> {
 
 /** @internal */
 export async function performSole(this: FinderRelation): Promise<any> {
-  const rel = this._clone();
+  const rel = this.clone();
   rel.limitValue = 2;
   const records = await rel.toArray();
   if (records.length === 0) {
@@ -713,7 +713,7 @@ export async function exists(
   this: FinderRelation,
   conditions?: Record<string, unknown> | unknown,
 ): Promise<boolean> {
-  if (this._isEmptyRelation()) return false;
+  if (this.isNullRelation()) return false;
   // `Base === conditions` (finder_methods.rb:360) — detected via the inherited
   // `_isActiveRecordBase` marker so a model of any class (not just this
   // relation's) is caught.
