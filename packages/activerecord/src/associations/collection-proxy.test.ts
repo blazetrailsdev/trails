@@ -967,6 +967,23 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
   });
 });
 
+// The other side of `calculate`'s none branch: a proxy whose own state is a none
+// relation for a reason that has nothing to do with a new owner — here
+// `Tag has_many :null_taggings, -> { none }` on a PERSISTED tag. Deferring to
+// `scope()` must return the same answer the in-memory short-circuit did, since
+// the association scope carries the same `none`.
+describe("CollectionProxy — a none-scoped association on a persisted owner", () => {
+  const { tags } = fixtures(["tags", "taggings"]);
+
+  it("still counts zero through the association scope", async () => {
+    const tag = await Tag.find(tags("general").id);
+    const nullTaggings = association(tag as any, "nullTaggings") as any;
+    expect(tag.isNewRecord()).toBe(false);
+    expect(await nullTaggings.count()).toBe(0);
+    expect(await nullTaggings.size()).toBe(0);
+  });
+});
+
 // The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,
 // scanned in memory) must emit the identical not-found message as the SQL
 // `performFind` path — Rails routes both through
