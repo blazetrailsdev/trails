@@ -6478,7 +6478,7 @@ export class Relation<T extends Base> {
    */
   async findByTokenFor(purpose: string, token: string): Promise<T | null> {
     const primaryKey = this.model.primaryKey as string | string[] | null;
-    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this.model);
+    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
     const record = await this.model.tokenDefinitions.fetch(purpose).resolveToken(token, (id) => {
       // Rails passes `model.primary_key => [id]`; with a composite key that
       // hash key is the key array, which trails' findBy spells one column at

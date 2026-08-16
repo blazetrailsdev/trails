@@ -4,14 +4,14 @@ import { classAttribute } from "./class-attribute.js";
 describe("classAttribute", () => {
   it("defines a class-level attribute with default", () => {
     class Model {}
-    classAttribute(Model, "tableName", { default: "models" });
+    classAttribute.call(Model, "tableName", { default: "models" });
 
     expect((Model as any).tableName).toBe("models");
   });
 
   it("allows overriding the class-level value", () => {
     class Model {}
-    classAttribute(Model, "tableName", { default: "models" });
+    classAttribute.call(Model, "tableName", { default: "models" });
     (Model as any).tableName = "users";
 
     expect((Model as any).tableName).toBe("users");
@@ -19,7 +19,7 @@ describe("classAttribute", () => {
 
   it("instance reads fall back to class value", () => {
     class Model {}
-    classAttribute(Model, "tableName", { default: "models" });
+    classAttribute.call(Model, "tableName", { default: "models" });
 
     const instance = new Model() as any;
     expect(instance.tableName).toBe("models");
@@ -27,7 +27,7 @@ describe("classAttribute", () => {
 
   it("instance can override the value locally", () => {
     class Model {}
-    classAttribute(Model, "tableName", { default: "models" });
+    classAttribute.call(Model, "tableName", { default: "models" });
 
     const a = new Model() as any;
     const b = new Model() as any;
@@ -39,7 +39,7 @@ describe("classAttribute", () => {
 
   it("subclass inherits from parent", () => {
     class Base {}
-    classAttribute(Base, "color", { default: "red" });
+    classAttribute.call(Base, "color", { default: "red" });
 
     class Child extends Base {}
     // Child should inherit
@@ -48,7 +48,7 @@ describe("classAttribute", () => {
 
   it("subclass can override without affecting parent", () => {
     class Base {}
-    classAttribute(Base, "color", { default: "red" });
+    classAttribute.call(Base, "color", { default: "red" });
 
     class Child extends Base {}
     (Child as any).color = "blue";
@@ -59,7 +59,7 @@ describe("classAttribute", () => {
 
   it("instanceWriter: false prevents instance writes", () => {
     class Model {}
-    classAttribute(Model, "locked", { default: true, instanceWriter: false });
+    classAttribute.call(Model, "locked", { default: true, instanceWriter: false });
 
     const instance = new Model() as any;
     expect(instance.locked).toBe(true);
@@ -72,7 +72,7 @@ describe("classAttribute", () => {
 
   it("instanceReader: false prevents instance reads", () => {
     class Model {}
-    classAttribute(Model, "secret", {
+    classAttribute.call(Model, "secret", {
       default: "hidden",
       instanceReader: false,
     });
@@ -86,7 +86,7 @@ describe("classAttribute", () => {
 
   it("instancePredicate creates isName getter", () => {
     class Model {}
-    classAttribute(Model, "active", {
+    classAttribute.call(Model, "active", {
       default: true,
       instancePredicate: true,
     });
@@ -97,21 +97,21 @@ describe("classAttribute", () => {
 
   it("defines several attributes at once", () => {
     class Model {}
-    classAttribute(Model, "one", "two", { default: 1 });
+    classAttribute.call(Model, "one", "two", { default: 1 });
 
     expect((Model as any).one).toBe(1);
     expect((Model as any).two).toBe(1);
   });
 
   it("raises a TypeError on a name that is neither a symbol nor a string", () => {
-    expect(() => classAttribute(class {}, 1 as unknown as string)).toThrow(
+    expect(() => classAttribute.call(class {}, 1 as unknown as string)).toThrow(
       new TypeError("1 is not a symbol nor a string"),
     );
   });
 
   it("predicate reflects current value", () => {
     class Model {}
-    classAttribute(Model, "active", {
+    classAttribute.call(Model, "active", {
       default: false,
       instancePredicate: true,
     });

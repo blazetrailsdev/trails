@@ -7,9 +7,9 @@ describe("ClassAttributeTest", () => {
 
   beforeEach(() => {
     Klass = class {};
-    classAttribute(Klass, "setting");
-    classAttribute(Klass, "timeout", { default: 5 });
-    classAttribute(Klass, "system");
+    classAttribute.call(Klass, "setting");
+    classAttribute.call(Klass, "timeout", { default: 5 });
+    classAttribute.call(Klass, "system");
     Sub = class extends Klass {};
   });
 
@@ -70,7 +70,7 @@ describe("ClassAttributeTest", () => {
 
   it("disabling instance writer", () => {
     const Cls = class {};
-    classAttribute(Cls, "setting", { instanceWriter: false });
+    classAttribute.call(Cls, "setting", { instanceWriter: false });
     const object = new (Cls as any)();
     expect(() => {
       object.setting = "boom";
@@ -82,7 +82,7 @@ describe("ClassAttributeTest", () => {
 
   it("disabling instance reader", () => {
     const Cls = class {};
-    classAttribute(Cls, "setting", { instanceReader: false });
+    classAttribute.call(Cls, "setting", { instanceReader: false });
     const object = new (Cls as any)();
     expect(object.setting).toBeUndefined();
     expect(
@@ -94,7 +94,7 @@ describe("ClassAttributeTest", () => {
 
   it("disabling both instance writer and reader", () => {
     const Cls = class {};
-    classAttribute(Cls, "setting", { instanceAccessor: false });
+    classAttribute.call(Cls, "setting", { instanceAccessor: false });
     const object = new (Cls as any)();
     expect(object.setting).toBeUndefined();
     expect(Object.getPrototypeOf(object)).not.toHaveProperty("setting");
@@ -104,7 +104,7 @@ describe("ClassAttributeTest", () => {
 
   it("disabling instance predicate", () => {
     const Cls = class {};
-    classAttribute(Cls, "setting", { instancePredicate: false });
+    classAttribute.call(Cls, "setting", { instancePredicate: false });
     const object = new (Cls as any)();
     expect(object.isSetting).toBeUndefined();
     expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");

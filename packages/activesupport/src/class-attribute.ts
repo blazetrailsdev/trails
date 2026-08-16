@@ -62,8 +62,12 @@ export namespace ClassAttribute {
 /**
  * Define a class-level attribute that is inherited by subclasses.
  * Reads walk the constructor chain; writes are local to the class/instance.
+ *
+ * Rails defines this on Module (core_ext/class/attribute.rb:86), so the class
+ * being extended is `self` — here the `this`-typed mixin idiom (CLAUDE.md,
+ * _Module mixins_), which callers reach with `classAttribute.call(Klass, ...)`.
  */
-export function classAttribute(klass: any, ...attrs: (string | ClassAttributeOptions)[]): void {
+export function classAttribute(this: any, ...attrs: (string | ClassAttributeOptions)[]): void {
   const last = attrs[attrs.length - 1];
   const options: ClassAttributeOptions =
     typeof last === "object" && last !== null ? (attrs.pop() as ClassAttributeOptions) : {};
@@ -84,9 +88,9 @@ export function classAttribute(klass: any, ...attrs: (string | ClassAttributeOpt
     }
 
     const namespacedName = `__class_attr_${name}`;
-    ClassAttribute.redefine(klass, name, namespacedName, defaultValue);
+    ClassAttribute.redefine(this, name, namespacedName, defaultValue);
 
-    Object.defineProperty(klass, name, {
+    Object.defineProperty(this, name, {
       configurable: true,
       enumerable: false,
       get(this: any) {
@@ -113,16 +117,16 @@ export function classAttribute(klass: any, ...attrs: (string | ClassAttributeOpt
           this[`@${name}`] = value;
         };
       }
-      Object.defineProperty(klass.prototype, name, descriptor);
+      Object.defineProperty(this.prototype, name, descriptor);
     }
 
     if (instancePredicate) {
       const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-      ClassAttribute.redefineMethod(klass, predicateName, false, function (this: any) {
+      ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
         return !!this[name];
       });
       if (instanceReader) {
-        ClassAttribute.redefineMethod(klass.prototype, predicateName, false, function (this: any) {
+        ClassAttribute.redefineMethod(this.prototype, predicateName, false, function (this: any) {
           return !!this[name];
         });
       }
