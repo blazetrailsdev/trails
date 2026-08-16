@@ -35,27 +35,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
-    "call": "distinct!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `having_clause.empty?` (calculations.rb:542). trails stores the having clause as a plain array of predicates and tests it with `.length === 0`, so the faithful port emits no callee for the Ruby `empty?`. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -63,70 +42,14 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
-    "call": "lookup_cast_type_from_join_dependencies",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "operation_over_aggregate_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "primary_key",
-    "reason": "Per-entry verified (RFC 0072 cross-helper reads): Rails calculations.rb:585 does `association.klass.base_class.where(association.klass.base_class.primary_key => key_ids)`; trails relation/calculations.ts delegates to the shared `groupedAggregate` helper, whose belongs_to arm performs exactly that read (`klass.where({ [klass.primaryKey]: ids })`). `groupedAggregate` is shared with the grouped count/sum/average/minimum/maximum arms, so the split stays - the divergence is stated at the call site in executeGroupedCalculation."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "quote_column_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "select_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "type_cast_calculated_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "order:constructor,withConnection",
+    "reason": "Verified per-site (RFC 0106): calculations.rb:527 opens `model.with_connection do |connection|` around the whole remainder of the body, so `with_connection` precedes `ColumnAliasTracker.new` (:528); trails calls it at the `select_all` (:556) instead, because the calculation entry points already run inside `inQueryConnection`'s `with_connection`. Hoisting it to :527 is a whole-body reindent and rides `converge-execute-grouped-calculation-body-to-rails-source-order`."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "type_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "where",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

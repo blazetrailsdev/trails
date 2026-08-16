@@ -2,10 +2,7 @@
  * Mirrors: activerecord/test/cases/explain_test.rb
  *
  * Rails guards the whole suite on `supports_explain?` and rides
- * `fixtures :cars` + the canonical `Car` model. Our `explain()` resolves to
- * the rendered query-plan string rather than Rails' chainable proxy, so the
- * per-aggregate tests assert the plan string (Rails' `assert_match(/^EXPLAIN/`)
- * and exercise the matching aggregate alongside it.
+ * `fixtures :cars` + the canonical `Car` model.
  */
 import { describe, it, expect } from "vitest";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
@@ -15,6 +12,7 @@ import { rubyInspect } from "./relation/ruby-inspect.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "./support/supports.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
@@ -26,8 +24,8 @@ describe("ExplainTest", () => {
   fixtures(["cars", "bulbs"]);
 
   itIfSupports("explain", "relation explain", async () => {
-    const message = await Car.where({ name: "honda" }).explain();
-    expect(message).toMatch(/EXPLAIN/i);
+    const message = await Car.where({ name: "honda" }).explain().inspect();
+    expect(message).toMatch(/^EXPLAIN/m);
   });
 
   itIfSupports("explain", "collecting queries for explain", async () => {
@@ -48,68 +46,117 @@ describe("ExplainTest", () => {
     }
   });
 
-  // The aggregate's return type is adapter-dependent (PG/MariaDB return AVG/SUM
-  // as decimal strings, SQLite as numbers), so — like Rails, which only asserts
-  // the EXPLAIN message — we run the aggregate alongside and assert the plan.
+  // Rails asserts the EXPLAIN header AND that the explained SQL is the query the
+  // matching operation actually runs (`capture_sql { Car.average(:id) }.first`),
+  // which is what makes the proxy members distinguishable from `inspect`.
   itIfSupports("explain", "relation explain with average", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.average("id")).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.average("id");
+      })
+    )[0];
+    const message = await Car.all().explain().average("id");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with count", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.count()).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.count();
+      })
+    )[0];
+    const message = await Car.all().explain().count();
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with count and argument", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await (Car as any).count("id")).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await (Car as any).count("id");
+      })
+    )[0];
+    const message = await (Car.all().explain() as any).count("id");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with minimum", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.minimum("id")).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.minimum("id");
+      })
+    )[0];
+    const message = await Car.all().explain().minimum("id");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with maximum", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.maximum("id")).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.maximum("id");
+      })
+    )[0];
+    const message = await Car.all().explain().maximum("id");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with sum", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.sum("id")).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.sum("id");
+      })
+    )[0];
+    const message = await Car.all().explain().sum("id");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with first", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.first()).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.all().first();
+      })
+    )[0].replace(/LIMIT[\s\S]*/, "");
+    const message = await Car.all().explain().first();
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with last", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.last()).not.toBeNull();
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.all().last();
+      })
+    )[0].replace(/LIMIT[\s\S]*/, "");
+    const message = await Car.all().explain().last();
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with pluck", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    expect(await Car.pluck("name")).toContain("honda");
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.all().pluck();
+      })
+    )[0];
+    const message = await Car.all().explain().pluck();
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with pluck with args", async () => {
-    const plan = await Car.all().explain();
-    expect(plan).toMatch(/EXPLAIN/i);
-    const values = await Car.pluck("id", "name");
-    expect(values.length).toBeGreaterThan(0);
+    const expectedQuery = (
+      await captureSql(async () => {
+        await Car.all().pluck("id", "name");
+      })
+    )[0];
+    const message = await Car.all().explain().pluck("id", "name");
+    expect(message).toMatch(/^EXPLAIN/m);
+    expect(message).toContain(expectedQuery);
   });
 
   itIfSupports("explain", "exec explain with no binds", async () => {
@@ -293,14 +340,14 @@ describe("ExplainTest", () => {
     expect(rendered).toBe('[[nil, "raw"], [nil, 42]]');
   });
 
-  it("rejects multiple hash options (Rails extract_options! semantics)", async () => {
-    await expect(Car.all().explain({ format: "json" }, { format: "xml" } as never)).rejects.toThrow(
+  it("rejects multiple hash options (Rails extract_options! semantics)", () => {
+    expect(() => Car.all().explain({ format: "json" }, { format: "xml" } as never)).toThrow(
       /at most one option hash/,
     );
   });
 
-  it("rejects a non-trailing hash option", async () => {
-    await expect(Car.all().explain({ format: "json" } as never, "analyze")).rejects.toThrow(
+  it("rejects a non-trailing hash option", () => {
+    expect(() => Car.all().explain({ format: "json" } as never, "analyze")).toThrow(
       /last argument/,
     );
   });
