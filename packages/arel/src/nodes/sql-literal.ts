@@ -1,4 +1,4 @@
-import type { Included } from "@blazetrails/activesupport";
+import { isBlank, type Included } from "@blazetrails/activesupport";
 import { Node, NodeVisitor } from "./node.js";
 import { Fragments } from "./fragments.js";
 import { buildQuoted } from "./casted.js";
@@ -36,6 +36,21 @@ export class SqlLiteral extends Node {
   // `in_order_of`'s `column.to_s` (query_methods.rb:724) both rely on.
   toString(): string {
     return this.value;
+  }
+
+  /**
+   * Ruby gets this for free: `SqlLiteral < String`, so `blank?` is
+   * `String#blank?` and a whitespace-only literal is blank —
+   * `build_order`'s `order_values.compact_blank` (query_methods.rb:2056)
+   * drops one. A TS class cannot subclass the string primitive, so the
+   * predicate is spelled out and `Object#blank?` dispatches to it.
+   * @noRailsEquivalent PERMANENT: `SqlLiteral < String` in Ruby, so `blank?`
+   * arrives by inheritance. TypeScript cannot subclass the string primitive,
+   * so the inherited predicate has to be written out for `Object#blank?` to
+   * dispatch to it; no amount of porting removes this name.
+   */
+  isBlank(): boolean {
+    return isBlank(this.value);
   }
 
   // Required by the Predications mixin (mirrors Rails' private

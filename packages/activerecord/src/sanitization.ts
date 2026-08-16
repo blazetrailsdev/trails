@@ -133,8 +133,11 @@ export function disallowRawSqlBang(
   for (const arg of args) {
     if (typeof arg === "symbol") continue;
     if (arg instanceof Nodes.Node) continue;
-    if (!columnMatcher.test(arg.toString().trim())) {
-      unexpected.push(arg.toString());
+    // Ruby `arg.to_s.strip` (sanitization.rb:186): `nil.to_s` is `""`, not the
+    // `"null"` a bare JS `String(arg)` would produce.
+    const str = arg == null ? "" : arg.toString();
+    if (!columnMatcher.test(str.trim())) {
+      unexpected.push(str);
     }
   }
   if (unexpected.length > 0) {

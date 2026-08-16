@@ -161,6 +161,15 @@ export function isBlank(value: unknown): boolean {
   )
     return Time.isBlank(value);
   if (value instanceof Set || value instanceof Map) return value.size === 0;
+  // Ruby's `blank?` is a method on the object, so a value that answers it
+  // itself wins over the generic `empty?` probe below. This is how a class
+  // whose Ruby counterpart is a `String` subclass — `Arel::Nodes::SqlLiteral`
+  // is the one in the tree — gets `String#blank?`'s whitespace semantics.
+  const blank = (value as { isBlank?: unknown }).isBlank;
+  if (typeof blank === "function" && !isAsyncFunction(blank)) {
+    const result: unknown = (blank as () => unknown).call(value);
+    return result != null && result !== false;
+  }
   const empty = (value as { isEmpty?: unknown }).isEmpty ?? (value as { empty?: unknown }).empty;
   if (typeof empty === "boolean") return empty;
   if (typeof empty === "function" && !isAsyncFunction(empty)) {

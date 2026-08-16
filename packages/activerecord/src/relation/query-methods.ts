@@ -28,7 +28,7 @@ import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { any, foreignKey } from "@blazetrails/activesupport";
+import { any, compactBlank, foreignKey } from "@blazetrails/activesupport";
 
 /**
  * Interface for the scope that WhereChain delegates to.
@@ -249,7 +249,9 @@ interface QueryMethodsHost {
   unscopeValues: Array<string | { where: string | string[] }>;
   optimizerHintsValues: string[];
   annotateValues: string[];
-  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  withValues: Array<Record<string, unknown>>;
+  /** Mirrors Rails' `@with_is_recursive` (query_methods.rb:527). */
+  _withIsRecursive: boolean;
   limitValue: number | null;
   offsetValue: number | string | null;
   lockValue: string | null;
@@ -311,10 +313,7 @@ interface QueryMethodsHost {
 // dedups by eql?/hash — structural for Symbol/String/Hash specs alike. Mirror
 // that with structuralUnionEq so a repeated `includes(:x)`/`preload(:x)` folds
 // to one spec instead of making the preloader load it twice.
-function unionAppendAssociations(
-  target: readonly AssociationSpec[],
-  incoming: readonly AssociationSpec[],
-): AssociationSpec[] {
+function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
   const union = [...target];
   for (const spec of incoming) {
     if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
@@ -323,17 +322,17 @@ function unionAppendAssociations(
 }
 
 function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.includesValues = unionAppendAssociations(this.includesValues, associations);
+  this.includesValues = unionAppend(this.includesValues, associations);
   return this;
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.eagerLoadValues = unionAppendAssociations(this.eagerLoadValues, associations);
+  this.eagerLoadValues = unionAppend(this.eagerLoadValues, associations);
   return this;
 }
 
 function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  this.preloadValues = unionAppendAssociations(this.preloadValues, associations);
+  this.preloadValues = unionAppend(this.preloadValues, associations);
   return this;
 }
 
@@ -362,189 +361,16 @@ export function referencesFromConditions(conditions: unknown): string[] {
   return PredicateBuilder.references(conditions).map((ref) => ref.value);
 }
 
-// Resolve a single CTE sub-query value into an arel body node, mirroring Rails'
-// `build_with_expression_from_value(value, nested)`. A raw SQL string /
-// `SqlLiteral` becomes `Nodes.Grouping(SqlLiteral)`
-// (`when SqlLiteral then Grouping.new(value)`), so it carries its own operand
-// parens. A `Relation` contributes its real Arel SelectStatement node
-// (`value._cteBodyArelNode()`, mirroring `value.arel(.ast)`) and an
-// `Arel::SelectManager` its `.ast` — so adapter quoting and bind collection are
-// preserved through to the visitor rather than frozen at `toSql()` time. Rails'
-// `nested` flag selects `value.arel` (a manager) vs `value.arel.ast` (a node);
-// trails' Cte/UnionAll operands must be visitable AST nodes, so both branches
-// resolve to the SelectStatement node — `nested` is threaded to match Rails'
-// reduction shape and the single-element unwrap below. A relation whose SQL
-// `buildArel` cannot fully encode (set-op/eager body) returns null and
-// falls back to its inlined SQL as a bare `SqlLiteral`.
-function buildCteLeaf(q: unknown, nested: boolean): Nodes.Node {
-  if (typeof q === "string") return new Nodes.Grouping(Arel.sql(q) as any);
-  if (q instanceof Nodes.SqlLiteral) return new Nodes.Grouping(q as any);
-  if (q instanceof SelectManager) return q.ast as unknown as Nodes.Node;
-  const node = (q as any)._cteBodyArelNode?.(nested);
-  if (node) return node as Nodes.Node;
-  return Arel.sql((q as any).toSql()) as unknown as Nodes.Node;
-}
-
-/** Validate and resolve a CTE name+query into an arel expression node. */
-function resolveCteEntry(name: string, query: unknown): Nodes.Node {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-    throw argumentError(
-      `Invalid CTE name "${name}": must be a valid SQL identifier (letters, digits, underscores, not starting with a digit).`,
-    );
-  }
-  if (query === null || query === undefined) {
-    throw argumentError(
-      `Invalid argument for with(): null/undefined is not allowed for CTE "${name}".`,
-    );
-  }
-  if (Array.isArray(query)) {
-    if (query.length === 0) throw argumentError(`Empty array passed for CTE "${name}".`);
-    for (const q of query) {
-      if (typeof q !== "string" && typeof q?.toSql !== "function") {
-        const typeName =
-          q !== null && typeof q === "object"
-            ? `type object (${(q as object).constructor?.name ?? "unknown"})`
-            : `type ${typeof q}`;
-        throw argumentError(`Unsupported argument type in array for CTE "${name}": ${typeName}`);
-      }
-    }
-    // Rails reduces array sub-queries into a left-nested `Arel::Nodes::UnionAll`
-    // AST (build_with_expression_from_value). A single-element array unwraps to
-    // its sole leaf with `nested = false`; multi-element leaves are resolved with
-    // `nested = true`. The SQLite visitor strips the leaves' `Grouping` parens
-    // inside UNION ALL (infix_value_with_paren); PG/MySQL keep them.
-    if (query.length === 1) return buildCteLeaf(query[0], false);
-    return (query as unknown[])
-      .map((q) => buildCteLeaf(q, true))
-      .reduce((left, right) => new Nodes.UnionAll(left as any, right as any));
-  }
-  const q = query as any;
-  if (typeof q !== "string" && typeof q?.toSql !== "function") {
-    const typeName =
-      q !== null && typeof q === "object"
-        ? `type object (${(q as object).constructor?.name ?? "unknown"})`
-        : `type ${typeof q}`;
-    throw argumentError(
-      `Unsupported argument type for CTE "${name}": expected a SQL string or Relation, got ${typeName}`,
-    );
-  }
-  return buildCteLeaf(query, false);
-}
-
-/** Upsert a CTE into withValues by name (last-write-wins), matching Rails behavior. */
-function upsertCte(
-  ctes: ReadonlyArray<{ name: string; expression: Nodes.Node; recursive: boolean }>,
-  name: string,
-  expression: Nodes.Node,
-  recursive: boolean,
-): Array<{ name: string; expression: Nodes.Node; recursive: boolean }> {
-  const next = [...ctes];
-  const existing = next.findIndex((c) => c.name === name);
-  if (existing >= 0) {
-    next[existing] = { name, expression, recursive };
-  } else {
-    next.push({ name, expression, recursive });
-  }
-  return next;
-}
-
-/**
- * Render the `WITH [RECURSIVE] <name> AS (body), ...` clause for a set of CTEs.
- * `compile` lowers a CTE body node to `[sql, binds]` through the dialect's arel
- * visitor (binds collected, not inlined — Relation/SelectManager bodies thread
- * their bind values to the caller in body order); `quoteName` quotes the CTE
- * name through the adapter (double quotes on SQLite/PG, backticks on MySQL) —
- * mirroring Rails' `visit_Arel_Nodes_Cte`, which renders the name via
- * `quote_table_name`. `UnionAll` / `Grouping` bodies already emit their own
- * surrounding parens, so the `AS (...)` parens are only added for any other
- * (bare) node. Returns the clause SQL plus the concatenated body binds (in CTE
- * declaration order); the caller prepends these to the main query's binds since
- * the `WITH` clause renders first.
- * @internal
- */
-export function buildCteSql(
-  ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
-  compile: (node: Nodes.Node) => [string, unknown[]],
-  quoteName: (name: string) => string,
-): { sql: string; binds: unknown[] } {
-  const recursive = ctes.some((c) => c.recursive);
-  const binds: unknown[] = [];
-  const defs = ctes
-    .map((c) => {
-      // Each body compiles with a fresh collector, so PG `$N` placeholders
-      // restart at `$1` per CTE. Shift this body's placeholders up by the binds
-      // already emitted by earlier CTEs so the concatenated WITH clause numbers
-      // globally (mirrors Rails compiling all with_statements through one
-      // collector). SQLite/MySQL use positional `?`, so the shift is a no-op.
-      const offset = binds.length;
-      const [rawBody, bodyBinds] = compile(c.expression);
-      const body =
-        offset > 0
-          ? rawBody.replace(/\$(\d+)/g, (_m, n) => `$${parseInt(n, 10) + offset}`)
-          : rawBody;
-      binds.push(...bodyBinds);
-      const wrapped =
-        c.expression instanceof Nodes.UnionAll || c.expression instanceof Nodes.Grouping
-          ? body
-          : `(${body})`;
-      return `${quoteName(c.name)} AS ${wrapped}`;
-    })
-    .join(", ");
-  return { sql: `WITH ${recursive ? "RECURSIVE " : ""}${defs}`, binds };
-}
-
-function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
-  for (const cte of ctes) {
-    if (!isPlainObject(cte)) {
-      const typeName =
-        cte !== null && typeof cte === "object"
-          ? `type object (${(cte as object).constructor?.name ?? "unknown"})`
-          : `type ${typeof cte}`;
-      throw argumentError(`Unsupported argument type: ${typeName}`);
-    }
-    // `self.with_values |= args` (query_methods.rb:500-504). Rails stores the
-    // raw args, so `relation.with!(*with_values)` round-trips through Merger's
-    // NORMAL_VALUES loop (merger.rb:57-66) and two CTEs sharing an alias both
-    // survive, leaving the database to object. trails resolves at `with!` time,
-    // so a fed-back entry is unioned in as-is rather than re-parsed. Converging
-    // the storage shape (which retires this branch and `isCteEntry`) is tracked
-    // by 0107/converge-with-values-to-rails-raw-args.
-    if (isCteEntry(cte)) {
-      if (!this.withValues.includes(cte)) this.withValues = [...this.withValues, cte];
-      continue;
-    }
-    for (const [name, query] of Object.entries(cte)) {
-      const expression = resolveCteEntry(name, query);
-      this.withValues = upsertCte(this.withValues, name, expression, false);
-    }
-  }
+function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
+  const processed = processWithArgs.call(this, args);
+  this.withValues = unionAppend(this.withValues, processed);
   return this;
 }
 
-function isCteEntry(
-  value: Record<string, unknown>,
-): value is { name: string; expression: Nodes.Node; recursive: boolean } {
-  return (
-    typeof value.name === "string" &&
-    value.expression instanceof Nodes.Node &&
-    typeof value.recursive === "boolean"
-  );
-}
-
-function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
-  for (const cte of ctes) {
-    if (!isPlainObject(cte)) {
-      const typeName =
-        cte !== null && typeof cte === "object"
-          ? `type object (${(cte as object).constructor?.name ?? "unknown"})`
-          : `type ${typeof cte}`;
-      throw argumentError(`Unsupported argument type: ${typeName}`);
-    }
-    for (const [name, query] of Object.entries(cte)) {
-      const expression = resolveCteEntry(name, query);
-      this.withValues = upsertCte(this.withValues, name, expression, true);
-    }
-  }
+function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
+  const processed = processWithArgs.call(this, args);
+  this.withValues = unionAppend(this.withValues, processed);
+  this._withIsRecursive = true;
   return this;
 }
 
@@ -1146,17 +972,20 @@ export function structurallyIncompatibleValuesFor(
   other: QueryMethodsHost,
 ): string[] {
   const values = other._values;
-  const incompat: string[] = [];
-  for (const method of STRUCTURAL_VALUE_METHODS) {
+  // Ruby `Array#reject` is core Enumerable, whose faithful JS spelling is
+  // `filter` over the negated block — so Rails' `next true` (rejected, i.e.
+  // compatible) is `return false` here, and its trailing `v1 == v2` is the
+  // negated `deepEqual`.
+  const incompat = STRUCTURAL_VALUE_METHODS.filter((method) => {
     let v1 = this._values[method];
     let v2 = values[method];
     if (Array.isArray(v1)) {
-      if (!Array.isArray(v2)) continue;
+      if (!Array.isArray(v2)) return false;
       v1 = uniqArray(v1);
       v2 = uniqArray(v2);
     }
-    if (!deepEqual(v1, v2)) incompat.push(method);
-  }
+    return !deepEqual(v1, v2);
+  });
   // trails splits `:joins` storage across `@values[:joins]` and the trails-only
   // `_joinClauses` (the explicit-ON and where-association joins), so the second
   // store is compared too — under the same `:joins` name, never reported twice.
@@ -1627,7 +1456,10 @@ export function checkIfMethodHasArgumentsBang(
   } else {
     block?.(args);
 
-    const flat = flattenedArgs(args);
+    // Ruby `args.flatten!` (query_methods.rb:2219) — nested ARRAYS only, so
+    // `with({ cte: rel })` keeps its CTE definition hash intact; this is not
+    // `flattened_args`, which also flattens hashes.
+    const flat = args.flat(Infinity);
     args.length = 0;
     for (const a of flat) {
       if (!isBlankArgument(a)) args.push(a);
@@ -1635,12 +1467,25 @@ export function checkIfMethodHasArgumentsBang(
   }
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::QueryMethods#flattened_args (query_methods.rb:2077-2079)
+ * — `args.flat_map { |e| (e.is_a?(Hash) || e.is_a?(Array)) ? flattened_args(e.to_a) : e }`.
+ * A Hash flattens through `to_a`, so both its keys and its VALUES reach the
+ * caller (`disallow_raw_sql!` checks the direction as well as the column).
+ * A `Map` is the Ruby-Hash analogue for keys JS objects cannot hold.
+ * @internal
+ */
 export function flattenedArgs(args: unknown[]): unknown[] {
-  // Mirrors Ruby `Array#flatten!`: recurse into nested arrays only. Hashes
-  // (plain objects) and every other value pass through untouched, so
-  // `with({ cte: rel })` keeps its CTE definition hash intact.
-  return args.flatMap((e) => (Array.isArray(e) ? flattenedArgs(e) : e));
+  return args.flatMap((e) =>
+    isPlainObject(e) || e instanceof Map || Array.isArray(e) ? flattenedArgs(toA(e)) : e,
+  );
+}
+
+/** Ruby `Hash#to_a` / `Array#to_a`: a Hash becomes its `[key, value]` pairs. */
+function toA(value: unknown[] | Map<unknown, unknown> | Record<string, unknown>): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value instanceof Map) return [...value].map(([k, v]) => [k, v]);
+  return Object.entries(value);
 }
 
 const VALID_DIRECTIONS = new Set(["asc", "desc"]);
@@ -1938,29 +1783,6 @@ export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknow
   return orderArgs;
 }
 
-function flattenedOrderKeysForRawSqlCheck(orderArgs: unknown[]): string[] {
-  const result: string[] = [];
-  for (const arg of orderArgs) {
-    if (Array.isArray(arg)) {
-      result.push(...flattenedOrderKeysForRawSqlCheck(arg));
-    } else if (typeof arg === "string") {
-      result.push(arg);
-    } else if (arg instanceof Nodes.Node) {
-      // Arel nodes (SqlLiteral, Attribute, Ordering, …) are pre-sanitized; skip them.
-    } else if (arg instanceof Map) {
-      for (const key of arg.keys()) {
-        if (typeof key === "string") result.push(key);
-      }
-    } else if (isPlainObject(arg)) {
-      for (const [key, value] of Object.entries(arg)) {
-        result.push(key);
-        if (isPlainObject(value)) result.push(...flattenedOrderKeysForRawSqlCheck([value]));
-      }
-    }
-  }
-  return result;
-}
-
 function orderedNode(node: unknown, dir: unknown): unknown {
   return String(dir).toLowerCase() === "desc"
     ? new Nodes.Descending(node)
@@ -1969,12 +1791,14 @@ function orderedNode(node: unknown, dir: unknown): unknown {
 
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
-  // disallowRawSqlBang skips symbols — resolve symbol names to strings first
-  // so their descriptions are validated against the column-name matcher.
-  const flattenedArgs = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
-    isRubySymbol(k) ? symbolToName(k) : k,
+  // disallowRawSqlBang's Symbol skip tests `typeof arg === "symbol"`, which a
+  // trails Ruby Symbol (a ":name" string) never is — resolve symbol names to
+  // strings first so their descriptions, not their leading colons, are what the
+  // column-name matcher sees.
+  const flattened = flattenedArgs(orderArgs).map((k) =>
+    typeof k === "string" && isRubySymbol(k) ? symbolToName(k) : k,
   );
-  this.model.disallowRawSqlBang(flattenedArgs, {
+  this.model.disallowRawSqlBang(flattened as (string | symbol | Nodes.Node)[], {
     permit: (
       this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
@@ -2027,14 +1851,7 @@ export function buildOrder(this: QueryMethodsHost, arel: any): void {
   for (const rawClause of ((this as any)._rawOrderClauses ?? []) as string[]) {
     arel.order?.(new Nodes.SqlLiteral(rawClause));
   }
-  // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
-  // drops a blank one along with nil and "".
-  const orders = ((this as any).orderValues ?? []).filter((o: unknown) => {
-    if (o === null || o === undefined) return false;
-    if (typeof o === "string") return o.trim() !== "";
-    if (o instanceof Nodes.SqlLiteral) return String((o as any).value ?? "").trim() !== "";
-    return true;
-  });
+  const orders = compactBlank(((this as any).orderValues ?? []) as unknown[]);
   if (orders.length > 0) arel.order?.(...orders);
 }
 
@@ -2449,40 +2266,50 @@ export function buildSelect(this: QueryMethodsHost, arel: any): void {
 }
 
 /** @internal */
-export function buildWithExpressionFromValue(this: QueryMethodsHost, value: unknown): unknown {
+export function buildWithExpressionFromValue(
+  this: QueryMethodsHost,
+  value: unknown,
+  nested = false,
+): unknown {
   if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value as any);
-  // Always return the AST node so Cte.relation receives a Node, not a SelectManager.
-  if (value instanceof SelectManager) return value.ast;
-  if (value !== null && typeof value === "object" && typeof (value as any).toArel === "function") {
-    return (value as any).toArel().ast;
+  // Rails' `when ActiveRecord::Relation` arm returns `value.arel` when not
+  // nested and `value.arel.ast` when it is. trails' Cte/UnionAll operands must
+  // be visitable AST nodes, so both resolve to the SelectStatement node —
+  // `nested` is threaded to match Rails' reduction shape. `_cteBodyArelNode`
+  // is the `arel` call: it returns null for a body `buildArel` cannot fully
+  // encode (a set-op/eager-load relation), which falls back to inlined SQL.
+  if (value !== null && typeof value === "object" && "_cteBodyArelNode" in value) {
+    const node = (value as any)._cteBodyArelNode(nested);
+    return node ?? (Arel.sql((value as any).toSql()) as unknown);
   }
+  if (value instanceof SelectManager) return value.ast;
   if (Array.isArray(value)) {
-    if (value.length === 0)
-      throw argumentError("Empty array passed to buildWithExpressionFromValue");
-    if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0]);
-    const parts = value.map((query) => buildWithExpressionFromValue.call(this, query));
+    if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
+
+    const parts = value.map((query) => buildWithExpressionFromValue.call(this, query, true));
     return parts.reduce(
       (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
     );
   }
-  throw argumentError(`Unsupported argument type: \`${String(value)}\` ${typeof value}`);
+  throw argumentError(`Unsupported argument type: \`${String(value)}\` ${rubyClassNameOf(value)}`);
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::QueryMethods#build_with_value_from_hash
+ * (query_methods.rb:1923-1927).
+ * @internal
+ */
 export function buildWithValueFromHash(
   this: QueryMethodsHost,
   hash: Record<string, unknown>,
 ): unknown[] {
-  return Object.keys(hash).map((key) => {
-    const name = isRubySymbol(key) ? symbolToName(key) : key;
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-      throw argumentError(
-        `Invalid CTE name "${name}": must be a valid SQL identifier (letters, digits, underscores, not starting with a digit).`,
-      );
-    }
-    const expr = buildWithExpressionFromValue.call(this, (hash as any)[key]);
-    return new Nodes.TableAlias(expr as any, name);
-  });
+  return Object.entries(hash).map(
+    ([name, value]) =>
+      new Nodes.TableAlias(
+        buildWithExpressionFromValue.call(this, value) as any,
+        isRubySymbol(name) ? symbolToName(name) : name,
+      ),
+  );
 }
 
 // Rails passes lookupTableKlassFromJoinDependencies as a block to
@@ -2611,7 +2438,10 @@ export function selectNamedJoins(
   for (const joinName of joinNames) {
     if (
       isRubySymbol(joinName) &&
-      any(this.withValues, (cte) => cte.name === symbolToName(joinName))
+      // Rails: `with_values.any? { _1.key?(join_name) }` (query_methods.rb:1800).
+      // The hash keys are the Symbols `with(...)` was called with, so compare
+      // against the Symbol itself and against its bare name.
+      any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte)
     ) {
       cteJoins.push(symbolToName(joinName));
     } else {
@@ -3000,15 +2830,19 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
 
 /** @internal */
 export function buildWith(this: QueryMethodsHost, arel: any): void {
-  if (!this.withValues || this.withValues.length === 0) return;
+  if (this.withValues.length === 0) return;
 
-  const hasRecursive = this.withValues.some((c) => c.recursive);
-  const withNodes = this.withValues.map((c) => new Nodes.Cte(c.name, c.expression as any));
+  const withStatements = this.withValues.flatMap((withValue) =>
+    buildWithValueFromHash.call(this, withValue),
+  );
 
-  if (hasRecursive) {
-    arel.withRecursive?.(...withNodes);
+  // Rails is `arel.with(:recursive, with_statements)`; trails' SelectManager
+  // splits the Symbol arm into its own `withRecursive`, and both take the
+  // statements varargs where Ruby's flattens the array it is handed.
+  if (this._withIsRecursive) {
+    arel.withRecursive?.(...withStatements);
   } else {
-    arel.with?.(...withNodes);
+    arel.with?.(...withStatements);
   }
 }
 

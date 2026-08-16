@@ -128,11 +128,15 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     );
   });
 
-  it("with when invalid params are passed", () => {
-    expect(() => Post.with({ posts_with_tags: null as any }).load()).toThrow();
-    expect(() =>
+  it("with when invalid params are passed", async () => {
+    // Rails validates in `build_with_expression_from_value` at `build_arel`
+    // time, so the raise lands on `load` — which is a promise here.
+    await expect(Post.with({ posts_with_tags: null as any }).load()).rejects.toThrow(
+      /Unsupported argument type/,
+    );
+    await expect(
       Post.with({ posts_with_tags: [Post.where("tags_count > 0"), 5 as any] }).load(),
-    ).toThrow();
+    ).rejects.toThrow(/Unsupported argument type/);
   });
 
   it("with when passing arrays", async () => {
@@ -299,8 +303,8 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   it("unscoping", async () => {
     const relation = Post.with({ posts_with_comments: Post.where("legacy_comments_count > 0") });
 
-    const ctes = relation.values()["with"] as Array<{ name: string }>;
-    expect(ctes.flatMap((c) => [c.name]).includes("posts_with_comments")).toBe(true);
+    const ctes = relation.values()["with"] as Array<Record<string, unknown>>;
+    expect(ctes.flatMap((c) => Object.keys(c)).includes("posts_with_comments")).toBe(true);
     const unscoped = relation.unscope("with");
     expect(unscoped.values()["with"]).toBeUndefined();
     expect(await unscoped.count()).toEqual(await Post.count());
