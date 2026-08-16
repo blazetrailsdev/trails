@@ -18,7 +18,7 @@ import type { JoinDependency } from "../associations/join-dependency.js";
 import { columnType, Result, type ColumnType } from "../result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
-import { arelColumn, arelColumns, buildJoinDependencies } from "./query-methods.js";
+import { arelColumn, arelColumns, eachJoinDependencies } from "./query-methods.js";
 
 /**
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
@@ -1052,14 +1052,16 @@ export function lookupCastTypeFromJoinDependencies(
   name: string,
   joinDependencies?: JoinDependency[],
 ): unknown {
-  const deps = joinDependencies ?? buildJoinDependencies.call(rel as any);
-  for (const jd of deps) {
-    for (const node of jd) {
-      const type = castTypeFromKlass(node.baseKlass, name);
-      if (type) return type;
-    }
-  }
-  return null;
+  let found: unknown = null;
+  eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {
+    if (found != null) return;
+    // Ruby `return type if type` returns from lookup_cast_type_from_join_dependencies
+    // itself (calculations.rb:596); a TS callback cannot, so the first hit is kept
+    // and later joins are skipped.
+    const type = castTypeFromKlass(join.baseKlass, name);
+    if (type) found = type;
+  });
+  return found;
 }
 
 function castTypeFromKlass(klass: any, name: string): unknown {
@@ -1100,22 +1102,18 @@ export function typeCastPluckValues(
     }
     return result.castValues(overrides);
   }
-  const castTypes = result.columns.map((name, i) => pluckCastType(rel, name, i, result));
+  const castTypes = result.columns.map((name, i) => {
+    // Rails' `model.attribute_types.fetch(name) { ... }` (calculations.rb:611):
+    // the block runs only when the model owns no such attribute.
+    const known = pluckCastTypeForKnownColumn(rel.model, name);
+    if (known) return known;
+    return (
+      (lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null) ??
+      // Driver OID type (e.g. PostgreSQL) or identity fallback.
+      columnType(result, name, i, {})
+    );
+  });
   return result.castValues(castTypes);
-}
-
-function pluckCastType(
-  rel: CalculationRelation,
-  name: string,
-  index: number,
-  result: Result,
-): ColumnType {
-  const known = pluckCastTypeForKnownColumn(rel.model, name);
-  if (known) return known;
-  const joinType = lookupCastTypeFromJoinDependencies(rel, name) as ColumnType | null;
-  if (joinType) return joinType;
-  // Driver OID type (e.g. PostgreSQL) or identity fallback.
-  return columnType(result, name, index, {});
 }
 
 /**
