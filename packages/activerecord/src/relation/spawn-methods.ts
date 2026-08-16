@@ -4,12 +4,17 @@
  * Mirrors: ActiveRecord::SpawnMethods
  */
 
+import { except as exceptValues, slice } from "@blazetrails/activesupport";
 import { Merger, HashMerger } from "./merger.js";
 import { argumentError, setValues } from "./query-methods.js";
+import type { ExceptSkip } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
   isAlreadyInScope(registry: unknown): boolean;
+  values(): Record<string, unknown>;
+  /** @internal */
+  relationWith(values: Record<string, unknown>): T;
   _model: { all(): T; scopeRegistry(): unknown };
 }
 
@@ -103,10 +108,39 @@ export function mergeBang(this: any, other: any): any {
   throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
 }
 
+/**
+ * Removes from the query the condition(s) specified in +skips+.
+ *
+ * Mirrors: ActiveRecord::SpawnMethods#except (spawn_methods.rb:59-61) —
+ * `relation_with values.except(*skips)`. Unlike `unscope`, this only removes
+ * the value from the returned relation; it does NOT record an `unscope_values`
+ * directive, so merging the result does not erase the same parts on the other
+ * relation.
+ */
+export function except<T extends SpawnRelation<T>>(this: T, ...skips: Array<ExceptSkip>): T {
+  return this.relationWith(exceptValues(this.values(), ...skips));
+}
+
+/**
+ * Removes any condition from the query other than the one(s) specified in
+ * +onlies+.
+ *
+ * Mirrors: ActiveRecord::SpawnMethods#only (spawn_methods.rb:67-69) —
+ * `relation_with values.slice(*onlies)`. Like `except`, this resets value keys
+ * on the returned relation WITHOUT recording an `unscope_values` directive. It
+ * covers the same full `Relation::VALUE_METHODS` surface as `except`: every key
+ * NOT named is reset (the complement of `values.slice`).
+ */
+export function only<T extends SpawnRelation<T>>(this: T, ...onlies: Array<ExceptSkip>): T {
+  return this.relationWith(slice(this.values(), ...onlies));
+}
+
 export const SpawnMethods = {
   spawn: performSpawn,
   merge: performMerge,
   mergeBang,
+  except,
+  only,
   relationWith,
 } as const;
 

@@ -1,16 +1,1 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "explain.ts",
-    "rubyName": "exec_explain",
-    "call": "render_bind",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "explain.ts",
-    "rubyName": "exec_explain",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]
+[]

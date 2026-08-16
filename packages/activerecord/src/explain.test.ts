@@ -9,7 +9,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, ExplainRegistry, registerModel } from "./index.js";
-import { buildExplainClause } from "./explain.js";
+import { buildExplainClause, renderBind } from "./explain.js";
+import { QueryAttribute } from "./relation/query-attribute.js";
+import { rubyInspect } from "./relation/ruby-inspect.js";
+import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "./support/supports.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-fixtures.js";
@@ -134,13 +137,14 @@ describe("ExplainTest", () => {
   });
 
   itIfSupports("explain", "exec explain with binds", async () => {
-    // Mirrors Rails' bind variant. ExplainRegistry collects plain bind values, so
-    // `render_bind` emits the value-only inspect form (`[1]`) rather than Rails'
-    // `[["wadus", 1]]` name/value tuples (which only apply to Attribute binds).
+    // Mirrors Rails: `binds = [[bind_param("wadus", 1)], [bind_param("chaflan", 2)]]`
+    // (explain_test.rb:141), where `bind_param` is a QueryAttribute over
+    // `Type::Value` (explain_test.rb:176-178). `render_bind` renders each as a
+    // `[name, value]` tuple, and `exec_explain` inspects the resulting array.
     const sqls = ["foo", "bar"];
     const queries: [string, unknown[]][] = [
-      [sqls[0], [1]],
-      [sqls[1], [2]],
+      [sqls[0], [bindParam("wadus", 1)]],
+      [sqls[1], [bindParam("chaflan", 2)]],
     ];
     const adapter = Base.connection as unknown as {
       explain: (...args: unknown[]) => Promise<string>;
@@ -151,8 +155,8 @@ describe("ExplainTest", () => {
     try {
       const clause = await buildExplainClause(adapter);
       const expected = [
-        `${clause} ${sqls[0]} [1]\nquery plan ${sqls[0]}`,
-        `${clause} ${sqls[1]} [2]\nquery plan ${sqls[1]}`,
+        `${clause} ${sqls[0]} [["wadus", 1]]\nquery plan ${sqls[0]}`,
+        `${clause} ${sqls[1]} [["chaflan", 2]]\nquery plan ${sqls[1]}`,
       ].join("\n");
       expect(await Base.execExplain(queries)).toBe(expected);
     } finally {
@@ -227,22 +231,14 @@ describe("ExplainTest", () => {
     // Ruby's `Array#inspect` output: strings double-quoted, numbers
     // bare, nil as `nil`, booleans as `true/false`. The BigInt case
     // is the one that used to crash raw `JSON.stringify`.
-    const rel = Car.all() as unknown as {
-      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
-    };
     // Booleans go through the adapter's typeCast: SQLite collapses
     // them to 1/0, PG/MySQL keep them as true/false. So the rendered
     // form differs by backend; assert both halves independently.
-    const rendered = rel._renderExplainBinds(Base.connection, [
-      BigInt(42),
-      "str",
-      7,
-      null,
-      true,
-      false,
-    ]);
-    expect(rendered.startsWith('[42, "str", 7, nil, ')).toBe(true);
-    expect(rendered).toMatch(/\b(1, 0|true, false)\]$/);
+    const rendered = rubyInspect(
+      [BigInt(42), "str", 7, null, true, false].map((b) => renderBind(Base.connection, b)),
+    );
+    expect(rendered.startsWith('[[nil, 42], [nil, "str"], [nil, 7], [nil, nil], ')).toBe(true);
+    expect(rendered).toMatch(/\[nil, (1\], \[nil, 0|true\], \[nil, false)\]\]$/);
     // End-to-end on sqlite: where-literals are interpolated into the
     // SQL (no binds reach the adapter), so the round-trip still
     // returns non-empty output.
@@ -251,16 +247,14 @@ describe("ExplainTest", () => {
   });
 
   it("normalizes Date binds — invalid Dates render as 'Invalid Date'", () => {
-    // _normalizeExplainBindValue is reached directly only when a caller bypasses
-    // the adapter typeCast (which rejects raw Date post-PR-6); the branch still
-    // exists as a defensive boundary handler for legacy / test code paths.
-    const rel = Car.all() as unknown as {
-      _normalizeExplainBindValue: (v: unknown) => unknown;
-    };
-    expect(rel._normalizeExplainBindValue(new Date("2026-04-15T12:00:00.000Z"))).toBe(
+    // A raw Date bind bypasses the adapter typeCast (which rejects it post-PR-6);
+    // the branch still exists as a defensive boundary handler for legacy / test
+    // code paths.
+    const stub = { typeCast: (v: unknown) => v } as unknown as DatabaseAdapter;
+    expect(renderBind(stub, new Date("2026-04-15T12:00:00.000Z"))[1]).toBe(
       "2026-04-15T12:00:00.000Z",
     );
-    expect(rel._normalizeExplainBindValue(new Date(NaN))).toBe("Invalid Date");
+    expect(renderBind(stub, new Date(NaN))[1]).toBe("Invalid Date");
   });
 
   it("renders binary binds as '<N bytes of binary data>' (Rails parity)", async () => {
@@ -268,15 +262,15 @@ describe("ExplainTest", () => {
     //   "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"
     // We reach the same result structurally — after typeCast, any
     // Buffer / Uint8Array / ArrayBuffer bind gets normalized to the
-    // same byte-count string before rubyInspect sees it, so an
-    // EXPLAIN over a BYTEA/BLOB column doesn't dump the raw buffer.
-    const rel = Car.all() as unknown as {
-      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
-    };
+    // same byte-count string, so an EXPLAIN over a BYTEA/BLOB column
+    // doesn't dump the raw buffer.
+    const stub = { typeCast: (v: unknown) => v } as unknown as DatabaseAdapter;
     const buf = Buffer.from("hello world"); // 11 bytes
     const u8 = new Uint8Array([1, 2, 3, 4, 5]); // 5 bytes
-    const rendered = rel._renderExplainBinds(Base.connection, [buf, u8]);
-    expect(rendered).toBe('["<11 bytes of binary data>", "<5 bytes of binary data>"]');
+    const rendered = rubyInspect([buf, u8].map((b) => renderBind(stub, b)));
+    expect(rendered).toBe(
+      '[[nil, "<11 bytes of binary data>"], [nil, "<5 bytes of binary data>"]]',
+    );
   });
 
   it("unwraps PG-style { value, format } bind shapes when rendering", async () => {
@@ -284,20 +278,19 @@ describe("ExplainTest", () => {
     // raw wrapper would stringify to "[object Object]" via
     // `rubyInspect`'s object fallback. Normalization recurses on
     // `.value` so we show the actual payload instead of the envelope.
-    const rel = Car.all() as unknown as {
-      _renderExplainBinds: (a: DatabaseAdapter, binds: unknown[]) => string;
-    };
     // Skip typeCast here — we're testing the normalization of a
     // pre-cast bind-wrapper value. The inner adapter.typeCast call
     // would pass these objects through unchanged on non-PG adapters.
     const stub = {
       typeCast: (v: unknown) => v,
     } as unknown as DatabaseAdapter;
-    const rendered = rel._renderExplainBinds(stub, [
-      { value: "raw", format: 1 },
-      { value: 42, format: 0 },
-    ]);
-    expect(rendered).toBe('["raw", 42]');
+    const rendered = rubyInspect(
+      [
+        { value: "raw", format: 1 },
+        { value: 42, format: 0 },
+      ].map((b) => renderBind(stub, b)),
+    );
+    expect(rendered).toBe('[[nil, "raw"], [nil, 42]]');
   });
 
   it("rejects multiple hash options (Rails extract_options! semantics)", async () => {
@@ -328,4 +321,9 @@ describe("ExplainTest", () => {
     expect(plan1.toLowerCase()).toContain("where");
     expect(plan2.toLowerCase()).not.toContain("where");
   });
+
+  // Mirrors: explain_test.rb:176-178
+  function bindParam(name: string, value: unknown): QueryAttribute {
+    return new QueryAttribute(name, value, new ValueType());
+  }
 });

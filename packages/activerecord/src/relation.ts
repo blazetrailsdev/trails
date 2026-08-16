@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, Notifications, slice } from "@blazetrails/activesupport";
+import { except, hexdigest, Notifications } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -98,10 +98,8 @@ import {
 } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
 import { Explain } from "./explain.js";
-import { inspectExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { rubyInspectArray } from "./relation/ruby-inspect.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { JoinDependency } from "./associations/join-dependency.js";
 import {
@@ -1336,21 +1334,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Keep only the specified query parts and remove everything else.
-   *
-   * Mirrors: ActiveRecord::SpawnMethods#only — `relation_with
-   * values.slice(*onlies)` (spawn_methods.rb). Like `except`, this resets value
-   * keys on the returned relation WITHOUT recording an `unscope_values`
-   * directive, so merging the result does not erase the same parts on the other
-   * relation (unlike delegating to `unscope`). It covers the same full
-   * `Relation::VALUE_METHODS` surface as `except`: every key NOT named is reset
-   * (the complement of `values.slice`).
-   */
-  only(...onlies: Array<ExceptSkip>): Relation<T> {
-    return this.relationWith(slice(this.values(), ...onlies));
-  }
-
-  /**
    * Add custom methods to this relation instance.
    * Accepts an object with methods, or a function that receives the relation.
    *
@@ -1367,19 +1350,6 @@ export class Relation<T extends Base> {
   ): Relation<T> | (Relation<T> & Record<string, (...args: any[]) => any>) {
     if (!mod) return this._clone();
     return this._clone().extendingBang(mod);
-  }
-
-  /**
-   * Remove the specified query parts, keeping everything else.
-   *
-   * Mirrors: ActiveRecord::SpawnMethods#except — `relation_with
-   * values.except(*skips)`. Unlike `unscope`, this only removes the value
-   * from the returned relation; it does NOT record an `unscope_values`
-   * directive, so merging the result does not erase the same parts on the
-   * other relation.
-   */
-  except(...skips: Array<ExceptSkip>): Relation<T> {
-    return this.relationWith(except(this.values(), ...skips));
   }
 
   /**
@@ -2823,191 +2793,6 @@ export class Relation<T extends Base> {
       this._loaded = wasLoaded;
       this._records = priorRecords;
     }
-  }
-
-  /**
-   * Render the EXPLAIN output for a list of collected queries. For each
-   * [sql, binds] pair, prints the adapter's EXPLAIN clause + SQL header
-   * (with binds appended when present) followed by the adapter's plan
-   * output — one block per query, separated by blank lines.
-   *
-   * Mirrors: ActiveRecord::Relation#exec_explain
-   * @internal
-   */
-  async execExplain(
-    queries: [string, unknown[]][],
-    options: ExplainOption[] = [],
-  ): Promise<string> {
-    const c = this._conn();
-    if (typeof c?.explain !== "function") {
-      return "EXPLAIN not supported by this adapter";
-    }
-    // No `_toSql()` fallback: collecting over the always-executing
-    // exec_queries path means a real relation always yields at least one
-    // captured query (with adapter-quoted SQL — backticks on MySQL), and a
-    // query-less relation (`.none()`) yields empty output, matching Rails.
-    const clause = await this.buildExplainClause(c, options);
-    const parts: string[] = [];
-    for (const [sql, binds] of queries) {
-      let msg = `${clause} ${sql}`;
-      if (binds.length > 0) msg += ` ${this._renderExplainBinds(c, binds)}`;
-      const plan = await c.explain(sql, binds, options);
-      parts.push(`${msg}\n${plan}`);
-    }
-    return parts.join("\n");
-  }
-
-  /**
-   * Render a bind array for the EXPLAIN header. Mirrors Rails'
-   * `exec_explain` rendering:
-   *
-   *     msg << binds.map { |attr| render_bind(c, attr) }.inspect
-   *
-   * where `render_bind` does `connection.type_cast(attr.value_for_database)`
-   * — so each bind comes out as its primitive DB-cast value, then
-   * Ruby's `Array#inspect` formats the list (strings double-quoted,
-   * numbers bare, nil as `nil`).
-   *
-   * Rails' `render_bind` returns `[attr.name, value]` pairs when the
-   * bind is an Attribute object; `ExplainRegistry` collects plain
-   * values (no Attribute wrappers here), so we emit the value-only
-   * form — same shape, just without the `[name, value]` tuples.
-   *
-   * Some adapters' `typeCast` can legitimately return non-primitive
-   * shapes (PG's `BinaryData` comes out as `{ value, format }`);
-   * `_normalizeExplainBindValue` below reduces those to something
-   * rubyInspect can render cleanly, and handles binary data the way
-   * Rails' `render_bind` does: `<N bytes of binary data>`.
-   */
-  private _renderExplainBinds(adapter: DatabaseAdapter, binds: unknown[]): string {
-    const casted = binds.map((b) => {
-      // Rails' `render_bind` short-circuits binary-typed binds BEFORE
-      // calling type_cast:
-      //   if attr.type.binary? && attr.value
-      //     "<#{attr.value_for_database.to_s.bytesize} bytes of binary data>"
-      //   else
-      //     connection.type_cast(attr.value_for_database)
-      //   end
-      // We don't have attribute types at this layer, so we detect
-      // binary structurally (Buffer / Uint8Array / ArrayBuffer) before
-      // handing the value to typeCast — some adapters' typeCast throws
-      // on buffer shapes because they're not bindable primitives.
-      const binaryBytes = this._binaryByteLength(b);
-      if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
-      if (typeof adapter.typeCast !== "function") {
-        // Throw loudly — a silent fallback would
-        // make EXPLAIN output depend on whether the adapter
-        // happens to implement `typeCast`, and nothing we ship does
-        // without it.
-        throw new Error(
-          `Relation#explain: adapter ${this._conn().adapterName} does not implement typeCast()`,
-        );
-      }
-      return this._normalizeExplainBindValue(adapter.typeCast(b));
-    });
-    return rubyInspectArray(casted);
-  }
-
-  /**
-   * Reduce a typeCast'd bind value to a form `rubyInspect` can render
-   * as a primitive:
-   *   - binary (Buffer / Uint8Array / ArrayBuffer) → `"<N bytes of
-   *     binary data>"`, matching Rails' `render_bind` binary branch.
-   *   - PG-style bind wrappers (`{ value, format }` from
-   *     `pg/quoting.ts`'s `BinaryBind` shape) → unwrap `.value` and
-   *     normalize recursively.
-   *   - Dates / primitives (including symbols handled by typeCast
-   *     earlier) → pass through.
-   *   - Anything else → `JSON.stringify`, falling back to
-   *     `Object.prototype.toString.call` when non-serializable.
-   *
-   * Mirrors: the binary branch of
-   * ActiveRecord::Relation#render_bind.
-   */
-  private _normalizeExplainBindValue(value: unknown): unknown {
-    if (
-      value === null ||
-      value === undefined ||
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "bigint" ||
-      typeof value === "boolean"
-    ) {
-      return value;
-    }
-    // boundary: bound query inspect accepts caller-supplied values.
-    // Invalid (NaN) Date prints as "Invalid Date" instead of JSON's "null".
-    if (value instanceof Date) {
-      return Number.isNaN(value.getTime()) ? String(value) : value.toISOString();
-    }
-    // Temporal values: coerce to ISO string for inspect output.
-    // ZonedDateTime uses toInstant().toString() to avoid the bracketed IANA form.
-    if (value instanceof Temporal.ZonedDateTime) return value.toInstant().toString();
-    if (
-      value instanceof Temporal.Instant ||
-      value instanceof Temporal.PlainDate ||
-      value instanceof Temporal.PlainTime
-    ) {
-      return value.toString();
-    }
-    const binaryBytes = this._binaryByteLength(value);
-    if (binaryBytes !== null) return `<${binaryBytes} bytes of binary data>`;
-    if (typeof value === "object") {
-      // Bind-wrapper objects like PG's BinaryBind (`{ value, format }`)
-      // — recurse on `.value` so the inspected form shows the payload
-      // rather than the wrapper envelope.
-      const keys = Object.keys(value);
-      if (
-        "value" in value &&
-        keys.length > 0 &&
-        keys.every((k) => k === "value" || k === "format")
-      ) {
-        return this._normalizeExplainBindValue((value as { value: unknown }).value);
-      }
-      try {
-        return JSON.stringify(value);
-      } catch {
-        return Object.prototype.toString.call(value);
-      }
-    }
-    return String(value);
-  }
-
-  private _binaryByteLength(value: unknown): number | null {
-    if (typeof Buffer !== "undefined" && value instanceof Buffer) return value.byteLength;
-    if (typeof ArrayBuffer !== "undefined") {
-      if (value instanceof ArrayBuffer) return value.byteLength;
-      if (ArrayBuffer.isView(value)) return value.byteLength;
-    }
-    return null;
-  }
-
-  /**
-   * Build the "EXPLAIN for:" header (Rails prints `EXPLAIN for: <sql>` /
-   * `EXPLAIN (ANALYZE, VERBOSE) for: <sql>`). Adapters override via
-   * `buildExplainClause(options)`; we fall back to a minimal form for
-   * adapters that don't implement it yet.
-   *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#build_explain_clause
-   */
-  private async buildExplainClause(
-    adapter: DatabaseAdapter,
-    options: ExplainOption[],
-  ): Promise<string> {
-    if (typeof adapter.buildExplainClause === "function") {
-      return adapter.buildExplainClause(options);
-    }
-    if (options.length === 0) return "EXPLAIN for:";
-    const parts = options.map((o) => {
-      if (typeof o === "string") return o.toUpperCase();
-      if (!o || typeof o !== "object" || typeof o.format !== "string") {
-        throw new TypeError(
-          `EXPLAIN option hash requires a string 'format'; got ${inspectExplainOption(o)}`,
-        );
-      }
-      return `FORMAT ${o.format.toUpperCase()}`;
-    });
-    return `EXPLAIN (${parts.join(", ")}) for:`;
   }
 
   // count, sum, average, minimum, maximum are mixed in via
@@ -6089,6 +5874,8 @@ export interface Relation<T extends Base>
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;
+  except(...skips: Array<ExceptSkip>): Relation<T>;
+  only(...onlies: Array<ExceptSkip>): Relation<T>;
   /** @internal */
   relationWith(values: Record<string, unknown>): Relation<T>;
   /** @internal */

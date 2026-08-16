@@ -40,7 +40,6 @@ import {
 import { setCurrentAdapterResolver } from "./type.js";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
 // Side-effect import: relation.ts registers the `Relation` family slot that
 // `relationClassFor` builds every per-model relation subclass from. relation.ts
@@ -2021,12 +2020,7 @@ export class Base extends Model {
   declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
 
   /** @internal */
-  static execExplain(
-    queries: [string, unknown[]][],
-    options: ExplainOption[] = [],
-  ): Promise<string> {
-    return _execExplain(this, queries, options);
-  }
+  declare static execExplain: typeof _execExplain;
 
   /** @internal */
   declare static renderBind: typeof _renderBind;
@@ -4546,7 +4540,7 @@ extend(Base, {
 });
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,
-  // execExplain is a static wrapper (passes `this`) — not in extend()
+  execExplain: _execExplain,
   renderBind: _renderBind,
   buildExplainClause: _buildExplainClause,
 });

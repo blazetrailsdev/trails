@@ -1,13 +1,28 @@
 import { ExplainRegistry } from "./explain-registry.js";
-import type { Base } from "./base.js";
+import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
+import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Attribute } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/date";
 
 /**
  * Explain module — entry points for collecting queries and running EXPLAIN.
  *
  * Mirrors: ActiveRecord::Explain
  */
+
+/**
+ * The receiver of every member below. Rails mixes `ActiveRecord::Explain` in on
+ * both sides — `extend Explain` at base.rb:294 (class level) and
+ * `include ... Explain ...` at relation.rb:68 (instance level) — so a model
+ * class and a `Relation` run the same method objects. Both receivers answer
+ * `with_connection`, which is all `exec_explain` needs.
+ *
+ * @internal
+ */
+export interface ExplainHost {
+  withConnection<T>(fn: (conn: DatabaseAdapter) => T | Promise<T>): Promise<T>;
+}
 
 /**
  * Execute the block with query collection enabled. Queries are captured by
@@ -22,23 +37,36 @@ export async function collectingQueriesForExplain<T>(
 }
 
 /**
- * Run EXPLAIN against each captured [sql, binds] pair and return a
- * formatted string ready to be logged.
- *
- * Delegates to the model's Relation for bind rendering so output is
- * consistent with Relation#explain — including typeCast and binary handling.
+ * Make the adapter execute EXPLAIN for the tuples of queries and bindings.
+ * Returns a formatted string ready to be logged.
  *
  * Mirrors: ActiveRecord::Explain#exec_explain
+ *
+ * @internal
  */
 export async function execExplain(
-  modelClass: typeof Base,
+  this: ExplainHost,
   queries: [string, unknown[]][],
   options: ExplainOption[] = [],
 ): Promise<string> {
-  // Delegate to Relation#execExplain which handles typeCast, binary binds,
-  // and adapter-specific buildExplainClause — reusing that logic avoids
-  // duplicating the JSON.stringify / typeCast edge cases.
-  return (modelClass as any).all().execExplain(queries, options);
+  const str = await this.withConnection(async (c) => {
+    const msgs: string[] = [];
+    for (const [sql, binds] of queries) {
+      let msg = `${await buildExplainClause(c, options)} ${sql}`;
+      if (binds.length > 0) {
+        msg += " ";
+        msg += rubyInspect(binds.map((attr) => renderBind(c, attr)));
+      }
+      msg += "\n";
+      // `explain` is optional on AbstractAdapter (Rails' raises NotImplementedError
+      // instead); every adapter reaching here implements it.
+      msg += await c.explain!(sql, binds, options);
+      msgs.push(msg);
+    }
+    return msgs.join("\n");
+  });
+
+  return str;
 }
 
 function byteSize(value: unknown): number {
@@ -55,6 +83,65 @@ function byteSize(value: unknown): number {
   return byteSize(String(value));
 }
 
+function binaryByteLength(value: unknown): number | null {
+  if (typeof Buffer !== "undefined" && value instanceof Buffer) return value.byteLength;
+  if (typeof ArrayBuffer !== "undefined") {
+    if (value instanceof ArrayBuffer) return value.byteLength;
+    if (ArrayBuffer.isView(value)) return value.byteLength;
+  }
+  return null;
+}
+
+/**
+ * Reduce a `type_cast`ed bind value to something `rubyInspect` renders as a
+ * primitive. Ruby needs no such step — every `type_cast` result there already
+ * has a meaningful `inspect` — but trails adapters hand back JS objects
+ * (`Date`, `Temporal.*`, PG's `{ value, format }` binary wrapper) that would
+ * otherwise print as `[object Object]`. Binary payloads take Rails'
+ * `render_bind` binary form here rather than in the attribute branch, because
+ * `ExplainRegistry` collects raw values with no `attr.type` to ask.
+ */
+function normalizeBindValue(value: unknown): unknown {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  // boundary: bound query inspect accepts caller-supplied values.
+  // Invalid (NaN) Date prints as "Invalid Date" instead of JSON's "null".
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? String(value) : value.toISOString();
+  }
+  // ZonedDateTime uses toInstant().toString() to avoid the bracketed IANA form.
+  if (value instanceof Temporal.ZonedDateTime) return value.toInstant().toString();
+  if (
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime
+  ) {
+    return value.toString();
+  }
+  const bytes = binaryByteLength(value);
+  if (bytes !== null) return `<${bytes} bytes of binary data>`;
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    if ("value" in value && keys.length > 0 && keys.every((k) => k === "value" || k === "format")) {
+      return normalizeBindValue((value as { value: unknown }).value);
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return Object.prototype.toString.call(value);
+    }
+  }
+  return String(value);
+}
+
 /**
  * Render a single bind parameter as [name, value] for EXPLAIN output.
  * Binary values are replaced with a byte-count summary.
@@ -64,17 +151,18 @@ function byteSize(value: unknown): number {
  * @internal
  */
 export function renderBind(connection: any, attr: unknown): [string | null, unknown] {
+  let value: unknown;
   // Mirrors Rails: `if ActiveModel::Attribute === attr`
   if (attr instanceof Attribute) {
-    const dbValue = attr.valueForDatabase;
     const isBinary = (attr.type as any)?.binary?.() ?? (attr.type as any)?.isBinary?.() ?? false;
-    if (isBinary && (attr.value ?? dbValue) != null) {
-      const bytes = byteSize(dbValue ?? attr.value);
-      return [attr.name, `<${bytes} bytes of binary data>`];
+    if (isBinary && attr.value != null) {
+      value = `<${byteSize(attr.valueForDatabase)} bytes of binary data>`;
+    } else {
+      value = normalizeBindValue(connection?.typeCast?.(attr.valueForDatabase));
     }
-    return [attr.name, connection?.typeCast?.(dbValue) ?? dbValue];
+    return [attr.name, value];
   }
-  const value = connection?.typeCast?.(attr) ?? attr;
+  value = normalizeBindValue(connection?.typeCast?.(attr) ?? attr);
   return [null, value];
 }
 
@@ -104,13 +192,11 @@ export async function buildExplainClause(
  * `include(Relation, Explain)` for the instance side. Neither redefines a
  * member: the definitions above are the single source for both.
  *
- * `execExplain` is not a member here — it takes the receiving model class as
- * an explicit first argument on the class side, and `Relation` carries its own
- * `execExplain` mirror of explain.rb:19-36 already.
- *
  * Mirrors: ActiveRecord::Explain
  */
 export const Explain = {
   collectingQueriesForExplain,
+  execExplain,
   renderBind,
+  buildExplainClause,
 } as const;
