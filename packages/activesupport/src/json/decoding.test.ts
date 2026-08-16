@@ -1,52 +1,75 @@
 import { describe, it, expect } from "vitest";
+import { Date as RubyDate } from "@blazetrails/date";
+import { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "../json.js";
+
+/** Mirrors the `with_parse_json_times` helper (json/decoding_test.rb:118-124). */
+function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
+  const oldValue = parseJsonTimes;
+  setParseJsonTimes(value);
+  try {
+    return fn();
+  } finally {
+    setParseJsonTimes(oldValue);
+  }
+}
 
 describe("TestJSONDecoding", () => {
   it("JSON decodes ", () => {
-    expect(JSON.parse('{"returnTo":{"/categories":"/"}}')).toEqual({
+    expect(ActiveSupportJSON.decode('{"returnTo":{"/categories":"/"}}')).toEqual({
       returnTo: { "/categories": "/" },
     });
-    expect(JSON.parse('{"returnTo":{"/categories":1}}')).toEqual({
+    expect(ActiveSupportJSON.decode('{"returnTo":{"/categories":1}}')).toEqual({
       returnTo: { "/categories": 1 },
     });
-    expect(JSON.parse('{"returnTo":[1,"a"]}')).toEqual({ returnTo: [1, "a"] });
-    expect(JSON.parse('{"a": "\'", "b": "5,000"}')).toEqual({ a: "'", b: "5,000" });
-    expect(JSON.parse('{"matzue": "松江", "asakusa": "浅草"}')).toEqual({
+    expect(ActiveSupportJSON.decode('{"returnTo":[1,"a"]}')).toEqual({ returnTo: [1, "a"] });
+    expect(ActiveSupportJSON.decode('{"a": "\'", "b": "5,000"}')).toEqual({ a: "'", b: "5,000" });
+    expect(ActiveSupportJSON.decode('{"matzue": "松江", "asakusa": "浅草"}')).toEqual({
       matzue: "松江",
       asakusa: "浅草",
     });
-    expect(JSON.parse("[]")).toEqual([]);
-    expect(JSON.parse("{}")).toEqual({});
-    expect(JSON.parse('{"a":1}')).toEqual({ a: 1 });
-    expect(JSON.parse('{"a": ""}')).toEqual({ a: "" });
-    expect(JSON.parse('{"a": null}')).toEqual({ a: null });
-    expect(JSON.parse('{"a": true}')).toEqual({ a: true });
-    expect(JSON.parse('{"a": false}')).toEqual({ a: false });
-    expect(JSON.parse('{"a": "\\u003cunicode\\u0020escape\\u003e"}')).toEqual({
+    expect(ActiveSupportJSON.decode("[]")).toEqual([]);
+    expect(ActiveSupportJSON.decode("{}")).toEqual({});
+    expect(ActiveSupportJSON.decode('{"a":1}')).toEqual({ a: 1 });
+    expect(ActiveSupportJSON.decode('{"a": ""}')).toEqual({ a: "" });
+    expect(ActiveSupportJSON.decode('{"a": null}')).toEqual({ a: null });
+    expect(ActiveSupportJSON.decode('{"a": true}')).toEqual({ a: true });
+    expect(ActiveSupportJSON.decode('{"a": false}')).toEqual({ a: false });
+    expect(ActiveSupportJSON.decode('{"a": "\\u003cunicode\\u0020escape\\u003e"}')).toEqual({
       a: "<unicode escape>",
     });
-    expect(JSON.parse('{"a": "\\u003cbr /\\u003e"}')).toEqual({ a: "<br />" });
-    expect(JSON.parse('{"a":"\\n"}')).toEqual({ a: "\n" });
-    expect(JSON.parse('{"a":"\\u000a"}')).toEqual({ a: "\n" });
-    expect(JSON.parse('{"a":"Line1\\u000aLine2"}')).toEqual({ a: "Line1\nLine2" });
-    expect(JSON.parse('"a string"')).toBe("a string");
-    expect(JSON.parse("1.1")).toBe(1.1);
-    expect(JSON.parse("1")).toBe(1);
-    expect(JSON.parse("-1")).toBe(-1);
-    expect(JSON.parse("true")).toBe(true);
-    expect(JSON.parse("false")).toBe(false);
-    expect(JSON.parse("null")).toBe(null);
+    expect(ActiveSupportJSON.decode('{"a": "\\u003cbr /\\u003e"}')).toEqual({ a: "<br />" });
+    expect(ActiveSupportJSON.decode('{"a":"\\n"}')).toEqual({ a: "\n" });
+    expect(ActiveSupportJSON.decode('{"a":"\\u000a"}')).toEqual({ a: "\n" });
+    expect(ActiveSupportJSON.decode('{"a":"Line1\\u000aLine2"}')).toEqual({ a: "Line1\nLine2" });
+    expect(ActiveSupportJSON.decode('"a string"')).toBe("a string");
+    expect(ActiveSupportJSON.decode("1.1")).toBe(1.1);
+    expect(ActiveSupportJSON.decode("1")).toBe(1);
+    expect(ActiveSupportJSON.decode("-1")).toBe(-1);
+    expect(ActiveSupportJSON.decode("true")).toBe(true);
+    expect(ActiveSupportJSON.decode("false")).toBe(false);
+    expect(ActiveSupportJSON.decode("null")).toBe(null);
+
+    withParseJsonTimes(true, () => {
+      expect(ActiveSupportJSON.decode('{"d":"1970-01-01", "s":"\\u0020escape"}')).toEqual({
+        d: RubyDate.parse("1970-01-01"),
+        s: " escape",
+      });
+      expect(ActiveSupportJSON.decode('{"a":"Line1\\u000aLine2"}')).toEqual({ a: "Line1\nLine2" });
+    });
   });
 
   it("JSON decodes time JSON with time parsing disabled", () => {
-    const result = JSON.parse('{"a": "2007-01-01 01:12:34 Z"}');
-    expect(result).toEqual({ a: "2007-01-01 01:12:34 Z" });
+    withParseJsonTimes(false, () => {
+      const expected = { a: "2007-01-01 01:12:34 Z" };
+      expect(ActiveSupportJSON.decode('{"a": "2007-01-01 01:12:34 Z"}')).toEqual(expected);
+    });
   });
 
   it("failed json decoding", () => {
-    expect(() => JSON.parse("undefined")).toThrow();
-    expect(() => JSON.parse("{a: 1}")).toThrow();
-    expect(() => JSON.parse("{: 1}")).toThrow();
-    expect(() => JSON.parse("")).toThrow();
+    expect(() => ActiveSupportJSON.decode("undefined")).toThrow(ActiveSupportJSON.parseError());
+    expect(() => ActiveSupportJSON.decode("{a: 1}")).toThrow(ActiveSupportJSON.parseError());
+    expect(() => ActiveSupportJSON.decode("{: 1}")).toThrow(ActiveSupportJSON.parseError());
+    expect(() => ActiveSupportJSON.decode("")).toThrow(ActiveSupportJSON.parseError());
   });
 
   it("cannot pass unsupported options", () => {
@@ -54,7 +77,7 @@ describe("TestJSONDecoding", () => {
       if (options && "create_additions" in options) {
         throw new Error("Unsupported option: create_additions");
       }
-      return JSON.parse(json);
+      return ActiveSupportJSON.decode(json);
     };
     expect(() => decode("", { create_additions: true })).toThrow();
   });

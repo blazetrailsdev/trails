@@ -54,12 +54,23 @@ describe("ParameterFilterTest", () => {
   });
 
   it("precompile_filters", () => {
-    // ParameterFilter supports regexp filters which are effectively pre-compiled
-    const f = new ParameterFilter([/password/i, /token/i]);
-    const result = f.filter({ Password: "secret", access_token: "abc", username: "alice" });
-    expect(result["Password"]).toBe("[FILTERED]");
-    expect(result["access_token"]).toBe("[FILTERED]");
-    expect(result["username"]).toBe("alice");
+    const patterns = [/A.a/, /b.B/i, "ccC", "ddD"];
+    const keys = ["Aaa", "Bbb", "Ccc", "Ddd"];
+    const deepPatterns = [/A\.a/, /b\.B/i, "c.C", "d.D"];
+    const deepKeys = ["A.a", "B.b", "C.c", "D.d"];
+    const procs = [() => {}, () => {}];
+
+    const precompiled = ParameterFilter.precompileFilters([...patterns, ...deepPatterns, ...procs]);
+
+    const regexps = precompiled.filter((f): f is RegExp => f instanceof RegExp);
+    expect(precompiled.length).toBe(regexps.length + procs.length);
+
+    const filter = new ParameterFilter(precompiled);
+    for (const key of keys) expect(filter.filterParam(key, "x")).toBe("[FILTERED]");
+    for (const deepKey of deepKeys) {
+      expect(filter.filter({ [deepKey]: "x" })[deepKey]).toBe("[FILTERED]");
+    }
+    expect(filter.filterParam("zzz", "x")).toBe("x");
   });
 });
 

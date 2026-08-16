@@ -2,9 +2,9 @@
   {
     "package": "activesupport",
     "tsFile": "configuration-file.ts",
-    "rubyName": "initialize",
-    "call": "read",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "parse",
+    "call": "include?",
+    "reason": "`@content.include?(\"<%\")` (configuration_file.rb:22) only chooses between the rendered source and the raw file; `render` is a scoped SKIP (no runtime ERB below actionview), so trails always parses the file as written and has no branch to test."
   },
   {
     "package": "activesupport",

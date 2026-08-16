@@ -2,8 +2,20 @@
   {
     "package": "activesupport",
     "tsFile": "parameter-filter.ts",
-    "rubyName": "filter",
-    "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "call",
+    "call": "new",
+    "reason": "`params.class.new` (parameter_filter.rb:126) allocates a hash of the receiver's class; a plain JS object has no constructor to call, so `Object.create(Object.getPrototypeOf(params))` is the same allocation and keeps a null-prototype params hash null-prototype."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "parameter-filter.ts",
+    "rubyName": "compile_filters!",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:join",
+      "bool:true"
+    ],
+    "reason": "`Regexp.new(strings.join(\"|\"), true)` (parameter_filter.rb:121-122) — Ruby's second Regexp argument is the ignore-case boolean; the JS constructor takes a flag string, so `\"i\"` is the same argument spelled the way the language spells it. Language shortcoming."
   }
 ]

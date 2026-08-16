@@ -14,7 +14,7 @@ export class ConfigurationFile {
 
   constructor(contentPath: string) {
     this.contentPath = contentPath;
-    this.content = getFs().readFileSync(contentPath, "utf8");
+    this.content = this.read(contentPath);
   }
 
   static parse(contentPath: string): Record<string, unknown> {
@@ -22,12 +22,6 @@ export class ConfigurationFile {
   }
 
   parse(): Record<string, unknown> {
-    if (this.content.includes("\u00A0")) {
-      console.warn(
-        `${this.contentPath} contains invisible non-breaking spaces, you may want to remove those`,
-      );
-    }
-
     try {
       const parsed = yamlParse(this.content);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -43,6 +37,17 @@ export class ConfigurationFile {
         error,
       );
     }
+  }
+
+  /** Mirrors the private `read` (configuration_file.rb:44-52). */
+  private read(contentPath: string): string {
+    const content = getFs().readFileSync(contentPath, "utf8");
+    if (content.includes("\u00A0")) {
+      console.warn(
+        `${contentPath} contains invisible non-breaking spaces, you may want to remove those`,
+      );
+    }
+    return content;
   }
 
   static FormatError = FormatError;
