@@ -150,6 +150,11 @@ export class OrderedOptions {
     return this;
   }
 
+  /** `Hash#size` — the own-entry count, unlike `Enumerable#count`. */
+  get size(): number {
+    return this.data.size;
+  }
+
   /** `Enumerable#count` — like `entries`, counted through `each`. */
   get count(): number {
     return this.entries().length;

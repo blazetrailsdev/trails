@@ -43,11 +43,16 @@ describe("OrderedOptionsTest", () => {
 
   it("method access", () => {
     const a = new OrderedOptions() as any;
-    a.boy = "John";
-    expect(a["boy?"]()).toBe(true);
-    expect(a["girl?"]()).toBe(false);
-    expect(a.has("boy")).toBe(true);
-    expect(a.has("girl")).toBe(false);
+    expect(a.notSet).toBeUndefined();
+    a.allowConcurrency = true;
+    expect(a.size).toBe(1);
+    expect(a.allowConcurrency).toBe(true);
+    a.allowConcurrency = false;
+    expect(a.size).toBe(1);
+    expect(a.allowConcurrency).toBe(false);
+    a.elseWhere = 56;
+    expect(a.size).toBe(2);
+    expect(a.elseWhere).toBe(56);
   });
 
   it("inheritable options continues lookup in parent", () => {
@@ -121,7 +126,7 @@ describe("OrderedOptionsTest", () => {
     const parent = new OrderedOptions({ foo: "bar" });
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
-    expect(child.toH()).toEqual({ baz: "qux" });
+    expect(child.toH()).toEqual({ foo: "bar", baz: "qux" });
   });
 
   it("ordered options dup", () => {
@@ -180,7 +185,10 @@ describe("OrderedOptionsTest", () => {
     child.baz = "qux";
     const collected: [string, unknown][] = [];
     child.each((k: string, v: unknown) => collected.push([k, v]));
-    expect(collected).toEqual([["baz", "qux"]]);
+    expect(collected).toEqual([
+      ["foo", "bar"],
+      ["baz", "qux"],
+    ]);
   });
 
   it("inheritable options to a", () => {
@@ -199,7 +207,7 @@ describe("OrderedOptionsTest", () => {
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     child.another = "one";
-    expect(child.count).toBe(2);
+    expect(child.count).toBe(3);
   });
 
   it("ordered options to s", () => {
@@ -233,6 +241,6 @@ describe("OrderedOptionsTest", () => {
     child.baz = "qux";
     const str = child.inspect();
     expect(str).toContain("InheritableOptions");
-    expect(str).toContain("parent");
+    expect(str).toContain("foo");
   });
 });
