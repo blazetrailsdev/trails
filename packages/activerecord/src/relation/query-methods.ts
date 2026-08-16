@@ -502,12 +502,33 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>
           : `type ${typeof cte}`;
       throw argumentError(`Unsupported argument type: ${typeName}`);
     }
+    // A `with_values` entry fed back in — Rails' `with_values` holds the raw
+    // args, so `relation.with!(*with_values)` round-trips through Merger's
+    // NORMAL_VALUES loop (merger.rb:57-66); trails resolves at `with!` time, so
+    // the already-resolved entry is upserted as-is rather than re-parsed.
+    if (isCteEntry(cte)) {
+      // `self.with_values |= args` (query_methods.rb) — a union of the raw
+      // args, so two CTEs sharing an alias both survive a merge and the
+      // database is the one that objects.
+      if (!this.withValues.includes(cte)) this.withValues = [...this.withValues, cte];
+      continue;
+    }
     for (const [name, query] of Object.entries(cte)) {
       const expression = resolveCteEntry(name, query);
       this.withValues = upsertCte(this.withValues, name, expression, false);
     }
   }
   return this;
+}
+
+function isCteEntry(
+  value: Record<string, unknown>,
+): value is { name: string; expression: Nodes.Node; recursive: boolean } {
+  return (
+    typeof value.name === "string" &&
+    value.expression instanceof Nodes.Node &&
+    typeof value.recursive === "boolean"
+  );
 }
 
 function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>>): any {
@@ -1287,7 +1308,9 @@ function limitBang(this: QueryMethodsHost, value: number | null): any {
 }
 
 function offsetBang(this: QueryMethodsHost, value: number | null): any {
-  this.offsetValue = value === null ? null : Math.trunc(value);
+  // Mirrors `offset!` (query_methods.rb:1231-1234): the raw value is stored and
+  // integer-coerced later, by `build_arel`'s `offset_value.to_i` (:1758).
+  this.offsetValue = value;
   return this;
 }
 
@@ -1365,8 +1388,10 @@ function extendingBang(
   return this;
 }
 
-function optimizerHintsBang(this: QueryMethodsHost, ...hints: string[]): any {
-  this.optimizerHintsValues = [...this.optimizerHintsValues, ...hints];
+function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
+  // `self.optimizer_hints_values |= args` (query_methods.rb:1490-1493) — a
+  // union, so a hint already present is not repeated.
+  this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
   return this;
 }
 
@@ -1665,6 +1690,15 @@ export function processWithArgs(
     }
     return Object.entries(arg).map(([k, v]) => ({ [k]: v }));
   });
+}
+
+/** Ruby `Object#to_i` semantics: nil → 0, leading-integer parse otherwise. */
+function toI(value: unknown): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return Math.trunc(value);
+  if (typeof value === "bigint") return Number(value);
+  const n = Number.parseInt(String(value), 10);
+  return Number.isNaN(n) ? 0 : n;
 }
 
 /** @internal */
@@ -2528,11 +2562,14 @@ export function buildArel(
 
   if (this.limitValue !== null)
     arel.take(
-      connection?.sanitizeLimit
-        ? connection.sanitizeLimit(this.limitValue)
-        : sanitizeLimit(this.limitValue),
+      buildCastValue(
+        "LIMIT",
+        connection?.sanitizeLimit
+          ? connection.sanitizeLimit(this.limitValue)
+          : sanitizeLimit(this.limitValue),
+      ),
     );
-  if (this.offsetValue !== null) arel.skip(this.offsetValue);
+  if (this.offsetValue !== null) arel.skip(buildCastValue("OFFSET", toI(this.offsetValue)));
 
   if (this.groupValues.length > 0)
     arel.group(

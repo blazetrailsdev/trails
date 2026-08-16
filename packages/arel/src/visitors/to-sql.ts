@@ -755,21 +755,13 @@ export class ToSql extends Visitor {
 
   protected visitArelNodesOffset(o: Nodes.Offset, collector: SQLString): SQLString {
     collector.append("OFFSET ");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     return collector;
   }
 
   protected visitArelNodesLimit(o: Nodes.Limit, collector: SQLString): SQLString {
     collector.append("LIMIT ");
-    if (o.expr instanceof Node) {
-      this.visit(o.expr, collector);
-    } else {
-      collector.append(String(o.expr));
-    }
+    this.visit(o.expr, collector);
     return collector;
   }
 

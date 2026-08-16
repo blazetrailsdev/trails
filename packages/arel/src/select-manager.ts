@@ -96,7 +96,7 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#skip (select_manager.rb). Pass `null`
    * to clear; raw amounts flow through `new Offset(amount)` unwrapped.
    */
-  skip(amount: number | Node | null): this {
+  skip(amount: unknown): this {
     this.ast.offset = amount == null ? null : new Offset(amount);
     return this;
   }
@@ -419,7 +419,7 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#take (select_manager.rb). Pass `null`
    * to clear; raw amounts flow through `new Limit(amount)` unwrapped.
    */
-  take(limit: number | Node | null): this {
+  take(limit: unknown): this {
     this.ast.limit = limit == null ? null : new Limit(limit);
     return this;
   }

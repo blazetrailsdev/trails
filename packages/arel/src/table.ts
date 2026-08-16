@@ -173,9 +173,12 @@ export class Table extends Node {
     return this.from().having(expr);
   }
 
-  get(name: string, table?: Attribute["relation"]): Attribute {
-    const resolved = this.klass?._attributeAliases?.[name] ?? name;
-    return new Attribute(table ?? this, resolved);
+  get(name: string | null, table?: Attribute["relation"]): Attribute {
+    // Rails' `Table#[]` accepts a nil name (`table[nil]` for a pkless model in
+    // `Relation#delete_all`, relation.rb:1027-1031) and builds an Attribute
+    // whose name is nil; only a subquery-shaped statement ever renders it.
+    const resolved = name === null ? null : (this.klass?._attributeAliases?.[name] ?? name);
+    return new Attribute(table ?? this, resolved as string);
   }
 
   /**
