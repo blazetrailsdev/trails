@@ -24,8 +24,8 @@ export function _setAssociationRelationCtor(
 }
 import { applyThenable, stripThenable } from "../relation/thenable.js";
 import {
-  findNthFromLast as baseFindNthFromLast,
   findNth as baseFindNth,
+  findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
   performLast as basePerformLast,
   findTake as baseFindTake,
@@ -1936,8 +1936,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
-    // `@offsets = @take = nil` (collection_proxy.rb:1113) — the collection just
-    // changed, so the find_nth/find_take memos are stale.
+    // `@offsets = @take = nil` (collection_proxy.rb:1113).
     this._offsets = undefined;
     this._take = undefined;
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
@@ -3318,7 +3317,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#reset_scope
    */
   resetScope(): this {
-    // `@offsets = @take = nil` (collection_proxy.rb:1113).
     this._offsets = undefined;
     this._take = undefined;
     this._scope = undefined;
