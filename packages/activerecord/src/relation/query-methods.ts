@@ -1485,6 +1485,7 @@ function reverseOrderBang(this: QueryMethodsHost): any {
   // false for an Arel node (it has no #empty?), so routing clauses through it
   // would drop every Ordering. Only nil/blank-string clauses are blank in this
   // list; Arel nodes never are.
+  //
   // `_rawOrderClauses` is the trails-side carrier for order SQL Rails keeps in
   // the same `order_values` list, so `reverse_sql_order`'s String branch owns
   // them here rather than at a caller-side "is this order reversible" branch.
