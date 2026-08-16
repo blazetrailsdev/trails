@@ -49,7 +49,7 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     const [node] = preprocess(rel, [{ topics: { title: "desc" } }]);
     expect(node).toBeInstanceOf(Nodes.Descending);
     expect(sqlOf(node)).toMatch(/"topics"\."title" DESC|`topics`\.`title` DESC/);
-    expect(rel.referencesValues).toContain("topics");
+    expect(rel.referencesValues?.map(String)).toContain("topics");
   });
 
   it("leaves a String arg unchanged", () => {

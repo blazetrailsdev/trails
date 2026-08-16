@@ -145,7 +145,7 @@ describe("Relation private build-arel helpers", () => {
     it("registers the table in references_values", () => {
       const rel = relation();
       rel.arelColumnWithTable("comments", "id");
-      expect((rel as any).referencesValues).toContain("comments");
+      expect((rel as any).referencesValues.map(String)).toContain("comments");
     });
   });
 

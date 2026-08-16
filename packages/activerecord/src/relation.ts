@@ -541,7 +541,6 @@ export class Relation<T extends Base> {
       (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
     );
   }
-  private _manualReferences: string[] = [];
   private _skipPreloading = false;
   private _loaded = false;
   // Rails `@delegate_to_model` (relation.rb:90) — true only while a scope body
@@ -884,9 +883,7 @@ export class Relation<T extends Base> {
       | Record<string, unknown>
       | string[];
     const rel = this._clone();
-    for (const t of referencesFromConditions(conditions)) {
-      if (!rel.referencesValues.includes(t)) rel.referencesValues = [...rel.referencesValues, t];
-    }
+    rel.referencesBang(...referencesFromConditions(conditions));
     if (
       Array.isArray(conditions) &&
       tuples !== undefined &&
@@ -1238,10 +1235,7 @@ export class Relation<T extends Base> {
     // (query_methods.rb:721-722) — recorded on the spawn, which trails clones
     // up-front rather than at Rails' `spawn.order!`.
     const references = _qm.columnReferences([column]);
-    for (const reference of references) {
-      if (!rel.referencesValues.includes(reference))
-        rel.referencesValues = [...rel.referencesValues, reference];
-    }
+    if (references.length > 0) rel.referencesBang(...references);
 
     // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
     // Cast each value to its database form so the CASE/IN predicates match a typed
@@ -2655,15 +2649,6 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
    */
-  /**
-   * References eligible to alias an eager-load join (Rails seeds @references
-   * only from SqlLiteral references). Excludes bare-string `.references(...)`
-   * calls, which promote includes to eager_load but never rename the join.
-   */
-  private _aliasableReferences(): string[] {
-    return this.referencesValues.filter((r) => !this._manualReferences.includes(r));
-  }
-
   private referencesEagerLoadedTables(): boolean {
     if (this.includesValues.length === 0) return false;
     if (this.referencesValues.length === 0) return false;
@@ -2709,7 +2694,7 @@ export class Relation<T extends Base> {
       String((this._model as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
 
-    return this.referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+    return this.referencesValues.some((ref) => !joinedTables.has(String(ref).toLowerCase()));
   }
 
   /**
@@ -4076,27 +4061,7 @@ export class Relation<T extends Base> {
    */
   references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":references", tableNames);
-    // Tag bare-string references as manual so they don't act as eager-load join
-    // aliases — mirrors Rails seeding @references only from SqlLiteral
-    // references (`Arel.sql("…")`). A SqlLiteral reference IS aliasable and so
-    // is excluded here. See QueryMethodsHost._manualReferences.
-    //
-    // Aliasability is decided on a name's FIRST occurrence: Rails dedupes via
-    // `references_values |= table_names` (union keeps the existing object), so a
-    // later bare `references("foo")` does not un-alias an earlier
-    // `references(Arel.sql("foo"))`. Mirror that by only tagging bare strings
-    // whose value is not already a known reference before this call.
-    const seen = new Set(this.referencesValues);
-    const manual: string[] = [];
-    for (const t of tableNames) {
-      const name = t instanceof Nodes.SqlLiteral ? t.value : t;
-      if (seen.has(name)) continue; // first occurrence wins (Rails `|=` keeps it)
-      seen.add(name);
-      if (!(t instanceof Nodes.SqlLiteral)) manual.push(name);
-    }
-    const rel = this._clone().referencesBang(...tableNames) as Relation<T>;
-    rel._manualReferences = [...new Set([...rel._manualReferences, ...manual])];
-    return rel;
+    return this._clone().referencesBang(...tableNames) as Relation<T>;
   }
 
   /**
@@ -5013,14 +4978,17 @@ export class Relation<T extends Base> {
     this._distinctOnColumns = [...source._distinctOnColumns];
     this._isNone = source._isNone;
     this._joinClauses = [...source._joinClauses];
-    this._manualReferences = [...source._manualReferences];
     // Rebind extension-module methods onto this clone. Ruby's `extend`
     // mutates the singleton class, so a cloned relation keeps the mixed-in
     // methods; here `extending_values` only carries the module objects, so we
     // re-bind each method to the new instance. Without this, extension
     // methods applied to a CollectionProxy (or via `extending(...)`) are
     // lost the moment the relation is spawned (`rel.where(...).fooExt()`).
-    for (const mod of this.extendingValues) {
+    // Read the modules off `source`, not `this`: `@values` was just copied from
+    // it, and a `CollectionProxy` receiver delegates its `extending_values`
+    // reader to `scope` (collection_proxy.rb:1128-1137), which would build the
+    // association scope mid-copy.
+    for (const mod of source.extendingValues) {
       for (const [name, fn] of Object.entries(mod)) {
         if (typeof fn === "function") {
           (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
@@ -5223,7 +5191,7 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
   leftOuterJoinsValues: AssociationSpec[];
   /** Mirrors: ActiveRecord::Relation#references_values */
-  referencesValues: string[];
+  referencesValues: Array<string | Nodes.SqlLiteral>;
   /** Mirrors: ActiveRecord::Relation#extending_values */
   extendingValues: Array<Record<string, (...args: any[]) => any>>;
   /** Mirrors: ActiveRecord::Relation#extensions */
@@ -5314,10 +5282,11 @@ export interface Relation<T extends Base>
     extra?: Record<string, unknown>,
   ): Promise<T>;
   raiseRecordNotFoundExceptionBang(
-    message?: string,
-    modelName?: string,
-    primaryKey?: string,
-    id?: unknown,
+    ids?: unknown,
+    resultSize?: number,
+    expectedSize?: number,
+    key?: string,
+    notFoundIds?: unknown[],
   ): never;
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;

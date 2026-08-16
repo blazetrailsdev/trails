@@ -2068,17 +2068,20 @@ describe("RelationTest", () => {
   });
 
   it("automatically added where references", () => {
+    // `PredicateBuilder.references` yields `Arel.sql(...)`, and Ruby's
+    // SqlLiteral IS a String — so `assert_equal ["comments"]` passes there.
+    // TypeScript has no String subclass, hence the explicit `String()`.
     const scope1 = Post.where({ comments: { body: "Bla" } });
-    expect((scope1 as any).referencesValues).toEqual(["comments"]);
+    expect((scope1 as any).referencesValues.map(String)).toEqual(["comments"]);
     const scope2 = Post.where({ "comments.body": "Bla" });
-    expect((scope2 as any).referencesValues).toEqual(["comments"]);
+    expect((scope2 as any).referencesValues.map(String)).toEqual(["comments"]);
   });
 
   it("automatically added where not references", () => {
     const scope1 = Post.all().whereNot({ comments: { body: "Bla" } });
-    expect((scope1 as any).referencesValues).toEqual(["comments"]);
+    expect((scope1 as any).referencesValues.map(String)).toEqual(["comments"]);
     const scope2 = Post.all().whereNot({ "comments.body": "Bla" });
-    expect((scope2 as any).referencesValues).toEqual(["comments"]);
+    expect((scope2 as any).referencesValues.map(String)).toEqual(["comments"]);
   });
 
   it("automatically added having references", () => {
@@ -2087,29 +2090,36 @@ describe("RelationTest", () => {
   });
 
   it("automatically added order references", () => {
-    expect((Post.order("comments.body") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.id") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.body", "yaks.body") as any).referencesValues).toEqual([
+    expect((Post.order("comments.body") as any).referencesValues.map(String)).toEqual(["comments"]);
+    expect((Post.order("comments.id") as any).referencesValues.map(String)).toEqual(["comments"]);
+    expect((Post.order("comments.body", "yaks.body") as any).referencesValues.map(String)).toEqual([
       "comments",
       "yaks",
     ]);
-    expect((Post.order("comments.body, yaks.body") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.body asc") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.order("foo(comments.body)") as any).referencesValues).toEqual([]);
+    expect((Post.order("comments.body, yaks.body") as any).referencesValues.map(String)).toEqual([
+      "comments",
+    ]);
+    expect((Post.order("comments.body asc") as any).referencesValues.map(String)).toEqual([
+      "comments",
+    ]);
+    expect((Post.order("foo(comments.body)") as any).referencesValues.map(String)).toEqual([]);
   });
 
   it("automatically added reorder references", () => {
-    expect((Post.reorder("comments.body") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("comments.id") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("comments.body", "yaks.body") as any).referencesValues).toEqual([
-      "comments",
-      "yaks",
-    ]);
-    expect((Post.reorder("comments.body, yaks.body") as any).referencesValues).toEqual([
+    expect((Post.reorder("comments.body") as any).referencesValues.map(String)).toEqual([
       "comments",
     ]);
-    expect((Post.reorder("comments.body asc") as any).referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("foo(comments.body)") as any).referencesValues).toEqual([]);
+    expect((Post.reorder("comments.id") as any).referencesValues.map(String)).toEqual(["comments"]);
+    expect(
+      (Post.reorder("comments.body", "yaks.body") as any).referencesValues.map(String),
+    ).toEqual(["comments", "yaks"]);
+    expect((Post.reorder("comments.body, yaks.body") as any).referencesValues.map(String)).toEqual([
+      "comments",
+    ]);
+    expect((Post.reorder("comments.body asc") as any).referencesValues.map(String)).toEqual([
+      "comments",
+    ]);
+    expect((Post.reorder("foo(comments.body)") as any).referencesValues.map(String)).toEqual([]);
   });
 
   it("order with reorder nil removes the order", () => {
