@@ -708,61 +708,33 @@ export async function exists(
   conditions?: Record<string, unknown> | unknown,
 ): Promise<boolean> {
   if (this._isEmptyRelation()) return false;
-  // Rails FinderMethods#exists?: `return false if !conditions` — treats an
-  // explicit `false` / `null` argument as "no match possible". This precedes
-  // the `if eager_loading?` branch, so it short-circuits before the
-  // eager-load validation below (finder_methods.rb:367-369).
-  if (conditions === false || conditions === null) return false;
-  // Rails FinderMethods#exists?: `return false if !conditions || limit_value == 0`
-  // (finder_methods.rb:367). A relation limited to zero rows can never match, so
-  // short-circuit to false without emitting any query.
-  if (this.limitValue === 0) return false;
-  // Rails FinderMethods#exists? (finder_methods.rb:360-364): reject an
-  // ActiveRecord instance argument with `if Base === conditions` before any
-  // query is built. Detect it via the inherited `_isActiveRecordBase` marker
-  // so a model of any class (not just this relation's) is caught.
-  // Rails runs this Base check just *before* `return false if !conditions`;
-  // we run it just after. The branches are mutually exclusive (an AR instance
-  // is never `false`/`null`), so the order is behaviorally identical.
+  // `Base === conditions` (finder_methods.rb:360) — detected via the inherited
+  // `_isActiveRecordBase` marker so a model of any class (not just this
+  // relation's) is caught.
   if (isBaseInstance(conditions)) {
     throw new ArgumentError(
       "You are passing an instance of ActiveRecord::Base to `exists?`. " +
         "Please pass the id of the object by calling `.id`.",
     );
   }
-  // Rails exists? then routes through apply_join_dependency when eager
-  // loading, raising EagerLoadPolymorphicError for polymorphic specs.
+  // `return false if !conditions || limit_value == 0` (finder_methods.rb:367).
+  // Ruby's `!conditions` is true only for nil/false, so `undefined` — our
+  // stand-in for the `:none` default, a truthy Symbol in Ruby — passes through.
+  if (conditions === false || conditions === null || this.limitValue === 0) return false;
+  // Rails builds the JoinDependency inside `apply_join_dependency`
+  // (finder_methods.rb:370) even on the arm that never reaches it, so the
+  // EagerLoadPolymorphicError it raises for a polymorphic spec has to be
+  // surfaced here rather than only where the joins are actually built.
   this._checkEagerLoadable();
-  // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
-  // the eager-load check precedes construct_relation_for_exists, and conditions
-  // thread through to the recursion (`apply_join_dependency(eager_loading: false)
-  // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
   if (this._eagerLoadingForSql()) {
     return this.applyJoinDependency({ eagerLoading: false }).exists(conditions);
   }
-  // Mirrors Rails FinderMethods#construct_relation_for_exists
-  // (finder_methods.rb:438): shape the existence probe and apply the argument's
-  // `case conditions` (Array/Hash → where!, else → where!(primary_key =>
-  // conditions)) in one place — `exists?` no longer reimplements that
-  // case-analysis. When `distinct_value && offset_value` keep the relation's
-  // select/distinct/group/having/offset and drop only the order
-  // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
-  // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive.
-  // `undefined` is our `:none` sentinel, so the helper adds no where!. Building
-  // the probe through the real relation reuses the shared select-list builder,
-  // so the distinct+offset branch's default `*` projection is `ignoredColumns`-
-  // aware, matching Rails' `build_select`.
   const relation = this.constructRelationForExists(conditions);
   // Resolve any deferred distinct-PK subquery markers to a literal id list
-  // before compiling the probe (Rails materializes at `.where()`-build time).
+  // before compiling: Arel has no such marker, so Rails materializes them at
+  // `.where()`-build time and never carries one into `arel`.
   await relation._materializeDeferredDistinctPkPredicates();
-  // Rails: `return false if relation.where_clause.contradiction?`
-  // (finder_methods.rb:375) — evaluated on the post-construct relation.
   if (relation.whereClause.isContradiction()) return false;
-  // Tag the probe query `<Model> Exists?` — the name Rails passes to its
-  // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
-  // finder_methods.rb) — so LogSubscriber labels it instead of falling back
-  // to the adapter's generic "SQL" default.
   const [existsSql, existsBinds] = this._compileAstWithBinds(relation.toArel().ast);
   return await this.skipQueryCacheIfNecessary(() =>
     this.withConnection(
@@ -810,9 +782,7 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
  * Alias of {@link include} — mirrors `alias :member? :include?`
  * (finder_methods.rb:407).
  */
-export function member(this: FinderRelation, record: any): Promise<boolean> {
-  return include.call(this, record);
-}
+export const member = include;
 
 // Mirrors ActiveRecord::FinderMethods#raise_record_not_found_exception!
 // (finder_methods.rb:417). Composes the faithful not-found messages from the

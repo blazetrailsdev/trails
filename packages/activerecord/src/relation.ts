@@ -2142,13 +2142,12 @@ export class Relation<T extends Base> {
   /**
    * Check if there are any matching records.
    *
-   * Mirrors: ActiveRecord::Relation#any?
+   * Mirrors: ActiveRecord::Relation#any? (relation.rb:391-396) — `!empty?`;
+   * the `loaded?` short-circuit lives in `empty?` (relation.rb:362-370).
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
     if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
-    // Rails relation.rb `any?` is `!empty?` — the `loaded?` short-circuit lives
-    // in `empty?` (relation.rb:271-274), not here.
     return !(await this.isEmpty());
   }
 
