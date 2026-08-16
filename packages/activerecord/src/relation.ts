@@ -305,6 +305,7 @@ declare const relationNameBrand: unique symbol;
  */
 export type RelationName = string | { readonly [relationNameBrand]: never };
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * The chainable object `Relation#explain` returns. Every member runs one
  * operation with query collection enabled and renders the EXPLAIN output for
@@ -320,7 +321,6 @@ export type RelationName = string | { readonly [relationNameBrand]: never };
  * Mirrors: ActiveRecord::Relation::ExplainProxy (relation.rb:6-51)
  * @internal
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExplainProxy<T extends Base> {
   private readonly _relation: Relation<T>;
   private readonly _options: ExplainOption[];
@@ -403,6 +403,7 @@ export interface ExplainProxy<T extends Base> {
    */
   finally(onfinally?: (() => void) | null): Promise<string>;
 }
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
