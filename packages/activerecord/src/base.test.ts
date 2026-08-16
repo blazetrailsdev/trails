@@ -736,7 +736,7 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit("asdfadf" as any).toSql()).toThrow(/invalid value for Integer/i);
+    expect(() => User.limit("asdfadf").toSql()).toThrow(/invalid value for Integer/i);
   });
   it("limit should sanitize sql injection for limit without commas", () => {
     class User extends Base {
@@ -744,7 +744,7 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit("1 select * from schema" as any).toSql()).toThrow(
+    expect(() => User.limit("1 select * from schema").toSql()).toThrow(
       /invalid value for Integer/i,
     );
   });
@@ -754,9 +754,7 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(() => User.limit("1, 7 procedure help()" as any).toSql()).toThrow(
-      /invalid value for Integer/i,
-    );
+    expect(() => User.limit("1, 7 procedure help()").toSql()).toThrow(/invalid value for Integer/i);
   });
   it("preserving time objects", async () => {
     class Topic extends Base {
