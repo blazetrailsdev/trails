@@ -4,13 +4,6 @@
  * `<<` and `>>` have no TS syntax that dispatches to a method, so they are the
  * named methods `docs/ruby-ts-conventions.md` ("Operators") calls for: `plus`,
  * `minus`, `cmp`, `lshift`, `rshift`.
- *
- * `test_next`'s `Date.today` / `DateTime.now` arms (`:161-172`) are not here:
- * neither `date_s_today` (`date_core.c:3789-3826`) nor `datetime_s_now`
- * (`:8134-8228`) is implemented, and RFC 0088's construction statics answer a
- * `Temporal.PlainDate`, which carries no `next`/`succ` — so the return shape is
- * a decision the port of those two has to make. Filed against 0088 as
- * `port-date-today-and-datetime-now`.
  */
 import { describe, it, expect } from "vitest";
 import { ArgumentError, Date, DateTime, Rational, Time } from "./index.js";
@@ -145,6 +138,26 @@ describe("TestDateArith", () => {
     expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
     d = new Date(2000, 12, 31).succ();
     expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
+
+    // `Date.today` / `DateTime.now` answer the `Temporal` seat (RFC 0088), which
+    // carries no `next`/`succ`, so Ruby's own receiver is fed back through the
+    // `Temporal` constructor overload — `d_simple_new_internal`'s other entry
+    // point (`date_core.c:3036`), the same idiom `test_date_new.rb`'s
+    // "civil reform" uses. `d2 - 1` is `minus(1)` (`d_lite_minus`, `:6343-6360`)
+    // and `assert_equal` is `Comparable#==` (`equals`).
+    d = new Date(Date.today());
+    let d2 = d.next();
+    expect(d.equals(d2.minus(1))).toBe(true);
+    d = new Date(Date.today());
+    d2 = d.succ();
+    expect(d.equals(d2.minus(1))).toBe(true);
+
+    let dt = new DateTime(DateTime.now());
+    let dt2 = dt.next();
+    expect(dt.equals(dt2.minus(1))).toBe(true);
+    dt = new DateTime(DateTime.now());
+    dt2 = dt.succ();
+    expect(dt.equals(dt2.minus(1))).toBe(true);
   });
 
   it("next day", () => {
