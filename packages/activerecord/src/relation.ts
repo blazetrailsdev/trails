@@ -1060,7 +1060,9 @@ export class Relation<T extends Base> {
    * shares one body and lets `__callee__` name whichever alias was called;
    * TypeScript has no `__callee__`, so the body is materialized once per callee
    * rather than routed through a helper Rails does not have — the ArgumentError
-   * has to name `#without` here, exactly as excluding_test.rb:108 asserts.
+   * has to name `#without` here, exactly as
+   * `excluding_test.rb:103-110` (`test_raises_on_record_from_different_class`)
+   * asserts.
    */
   without(...records: unknown[]): Relation<T> {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
