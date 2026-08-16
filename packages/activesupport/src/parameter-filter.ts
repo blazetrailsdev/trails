@@ -21,15 +21,21 @@
  */
 
 /**
- * A Ruby block filter. Rails' blocks mutate `key`/`value` in place (via
+ * A Ruby block filter. Rails' blocks mutate `value` in place (via
  * `String#replace`) and their return value is discarded; a JS string is an
  * immutable primitive, so a block hands its replacement back by returning it.
  * The only sanctioned deviation here — everything else follows the Ruby.
+ *
+ * A block cannot rewrite the key in the port, and does not need to: Rails
+ * hands the block `key.dup` (parameter_filter.rb:149), a copy local to
+ * `value_for_key`, while `call` writes `filtered_params[key]` with its own
+ * unmutated key (:129) — so a key mutation never reaches the filtered hash in
+ * Rails either. `value_for_key` returns the value alone in both.
  */
 export type FilterProc = (
   key: string,
   value: unknown,
-  originalParams?: Record<string, unknown>,
+  originalParams?: Record<string, unknown> | null,
 ) => unknown;
 
 export type Filter = string | RegExp | FilterProc;
@@ -159,7 +165,7 @@ export class ParameterFilter {
   private call(
     params: Record<string, unknown>,
     fullParentKey: string | null = null,
-    originalParams: Record<string, unknown> = params,
+    originalParams: Record<string, unknown> | null = params,
   ): Record<string, unknown> {
     // `params.class.new` (parameter_filter.rb:126): a plain JS object has no
     // constructor to call, so the same prototype is the same class.
@@ -188,12 +194,12 @@ export class ParameterFilter {
     } else if (this.deepRegexps?.some((r) => r.test(fullKey!))) {
       value = this.mask;
     } else if (isHash(value)) {
-      value = this.call(value, fullKey ?? null, originalParams ?? value);
+      value = this.call(value, fullKey ?? null, originalParams);
     } else if (Array.isArray(value)) {
       value = value.map((v) => this.valueForKey(key, v, fullParentKey, originalParams));
     } else if (this.blocks) {
       for (const b of this.blocks) {
-        const result = b.length === 2 ? b(key, value) : b(key, value, originalParams ?? undefined);
+        const result = b.length === 2 ? b(key, value) : b(key, value, originalParams);
         if (result !== undefined) value = result;
       }
     }
