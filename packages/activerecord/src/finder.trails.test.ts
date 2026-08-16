@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Post } from "./test-helpers/models/post.js";
 
 registerModel(Post);
@@ -29,5 +30,31 @@ describe("FinderTrailsTest", () => {
     const thinking = posts("thinking");
     const found = (await Post.find(["1-foo", "2-bar"])) as Post[];
     expect(found.map((r) => r.id)).toStrictEqual([welcome.id, thinking.id]);
+  });
+
+  it("take memoizes the record so a second call issues no query", async () => {
+    const relation = Post.all();
+    const first = await relation.take();
+    expect(first).not.toBeNull();
+    await assertNoQueries(false, async () => {
+      expect(await relation.take()).toStrictEqual(first);
+    });
+    relation.reset();
+    await assertQueriesCount(1, false, async () => {
+      expect(await relation.take()).toStrictEqual(first);
+    });
+  });
+
+  it("second memoizes per offset so a second call issues no query", async () => {
+    const relation = Post.order({ id: "asc" });
+    const second = await relation.second();
+    expect(second).not.toBeNull();
+    await assertNoQueries(false, async () => {
+      expect(await relation.second()).toStrictEqual(second);
+    });
+    relation.reset();
+    await assertQueriesCount(1, false, async () => {
+      expect(await relation.second()).toStrictEqual(second);
+    });
   });
 });

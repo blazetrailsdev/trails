@@ -444,6 +444,9 @@ export class Relation<T extends Base> {
   // `spawn`'s `model.all` branch) reachable at all.
   private _delegateToModel = false;
   private _records: T[] = [];
+  // Rails `@take` / `@offsets` (finder_methods.rb:586, 599-600).
+  private _take?: T | null;
+  private _offsets?: Map<number, T | null>;
   /**
    * Per-record loader block, run on each freshly instantiated record BEFORE
    * its find/initialize callbacks fire — the trails analog of the block Rails
@@ -1992,6 +1995,8 @@ export class Relation<T extends Base> {
   reset(): this {
     this._loaded = false;
     this._delegateToModel = false;
+    this._offsets = undefined;
+    this._take = undefined;
     this._records = [];
     this._cacheKeys = undefined;
     this._cacheVersions = undefined;
