@@ -849,11 +849,11 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
 });
 
 // The mutation terminals invoked on the PROXY itself (not a spawned relation)
-// route through `Relation`'s implementations with `this` = the proxy, so
-// they hit the base `_isEmptyRelation()` chokepoint on the proxy. The
-// `CollectionProxy#_isEmptyRelation` override rebases the stale new-owner
-// `1=0` seed there, giving the mutation side the same rebase reads already
-// get through `_finderScope`.
+// route through `scope()`, which the association rebuilds against the resolved
+// FK — so the proxy's own stale new-owner `1=0` seed is never read. Rails gets
+// this from `delegate(*delegate_methods, to: :scope)`
+// (collection_proxy.rb:1128-1137) sending the QueryMethods value readers the
+// inherited `update_all` uses to `@association.scope`.
 describe("CollectionProxy — mutation terminals invoked on the proxy itself on stale new-owner seed", () => {
   fixtures(["authors", "posts"]);
 
@@ -907,6 +907,48 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     expect((await Post.find(theirs.id)).author_id).toBe(otherAuthor.id);
   });
 
+  // Rails' `reader` (collection_association.rb:34-43) ends in
+  // `@proxy.reset_scope`, so every collection read drops the memoized `@scope`
+  // (collection_proxy.rb:1112-1116) and rebuilds it from the association. A
+  // proxy whose scope was memoized while the owner was new therefore resolves
+  // the persisted FK on the next read — which is how #6612's delegated value
+  // readers reach a live scope rather than the stale `1=0` seed.
+  it("resolves the persisted FK on updateAll read again after save", async () => {
+    const author = new Author({ name: "Proxy Mutation Four" });
+    // `whereBang` is delegated to `scope()`, so this memoizes the `1=0` scope
+    // while the owner is still new.
+    (association<Post>(author, "posts") as any).whereBang({ title: "mine" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const mine = await Post.create({ title: "mine", body: "1", author_id: authorId });
+    const otherAuthor = await Author.create({ name: "Someone Else Three" });
+    const theirs = await Post.create({ title: "mine", body: "2", author_id: otherAuthor.id });
+
+    // Re-read through the reader, as Rails' `person.posts.update_all` does.
+    const posts = association<Post>(author, "posts") as any;
+    expect(await posts.updateAll({ body: "updated" })).toBe(1);
+    expect((await Post.find(mine.id)).body).toBe("updated");
+    expect((await Post.find(theirs.id)).body).toBe("2");
+  });
+
+  // The same reader contract on a read terminal: a count taken while the owner
+  // was new must not pin the collection to the `1=0` seed for later reads.
+  it("counts against the persisted FK when read again after save", async () => {
+    const author = new Author({ name: "Proxy Mutation Five" });
+    expect(await (association<Post>(author, "posts") as any).count()).toBe(0);
+
+    await author.save();
+    const authorId = author.id as number;
+    await Post.create({ title: "mine", body: "1", author_id: authorId });
+    const otherAuthor = await Author.create({ name: "Someone Else Four" });
+    await Post.create({ title: "theirs", body: "2", author_id: otherAuthor.id });
+
+    const posts = association<Post>(author, "posts") as any;
+    expect(await posts.count()).toBe(1);
+    expect(await posts.size()).toBe(1);
+  });
+
   it("resolves the persisted FK on touchAll invoked on the proxy after save", async () => {
     const ship = new Ship({ name: "Proxy Mutation Three" });
     const parts = association<ShipPart>(ship, "parts") as any;
@@ -918,6 +960,23 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
 
     expect(await parts.touchAll()).toBe(1);
     expect(String((await ShipPart.find(mast.id)).updated_at)).not.toBe(stale);
+  });
+});
+
+// The other side of `calculate`'s none branch: a proxy whose own state is a none
+// relation for a reason that has nothing to do with a new owner — here
+// `Tag has_many :null_taggings, -> { none }` on a PERSISTED tag. Deferring to
+// `scope()` must return the same answer the in-memory short-circuit did, since
+// the association scope carries the same `none`.
+describe("CollectionProxy — a none-scoped association on a persisted owner", () => {
+  const { tags } = fixtures(["tags", "taggings"]);
+
+  it("still counts zero through the association scope", async () => {
+    const tag = await Tag.find(tags("general").id);
+    const nullTaggings = association(tag as any, "nullTaggings") as any;
+    expect(tag.isNewRecord()).toBe(false);
+    expect(await nullTaggings.count()).toBe(0);
+    expect(await nullTaggings.size()).toBe(0);
   });
 });
 

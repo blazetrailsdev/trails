@@ -80,6 +80,7 @@ import {
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { Explain } from "./explain.js";
+import { sanitizeLimit } from "./connection-adapters/abstract/database-statements.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { PrettyPrinter } from "./pretty-print.js";
@@ -263,7 +264,7 @@ export type ValuesHash = {
   optimizerHints?: string[];
   annotate?: string[];
   with?: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
-  limit?: number | null;
+  limit?: number | string | null;
   offset?: number | string | null;
   lock?: string | null;
   readonly?: boolean;
@@ -494,16 +495,16 @@ export class Relation<T extends Base> {
   private _isNone = false;
   /**
    * @internal True when this relation's WHERE base is the stale new-owner
-   * `1=0` NullRelation seed of a `CollectionProxy` (owner was a NEW record when
-   * the proxy was constructed). Set on the proxy at construction and propagated
-   * to every spawned relation via `initializeCopy`, so a query executed after
-   * the owner is saved can rebase the dead seed onto the resolved association
-   * scope. See `associations/new-owner-seed-rebase.ts`.
+   * `1=0` NullRelation seed of an association scope built while the owner was a
+   * NEW record. Set on that scope and propagated to every spawned relation via
+   * `initializeCopy`, so a query executed after the owner is saved can rebase
+   * the dead seed onto the resolved association scope. See
+   * `associations/new-owner-seed-rebase.ts`.
    */
   _seededNoneNewOwner = false;
   /**
    * @internal Identity snapshot of the seed WHERE predicates captured when a
-   * `CollectionProxy` is constructed, so a rebase can separate accumulated
+   * new-owner association scope is built, so a rebase can separate accumulated
    * mutation predicates from the stale `1=0` seed. Empty on ordinary relations.
    */
   _seedWherePredicates: readonly unknown[] = [];
@@ -1090,7 +1091,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#limit
    */
-  limit(value: number | null): Relation<T> {
+  limit(value: number | string | null): Relation<T> {
     return this._clone().limitBang(value);
   }
 
@@ -3056,8 +3057,8 @@ export class Relation<T extends Base> {
     // No `none?` guard here: Rails' touch_all (relation.rb:969-971) is a bare
     // `update_all model.touch_attributes_with_time(...)` and inherits the
     // `return 0 if @none` from update_all (relation.rb:592). Delegating rather
-    // than short-circuiting also routes the new-owner seed rebase through
-    // updateAll's chokepoint.
+    // than short-circuiting is also what lets a CollectionProxy's touchAll build
+    // from the value readers delegated to `scope` (collection_proxy.rb:1128-1137).
 
     // Use touchAttributesWithTime so alias-resolved column names are used
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
@@ -3320,10 +3321,14 @@ export class Relation<T extends Base> {
    */
   toArel(aliases?: AliasTracker): SelectManager {
     // Rails' `arel` reader is `with_connection { |c| build_arel(c, aliases) }`
-    // (query_methods.rb:1595). `_resolveAdapter` is the trails stand-in for the
-    // acquisition: it yields the threaded connection when there is one and null
-    // for a model with no established pool, which Arel building tolerates.
-    return this.buildArel(this._resolveAdapter(), aliases);
+    // (query_methods.rb:1595), so `build_arel` always has a connection.
+    // `_resolveAdapter` is the trails stand-in for that acquisition, but it
+    // yields null for a model with no established pool — Arel building is
+    // reachable there (CTE bodies, `from(relation)` subqueries). Name that case
+    // HERE, at the acquisition point, substituting the abstract adapter's own
+    // `sanitize_limit` (abstract/database_statements.rb), so `build_arel`'s body
+    // never has to consider a missing connection the way Rails' never does.
+    return this.buildArel(this._resolveAdapter() ?? { sanitizeLimit }, aliases);
   }
 
   /**
@@ -4149,7 +4154,8 @@ export class Relation<T extends Base> {
   ): Promise<number> {
     // No `none?` guard here: Rails' update_counters (relation.rb:926-944) ends
     // in `update_all updates` and inherits the `return 0 if @none` from there
-    // (relation.rb:592), which is also what routes the new-owner seed rebase.
+    // (relation.rb:592), and — on a CollectionProxy — the association scope,
+    // through the value readers delegated to `scope` (collection_proxy.rb:1128-1137).
 
     // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
     const touchFromCounters = (counters as Record<string, unknown>).touch;
@@ -4368,8 +4374,8 @@ export class Relation<T extends Base> {
    * (`owner.things.where(...)`) resolves the persisted FK once the owner is
    * saved — mirroring Rails' CollectionProxy delegating every query to
    * `association.scope`, rather than each terminal carrying its own rebase hook.
-   * `CollectionProxy` overrides this too, so mutation terminals invoked on the
-   * PROXY itself (`owner.things.updateAll(...)`) rebase the same way.
+   * `CollectionProxy` needs no rebase at all: it is never `@none` itself, and
+   * its value readers are delegated to `scope` (collection_proxy.rb:1128-1137).
    *
    * @internal
    */

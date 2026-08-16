@@ -16,7 +16,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError, ArgumentError } from "@blazetrails/activemodel";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -1314,16 +1314,74 @@ export function emptyInsertStatementValue(_primaryKey?: string | null): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#sanitize_limit
  */
 export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
-  if (typeof limit === "number" && Number.isInteger(limit)) {
+  if ((typeof limit === "number" && Number.isInteger(limit)) || limit instanceof Nodes.SqlLiteral) {
     return limit;
   }
-  if (limit instanceof Nodes.SqlLiteral) {
-    return limit;
+  // Ruby's `Integer(limit)` (database_statements.rb:512): a String parses with
+  // base detection, a Float truncates toward zero, and anything else raises —
+  // ArgumentError for a String Ruby cannot parse (which is what the SQL-injection
+  // strings in `base_test.rb:187-205` hit), TypeError for a value that has no
+  // integer conversion at all.
+  if (typeof limit === "string") {
+    return integerFromString(limit);
   }
-  if (typeof limit === "string" && /^[+-]?\d+$/.test(limit.trim())) {
-    return Number(limit.trim());
+  if (typeof limit === "number") {
+    if (!Number.isFinite(limit)) throw new FloatDomainError(String(limit));
+    return Math.trunc(limit);
   }
-  throw new TypeError(`Invalid LIMIT: ${limit}`);
+  throw new TypeError(`can't convert ${rubyClassName(limit)} into Integer`);
+}
+
+/**
+ * Ruby's `Integer(str)` with base 0: an optional sign, then a `0x`/`0b`/`0o`/`0d`
+ * radix prefix (a bare leading `0` meaning octal, so `Integer("012") # => 10`),
+ * with `_` allowed between digits. Anything else raises ArgumentError.
+ */
+function integerFromString(str: string): number {
+  const invalid = () => new ArgumentError(`invalid value for Integer(): ${JSON.stringify(str)}`);
+  const signMatch = /^([+-]?)(.*)$/s.exec(str.trim())!;
+  const sign = signMatch[1];
+  let body = signMatch[2];
+
+  let radix = 10;
+  const prefix = /^0([xbod])/i.exec(body);
+  if (prefix) {
+    radix = { x: 16, b: 2, o: 8, d: 10 }[prefix[1].toLowerCase()]!;
+    body = body.slice(2);
+  } else if (/^0./.test(body)) {
+    // A bare leading `0` is the octal prefix, and like the lettered prefixes it
+    // may be followed by an `_` separator: `Integer("0_1") # => 1`.
+    radix = 8;
+    body = body.slice(1).replace(/^_/, "");
+  }
+
+  const digits = { 2: "[01]", 8: "[0-7]", 10: "[0-9]", 16: "[0-9a-fA-F]" }[radix]!;
+  if (!new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) throw invalid();
+  return (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), radix);
+}
+
+/**
+ * Ruby core's `FloatDomainError` (a `RangeError` subclass) — what
+ * `Integer(Float::NAN)` / `Integer(Float::INFINITY)` raise, message `"NaN"` /
+ * `"Infinity"`. Spelled locally rather than exported: it is reachable only
+ * through `Integer()`'s Float arm, as in Ruby.
+ */
+class FloatDomainError extends globalThis.RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FloatDomainError";
+  }
+}
+
+/**
+ * The name Ruby's `TypeError` message uses for an unconvertible value:
+ * `nil`/`true`/`false` render as themselves, everything else as its class
+ * (`can't convert Array into Integer`).
+ */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "boolean") return String(value);
+  return (value as object)?.constructor?.name ?? typeof value;
 }
 
 /**

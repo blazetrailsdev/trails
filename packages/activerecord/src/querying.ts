@@ -213,7 +213,7 @@ export function group<T extends typeof Base>(
 /** Mirrors: ActiveRecord::Querying#limit */
 export function limit<T extends typeof Base>(
   this: T,
-  value: number | null,
+  value: number | string | null,
 ): Relation<InstanceType<T>> {
   return this.all().limit(value);
 }
