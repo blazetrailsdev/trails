@@ -3049,17 +3049,23 @@ export class PostgreSQLAdapter
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
     void super.clearCacheBang({ newConnection });
-    if (newConnection) {
-      // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
-      // map without DEALLOCATE: the session that owned those statement names is
-      // gone, so naming them again is an error, not a cleanup.
-      this._statements.reset();
-    } else if (this._rawConnection) {
-      return this._statements.clear();
-    } else {
-      this._statements.reset();
-      this._needsDeallocateAll = true;
-    }
+    // Rails wraps the pool mutation in `@lock.synchronize`
+    // (abstract_adapter.rb:741-747) — the precondition `dealloc` states
+    // outright: "the statement pool is only accessed while holding the
+    // connection's lock" (postgresql_adapter.rb:308-310).
+    return this.lock.synchronize(() => {
+      if (newConnection) {
+        // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
+        // map without DEALLOCATE: the session that owned those statement names is
+        // gone, so naming them again is an error, not a cleanup.
+        this._statements.reset();
+      } else if (this._rawConnection) {
+        return this._statements.clear();
+      } else {
+        this._statements.reset();
+        this._needsDeallocateAll = true;
+      }
+    });
   }
 
   /**
