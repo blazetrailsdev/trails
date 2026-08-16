@@ -6897,9 +6897,6 @@ include(Relation, Calculations);
 include(Relation, SpawnMethods);
 include(Relation, DelegationMethods);
 include(Relation, Batches);
-// relation.rb:68 — `include FinderMethods, ..., Batches, Explain, Delegation`.
-// Rails also does `extend Explain` on Base (base.rb:294); both sides read the
-// one definition in `explain.ts`.
 include(Relation, Explain);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
