@@ -78,15 +78,8 @@ export class Merger {
       if (Array.isArray(value)) rel[bang](...value);
       else rel[bang](value);
     }
-    // `references_values` has a trails-only sidecar, `_manualReferences`,
-    // marking the refs a caller asked for explicitly (vs. those inferred from an
-    // `includes`). `references!` does not maintain it, so the loop's
-    // `references` step cannot carry it and it rides along here.
-    for (const ref of this.other._manualReferences ?? []) {
-      if (!rel._manualReferences.includes(ref)) rel._manualReferences.push(ref);
-    }
 
-    if (this.other._isNone) rel._isNone = true;
+    if (this.other.isNullRelation()) rel.noneBang();
 
     this.mergeSelectValues(rel);
     this.mergeMultiValues(rel);
@@ -214,38 +207,20 @@ export class Merger {
     QueryMethodBangs.leftOuterJoinsBang.call(rel, joinDependency as any, ...(others as any[]));
   }
 
-  // Rails stores order_values as Arel nodes already qualified against the
-  // origin model's table (preprocess_order_args at order! time), so a
-  // cross-model merge carries `authors.name` rather than re-resolving the bare
-  // column against the receiver. trails defers qualification to SQL build
-  // (against the *receiver* table), so a bare-column order from another model
-  // would wrongly bind to the receiver (`posts.name`). Mirror Rails by
-  // qualifying the other relation's bare-column order clauses against ITS table
-  // before copying. Dotted refs, raw SQL, and existing Arel nodes pass through.
-  private qualifyOrderForOther(clause: unknown): unknown {
-    if (clause instanceof Nodes.Node) return clause;
-    const table: any = this.other._model?.arelTable;
-    if (!table) return clause;
-    const asNode = (col: string, dir: string): unknown => {
-      const attr = table.get(col);
-      return dir.toLowerCase() === "desc" ? new Nodes.Descending(attr) : new Nodes.Ascending(attr);
-    };
-    const bareColumn = (s: string): RegExpMatchArray | null =>
-      s.trim().match(/^([A-Za-z_$][\w$]*)(?:\s+(ASC|DESC))?$/i);
-    if (typeof clause === "string") {
-      const m = bareColumn(clause);
-      return m ? asNode(m[1], m[2] ?? "asc") : clause;
-    }
-    return clause;
-  }
-
+  // Mirrors merge_multi_values (merger.rb:154-167).
   private mergeMultiValues(rel: any): void {
-    if (this.other.orderValues && this.other.orderValues.length > 0) {
-      const sameKlass = this.other._model === rel._model;
-      rel.orderValues = sameKlass
-        ? [...this.other.orderValues]
-        : this.other.orderValues.map((c: unknown) => this.qualifyOrderForOther(c));
+    if (this.other.reorderingValue) {
+      // override any order specified in the original relation
+      rel.reorderBang(...this.other.orderValues);
+    } else if (this.other.orderValues.length > 0) {
+      // merge in order_values from relation
+      rel.orderBang(...this.other.orderValues);
     }
+
+    const extensions = this.other.extensions.filter(
+      (mod: unknown) => !rel.extensions.includes(mod),
+    );
+    if (extensions.length > 0) rel.extendingBang(...extensions);
   }
 
   // Mirrors merge_single_values (merger.rb:169-174).

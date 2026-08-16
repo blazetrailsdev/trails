@@ -16,34 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
-    "rubyName": "merge_multi_values",
-    "call": "extending!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_multi_values",
-    "call": "extensions",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_multi_values",
-    "call": "order!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_multi_values",
-    "call": "reorder!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `other.left_outer_joins_values.empty?` (merger.rb:137) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."

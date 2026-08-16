@@ -312,6 +312,14 @@ interface FinderRelation {
   /** Relation#loaded? / Relation#records (relation.ts). */
   isLoaded: boolean;
   records(): Promise<any[]>;
+  /** Mirrors `raise_record_not_found_exception!` (finder_methods.rb:417). */
+  raiseRecordNotFoundExceptionBang(
+    ids?: unknown,
+    resultSize?: number,
+    expectedSize?: number,
+    key?: string,
+    notFoundIds?: unknown[],
+  ): never;
   /** @internal */
   findTake(): Promise<any | null>;
   /** @internal */
@@ -993,7 +1001,7 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
   const record = await relation.take();
   if (!record) {
     // Rails find_one: raise_record_not_found_exception!(id, 0, 1)
-    (this as any).raiseRecordNotFoundExceptionBang(id, 0, 1);
+    this.raiseRecordNotFoundExceptionBang(id, 0, 1);
   }
   return record;
 }
@@ -1021,7 +1029,7 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
 
   if (records.length !== expectedSize) {
     // Rails find_some: raise_record_not_found_exception!(ids, result.size, expected_size)
-    (this as any).raiseRecordNotFoundExceptionBang(ids, records.length, expectedSize);
+    this.raiseRecordNotFoundExceptionBang(ids, records.length, expectedSize);
   }
   return records;
 }
@@ -1045,7 +1053,7 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
 
   if (records.length !== ids.length) {
     // Rails find_some_ordered: raise_record_not_found_exception!(ids, result.size, ids.size)
-    (this as any).raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
+    this.raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
   }
   const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
   return records.sort((a: any, b: any) => {

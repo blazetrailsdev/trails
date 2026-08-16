@@ -256,7 +256,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     expect(target.effectiveSqlName).toBe("jdt_comments");
 
     // Lazily consume references; the free reference name renames the target.
-    jd.joinConstraints([], (jd as any)._aliasTracker, ["jdtComments"]);
+    jd.joinConstraints([], (jd as any)._aliasTracker, [new Nodes.SqlLiteral("jdtComments")]);
     expect(target.effectiveSqlName).toBe("jdtComments");
     expect(tableRealName(target.arelTable as TableRef)).toBe("jdt_comments");
     expect(tableSqlName(target.arelTable as TableRef)).toBe("jdtComments");

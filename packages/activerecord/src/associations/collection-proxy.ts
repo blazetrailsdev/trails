@@ -614,8 +614,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       initializeCopy: (other: Relation<T>) => void;
     };
     const relationProto = Relation.prototype as unknown as {
-      noneBang: (this: unknown) => unknown;
       extendingBang: (this: unknown, ...mods: unknown[]) => unknown;
+    };
+    // `none!` reads `where_clause` (query_methods.rb) — a reader delegated to
+    // `scope` — so it is applied to a plain relation and copied onto the
+    // proxy's own inherited state rather than called on the proxy.
+    const seedNone = (): void => {
+      proxySelf.initializeCopy((targetModel as any).all().noneBang() as Relation<T>);
     };
     if (assocDef.options.through) {
       // Config validation FIRST, outside the try — missing through
@@ -665,7 +670,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       } catch (err) {
         if (err instanceof ArgumentError) {
           this._deferredFkError = err;
-          relationProto.noneBang.call(this);
+          seedNone();
           seedRel = null;
         } else {
           throw err;
@@ -673,7 +678,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       }
       if (seedRel === null) {
         if (this._deferredFkError === undefined) {
-          relationProto.noneBang.call(this);
+          seedNone();
           // New-owner seed: the `1=0` base must be rebased onto the resolved
           // scope once the owner is saved (see `_maybeRebaseProxySeed`).
           this._seededNoneNewOwner = true;
@@ -698,10 +703,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
 
     // Capture the seed WHERE predicates so a later rebase (new-owner `1=0`
-    // seed, owner then saved) can separate them from mutation predicates.
-    this._seedWherePredicates = [
-      ...(this as unknown as { whereClause: { predicates: unknown[] } }).whereClause.predicates,
-    ];
+    // seed, owner then saved) can separate them from mutation predicates. Read
+    // through `Relation.prototype` for the same reason the seeding bangs above
+    // are called that way: `where_clause` is one of the readers delegated to
+    // `scope` (collection_proxy.rb:1128-1137), and the seed lives in the
+    // proxy's OWN inherited state — going through the delegation here would
+    // also force an eager `scope()` build, which Rails defers to load time.
+    const ownWhereClause = Object.getOwnPropertyDescriptor(
+      Relation.prototype,
+      "whereClause",
+    )?.get?.call(this) as { predicates: unknown[] } | undefined;
+    this._seedWherePredicates = [...(ownWhereClause?.predicates ?? [])];
   }
 
   /**
@@ -3269,6 +3281,32 @@ const delegateMethods = (
     "upsertAll",
     "loadAsync",
   ]);
+
+// The VALUE_METHODS accessors `query_methods.rb:162-183` generates
+// (`where_clause`, `order_values`, `limit_value`, …) are
+// `QueryMethods.public_instance_methods(false)` too, so `delegate(*delegate_methods,
+// to: :scope)` routes them at `scope` as well — which is how a Rails
+// `CollectionProxy` runs the mutation terminals it inherits from `Relation`
+// (`update_all` reads `where_clause` / `values` / `having_clause`,
+// relation.rb:1010-1027) against the association scope with no override.
+// They are accessors, not methods, so the delegation is a property pair.
+const valueAccessorNames = [
+  ...Relation.MULTI_VALUE_METHODS.map((name) => `${name}Values`),
+  ...Relation.SINGLE_VALUE_METHODS.map((name) => `${name}Value`),
+  ...Relation.CLAUSE_METHODS.map((name) => `${name}Clause`),
+];
+
+for (const name of valueAccessorNames) {
+  Object.defineProperty(CollectionProxy.prototype, name, {
+    get(this: CollectionProxy<Base>): unknown {
+      return (this.scope() as Record<string, unknown>)[name];
+    },
+    set(this: CollectionProxy<Base>, value: unknown) {
+      (this.scope() as Record<string, unknown>)[name] = value;
+    },
+    configurable: true,
+  });
+}
 
 for (const name of delegateMethods) {
   Object.defineProperty(CollectionProxy.prototype, name, {

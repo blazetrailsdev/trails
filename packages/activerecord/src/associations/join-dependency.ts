@@ -424,7 +424,7 @@ export class JoinDependency {
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
-    references?: string[],
+    references?: Array<string | Nodes.SqlLiteral>,
   ): Nodes.Join[] {
     // Aliasing is resolved here, at emit-time, against the AliasTracker — either
     // the shared one threaded in from `build_joins` (so merged/eager joins collide
@@ -452,7 +452,13 @@ export class JoinDependency {
     this._references = new Map();
     this._joinedTables = new Map();
     if (references) {
-      for (const tableName of references) this._references.set(tableName, tableName);
+      // `@references[table_name.to_sym] = table_name if table_name.is_a?(SqlLiteral)`
+      // (join_dependency.rb:90-92) — a bare-String reference promotes `includes`
+      // to an eager JOIN but never renames it.
+      for (const tableName of references) {
+        if (tableName instanceof Nodes.SqlLiteral)
+          this._references.set(tableName.value, tableName.value);
+      }
     }
     const joins = this.makeJoinConstraints(this.joinRoot, this.joinType);
 

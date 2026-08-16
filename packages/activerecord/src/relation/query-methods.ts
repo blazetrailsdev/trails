@@ -244,7 +244,7 @@ interface QueryMethodsHost {
   orderValues: Array<string | Nodes.Node>;
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoinsValues: AssociationSpec[];
-  referencesValues: string[];
+  referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: Array<Record<string, (...args: any[]) => any>>;
   unscopeValues: Array<string | { where: string | string[] }>;
   optimizerHintsValues: string[];
@@ -284,11 +284,6 @@ interface QueryMethodsHost {
   // leading-colon string — or a string naming an association; everything else
   // (Arel join nodes, raw SQL strings) is a raw join value.
   _isNamedJoinValue(v: unknown): boolean;
-  // References added by an explicit `.references(...)` call. Rails only seeds
-  // JoinDependency's alias map from SqlLiteral references (those auto-derived by
-  // column_references / arel_column_with_table), NOT from these bare-string
-  // manual references — so they are excluded when aliasing eager-load joins.
-  _manualReferences: string[];
   _skipPreloading: boolean;
   _model: typeof import("../base.js").Base;
   model: QueryMethodsHost["_model"];
@@ -337,13 +332,36 @@ function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[])
   return this;
 }
 
-function referencesBang(this: QueryMethodsHost, ...tables: Array<string | Nodes.SqlLiteral>): any {
-  for (const t of tables) {
-    const name = t instanceof Nodes.SqlLiteral ? t.value : t;
-    if (name && !this.referencesValues.includes(name))
-      this.referencesValues = [...this.referencesValues, name];
-  }
+function referencesBang(
+  this: QueryMethodsHost,
+  ...tableNames: Array<string | Nodes.SqlLiteral>
+): any {
+  // `self.references_values |= table_names` (query_methods.rb:360-363). Ruby's
+  // SqlLiteral is a String subclass, so the union compares by SQL text and the
+  // FIRST occurrence is the one kept — an `Arel.sql("foo")` already present is
+  // not downgraded by a later bare `"foo"`, and vice versa.
+  this.referencesValues = unionReferences(this.referencesValues, tableNames);
   return this;
+}
+
+/** Ruby `SqlLiteral < String`, so a reference compares by its SQL text. */
+function referenceName(reference: string | Nodes.SqlLiteral): string {
+  return reference instanceof Nodes.SqlLiteral ? reference.value : reference;
+}
+
+function unionReferences(
+  a: Array<string | Nodes.SqlLiteral>,
+  b: Array<string | Nodes.SqlLiteral>,
+): Array<string | Nodes.SqlLiteral> {
+  const result = [...a];
+  const seen = new Set(a.map(referenceName));
+  for (const reference of b) {
+    const name = referenceName(reference);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    result.push(reference);
+  }
+  return result;
 }
 
 /**
@@ -357,9 +375,13 @@ function referencesBang(this: QueryMethodsHost, ...tables: Array<string | Nodes.
  * — `references = PredicateBuilder.references(opts)`.
  * @internal
  */
-export function referencesFromConditions(conditions: unknown): string[] {
+export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[] {
   if (!isPlainObject(conditions)) return [];
-  return PredicateBuilder.references(conditions).map((ref) => ref.value);
+  // `PredicateBuilder.references` yields `Arel.sql(key, retryable: true)`
+  // (predicate_builder.rb:28-36) — SqlLiterals, which is what makes a hash
+  // condition's table able to alias its eager-load join
+  // (join_dependency.rb:90-92).
+  return PredicateBuilder.references(conditions);
 }
 
 // Resolve a single CTE sub-query value into an arel body node, mirroring Rails'
@@ -824,9 +846,6 @@ export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): vo
     case "leftOuterJoins":
       host._joinClauses = host._joinClauses.filter((j) => j.type !== "left");
       break;
-    case "references":
-      host._manualReferences = [];
-      break;
   }
 }
 
@@ -834,12 +853,7 @@ export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): vo
  * The value keys whose trails representation spills outside `@values` into a
  * sidecar store, so replacing the hash wholesale has to clear them too.
  */
-const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = [
-  "order",
-  "joins",
-  "leftOuterJoins",
-  "references",
-];
+const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = ["order", "joins", "leftOuterJoins"];
 
 /**
  * Replace `@values` wholesale.
@@ -1244,9 +1258,7 @@ function andBang(this: QueryMethodsHost, other: any): any {
   //                references_values |= other.references_values
   this.whereClause = this.whereClause.union(other.whereClause);
   this.havingClause = this.havingClause.union(other.havingClause);
-  const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
-  this.referencesValues = unionStrings(this.referencesValues, other.referencesValues);
-  this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
+  this.referencesValues = unionReferences(this.referencesValues, other.referencesValues);
   return this;
 }
 
@@ -1255,9 +1267,7 @@ function orBang(this: QueryMethodsHost, other: any): any {
   assertStructurallyCompatible(this, other, "or");
   this.whereClause = this.whereClause.or(other.whereClause);
   this.havingClause = this.havingClause.or(other.havingClause);
-  const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
-  this.referencesValues = unionStrings(this.referencesValues, other.referencesValues);
-  this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
+  this.referencesValues = unionReferences(this.referencesValues, other.referencesValues);
   return this;
 }
 
@@ -1883,7 +1893,7 @@ function symbolToName(s: string): string {
 }
 
 /** @internal */
-export function columnReferences(orderArgs: unknown[]): string[] {
+export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
   const refs: string[] = [];
   for (const arg of orderArgs) {
     if (Array.isArray(arg)) {
@@ -1891,7 +1901,7 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       // here too — otherwise a qualified column inside the array (e.g.
       // `order(["comments.body", ...])`) never registers its table reference and
       // an `includes` it names is not promoted to `eager_load`.
-      refs.push(...columnReferences(arg));
+      refs.push(...columnReferences(arg).map((ref) => ref.value));
     } else if (typeof arg === "string") {
       const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
       const t = extractTableNameFrom(term);
@@ -1927,7 +1937,11 @@ export function columnReferences(orderArgs: unknown[]): string[] {
       }
     }
   }
-  return refs;
+  // `.filter_map { |ref| Arel.sql(ref, retryable: true) if ref }`
+  // (query_methods.rb:2146) — the references order args imply are SqlLiterals,
+  // which is what lets an order like `order(author: { name: :asc })` alias the
+  // eager-load join to `author` (join_dependency.rb:90-92, :202).
+  return refs.map((ref) => new Nodes.SqlLiteral(ref, { retryable: true }));
 }
 
 /** @internal */
@@ -1982,8 +1996,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);
   if (refs.length > 0) {
-    const existing: string[] = (this as any).referencesValues ?? [];
-    (this as any).referencesValues = [...new Set([...existing, ...refs])];
+    (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], refs);
   }
   const mapped: unknown[] = [];
   for (const arg of orderArgs) {
@@ -2262,8 +2275,12 @@ export function arelColumnWithTable(
   tableName: string,
   columnName: string,
 ): unknown {
-  const existing = (this as any).referencesValues ?? [];
-  if (!existing.includes(tableName)) (this as any).referencesValues = [...existing, tableName];
+  // `self.references_values |= [Arel.sql(table_name, retryable: true)]`
+  // (query_methods.rb:1979) — a SqlLiteral reference, which is the only kind
+  // JoinDependency seeds its alias map from (join_dependency.rb:90-92).
+  (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], [
+    new Nodes.SqlLiteral(tableName, { retryable: true }),
+  ]);
   // Ruby discriminates `column_name.is_a?(Symbol)` (query_methods.rb:1980): a
   // Symbol names a column, a String may be an expression.
   const isSymbol = isRubySymbol(columnName);
@@ -2908,7 +2925,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
     trackerWasBuilt = true;
     return plan.tracker();
   };
-  const references = (this as any)._aliasableReferences();
+  const references = (this as any).referencesValues;
 
   // Rails build_joins (query_methods.rb:1881-1897) emits ALL named association
   // joins — joins_values (InnerJoin) plus the folded left_outer JoinDependency —
