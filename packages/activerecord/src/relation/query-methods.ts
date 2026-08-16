@@ -22,7 +22,6 @@ import {
 } from "../errors.js";
 import { FromClause } from "./from-clause.js";
 import { WhereClause } from "./where-clause.js";
-import { disallowRawSqlBang } from "../sanitization.js";
 import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
@@ -1941,7 +1940,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   const flattenedArgs = flattenedOrderKeysForRawSqlCheck(orderArgs).map((k) =>
     isRubySymbol(k) ? symbolToName(k) : k,
   );
-  disallowRawSqlBang(flattenedArgs, {
+  this.model.disallowRawSqlBang(flattenedArgs, {
     permit: (
       this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
@@ -2376,7 +2375,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // shape deviation to converge away. See the
     // `eager-from-subquery-column-alias-projection` story.
     const subArel =
-      typeof resolved.buildArel === "function" ? resolved.buildArel() : resolved.toArel();
+      typeof resolved.toArel === "function" ? resolved.toArel() : resolved.buildArel();
     return subArel.as(alias);
   }
   return opts;
@@ -2509,7 +2508,14 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
 /** @internal */
 export function buildArel(
   this: QueryMethodsHost,
-  _connection?: unknown,
+  // Rails threads the `with_connection` connection into every `build_arel`
+  // call (query_methods.rb:1595, relation.rb:1023) and reads it for
+  // `connection.sanitize_limit` (query_methods.rb:1757). trails' Arel building
+  // is reachable on a model with no established connection (subquery/CTE
+  // construction in tests), where `_conn()` raises — so a null connection
+  // degrades to the same `sanitize_limit` as a module function, exactly as
+  // `_annotationComments` degrades to the abstract `sanitizeAsSqlComment`.
+  connection?: { sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral } | null,
   aliases?: AliasTracker,
 ): any {
   const table: any = this.table;
@@ -2520,7 +2526,12 @@ export function buildArel(
   if (!this.whereClause.isEmpty()) arel.where(this.whereClause.ast);
   if (!this.havingClause.isEmpty()) arel.having(this.havingClause.ast);
 
-  if (this.limitValue !== null) arel.take(sanitizeLimit(this.limitValue));
+  if (this.limitValue !== null)
+    arel.take(
+      connection?.sanitizeLimit
+        ? connection.sanitizeLimit(this.limitValue)
+        : sanitizeLimit(this.limitValue),
+    );
   if (this.offsetValue !== null) arel.skip(this.offsetValue);
 
   if (this.groupValues.length > 0)

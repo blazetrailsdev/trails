@@ -7,6 +7,7 @@ import {
   Visitors,
   UpdateManager,
   DeleteManager,
+  sql,
 } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
@@ -23,7 +24,6 @@ import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
-import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
 import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
 import {
@@ -1104,7 +1104,7 @@ export class Relation<T extends Base> {
    * leases no connection.
    */
   inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
-    disallowRawSqlBang([column], {
+    this.model.disallowRawSqlBang([column], {
       permit: (
         this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
       ).columnNameWithOrderMatcher(),
@@ -2669,7 +2669,7 @@ export class Relation<T extends Base> {
     // annotate() comments fold in through the ordinary path.
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk, limitedIds);
     jd.applyColumnAliases(eagerRelation);
-    const manager = eagerRelation.buildArel();
+    const manager = eagerRelation.toArel();
     const [sql, eagerBinds] = this._compileAstWithBinds(manager.ast);
 
     // Read through selectAll (not execute) so the adapter-reported result
@@ -2988,30 +2988,21 @@ export class Relation<T extends Base> {
     // Array [sql, *binds] (sanitize_sql_for_assignment). The blank/none checks
     // mirror Rails' order (blank precedes none?).
     const table = this.table;
-    let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral;
-    if (Array.isArray(updates)) {
-      const [sql, ...binds] = updates;
-      if (!sql || typeof sql !== "string")
-        throw new ArgumentError("Empty list of attributes to change");
-      if (this._isEmptyRelation()) return 0;
-      await this._materializeDeferredDistinctPkPredicates();
-      const normalizedBinds: unknown[] = [];
-      for (const v of binds) {
-        normalizedBinds.push(_qm.normalizeBoundValue.call(this as any, v));
-      }
-      values = new Nodes.BoundSqlLiteral(sql, normalizedBinds, {});
-    } else if (typeof updates === "string") {
-      if (!updates) throw new ArgumentError("Empty list of attributes to change");
-      if (this._isEmptyRelation()) return 0;
-      await this._materializeDeferredDistinctPkPredicates();
-      values = new Nodes.SqlLiteral(updates);
-    } else {
-      // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
-      if (Object.keys(updates).length === 0)
-        throw new ArgumentError("Empty list of attributes to change");
-      if (this._isEmptyRelation()) return 0;
-      await this._materializeDeferredDistinctPkPredicates();
+    // Mirrors Rails: blank check precedes none? check (relation.rb:589-591).
+    if (
+      typeof updates === "string"
+        ? updates.length === 0
+        : Array.isArray(updates)
+          ? updates.length === 0 || !updates[0]
+          : Object.keys(updates).length === 0
+    ) {
+      throw new ArgumentError("Empty list of attributes to change");
+    }
+    if (this._isEmptyRelation()) return 0;
+    await this._materializeDeferredDistinctPkPredicates();
 
+    let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
+    if (typeof updates !== "string" && !Array.isArray(updates)) {
       if (
         this.model.lockingEnabled &&
         !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
@@ -3020,6 +3011,8 @@ export class Relation<T extends Base> {
         updates[attr.name] = this._incrementAttribute(attr);
       }
       values = this._substituteValues(Object.entries(updates));
+    } else {
+      values = sql(this.model.sanitizeSqlForAssignment(updates, table.name));
     }
 
     // Mirrors `relation.rb:606-616`.
@@ -3421,7 +3414,11 @@ export class Relation<T extends Base> {
    * than a projection-only fragment.
    */
   toArel(aliases?: AliasTracker): SelectManager {
-    return this.buildArel(undefined, aliases);
+    // Rails' `arel` reader is `with_connection { |c| build_arel(c, aliases) }`
+    // (query_methods.rb:1595). `_resolveAdapter` is the trails stand-in for the
+    // acquisition: it yields the threaded connection when there is one and null
+    // for a model with no established pool, which Arel building tolerates.
+    return this.buildArel(this._resolveAdapter(), aliases);
   }
 
   /**
@@ -3653,7 +3650,7 @@ export class Relation<T extends Base> {
       }
       // null (e.g. unresolvable association): fall through to plain SQL.
     }
-    return this._toSqlViaConnection(this.buildArel().ast);
+    return this._toSqlViaConnection(this.toArel().ast);
   }
 
   /**
@@ -3709,7 +3706,7 @@ export class Relation<T extends Base> {
     // the main query's; PG `$N` placeholders fall out correctly by
     // construction) — replacing the former post-compile string splice and its
     // manual `$N` renumbering.
-    return this._compileSelectSql(this.buildArel());
+    return this._compileSelectSql(this.toArel());
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -3959,7 +3956,7 @@ export class Relation<T extends Base> {
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
-    return eagerRelation.buildArel();
+    return eagerRelation.toArel();
   }
 
   /**
@@ -4090,7 +4087,7 @@ export class Relation<T extends Base> {
    */
   _cteBodyArelNode(_nested = false): Nodes.Node | null {
     if (this._eagerLoadingForSql()) return null;
-    return this.buildArel().ast as unknown as Nodes.Node;
+    return this.toArel().ast as unknown as Nodes.Node;
   }
 
   /** Compile an Arel node, returning [sql, type-cast binds]. */

@@ -6,6 +6,7 @@
 
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
+import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
 import {
   ConnectionNotDefined,
   PreparedStatementInvalid,
@@ -116,11 +117,18 @@ function _sanitizeSqlHashForAssignment(
  * Mirrors: ActiveRecord::Sanitization::ClassMethods#disallow_raw_sql!
  */
 export function disallowRawSqlBang(
+  this: { adapterClassSync(): unknown },
   args: (string | symbol | Nodes.Node)[],
   { permit }: { permit?: RegExp } = {},
 ): void {
+  // Rails defaults the kwarg to `adapter_class.column_name_matcher`
+  // (sanitization.rb:183); `column_name_matcher` is in `Quoting::ClassMethods`
+  // (abstract/quoting.rb:32), so it is a static the adapter constructor type
+  // does not carry.
   const columnMatcher =
-    permit ?? /^(?:"?\w+"?\.)?"?\w+"?(?:\s+(?:ASC|DESC))?(?:\s+NULLS\s+(?:FIRST|LAST))?$/i;
+    permit ??
+    (this.adapterClassSync() as { columnNameMatcher(): RegExp } | null)?.columnNameMatcher() ??
+    abstractColumnNameMatcher();
   const unexpected: string[] = [];
   for (const arg of args) {
     if (typeof arg === "symbol") continue;

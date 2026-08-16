@@ -304,44 +304,29 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(second[0]).toBe(first[0]);
   });
 
-  it("toArray honors direct bang-mutation of inherited Relation state", async () => {
-    // In-place bang mutations on CP (cp.whereBang/orderBang/limitBang)
-    // change the inherited Relation state. `toArray()` routes through
-    // `findTarget` with a scope-override executor so the query honors the
-    // mutations, bypassing the association cache.
+  it("bang builders delegate to scope, leaving load_target untouched", async () => {
+    // `collection_proxy.rb:1128-1137` delegates the bang half of
+    // `QueryMethods.public_instance_methods(false)` to `scope` just like the
+    // non-bang half, so `proxy.whereBang(...)` mutates the memoized association
+    // scope — never the proxy's own target — and `to_a` (load_target) still
+    // returns the full collection.
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
+    const scope = proxy.scope();
     proxy.whereBang({ title: "b" });
-    const results = await proxy.toArray();
-    expect(results.map((p: Post) => p.title)).toEqual(["b"]);
+    expect((await proxy.toArray()).map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
+    expect((await scope.toArray()).map((p: Post) => p.title)).toEqual(["b"]);
   });
 
-  it("await proxy (load) honors direct bang-mutation of inherited Relation state", async () => {
-    // `await proxy` calls load(), which uses the same unified _execLoad() path
-    // as toArray(). When the proxy state has been mutated (whereBang/orderBang),
-    // the scope-override executor is passed to findTarget so the mutated
-    // scope is executed directly rather than falling back to the association cache.
-    const author = await Author.create({ name: "Diverged" });
-    for (const title of ["x", "y", "z"]) {
-      await Post.create({ title, body: title, author_id: author.id as number });
-    }
-    const proxy = association<Post>(author, "posts") as any;
-    proxy.whereBang({ title: "y" });
-    const results = await proxy;
-    expect(results.map((p: Post) => p.title)).toEqual(["y"]);
-  });
-
-  it("orderBang mutation respected in the unified load path", async () => {
-    // Verify that non-where mutations (orderBang) also route through the
-    // scope-override executor and produce correctly ordered results.
+  it("orderBang delegates to scope", async () => {
     const author = await Author.create({ name: "Ordered" });
     for (const title of ["c", "a", "b"]) {
       await Post.create({ title, body: title, author_id: author.id as number });
     }
     const proxy = association<Post>(author, "posts") as any;
+    const scope = proxy.scope();
     proxy.orderBang({ title: "asc" });
-    const results = await proxy.toArray();
-    expect(results.map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
+    expect((await scope.toArray()).map((p: Post) => p.title)).toEqual(["a", "b", "c"]);
   });
 
   // ── Phase R.2 — collection reader returns the AssociationProxy ─────
