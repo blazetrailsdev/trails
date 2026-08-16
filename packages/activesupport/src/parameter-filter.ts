@@ -161,9 +161,8 @@ export class ParameterFilter {
     fullParentKey: string | null = null,
     originalParams: Record<string, unknown> = params,
   ): Record<string, unknown> {
-    // Ruby's `params.class.new`: a fresh object of the same class, which for a
-    // plain JS object means the same prototype — so a null-prototype params
-    // hash filters into a null-prototype result.
+    // `params.class.new` (parameter_filter.rb:126): a plain JS object has no
+    // constructor to call, so the same prototype is the same class.
     const filteredParams = Object.create(Object.getPrototypeOf(params)) as Record<string, unknown>;
 
     for (const [key, value] of Object.entries(params)) {

@@ -41,7 +41,7 @@ function convertDatesFrom(data: unknown): unknown {
     }
   } else if (typeof data === "string" && DATETIME_REGEX.test(data)) {
     try {
-      return zone()?.parse(data) ?? data;
+      return zone()!.parse(data);
     } catch (error) {
       if (!(error instanceof ArgumentError)) throw error;
       return data;
