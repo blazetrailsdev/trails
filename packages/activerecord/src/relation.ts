@@ -63,7 +63,6 @@ import {
   type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
-import { seedJoinClauseAliases } from "./relation/merged-join-alias-tracker.js";
 import { Batches } from "./relation/batches.js";
 import {
   wrapWithScopeProxy,
@@ -430,7 +429,7 @@ export class Relation<T extends Base> {
     // Rails `Relation.create(model, table:)` stores any supplied table object as
     // `@table`, including an aliased table (`arel_table.alias(...)`). Accept the
     // Arel `TableAlias` node directly so callers don't need to cast; the build
-    // paths (`_buildSelectManager`, Calculations#performCount) seed the manager
+    // paths (`buildArel`, Calculations#performCount) seed the manager
     // from whichever node this is.
     table?: Table | Nodes.TableAlias,
     predicateBuilder?: PredicateBuilder,
@@ -2612,7 +2611,7 @@ export class Relation<T extends Base> {
    *
    * Alias resolution and `references` re-aliasing (`authors AS author`) are
    * deferred to emit-time: the eager JD is folded into the single
-   * `build_joins` `emitJoinPlan` call (via `_applyJoinsToManager`), whose one
+   * `build_joins` `emitJoinPlan` call (via `buildJoins`), whose one
    * shared `AliasTracker` and `walk` fold handle collisions against the manual
    * joins — there is no separate construction tracker to seed and no skip
    * filter to compute.
@@ -2664,7 +2663,7 @@ export class Relation<T extends Base> {
     // annotate() comments fold in through the ordinary path.
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk, limitedIds);
     jd.applyColumnAliases(eagerRelation);
-    const manager = eagerRelation._buildArel();
+    const manager = eagerRelation.buildArel();
     const [sql, eagerBinds] = this._compileAstWithBinds(manager.ast);
 
     // Read through selectAll (not execute) so the adapter-reported result
@@ -3065,7 +3064,7 @@ export class Relation<T extends Base> {
    *
    * Only the calculation/exists entry points call this — the `toArray` eager
    * path builds its real JoinDependency in `_executeEagerLoad`/`_buildEagerSql`,
-   * which raises there, so re-checking from the shared `_applyJoinsToManager`
+   * which raises there, so re-checking from the shared `buildJoins`
    * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
    *
    * Public (not `private`) because the calculation mixins in
@@ -3080,172 +3079,6 @@ export class Relation<T extends Base> {
     ];
     if (specs.length === 0) return;
     new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
-  }
-
-  private _applyJoinsToManager(manager: SelectManager, aliases?: AliasTracker): void {
-    // Live SQL path: assemble a JoinEmissionPlan and hand it to the shared
-    // `build_joins` port (`emitJoinPlan`), which `buildJoins` (the
-    // `from(relation)` subquery path) also delegates to. An eager JoinDependency
-    // rides in `joins_values` exactly as Rails
-    // `apply_join_dependency` puts it there, so `emitJoinPlan`'s
-    // `select_named_joins` partition folds it into `stashedJoins`: the manual
-    // joins AND the eager JD emit through ONE `build_joins` call with ONE shared
-    // `AliasTracker` and dedup via the JD `walk` fold — no separate eager
-    // tracker, no table-name skip filter. The shared emitter handles raw join
-    // clauses, the shared AliasTracker, and the left_outer/joins/eager dedup fold.
-    const leadingJoins: Nodes.Join[] = [];
-    const joinNodes: Nodes.Join[] = [];
-    // Left_outer_joins_values resolved via JoinDependency. When named INNER joins
-    // are also present the left-outer JD folds into the inner JD's
-    // join_constraints (Rails build_join_buckets: stashed_left_joins.unshift),
-    // deduping a both-ways association to a single INNER JOIN via `walk`. The
-    // eager JoinDependency rides in `joins_values` and folds into the SAME
-    // `join_constraints` call, so `walk` decides what a left-outer value already
-    // covered by `eager_load` emits — no exclusion filter here, matching Rails
-    // and the subquery half.
-    _qm.assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
-    // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
-    // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
-    // (query_methods.rb:1830-1836). Only true associations remain for the JD;
-    // a CTEJoin routes to `buildWithJoinNode(name, OuterJoin)` (like the
-    // subquery `from(relation)` path) so `Post.with(cte).leftOuterJoins(cteSym)`
-    // emits a LEFT OUTER JOIN directly on this live path instead of raising
-    // "Invalid association spec". A JoinDependency already in the values is
-    // stashed into `leftStashed`; the constructed left-outer JD is `unshift`ed
-    // ahead of it (query_methods.rb:1843: `stashed_left_joins.unshift`).
-    //
-    // Rails pushes the CTE join_node in the left-outer section (query_methods.rb:1832)
-    // BEFORE the `joins_values` loop appends its nodes to the same bucket
-    // (query_methods.rb:1852-1863), so `buckets[:join_node]` is
-    // `[...cteNodes, ...joinsValuesNodes]`. This method runs the two sections in
-    // that same order, so the CTE nodes are simply pushed first.
-    const cteOuterJoinNodes: Nodes.Join[] = [];
-    const leftStashed: JoinDependency[] = [];
-    const leftAssociations = _qm.selectNamedJoins.call(
-      this as any,
-      this._leftOuterJoinsValues,
-      leftStashed,
-      (left: unknown) => {
-        if (left instanceof _qm.CTEJoin) {
-          cteOuterJoinNodes.push(
-            _qm.buildWithJoinNode.call(this as any, left.name, Nodes.OuterJoin) as Nodes.Join,
-          );
-        } else {
-          throw _qm.argumentError("only Hash, Symbol and Array are allowed");
-        }
-      },
-    );
-    joinNodes.push(...cteOuterJoinNodes);
-    // Mirror Rails build_join_buckets' `if joins_values.empty?` short-circuit
-    // (query_methods.rb:1838-1842), matching buildJoinBuckets' named_join /
-    // early-return branch (query-methods.ts:2782-2789). When left-outer values
-    // exist but there are no inner joins_values, raw join clauses, or eager stash,
-    // route the resolved left-outer associations through `namedJoins` (emitJoinPlan
-    // builds one OuterJoin JoinDependency from them) instead of constructing a
-    // left-outer JD and folding it into the stash. This keeps the shape identical
-    // to the subquery `from(relation)` path.
-    //
-    // The emptiness check below is Rails' `joins_values.empty?`; `_joinClauses`
-    // is trails-only compensation for raw join clauses living outside
-    // `joins_values`.
-    //
-    // Fires whenever left_outer_joins_values is non-empty (Rails' `unless
-    // left_outer_joins_values.empty?`, query_methods.rb:1828), even when the
-    // resolved `leftAssociations` is empty — e.g. left_outer_joins_values held only
-    // a CTE symbol, already routed into `joinNodes` above. Rails returns early there
-    // too (`buckets[:named_join] = left_joins` with an empty `left_joins`); the
-    // empty-named early return emits the same SQL as the stash-fold path.
-    const pureLeftOuter = this._joinsValues.length === 0 && this._joinClauses.length === 0;
-    const leftOuterIsNamed = pureLeftOuter && this._leftOuterJoinsValues.length > 0;
-    if (this._leftOuterJoinsValues.length > 0 && !leftOuterIsNamed) {
-      // query_methods.rb:1843: `stashed_left_joins.unshift` — unconditional, so
-      // `stashed_left_joins` is non-empty (Ruby: truthy) here even when the
-      // resolved association list is empty.
-      leftStashed.unshift(
-        QueryMethodBangs.constructJoinDependency.call(
-          this as any,
-          leftAssociations as any,
-          Nodes.OuterJoin,
-        ),
-      );
-    }
-
-    // query_methods.rb:1847-1876, the `joins_values` half of build_join_buckets,
-    // run only when the pure-left-outer early return above did not fire.
-    const stashedJoins: JoinDependency[] = [];
-    const namedJoins: AssociationSpec[] = [];
-    if (!leftOuterIsNamed) {
-      const joins: unknown[] = [...this._joinsValues];
-      // query_methods.rb:1848-1850: the eager stash is the trailing `joins_values`
-      // JoinDependency whose base_klass is this model — a cross-klass merged JD
-      // fails that test and stays in the stream for `select_named_joins`.
-      const lastJoinsValue = joins[joins.length - 1];
-      const stashedEagerLoad =
-        lastJoinsValue instanceof JoinDependency && lastJoinsValue.baseKlass === this._model
-          ? (joins.pop() as JoinDependency)
-          : undefined;
-
-      // query_methods.rb:1851-1853. Rails wraps every String; trails collapses
-      // Ruby's Symbol and String into one type, so an association-name string
-      // stays a named join value instead of becoming a raw SQL fragment.
-      for (const [i, v] of joins.entries()) {
-        if (typeof v === "string" && !this._isNamedJoinValue(v)) {
-          joins[i] = new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim()));
-        }
-      }
-
-      const hasStashed = stashedEagerLoad !== undefined || leftStashed.length > 0;
-      // query_methods.rb:1855-1862: only the LEADING run of Join nodes is shifted
-      // off and routed by `hasStashed`; a raw join BEHIND a named join falls
-      // through to `select_named_joins`, which buckets it as a join_node
-      // unconditionally (query_methods.rb:1866-1867).
-      while (joins[0] instanceof Nodes.Join) {
-        const joinNode = joins.shift() as Nodes.Join;
-        if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
-          joinNodes.push(joinNode);
-        } else {
-          leadingJoins.push(joinNode);
-        }
-      }
-
-      // query_methods.rb:1864-1873.
-      namedJoins.push(
-        ..._qm.selectInnerNamedJoins.call(this as any, joins, stashedJoins, joinNodes),
-      );
-
-      // query_methods.rb:1875-1876 — the eager stash goes in LAST.
-      stashedJoins.push(...leftStashed);
-      if (stashedEagerLoad) stashedJoins.push(stashedEagerLoad);
-    } else {
-      stashedJoins.push(...leftStashed);
-    }
-
-    // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
-    // (query_methods.rb:1894) — the converged `Relation#aliasTracker`, built
-    // once here (this method is the live-path half of the `build_joins` split)
-    // and threaded through either emit below. Lazy behind the same
-    // `unless named_joins.empty? && stashed_joins.empty?` guard Rails builds it
-    // under (see JoinEmissionPlan#tracker) — a joinless relation on a
-    // connectionless model must not touch `connectionPool()`. The
-    // `_joinClauses` seeding is trails-only compensation for raw join clauses
-    // living outside `joins_values` (see merged-join-alias-tracker.ts).
-    let memoTracker: AliasTracker | undefined;
-    const tracker = (): AliasTracker => {
-      if (!memoTracker) {
-        memoTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
-        seedJoinClauseAliases(this as any, memoTracker);
-      }
-      return memoTracker;
-    };
-    _qm.emitJoinPlan.call(this as any, manager, {
-      leadingJoins,
-      joinNodes,
-      stashedJoins,
-      namedJoins: leftOuterIsNamed ? (leftAssociations as any) : namedJoins,
-      joinType: leftOuterIsNamed ? Nodes.OuterJoin : Nodes.InnerJoin,
-      aliases,
-      tracker,
-    });
   }
 
   /**
@@ -3382,8 +3215,8 @@ export class Relation<T extends Base> {
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency()._buildArel()
-        : this._buildArel();
+        ? this.applyJoinDependency().buildArel()
+        : this.buildArel(this._conn());
       arel.source.left = table;
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
       const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
@@ -3466,8 +3299,8 @@ export class Relation<T extends Base> {
       // implicitly here (the no-arg default, finder_methods.rb:457), so a
       // grouped delete skips the limit/offset materialization guard.
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency()._buildArel()
-        : this._buildArel();
+        ? this.applyJoinDependency().buildArel()
+        : this.buildArel(this._conn());
       // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
       // target back to the bare table before `compile_delete`. For the common
       // and join cases `source.left` is already the table, but an explicit
@@ -4066,29 +3899,16 @@ export class Relation<T extends Base> {
   // -- SQL generation --
 
   /**
-   * Return the Arel SelectManager for this relation.
-   *
-   * Mirrors: ActiveRecord::Relation#arel
-   */
-  private _buildProjections(_table: Table): any[] {
-    // Delegate to the canonical Rails `build_select` mirror so the legacy
-    // toArel/toSql path and the Arel-manager `buildSelect` path stay in sync.
-    return _qm.buildProjections.call(this as any) as any[];
-  }
-
-  /**
    * Return the complete query AST as a SelectManager — projections, joins,
    * wheres, order, distinct, limit/offset, group, having, lock, hints, from,
    * CTEs, and annotate() comments. Mirrors Rails `build_arel`
-   * (active_record/relation/query_methods.rb#build_arel, ~L1700-1760): the
-   * single manager Rails then compiles, so anything consuming `relation.arel()`
-   * as a subquery (`where(id: subrel.arel)`, `from(relation)`) carries the full
-   * query rather than a projection-only fragment. This is also the manager
-   * `_toSql` compiles, so the legacy string-assembly path and the Arel-manager
-   * path can no longer drift.
+   * (active_record/relation/query_methods.rb:1750): the single manager Rails
+   * then compiles, so anything consuming `relation.arel()` as a subquery
+   * (`where(id: subrel.arel)`, `from(relation)`) carries the full query rather
+   * than a projection-only fragment.
    */
   toArel(aliases?: AliasTracker): SelectManager {
-    return this._buildArel(aliases);
+    return this.buildArel(undefined, aliases);
   }
 
   /**
@@ -4309,50 +4129,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Shared full-manager builder for `toArel`/`arel()` and the non-eager
-   * `_toSql`. Mirrors Rails `build_arel` (query_methods.rb#build_arel): the
-   * base select manager (projections, joins, wheres, order, distinct,
-   * limit/offset, group, having, lock, hints, from) with CTEs (`WITH`) and the
-   * de-duplicated annotate() comments folded into the AST so their binds thread
-   * through the single collector in document order.
-   *
-   * Deliberately uses `_buildSelectManager`, NOT the eager-load JoinDependency
-   * manager: Rails `arel`/`build_arel` projects the model's normal columns even
-   * when eager loading (the `t0_r0…` alias projection is added only by
-   * `apply_join_dependency` on the loading path — `relation.rb#to_sql`/
-   * `exec_queries`, mirrored here by `_buildEagerSql`). Routing `arel()` through
-   * the alias manager would make `relation.select(pk).arel()` (subquery use)
-   * project JoinDependency alias columns instead of the single requested
-   * column.
-   */
-  private _buildArel(aliases?: AliasTracker): SelectManager {
-    const manager = this._buildSelectManager(aliases);
-    this._applyCtesAndAnnotationsToManager(manager);
-    return manager;
-  }
-
-  /**
-   * Fold this relation's CTEs (`WITH`/`WITH RECURSIVE`) and annotate() comments
-   * into a SelectManager's AST. Shared by `_buildArel` and the set-operation
-   * operand builder so both encode the same prefix. Mirrors Rails `build_arel`
-   * attaching `@values[:with]` and the de-duplicated annotates onto the manager.
-   */
-  private _applyCtesAndAnnotationsToManager(manager: SelectManager): void {
-    if (this._ctes.length > 0) {
-      const cteNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression));
-      if (this._ctes.some((c) => c.recursive)) manager.withRecursive(...cteNodes);
-      else manager.with(...cteNodes);
-    }
-    if (this._annotations.length > 0) {
-      // Rails dedupes annotations before attaching them to the Arel manager
-      // (query_methods.rb#build_arel: `annotates.uniq if annotates.size > 1`).
-      const annotates =
-        this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
-      manager.comment(...annotates);
-    }
-  }
-
-  /**
    * Generate the SQL for this relation.
    */
   toSql(): string {
@@ -4364,12 +4140,11 @@ export class Relation<T extends Base> {
     if (this._eagerLoadingForSql()) {
       const manager = this._buildEagerOperandManager();
       if (manager !== null) {
-        this._applyCtesAndAnnotationsToManager(manager);
         return this._toSqlViaConnection(manager.ast);
       }
       // null (e.g. unresolvable association): fall through to plain SQL.
     }
-    return this._toSqlViaConnection(this._buildArel().ast);
+    return this._toSqlViaConnection(this.buildArel().ast);
   }
 
   /**
@@ -4420,12 +4195,12 @@ export class Relation<T extends Base> {
     }
 
     // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
-    // annotate() comments are folded into the manager AST by `_buildArel`, so a
+    // annotate() comments are folded into the manager AST by `buildArel`, so a
     // single collector numbers every bind in document order (CTE binds precede
     // the main query's; PG `$N` placeholders fall out correctly by
     // construction) — replacing the former post-compile string splice and its
     // manual `$N` renumbering.
-    return this._compileSelectSql(this._buildArel());
+    return this._compileSelectSql(this.buildArel());
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -4551,9 +4326,9 @@ export class Relation<T extends Base> {
     // relation `_applyEagerJoinDependency` yields.
     const joined = this._clone();
     QueryMethodBangs.joinsBang.call(joined as any, jd as any);
-    joined._applyJoinsToManager(idSubquery);
-    this._applyWheresToManager(idSubquery, table);
-    this._applyOrderToManager(idSubquery);
+    _qm.buildJoins.call(joined as any, idSubquery);
+    if (!this._whereClause.isEmpty()) idSubquery.where(this._whereClause.ast);
+    this.buildOrder(idSubquery);
     if (this._limitValue !== null) idSubquery.take(this._limitValue);
     if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
     return idSubquery;
@@ -4621,7 +4396,7 @@ export class Relation<T extends Base> {
       ) => string | string[];
     };
     // Qualify a bare known-column order to the base table (mirroring
-    // `_applyOrderToManager` and Rails' order_values, which are qualified Arel
+    // `buildOrder` and Rails' order_values, which are qualified Arel
     // attributes). columns_for_distinct projects the order columns into the
     // SELECT list, so an unqualified `id` would be ambiguous under the eager
     // LEFT OUTER JOIN (e.g. a self-referential `Topic.replies` join on the same
@@ -4646,13 +4421,11 @@ export class Relation<T extends Base> {
   // JoinDependency (alias-projecting) SQL synchronously for toSql()/parity
   // runner use. Rails routes this through apply_join_dependency, whose inner
   // `relation.to_sql` re-enters build_arel — so CTEs (`WITH`) and annotate()
-  // comments belong here too; fold them into the manager AST via the same
-  // helper `_buildArel` uses, keeping the two paths in sync.
+  // comments fold in through `buildArel` on the yielded eager relation.
   // Returns null if no eager associations could be joined (fall back to plain SQL).
   private _buildEagerSql(): string | null {
     const manager = this._buildEagerOperandManager();
     if (manager === null) return null;
-    this._applyCtesAndAnnotationsToManager(manager);
     return this._compileSelectSql(manager);
   }
 
@@ -4677,81 +4450,7 @@ export class Relation<T extends Base> {
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
     jd.applyColumnAliases(eagerRelation);
-    return eagerRelation._buildSelectManager();
-  }
-
-  /**
-   * Build the SelectManager for this relation: projections, joins, wheres,
-   * order, distinct, limit/offset, group, having, lock, hints, and from(). Does
-   * NOT apply the eager-load join dependency, annotate() comments, or CTE
-   * prefix — those are layered on in `_buildArel` / `_toSql`.
-   */
-  private _buildSelectManager(aliases?: AliasTracker): SelectManager {
-    // `this.table` is the model's arel_table unless the relation was built on a
-    // table alias (Rails `Relation.create(Model, table: arel_table.alias(...))`),
-    // in which case projections, FROM, and ORDER BY must all reference the alias
-    // so they stay consistent with the WHERE clause the predicate builder wrote.
-    const table = this.table;
-    // `Table#project` seeds a SelectManager whose FROM is the table. A table
-    // ALIAS (Nodes.TableAlias, from `Relation.create(Model, table: alias)`) is a
-    // plain AST node without that factory helper, so seed the manager directly —
-    // `new SelectManager(node)` sets FROM to the alias (`developers omg_developers`).
-    const manager = table instanceof Table ? table.project() : new SelectManager(table as any);
-
-    // Rails `build_arel` runs `build_joins` BEFORE `build_select`
-    // (query_methods.rb), which is what lets a Proc select value —
-    // `apply_column_aliases`' `-> { aliases.columns }` — read the JoinDependency
-    // aliases that `join_constraints` only resolves at join-emit time.
-    this._applyJoinsToManager(manager, aliases);
-
-    this._applyWheresToManager(manager, table);
-    this._applyOrderToManager(manager);
-
-    if (this._isDistinct) manager.distinct();
-    if (this._limitValue !== null) manager.take(this._limitValue);
-    if (this._offsetValue !== null) manager.skip(this._offsetValue);
-
-    for (const col of this._groupColumns) {
-      manager.group(groupColumnToArel(col, table));
-    }
-
-    if (!this._havingClause.isEmpty()) manager.having(this._havingClause.ast);
-
-    const projections = this._buildProjections(table);
-    if (projections.length > 0) manager.project(...(projections as any));
-
-    if (this._lockValue) {
-      manager.lock(this._lockValue);
-    }
-
-    if (this._optimizerHints.length > 0) {
-      manager.optimizerHints(...this._optimizerHints);
-    }
-
-    // Apply from() on the manager pre-compile (mirrors Rails build_from) so the
-    // FROM source — and any subquery binds — thread through the single collector
-    // in document order, rather than being spliced into the compiled SQL.
-    const fromNode = this._buildFromNode();
-    if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
-
-    return manager;
-  }
-
-  private _combineNodes(nodes: Nodes.Node[]): Nodes.Node | null {
-    if (nodes.length === 0) return null;
-    if (nodes.length === 1) return nodes[0];
-    return new Nodes.And(nodes);
-  }
-
-  private _collectAllWhereNodes(_table: Table, rel: Relation<T>): Nodes.Node[] {
-    return rel._whereClause.predicatesWithWrappedSqlLiterals();
-  }
-
-  private _applyWheresToManager(manager: SelectManager, table: Table): void {
-    const allNodes = this._collectAllWhereNodes(table, this);
-    for (const node of allNodes) {
-      manager.where(node);
-    }
+    return eagerRelation.buildArel();
   }
 
   /**
@@ -4817,25 +4516,6 @@ export class Relation<T extends Base> {
    * Compile a SelectManager's AST through the adapter visitor (`_arelVisitor`).
    * Sets _lastSelectRetryable and _lastSelectBinds for the execution call sites.
    */
-  /**
-   * Build the arel FROM source for a `from()` clause (mirrors Rails
-   * `build_from`), or `undefined` when no `from()` was set. String and Arel-node
-   * values pass through to `SelectManager#from`; a normal Relation value becomes
-   * a live `TableAlias` subquery (via `buildFrom` → `opts.arel.as(name)`), so its
-   * binds parameterize and its retryability follows the actual child nodes. All
-   * of these thread through the single outer collector (binds in document order,
-   * FROM before WHERE) with identifier quoting left to the visitor.
-   *
-   * Set-operation subqueries are no exception: `buildFrom` wraps the compound
-   * Union/UnionAll/Intersect/Except node as a derived-table `TableAlias`, so they
-   * parameterize through the same collector with no `BoundSqlLiteral`/`$N`→`?`
-   * fallback.
-   */
-  private _buildFromNode(): Nodes.Node | string | undefined {
-    if (this._fromClause.isEmpty()) return undefined;
-    return this.buildFrom() as Nodes.Node | string | undefined;
-  }
-
   private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
     // Rails: `if prepared_statements ... else sql = visitor.compile(arel, collector)`
     // (database_statements.rb:31-45) — with prepared statements off the
@@ -4891,10 +4571,9 @@ export class Relation<T extends Base> {
   /**
    * Resolve this relation to the Arel SelectStatement node used as a CTE body,
    * mirroring Rails' `build_with_expression_from_value` Relation branch
-   * (`value.arel(.ast)`). `_buildSelectManager` threads joins/wheres/from/having
-   * — matching `_toSql` minus the CTE/eager/annotate prefix — so a
+   * (`value.arel(.ast)`). `buildArel` threads joins/wheres/from/having, so a
    * recursive body's string JOIN survives (with_recursive). Returns null for
-   * relations whose SQL `_buildSelectManager` does not fully encode (eager-load
+   * relations whose SQL `buildArel` does not fully encode (eager-load
    * bodies), letting the caller fall back to pre-rendered SQL.
    * `nested` is accepted to mirror Rails' threading; both branches resolve to the
    * AST node since trails' Cte/UnionAll operands must be visitable nodes.
@@ -4902,7 +4581,7 @@ export class Relation<T extends Base> {
    */
   _cteBodyArelNode(_nested = false): Nodes.Node | null {
     if (this._eagerLoadingForSql()) return null;
-    return this._buildSelectManager().ast as unknown as Nodes.Node;
+    return this.buildArel().ast as unknown as Nodes.Node;
   }
 
   /** Compile an Arel node, returning [sql, type-cast binds]. */
@@ -5008,18 +4687,6 @@ export class Relation<T extends Base> {
       return this._conn().quoteColumnName(name);
     }
     return `"${name.replace(/"/g, '""')}"`;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::QueryMethods#build_order. `_rawOrderClauses` is the
-   * trails-side carrier for `inOrderOf`'s generated SQL, which Rails keeps
-   * inside order_values as an Arel CASE node.
-   */
-  private _applyOrderToManager(manager: SelectManager): void {
-    for (const rawClause of this._rawOrderClauses) {
-      manager.order(new Nodes.SqlLiteral(rawClause));
-    }
-    this.buildOrder(manager);
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {

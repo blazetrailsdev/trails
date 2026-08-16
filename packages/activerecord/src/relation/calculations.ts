@@ -186,16 +186,12 @@ interface CalculationRelation {
   /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
   selectValues: (string | symbol | Nodes.Node)[];
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
-  _applyJoinsToManager(manager: any): void;
   /** @internal Rails `apply_join_dependency`; see Relation. */
   applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
   _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
   /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
   calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
-  _applyWheresToManager(manager: any, table: any): void;
-  _applyOrderToManager(manager: any): void;
-  _buildFromNode(): Nodes.Node | string | undefined;
   _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
   // --- read by pluck / pick / ids (calculations.rb:291-412) ---
@@ -254,10 +250,8 @@ interface CalculationRelation {
   _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean;
   /** @internal trails: `distinct_relation_for_primary_key`'s executed half. */
   _materializeLimitedIds(jd: JoinDependency, primaryKey: string | string[]): Promise<unknown[]>;
-  /** @internal trails: the select manager `build_arel` builds. */
-  _buildSelectManager(): SelectManager;
-  /** @internal trails: folds `WITH` and `annotate()` into a built manager. */
-  _applyCtesAndAnnotationsToManager(manager: SelectManager): void;
+  /** @internal Rails `build_arel` (query_methods.rb:1750). */
+  buildArel(connection?: unknown, aliases?: unknown): SelectManager;
   /** @internal trails: compiles an AST to `[sql, binds]`. */
   _compileAstWithBinds(ast: unknown): [string, unknown[]];
 }
@@ -972,15 +966,8 @@ export async function pluck(
     // (adding joins Rails would not add for the pluck columns).
     const rel = this._clone();
     rel._selectColumns = null;
-    const manager = rel._buildSelectManager();
+    const manager = rel.buildArel();
     manager.projections = projections as any;
-    // Fold CTEs (`WITH`) and annotate() comments into the manager AST — exactly
-    // as the main SELECT path does (`_buildArel` → `_applyCtesAndAnnotationsToManager`)
-    // — so a single visitor collector numbers every bind in document order (CTE
-    // binds precede the main query's; PG `$N` placeholders fall out by
-    // construction). Replaces the former `buildCteSql` string prefix and its
-    // manual `$N` renumbering.
-    this._applyCtesAndAnnotationsToManager(manager);
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
     const result = await this.skipQueryCacheIfNecessary(() =>

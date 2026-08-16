@@ -309,7 +309,7 @@ export function referencesFromConditions(conditions: unknown): string[] {
 // trails' Cte/UnionAll operands must be visitable AST nodes, so both branches
 // resolve to the SelectStatement node — `nested` is threaded to match Rails'
 // reduction shape and the single-element unwrap below. A relation whose SQL
-// `_buildSelectManager` cannot fully encode (set-op/eager body) returns null and
+// `buildArel` cannot fully encode (set-op/eager body) returns null and
 // falls back to its inlined SQL as a bare `SqlLiteral`.
 function buildCteLeaf(q: unknown, nested: boolean): Nodes.Node {
   if (typeof q === "string") return new Nodes.Grouping(Arel.sql(q) as any);
@@ -2089,6 +2089,11 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
 
 /** @internal */
 export function buildOrder(this: QueryMethodsHost, arel: any): void {
+  // `_rawOrderClauses` is the trails-side carrier for `inOrderOf`'s generated
+  // SQL, which Rails keeps inside order_values as an Arel CASE node.
+  for (const rawClause of ((this as any)._rawOrderClauses ?? []) as string[]) {
+    arel.order?.(new Nodes.SqlLiteral(rawClause));
+  }
   // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
   // drops a blank one along with nil and "".
   const orders = ((this as any)._orderClauses ?? []).filter((o: unknown) => {
@@ -2477,61 +2482,6 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   return opts;
 }
 
-/**
- * Explicit select-list columns, or `null` to signal the default table-star
- * fallback. Shared by `buildSelect` and `buildProjections`; mirrors the
- * non-star branches of Rails' `build_select` / `arel_columns`:
- *
- *  - explicit `select` values route through `arelColumns`, so bare literals
- *    (`"1"`, `"foo()"`) emit verbatim, symbols are table-qualified, and
- *    hash/alias forms expand correctly;
- *  - `ignoredColumns` / `enumerateColumnsInSelectStatements` project the
- *    explicit column list (the primary key is prepended when it would
- *    otherwise be dropped, so instantiation can still identify rows).
- *
- * @internal
- */
-function selectListColumns(
-  host: QueryMethodsHost,
-  model: QueryMethodsHost["model"],
-): unknown[] | null {
-  const selectCols = (host as any)._selectColumns;
-  if (selectCols && selectCols.length > 0) {
-    return arelColumns.call(host, selectCols);
-  }
-  const modelClass: any = model;
-  if (
-    (modelClass?.ignoredColumns?.length ?? 0) > 0 ||
-    modelClass?.enumerateColumnsInSelectStatements
-  ) {
-    let cols: string[] = modelClass?.columnNames?.() ?? [];
-    const pk = modelClass?.primaryKey;
-    if (typeof pk === "string" && !cols.includes(pk)) {
-      cols = [pk, ...cols];
-    }
-    if (cols.length > 0) {
-      const table: any = (host as any).table ?? modelClass?.arelTable;
-      return cols.map((f: string) => table?.get(f) ?? Arel.sql(f));
-    }
-  }
-  return null;
-}
-
-/**
- * Projection nodes for the legacy `toArel`/`toSql` path. Returns the explicit
- * select list, or the qualified table star (`"users".*`) — qualifying avoids
- * the join-collision trap where a JOIN's same-named column overwrites the
- * target row hash (drivers keep one key per name, last write wins).
- *
- * @internal
- */
-export function buildProjections(this: QueryMethodsHost): unknown[] {
-  const cols = selectListColumns(this, this.model);
-  if (cols) return cols;
-  const table: any = (this as any).table ?? (this.model as any)?.arelTable;
-  return [table ? tableStar(table) : Arel.sql("*")];
-}
-
 // A table's `.*` projection. `Table#star` is a getter; a table ALIAS
 // (Nodes.TableAlias) has no such helper, but `get("*")` yields the equivalent
 // `<alias>.*` Attribute (the "*" sentinel skips column-name quoting either way).
@@ -2674,7 +2624,9 @@ export function buildArel(
   if (this._offsetValue !== null) arel.skip(this._offsetValue);
 
   if (this._groupColumns.length > 0)
-    arel.group(...(arelColumns.call(this, this._groupColumns) as (Nodes.Node | string)[]));
+    arel.group(
+      ...(arelColumns.call(this, [...new Set(this._groupColumns)]) as (Nodes.Node | string)[]),
+    );
 
   buildOrder.call(this, arel);
   buildWith.call(this, arel);
@@ -2914,13 +2866,11 @@ export function buildJoinBuckets(
 
 /**
  * Resolved inputs for `emitJoinPlan` — the bucket-routed join nodes plus the
- * stashed JoinDependencies to fold into the primary named/left JD. Both the
- * live SQL path (`_applyJoinsToManager`) and the `from(relation)` subquery path
- * (`buildJoins`) compute a plan and hand it to the shared emitter, so there is
- * one Rails `build_joins` port. Both fill the plan the same way for eager
- * loading — the eager JoinDependency rides in `joins_values` (Rails
- * `apply_join_dependency`) and is stashed from there — and differ only in
- * `aliases` (only the subquery path threads a tracker in from `build_from`).
+ * stashed JoinDependencies to fold into the primary named/left JD. `buildJoins`
+ * computes a plan and hands it to the shared emitter. The eager JoinDependency
+ * rides in `joins_values` (Rails `apply_join_dependency`) and is stashed from
+ * there; `aliases` is threaded in only by the `from(relation)` subquery path,
+ * from `build_from`.
  *
  * @internal
  */
@@ -2962,8 +2912,7 @@ export interface JoinEmissionPlan {
 /**
  * Single shared port of Rails `build_joins` (query_methods.rb:1881) emission:
  * given a resolved {@link JoinEmissionPlan}, push every join node onto the
- * Arel `SelectManager`. Both `_applyJoinsToManager` (live `toSql`/`toArel`) and
- * `buildJoins` (`from(relation)` subquery) delegate here so the left_outer/joins
+ * Arel `SelectManager`. `buildJoins` delegates here so the left_outer/joins
  * dedup fold (PR #3501 / #3890) lives in exactly one place and cannot re-drift.
  *
  * @internal
@@ -2991,8 +2940,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
   // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
-  // (query_methods.rb:1891). Built by the caller (`buildJoins` /
-  // `_applyJoinsToManager`, the two halves of the `build_joins` split) via the
+  // (query_methods.rb:1891). Built by the caller (`buildJoins`) via the
   // converged `Relation#aliasTracker` and threaded in on the plan. Seeding it
   // with the leading-join + join-node tables means a JoinDependency joining a
   // table already claimed by a leading/raw join node is re-aliased to its
@@ -3059,15 +3007,18 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 
 /** @internal */
 export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
-  const joinsValues = this.joinsValues;
-  const hasNamedInner = joinsValues.some((v) => this._isNamedJoinValue(v));
-  const hasRawJoins = joinsValues.some((v) => !this._isNamedJoinValue(v));
-  const hasEagerAssocs =
-    this._eagerLoadAssociations.length > 0 || this.leftOuterJoinsValues.length > 0 || hasNamedInner;
-  if (this._joinClauses.length === 0 && !hasRawJoins && !hasEagerAssocs) return;
+  // query_methods.rb:1882 — `return if joins_values.empty? && left_outer_joins_values.empty?`.
+  // `_joinClauses` is trails-only compensation for raw join clauses living
+  // outside `joins_values` (see merged-join-alias-tracker.ts).
+  if (
+    this.joinsValues.length === 0 &&
+    this.leftOuterJoinsValues.length === 0 &&
+    this._joinClauses.length === 0
+  )
+    return;
 
-  // Subquery path: buckets fold eager into stashed_join. Delegate emission to
-  // the shared `build_joins` port.
+  // Buckets fold eager into stashed_join. Delegate emission to the shared
+  // `build_joins` port.
   const [buckets, joinType] = buildJoinBuckets.call(this);
   const leadingJoins = buckets.leading_join as Nodes.Join[];
   const joinNodes = buckets.join_node as Nodes.Join[];

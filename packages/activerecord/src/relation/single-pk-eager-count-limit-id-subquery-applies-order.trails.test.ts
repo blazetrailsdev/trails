@@ -17,7 +17,7 @@
  * arbitrary limited id set, so the subsequent `COUNT(DISTINCT other)` over
  * `pk IN (<ids>)` can diverge from Rails whenever the ordered vs unordered
  * top-n rows differ. This mirrors the composite-PK sibling (PR #4549), which
- * already applies `_applyOrderToManager(idSubquery, table)`.
+ * already applies `buildOrder(idSubquery)`.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";

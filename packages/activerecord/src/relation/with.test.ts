@@ -241,7 +241,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     // `cte[model.foreign_key] = table[model.primary_key]`. trails mirrors this in
     // `buildJoinBuckets`' `selectNamedJoins` block — a `CTEJoin` becomes
     // `buildWithJoinNode(name, Nodes.OuterJoin)`. The same partition runs on the
-    // live `_applyJoinsToManager` path, so `with(...).leftOuterJoins(cte)` emits
+    // live `buildJoins` path, so `with(...).leftOuterJoins(cte)` emits
     // the LEFT OUTER JOIN directly (no `from(...)` subquery wrapper). Lock the
     // OuterJoin routing: the CTE symbol must emit a LEFT OUTER JOIN to the CTE
     // (`commented_posts.post_id = posts.id`), not an INNER JOIN. (trails Symbol
