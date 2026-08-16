@@ -330,7 +330,10 @@ export class ExplainProxy<T extends Base> {
     this._options = options;
   }
 
-  /** Mirrors: ActiveRecord::Relation::ExplainProxy#inspect (relation.rb:12-14) */
+  /**
+   * Mirrors: ActiveRecord::Relation::ExplainProxy#inspect (relation.rb:12-14) —
+   * `exec_explain { @relation.send(:exec_queries) }`, private-bypass included.
+   */
   inspect(): Promise<string> {
     return this.execExplain(() => (this._relation as any).execQueries());
   }
@@ -5481,8 +5484,9 @@ export class Relation<T extends Base> {
    * Rails' `exec_queries` does not touch `@records` — the assignment lives in
    * `#load`. trails' `_toArrayInner` (this relation's `exec_main_query`) ends in
    * `loadRecords`, so the load-cache state is snapshotted and restored here to
-   * keep `.explain` side-effect-free. Lifting `loadRecords` out of
-   * `_toArrayInner` is tracked by `split-load-records-out-of-exec-queries`.
+   * keep `.explain` side-effect-free. The `@none` short-circuit is
+   * `exec_main_query`'s `return [] if @none` (relation.rb:1422-1429), which `_toArrayInner`
+   * does not carry. Both ride `split-load-records-out-of-exec-queries`.
    *
    * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1425)
    */
