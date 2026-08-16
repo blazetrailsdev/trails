@@ -1469,7 +1469,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // `records` is `records + relations.flat_map(&:ids)` — scalar AR records plus
   // every relation arg's eagerly-materialized ids — built into ONE predicate.
   // Ruby materializes those ids before this call (synchronous query execution);
-  // trails' builder is synchronous-and-lazy, so `_excludingArgs` leaves any
+  // trails' builder is synchronous-and-lazy, so `excluding`/`without` leave any
   // UNLOADED relation in `records` for us to defer here.
   const unloadedRelations = records.filter((r) => isRelationLike(r));
   const literalRecords = records.filter((r) => !isRelationLike(r));

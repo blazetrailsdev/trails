@@ -170,6 +170,12 @@ export class OrderedOptions {
    * `Object#dup` — allocates the receiver's OWN class and copies its ivars, so
    * an `InheritableOptions` dup stays an `InheritableOptions` reading through
    * the same parent (`Hash#dup` carries the default block over too).
+   *
+   * TypeScript has no allocate-without-initialize, so the ivars are replayed
+   * through the constructor: this is only valid for the two classes in this
+   * file, whose sole constructor argument is the parent (`InheritableOptions`)
+   * or the default block (`OrderedOptions`, which has no `parent`). A subclass
+   * with a differently-shaped constructor would need its own `dup`.
    */
   dup(): this {
     const copy = new (this.constructor as new (parent?: unknown) => this)(
