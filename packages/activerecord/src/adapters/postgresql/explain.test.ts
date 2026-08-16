@@ -56,8 +56,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(typeof plan).toBe("string");
       expect(plan.toLowerCase()).toContain("select");
       expect(plan).toContain("ex_relations");
-      // The per-query header from PG buildExplainClause:
-      expect(plan).toMatch(/EXPLAIN.*for:/);
+      // The per-query header from PG buildExplainClause (no " for:" — that is
+      // Explain#build_explain_clause's fallback only, explain.rb:56-61):
+      expect(plan).toMatch(/^EXPLAIN SELECT/m);
     });
 
     it("Relation#explain on PG captures preload queries", async () => {
@@ -107,12 +108,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("buildExplainClause renders FORMAT JSON for { format: 'json' }", async () => {
       const clause = await adapter.buildExplainClause([{ format: "json" }]);
-      expect(clause).toBe("EXPLAIN (FORMAT JSON) for:");
+      expect(clause).toBe("EXPLAIN (FORMAT JSON)");
     });
 
     it("buildExplainClause combines string flags and format hash", async () => {
       const clause = await adapter.buildExplainClause(["analyze", { format: "json" }]);
-      expect(clause).toBe("EXPLAIN (ANALYZE, FORMAT JSON) for:");
+      expect(clause).toBe("EXPLAIN (ANALYZE, FORMAT JSON)");
     });
 
     it("buildExplainClause rejects unknown format", async () => {
