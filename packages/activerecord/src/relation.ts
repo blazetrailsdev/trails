@@ -3676,7 +3676,7 @@ export class Relation<T extends Base> {
         .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
         .trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(bare)) return new Nodes.SqlLiteral(raw);
-      // Rails' `arel_column(field) { ... }` (query_methods.rb:1662-1676).
+      // Rails' `arel_column(field) { ... }` (query_methods.rb:1990-2005).
       return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as Nodes.Node;
     });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
@@ -5086,8 +5086,9 @@ export interface Relation<T extends Base>
   // QueryMethods' flag / annotation / scope-shaping methods (query-methods.ts),
   // whose mixin signatures return `any` — declared here with the relation's own
   // element type.
-  none(): Relation<T>;
+  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;
   lock(locks?: string | boolean): Relation<T>;
+  none(): Relation<T>;
   readonly(value?: boolean): Relation<T>;
   strictLoading(value?: boolean): Relation<T>;
   createWith(value: Record<string, unknown> | null): Relation<T>;
@@ -5100,7 +5101,6 @@ export interface Relation<T extends Base>
   extending(): Relation<T>;
   optimizerHints(...args: string[]): Relation<T>;
   annotate(...args: string[]): Relation<T>;
-  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;
