@@ -1945,7 +1945,9 @@ export class Model {
    * Mirrors: ActiveModel::Validations#validates_with
    * (activemodel/lib/active_model/validations/with.rb:143-151). Unlike the
    * class method it registers nothing — each klass is built and run
-   * immediately against `this`.
+   * immediately against `this`. Rails' loop is synchronous; a trails validator
+   * may return a promise (RFC 0063 made validation async), so each run is
+   * awaited in turn, which preserves Rails' one-validator-at-a-time order.
    */
   async validatesWith(
     ...args: Array<

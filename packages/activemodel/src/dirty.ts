@@ -404,9 +404,6 @@ export class DirtyTracker {
    * Mirrors: ActiveModel::AttributeMutationTracker#force_change
    */
   forceChange(name: string): unknown {
-    // Rails resolves the value inside the tracker
-    // (attribute_mutation_tracker.rb:63-65 `forced_changes[attr_name] =
-    // fetch_value(attr_name)`), so the caller passes only the name.
     const currentValue = this.fetchValue(name);
     // Unconditional forced marker (Rails: forced_changes[attr] = fetch_value).
     this._forcedNames.add(name);

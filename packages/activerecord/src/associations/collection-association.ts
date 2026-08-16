@@ -1348,12 +1348,15 @@ export class CollectionAssociation extends Association {
         memoryByIdentity.delete(identity);
 
         const memAttributeNames = new Set(memRecord.attributeNames());
-        const changed = new Set(memRecord.changedAttributeNamesToSave);
+        const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
         const attrReadonly: ReadonlySet<string> =
           (memRecord.constructor as unknown as { _readonlyAttributes?: ReadonlySet<string> })
             ._readonlyAttributes ?? new Set<string>();
-        for (const name of record.attributeNames()) {
-          if (!memAttributeNames.has(name) || changed.has(name) || attrReadonly.has(name)) continue;
+        for (const name of record
+          .attributeNames()
+          .filter((name) => memAttributeNames.has(name))
+          .filter((name) => !changedAttributeNamesToSave.has(name))
+          .filter((name) => !attrReadonly.has(name))) {
           memRecord._writeAttribute(name, record.get(name));
         }
 

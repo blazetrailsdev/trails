@@ -73,7 +73,6 @@ export class Default {
     if (scopes.length === 0) return undefined;
 
     return evaluateDefaultScope.call(this, () => {
-      // default.rb:159-167 names the accumulator `combined_scope`.
       let combinedScope = relation;
       for (const scopeObj of scopes) {
         if (isExecuteScope(allQueries, scopeObj)) {

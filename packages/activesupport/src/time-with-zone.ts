@@ -94,7 +94,7 @@ export class TimeWithZone {
   /** The timezone */
   private readonly _timeZone: TimeZone;
   /** `@period` — memoized by {@link period}. */
-  private _periodMemo?: TimezonePeriod;
+  private _period?: TimezonePeriod;
 
   constructor(instant: Temporal.Instant, timeZone: TimeZone) {
     this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo);
@@ -123,7 +123,7 @@ export class TimeWithZone {
    */
   get period(): TimezonePeriod {
     const utc = this._zoned.toInstant();
-    return (this._periodMemo ??= this._timeZone.periodForUtc(utc));
+    return (this._period ??= this._timeZone.periodForUtc(utc));
   }
 
   /** The TimeZone instance */

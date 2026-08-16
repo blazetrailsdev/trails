@@ -894,7 +894,6 @@ export async function pluck(
     // Rails columns_hash.key? — qualify a bare known column to the base table.
     const knownColumns = new Set(this._model.attributeNames());
     const isKnownColumn = (name: string): boolean => knownColumns.has(name);
-    // calculations.rb:315 names the arel_columns result `columns`.
     const columns = columnNames.map((c) => {
       if (c instanceof Nodes.SqlLiteral) {
         // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
