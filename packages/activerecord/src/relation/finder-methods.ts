@@ -451,11 +451,6 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 
 /** @internal */
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
-  // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
-  // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
-  // live association scope, so a saved owner's persisted FK is picked up instead
-  // of returning null.
-  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
   // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
   // first → find_nth(0) → find_nth_with_limit(0, 1). find_nth_with_limit reads
   // the loaded cache when present, otherwise runs an ordered LIMIT query — and
@@ -488,15 +483,10 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   // (finder_methods.rb:203). When the relation is already loaded — or carries a
   // `limit`/`offset` that a reverse-order query would otherwise discard — Rails
   // materializes the records and reads the tail in Ruby rather than issuing a
-  // fresh reversed query. This arm runs BEFORE the none short-circuit below, as
-  // in Rails, so a loaded relation reports its records even when its (stale)
-  // clauses would build an empty query.
+  // fresh reversed query.
   if (this.isLoaded || (this as any)._limitValue != null || (this as any)._offsetValue != null) {
     return findLast.call(this, n);
   }
-  // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
-  // reporting the none short-circuit. Rails has no counterpart.
-  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
   let rel: any;
   if (!hasReversibleOrder(this)) {
     rel = orderByPk(this, "desc");
