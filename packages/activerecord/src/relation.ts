@@ -913,7 +913,7 @@ export class Relation<T extends Base> {
       // The `lookup_table_klass_from_join_dependencies` block (see `where`'s
       // composite branch) so a qualified col naming a manual-join table binds
       // through the joined model's type rather than the generic
-      // `TypeCasterConnection`.
+      // `TypeCasterConnection` (query_methods.rb:1643-1645).
       const nodes = this.predicateBuilder.buildComposite(
         conditions as string[],
         tuples,
@@ -3676,9 +3676,7 @@ export class Relation<T extends Base> {
         .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
         .trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(bare)) return new Nodes.SqlLiteral(raw);
-      // Rails resolves a bare column name through `arel_column`
-      // (query_methods.rb:1662-1676): `table[field]` when the model's
-      // `columns_hash` knows it, else the block's fallback.
+      // Rails' `arel_column(field) { ... }` (query_methods.rb:1662-1676).
       return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as Nodes.Node;
     });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
