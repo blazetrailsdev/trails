@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise";
 import { Temporal } from "@blazetrails/date";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, KeyError } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -1077,8 +1077,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * guard) and the replay below is the single re-issue of the batch.
    */
   override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
+    // Rails: `transaction_isolation_levels.fetch(isolation)`
+    // (abstract_mysql_adapter.rb:235) — unknown levels raise Ruby's `KeyError`.
     const level = transactionIsolationLevels()[isolation];
-    if (!level) throw new Error(`Unknown transaction isolation level: ${isolation}`);
+    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
     await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
       await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", {
         materializeTransactions: false,

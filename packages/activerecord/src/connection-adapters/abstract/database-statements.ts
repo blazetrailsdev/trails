@@ -1044,11 +1044,11 @@ export async function beginDeferredTransaction(
 ): Promise<void> {
   const host = this as DatabaseStatementsHost;
   if (isolationLevel) {
-    const levels = transactionIsolationLevels();
-    const normalized = levels[isolationLevel] ?? isolationLevel;
+    // Rails passes the level name straight through (database_statements.rb:412-418);
+    // the adapters do the `transaction_isolation_levels.fetch` themselves.
     return host?.beginIsolatedDbTransaction
-      ? host.beginIsolatedDbTransaction.call(host, normalized)
-      : beginIsolatedDbTransaction.call(this, normalized);
+      ? host.beginIsolatedDbTransaction.call(host, isolationLevel)
+      : beginIsolatedDbTransaction.call(this, isolationLevel);
   }
   return host?.beginDbTransaction
     ? host.beginDbTransaction.call(host)

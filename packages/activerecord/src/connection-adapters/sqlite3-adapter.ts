@@ -856,7 +856,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     name: string | null = null,
     binds: unknown[] = [],
     prepare = false,
-    _async = false,
+    async = false,
     _allowRetry = false,
     materializeTransactions = true,
     batch = false,
@@ -865,12 +865,15 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     try {
       if (materializeTransactions) await this.materializeTransactions();
       const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
+      // Rails: `log(sql, name, binds, type_casted_binds, async: async)`
+      // (abstract/database_statements.rb:554) — a scheduled FutureResult's
+      // event must carry `async: true` in its payload.
       return await this.log(
         sql,
         name,
         binds,
         this.typeCastedBinds(binds),
-        false,
+        async,
         async (payload) => {
           try {
             return await this.performQuery(this.driver, sql, binds, driverBinds, {

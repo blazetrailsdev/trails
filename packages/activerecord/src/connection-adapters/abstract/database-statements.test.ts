@@ -15,6 +15,7 @@ import {
   transaction,
   transactionIsolationLevels,
   beginDbTransaction,
+  beginDeferredTransaction,
   beginIsolatedDbTransaction,
   commitDbTransaction,
   execRollbackDbTransaction,
@@ -181,6 +182,22 @@ describe("DatabaseStatements", () => {
       expect(levels.read_committed).toBe("READ COMMITTED");
       expect(levels.repeatable_read).toBe("REPEATABLE READ");
       expect(levels.serializable).toBe("SERIALIZABLE");
+    });
+
+    // Rails' begin_deferred_transaction hands the level name straight to
+    // begin_isolated_db_transaction (database_statements.rb:412-418) — it does
+    // not map it through transaction_isolation_levels, and it does not let an
+    // unknown level pass silently.
+    it("begin deferred transaction forwards the isolation level name verbatim", async () => {
+      const seen: string[] = [];
+      const host = {
+        beginIsolatedDbTransaction: async (isolation: string) => {
+          seen.push(isolation);
+        },
+      };
+      await beginDeferredTransaction.call(host as never, "read_committed");
+      await beginDeferredTransaction.call(host as never, "bogus");
+      expect(seen).toEqual(["read_committed", "bogus"]);
     });
 
     it("begin isolated db transaction raises by default", async () => {
