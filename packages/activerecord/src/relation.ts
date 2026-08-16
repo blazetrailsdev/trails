@@ -1019,7 +1019,7 @@ export class Relation<T extends Base> {
   /**
    * Exclude specific records from the result.
    *
-   * Mirrors: ActiveRecord::Relation#excluding / #without
+   * Mirrors: ActiveRecord::QueryMethods#excluding (query_methods.rb:1574-1584).
    */
   excluding(...records: unknown[]): Relation<T> {
     const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
@@ -2158,13 +2158,12 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#any? (relation.rb:391-396) — `!empty?`;
    * the `loaded?` short-circuit lives in `empty?` (relation.rb:362-370).
+   * A pattern argument goes straight to `Enumerable`, whose `===` is
+   * `instance_of?` for a class and a call for any other object.
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
     if (pattern !== undefined) {
-      // Ruby hands the pattern straight to `Enumerable#any?`, which tests each
-      // element with `===`: for a class that is `instance_of?`, for anything
-      // else the object is called as the predicate.
       const matches = (record: T): boolean =>
         (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
           ? record instanceof (pattern as new (...args: never[]) => Base)
@@ -2177,12 +2176,13 @@ export class Relation<T extends Base> {
   /**
    * Check if there are multiple matching records.
    *
-   * Mirrors: ActiveRecord::Relation#many?
+   * Mirrors: ActiveRecord::Relation#many? (relation.rb:413-419). The optional
+   * predicate is Ruby's block, which `Enumerable#many?` counts through,
+   * short-circuiting at two matches.
    */
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
     if (this.isNullRelation()) return false;
     if (predicate !== undefined) {
-      // `Enumerable#many?` counts matches, short-circuiting at 2.
       let count = 0;
       for (const record of await this.toArray()) {
         if (predicate(record) && ++count === 2) break;
@@ -2196,19 +2196,17 @@ export class Relation<T extends Base> {
   /**
    * Check if there is exactly one matching record.
    *
-   * Mirrors: ActiveRecord::Relation#one?
+   * Mirrors: ActiveRecord::Relation#one? (relation.rb:404-411).
+   * A pattern argument goes straight to `Enumerable`, whose `===` is
+   * `instance_of?` for a class and a call for any other object.
    */
   async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
     if (pattern !== undefined) {
-      // Ruby hands the pattern straight to `Enumerable#one?`, which tests each
-      // element with `===`: for a class that is `instance_of?`, for anything
-      // else the object is called as the predicate.
       const matches = (record: T): boolean =>
         (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
           ? record instanceof (pattern as new (...args: never[]) => Base)
           : (pattern as (record: T) => boolean)(record);
-      // `Enumerable#one?` counts matches, short-circuiting at 2.
       let count = 0;
       for (const record of await this.toArray()) {
         if (matches(record) && ++count === 2) break;
@@ -4269,14 +4267,13 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation#none?
+   * Mirrors: ActiveRecord::Relation#none? (relation.rb:373-378).
+   * A pattern argument goes straight to `Enumerable`, whose `===` is
+   * `instance_of?` for a class and a call for any other object.
    */
   async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return true;
     if (pattern !== undefined) {
-      // Ruby hands the pattern straight to `Enumerable#none?`, which tests each
-      // element with `===`: for a class that is `instance_of?`, for anything
-      // else the object is called as the predicate.
       const matches = (record: T): boolean =>
         (pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
           ? record instanceof (pattern as new (...args: never[]) => Base)
@@ -4351,23 +4348,25 @@ export class Relation<T extends Base> {
     return except(this._values, "extending", "skipQueryCache", "strictLoading");
   }
 
-  /** Mirrors: ActiveRecord::Relation#empty_scope? (relation.rb:1299) —
-   *  `@values == model.unscoped.values`, compared value by value. */
+  /**
+   * Mirrors: ActiveRecord::Relation#empty_scope? (relation.rb:1299) —
+   * `@values == model.unscoped.values`, compared value by value.
+   *
+   * In the WHERE half, the unscoped baseline may carry the STI
+   * `type_condition`, so a relation whose WHERE matches that baseline (rather
+   * than being literally empty) is still an empty scope. Only a
+   * finder-type-condition class has such a baseline — for anything else a
+   * non-empty WHERE means a real, non-empty scope — and the baseline is built
+   * against this relation's own table so an alias-qualified relation compares
+   * its type_condition against an identically-qualified one rather than the
+   * default arel_table.
+   */
   get isEmptyScope(): boolean {
-    // The WHERE half of `@values == model.unscoped.values`: the unscoped
-    // baseline may carry the STI `type_condition`, so a relation whose WHERE
-    // matches that baseline (rather than being literally empty) is still an
-    // empty scope.
     let whereMatchesUnscopedBaseline: boolean;
     if (this.whereClause.isEmpty()) {
       whereMatchesUnscopedBaseline = true;
     } else {
       const klass = this._model as any;
-      // Only a finder-type-condition class has a non-empty unscoped baseline;
-      // for anything else a non-empty WHERE means a real, non-empty scope.
-      // The baseline is built against this relation's own table so an
-      // alias-qualified relation compares its type_condition against an
-      // identically-qualified one rather than the default arel_table.
       const connection = klass.isFinderNeedsTypeCondition?.() ? this._conn() : undefined;
       const baseline = connection?.toSql
         ? klass._buildUnscopedRelation?.(this._table ?? undefined)

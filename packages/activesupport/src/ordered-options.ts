@@ -193,10 +193,13 @@ export class OrderedOptions {
 export class InheritableOptions extends OrderedOptions {
   private readonly parent: OrderedOptions | Record<string, unknown>;
 
-  /** Mirrors `initialize(parent = nil)` (ordered_options.rb:89-99). */
+  /**
+   * Mirrors `initialize(parent = nil)` (ordered_options.rb:89-99) — an
+   * `OrderedOptions` parent is read through the faster `_get`, any other hash
+   * through `[]`, and a nil parent leaves an empty hash behind.
+   */
   constructor(parent: OrderedOptions | Record<string, unknown> | null = null) {
     if (parent instanceof OrderedOptions) {
-      // use the faster _get when dealing with OrderedOptions
       super((k) => (parent as unknown as { _get(key: string): unknown })._get(k));
       this.parent = parent;
     } else if (parent != null) {
