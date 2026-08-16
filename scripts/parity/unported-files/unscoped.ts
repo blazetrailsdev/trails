@@ -49,11 +49,33 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "relation/load_async_test.rb",
+    tests: [
+      "scheduled?",
+      "null scheduled?",
+      "reset",
+      "load async has many association",
+      "load async has many through association",
+      "load async instrumentation is thread safe",
+      "simple query",
+      "load async from transaction",
+      "eager loading query",
+      "contradiction",
+      "pluck",
+      "count",
+      "size",
+      "empty?",
+      "load async pluck with query cache",
+      "load async count with query cache",
+      "async query executor and configuration",
+    ],
     reason:
       "SOURCE NOW PORTED (future_result.rb — story " +
-      "call-args-ar-select-all-empty-async-row); this is a test-only entry. The live " +
-      "test classes assert `scheduled?`, thread interleaving and mutex lock_wait, which " +
-      "have no observable analogue on a single-threaded event loop where " +
+      "call-args-ar-select-all-empty-async-row); this is a test-only entry, narrowed " +
+      "from the whole file by story enroll-load-async-notification-forwarding, which " +
+      "ported `test_notification_forwarding` now that FutureResult::EventBuffer stamps " +
+      "`payload[:lock_wait]` (future_result.rb:43). The tests still named here assert " +
+      "`scheduled?`, thread interleaving and thread-pool sizing, which have no " +
+      "observable analogue on a single-threaded event loop where " +
       "`await relation.toArray()` is the async surface.",
   },
   {
