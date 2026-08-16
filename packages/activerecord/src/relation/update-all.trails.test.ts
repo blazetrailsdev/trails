@@ -155,6 +155,15 @@ describe("touch_all / update_counters with empty updates", () => {
     );
   });
 
+  it("update_all with a whitespace-only string argument raises", async () => {
+    // Rails' guard is `updates.blank?` (relation.rb:589), and Ruby's
+    // `String#blank?` is `strip.empty?` — a whitespace-only SQL fragment is
+    // blank, so it raises rather than reaching sanitize_sql_for_assignment.
+    await expect(Post.all().updateAll("  ")).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
   it("update_counters with touch: [] raises when there are no timestamp columns", async () => {
     // `touch: []` is truthy in Ruby too, so Rails calls
     // touch_attributes_with_time with no names; on a model without
