@@ -250,7 +250,7 @@ export class ThroughAssociation extends Association {
     if (!sourceIsNested && !this.reflectionScope.isEmptyScope) {
       sourceScope = this.reflectionScope._clone();
       if (!hasSourceType) {
-        sourceScope._whereClause = new WhereClause([]);
+        sourceScope.whereClause = new WhereClause([]);
       }
     }
     if (sourceScope != null && this.preloadScope != null) {
@@ -358,12 +358,12 @@ export class ThroughAssociation extends Association {
     const reflScope = this.reflectionScope;
 
     // values[:annotate] → scope.annotate!(*annotations) (through_association.rb:111-113)
-    const annotations: string[] = reflScope?._annotations ?? [];
+    const annotations: string[] = reflScope?.annotateValues ?? [];
     if (annotations.length > 0) {
       scope = scope.annotate(...annotations);
     }
 
-    const whereClause = reflScope?._whereClause;
+    const whereClause = reflScope?.whereClause;
     if (options.sourceType) {
       // scope.where!(reflection.foreign_type => source_type) (rb:115-116)
       const foreignType = (this.reflection as any).foreignType;
@@ -392,12 +392,12 @@ export class ThroughAssociation extends Association {
         // or sub-chain intermediate) resolves in this one join, closing the
         // latent gap where an outer predicate qualified a sub-chain table no
         // single trails stage joined.
-        scope._whereClause = new WhereClause([
-          ...scope._whereClause.predicates,
+        scope.whereClause = new WhereClause([
+          ...scope.whereClause.predicates,
           ...whereClause.predicates,
         ]);
         const sourceName = sourceRefl.name;
-        const nestedIncludes: any[] = reflScope?._includesAssociations ?? [];
+        const nestedIncludes: any[] = reflScope?.includesValues ?? [];
         if (nestedIncludes.length > 0) {
           scope = scope.includes({ [sourceName]: nestedIncludes });
         } else {
@@ -412,7 +412,7 @@ export class ThroughAssociation extends Association {
         // instance) — so this is intentionally NOT wrapped: it must fail loudly
         // the way Rails does rather than silently degrade to an unreferenced
         // `includes` (a differently-shaped query). This branch is a direct port.
-        const refs: string[] = reflScope?._referencesValues ?? [];
+        const refs: string[] = reflScope?.referencesValues ?? [];
         if (refs.length > 0) {
           scope = scope.references(...refs);
         } else {
@@ -438,17 +438,17 @@ export class ThroughAssociation extends Association {
         }
 
         // left_outer_joins!(source_reflection.name => left_outer_joins) (rb:136-137).
-        const nestedLeftOuter: any[] = reflScope?._leftOuterJoinsValues ?? [];
+        const nestedLeftOuter: any[] = reflScope?.leftOuterJoinsValues ?? [];
         if (nestedLeftOuter.length > 0) {
           scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
         }
 
         // scope.eager_loading? && order (rb:139-141): true here since we always
         // includes! the source above.
-        const orderClauses: any[] = reflScope?._orderClauses ?? [];
+        const orderClauses: any[] = reflScope?.orderValues ?? [];
         const rawOrderClauses: string[] = reflScope?._rawOrderClauses ?? [];
         if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
-          scope._orderClauses = [...scope._orderClauses, ...orderClauses];
+          scope.orderValues = [...scope.orderValues, ...orderClauses];
           scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
         }
       }

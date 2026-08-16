@@ -1838,7 +1838,7 @@ describe("AssociationsTest", () => {
   it("association with references", async () => {
     const firm = companies("first_firm");
     const scope = association(firm, "associationWithReferences").scope();
-    expect(scope._referencesValues).toEqual(["foo"]);
+    expect(scope.referencesValues).toEqual(["foo"]);
   });
 
   it("force reload", async () => {

@@ -205,7 +205,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const recordIds = (await (
         records as { pluck: (...cols: string[]) => Promise<unknown[]> }
       ).pluck(...foreignKeyCols)) as JoinIds;
-      // `orderValues` covers `_orderClauses` (the parsed form); raw-SQL
+      // `orderValues` covers `orderValues` (the parsed form); raw-SQL
       // orders (e.g. `inOrderOf`) live in `_rawOrderClauses` and are
       // invisible to the public getter. Check both so chain steps with
       // raw orders trigger the DJAR wrapping branch correctly.
@@ -324,7 +324,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // If PredicateBuilder.buildComposite short-circuited to
       // `Relation#none()` (empty tuples / all-null components), the
       // scope is already a never-match. Skip the wrap: the fresh DJAR
-      // would only copy `_whereClause.predicates` and lose `_isNone`,
+      // would only copy `whereClause.predicates` and lose `_isNone`,
       // causing a full-table SELECT instead of an empty result.
       if ((scope as { _isNone: boolean })._isNone) return scope;
       // Loaded-chain wrap: DJAR loads via SQL, then re-groups by the
@@ -341,9 +341,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         keyCols.length === 1
           ? new Ctor(klass, keyCols[0], joinIds as unknown[])
           : new Ctor(klass, keyCols, joinIds as unknown[][]);
-      const sourceWhere = (scope as { _whereClause?: { predicates?: unknown[] } })._whereClause;
-      const splitWhere = (split as unknown as { _whereClause?: { predicates: unknown[] } })
-        ._whereClause;
+      const sourceWhere = (scope as { whereClause?: { predicates?: unknown[] } }).whereClause;
+      const splitWhere = (split as unknown as { whereClause?: { predicates: unknown[] } })
+        .whereClause;
       if (sourceWhere?.predicates && splitWhere) {
         splitWhere.predicates.push(...sourceWhere.predicates);
       }

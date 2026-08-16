@@ -87,8 +87,8 @@ async function recordsIntersection(rel: any, other: readonly unknown[]): Promise
  * merge algorithm; `merge` (performMerge) reaches it via `spawn.merge!`.
  */
 export function mergeBang(this: any, other: any): any {
-  // A bare Relation is detected by its `_whereClause`.
-  if (other && typeof other === "object" && "_whereClause" in other) {
+  // A bare Relation is detected by its `whereClause`.
+  if (other && typeof other === "object" && "whereClause" in other) {
     return new Merger(this, other).merge();
   }
   // Rails merge! (spawn_methods.rb:43-51) hash-merges only a *Hash*. A JS Array is
@@ -147,9 +147,6 @@ export const SpawnMethods = {
 /**
  * Mirrors: ActiveRecord::SpawnMethods#relation_with (spawn_methods.rb:71-74) —
  * `result = spawn; result.instance_variable_set(:@values, values); result`.
- * trails holds the values in typed fields instead of a `@values` hash, so the
- * ivar replacement is spelled as `setValues`, which assigns the keys the hash
- * carries and resets the ones it dropped.
  *
  * @internal
  */

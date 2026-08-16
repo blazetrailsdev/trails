@@ -53,10 +53,11 @@ export class Merger {
   }
 
   // Rails merges `with` through the NORMAL_VALUES loop (`relation.with!(*value)`),
-  // appending the other relation's CTEs. trails stores them in `_ctes`; mirror
+  // appending the other relation's CTEs. trails stores them in `withValues`; mirror
   // the append so a merged relation keeps both sides' common table expressions.
   private mergeCtes(rel: any): void {
-    if (this.other._ctes?.length > 0) rel._ctes = [...rel._ctes, ...this.other._ctes];
+    if (this.other.withValues?.length > 0)
+      rel.withValues = [...rel.withValues, ...this.other.withValues];
   }
 
   // Rails merger.rb processes :unscope as a NORMAL_VALUE: before the clauses are
@@ -64,7 +65,7 @@ export class Merger {
   // resets to the merged relation. This is what lets
   // `where(...).merge(unscope(:where))` clear the accumulated where clause.
   private mergeUnscope(rel: any): void {
-    const unscopeValues = this.other._unscopeValues ?? [];
+    const unscopeValues = this.other.unscopeValues ?? [];
     if (unscopeValues.length > 0) rel.unscopeBang(...unscopeValues);
   }
 
@@ -74,7 +75,7 @@ export class Merger {
   // reflection's extension modules — mixed in at association_scope.rb:28 —
   // onto the association's own scope.
   private mergeExtending(rel: any): void {
-    const extendingValues = this.other._extending ?? [];
+    const extendingValues = this.other.extendingValues ?? [];
     if (extendingValues.length > 0) rel.extendingBang(...extendingValues);
   }
 
@@ -84,7 +85,7 @@ export class Merger {
     // relations target different models, the other side's bare columns are
     // first resolved against *its own* table via arel_columns so a symbol like
     // `:body` qualifies to `comments.body` instead of the receiver's table.
-    const otherSelect = this.other._selectColumns;
+    const otherSelect = this.other.selectValues;
     if (otherSelect == null || otherSelect.length === 0) return;
     const columns =
       this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
@@ -151,7 +152,7 @@ export class Merger {
       // over the whole store, named and raw alike.
       for (const v of joinsValues) {
         if (!rel.joinsValues.some((existing: unknown) => structuralUnionEq(existing, v)))
-          rel._joinsValues.push(v);
+          rel.joinsValues = [...rel.joinsValues, v];
       }
       return;
     }
@@ -179,8 +180,8 @@ export class Merger {
     if (otherLeft.length === 0) return;
     if (other.model === rel.model) {
       for (const v of otherLeft) {
-        if (!rel._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-          rel._leftOuterJoinsValues.push(v);
+        if (!rel.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+          rel.leftOuterJoinsValues = [...rel.leftOuterJoinsValues, v];
       }
       return;
     }
@@ -228,21 +229,22 @@ export class Merger {
   }
 
   private mergeMultiValues(rel: any): void {
-    if (this.other._orderClauses && this.other._orderClauses.length > 0) {
+    if (this.other.orderValues && this.other.orderValues.length > 0) {
       const sameKlass = this.other._model === rel._model;
-      rel._orderClauses = sameKlass
-        ? [...this.other._orderClauses]
-        : this.other._orderClauses.map((c: unknown) => this.qualifyOrderForOther(c));
+      rel.orderValues = sameKlass
+        ? [...this.other.orderValues]
+        : this.other.orderValues.map((c: unknown) => this.qualifyOrderForOther(c));
     }
-    if (this.other._groupColumns && this.other._groupColumns.length > 0) {
-      rel._groupColumns.push(...this.other._groupColumns);
+    if (this.other.groupValues && this.other.groupValues.length > 0) {
+      rel.groupValues = [...rel.groupValues, ...this.other.groupValues];
     }
-    if (this.other._annotations && this.other._annotations.length > 0) {
-      rel._annotations.push(...this.other._annotations);
+    if (this.other.annotateValues && this.other.annotateValues.length > 0) {
+      rel.annotateValues = [...rel.annotateValues, ...this.other.annotateValues];
     }
-    if (this.other._referencesValues) {
-      for (const ref of this.other._referencesValues) {
-        if (!rel._referencesValues.includes(ref)) rel._referencesValues.push(ref);
+    if (this.other.referencesValues) {
+      for (const ref of this.other.referencesValues) {
+        if (!rel.referencesValues.includes(ref))
+          rel.referencesValues = [...rel.referencesValues, ref];
       }
     }
     if (this.other._manualReferences) {
@@ -253,40 +255,40 @@ export class Merger {
   }
 
   private mergeSingleValues(rel: any): void {
-    if (this.other._limitValue !== null && this.other._limitValue !== undefined) {
-      rel._limitValue = this.other._limitValue;
+    if (this.other.limitValue !== null && this.other.limitValue !== undefined) {
+      rel.limitValue = this.other.limitValue;
     }
-    if (this.other._offsetValue !== null && this.other._offsetValue !== undefined) {
-      rel._offsetValue = this.other._offsetValue;
+    if (this.other.offsetValue !== null && this.other.offsetValue !== undefined) {
+      rel.offsetValue = this.other.offsetValue;
     }
-    if (this.other._isDistinct) rel._isDistinct = true;
-    if (this.other._lockValue) rel._lockValue = this.other._lockValue;
-    if (this.other._isReadonly) rel._isReadonly = true;
-    if (this.other._skipQueryCache) rel._skipQueryCache = true;
-    if (this.other._isStrictLoading !== undefined)
-      rel._isStrictLoading = this.other._isStrictLoading;
+    if (this.other.distinctValue) rel.distinctValue = true;
+    if (this.other.lockValue) rel.lockValue = this.other.lockValue;
+    if (this.other.readonlyValue) rel.readonlyValue = true;
+    if (this.other.skipQueryCacheValue) rel.skipQueryCacheValue = true;
+    if (this.other.strictLoadingValue != null)
+      rel.strictLoadingValue = this.other.strictLoadingValue;
     // Mirrors merge_single_values (merger.rb): create_with merges hash-wise with
     // the other relation's values winning (last-wins precedence).
-    if (this.other._createWithAttrs && Object.keys(this.other._createWithAttrs).length > 0) {
-      rel._createWithAttrs = { ...(rel._createWithAttrs ?? {}), ...this.other._createWithAttrs };
+    if (this.other.createWithValue && Object.keys(this.other.createWithValue).length > 0) {
+      rel.createWithValue = { ...(rel.createWithValue ?? {}), ...this.other.createWithValue };
     }
   }
 
   private mergeClauses(rel: any): void {
-    if (this.isReplaceFromClause() && this.other._fromClause) {
-      rel._fromClause = this.other._fromClause;
+    if (this.isReplaceFromClause() && this.other.fromClause) {
+      rel.fromClause = this.other.fromClause;
     }
 
-    const whereClause = rel._whereClause.merge(this.other._whereClause);
-    if (!whereClause.isEmpty()) rel._whereClause = whereClause;
+    const whereClause = rel.whereClause.merge(this.other.whereClause);
+    if (!whereClause.isEmpty()) rel.whereClause = whereClause;
 
-    const havingClause = rel._havingClause.merge(this.other._havingClause);
-    if (!havingClause.isEmpty()) rel._havingClause = havingClause;
+    const havingClause = rel.havingClause.merge(this.other.havingClause);
+    if (!havingClause.isEmpty()) rel.havingClause = havingClause;
   }
 
   private isReplaceFromClause(): boolean {
-    const relationFrom = this.relation._fromClause;
-    const otherFrom = this.other._fromClause;
+    const relationFrom = this.relation.fromClause;
+    const otherFrom = this.other.fromClause;
     // Rails replace_from_clause? also requires same base_class, so a cross-model
     // merge (e.g. Comment.merge(Post.from("posts"))) keeps the receiver's own
     // FROM (its base table) rather than swapping in the other model's table.

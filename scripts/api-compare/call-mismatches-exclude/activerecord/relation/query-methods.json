@@ -142,17 +142,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
-    "rubyName": "excluding!",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:predicates"
-    ],
-    "reason": "RFC 0099 bucket (c) tooling noise, verified at relation/query_methods.rb `excluding!`: the two bodies each construct more than one object (or the port raises a guard Rails does not), and the comparator pairs the `new` occurrences positionally, so this row compares two unrelated constructions rather than a matched call site."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
     "rubyName": "missing",
     "call": "left_outer_joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

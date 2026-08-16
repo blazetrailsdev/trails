@@ -202,8 +202,8 @@ describe("DisableJoinsAssociationScope", () => {
     const post2 = await DjsPost.create({ djs_author_id: 1, title: "p2" });
 
     const djar = new DisableJoinsAssociationRelation(DjsPost, "id", [post2.id, post1.id]);
-    (djar as any)._whereClause.predicates.push(
-      ...(DjsPost as any).where({ id: [post1.id, post2.id] })._whereClause.predicates,
+    (djar as any).whereClause.predicates.push(
+      ...(DjsPost as any).where({ id: [post1.id, post2.id] }).whereClause.predicates,
     );
     const loaded = await djar;
     expect(loaded.map((p: any) => p.title)).toEqual(["p2", "p1"]);

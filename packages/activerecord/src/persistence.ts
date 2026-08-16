@@ -2235,7 +2235,7 @@ export function applyDefaultAndGlobalConstraints(
   if (defaultConstraint != null) manager.where(defaultConstraint);
   const globalScope = ScopeRegistry.globalCurrentScope(ctor);
   if (globalScope) {
-    const ast = globalScope._whereClause?.ast;
+    const ast = globalScope.whereClause?.ast;
     if (ast != null) manager.where(ast);
   }
 }
@@ -2244,11 +2244,11 @@ export function applyDefaultAndGlobalConstraints(
 export function buildDefaultConstraint(this: {
   defaultScopes?: { allQueries: boolean; scope: (rel: any) => any }[];
   defaultScoped(options: { allQueries?: boolean | null }): {
-    _whereClause: { isEmpty(): boolean; ast: unknown };
+    whereClause: { isEmpty(): boolean; ast: unknown };
   };
 }): unknown {
   if (!this.defaultScopes?.some((s) => s.allQueries)) return undefined;
-  const defaultWhereClause = this.defaultScoped({ allQueries: true })._whereClause;
+  const defaultWhereClause = this.defaultScoped({ allQueries: true }).whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 

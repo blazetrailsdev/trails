@@ -152,7 +152,7 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
  * same error shape as Relation#limitBang. Rails' `first(n)` / `last(n)`
  * / `take(n)` all route through `limit(limit)` which validates; our
  * TS finder methods bypass validation for first/take via
- * `_limitValue = n` (a TS-internal shortcut that diverges from Rails).
+ * `limitValue = n` (a TS-internal shortcut that diverges from Rails).
  * For Rails fidelity at the CollectionProxy layer we validate all
  * three.
  */
@@ -620,7 +620,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // fail-closed `_isNone` path.
     const ctor = record.constructor as typeof Base;
     const proxySelf = this as unknown as {
-      _copyStateFrom: (other: Relation<T>) => void;
+      initializeCopy: (other: Relation<T>) => void;
       noneBang: () => unknown;
     };
     if (assocDef.options.through) {
@@ -643,7 +643,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // Previous fail-closed catch swallowed deterministic config
       // errors — worse than letting construction fail.
       const throughRel = this._buildThroughScope() as Relation<T>;
-      proxySelf._copyStateFrom(throughRel);
+      proxySelf.initializeCopy(throughRel);
       // A new owner's through/HABTM scope collapses to `none()` (unresolvable
       // FK) — mark it so a mutated finder rebases onto the resolved join scope
       // once the owner is saved (see `_seededNoneNewOwner`).
@@ -656,7 +656,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       // scope from `targetModel.all()` is applied, the relation is
       // scope-proxied (so the definition's scope can call named scopes /
       // generated methods on it), and composite-PK validation runs.
-      // Then `_copyStateFrom` onto `this`. Missing owner PK →
+      // Then `initializeCopy` onto `this`. Missing owner PK →
       // `_isNone = true` (Rails' NullRelation fallback).
       // `scope()` derives the foreign key, which can raise a
       // `ArgumentError` when the owner's `query_constraints` make the FK
@@ -685,7 +685,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           this._seededNoneNewOwner = true;
         }
       } else {
-        proxySelf._copyStateFrom(seedRel);
+        proxySelf.initializeCopy(seedRel);
       }
     }
 
@@ -694,9 +694,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `association.extensions` (`reflection.extensions` =
     // `Array(options[:extend])`). Routing through `extendingBang` (rather
     // than binding methods directly onto the instance) records the
-    // modules in `_extending`, so extension methods survive every spawned
+    // modules in `extendingValues`, so extension methods survive every spawned
     // scope (`owner.things.where(...).fooExtension()`) via the rebinding
-    // in `_copyStateFrom`.
+    // in `initializeCopy`.
     const ext = assocDef.options.extend;
     if (ext) {
       const extensions = Array.isArray(ext) ? ext : [ext];
@@ -708,7 +708,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Capture the seed WHERE predicates so a later rebase (new-owner `1=0`
     // seed, owner then saved) can separate them from mutation predicates.
     this._seedWherePredicates = [
-      ...(this as unknown as { _whereClause: { predicates: unknown[] } })._whereClause.predicates,
+      ...(this as unknown as { whereClause: { predicates: unknown[] } }).whereClause.predicates,
     ];
   }
 
@@ -873,7 +873,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Rails: AssociationRelation#exec_queries runs set_strict_loading per
     // record, then Relation#exec_queries applies strict_loading_value
     // (including false) to all records afterward (unless nil).
-    const sv = (this as any)._isStrictLoading as boolean | undefined;
+    const sv = (this as any).strictLoadingValue as boolean | undefined;
     if (sv !== undefined) {
       for (const r of results) (r as any)._strictLoading = sv;
     }
@@ -2754,7 +2754,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `association.reset_scope` (autosave_association.rb:428).
     if (scope?._isNone === true && this._record.isNewRecord()) {
       scope._seededNoneNewOwner = true;
-      scope._seedWherePredicates = [...scope._whereClause.predicates];
+      scope._seedWherePredicates = [...scope.whereClause.predicates];
     }
     return scope;
   }
@@ -2983,7 +2983,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // @ts-expect-error async divergence from Relation#inspect — see doc comment.
   async inspect(): Promise<string> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any)._limitValue as number | null;
+    const limitValue = (this as any).limitValue as number | null;
     const take = limitValue != null ? Math.min(limitValue, 11) : 11;
     // Rails' unloaded branch is `annotate("loading for inspect").take(...)`
     // (relation.rb:1291); carry the annotation onto the bounded query.
@@ -3007,7 +3007,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any)._limitValue as number | null;
+    const limitValue = (this as any).limitValue as number | null;
     const take = limitValue != null ? Math.min(limitValue, 11) : 11;
     const subject = this._targetLoaded
       ? this._target
@@ -3314,7 +3314,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 // that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
 // The bang builders are NOT delegated: `CollectionProxy`'s constructor seeds its
 // own inherited `Relation` state through `noneBang` / `extendingBang` /
-// `_copyStateFrom`, and `toSql` / `toArray` read that state, so a proxy-wide
+// `initializeCopy`, and `toSql` / `toArray` read that state, so a proxy-wide
 // bang delegation would send the seed to the memoized scope instead of the proxy —
 // converging that half is story `collection-proxy-delegate-query-method-bangs-to-scope`.
 const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [

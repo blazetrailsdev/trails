@@ -145,7 +145,7 @@ describe("Relation private build-arel helpers", () => {
     it("registers the table in references_values", () => {
       const rel = relation();
       rel.arelColumnWithTable("comments", "id");
-      expect((rel as any)._referencesValues).toContain("comments");
+      expect((rel as any).referencesValues).toContain("comments");
     });
   });
 
@@ -194,7 +194,7 @@ describe("Relation private build-arel helpers", () => {
 describe("Relation#offset float truncation", () => {
   it("truncates float offset to integer via Math.trunc", () => {
     const r = relation().offset(1.7);
-    expect((r as any)._offsetValue).toBe(1);
+    expect((r as any).offsetValue).toBe(1);
   });
 
   it("emits OFFSET 1 in SQL when offset(1.7) is called", () => {

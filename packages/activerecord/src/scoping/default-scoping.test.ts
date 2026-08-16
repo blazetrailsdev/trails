@@ -539,19 +539,19 @@ describe("DefaultScopingTest", () => {
 
   it("additional conditions are ANDed with the default scope", async () => {
     const scope = DeveloperCalledJamis.where({ name: "David" });
-    expect((scope as any)._whereClause.ast.children.length).toBe(2);
+    expect((scope as any).whereClause.ast.children.length).toBe(2);
     expect(await scope).toEqual([]);
   });
 
   it("additional conditions in a scope are ANDed with the default scope", async () => {
     const scope = (DeveloperCalledJamis as any).david();
-    expect(scope._whereClause.ast.children.length).toBe(2);
+    expect(scope.whereClause.ast.children.length).toBe(2);
     expect(await scope.toArray()).toEqual([]);
   });
 
   it("a scope can remove the condition from the default scope", async () => {
     const scope = (DeveloperCalledJamis as any).david2();
-    expect(scope._whereClause.ast).toBeInstanceOf(Nodes.Equality);
+    expect(scope.whereClause.ast).toBeInstanceOf(Nodes.Equality);
     expect((await scope.toArray()).map((d: any) => d.id)).toEqual(
       (await Developer.where({ name: "David" })).map((d: any) => d.id),
     );
@@ -559,7 +559,7 @@ describe("DefaultScopingTest", () => {
 
   it("with abstract class where clause should not be duplicated", () => {
     const scope = Lion.all();
-    expect((scope as any)._whereClause.ast).toBeInstanceOf(Nodes.Equality);
+    expect((scope as any).whereClause.ast).toBeInstanceOf(Nodes.Equality);
   });
 
   it("with abstract class scope should be executed in correct context", () => {
@@ -798,8 +798,8 @@ describe("DefaultScopingTest", () => {
 
   it("unscope merging", () => {
     const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
-    expect((merged as any)._whereClause.isEmpty()).toBe(true);
-    expect((merged.where({ name: "Jon" }) as any)._whereClause.isEmpty()).toBe(false);
+    expect((merged as any).whereClause.isEmpty()).toBe(true);
+    expect((merged.where({ name: "Jon" }) as any).whereClause.isEmpty()).toBe(false);
   });
 
   it("order to unscope reordering", () => {

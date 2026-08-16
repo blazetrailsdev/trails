@@ -204,7 +204,7 @@ describe("Relation#where — composite-key form", () => {
         else if (c) walk(c);
       }
     };
-    rel._whereClause.predicates.forEach(walk);
+    rel.whereClause.predicates.forEach(walk);
     // Attribute re-rooted onto the join-only `contracts` table…
     expect(eq.left.relation.name).toBe("contracts");
     // …and the bind is typed by Contract's `attribute("metadata", "json")`

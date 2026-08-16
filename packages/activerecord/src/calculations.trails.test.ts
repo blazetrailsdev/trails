@@ -176,7 +176,7 @@ describe("grouped calculation keyed via Arel attribute type caster", () => {
 // (calculations.rb:516), and unwraps the key tuple to a scalar only when a
 // single group field survives (calculations.rb:583-584). Guards against a
 // regression to the old single-field collapse, where every non-association
-// grouped calculation reduced to `_groupColumns[0]`.
+// grouped calculation reduced to `groupValues[0]`.
 // ==========================================================================
 
 describe("multi-field grouped calculation key shape", () => {

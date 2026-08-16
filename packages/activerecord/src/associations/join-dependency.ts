@@ -832,7 +832,7 @@ export class JoinDependency {
    */
   instantiate(
     resultSet: Record<string, unknown>[],
-    strictLoadingValue?: boolean,
+    strictLoadingValue?: boolean | null,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any[] {
     return this.instantiateFromRows(resultSet, strictLoadingValue, columnTypes).parents;
@@ -927,7 +927,7 @@ export class JoinDependency {
    */
   instantiateFromRows(
     rows: Record<string, unknown>[],
-    strictLoadingValue?: boolean,
+    strictLoadingValue?: boolean | null,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): {
     parents: any[];
@@ -1000,7 +1000,7 @@ export class JoinDependency {
     row: Record<string, unknown>,
     seen: Map<any, Map<JoinPart, Map<unknown, any>>>,
     modelCache: Map<JoinPart, Map<unknown, any>>,
-    strictLoadingValue?: boolean,
+    strictLoadingValue?: boolean | null,
   ): void {
     if (arParent == null) return;
     const aliases = this.aliases();
@@ -1194,7 +1194,7 @@ export class JoinDependency {
     row: Record<string, unknown>,
     modelCache: Map<JoinPart, Map<unknown, any>>,
     id: unknown,
-    strictLoadingValue?: boolean,
+    strictLoadingValue?: boolean | null,
   ): any {
     let nodeCache = modelCache.get(node);
     if (!nodeCache) {

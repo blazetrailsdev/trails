@@ -1800,12 +1800,12 @@ export class SchemaStatements {
     if (typeof (relation as any).limitBang === "function") {
       (relation as any).limitBang(null);
     } else {
-      (relation as any)._limitValue = null;
+      (relation as any).limitValue = null;
     }
     if (typeof (relation as any).offsetBang === "function") {
       (relation as any).offsetBang(null);
     } else {
-      (relation as any)._offsetValue = null;
+      (relation as any).offsetValue = null;
     }
     return relation;
   }

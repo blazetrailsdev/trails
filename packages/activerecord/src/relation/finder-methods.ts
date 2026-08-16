@@ -286,15 +286,15 @@ interface FinderRelation {
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
   _isEmptyRelation(): boolean;
-  _limitValue: number | null;
-  _offsetValue: number | null;
-  _orderClauses: unknown[];
+  limitValue: number | null;
+  offsetValue: number | null;
+  orderValues: unknown[];
   _rawOrderClauses: string[];
-  _createWithAttrs: Record<string, unknown>;
+  createWithValue: Record<string, unknown>;
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
   _clone(): any;
-  _whereClause: { isEmpty(): boolean };
+  whereClause: { isEmpty(): boolean };
   /** Relation#arel — the built SelectManager (relation.ts). */
   arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
   where(conditions: unknown, ...rest: unknown[]): any;
@@ -341,7 +341,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   // The guard is `where_clause.empty?`, but the rendered SQL comes from the
   // built arel, whose WHERE also folds in the STI type_condition and any
   // default-scope predicates.
-  const conditions = this._whereClause.isEmpty()
+  const conditions = this.whereClause.isEmpty()
     ? ""
     : ` [${this.arel().whereSql(this._model)?.value ?? ""}]`;
 
@@ -439,7 +439,7 @@ export async function performFindSoleBy(
 }
 
 function hasOrder(rel: FinderRelation): boolean {
-  return rel._orderClauses.length > 0 || rel._rawOrderClauses.length > 0;
+  return rel.orderValues.length > 0 || rel._rawOrderClauses.length > 0;
 }
 
 /** @internal */
@@ -469,7 +469,7 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   // `limit`/`offset` that a reverse-order query would otherwise discard — Rails
   // materializes the records and reads the tail in Ruby rather than issuing a
   // fresh reversed query.
-  if (this.isLoaded || (this as any)._limitValue != null || (this as any)._offsetValue != null) {
+  if (this.isLoaded || (this as any).limitValue != null || (this as any).offsetValue != null) {
     return findLast.call(this, n);
   }
   // `result = ordered_relation.limit(limit); result = result.reverse_order!;
@@ -492,7 +492,7 @@ export async function performLastBang(this: FinderRelation): Promise<any> {
 /** @internal */
 export async function performSole(this: FinderRelation): Promise<any> {
   const rel = this._clone();
-  rel._limitValue = 2;
+  rel.limitValue = 2;
   const records = await rel.toArray();
   if (records.length === 0) {
     // Rails Relation#sole calls `raise_record_not_found_exception!` with no
@@ -533,12 +533,12 @@ export async function findNthWithLimit(
     return (await this.records()).slice(index, index + limit) ?? [];
   }
   let relation: any = orderedRelation.call(this);
-  if ((this as any)._limitValue != null) {
-    limit = Math.min((this as any)._limitValue - index, limit);
+  if ((this as any).limitValue != null) {
+    limit = Math.min((this as any).limitValue - index, limit);
   }
   if (limit <= 0) return [];
   if (index > 0) {
-    relation = relation.offset(((this as any)._offsetValue ?? 0) + index);
+    relation = relation.offset(((this as any).offsetValue ?? 0) + index);
   }
   return relation.limit(limit).toArray();
 }
@@ -553,7 +553,7 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   // Rails: `if relation.order_values.empty? || relation.has_limit_or_offset?`
   // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
   // treated as "has an order" — avoids loading all records for those relations.
-  if (!hasOrder(relation) || relation._limitValue != null || relation._offsetValue != null) {
+  if (!hasOrder(relation) || relation.limitValue != null || relation.offsetValue != null) {
     const records = await relation.records();
     return records[records.length - 1 - index] ?? null;
   }
@@ -692,7 +692,7 @@ export function raiseRecordNotFoundExceptionBang(
   // Rails: `conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`
   // (finder_methods.rb:418). `where_sql` returns nil when the manager has no
   // wheres, which Ruby interpolates as "" — hence the `?? ""`.
-  const conditions = this._whereClause.isEmpty()
+  const conditions = this.whereClause.isEmpty()
     ? ""
     : ` [${this.arel().whereSql(this.model)?.value ?? ""}]`;
 
@@ -803,7 +803,7 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
   }
   let relation: any;
-  if ((this as any)._isDistinct && (this as any)._offsetValue != null) {
+  if ((this as any).distinctValue && (this as any).offsetValue != null) {
     relation = (this as any).except("order").limitBang(1);
   } else {
     relation = (this as any)
@@ -886,8 +886,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   // Rails: expected_size = ids.size, then clamp down for limit/offset.
   // "11 ids with limit 3, offset 9 should give 2 results."
   let expectedSize = ids.length;
-  const limitValue: number | null = (this as any)._limitValue ?? null;
-  const offsetValue: number | null = (this as any)._offsetValue ?? null;
+  const limitValue: number | null = (this as any).limitValue ?? null;
+  const offsetValue: number | null = (this as any).offsetValue ?? null;
   if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
   if (offsetValue !== null && ids.length - offsetValue < expectedSize)
     expectedSize = ids.length - offsetValue;
@@ -901,8 +901,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
 
 /** @internal */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const offsetValue: number = (this as any)._offsetValue ?? 0;
-  const limitValue: number | null = (this as any)._limitValue ?? null;
+  const offsetValue: number = (this as any).offsetValue ?? 0;
+  const limitValue: number | null = (this as any).limitValue ?? null;
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
   let relation = (this as any).except("limit", "offset");
