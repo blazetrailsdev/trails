@@ -3,6 +3,8 @@ import { Model, Errors } from "../index.js";
 import { WithValidator } from "./with.js";
 
 describe("ValidatesWithTest", () => {
+  const ERROR_MESSAGE = "Validation error from validator";
+
   it("validates_with with options", async () => {
     class CustomValidator {
       private minLength: number;
@@ -93,22 +95,41 @@ describe("ValidatesWithTest", () => {
     expect(await p.isValid()).toBe(true);
   });
 
+  // with_validation_test.rb:112-117. The instance `validates_with`
+  // (with.rb:143-151) builds each validator from a `dup` of the options and
+  // runs it against `self` right away, so a validator that clears the hash it
+  // was handed cannot blind the next one.
   it("instance validates_with method preserves validator options", async () => {
-    class CustomValidator {
+    class ValidatorThatDoesNotAddErrors {
+      validate(_record: any) {}
+    }
+    class ValidatorThatClearsOptions extends ValidatorThatDoesNotAddErrors {
+      constructor(options: any) {
+        super();
+        for (const key of Object.keys(options)) delete options[key];
+      }
+    }
+    class ValidatorThatValidatesOptions {
       options: any;
       constructor(options: any = {}) {
         this.options = options;
       }
-      validate(_record: any) {}
-    }
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator, { custom: "value" });
+      validate(record: any) {
+        if (this.options.field === "first_name") {
+          record.errors.add("base", ":invalid", { message: ERROR_MESSAGE });
+        }
       }
     }
-    const p = new Person({});
-    expect(await p.isValid()).toBe(true);
+    class Topic extends Model {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const topic = new Topic({});
+    await topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
+      field: "first_name",
+    });
+    expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
   });
 
   it("each validator checks validity", async () => {

@@ -176,7 +176,9 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   forceChange(attrName: string): void {
-    if (this.forcedChanges.has(attrName)) return;
+    // attribute_mutation_tracker.rb:121-123 guards on `attribute_changed?`,
+    // which for this tracker IS the forced-changes lookup.
+    if (this.attributeChanged(attrName)) return;
     const value = this.fetchValue(attrName);
     this.forcedChanges.set(attrName, cloneValue(value));
   }

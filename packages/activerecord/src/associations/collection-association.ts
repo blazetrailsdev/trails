@@ -1320,37 +1320,50 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Merge persisted records from DB with in-memory target records.
-   * Preserves order of persisted, deduplicates, and keeps
-   * attribute changes from in-memory versions.
+   * Merge persisted records from DB with in-memory target records:
+   *
+   *   * The final array must not have duplicates
+   *   * The order of the persisted array is to be preserved
+   *   * Any changes made to attributes on objects in the memory array are to
+   *     be preserved
+   *   * Otherwise, attributes should have the value found in the database
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#merge_target_lists
+   * (collection_association.rb:335-352).
    */
   private mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
     if (memory.length === 0) return persisted;
 
-    const newRecords: Base[] = [];
+    // `memory.delete(record)` is Array#delete over AR `==` — id equality for a
+    // persisted record, object identity for a new one. `recordIdentity`
+    // returns exactly that: the id key, or the record itself when the PK is
+    // nil. Insertion order is the memory order the `reject` tail below reads.
     const memoryByIdentity = new Map<string | Base, Base>();
-    for (const record of memory) {
-      const identity = this.recordIdentity(record);
-      if (typeof identity !== "string") {
-        newRecords.push(record);
-      } else {
-        memoryByIdentity.set(identity, record);
-      }
-    }
+    for (const record of memory) memoryByIdentity.set(this.recordIdentity(record), record);
 
     const merged = persisted.map((record) => {
       const identity = this.recordIdentity(record);
-      if (typeof identity !== "string") return record;
       const memRecord = memoryByIdentity.get(identity);
       if (memRecord) {
         memoryByIdentity.delete(identity);
+
+        const memAttributeNames = new Set(memRecord.attributeNames());
+        const changed = new Set(memRecord.changedAttributeNamesToSave);
+        const attrReadonly: ReadonlySet<string> =
+          (memRecord.constructor as unknown as { _readonlyAttributes?: ReadonlySet<string> })
+            ._readonlyAttributes ?? new Set<string>();
+        for (const name of record.attributeNames()) {
+          if (!memAttributeNames.has(name) || changed.has(name) || attrReadonly.has(name)) continue;
+          memRecord._writeAttribute(name, record.get(name));
+        }
+
         return memRecord;
+      } else {
+        return record;
       }
-      return record;
     });
 
-    merged.push(...newRecords);
-    return merged;
+    return [...merged, ...[...memoryByIdentity.values()].filter((record) => !record.isPersisted())];
   }
 
   private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {

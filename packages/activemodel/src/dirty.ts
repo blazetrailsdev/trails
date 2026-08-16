@@ -403,7 +403,11 @@ export class DirtyTracker {
    *
    * Mirrors: ActiveModel::AttributeMutationTracker#force_change
    */
-  forceChange(name: string, currentValue: unknown): unknown {
+  forceChange(name: string): unknown {
+    // Rails resolves the value inside the tracker
+    // (attribute_mutation_tracker.rb:63-65 `forced_changes[attr_name] =
+    // fetch_value(attr_name)`), so the caller passes only the name.
+    const currentValue = this.fetchValue(name);
     // Unconditional forced marker (Rails: forced_changes[attr] = fetch_value).
     this._forcedNames.add(name);
     // Capture the "was" only when the attribute isn't already changed (by this
@@ -423,6 +427,15 @@ export class DirtyTracker {
       this._changedAttributes.set(name, [cloned, cloned]);
     }
     return currentValue;
+  }
+
+  /**
+   * Mirrors: ActiveModel::AttributeMutationTracker#fetch_value
+   * (attribute_mutation_tracker.rb:97-99) — `attributes.fetch_value(attr_name)`
+   * off the tracker's own AttributeSet, which {@link snapshot} binds.
+   */
+  private fetchValue(attrName: string): unknown {
+    return this._attrs?.fetchValue(attrName);
   }
 
   /**
@@ -579,7 +592,10 @@ export class DirtyTracker {
  * @internal Rails-private helper.
  */
 export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
-  return this._dirty.forceChange(attrName, this._attributes.fetchValue(attrName));
+  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
+  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
+  // Record-shaped reader over it, not the tracker itself.
+  return this._dirty.forceChange(attrName);
 }
 
 /**

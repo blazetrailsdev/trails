@@ -125,16 +125,18 @@ export class RangeType extends ValueType<Range> {
 
   override serialize(value: unknown): unknown {
     if (!(value instanceof Range)) return value;
-    return new Range(
-      this.typeCastSingleForDatabase(value.begin),
-      this.typeCastSingleForDatabase(value.end),
-      value.excludeEnd,
-    );
+    // range.rb:34-42 names both bounds before building the ::Range.
+    const from = this.typeCastSingleForDatabase(value.begin);
+    const to = this.typeCastSingleForDatabase(value.end);
+    return new Range(from, to, value.excludeEnd);
   }
 
   override map(value: Range | null, block?: (value: unknown) => unknown): Range | null {
     if (value == null || !block) return value;
-    return new Range(block(value.begin), block(value.end), value.excludeEnd);
+    // range.rb:50-54.
+    const newBegin = block(value.begin);
+    const newEnd = block(value.end);
+    return new Range(newBegin, newEnd, value.excludeEnd);
   }
 
   override isForceEquality(value: unknown): boolean {

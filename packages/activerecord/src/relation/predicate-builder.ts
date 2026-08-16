@@ -229,9 +229,9 @@ export class PredicateBuilder {
    *
    * @internal
    */
-  private groupingQueries(queryGroups: Nodes.Node[][]): Nodes.Node[] {
-    if (queryGroups.length === 0) return [];
-    if (queryGroups.length === 1) return queryGroups[0];
+  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[] {
+    if (queries.length === 0) return [];
+    if (queries.length === 1) return queries[0];
     // Rails `grouping_queries` (predicate_builder.rb:157-159):
     // `queries.map! { |query| query.reduce(&:and) }` then an n-ary
     // `Arel::Nodes::Or.new(queries)` wrapped in one Grouping. `Node#and`
@@ -240,8 +240,8 @@ export class PredicateBuilder {
     // pairwise reduce, not a flat n-ary `And`. SQL is identical either way
     // (the And visitor joins children without parens), but the AST shape
     // matches Rails for anything walking the tree.
-    const queries = queryGroups.map((query) => query.reduce((left, right) => left.and(right)));
-    return [new Nodes.Grouping(new Nodes.Or(queries))];
+    const reduced = queries.map((query) => query.reduce((left, right) => left.and(right)));
+    return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {

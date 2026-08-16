@@ -30,7 +30,9 @@ describe("classifyPair", () => {
     expect(classifyPair("objectId", "this")).toBe("no-js-equivalent");
     expect(classifyPair("toI", "parseInt")).toBe("no-js-equivalent");
     expect(classifyPair("toS", "toString")).toBe("no-js-equivalent");
-    expect(classifyPair("toS", "fetchValue")).toBe("burndown");
+    // Ruby's `to_s` against an already-`string` TS parameter is the mirror
+    // image of the implicit-to_s class — there is nothing for TS to spell.
+    expect(classifyPair("toS", "fetchValue")).toBe("implicit-to-s");
   });
 
   it("names what the conventions table itself produces", () => {
@@ -79,7 +81,33 @@ describe("classifyPair", () => {
     // → `becoming._attributes`), so the class keys on the Ruby name alone.
     expect(classifyPair("instanceVariableGet", "_attributes")).toBe("ivar-reflection");
     expect(classifyPair("instance_variable_set", "_attributes")).toBe("ivar-reflection");
+    // A Ruby block passed as a trailing `{ }` reaches TS as a callback
+    // argument spelled `block` (locator.rb:223 `model_class.unscoped { yield }`
+    // → `klass.unscoped(block)`), so the arm keys on the TS spelling alone.
+    expect(classifyPair("modelClass", "block")).toBe("block-idiom");
     expect(classifyPair("instance_exec", "proc")).toBe("burndown");
+  });
+
+  // to_sql.rb:874 `quote_table_name(name)` with a composite-PK Array vs
+  // to-sql.ts `quoteTableName(toS(name))`; postgresql_adapter.rb's remove_index
+  // `quote_table_name(index_to_remove)` vs `.toString()` on the Name.
+  it("names Ruby's implicit to_s where TS spells the conversion", () => {
+    expect(classifyPair("name", "toS")).toBe("implicit-to-s");
+    expect(classifyPair("indexToRemove", "toString")).toBe("implicit-to-s");
+    expect(classifyPair("toS", "attrName")).toBe("implicit-to-s");
+    // `inspect` → `toString` is unconvergeable for the stronger reason.
+    expect(classifyPair("inspect", "toString")).toBe("no-js-equivalent");
+  });
+
+  // Ruby builtins whose TS spelling is the free function or method doing the
+  // same work: locator.rb:107 `compact`, base.rb:282 `File.read`,
+  // flatten.rb:100 `gsub`, base.rb:269 `inspect`.
+  it("names the Ruby builtins TS spells under another name", () => {
+    expect(classifyPair("compact", "filter")).toBe("no-js-equivalent");
+    expect(classifyPair("read", "readFile")).toBe("no-js-equivalent");
+    expect(classifyPair("gsub", "replaceAll")).toBe("no-js-equivalent");
+    expect(classifyPair("inspect", "inspectError")).toBe("no-js-equivalent");
+    expect(classifyPair("strip", "trim")).toBe("no-js-equivalent");
   });
 });
 
@@ -110,6 +138,7 @@ describe("the taxonomy itself", () => {
       "module-mixin-call",
       "block-idiom",
       "ivar-reflection",
+      "implicit-to-s",
     ]);
   });
 

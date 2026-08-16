@@ -1935,6 +1935,44 @@ export class Model {
   }
 
   /**
+   * Passes the record off to the class or classes specified and allows them
+   * to add errors based on more complex conditions, so a `validate :foo` body
+   * can run a validator on the spot:
+   *
+   *   validate :instanceValidations
+   *   instanceValidations() { this.validatesWith(MyValidator); }
+   *
+   * Mirrors: ActiveModel::Validations#validates_with
+   * (activemodel/lib/active_model/validations/with.rb:143-151). Unlike the
+   * class method it registers nothing — each klass is built and run
+   * immediately against `this`.
+   */
+  async validatesWith(
+    ...args: Array<
+      | {
+          new (
+            options: Record<string, unknown>,
+          ): ValidatorBase | { validate(record: ValidatableRecord): unknown };
+        }
+      | Record<string, unknown>
+    >
+  ): Promise<void> {
+    const last = args[args.length - 1];
+    const options: Record<string, unknown> =
+      typeof last === "function" ? {} : ((args.pop() as Record<string, unknown>) ?? {});
+    options.class = this.constructor;
+
+    for (const klass of args as Array<{
+      new (
+        options: Record<string, unknown>,
+      ): ValidatorBase | { validate(record: ValidatableRecord): unknown };
+    }>) {
+      const validator = new klass({ ...options });
+      await validator.validate(this as unknown as ValidatableRecord);
+    }
+  }
+
+  /**
    * Freeze this model instance. Mirrors Rails
    * `ActiveModel::Validations#freeze` (activemodel/lib/active_model/validations.rb:372-377):
    *
@@ -2163,7 +2201,7 @@ export class Model {
    */
   attributeWillChange(name: string): unknown {
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
-    return this._dirty.forceChange(resolved, this._attributes.fetchValue(resolved));
+    return this._dirty.forceChange(resolved);
   }
 
   /**
