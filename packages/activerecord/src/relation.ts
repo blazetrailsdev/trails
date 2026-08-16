@@ -5108,15 +5108,20 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1425)
    */
   private async execQueries(): Promise<T[]> {
-    if (this._isNone) return [];
-    const wasLoaded = this._loaded;
-    const priorRecords = this._records;
-    try {
-      return await this.withConnection(() => this._toArrayInner());
-    } finally {
-      this._loaded = wasLoaded;
-      this._records = priorRecords;
-    }
+    return this.skipQueryCacheIfNecessary(async () => {
+      const rows = await this.execMainQuery();
+      const records = this.instantiateRecords(rows);
+      if (!this.skipPreloadingValue) await this.preloadAssociations(records);
+
+      if (this.readonlyValue) {
+        for (const record of records) (record as any)._readonly = true;
+      }
+      if (this.strictLoadingValue != null) {
+        for (const record of records) (record as any)._strictLoading = this.strictLoadingValue;
+      }
+
+      return records;
+    });
   }
 
   private async execMainQuery(): Promise<Record<string, unknown>[]> {

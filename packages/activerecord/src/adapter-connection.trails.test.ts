@@ -60,13 +60,26 @@ class QueryTestAdapter extends LifecycleTestAdapter {
   failOnce = false;
 
   override async selectAll(
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
-    opts?: { allowRetry?: boolean },
+    opts?: { allowRetry?: boolean; preparable?: boolean | null },
   ): Promise<Result> {
-    this.capturedAllowRetry = opts?.allowRetry ?? false;
-    return this.withRawConnection({ allowRetry: opts?.allowRetry ?? false }, async () => {
+    // `select_all` derives allow_retry from `to_sql_and_binds`' collector
+    // (database_statements.rb:29-45, :69-71), which is what the relation now
+    // hands it an Arel manager for.
+    const [, , , allowRetry] = (
+      this as unknown as {
+        toSqlAndBinds(
+          arel: unknown,
+          binds: unknown[],
+          preparable: boolean | null,
+          allowRetry: boolean,
+        ): [string, unknown[], boolean | null, boolean];
+      }
+    ).toSqlAndBinds(arel, binds ?? [], opts?.preparable ?? null, opts?.allowRetry ?? false);
+    this.capturedAllowRetry = allowRetry;
+    return this.withRawConnection({ allowRetry }, async () => {
       if (this.failOnce) {
         this.failOnce = false;
         throw new ConnectionFailed("remote disconnect");
@@ -90,10 +103,8 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     adapter.simulateConnect();
     PostForRetryTest.adapter = adapter as unknown as DatabaseAdapter;
 
-    // The raw-SQL WHERE makes the SELECT non-retryable. from() takes a
-    // retryable Arel node, which _toSqlWithoutSetOp compiles a second time
-    // through the shared visitor — that compile must not clobber the
-    // already-captured classification (regression: collector reset).
+    // The raw-SQL WHERE makes the SELECT non-retryable, and the retryable
+    // from() node must not raise it back (regression: collector reset).
     const fromNode = new Nodes.SqlLiteral("posts", { retryable: true });
     await PostForRetryTest.where("1 = 1").from(fromNode).limit(1);
     expect(adapter.capturedAllowRetry).toBe(false);
