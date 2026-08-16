@@ -2313,7 +2313,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `find_nth(0)` (finder_methods.rb:598-601). Rails' CollectionProxy#first is
     // a bare `super`, so the `@offsets` memo lands on the proxy itself; the query
     // still routes through `_finderScope` via our `findNthWithLimit` override.
-    return baseFindNth(this as any, 0);
+    return baseFindNth.call(this as any, 0);
   }
 
   /**

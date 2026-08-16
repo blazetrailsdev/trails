@@ -1664,11 +1664,9 @@ function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
   return this;
 }
 
-/** @internal */
-function async(this: QueryMethodsHost): QueryMethodsHost {
-  const rel = (this as any).spawn();
-  rel._async = true;
-  return rel;
+/** Mirrors: ActiveRecord::QueryMethods#async (query_methods.rb:1678-1680). @internal */
+export function async(this: QueryMethodsHost): QueryMethodsHost {
+  return asyncBang.call((this as any).spawn());
 }
 
 /** @internal */
@@ -2194,6 +2192,7 @@ export const QueryMethodBangs = {
   isTableNameMatches,
   arelColumn,
   arelColumnWithTable,
+  async,
   buildWhereClause,
   // Mirrors `alias :build_having_clause :build_where_clause`
   // (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
