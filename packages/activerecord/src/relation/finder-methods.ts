@@ -12,12 +12,14 @@ import { Nodes } from "@blazetrails/arel";
 import { wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
+  ArgumentError,
   RangeError as ActiveModelRangeError,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
+import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 
 /** Mirrors: `ActiveRecord::FinderMethods::ONE_AS_ONE` (finder_methods.rb:7). */
 const ONE_AS_ONE = "1 AS one";
@@ -294,7 +296,8 @@ interface FinderRelation {
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
   _clone(): any;
-  whereClause: { isEmpty(): boolean };
+  whereClause: { isEmpty(): boolean; isContradiction(): boolean };
+  havingClause: { isEmpty(): boolean };
   /** Relation#arel — the built SelectManager (relation.ts). */
   arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
   where(conditions: unknown, ...rest: unknown[]): any;
@@ -317,6 +320,23 @@ interface FinderRelation {
   findNthWithLimit(index: number, limit: number): Promise<any[]>;
   /** @internal */
   findNthFromLast(index: number): Promise<any | null>;
+  /** @internal Relation#exists? — recursed into by the eager-loading arm. */
+  exists(conditions?: unknown): Promise<boolean>;
+  /** @internal */
+  constructRelationForExists(conditions: unknown): any;
+  /** @internal Relation#eager_loading? (relation.ts). */
+  _eagerLoadingForSql(): boolean;
+  /** @internal Rails raises EagerLoadPolymorphicError from apply_join_dependency. */
+  _checkEagerLoadable(): void;
+  /** @internal Relation#apply_join_dependency (relation.ts). */
+  applyJoinDependency(options?: { eagerLoading?: boolean }): any;
+  /** @internal */
+  _materializeDeferredDistinctPkPredicates(): Promise<void>;
+  /** @internal */
+  _compileAstWithBinds(ast: unknown): [string, unknown[]];
+  toArel(): { ast: unknown };
+  skipQueryCacheIfNecessary<R>(block: () => R): R;
+  withConnection<R>(block: (c: any) => R): R;
 }
 
 function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
@@ -675,6 +695,125 @@ export async function performCreateOrFindByBang(
   }
 }
 
+/**
+ * Check if any records exist, optionally with conditions.
+ *
+ * Mirrors: ActiveRecord::FinderMethods#exists? — ending in
+ * `skip_query_cache_if_necessary { with_connection { |c|
+ * c.select_rows(relation.arel, "#{model.name} Exists?").size == 1 } }`
+ * (finder_methods.rb:377-381), the cached read path.
+ */
+export async function exists(
+  this: FinderRelation,
+  conditions?: Record<string, unknown> | unknown,
+): Promise<boolean> {
+  if (this._isEmptyRelation()) return false;
+  // Rails FinderMethods#exists?: `return false if !conditions` — treats an
+  // explicit `false` / `null` argument as "no match possible". This precedes
+  // the `if eager_loading?` branch, so it short-circuits before the
+  // eager-load validation below (finder_methods.rb:367-369).
+  if (conditions === false || conditions === null) return false;
+  // Rails FinderMethods#exists?: `return false if !conditions || limit_value == 0`
+  // (finder_methods.rb:367). A relation limited to zero rows can never match, so
+  // short-circuit to false without emitting any query.
+  if (this.limitValue === 0) return false;
+  // Rails FinderMethods#exists? (finder_methods.rb:360-364): reject an
+  // ActiveRecord instance argument with `if Base === conditions` before any
+  // query is built. Detect it via the inherited `_isActiveRecordBase` marker
+  // so a model of any class (not just this relation's) is caught.
+  // Rails runs this Base check just *before* `return false if !conditions`;
+  // we run it just after. The branches are mutually exclusive (an AR instance
+  // is never `false`/`null`), so the order is behaviorally identical.
+  if (isBaseInstance(conditions)) {
+    throw new ArgumentError(
+      "You are passing an instance of ActiveRecord::Base to `exists?`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+  }
+  // Rails exists? then routes through apply_join_dependency when eager
+  // loading, raising EagerLoadPolymorphicError for polymorphic specs.
+  this._checkEagerLoadable();
+  // Mirrors Rails FinderMethods#exists? `if eager_loading?` (finder_methods.rb:369):
+  // the eager-load check precedes construct_relation_for_exists, and conditions
+  // thread through to the recursion (`apply_join_dependency(eager_loading: false)
+  // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
+  if (this._eagerLoadingForSql()) {
+    return this.applyJoinDependency({ eagerLoading: false }).exists(conditions);
+  }
+  // Mirrors Rails FinderMethods#construct_relation_for_exists
+  // (finder_methods.rb:438): shape the existence probe and apply the argument's
+  // `case conditions` (Array/Hash → where!, else → where!(primary_key =>
+  // conditions)) in one place — `exists?` no longer reimplements that
+  // case-analysis. When `distinct_value && offset_value` keep the relation's
+  // select/distinct/group/having/offset and drop only the order
+  // (`except(:order).limit!(1)`); otherwise `except(:select, :distinct,
+  // :order)._select!(ONE_AS_ONE).limit!(1)` — group/having/offset survive.
+  // `undefined` is our `:none` sentinel, so the helper adds no where!. Building
+  // the probe through the real relation reuses the shared select-list builder,
+  // so the distinct+offset branch's default `*` projection is `ignoredColumns`-
+  // aware, matching Rails' `build_select`.
+  const relation = this.constructRelationForExists(conditions);
+  // Resolve any deferred distinct-PK subquery markers to a literal id list
+  // before compiling the probe (Rails materializes at `.where()`-build time).
+  await relation._materializeDeferredDistinctPkPredicates();
+  // Rails: `return false if relation.where_clause.contradiction?`
+  // (finder_methods.rb:375) — evaluated on the post-construct relation.
+  if (relation.whereClause.isContradiction()) return false;
+  // Tag the probe query `<Model> Exists?` — the name Rails passes to its
+  // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
+  // finder_methods.rb) — so LogSubscriber labels it instead of falling back
+  // to the adapter's generic "SQL" default.
+  const [existsSql, existsBinds] = this._compileAstWithBinds(relation.toArel().ast);
+  return await this.skipQueryCacheIfNecessary(() =>
+    this.withConnection(
+      async (c) =>
+        (await c.selectRows(existsSql, `${this.model.name} Exists?`, existsBinds)).length === 1,
+    ),
+  );
+}
+
+/**
+ * Check if the given record is present in the relation.
+ *
+ * Mirrors: ActiveRecord::FinderMethods#include? (finder_methods.rb:389-407).
+ * A non-model argument short-circuits to `false` without querying. A loaded
+ * relation — or one carrying offset/limit/having — compares in memory; an
+ * unloaded relation without those issues a cheap `exists?(id)` rather than
+ * materializing every row.
+ */
+export async function include(this: FinderRelation, record: any): Promise<boolean> {
+  if (!(record instanceof (this.model as unknown as new (...args: any[]) => any))) return false;
+  if (
+    this.isLoaded ||
+    this.offsetValue !== null ||
+    this.limitValue !== null ||
+    !this.havingClause.isEmpty()
+  ) {
+    const records = await this.toArray();
+    return records.some((r) => r.equals(record));
+  }
+  // Unloaded fast path: probe existence by primary key. The composite-PK arm
+  // (Rails `record.class.composite_primary_key?`) is a `primary_key.zip(id)`
+  // hash rather than the tuple, which exists()'s array branch would read as
+  // `[sql, ...binds]`.
+  const recordClass = record.constructor;
+  const id = recordClass.compositePrimaryKey
+    ? Object.fromEntries(
+        (recordClass.primaryKey as string[]).map((column, index) => [column, record.id[index]]),
+      )
+    : record.id;
+
+  return this.exists(id);
+}
+
+/**
+ * Alias of {@link include} — mirrors `alias :member? :include?`
+ * (finder_methods.rb:407).
+ */
+export function member(this: FinderRelation, record: any): Promise<boolean> {
+  return include.call(this, record);
+}
+
 // Mirrors ActiveRecord::FinderMethods#raise_record_not_found_exception!
 // (finder_methods.rb:417). Composes the faithful not-found messages from the
 // same ids / result_size / expected_size / key / not_found_ids arguments Rails
@@ -765,6 +904,9 @@ export const FinderMethods = {
   secondToLastBang: performSecondToLastBang,
   thirdToLast: performThirdToLast,
   thirdToLastBang: performThirdToLastBang,
+  exists,
+  include,
+  member,
   findOrCreateByBang: performFindOrCreateByBang,
   createOrFindByBang: performCreateOrFindByBang,
   raiseRecordNotFoundExceptionBang,
@@ -772,6 +914,7 @@ export const FinderMethods = {
   // FinderMethods, and Relation gets them by `include`; they ride the same
   // mixin here so `relation.ts` does not redeclare a second copy.
   constructRelationForExists,
+  usingLimitableReflections,
   findWithIds,
   findOne,
   findSome,
@@ -841,6 +984,20 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
     }
   }
   return relation;
+}
+
+/**
+ * Mirror Rails `using_limitable_reflections?` (finder_methods.rb:487):
+ * `reflections.none?(&:collection?)` — a set of reflections is limitable
+ * when none of them is a collection association.
+ *
+ * @internal
+ */
+export function usingLimitableReflections(
+  this: FinderRelation,
+  reflections: Array<{ isCollection(): boolean }>,
+): boolean {
+  return reflections.every((r) => !r.isCollection());
 }
 
 /** @internal */
