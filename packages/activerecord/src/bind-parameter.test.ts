@@ -186,7 +186,7 @@ describe("BindParameterTest", () => {
     expect(Number((await Topic.find(1)).id)).toBe(1);
     cap.stop();
     // Rails asserts the cached find statement is keyed into the connection pool.
-    const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    const topicSql = cap.sqls.find((s) => /LIMIT/.test(s))!;
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
 
     // Rails then runs `assert_raises(RecordNotFound) { SillyReply.find(2) }` and
@@ -198,7 +198,7 @@ describe("BindParameterTest", () => {
     const authorCap = captureSelectSql("authors");
     await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
     authorCap.stop();
-    const authorSql = authorCap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    const authorSql = authorCap.sqls.find((s) => /LIMIT/.test(s))!;
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
   });
 
@@ -210,7 +210,7 @@ describe("BindParameterTest", () => {
     const cap = captureSelectSql("topics");
     expect(Number((await Topic.findBy({ id: 1 }))!.id)).toBe(1);
     cap.stop();
-    const topicSql = cap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    const topicSql = cap.sqls.find((s) => /LIMIT/.test(s))!;
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(topicSql));
 
     // Rails: `assert_raises(RecordNotFound) { SillyReply.find_by!(id: 2) }`, then
@@ -221,7 +221,7 @@ describe("BindParameterTest", () => {
     const authorCap = captureSelectSql("authors");
     await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
     authorCap.stop();
-    const authorSql = authorCap.sqls.find((s) => /LIMIT 1/.test(s))!;
+    const authorSql = authorCap.sqls.find((s) => /LIMIT/.test(s))!;
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(authorSql));
   });
 

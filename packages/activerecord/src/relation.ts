@@ -1,14 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { except, hexdigest, isBlank, Notifications } from "@blazetrails/activesupport";
-import {
-  Table,
-  SelectManager,
-  Nodes,
-  Visitors,
-  UpdateManager,
-  DeleteManager,
-  sql,
-} from "@blazetrails/arel";
+import { Table, SelectManager, Nodes, Visitors, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
@@ -278,7 +270,7 @@ export type ValuesHash = {
   annotate?: string[];
   with?: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   limit?: number | null;
-  offset?: number | null;
+  offset?: number | string | null;
   lock?: string | null;
   readonly?: boolean;
   reordering?: boolean;
@@ -975,7 +967,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#offset
    */
-  offset(value: number | null): Relation<T> {
+  offset(value: number | string | null): Relation<T> {
     return this._clone().offsetBang(value);
   }
 
@@ -2942,19 +2934,10 @@ export class Relation<T extends Base> {
     ) as Nodes.Node[];
     const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
     const primaryKey = this.primaryKey;
-    let stmtAst;
-    if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      const key = Array.isArray(primaryKey)
-        ? primaryKey.map((pk) => table.get(pk))
-        : table.get(primaryKey);
-      stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
-    } else {
-      const um = new UpdateManager().table(table).set(values);
-      for (const node of this.whereClause.predicatesWithWrappedSqlLiterals()) {
-        um.where(node);
-      }
-      stmtAst = um.ast;
-    }
+    const key = this.model.compositePrimaryKey
+      ? (primaryKey as string[]).map((pk) => table.get(pk))
+      : table.get((primaryKey as string | null) ?? null);
+    const stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
     const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execUpdate(
       updateSql,
@@ -3033,20 +3016,10 @@ export class Relation<T extends Base> {
     ) as Nodes.Node[];
     const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
     const primaryKey = this.model.primaryKey;
-    let stmtAst;
-    if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      const key = Array.isArray(primaryKey)
-        ? primaryKey.map((pk) => table.get(pk))
-        : table.get(primaryKey);
-      stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
-    } else {
-      // No primary key — fall back to a plain DeleteManager.
-      const dm = new DeleteManager().from(table);
-      for (const node of this.whereClause.predicatesWithWrappedSqlLiterals()) {
-        dm.where(node);
-      }
-      stmtAst = dm.ast;
-    }
+    const key = this.model.compositePrimaryKey
+      ? (primaryKey as string[]).map((pk) => table.get(pk))
+      : table.get((primaryKey as string | null) ?? null);
+    const stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
 
     const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
     const count = await this._conn().execDelete(

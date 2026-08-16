@@ -1,7 +1,9 @@
 import { Nodes } from "@blazetrails/arel";
-import { assertValidKeys } from "@blazetrails/activesupport";
+import { assertValidKeys, isBlank } from "@blazetrails/activesupport";
 
 import { JoinDependency } from "../associations/join-dependency.js";
+import { Relation } from "../relation.js";
+import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
 import {
   arelColumns,
@@ -27,6 +29,36 @@ export class Merger {
     this.values = typeof other.values === "function" ? other.values() : {};
   }
 
+  /**
+   * Mirrors: `ActiveRecord::Relation::Merger::NORMAL_VALUES`
+   * (merger.rb:52-56) — `Relation::VALUE_METHODS - Relation::CLAUSE_METHODS -
+   * [...]`.
+   *
+   * Ruby resolves `Relation::VALUE_METHODS` in the class body under Zeitwerk;
+   * ESM would have to evaluate `relation.ts` while it is still mid-eval
+   * (relation.ts -> spawn-methods.ts -> merger.ts -> relation.ts), so the
+   * constant is read at call time — where Ruby's autoload resolves it — via a
+   * static getter. See CLAUDE.md, "Call-time constant resolution".
+   */
+  static get NORMAL_VALUES(): readonly ValueMethod[] {
+    return Relation.VALUE_METHODS.filter(
+      (name) =>
+        !(Relation.CLAUSE_METHODS as readonly string[]).includes(name) &&
+        ![
+          "select",
+          "includes",
+          "preload",
+          "joins",
+          "leftOuterJoins",
+          "order",
+          "reverseOrder",
+          "lock",
+          "createWith",
+          "reordering",
+        ].includes(name),
+    );
+  }
+
   // Rails' Merger#merge mutates the relation it is given and returns it
   // (merger.rb) — it does NOT clone. Non-destructive `merge` gets its fresh copy
   // from `spawn` before ever reaching here (SpawnMethods#merge = `spawn.merge!`),
@@ -35,10 +67,24 @@ export class Merger {
   // performMerge in spawn-methods.ts.
   merge(): any {
     const rel = this.relation;
-    this.mergeUnscope(rel);
-    this.mergeExtending(rel);
-    this.mergeCtes(rel);
-    this.mergeEagerLoad(rel);
+    for (const name of Merger.NORMAL_VALUES) {
+      const value = this.values[name];
+      // The unless clause is here mostly for performance reasons (since the `send` call might be
+      // moderately expensive), most of the time the value is going to be `nil` or `.blank?`, the
+      // only catch is that `false.blank?` returns `true`, so there needs to be an extra check so
+      // that explicit `false` values don't fall through the cracks.
+      if (value == null || (isBlank(value) && value !== false)) continue;
+      const bang = `${name}Bang`;
+      if (Array.isArray(value)) rel[bang](...value);
+      else rel[bang](value);
+    }
+    // `references_values` has a trails-only sidecar, `_manualReferences`,
+    // marking the refs a caller asked for explicitly (vs. those inferred from an
+    // `includes`). `references!` does not maintain it, so the loop's
+    // `references` step cannot carry it and it rides along here.
+    for (const ref of this.other._manualReferences ?? []) {
+      if (!rel._manualReferences.includes(ref)) rel._manualReferences.push(ref);
+    }
 
     if (this.other._isNone) rel._isNone = true;
 
@@ -52,33 +98,6 @@ export class Merger {
     return rel;
   }
 
-  // Rails merges `with` through the NORMAL_VALUES loop (`relation.with!(*value)`),
-  // appending the other relation's CTEs. trails stores them in `withValues`; mirror
-  // the append so a merged relation keeps both sides' common table expressions.
-  private mergeCtes(rel: any): void {
-    if (this.other.withValues?.length > 0)
-      rel.withValues = [...rel.withValues, ...this.other.withValues];
-  }
-
-  // Rails merger.rb processes :unscope as a NORMAL_VALUE: before the clauses are
-  // merged it calls `relation.unscope!(*value)`, re-applying the other relation's
-  // resets to the merged relation. This is what lets
-  // `where(...).merge(unscope(:where))` clear the accumulated where clause.
-  private mergeUnscope(rel: any): void {
-    const unscopeValues = this.other.unscopeValues ?? [];
-    if (unscopeValues.length > 0) rel.unscopeBang(...unscopeValues);
-  }
-
-  // Rails merges :extending through the NORMAL_VALUES loop
-  // (`relation.extending!(*value)`, merger.rb:58-67). This is how
-  // `target_scope.merge!(association_scope)` (association.rb:307) carries the
-  // reflection's extension modules — mixed in at association_scope.rb:28 —
-  // onto the association's own scope.
-  private mergeExtending(rel: any): void {
-    const extendingValues = this.other.extendingValues ?? [];
-    if (extendingValues.length > 0) rel.extendingBang(...extendingValues);
-  }
-
   private mergeSelectValues(rel: any): void {
     // Mirrors Rails' Merger#merge_select_values: union (`|=`) the other
     // relation's select_values into ours rather than replacing. When the two
@@ -90,14 +109,6 @@ export class Merger {
     const columns =
       this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
     rel._selectBang(...columns);
-  }
-
-  // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
-  // loop (`relation.eager_load!(*value)`, merger.rb:52-68), not as part of
-  // merge_preloads — it crosses the model boundary untouched.
-  private mergeEagerLoad(rel: any): void {
-    const otherEagerLoad = this.other.eagerLoadValues;
-    if (otherEagerLoad.length > 0) rel.eagerLoadBang(...otherEagerLoad);
   }
 
   private mergePreloads(rel: any): void {
@@ -235,41 +246,13 @@ export class Merger {
         ? [...this.other.orderValues]
         : this.other.orderValues.map((c: unknown) => this.qualifyOrderForOther(c));
     }
-    if (this.other.groupValues && this.other.groupValues.length > 0) {
-      rel.groupValues = [...rel.groupValues, ...this.other.groupValues];
-    }
-    if (this.other.annotateValues && this.other.annotateValues.length > 0) {
-      rel.annotateValues = [...rel.annotateValues, ...this.other.annotateValues];
-    }
-    if (this.other.referencesValues) {
-      for (const ref of this.other.referencesValues) {
-        if (!rel.referencesValues.includes(ref))
-          rel.referencesValues = [...rel.referencesValues, ref];
-      }
-    }
-    if (this.other._manualReferences) {
-      for (const ref of this.other._manualReferences) {
-        if (!rel._manualReferences.includes(ref)) rel._manualReferences.push(ref);
-      }
-    }
   }
 
+  // Mirrors merge_single_values (merger.rb:169-174).
   private mergeSingleValues(rel: any): void {
-    if (this.other.limitValue !== null && this.other.limitValue !== undefined) {
-      rel.limitValue = this.other.limitValue;
-    }
-    if (this.other.offsetValue !== null && this.other.offsetValue !== undefined) {
-      rel.offsetValue = this.other.offsetValue;
-    }
-    if (this.other.distinctValue) rel.distinctValue = true;
-    if (this.other.lockValue) rel.lockValue = this.other.lockValue;
-    if (this.other.readonlyValue) rel.readonlyValue = true;
-    if (this.other.skipQueryCacheValue) rel.skipQueryCacheValue = true;
-    if (this.other.strictLoadingValue != null)
-      rel.strictLoadingValue = this.other.strictLoadingValue;
-    // Mirrors merge_single_values (merger.rb): create_with merges hash-wise with
-    // the other relation's values winning (last-wins precedence).
-    if (this.other.createWithValue && Object.keys(this.other.createWithValue).length > 0) {
+    if (this.other.lockValue) rel.lockValue ||= this.other.lockValue;
+
+    if (!isBlank(this.other.createWithValue)) {
       rel.createWithValue = { ...(rel.createWithValue ?? {}), ...this.other.createWithValue };
     }
   }
@@ -302,45 +285,6 @@ export class Merger {
 }
 
 /**
- * Rails `Relation::VALUE_METHODS` (relation.rb:54-65) — the union of
- * MULTI_VALUE_METHODS, SINGLE_VALUE_METHODS, and CLAUSE_METHODS — expressed as
- * trails' camelCase keys. These are the only keys a hash `merge` accepts; each
- * dispatches to the matching value-method bang setter on the built relation.
- */
-const VALUE_METHODS = [
-  // MULTI_VALUE_METHODS
-  "includes",
-  "eagerLoad",
-  "preload",
-  "select",
-  "group",
-  "order",
-  "joins",
-  "leftOuterJoins",
-  "references",
-  "extending",
-  "unscope",
-  "optimizerHints",
-  "annotate",
-  "with",
-  // SINGLE_VALUE_METHODS
-  "limit",
-  "offset",
-  "lock",
-  "readonly",
-  "reordering",
-  "strictLoading",
-  "reverseOrder",
-  "distinct",
-  "createWith",
-  "skipQueryCache",
-  // CLAUSE_METHODS
-  "where",
-  "having",
-  "from",
-];
-
-/**
  * Merges a hash of value-method directives into a Relation.
  *
  * Mirrors: ActiveRecord::Relation::HashMerger. Rails validates the hash keys
@@ -354,7 +298,7 @@ export class HashMerger {
 
   constructor(relation: any, hash: Record<string, unknown>) {
     // Rails `HashMerger#initialize`: `hash.assert_valid_keys(*VALUE_METHODS)`.
-    assertValidKeys(hash, VALUE_METHODS);
+    assertValidKeys(hash, Relation.VALUE_METHODS as string[]);
     this.relation = relation;
     this.hash = hash;
   }

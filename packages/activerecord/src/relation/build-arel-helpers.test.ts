@@ -191,15 +191,24 @@ describe("Relation private build-arel helpers", () => {
   });
 });
 
+// `offset!` stores the raw value (query_methods.rb:1231-1234); `build_arel`
+// applies `offset_value.to_i` (:1758), so the truncation shows up in the SQL
+// and not in `offset_value`.
 describe("Relation#offset float truncation", () => {
   it("truncates float offset to integer via Math.trunc", () => {
     const r = relation().offset(1.7);
-    expect((r as any).offsetValue).toBe(1);
+    expect((r as any).offsetValue).toBe(1.7);
+    expect(r.toSql()).toContain("OFFSET 1");
   });
 
   it("emits OFFSET 1 in SQL when offset(1.7) is called", () => {
     const sql = relation().offset(1.7).toSql();
     expect(sql).toContain("OFFSET 1");
+  });
+
+  it("emits OFFSET 5 in SQL when offset is a numeric string", () => {
+    const sql = relation().offset("5").toSql();
+    expect(sql).toContain("OFFSET 5");
   });
 });
 

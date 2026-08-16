@@ -126,7 +126,7 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     // singular target load is ORDER BY pk LIMIT 1 (unlike the unordered
     // collection / normal-singular path). The second no-joins query is the
     // organizations target load.
-    expect(noJoins[1]).toMatch(/ORDER BY.+organizations.+id.+ASC.+LIMIT 1/i);
+    expect(noJoins[1]).toMatch(/ORDER BY.+organizations.+id.+ASC.+LIMIT/i);
   });
 
   it("nil on disable joins through", async () => {

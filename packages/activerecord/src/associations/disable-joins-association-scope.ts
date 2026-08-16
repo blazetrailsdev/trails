@@ -286,8 +286,9 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // Rails: `scope.merge!(relation.except(:select, :create_with, :includes,
       // :preload, :eager_load, :joins, :left_outer_joins))`
       // (disable_joins_association_scope.rb:36). `except` removes the value
-      // only — it must NOT record `unscope_values`, or `Merger#mergeUnscope`
-      // would replay the resets into `scope` and erase its own parts.
+      // only — it must NOT record `unscope_values`, or the `unscope` step of
+      // `Merger#merge`'s NORMAL_VALUES loop (merger.rb:57-66) would replay the
+      // resets into `scope` and erase its own parts.
       const stripped = (sfa as { except: (...keys: ExceptKey[]) => unknown }).except(
         "select",
         "createWith",
