@@ -13,12 +13,12 @@
  *      joined / de-duplicated (Rails `calculate`, calculations.rb:231-238, sets
  *      `select_values = Array(model.primary_key)` and counts distinctly).
  *   2. `groupedCompositeAssoc` (grouped calc keyed by a composite-FK belongs_to)
- *      emitted `_applyJoinsToManager(manager)` WITHOUT the `eagerJd` argument, so
+ *      emitted `buildJoins(manager)` WITHOUT the `eagerJd` argument, so
  *      `eager_load(:x).group(:composite_fk_belongs_to).count/.sum` never folded
  *      its eager JD through the shared emitter.
  *
  * Both now take their relation from `apply_join_dependency` and emit through
- * `_applyJoinsToManager(manager)`, so one `AliasTracker` spans the manual joins
+ * `buildJoins(manager)`, so one `AliasTracker` spans the manual joins
  * and the eager JD (a coinciding association dedups via `walk`).
  */
 import { describe, it, expect, beforeAll } from "vitest";

@@ -5,8 +5,8 @@
  * (query_methods.rb:1894) across every join dependency in `build_joins`, so a
  * `merge` that brings an association join onto a table the outer relation
  * already joins is aliased (`authors_categorizations`). Trails builds that
- * tracker through the converged `Relation#aliasTracker` at each `build_joins`
- * call site (`buildJoins` / `_applyJoinsToManager`) and then seeds it here
+ * tracker through the converged `Relation#aliasTracker` in `build_joins`
+ * (`buildJoins`) and then seeds it here
  * with the resolved `_joinClauses` tables — a trails-only step: Rails has no
  * `_joinClauses` (its raw join clauses ride `joins_values` as Arel nodes and
  * are counted by `initial_count_for`), so their pre-resolved tables must be

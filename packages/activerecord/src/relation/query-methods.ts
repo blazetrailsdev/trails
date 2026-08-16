@@ -309,7 +309,7 @@ export function referencesFromConditions(conditions: unknown): string[] {
 // trails' Cte/UnionAll operands must be visitable AST nodes, so both branches
 // resolve to the SelectStatement node — `nested` is threaded to match Rails'
 // reduction shape and the single-element unwrap below. A relation whose SQL
-// `_buildSelectManager` cannot fully encode (set-op/eager body) returns null and
+// `buildArel` cannot fully encode (set-op/eager body) returns null and
 // falls back to its inlined SQL as a bare `SqlLiteral`.
 function buildCteLeaf(q: unknown, nested: boolean): Nodes.Node {
   if (typeof q === "string") return new Nodes.Grouping(Arel.sql(q) as any);
@@ -2866,13 +2866,11 @@ export function buildJoinBuckets(
 
 /**
  * Resolved inputs for `emitJoinPlan` — the bucket-routed join nodes plus the
- * stashed JoinDependencies to fold into the primary named/left JD. Both the
- * live SQL path (`_applyJoinsToManager`) and the `from(relation)` subquery path
- * (`buildJoins`) compute a plan and hand it to the shared emitter, so there is
- * one Rails `build_joins` port. Both fill the plan the same way for eager
- * loading — the eager JoinDependency rides in `joins_values` (Rails
- * `apply_join_dependency`) and is stashed from there — and differ only in
- * `aliases` (only the subquery path threads a tracker in from `build_from`).
+ * stashed JoinDependencies to fold into the primary named/left JD. `buildJoins`
+ * computes a plan and hands it to the shared emitter. The eager JoinDependency
+ * rides in `joins_values` (Rails `apply_join_dependency`) and is stashed from
+ * there; `aliases` is threaded in only by the `from(relation)` subquery path,
+ * from `build_from`.
  *
  * @internal
  */
@@ -2914,8 +2912,7 @@ export interface JoinEmissionPlan {
 /**
  * Single shared port of Rails `build_joins` (query_methods.rb:1881) emission:
  * given a resolved {@link JoinEmissionPlan}, push every join node onto the
- * Arel `SelectManager`. Both `_applyJoinsToManager` (live `toSql`/`toArel`) and
- * `buildJoins` (`from(relation)` subquery) delegate here so the left_outer/joins
+ * Arel `SelectManager`. `buildJoins` delegates here so the left_outer/joins
  * dedup fold (PR #3501 / #3890) lives in exactly one place and cannot re-drift.
  *
  * @internal
@@ -2943,8 +2940,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
   // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
-  // (query_methods.rb:1891). Built by the caller (`buildJoins` /
-  // `_applyJoinsToManager`, the two halves of the `build_joins` split) via the
+  // (query_methods.rb:1891). Built by the caller (`buildJoins`) via the
   // converged `Relation#aliasTracker` and threaded in on the plan. Seeding it
   // with the leading-join + join-node tables means a JoinDependency joining a
   // table already claimed by a leading/raw join node is re-aliased to its
