@@ -1,132 +1,98 @@
 /**
- * ActiveSupport::OrderedOptions
+ * Mirrors: ActiveSupport::OrderedOptions
+ * (activesupport/lib/active_support/ordered_options.rb).
  *
- * A Hash-like object that supports method_missing access (get/set via property names).
- * Commonly used for Rails configuration objects.
+ * Rails' class is `OrderedOptions < Hash`, so every Hash method IS the API and
+ * the class itself overrides only `[]=`, `[]`, `dig`, `method_missing`,
+ * `respond_to_missing?`, `extractable_options?` and `inspect`
+ * (ordered_options.rb:33-70). TypeScript has no Hash to subclass, so — exactly
+ * as `HashWithIndifferentAccess` does — the Hash storage is a private `Map` and
+ * the Hash members this class is actually used through are spelled by
+ * docs/ruby-ts-conventions.md (`[]` → `get`, `[]=` → `set`, `key?` → `isKey`).
  *
- * Rails:
- *   opts = ActiveSupport::OrderedOptions.new
- *   opts.boy = "John"
- *   opts.boy        # => "John"
- *   opts.girl?      # => false
- *   opts.key?(:boy) # => true
- *
- * TypeScript uses a Proxy to support arbitrary property access.
+ * `method_missing` is a `Proxy`: property reads and writes that do not name a
+ * member fall through to the Hash, which is what makes `opts.boy = "John"`
+ * work.
  */
 
+import { presence } from "./core-ext/object/blank.js";
+import { KeyError } from "./core-ext/key-error.js";
+
 export class OrderedOptions {
-  private readonly _data: Map<string, unknown>;
+  private readonly data: Map<string, unknown>;
+
+  /**
+   * Ruby's Hash default block (`Hash.new { |h, k| … }`), the hook
+   * `InheritableOptions` hands its parent lookup to (ordered_options.rb:90-99).
+   * Only the un-overridden read (`_get`) consults it, as in Ruby.
+   */
+  protected defaultBlock?: (key: string) => unknown;
 
   constructor(initial: Record<string, unknown> = {}) {
-    this._data = new Map(Object.entries(initial));
+    this.data = new Map(Object.entries(initial));
     return new Proxy(this, {
-      get(target, prop: string | symbol) {
-        if (typeof prop === "symbol" || prop in target) {
-          const val = (target as any)[prop];
-          return typeof val === "function" ? val.bind(target) : val;
+      // Mirrors `method_missing` (ordered_options.rb:49-58) and
+      // `respond_to_missing?` (:60-62), which answers true for every name.
+      get(target, method: string | symbol) {
+        if (typeof method === "symbol" || method in target) {
+          const value = (target as any)[method];
+          return typeof value === "function" ? value.bind(target) : value;
         }
-        // <key>? → boolean presence check
-        if (prop.endsWith("?")) {
-          const key = prop.slice(0, -1);
+        if (method.endsWith("!")) {
+          const nameString = method.slice(0, -1);
           return () => {
-            const v = target._data.get(key);
-            return v !== undefined && v !== null && v !== false && v !== "";
+            const value = presence(target.get(nameString));
+            if (value === undefined) throw new KeyError(`:${nameString} is blank`);
+            return value;
           };
         }
-        // <key>! → value or throw
-        if (prop.endsWith("!")) {
-          const key = prop.slice(0, -1);
-          return () => {
-            const v = target._data.get(key);
-            if (v === undefined || v === null) {
-              throw new Error(`:${key} is blank`);
-            }
-            return v;
-          };
-        }
-        return target._data.get(prop);
+        return target.get(method);
       },
-      set(target, prop: string | symbol, value: unknown) {
-        if (typeof prop === "symbol" || prop in target) {
-          (target as any)[prop] = value;
+      set(target, method: string | symbol, value: unknown) {
+        if (typeof method === "symbol" || method in target) {
+          (target as any)[method] = value;
           return true;
         }
-        target._data.set(prop, value);
+        target.set(method, value);
         return true;
       },
-      has(target, prop: string | symbol) {
-        if (typeof prop === "symbol" || prop in target) return true;
-        return target._data.has(prop);
+      has(target, method: string | symbol) {
+        if (typeof method === "symbol" || method in target) return true;
+        return target.isKey(method);
       },
     });
   }
 
-  // -------------------------------------------------------------------------
-  // Hash-like interface
-  // -------------------------------------------------------------------------
-
   /**
    * Mirrors `alias_method :_get, :[]` (ordered_options.rb:34-35) — the
-   * original, un-overridden Hash read, kept so InheritableOptions can reach a
-   * parent's own storage without going through the subclass's `[]`.
+   * original, un-overridden Hash read, kept so `InheritableOptions` can reach a
+   * parent's own storage without going through the subclass's `[]`. Being the
+   * Hash read, it is the one that runs the default block.
    */
   protected _get(key: string): unknown {
-    return this._data.get(key);
+    if (this.data.has(key)) return this.data.get(key);
+    return this.defaultBlock?.(key);
   }
 
-  get(key: string): unknown {
-    return this._data.get(key);
-  }
+  /** Mirrors `[]=` (ordered_options.rb:37-39). */
   set(key: string, value: unknown): this {
-    this._data.set(key, value);
+    this.data.set(String(key), value);
     return this;
   }
-  key(value: unknown): string | undefined {
-    for (const [k, v] of this._data) if (v === value) return k;
-    return undefined;
-  }
-  has(key: string): boolean {
-    return this._data.has(key);
-  }
-  delete(key: string): boolean {
-    return this._data.delete(key);
-  }
-  keys(): string[] {
-    return [...this._data.keys()];
-  }
-  values(): unknown[] {
-    return [...this._data.values()];
-  }
-  entries(): [string, unknown][] {
-    return [...this._data.entries()];
-  }
-  toObject(): Record<string, unknown> {
-    return Object.fromEntries(this._data);
-  }
-  toH(): Record<string, unknown> {
-    return this.toObject();
+
+  /** Mirrors `[]` (ordered_options.rb:41-43). */
+  get(key: string): unknown {
+    return this._get(String(key));
   }
 
-  /** dig — nested key lookup */
-  dig(...keys: string[]): unknown {
-    let val: unknown = this.toObject();
-    for (const key of keys) {
-      if (val == null || typeof val !== "object") return undefined;
-      val = (val as any)[key];
+  /** Mirrors `dig` (ordered_options.rb:45-47). */
+  dig(key: string, ...identifiers: string[]): unknown {
+    let value = this.get(String(key));
+    for (const identifier of identifiers) {
+      if (value == null || typeof value !== "object") return undefined;
+      value = (value as any)[identifier];
     }
-    return val;
-  }
-
-  /** each — iterate over key/value pairs */
-  each(fn: (key: string, value: unknown) => void): void {
-    for (const [k, v] of this._data) fn(k, v);
-  }
-
-  get count(): number {
-    return this._data.size;
-  }
-  get size(): number {
-    return this._data.size;
+    return value;
   }
 
   /** Mirrors `extractable_options?` (ordered_options.rb:64-66). */
@@ -134,71 +100,100 @@ export class OrderedOptions {
     return true;
   }
 
-  /** inspect — like Ruby's inspect */
+  /** Mirrors `inspect` (ordered_options.rb:68-70). */
   inspect(): string {
-    const pairs = [...this._data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
-    return `#<OrderedOptions {${pairs.join(", ")}}>`;
+    const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    return `#<${this.constructor.name} {${pairs.join(", ")}}>`;
   }
 
   toString(): string {
     return this.inspect();
   }
 
-  /** dup — shallow copy */
+  // -- Hash members, which Rails inherits rather than defining --
+
+  /** `Hash#key?` — the un-overridden membership test. */
+  isKey(key: string): boolean {
+    return this.data.has(key);
+  }
+
+  /** `Hash#key` — the first key holding `value`. */
+  key(value: unknown): string | undefined {
+    for (const [k, v] of this.data) if (v === value) return k;
+    return undefined;
+  }
+
+  /** `Hash#keys`. */
+  keys(): string[] {
+    return [...this.data.keys()];
+  }
+
+  /** `Hash#entries` / `Hash#to_a`. */
+  entries(): [string, unknown][] {
+    return [...this.data.entries()];
+  }
+
+  /** `Hash#to_h`. */
+  toH(): Record<string, unknown> {
+    return Object.fromEntries(this.data);
+  }
+
+  /** `Hash#each`. */
+  each(fn: (key: string, value: unknown) => void): this {
+    for (const [k, v] of this.data) fn(k, v);
+    return this;
+  }
+
+  /** `Hash#count`. */
+  get count(): number {
+    return this.data.size;
+  }
+
+  /** `Object#dup`. */
   dup(): OrderedOptions {
-    return new OrderedOptions(this.toObject());
+    return new OrderedOptions(this.toH());
   }
 }
 
 /**
- * InheritableOptions — like OrderedOptions but falls through to a parent.
+ * Mirrors: ActiveSupport::InheritableOptions (ordered_options.rb:88-146).
+ *
+ * The parent lookup is Rails' Hash default block, not a hand-written read
+ * override: the constructor installs `defaultBlock`, so the un-overridden
+ * `_get` finds the parent's value exactly where Ruby's Hash does — and, as
+ * Rails documents at ordered_options.rb:92, an `OrderedOptions` parent is read
+ * through the faster `_get`.
  */
 export class InheritableOptions extends OrderedOptions {
-  private readonly _parent: OrderedOptions | null;
+  private readonly parent: OrderedOptions | Record<string, unknown>;
 
   constructor(parent: OrderedOptions | null = null, initial: Record<string, unknown> = {}) {
     super(initial);
-    this._parent = parent;
-    const self = this;
-    return new Proxy(this, {
-      get(target, prop: string | symbol) {
-        if (
-          typeof prop === "symbol" ||
-          prop in OrderedOptions.prototype ||
-          prop in InheritableOptions.prototype
-        ) {
-          const val = (target as any)[prop];
-          return typeof val === "function" ? val.bind(target) : val;
-        }
-        const strProp = prop;
-        if (strProp.endsWith("?")) {
-          const key = strProp.slice(0, -1);
-          return () => {
-            const local = (target as any)._data.get(key);
-            if (local !== undefined) return local !== null && local !== false && local !== "";
-            if (self._parent) return (self._parent as any)._data.get(key) !== undefined;
-            return false;
-          };
-        }
-        if (strProp.endsWith("!")) {
-          const key = strProp.slice(0, -1);
-          return () => {
-            const v = (target as any)._data.get(key) ?? self._parent?.get(key);
-            if (v === undefined || v === null) throw new Error(`:${key} is blank`);
-            return v;
-          };
-        }
-        const local = (target as any)._data.get(strProp);
-        if (local !== undefined) return local;
-        return self._parent?.get(strProp);
-      },
-    });
+    if (parent instanceof OrderedOptions) {
+      this.parent = parent;
+      this.defaultBlock = (k) => (parent as any)._get(k);
+    } else if (parent) {
+      this.parent = parent;
+      this.defaultBlock = (k) => (parent as Record<string, unknown>)[k];
+    } else {
+      this.parent = {};
+    }
   }
 
-  override get(key: string): unknown {
-    const local = super.get(key);
-    if (local !== undefined) return local;
-    return this._parent?.get(key);
+  /** Mirrors `to_h` (ordered_options.rb:100-102). */
+  override toH(): Record<string, unknown> {
+    return { ...this.parentToH(), ...super.toH() };
+  }
+
+  /** Mirrors `inspect` (ordered_options.rb:108-110). */
+  override inspect(): string {
+    const pairs = Object.entries(this.toH()).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+    return `#<${this.constructor.name} {${pairs.join(", ")}}>`;
+  }
+
+  /** Mirrors `to_s` (ordered_options.rb:112-114). */
+  override toString(): string {
+    return this.inspect();
   }
 
   /**
@@ -206,26 +201,37 @@ export class InheritableOptions extends OrderedOptions {
    * un-overridden `key?`, which sees only this object's own entries.
    */
   protected ownKey(key: string): boolean {
-    return super.has(key);
+    return super.isKey(key);
   }
 
   /** Mirrors `key?` (ordered_options.rb:126-128). */
-  override has(key: string): boolean {
-    return super.has(key) || (this._parent?.has(key) ?? false);
+  override isKey(key: string): boolean {
+    return super.isKey(key) || this.parentIsKey(key);
   }
 
   /** Mirrors `overridden?` (ordered_options.rb:130-132). */
   isOverridden(key: string): boolean {
-    return !!(this._parent && this._parent.has(key) && this.ownKey(key));
+    return !!(this.parent && this.parentIsKey(key) && this.ownKey(String(key)));
   }
 
-  /** inheritable_copy — new InheritableOptions parented to self */
+  /** Mirrors `inheritable_copy` (ordered_options.rb:134-136). */
   inheritableCopy(): InheritableOptions {
     return new InheritableOptions(this);
   }
 
-  override inspect(): string {
-    const parentStr = this._parent ? `parent=${this._parent.inspect()}, ` : "";
-    return `#<InheritableOptions {${parentStr}local=${JSON.stringify(this.toObject())}}>`;
+  /** Mirrors `each` (ordered_options.rb:142-145). */
+  override each(fn: (key: string, value: unknown) => void): this {
+    for (const [k, v] of Object.entries(this.toH())) fn(k, v);
+    return this;
+  }
+
+  private parentToH(): Record<string, unknown> {
+    return this.parent instanceof OrderedOptions ? this.parent.toH() : this.parent;
+  }
+
+  private parentIsKey(key: string): boolean {
+    return this.parent instanceof OrderedOptions
+      ? this.parent.isKey(key)
+      : Object.prototype.hasOwnProperty.call(this.parent, key);
   }
 }

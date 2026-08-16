@@ -3900,22 +3900,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve this relation to the Arel SelectStatement node used as a CTE body,
-   * mirroring Rails' `build_with_expression_from_value` Relation branch
-   * (`value.arel(.ast)`). `buildArel` threads joins/wheres/from/having, so a
-   * recursive body's string JOIN survives (with_recursive). Returns null for
-   * relations whose SQL `buildArel` does not fully encode (eager-load
-   * bodies), letting the caller fall back to pre-rendered SQL.
-   * `nested` is accepted to mirror Rails' threading; both branches resolve to the
-   * AST node since trails' Cte/UnionAll operands must be visitable nodes.
-   * @internal
-   */
-  _cteBodyArelNode(_nested = false): Nodes.Node | null {
-    if (this._eagerLoadingForSql()) return null;
-    return this.toArel().ast as unknown as Nodes.Node;
-  }
-
-  /**
    * Rails `Relation#assert_modifiable!`. Raises `UnmodifiableRelation`
    * when the relation has already been loaded.
    * @internal

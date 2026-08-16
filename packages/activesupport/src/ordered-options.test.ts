@@ -136,7 +136,7 @@ describe("OrderedOptionsTest", () => {
     expect(child.get("val")).toBe("child");
     expect(child.isOverridden("val")).toBe(true);
     expect(child.isOverridden("other")).toBe(false);
-    expect(child.has("val")).toBe(true);
+    expect(child.isKey("val")).toBe(true);
     expect(new InheritableOptions(parent).isOverridden("val")).toBe(false);
   });
 

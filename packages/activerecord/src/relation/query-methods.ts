@@ -2301,17 +2301,14 @@ export function buildWithExpressionFromValue(
   nested = false,
 ): unknown {
   if (value instanceof Nodes.SqlLiteral) return new Nodes.Grouping(value as any);
-  // Rails' `when ActiveRecord::Relation` arm returns `value.arel` when not
-  // nested and `value.arel.ast` when it is. trails' Cte/UnionAll operands must
-  // be visitable AST nodes, so both resolve to the SelectStatement node —
-  // `nested` is threaded to match Rails' reduction shape. `_cteBodyArelNode`
-  // is the `arel` call: it returns null for a body `buildArel` cannot fully
-  // encode (a set-op/eager-load relation), which falls back to inlined SQL.
-  if (value !== null && typeof value === "object" && "_cteBodyArelNode" in value) {
-    const node = (value as any)._cteBodyArelNode(nested);
-    return node ?? (Arel.sql((value as any).toSql()) as unknown);
+  if (value !== null && typeof value === "object" && "arel" in value) {
+    if (nested) {
+      return (value as any).arel().ast;
+    } else {
+      return (value as any).arel();
+    }
   }
-  if (value instanceof SelectManager) return value.ast;
+  if (value instanceof SelectManager) return value;
   if (Array.isArray(value)) {
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
 
