@@ -41,20 +41,22 @@ export class Merger {
    * static getter. See CLAUDE.md, "Call-time constant resolution".
    */
   static get NORMAL_VALUES(): readonly ValueMethod[] {
-    const excluded: readonly string[] = [
-      ...Relation.CLAUSE_METHODS,
-      "select",
-      "includes",
-      "preload",
-      "joins",
-      "leftOuterJoins",
-      "order",
-      "reverseOrder",
-      "lock",
-      "createWith",
-      "reordering",
-    ];
-    return Relation.VALUE_METHODS.filter((name) => !excluded.includes(name));
+    return Relation.VALUE_METHODS.filter(
+      (name) =>
+        !(Relation.CLAUSE_METHODS as readonly string[]).includes(name) &&
+        ![
+          "select",
+          "includes",
+          "preload",
+          "joins",
+          "leftOuterJoins",
+          "order",
+          "reverseOrder",
+          "lock",
+          "createWith",
+          "reordering",
+        ].includes(name),
+    );
   }
 
   // Rails' Merger#merge mutates the relation it is given and returns it
