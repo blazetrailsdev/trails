@@ -3049,16 +3049,10 @@ export class PostgreSQLAdapter
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
     void super.clearCacheBang({ newConnection });
-    // Rails wraps the whole pool mutation in `@lock.synchronize`
-    // (abstract_adapter.rb:741-747), which is what `dealloc`'s own comment
-    // relies on: "the statement pool is only accessed while holding the
-    // connection's lock" (postgresql_adapter.rb:308-310). Without it the
-    // eviction DEALLOCATEs go onto the wire beside a chain that owns the
-    // connection, and `_commandSettled` is false while they are in flight — so
-    // a rollback sampling `transactionStatus` reads PQTRANS_ACTIVE where Rails
-    // reads PQTRANS_INTRANS and fires a CancelRequest at a backend it does not
-    // own. A CancelRequest is addressed to a backend, not to a statement, so
-    // that one lands on whatever query the backend runs next.
+    // Rails wraps the pool mutation in `@lock.synchronize`
+    // (abstract_adapter.rb:741-747) — the precondition `dealloc` states
+    // outright: "the statement pool is only accessed while holding the
+    // connection's lock" (postgresql_adapter.rb:308-310).
     return this.lock.synchronize(() => {
       if (newConnection) {
         // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the

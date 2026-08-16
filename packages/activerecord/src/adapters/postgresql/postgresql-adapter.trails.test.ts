@@ -466,8 +466,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.preparedStatements = true;
         await other.execute("SELECT $1::integer AS n", [1]);
         await other.beginDbTransaction();
-        // `resetColumnInformation`'s shape (model-schema.rb:441): a sync caller
-        // that drops the returned chain.
+        // `reset_column_information`'s shape (model_schema.rb:523-524): a sync
+        // caller that drops the returned chain.
         void other.clearCacheBang();
         // The DEALLOCATE is dispatched from a microtask off the pool's chain,
         // so let the turn end before sampling — a read in the same tick sees
