@@ -33,7 +33,17 @@ async function captureUpdate(
   }
   const update = calls.find((c) => c.sql.startsWith("UPDATE"));
   if (!update) throw new Error(`no UPDATE captured; saw: ${calls.map((c) => c.sql).join(" | ")}`);
-  return update;
+  // Rails hands `ActiveModel::Attribute` binds down to the adapter, which reads
+  // `value_for_database` in `type_casted_binds` (abstract/quoting.rb:224); the
+  // assertions below are about that database value.
+  return {
+    sql: update.sql,
+    binds: update.binds.map((b) =>
+      b !== null && typeof b === "object" && "valueForDatabase" in b
+        ? (b as { valueForDatabase: unknown }).valueForDatabase
+        : b,
+    ),
+  };
 }
 
 describe("update_all value substitution", () => {

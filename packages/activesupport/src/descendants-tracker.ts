@@ -1,7 +1,7 @@
 export type AnyClass = abstract new (...args: unknown[]) => unknown;
 
 const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
-const _excludedDescendants = new globalThis.WeakSet<AnyClass>();
+let _excludedDescendants: globalThis.WeakSet<AnyClass> | null = new globalThis.WeakSet<AnyClass>();
 let _clearDisabled = false;
 
 export interface ReloadedClassesFiltering {
@@ -31,7 +31,7 @@ export namespace DescendantsTracker {
       this._addsSinceCompact = 0;
     }
 
-    has(object: T): boolean {
+    includes(object: T): boolean {
       return this._map.has(object);
     }
 
@@ -65,7 +65,7 @@ export namespace DescendantsTracker {
 
   export function subclasses(klass: AnyClass): AnyClass[] {
     const subs = _subclassMap.get(klass)?.toArray() ?? [];
-    return reject(subs);
+    return rejectBang(subs);
   }
 
   export function descendants(klass: AnyClass): AnyClass[] {
@@ -73,8 +73,11 @@ export namespace DescendantsTracker {
     return [...subs, ...subs.flatMap((s) => descendants(s))];
   }
 
-  export function disableClear(): void {
-    _clearDisabled = true;
+  export function disableClearBang(): void {
+    if (!_clearDisabled) {
+      _clearDisabled = true;
+      _excludedDescendants = null;
+    }
   }
 
   export function clear(classes: AnyClass[]): void {
@@ -84,15 +87,20 @@ export namespace DescendantsTracker {
       );
     }
     for (const klass of classes) {
-      _excludedDescendants.add(klass);
+      _excludedDescendants!.add(klass);
       for (const descendant of descendants(klass)) {
-        _excludedDescendants.add(descendant);
+        _excludedDescendants!.add(descendant);
       }
     }
   }
 
-  export function reject(classes: AnyClass[]): AnyClass[] {
-    return classes.filter((d) => !_excludedDescendants.has(d));
+  export function rejectBang(classes: AnyClass[]): AnyClass[] {
+    if (_excludedDescendants) {
+      for (let i = classes.length - 1; i >= 0; i--) {
+        if (_excludedDescendants.has(classes[i])) classes.splice(i, 1);
+      }
+    }
+    return classes;
   }
 }
 

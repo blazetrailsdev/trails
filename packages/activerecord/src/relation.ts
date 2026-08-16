@@ -3,7 +3,6 @@ import { except, hexdigest, isBlank, Notifications } from "@blazetrails/activesu
 import { Table, SelectManager, Nodes, Visitors, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
-import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
 import {
   ActiveRecordError,
   ConnectionNotEstablished,
@@ -13,10 +12,10 @@ import {
   UnknownPrimaryKey,
 } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
-import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
+
 import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
 import {
   habtmTargetFk,
@@ -536,13 +535,6 @@ export class Relation<T extends Base> {
   // that started before the reset can detect it lost the race and skip
   // committing stale records/loaded state.
   private _loadToken = 0;
-
-  // Retryability and bind values of the most recently compiled SELECT, captured
-  // in _compileSelectSql before any FROM-clause recompile can reset the shared
-  // visitor's collector. Read by toArray() to set allowRetry and pass binds.
-  private _lastSelectRetryable = false;
-  private _lastSelectBinds: unknown[] = [];
-  private _lastSelectPreparable = true;
 
   private _table: Table | null = null;
 
@@ -2491,20 +2483,14 @@ export class Relation<T extends Base> {
         loadedRecords = this._records;
         this.loadRecords(loadedRecords);
       } else {
-        const sql = this._toSql();
-        // _compileSelectSql captures the SELECT's retryability and bind values
-        // into _lastSelectRetryable/_lastSelectBinds at compile time. Reading the
-        // visitor's collector here would be wrong: from(ArelNode) recompiles and
-        // resets it.
-        const allowRetry = this._lastSelectRetryable;
+        // Rails' `_query_by_sql(arel, async: async)` (relation.rb:1449 →
+        // querying.rb:67-68): the ARel manager goes to `select_all`, which
+        // compiles it through `to_sql_and_binds` — that is where the binds,
+        // `preparable` and `allow_retry` come from.
         // Awaiting the FutureResult here is trails' `future.result` in
         // `exec_queries` (relation.rb:1408).
         const result = await this.skipQueryCacheIfNecessary(() =>
-          c.selectAll(sql, `${this.model.name} Load`, this._lastSelectBinds, {
-            allowRetry,
-            preparable: this._lastSelectPreparable,
-            async,
-          }),
+          c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
         );
         if (token !== this._loadToken) return [];
         const rows = result.toArray();
@@ -2726,11 +2712,7 @@ export class Relation<T extends Base> {
     const eagerAssociations = eagerAssocs ?? this.eagerLoadValues;
     const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
-      const sql = this._toSql();
-      const result = await this._conn().selectAll(sql, "Eager Load", this._lastSelectBinds, {
-        preparable: this._lastSelectPreparable,
-        async,
-      });
+      const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
       this._records = this._instrumentInstantiation(
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
@@ -2760,13 +2742,12 @@ export class Relation<T extends Base> {
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk, limitedIds);
     jd.applyColumnAliases(eagerRelation);
     const manager = eagerRelation.toArel();
-    const [sql, eagerBinds] = this._compileAstWithBinds(manager.ast);
 
     // Read through selectAll (not execute) so the adapter-reported result
     // column_types are available to type-cast extra/computed `select` columns
     // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
     // which slices `result_set.column_types`.
-    const result = await this._conn().selectAll(sql, "SQL", eagerBinds, { async });
+    const result = await this._conn().selectAll(manager, "SQL", [], { async });
     const rows = result.toArray();
 
     // Mirrors JoinDependency#instantiate: record_count is the raw JOIN
@@ -2895,7 +2876,7 @@ export class Relation<T extends Base> {
    * composite PK, CTEs, or a FROM override, so eager specs are
    * preloaded in those cases (a capability gap — Rails always JOINs). Kept in
    * one place so the `toArray` builder (`_executeEagerLoad`), the `toSql`
-   * builder (`_buildEagerSql`), and the calculation/exists raise-check
+   * builder (`toSql`), and the calculation/exists raise-check
    * (`_checkEagerLoadable`) agree on exactly when a JoinDependency is built.
    * @internal
    */
@@ -2939,7 +2920,7 @@ export class Relation<T extends Base> {
    * not raise either.
    *
    * Only the calculation/exists entry points call this — the `toArray` eager
-   * path builds its real JoinDependency in `_executeEagerLoad`/`_buildEagerSql`,
+   * path builds its real JoinDependency in `_executeEagerLoad`/`toSql`,
    * which raises there, so re-checking from the shared `buildJoins`
    * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
    *
@@ -3002,12 +2983,8 @@ export class Relation<T extends Base> {
       ? (primaryKey as string[]).map((pk) => table.get(pk))
       : table.get((primaryKey as string | null) ?? null);
     const stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
-    const [updateSql, updateBinds] = this._compileAstWithBinds(stmtAst);
-    const count = await this._conn().execUpdate(
-      updateSql,
-      `${this.model.name} Update All`,
-      updateBinds,
-    );
+    // Mirrors `relation.rb:618`: `c.update(stmt, "#{model} Update All")`.
+    const count = await this._conn().update(stmtAst, `${this.model.name} Update All`);
     this.reset();
     return count;
   }
@@ -3085,12 +3062,8 @@ export class Relation<T extends Base> {
       : table.get((primaryKey as string | null) ?? null);
     const stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
 
-    const [deleteSql, deleteBinds] = this._compileAstWithBinds(stmtAst);
-    const count = await this._conn().execDelete(
-      deleteSql,
-      `${this.model.name} Delete All`,
-      deleteBinds,
-    );
+    // Mirrors `relation.rb:1035`: `c.delete(stmt, "#{model} Delete All")`.
+    const count = await this._conn().delete(stmtAst, `${this.model.name} Delete All`);
     this.reset();
     return count;
   }
@@ -3578,47 +3551,31 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Generate the SQL for this relation.
+   * Returns sql statement for the relation.
+   *
+   * Mirrors: ActiveRecord::Relation#to_sql (relation.rb:1210-1222). The eager
+   * arm is Rails' `apply_join_dependency { |relation, jd| jd.apply_column_aliases(relation).to_sql }`
+   * — `_buildEagerOperandManager` is that block, and its manager is rendered
+   * through the same connection path (a null manager, e.g. an unresolvable
+   * association, falls through to the plain arel).
    */
   toSql(): string {
-    // Mirrors `model.with_connection { |c| c.unprepared_statement { c.to_sql(arel) } }`
-    // (relation.rb:1217-1218): build the same arel `_toSql` compiles and render
-    // it through the connection, which inlines binds during AST traversal via
-    // the SubstituteBinds collector. No cached node, no bespoke quoter, no
-    // post-hoc string pass.
+    let node: Nodes.Node | undefined;
     if (this._eagerLoadingForSql()) {
-      const manager = this._buildEagerOperandManager();
-      if (manager !== null) {
-        return this._toSqlViaConnection(manager.ast);
-      }
-      // null (e.g. unresolvable association): fall through to plain SQL.
+      node = this._buildEagerOperandManager()?.ast;
     }
-    return this._toSqlViaConnection(this.toArel().ast);
-  }
-
-  /**
-   * Render an Arel node to inlined display SQL through the connection, mirroring
-   * Rails' `model.with_connection { |c| c.unprepared_statement { c.to_sql(arel) } }`
-   * (relation.rb:1217-1218). The prepared-statements toggle mirrors Rails'
-   * `unprepared_statement` (abstract_adapter.rb) structurally — applied
-   * synchronously (the async `unpreparedStatement` exists for EXPLAIN, but
-   * `toSql` is sync). It is a no-op for the current output: `connection.toSql`
-   * already inlines every bind through a SubstituteBinds collector
-   * unconditionally (it never branches on `preparedStatements`), so the scope is
-   * kept only for parity should `toSql` later adopt Rails' flag-driven
-   * `collector` dispatch. There is exactly one render path: like Rails'
-   * `with_connection`, `_conn()` always yields a real connection
-   * (raising `ConnectionNotEstablished` when none is configured, as Rails does),
-   * never a quoter stand-in.
-   */
-  private _toSqlViaConnection(node: Nodes.Node): string {
-    const adapter = this._conn();
-    const wasPrepared = adapter.preparedStatements;
-    adapter.preparedStatements = false;
+    node ??= this.toArel().ast;
+    // `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`
+    // (relation.rb:1217-1218), applied synchronously: `to_sql` is sync here, so
+    // the flag is saved and restored around the render rather than through the
+    // async `unpreparedStatement` wrapper.
+    const conn = this._conn();
+    const wasPrepared = conn.preparedStatements;
+    conn.preparedStatements = false;
     try {
-      return adapter.toSql(node);
+      return conn.toSql(node);
     } finally {
-      adapter.preparedStatements = wasPrepared;
+      conn.preparedStatements = wasPrepared;
     }
   }
 
@@ -3632,24 +3589,6 @@ export class Relation<T extends Base> {
     return Notifications.instrument("instantiation.active_record", payload, () =>
       rows.map((row) => this._model._instantiate(row, block as never, columnTypes) as T),
     );
-  }
-
-  private _toSql(): string {
-    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
-    if (this._eagerLoadingForSql()) {
-      const eagerSql = this._buildEagerSql();
-      if (eagerSql !== null) return eagerSql;
-      // If _buildEagerSql returns null (e.g. unresolvable association),
-      // fall through to plain SQL so toSql() always returns something useful.
-    }
-
-    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
-    // annotate() comments are folded into the manager AST by `buildArel`, so a
-    // single collector numbers every bind in document order (CTE binds precede
-    // the main query's; PG `$N` placeholders fall out correctly by
-    // construction) — replacing the former post-compile string splice and its
-    // manual `$N` renumbering.
-    return this._compileSelectSql(this.toArel());
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -3805,10 +3744,11 @@ export class Relation<T extends Base> {
     basePk: string | string[],
   ): Promise<unknown[]> {
     const distinctSelect = this._distinctSelectForLimitedIds(basePk);
-    const [idSql, idBinds] = this._compileAstWithBinds(
-      this._buildEagerIdSubquery(jd, basePk, distinctSelect).ast,
+    const idResult = await this._conn().selectAll(
+      this._buildEagerIdSubquery(jd, basePk, distinctSelect),
+      "SQL",
     );
-    const idRows = await this._conn().execute(idSql, idBinds);
+    const idRows = (await idResult).toArray();
     // Rails `results.last(Array(relation.primary_key).length)`
     // (schema_statements.rb:1441) — a composite key yields one tuple per row.
     if (Array.isArray(basePk)) return idRows.map((row) => basePk.map((column) => row[column]));
@@ -3835,7 +3775,7 @@ export class Relation<T extends Base> {
     // `columns_for_distinct`. Rails maps over `Array(relation.primary_key)`
     // (schema_statements.rb:1430), so a composite key contributes every column.
     const pkColumns = (Array.isArray(basePk) ? basePk : [basePk]).map((column) =>
-      this._arelVisitor().compile(table.get(column)),
+      this._conn().toSql(table.get(column)),
     );
     const pkSql = pkColumns.length === 1 ? pkColumns[0] : pkColumns;
     const adapter = this._conn() as unknown as {
@@ -3866,22 +3806,10 @@ export class Relation<T extends Base> {
     return Array.isArray(values) ? values.join(", ") : values;
   }
 
-  // Mirrors: ActiveRecord::Relation#to_sql when eager_loading? — builds the
-  // JoinDependency (alias-projecting) SQL synchronously for toSql()/parity
-  // runner use. Rails routes this through apply_join_dependency, whose inner
-  // `relation.to_sql` re-enters build_arel — so CTEs (`WITH`) and annotate()
-  // comments fold in through `buildArel` on the yielded eager relation.
-  // Returns null if no eager associations could be joined (fall back to plain SQL).
-  private _buildEagerSql(): string | null {
-    const manager = this._buildEagerOperandManager();
-    if (manager === null) return null;
-    return this._compileSelectSql(manager);
-  }
-
   /**
    * Build the eager-load JoinDependency SelectManager (column aliases + LEFT
    * OUTER JOINs), or null when this relation has no resolvable eager loading.
-   * Shared by _buildEagerSql (string path) and the set-operation operand
+   * Shared by `toSql` (string path) and the set-operation operand
    * builder, which composes it into the compound's single collector.
    */
   private _buildEagerOperandManager(): SelectManager | null {
@@ -3928,96 +3856,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Wrap each `annotate` value in a `/* … *\/` comment, sanitizing through the
-   * connection so the adapter's own comment-escaping rules apply — mirrors
-   * Rails' arel comment visitor, which delegates to
-   * `@connection.sanitize_as_sql_comment`. Falls back to the abstract helper
-   * when no connection is established (e.g. `toSql` on an unconnected model).
-   */
-  private _annotationComments(): string {
-    // Mirror `_selectVisitor`/`_arelVisitor`: tolerate a partial/mock adapter
-    // that satisfies the `DatabaseAdapter` cast but omits `sanitizeAsSqlComment`
-    // (as several fixture/schema test helpers do), degrading to the abstract
-    // helper instead of throwing. `?.bind` also handles the unconnected case.
-    const adapter = this._resolveAdapter();
-    const sanitize = adapter?.sanitizeAsSqlComment?.bind(adapter) ?? sanitizeAsSqlComment;
-    // Mirror build_arel: uniq the annotate values when more than one before
-    // rendering the comment node (query_methods.rb `annotates.uniq`).
-    const annotations =
-      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
-    return annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
-  }
-
-  private _arelVisitor(): Visitors.ToSql {
-    // `_conn()` (not `_resolveAdapter()`) so an unconnected model raises
-    // ConnectionNotEstablished, as Rails does — the connection-less ANSI
-    // fallback this used to reach was the invention RFC 0007 deleted.
-    const adapter = this._conn();
-    return adapter.visitor ?? new Visitors.ToSql(adapter);
-  }
-
-  /** Returns the adapter's visitor when defined, or null. */
-  private _selectVisitor(): Visitors.ToSql | null {
-    return this._resolveAdapter()?.visitor ?? null;
-  }
-
-  /**
-   * Compile a SelectManager's AST through the adapter visitor (`_arelVisitor`).
-   * Sets _lastSelectRetryable and _lastSelectBinds for the execution call sites.
-   */
-  private _compileSelectSql(manager: { ast: Nodes.Node; toSql(): string }): string {
-    // Rails: `if prepared_statements ... else sql = visitor.compile(arel, collector)`
-    // (database_statements.rb:31-45) — with prepared statements off the
-    // collector is a `SubstituteBinds`, so every value inlines and `binds` is
-    // empty. Route through the connection's own `to_sql_and_binds` rather than
-    // `to_sql` so `allow_retry` is the collector's post-traversal `retryable`
-    // (rb:45), which a visitor can lower mid-compile (arel to_sql.rb:764-771).
-    const conn = this._conn();
-    if (conn.preparedStatements === false) {
-      const [inlinedSql, , inlinedPreparable, inlinedAllowRetry] = conn.toSqlAndBinds(
-        manager,
-      ) as unknown as [string, unknown[], boolean | null, boolean];
-      this._lastSelectBinds = [];
-      this._lastSelectPreparable = inlinedPreparable === true;
-      this._lastSelectRetryable = inlinedAllowRetry;
-      return inlinedSql;
-    }
-    const v = this._arelVisitor();
-    const [sql, binds, retryable, preparable] = v.compileWithBinds(manager.ast);
-    this._lastSelectRetryable = retryable;
-    return this._applyBindLimitFallback(manager, sql, this._typeCastBinds(binds), preparable);
-  }
-
-  /**
-   * Rails' `to_sql_and_binds` over-limit fallback (`database_statements.rb:36-38`):
-   * when the compiled bind count exceeds the adapter's parameter cap, recompile
-   * inlined (unprepared) via `conn.toSql` so the driver's variable limit isn't
-   * overflowed. Stores `_lastSelectBinds`/`_lastSelectPreparable` and returns the
-   * SQL for either branch. Reachable via a large multi-value `IN`/`NOT IN`
-   * (`HomogeneousIn`), which now carries real binds instead of inlined literals.
-   */
-  private _applyBindLimitFallback(
-    node: unknown,
-    sql: string,
-    castBinds: unknown[],
-    preparable: boolean,
-  ): string {
-    const conn = this._conn() as {
-      toSql(m: unknown): string;
-      preparedStatements?: boolean;
-      bindParamsLength?(): number;
-    };
-    if (exceedsBindParamsLimit(conn, castBinds.length)) {
-      this._lastSelectBinds = [];
-      this._lastSelectPreparable = false;
-      return conn.toSql(node);
-    }
-    this._lastSelectBinds = castBinds;
-    this._lastSelectPreparable = preparable;
-    return sql;
-  }
-
-  /**
    * Resolve this relation to the Arel SelectStatement node used as a CTE body,
    * mirroring Rails' `build_with_expression_from_value` Relation branch
    * (`value.arel(.ast)`). `buildArel` threads joins/wheres/from/having, so a
@@ -4031,31 +3869,6 @@ export class Relation<T extends Base> {
   _cteBodyArelNode(_nested = false): Nodes.Node | null {
     if (this._eagerLoadingForSql()) return null;
     return this.toArel().ast as unknown as Nodes.Node;
-  }
-
-  /** Compile an Arel node, returning [sql, type-cast binds]. */
-  private _compileAstWithBinds(node: Nodes.Node): [string, unknown[]] {
-    // Rails' non-prepared `to_sql_and_binds` branch (database_statements.rb:44):
-    // compile through the `SubstituteBinds` collector so every value inlines
-    // and no binds are sent.
-    const conn = this._conn();
-    if (conn.preparedStatements === false) return [conn.toSql(node), []];
-    const [sql, binds] = this._arelVisitor().compileWithBinds(node);
-    return [sql, this._typeCastBinds(binds)];
-  }
-
-  /** Cast QueryAttribute / ActiveModel::Attribute bind objects to primitive DB values. */
-  private _typeCastBinds(binds: unknown[]): unknown[] {
-    return binds.map((b) => {
-      if (b instanceof ModelAttribute) return b.valueForDatabase;
-      // Duck-type fallback: handles potential module-identity splits where
-      // instanceof fails but the Attribute interface is still satisfied.
-      if (b !== null && typeof b === "object" && "valueForDatabase" in b) {
-        const vfd = (b as { valueForDatabase: unknown }).valueForDatabase;
-        return vfd;
-      }
-      return b;
-    });
   }
 
   /**
@@ -4109,41 +3922,6 @@ export class Relation<T extends Base> {
     if (this._model._attributeDefinitions.has(col)) return true;
     const pk = this._model.primaryKey;
     return Array.isArray(pk) ? pk.includes(col) : pk === col;
-  }
-
-  /**
-   * Quote a bare column identifier so an unknown column under a `from(subquery)`
-   * context emits as bare `"col"` / `` `col` `` rather than `table.col`.
-   * Mirrors Rails' `order_column` fallback (query_methods.rb): `Arel.sql(
-   * model.adapter_class.quote_table_name(attr_name), retryable: true)`.
-   * (Rails uses `quote_table_name` for a bare identifier; we use the
-   * adapter's `quoteColumnName` — same emission for a single identifier
-   * on all three dialects.)
-   *
-   * We can't use `Nodes.UnqualifiedColumn(table.get(col))` here: the MySQL
-   * visitor — matching Rails' `arel/visitors/mysql.rb` — overrides that node
-   * to delegate to the inner Attribute (Rails needs the table prefix for
-   * `UPDATE t SET t.x = t.x + 1`), so MySQL would re-qualify.
-   *
-   * Quote against the visitor that will actually emit the SELECT so the
-   * bare identifier matches the rest of the SQL's identifier quoting.
-   * `_compileSelectSql` uses `_selectVisitor()` when defined, else
-   * `manager.toSql()` (which is the global ANSI ToSql).
-   * @internal
-   */
-  private _quoteBareColumn(name: string): string {
-    if (this._selectVisitor() !== null) {
-      return this._conn().quoteColumnName(name);
-    }
-    return `"${name.replace(/"/g, '""')}"`;
-  }
-
-  private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {
-    if (key.includes('"')) return { tbl: table.name, col: key };
-    const firstDot = key.indexOf(".");
-    if (firstDot === -1) return { tbl: table.name, col: key };
-    if (key.indexOf(".", firstDot + 1) !== -1) return { tbl: table.name, col: key };
-    return { tbl: key.slice(0, firstDot), col: key.slice(firstDot + 1) };
   }
 
   /**
@@ -5067,8 +4845,7 @@ export class Relation<T extends Base> {
         // quoting and adapter differences are handled by the AST visitor.
         // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
         // the bare alias name (same pattern SelectManager#as uses in Rails).
-        const innerSql = inner._toSql();
-        const innerBinds = inner._lastSelectBinds.slice();
+        const innerSql = inner.toSql();
         const subAlias = new Nodes.TableAlias(
           new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
           new Nodes.SqlLiteral(subqueryAlias, { retryable: true }),
@@ -5081,8 +4858,8 @@ export class Relation<T extends Base> {
           new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
           subColumn.maximum().as("timestamp"),
         );
-        const [outerSql] = this._compileAstWithBinds(outerManager.ast);
-        const rows = await this._conn().execute(outerSql, innerBinds);
+        const outerResult = await this._conn().selectAll(outerManager, "SQL");
+        const rows = (await outerResult).toArray();
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       } else {
@@ -5090,7 +4867,8 @@ export class Relation<T extends Base> {
         query.orderValues = [];
         query._rawOrderClauses = [];
         query.selectValues = [countStar.as("size"), maxNode.as("timestamp")];
-        const rows = await this._conn().execute(query._toSql(), query._lastSelectBinds);
+        const queryResult = await this._conn().selectAll(query.toArel(), "SQL");
+        const rows = (await queryResult).toArray();
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       }
@@ -5348,9 +5126,8 @@ export class Relation<T extends Base> {
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
     if (this._isNone) return [];
     return this.skipQueryCacheIfNecessary(async () => {
-      const sql = this._toSql();
-      const result = await this._conn().execute(sql, this._lastSelectBinds);
-      return result;
+      const result = await this._conn().selectAll(this.toArel(), `${this.model.name} Load`);
+      return (await result).toArray();
     });
   }
 

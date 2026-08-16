@@ -332,8 +332,6 @@ interface FinderRelation {
   applyJoinDependency(options?: { eagerLoading?: boolean }): any;
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
-  /** @internal */
-  _compileAstWithBinds(ast: unknown): [string, unknown[]];
   toArel(): { ast: unknown };
   skipQueryCacheIfNecessary<R>(block: () => R): R;
   withConnection<R>(block: (c: any) => R): R;
@@ -735,11 +733,9 @@ export async function exists(
   // `.where()`-build time and never carries one into `arel`.
   await relation._materializeDeferredDistinctPkPredicates();
   if (relation.whereClause.isContradiction()) return false;
-  const [existsSql, existsBinds] = this._compileAstWithBinds(relation.toArel().ast);
   return await this.skipQueryCacheIfNecessary(() =>
     this.withConnection(
-      async (c) =>
-        (await c.selectRows(existsSql, `${this.model.name} Exists?`, existsBinds)).length === 1,
+      async (c) => (await c.selectRows(relation.toArel(), `${this.model.name} Exists?`)).length === 1,
     ),
   );
 }

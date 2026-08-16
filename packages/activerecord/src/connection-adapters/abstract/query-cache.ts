@@ -429,10 +429,12 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     // SQL + binds via `to_sql_and_binds` before consulting the cache. A SQL
     // string passes through both steps unchanged with its binds intact.
     arel = arelFromRelation(arel);
-    const [sql, resolvedBinds, compiledPreparable] = toSqlAndBinds.call(
+    const [sql, resolvedBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
       this as DatabaseStatementsHost,
       arel,
       binds ?? [],
+      opts?.preparable ?? null,
+      opts?.allowRetry ?? false,
     );
     binds = resolvedBinds;
     // Rails query_cache.rb:242/248: to_sql_and_binds replaces the incoming
@@ -441,7 +443,11 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     // (non-null only for Arel inputs via the visitor) wins; opts.preparable
     // (relation._lastSelectPreparable for string inputs) is the fallback.
     const resolvedPreparable = compiledPreparable ?? opts?.preparable;
-    const forwardOpts = { ...opts, preparable: resolvedPreparable };
+    // query_cache.rb:242,245,248: `allow_retry` comes back from
+    // `to_sql_and_binds` (the collector's post-traversal flag for an Arel
+    // input, the caller's value for a SQL string) and is forwarded to `super`
+    // alongside `preparable`.
+    const forwardOpts = { ...opts, preparable: resolvedPreparable, allowRetry: compiledAllowRetry };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       if (opts?.async) {

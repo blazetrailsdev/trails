@@ -37,10 +37,11 @@ describe("ExplainTest", () => {
     expect(sql).toContain("SELECT");
     // Rails: `if binds.any?` — when the adapter parameterizes the predicate the
     // value rides in `binds`; otherwise the literal is interpolated into the SQL.
-    // ExplainRegistry collects plain bind values (no Attribute wrappers).
+    // ExplainRegistry collects the `ActiveModel::Attribute` binds the adapter
+    // received, so the value is read off the attribute — Rails' `binds.last.value`.
     if (binds.length > 0) {
       expect(binds.length).toBe(1);
-      expect(binds[binds.length - 1]).toBe("honda");
+      expect((binds[binds.length - 1] as { value: unknown }).value).toBe("honda");
     } else {
       expect(sql).toContain("honda");
     }
