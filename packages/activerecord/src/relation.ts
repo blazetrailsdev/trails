@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, Notifications } from "@blazetrails/activesupport";
+import { except, hexdigest, isBlank, Notifications } from "@blazetrails/activesupport";
 import {
   Table,
   SelectManager,
@@ -2989,15 +2989,7 @@ export class Relation<T extends Base> {
     // mirror Rails' order (blank precedes none?).
     const table = this.table;
     // Mirrors Rails: blank check precedes none? check (relation.rb:589-591).
-    if (
-      typeof updates === "string"
-        ? updates.length === 0
-        : Array.isArray(updates)
-          ? updates.length === 0 || !updates[0]
-          : Object.keys(updates).length === 0
-    ) {
-      throw new ArgumentError("Empty list of attributes to change");
-    }
+    if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
     if (this._isEmptyRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
