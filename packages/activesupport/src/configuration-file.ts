@@ -25,15 +25,14 @@ export class ConfigurationFile {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
+  /**
+   * Mirrors `ConfigurationFile#parse` (configuration_file.rb:21-41). Rails'
+   * rendered/raw split picks `YAML.unsafe_load` over `unsafe_load_file` (:24-34);
+   * one `yamlParse(source)` covers both, since the content is already read. The
+   * `render` call stays outside the `try` because Rails' rescue names
+   * `Psych::SyntaxError` alone, so a template error escapes unwrapped.
+   */
   parse({ context }: { context?: Record<string, unknown> } = {}): Record<string, unknown> {
-    // Rails: `source = @content.include?("<%") ? render(context) : @content`
-    // (configuration_file.rb:22). The rendered/raw split then decides between
-    // `YAML.unsafe_load` and `unsafe_load_file` (:24-34) — one `yamlParse(source)`
-    // here, since we already hold the file's content either way.
-    //
-    // The `render` call sits outside the `try` on purpose: Rails' rescue names
-    // `Psych::SyntaxError` only, so a template error raised by `render` escapes
-    // unwrapped and keeps the `sourceURL` frame the backtrace test asserts on.
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
       const parsed = yamlParse(source);

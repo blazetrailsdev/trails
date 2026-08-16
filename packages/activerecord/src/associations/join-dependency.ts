@@ -10,10 +10,11 @@
  * attribute hashes and instantiated into the correct model.
  */
 
+import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
 import { Table, Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
-import { isAssociationCached } from "../associations.js";
+import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
@@ -834,8 +835,45 @@ export class JoinDependency {
     resultSet: Record<string, unknown>[],
     strictLoadingValue?: boolean | null,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+    block?: (record: any) => void,
   ): any[] {
-    return this.instantiateFromRows(resultSet, strictLoadingValue, columnTypes).parents;
+    const payload = {
+      record_count: resultSet.length,
+      class_name: this._baseModel.baseClass.name,
+    };
+    const { parents, associations, parentKeys } = Notifications.instrument(
+      "instantiation.active_record",
+      payload,
+      () => this.instantiateFromRows(resultSet, strictLoadingValue, columnTypes),
+    );
+
+    const inverseMap = new Map<string, string | undefined>();
+    const modelAssocs: any[] = (this._baseModel as any)._associations ?? [];
+    for (const assoc of modelAssocs) {
+      inverseMap.set(assoc.name, assoc.options?.inverseOf);
+    }
+
+    for (const parent of parents) {
+      const pk = parentKeys.get(parent);
+      const assocs = associations.get(pk);
+      for (const node of this.nodes) {
+        if (node.immediateAssocName.startsWith("_through_")) continue;
+        if (node.parentPath !== null) continue;
+        const children = assocs?.get(node.immediateAssocName) ?? [];
+        const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
+
+        const inverseName = inverseMap.get(node.immediateAssocName);
+        if (inverseName) {
+          const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
+          for (const child of targets) {
+            _cacheSingularTarget(child, inverseName, parent);
+          }
+        }
+      }
+    }
+
+    if (block) for (const parent of parents) block(parent);
+    return parents;
   }
 
   /**
