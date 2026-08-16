@@ -2313,7 +2313,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `find_nth(0)` (finder_methods.rb:598-601). Rails' CollectionProxy#first is
     // a bare `super`, so the `@offsets` memo lands on the proxy itself; the query
     // still routes through `_finderScope` via our `findNthWithLimit` override.
-    return baseFindNth(this as any, 0);
+    return baseFindNth.call(this as any, 0);
   }
 
   /**
@@ -2394,13 +2394,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // so the loaded branch is handled here.
     if (n !== undefined) {
       if (this._targetLoaded) return this._target.slice(0, n);
-      return baseFindTakeWithLimit(this._finderScope() as any, n);
+      return baseFindTakeWithLimit.call(this._finderScope() as any, n);
     }
     if (this._targetLoaded) return this._target[0] ?? null;
     // `@take ||=` (finder_methods.rb:586). Rails' CollectionProxy#take is a bare
     // `super`, so the memo lands on the proxy itself; only the query goes through
     // `_finderScope`. A nil result is not memoized, matching `||=`.
-    this._take ??= await baseFindTake(this._finderScope() as any);
+    this._take ??= await baseFindTake.call(this._finderScope() as any);
     return this._take ?? null;
   }
 

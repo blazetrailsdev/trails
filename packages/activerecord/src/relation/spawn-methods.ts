@@ -107,6 +107,7 @@ export const SpawnMethods = {
   spawn: performSpawn,
   merge: performMerge,
   mergeBang,
+  relationWith,
 } as const;
 
 /**
@@ -119,10 +120,10 @@ export const SpawnMethods = {
  * @internal
  */
 export function relationWith<T extends SpawnRelation<T>>(
-  self: T,
+  this: T,
   values: Record<string, unknown>,
 ): T {
-  const result = (self as any).spawn();
+  const result = (this as any).spawn();
   setValues(result, values);
   return result;
 }

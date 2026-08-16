@@ -71,9 +71,9 @@ import {
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
   buildBatchOrders as _buildBatchOrders,
   applyLimits as _applyLimits,
-  actOnIgnoredOrder as _actOnIgnoredOrder,
   batchOnLoadedRelation as _batchOnLoadedRelation,
   batchOnUnloadedRelation as _batchOnUnloadedRelation,
+  Batches,
 } from "./relation/batches.js";
 import {
   wrapWithScopeProxy,
@@ -97,9 +97,7 @@ import {
   hasInclude as _hasInclude,
   typeCastPluckValues,
 } from "./relation/calculations.js";
-import * as _fm from "./relation/finder-methods.js";
 import { FinderMethods } from "./relation/finder-methods.js";
-import * as _sm from "./relation/spawn-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
@@ -113,10 +111,6 @@ import {
   type CounterCacheTouchOption,
 } from "./timestamp.js";
 import { ExplainRegistry } from "./explain-registry.js";
-import {
-  renderBind as _renderBind,
-  collectingQueriesForExplain as _collectingQueriesForExplain,
-} from "./explain.js";
 import { inspectExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -614,7 +608,7 @@ export class Relation<T extends Base> {
     // expands to distinct `writer_type`/`writer_id` predicates), and excepting by
     // the *columns the new predicates reference* — not the hash keys — drops both
     // of those columns before re-adding them.
-    const newClause = rel.buildWhereClause(conditions) as WhereClause;
+    const newClause = rel.buildWhereClause(conditions);
     rel._whereClause = rel._whereClause.except(...newClause.extractAttributes());
     rel._whereClause = rel._whereClause.plus(newClause);
     return rel;
@@ -835,7 +829,7 @@ export class Relation<T extends Base> {
       if (conditions.length === 0) {
         throw argumentError("Relation#whereNot: unsupported argument (empty array)");
       }
-      const clause = rel.buildWhereClause(conditions) as WhereClause;
+      const clause = rel.buildWhereClause(conditions);
       rel._whereClause = rel._whereClause.plus(clause.invert());
       return rel;
     }
@@ -846,7 +840,7 @@ export class Relation<T extends Base> {
     // (query_methods.rb:1631-1644) — then a single WhereClause#invert over the
     // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
     // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
-    const clause = rel.buildWhereClause(conditions) as WhereClause;
+    const clause = rel.buildWhereClause(conditions);
     rel._whereClause = rel._whereClause.plus(clause.invert());
     return rel;
   }
@@ -2277,7 +2271,7 @@ export class Relation<T extends Base> {
    */
   structurallyCompatible(other: Relation<T>): boolean {
     if (this._model !== other._model) return false;
-    return this.structurallyIncompatibleValuesFor(other).length === 0;
+    return this.structurallyIncompatibleValuesFor(other as never).length === 0;
   }
 
   /**
@@ -6970,149 +6964,6 @@ export class Relation<T extends Base> {
     return block();
   }
 
-  // ---------------------------------------------------------------------------
-  // PR 37c — build-helper privates (delegates to relation/query-methods.ts)
-  // Mirrors: ActiveRecord::QueryMethods private build helpers
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  private buildWhereClause(opts: unknown, rest: unknown[] = []): unknown {
-    return _qm.buildWhereClause.call(this as any, opts, rest);
-  }
-
-  /**
-   * Mirrors `alias :build_having_clause :build_where_clause`
-   * (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
-   * @internal
-   */
-  private buildHavingClause(opts: unknown, rest: unknown[] = []): unknown {
-    return _qm.buildWhereClause.call(this as any, opts, rest);
-  }
-
-  /** @internal */
-  private buildNamedBoundSqlLiteral(statement: string, values: Record<string, unknown>): unknown {
-    return _qm.buildNamedBoundSqlLiteral.call(this as any, statement, values);
-  }
-
-  /** @internal */
-  private buildBoundSqlLiteral(statement: string, values: unknown[]): unknown {
-    return _qm.buildBoundSqlLiteral.call(this as any, statement, values);
-  }
-
-  /** @internal */
-  private buildSubquery(subqueryAlias: string, selectValue: unknown): unknown {
-    return _qm.buildSubquery.call(this as any, subqueryAlias, selectValue);
-  }
-
-  /** @internal */
-  private buildCastValue(name: string, value: unknown): unknown {
-    return _qm.buildCastValue(name, value);
-  }
-
-  /** @internal */
-  private flattenedArgs(args: unknown[]): unknown[] {
-    return _qm.flattenedArgs(args);
-  }
-
-  /** @internal */
-  private validateOrderArgs(args: unknown[]): void {
-    _qm.validateOrderArgs.call(this as any, args);
-  }
-
-  /** @internal */
-  private processWithArgs(args: unknown[]): Record<string, unknown>[] {
-    return _qm.processWithArgs.call(this as any, args);
-  }
-
-  /** @internal */
-  private isDoesNotSupportReverse(order: string): boolean {
-    return _qm.isDoesNotSupportReverse(order);
-  }
-
-  /** @internal */
-  private reverseSqlOrder(orderQuery: unknown[]): unknown[] {
-    return _qm.reverseSqlOrder.call(this as any, orderQuery);
-  }
-
-  /** @internal */
-  private extractTableNameFrom(orderTerm: string): string | null {
-    return _qm.extractTableNameFrom(orderTerm);
-  }
-
-  /** @internal */
-  private columnReferences(orderArgs: unknown[]): string[] {
-    return _qm.columnReferences(orderArgs);
-  }
-
-  /** @internal */
-  private sanitizeOrderArguments(orderArgs: unknown[]): unknown[] {
-    return _qm.sanitizeOrderArguments.call(this as any, orderArgs);
-  }
-
-  /** @internal */
-  private preprocessOrderArgs(orderArgs: unknown[]): void {
-    _qm.preprocessOrderArgs.call(this as any, orderArgs);
-  }
-
-  /** @internal */
-  private buildOrder(arel: unknown): void {
-    _qm.buildOrder.call(this as any, arel);
-  }
-
-  /** @internal */
-  private buildCaseForValuePosition(
-    column: unknown,
-    values: unknown[],
-    options?: { filter?: boolean },
-  ): unknown {
-    return _qm.buildCaseForValuePosition.call(this as any, column, values, options);
-  }
-
-  /** @internal */
-  private resolveArelAttributes(attrs: unknown[]): unknown[] {
-    return _qm.resolveArelAttributes.call(this as any, attrs);
-  }
-
-  /** @internal */
-  private orderColumn(field: string): unknown {
-    return _qm.orderColumn.call(this as any, field);
-  }
-
-  /** @internal */
-  private processSelectArgs(fields: unknown[]): unknown[] {
-    return _qm.processSelectArgs.call(this as any, fields);
-  }
-
-  /** @internal */
-  private arelColumnAliasesFromHash(fields: Record<string, unknown>): unknown[] {
-    return _qm.arelColumnAliasesFromHash.call(this as any, fields);
-  }
-
-  /** @internal */
-  private buildFrom(): unknown {
-    return _qm.buildFrom.call(this as any);
-  }
-
-  /** @internal */
-  private buildSelect(arel: unknown): void {
-    _qm.buildSelect.call(this as any, arel);
-  }
-
-  /** @internal */
-  private buildWithExpressionFromValue(value: unknown): unknown {
-    return _qm.buildWithExpressionFromValue.call(this as any, value);
-  }
-
-  /** @internal */
-  private buildWithValueFromHash(hash: Record<string, unknown>): unknown[] {
-    return _qm.buildWithValueFromHash.call(this as any, hash);
-  }
-
-  /** @internal */
-  private lookupTableKlassFromJoinDependencies(tableName: string): unknown {
-    return _qm.lookupTableKlassFromJoinDependencies.call(this as any, tableName);
-  }
-
   // The `associated_table` block Rails threads from `build_where_clause`
   // (`predicate_builder.rb:71-73`): resolves a table name that exists only as a
   // join-dependency (a manual join, an alias) — not a direct reflection — to its
@@ -7120,176 +6971,6 @@ export class Relation<T extends Base> {
   // `where` / `whereNot`'s composite branches.
   private joinDependencyFallback(): (name: string) => typeof Base | null {
     return (name) => this.lookupTableKlassFromJoinDependencies(name) as typeof Base | null;
-  }
-
-  /** @internal */
-  private eachJoinDependencies(
-    joinDependencies: unknown[] | undefined,
-    block: (join: unknown) => void,
-  ): void {
-    _qm.eachJoinDependencies.call(this as any, joinDependencies as any, block);
-  }
-
-  /** @internal */
-  private buildJoinDependencies(): unknown[] {
-    return _qm.buildJoinDependencies.call(this as any);
-  }
-
-  /** @internal */
-  private buildArel(connection?: unknown, aliases?: AliasTracker): unknown {
-    return _qm.buildArel.call(this as any, connection, aliases);
-  }
-
-  /** @internal */
-  private selectNamedJoins(
-    joinNames: unknown[],
-    stashedJoins?: unknown[] | null,
-    block?: (join: unknown) => void,
-  ): unknown[] {
-    return _qm.selectNamedJoins.call(this as any, joinNames, stashedJoins ?? null, block);
-  }
-
-  /** @internal */
-  private selectAssociationList(
-    associations: unknown[],
-    stashedJoins?: unknown[] | null,
-    block?: (join: unknown) => void,
-  ): unknown[] {
-    return _qm.selectAssociationList.call(this as any, associations, stashedJoins ?? null, block);
-  }
-
-  /** @internal */
-  private buildJoinBuckets(): [
-    Record<string, unknown[]>,
-    typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
-  ] {
-    return _qm.buildJoinBuckets.call(this as any);
-  }
-
-  /** @internal */
-  private buildJoins(arel: unknown): void {
-    _qm.buildJoins.call(this as any, arel);
-  }
-
-  /** @internal */
-  private buildWith(arel: unknown): void {
-    _qm.buildWith.call(this as any, arel);
-  }
-
-  /** @internal */
-  private buildWithJoinNode(name: string, kind?: unknown): unknown {
-    return _qm.buildWithJoinNode.call(this as any, name, kind as any);
-  }
-
-  /** @internal */
-  private structurallyIncompatibleValuesFor(other: unknown): string[] {
-    return _qm.structurallyIncompatibleValuesFor(this as any, other as any);
-  }
-
-  // ---------------------------------------------------------------------------
-  // PR 37b — batch privates (delegates to relation/batches.ts)
-  // Mirrors: ActiveRecord::Batches private helpers
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  private actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void {
-    _actOnIgnoredOrder(this, errorOnIgnore);
-  }
-
-  // ---------------------------------------------------------------------------
-  // PR 37b — explain / async privates
-  // Mirrors: ActiveRecord::Explain + ActiveRecord::QueryMethods#async
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  private async collectingQueriesForExplain<R>(
-    fn: () => Promise<R>,
-  ): Promise<{ value: R; queries: [string, unknown[]][] }> {
-    return _collectingQueriesForExplain(fn);
-  }
-
-  /** @internal */
-  private renderBind(connection: unknown, attr: unknown): [string | null, unknown] {
-    return _renderBind(connection, attr);
-  }
-
-  /** @internal */
-  private async(): Relation<T> {
-    return (this.spawn() as any).asyncBang();
-  }
-
-  // ---------------------------------------------------------------------------
-  // PR 37d — finder privates (delegates to relation/finder-methods.ts + spawn-methods.ts)
-  // ---------------------------------------------------------------------------
-
-  /** @internal */
-  private constructRelationForExists(conditions: unknown): any {
-    return _fm.constructRelationForExists(this as any, conditions);
-  }
-
-  /** @internal */
-  private async findWithIds(ids: unknown[]): Promise<any> {
-    return _fm.findWithIds(this as any, ids);
-  }
-
-  /** @internal */
-  private async findOne(id: unknown): Promise<any> {
-    return _fm.findOne(this as any, id);
-  }
-
-  /** @internal */
-  private async findSome(ids: unknown[]): Promise<any[]> {
-    return _fm.findSome(this as any, ids);
-  }
-
-  /** @internal */
-  private async findSomeOrdered(ids: unknown[]): Promise<any[]> {
-    return _fm.findSomeOrdered(this as any, ids);
-  }
-
-  /** @internal */
-  private async findTake(): Promise<any | null> {
-    return _fm.findTake(this as any);
-  }
-
-  /** @internal */
-  private async findTakeWithLimit(limit: number): Promise<any[]> {
-    return _fm.findTakeWithLimit(this as any, limit);
-  }
-
-  /** @internal */
-  private findNth(index: number): Promise<any | null> {
-    return _fm.findNth(this as any, index);
-  }
-
-  /** @internal */
-  protected findNthWithLimit(index: number, limit: number): Promise<any[]> {
-    return _fm.findNthWithLimit.call(this as any, index, limit);
-  }
-
-  /** @internal */
-  protected findNthFromLast(index: number): Promise<any | null> {
-    return _fm.findNthFromLast.call(this as any, index);
-  }
-
-  /** @internal */
-  private async findLast(limit?: number): Promise<any> {
-    return _fm.findLast(this as any, limit);
-  }
-
-  /** @internal */
-  private orderedRelation(): any {
-    return _fm.orderedRelation(this as any);
-  }
-
-  /** @internal */
-  private _orderColumns(): string[] {
-    return _fm._orderColumns(this as any);
-  }
-
-  /** @internal */
-  private relationWith(values: Record<string, unknown>): Relation<T> {
-    return _sm.relationWith(this as any, values as any);
   }
 }
 
@@ -7375,6 +7056,36 @@ export interface Relation<T extends Base>
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;
+  /** @internal */
+  relationWith(values: Record<string, unknown>): Relation<T>;
+  /** @internal */
+  constructRelationForExists(conditions: unknown): Relation<T>;
+  /** @internal */
+  findWithIds(ids: unknown[]): Promise<T | T[]>;
+  /** @internal */
+  findOne(id: unknown): Promise<T>;
+  /** @internal */
+  findSome(ids: unknown[]): Promise<T[]>;
+  /** @internal */
+  findSomeOrdered(ids: unknown[]): Promise<T[]>;
+  /** @internal */
+  findTake(): Promise<T | null>;
+  /** @internal */
+  findTakeWithLimit(limit: number): Promise<T[]>;
+  /** @internal */
+  findNth(index: number): Promise<T | null>;
+  /** @internal */
+  findNthWithLimit(index: number, limit: number): Promise<T[]>;
+  /** @internal */
+  findNthFromLast(index: number): Promise<T | null>;
+  /** @internal */
+  findLast(limit?: number): Promise<T | T[] | null>;
+  /** @internal */
+  orderedRelation(): Relation<T>;
+  /** @internal */
+  _orderColumns(): string[];
+  /** @internal */
+  actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void;
 }
 
 // DelegationMethods carries getters (connection/primaryKey/tableName) and
@@ -7425,6 +7136,7 @@ include(Relation, FinderMethods);
 include(Relation, Calculations);
 include(Relation, SpawnMethods);
 include(Relation, DelegationMethods);
+include(Relation, Batches);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);

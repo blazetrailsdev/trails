@@ -8,6 +8,16 @@ import { ActiveRecord } from "../ar-config.js";
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
+
+  /** Mirrors: ActiveRecord::Batches#act_on_ignored_order (batches.rb:474-482). @internal */
+  actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
+    const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
+    if (raise) {
+      throw new Error(Batches.ORDER_IGNORE_MESSAGE);
+    } else if (this.model.logger) {
+      this.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
+    }
+  }
 }
 
 /** @internal */
@@ -144,16 +154,6 @@ export function buildBatchOrders(
   const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   const orderArr = Array.isArray(order) ? order : Array(cursorArr.length).fill(order ?? "asc");
   return cursorArr.map((col, i) => [col, orderArr[i] ?? "asc"]);
-}
-
-/** @internal */
-export function actOnIgnoredOrder(relation: any, errorOnIgnore: boolean | undefined): void {
-  const raise = errorOnIgnore !== undefined ? errorOnIgnore : ActiveRecord.errorOnIgnoredOrder;
-  if (raise) {
-    throw new Error(Batches.ORDER_IGNORE_MESSAGE);
-  } else if (relation.model.logger) {
-    relation.model.logger.warn(Batches.ORDER_IGNORE_MESSAGE);
-  }
 }
 
 /** @internal */

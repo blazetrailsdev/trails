@@ -1219,12 +1219,12 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
 
 /** @internal */
 export function structurallyIncompatibleValuesFor(
-  self: QueryMethodsHost,
+  this: QueryMethodsHost,
   other: QueryMethodsHost,
 ): string[] {
   const incompat: string[] = [];
   for (const [label, field] of STRUCTURAL_FIELDS) {
-    const a = self[field] as unknown;
+    const a = this[field] as unknown;
     const b = other[field] as unknown;
     // Mirrors Rails' structurally_incompatible_values_for (query_methods.rb):
     // for Array-valued methods it does `next true unless v2.is_a?(Array)` —
@@ -1304,7 +1304,7 @@ function assertStructurallyCompatible(
   other: QueryMethodsHost,
   methodName: string,
 ): void {
-  const incompat = structurallyIncompatibleValuesFor(self, other);
+  const incompat = structurallyIncompatibleValuesFor.call(self, other);
   if (incompat.length > 0) {
     throw argumentError(
       `Relation passed to #${methodName} must be structurally compatible. Incompatible values: [${incompat.map((v) => `:${v}`).join(", ")}]`,
@@ -1319,7 +1319,7 @@ function assertStructurallyCompatible(
  */
 export function areStructurallyCompatible(self: unknown, other: unknown): boolean {
   if (!isRelationForCombining(self) || !isRelationForCombining(other)) return false;
-  return structurallyIncompatibleValuesFor(self, other).length === 0;
+  return structurallyIncompatibleValuesFor.call(self, other).length === 0;
 }
 
 function andBang(this: QueryMethodsHost, other: any): any {
@@ -1664,11 +1664,9 @@ function asyncBang(this: QueryMethodsHost): QueryMethodsHost {
   return this;
 }
 
-/** @internal */
-function async(this: QueryMethodsHost): QueryMethodsHost {
-  const rel = (this as any).spawn();
-  rel._async = true;
-  return rel;
+/** Mirrors: ActiveRecord::QueryMethods#async (query_methods.rb:1678-1680). @internal */
+export function async(this: QueryMethodsHost): QueryMethodsHost {
+  return asyncBang.call((this as any).spawn());
 }
 
 /** @internal */
@@ -2194,6 +2192,45 @@ export const QueryMethodBangs = {
   isTableNameMatches,
   arelColumn,
   arelColumnWithTable,
+  async,
+  buildWhereClause,
+  // Mirrors `alias :build_having_clause :build_where_clause`
+  // (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
+  buildHavingClause: buildWhereClause,
+  buildNamedBoundSqlLiteral,
+  buildBoundSqlLiteral,
+  buildSubquery,
+  buildCastValue,
+  flattenedArgs,
+  validateOrderArgs,
+  processWithArgs,
+  isDoesNotSupportReverse,
+  reverseSqlOrder,
+  extractTableNameFrom,
+  columnReferences,
+  sanitizeOrderArguments,
+  preprocessOrderArgs,
+  buildOrder,
+  buildCaseForValuePosition,
+  resolveArelAttributes,
+  orderColumn,
+  processSelectArgs,
+  arelColumnAliasesFromHash,
+  buildFrom,
+  buildSelect,
+  buildWithExpressionFromValue,
+  buildWithValueFromHash,
+  lookupTableKlassFromJoinDependencies,
+  eachJoinDependencies,
+  buildJoinDependencies,
+  buildArel,
+  selectNamedJoins,
+  selectAssociationList,
+  buildJoinBuckets,
+  buildJoins,
+  buildWith,
+  buildWithJoinNode,
+  structurallyIncompatibleValuesFor,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -2663,7 +2700,7 @@ export function buildArel(
 export function selectNamedJoins(
   this: QueryMethodsHost,
   joinNames: unknown[],
-  stashedJoins: unknown[] | null,
+  stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
   // Mirror Rails: partition into CTEJoins (symbols matching a with_value key)
@@ -2700,7 +2737,7 @@ export function selectNamedJoins(
 export function selectAssociationList(
   this: QueryMethodsHost,
   associations: unknown[],
-  stashedJoins: unknown[] | null,
+  stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
   const result: unknown[] = [];
