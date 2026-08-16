@@ -110,6 +110,8 @@ interface CalculationRelation {
     primaryKey: string | string[];
     name: string;
     typeForAttribute?(name: string): ColumnType;
+    /** Mirrors `Model.attribute_types` (attribute_registration.rb) — Rails' hash-with-default. */
+    attributeTypes(): Record<string, ColumnType>;
     _attributeDefinitions?: { has(name: string): boolean };
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: CalculationConnection;
@@ -162,7 +164,7 @@ interface CalculationRelation {
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
   /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
   selectValues: (string | symbol | Nodes.Node)[];
-  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  withValues: Array<Record<string, unknown>>;
   /** @internal Rails `apply_join_dependency`; see Relation. */
   applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
@@ -1539,14 +1541,11 @@ export function typeCastPluckValues(
   rel: CalculationRelation,
 ): unknown[] {
   if (result.columns.length !== columns.length) {
-    // Column/projection count mismatch (Rails falls back to attribute_types):
-    // cast by name through the model's attribute types where known.
-    const overrides: Record<string, ColumnType> = {};
-    for (const name of result.columns) {
-      const type = pluckCastTypeForKnownColumn(rel.model, name);
-      if (type) overrides[name] = type;
-    }
-    return result.castValues(overrides);
+    // Rails: `model.attribute_types` wholesale (calculations.rb:611-612). Its
+    // unknown-name default never reaches `Result#column_type`, which asks with
+    // `fetch` — so an unlisted column still falls through to the driver's
+    // `column_types`, exactly as `name in typeOverrides` does here.
+    return result.castValues(rel.model.attributeTypes());
   }
   let joinDependencies: JoinDependency[] | undefined;
   const castTypes = result.columns.map((name, i) => {

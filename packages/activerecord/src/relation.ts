@@ -34,6 +34,7 @@ import {
   pluralize as _pluralize,
   isPlainObject as _isPlainObject,
   wrap,
+  any,
 } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
@@ -438,6 +439,14 @@ export class Relation<T extends Base> {
     "skipQueryCache",
   ] as const;
 
+  /**
+   * Mirrors: ActiveRecord::Relation::INVALID_METHODS_FOR_DELETE_ALL
+   * (relation.rb:63). Spelled with the Ruby member names because `delete_all`
+   * interpolates them straight into its error message; `with_recursive` has no
+   * `@values` entry in Rails either.
+   */
+  static readonly INVALID_METHODS_FOR_DELETE_ALL = ["distinct", "with", "with_recursive"] as const;
+
   /** Mirrors: ActiveRecord::Relation::CLAUSE_METHODS (relation.rb:62). */
   static readonly CLAUSE_METHODS = ["where", "having", "from"] as const;
 
@@ -458,6 +467,12 @@ export class Relation<T extends Base> {
    */
   _values: ValuesHash = {};
   private _rawOrderClauses: string[] = [];
+  /**
+   * Mirrors: ActiveRecord::Relation's `@with_is_recursive` (query_methods.rb:527)
+   * — an ivar, not a `VALUE_METHODS` entry, so `initialize_copy` carries it over
+   * with the rest of the receiver's ivars rather than through `@values`.
+   */
+  _withIsRecursive = false;
   private _distinctOnColumns: string[] = [];
   private _isNone = false;
   /**
@@ -3035,15 +3050,15 @@ export class Relation<T extends Base> {
     if (this._isEmptyRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
-    // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
-    // :with_recursive]`: `delete_all` cannot honor these clauses, so it raises
-    // rather than silently dropping them. The TS port stores `with` /
-    // `with_recursive` together in `withValues` (distinguished by the `recursive`
-    // flag), so split them back out to reproduce Rails' message verbatim.
-    const invalidMethods: string[] = [];
-    if (this.distinctValue) invalidMethods.push("distinct");
-    if (this.withValues.some((cte) => !cte.recursive)) invalidMethods.push("with");
-    if (this.withValues.some((cte) => cte.recursive)) invalidMethods.push("with_recursive");
+    // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL.select` (relation.rb:1014):
+    // `@values[method]`, tested with `any?` except for `:distinct`. There is no
+    // `@values[:with_recursive]` store — `with_recursive!` writes `with_values`
+    // like `with!` does — so that member always reads nil and never lands in the
+    // message, exactly as here.
+    const invalidMethods = Relation.INVALID_METHODS_FOR_DELETE_ALL.filter((method) => {
+      const value = (this._values as Record<string, unknown>)[method];
+      return method === "distinct" ? Boolean(value) : any((value ?? []) as unknown[]);
+    });
     if (invalidMethods.length > 0) {
       throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
     }
@@ -5172,6 +5187,7 @@ export class Relation<T extends Base> {
     this._table = source._table;
     this._values = { ...source._values };
     this._rawOrderClauses = [...source._rawOrderClauses];
+    this._withIsRecursive = source._withIsRecursive;
     this._distinctOnColumns = [...source._distinctOnColumns];
     this._isNone = source._isNone;
     this._joinClauses = [...source._joinClauses];
@@ -5440,7 +5456,7 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#annotate_values */
   annotateValues: string[];
   /** Mirrors: ActiveRecord::Relation#with_values */
-  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  withValues: Array<Record<string, unknown>>;
   /** Mirrors: ActiveRecord::Relation#limit_value */
   limitValue: number | null;
   /** Mirrors: ActiveRecord::Relation#offset_value */
