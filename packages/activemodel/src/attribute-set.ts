@@ -443,11 +443,6 @@ export class AttributeSet {
     return this[Symbol.iterator]();
   }
 
-  /** Whether `name` is present in the internal map (initialized or not). */
-  protected hasAttribute(name: string): boolean {
-    return this._attributes.has(name);
-  }
-
   /**
    * Apply `forgettingAssignment()` to each attribute in place so that shared
    * references (as in `becomes()`) see the updated baseline.

@@ -371,7 +371,7 @@ export namespace CallTemplate {
       return new ProcCall(filter);
     } else if (typeof filter === "function") {
       const arity = filter.length;
-      if (arity > 1) {
+      if (arity === 2) {
         return new InstanceExec2(
           filter as (target: object, block: (() => unknown) | null) => unknown,
         );

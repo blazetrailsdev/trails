@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import { Transaction } from "../transaction.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { Collectors } from "@blazetrails/arel";
 
@@ -51,9 +51,10 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
   });
 
   describe("instrumenter", () => {
-    it("returns the Notifications class", () => {
+    it("memoizes Notifications.instrumenter in the isolated execution state", () => {
       const a = new AbstractAdapter();
-      expect(a.instrumenter).toBe(Notifications);
+      expect(a.instrumenter).toBe(Notifications.instrumenter);
+      expect(IsolatedExecutionState.get("active_record_instrumenter")).toBe(a.instrumenter);
     });
   });
 
