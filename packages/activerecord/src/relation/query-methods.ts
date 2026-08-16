@@ -1219,9 +1219,10 @@ const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
 
 /** @internal */
 export function structurallyIncompatibleValuesFor(
-  self: QueryMethodsHost,
+  this: QueryMethodsHost,
   other: QueryMethodsHost,
 ): string[] {
+  const self = this;
   const incompat: string[] = [];
   for (const [label, field] of STRUCTURAL_FIELDS) {
     const a = self[field] as unknown;
@@ -1304,7 +1305,7 @@ function assertStructurallyCompatible(
   other: QueryMethodsHost,
   methodName: string,
 ): void {
-  const incompat = structurallyIncompatibleValuesFor(self, other);
+  const incompat = structurallyIncompatibleValuesFor.call(self, other);
   if (incompat.length > 0) {
     throw argumentError(
       `Relation passed to #${methodName} must be structurally compatible. Incompatible values: [${incompat.map((v) => `:${v}`).join(", ")}]`,
@@ -1319,7 +1320,7 @@ function assertStructurallyCompatible(
  */
 export function areStructurallyCompatible(self: unknown, other: unknown): boolean {
   if (!isRelationForCombining(self) || !isRelationForCombining(other)) return false;
-  return structurallyIncompatibleValuesFor(self, other).length === 0;
+  return structurallyIncompatibleValuesFor.call(self, other).length === 0;
 }
 
 function andBang(this: QueryMethodsHost, other: any): any {
@@ -2194,6 +2195,44 @@ export const QueryMethodBangs = {
   isTableNameMatches,
   arelColumn,
   arelColumnWithTable,
+  buildWhereClause,
+  // Mirrors `alias :build_having_clause :build_where_clause`
+  // (query_methods.rb:1654) — HAVING conditions parse identically to WHERE.
+  buildHavingClause: buildWhereClause,
+  buildNamedBoundSqlLiteral,
+  buildBoundSqlLiteral,
+  buildSubquery,
+  buildCastValue,
+  flattenedArgs,
+  validateOrderArgs,
+  processWithArgs,
+  isDoesNotSupportReverse,
+  reverseSqlOrder,
+  extractTableNameFrom,
+  columnReferences,
+  sanitizeOrderArguments,
+  preprocessOrderArgs,
+  buildOrder,
+  buildCaseForValuePosition,
+  resolveArelAttributes,
+  orderColumn,
+  processSelectArgs,
+  arelColumnAliasesFromHash,
+  buildFrom,
+  buildSelect,
+  buildWithExpressionFromValue,
+  buildWithValueFromHash,
+  lookupTableKlassFromJoinDependencies,
+  eachJoinDependencies,
+  buildJoinDependencies,
+  buildArel,
+  selectNamedJoins,
+  selectAssociationList,
+  buildJoinBuckets,
+  buildJoins,
+  buildWith,
+  buildWithJoinNode,
+  structurallyIncompatibleValuesFor,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -2663,7 +2702,7 @@ export function buildArel(
 export function selectNamedJoins(
   this: QueryMethodsHost,
   joinNames: unknown[],
-  stashedJoins: unknown[] | null,
+  stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
   // Mirror Rails: partition into CTEJoins (symbols matching a with_value key)
@@ -2700,7 +2739,7 @@ export function selectNamedJoins(
 export function selectAssociationList(
   this: QueryMethodsHost,
   associations: unknown[],
-  stashedJoins: unknown[] | null,
+  stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
   const result: unknown[] = [];
