@@ -128,9 +128,15 @@ export class OrderedOptions {
     return [...this.data.keys()];
   }
 
-  /** `Hash#entries` / `Hash#to_a`. */
+  /**
+   * `Enumerable#entries` — Ruby builds it on `each`, not on the Hash storage,
+   * which is why `InheritableOptions`'s `each` override (ordered_options.rb:142-145)
+   * makes it answer the parent-merged pairs.
+   */
   entries(): [string, unknown][] {
-    return [...this.data.entries()];
+    const out: [string, unknown][] = [];
+    this.each((key, value) => out.push([key, value]));
+    return out;
   }
 
   /** `Hash#to_h`. */
@@ -144,9 +150,9 @@ export class OrderedOptions {
     return this;
   }
 
-  /** `Hash#count`. */
+  /** `Enumerable#count` — like `entries`, counted through `each`. */
   get count(): number {
-    return this.data.size;
+    return this.entries().length;
   }
 
   /** `Object#dup`. */
@@ -217,6 +223,11 @@ export class InheritableOptions extends OrderedOptions {
   /** Mirrors `inheritable_copy` (ordered_options.rb:134-136). */
   inheritableCopy(): InheritableOptions {
     return new InheritableOptions(this);
+  }
+
+  /** Mirrors `to_a` (ordered_options.rb:138-140). */
+  toA(): [string, unknown][] {
+    return this.entries();
   }
 
   /** Mirrors `each` (ordered_options.rb:142-145). */

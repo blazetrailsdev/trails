@@ -158,6 +158,7 @@ describe("OrderedOptionsTest", () => {
   it("inheritable options to a", () => {
     const opts = new InheritableOptions(null, { x: 1 });
     expect(opts.entries()).toEqual([["x", 1]]);
+    expect(opts.toA()).toEqual([["x", 1]]);
   });
 
   it("inheritable options count", () => {
