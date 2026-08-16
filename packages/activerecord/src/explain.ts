@@ -95,3 +95,22 @@ export async function buildExplainClause(
   }
   return "EXPLAIN for:";
 }
+
+/**
+ * The mixin itself. Rails mixes `ActiveRecord::Explain` in on both sides —
+ * `extend Explain` at base.rb:294 (class level) and `include ... Explain ...`
+ * at relation.rb:68 (instance level) — so both receivers resolve the same
+ * method objects. `base.ts` wires the class side; `relation.ts` does
+ * `include(Relation, Explain)` for the instance side. Neither redefines a
+ * member: the definitions above are the single source for both.
+ *
+ * `execExplain` is not a member here — it takes the receiving model class as
+ * an explicit first argument on the class side, and `Relation` carries its own
+ * `execExplain` mirror of explain.rb:19-36 already.
+ *
+ * Mirrors: ActiveRecord::Explain
+ */
+export const Explain = {
+  collectingQueriesForExplain,
+  renderBind,
+} as const;

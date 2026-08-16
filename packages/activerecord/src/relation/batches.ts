@@ -4,10 +4,276 @@
  * Mirrors: ActiveRecord::Batches
  */
 import { ActiveRecord } from "../ar-config.js";
+import { stripThenable } from "./thenable.js";
+import { BatchEnumerator } from "./batches/batch-enumerator.js";
+import type { Base } from "../base.js";
+import type { InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
 
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
+
+  /**
+   * Yields individual records in batches for memory efficiency.
+   *
+   * Mirrors: ActiveRecord::Batches#find_each (batches.rb:36)
+   */
+  findEach<T extends Base>(
+    this: any,
+    {
+      batchSize = 1000,
+      start,
+      finish,
+      order,
+      cursor = this.primaryKey,
+      errorOnIgnore,
+    }: {
+      batchSize?: number;
+      start?: unknown;
+      finish?: unknown;
+      order?: "asc" | "desc" | ("asc" | "desc")[];
+      cursor?: string | string[];
+      errorOnIgnore?: boolean;
+    } = {},
+  ): AsyncGenerator<T> & { size(): Promise<number> } {
+    const relation = this;
+    const enumerator = (async function* () {
+      for await (const batch of relation.findInBatches({
+        batchSize,
+        start,
+        finish,
+        order,
+        cursor,
+        errorOnIgnore,
+      })) {
+        for (const record of batch as T[]) {
+          yield record;
+        }
+      }
+    })() as AsyncGenerator<T> & { size(): Promise<number> };
+    // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
+    // see findInBatches below for why it lives on the iterator.
+    enumerator.size = async (): Promise<number> => {
+      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
+      return applyLimits(
+        relation,
+        cursorArr,
+        start,
+        finish,
+        buildBatchOrders(cursorArr, order),
+      ).size();
+    };
+    return enumerator;
+  }
+
+  /**
+   * Yields arrays of records in batches.
+   *
+   * Mirrors: ActiveRecord::Batches#find_in_batches (batches.rb:96)
+   */
+  findInBatches<T extends Base>(
+    this: any,
+    {
+      batchSize = 1000,
+      start,
+      finish,
+      order,
+      cursor = this.primaryKey,
+      errorOnIgnore,
+    }: {
+      batchSize?: number;
+      start?: unknown;
+      finish?: unknown;
+      order?: "asc" | "desc" | ("asc" | "desc")[];
+      cursor?: string | string[];
+      errorOnIgnore?: boolean;
+    } = {},
+  ): AsyncGenerator<T[]> & { size(): Promise<number> } {
+    const relation = this;
+    // Rails' `to_enum(:find_in_batches, ...) { ... }` size block
+    // (batches.rb:161-168). An async iterator has no `Enumerator#size`, so the
+    // block hangs off the returned iterator under the same name; `size` is
+    // async here only because the count reaches the database.
+    const size = async (): Promise<number> => {
+      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
+      const total = await applyLimits(
+        relation,
+        cursorArr,
+        start,
+        finish,
+        buildBatchOrders(cursorArr, order),
+      ).size();
+      return Math.floor((total - 1) / batchSize) + 1;
+    };
+    const enumerator = (async function* () {
+      const enumerator = relation.inBatches({
+        of: batchSize,
+        start,
+        finish,
+        load: true,
+        errorOnIgnore,
+        cursor,
+        order,
+      });
+      for await (const batchRel of enumerator._generator()) {
+        yield (batchRel._records ?? []) as T[];
+      }
+    })() as AsyncGenerator<T[]> & { size(): Promise<number> };
+    enumerator.size = size;
+    return enumerator;
+  }
+
+  /**
+   * Returns a BatchEnumerator that yields Relations scoped to each batch.
+   * Unlike findInBatches which yields arrays of records, this yields
+   * Relation objects that can be further refined, and supports batch-level
+   * operations like deleteAll/updateAll.
+   *
+   * Mirrors: ActiveRecord::Batches#in_batches (batches.rb:167)
+   */
+  inBatches<T extends Base>(
+    this: any,
+    opts: InBatchesOptions,
+    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+  ): Promise<void>;
+  inBatches<T extends Base>(
+    this: any,
+    opts?: InBatchesOptions,
+  ): BatchEnumerator<LoadedRelation<Relation<T>>>;
+  inBatches<T extends Base>(
+    this: any,
+    {
+      of = 1000,
+      start,
+      finish,
+      order,
+      cursor: cursorOption,
+      errorOnIgnore,
+      load = false,
+      useRanges,
+    }: InBatchesOptions = {},
+    block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
+    const self = this;
+    const effectiveCursor = cursorOption ?? this.primaryKey;
+    const cursor = (Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor]).map(
+      String,
+    );
+    // `ensure_valid_options_for_batching!` reaches the schema cache, which is
+    // async here, so the validation runs when the batches are first pulled
+    // rather than at `in_batches` call time.
+    const ensureValidOptions = () =>
+      ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
+
+    if (this._orderClauses.length > 0) {
+      this.actOnIgnoredOrder(errorOnIgnore);
+    }
+
+    const batchOrders = buildBatchOrders(cursor, order as any);
+
+    const enumerator = block
+      ? null
+      : new BatchEnumerator<LoadedRelation<Relation<T>>>({
+          of,
+          start,
+          finish,
+          relation: self,
+          cursor,
+          order,
+          useRanges,
+        });
+
+    let remaining: number | null = null;
+    let batchLimit = of;
+    if (this._limitValue !== null) {
+      remaining = this._limitValue as number;
+      if (remaining < batchLimit) batchLimit = remaining;
+    }
+
+    let generator: () => AsyncGenerator<LoadedRelation<Relation<T>>>;
+    if (remaining === 0) {
+      generator = async function* () {};
+    } else if (this.loaded) {
+      const loadedBatches = batchOnLoadedRelation({
+        relation: this,
+        start,
+        finish,
+        cursor,
+        order: (order ?? "asc") as any,
+        batchLimit,
+      });
+      generator = async function* () {
+        await ensureValidOptions();
+        for (const batchRows of loadedBatches) {
+          const batchRel = self._clone();
+          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
+          );
+          batchRel._records = batchRows;
+          batchRel._loaded = true;
+          yield stripThenable(batchRel) as LoadedRelation<Relation<T>>;
+        }
+      };
+    } else {
+      generator = async function* () {
+        await ensureValidOptions();
+        for await (const { rows: batchRows, useRanges: batchUseRanges } of batchOnUnloadedRelation({
+          relation: self,
+          start,
+          finish,
+          cursor,
+          order: (order ?? "asc") as any,
+          batchLimit,
+          load,
+          remaining,
+          useRanges,
+        })) {
+          const batchRel = self._clone();
+          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
+          );
+          const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
+          if (batchUseRanges && !load && cursor.length === 1 && tuples.length > 0) {
+            // Range-mode: emit `col >= first AND col <= last` (reversed for desc)
+            // instead of `col IN (...)`. Mirrors Rails apply_finish_limit path.
+            const col = cursor[0];
+            const dir = batchOrders[0][1];
+            const first = tuples[0][0];
+            const last = tuples[tuples.length - 1][0];
+            const attr = self.table.get(col);
+            const lo = dir === "desc" ? last : first;
+            const hi = dir === "desc" ? first : last;
+            batchRel._whereClause.predicates.push(attr.gteq(lo).and(attr.lteq(hi)));
+          } else if (cursor.length === 1) {
+            const ids = tuples.map((t: unknown[]) => t[0]);
+            batchRel._whereClause.predicates.push(
+              ...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids }),
+            );
+          } else {
+            batchRel._whereClause.predicates.push(
+              ...self.predicateBuilder.buildComposite(cursor, tuples),
+            );
+          }
+          if (load) {
+            batchRel._records = batchRows;
+            batchRel._loaded = true;
+          }
+          yield stripThenable(batchRel);
+        }
+      } as () => AsyncGenerator<LoadedRelation<Relation<T>>>;
+    }
+
+    if (block) {
+      return (async () => {
+        for await (const batchRelation of generator()) {
+          await block(batchRelation);
+        }
+      })();
+    }
+
+    enumerator!._generator = generator;
+    return enumerator!;
+  }
 
   /** Mirrors: ActiveRecord::Batches#act_on_ignored_order (batches.rb:474-482). @internal */
   actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined): void {
