@@ -2764,25 +2764,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    if (this._scope === undefined) {
-      const built = (
-        this._record.association(this._assocName) as { scope(): unknown }
-      ).scope() as any;
-      // A new owner has no primary key yet, so the association scope collapses
-      // to the `1=0` NullRelation. Mark it — and skip the `@scope` memo, since
-      // the next call must rebuild against the saved owner — so a relation
-      // spawned off it (`owner.things.where(...)`, now built by
-      // `delegate(*QueryMethods, to: :scope)`) rebases onto the resolved scope
-      // once the owner is saved; see
-      // `AssociationRelation#_maybeRebaseAssociationSeed`.
-      if (built?._isNone === true && this._record.isNewRecord()) {
-        built._seededNoneNewOwner = true;
-        built._seedWherePredicates = [...built._whereClause.predicates];
-        return built;
-      }
-      this._scope = built;
+    const scope = (this._scope ??= (
+      this._record.association(this._assocName) as { scope(): unknown }
+    ).scope() as any);
+    // A new owner has no primary key yet, so the association scope collapses to
+    // the `1=0` NullRelation. Mark it, so a relation spawned off it
+    // (`owner.things.where(...)`, now built by the `scope` delegation above)
+    // rebases onto the resolved scope once the owner is saved — see
+    // `AssociationRelation#_maybeRebaseAssociationSeed`. The proxy's own `@scope`
+    // memo is dropped on the next read by `reader`'s `@proxy.reset_scope`
+    // (collection_association.rb:41) and the owner's save by
+    // `association.reset_scope` (autosave_association.rb:428).
+    if (scope?._isNone === true && this._record.isNewRecord()) {
+      scope._seededNoneNewOwner = true;
+      scope._seedWherePredicates = [...scope._whereClause.predicates];
     }
-    return this._scope;
+    return scope;
   }
 
   private _buildThroughScope(): any {
