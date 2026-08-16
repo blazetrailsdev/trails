@@ -17,14 +17,19 @@ import "./support/canonical-model-index.js";
 // ==========================================================================
 
 describe("lookupCastTypeFromJoinDependencies", () => {
+  // A JoinDependency exposes its nodes through `each`, which is what
+  // `each_join_dependencies` (calculations.rb:595) walks them with.
+  const fakeJoinDependency = (nodes: unknown[]): JoinDependency =>
+    ({ each: (fn: (node: unknown) => void) => nodes.forEach(fn) }) as unknown as JoinDependency;
+
   it("returns cast type from a joined table's attributeTypes", () => {
     const intType = { cast: (v: unknown) => Number(v) };
     const fakeNode = { baseKlass: { attributeTypes: () => ({ credit_limit: intType }) } };
-    const fakeJd = [fakeNode];
+    const fakeJd = fakeJoinDependency([fakeNode]);
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "credit_limit",
-      [fakeJd] as unknown as JoinDependency[],
+      [fakeJd],
     );
     expect(result).toBe(intType);
   });
@@ -34,7 +39,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "missing",
-      [[fakeNode]] as unknown as JoinDependency[],
+      [fakeJoinDependency([fakeNode])],
     );
     expect(result).toBeNull();
   });
@@ -47,7 +52,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "name",
-      [[node1], [node2]] as unknown as JoinDependency[],
+      [fakeJoinDependency([node1]), fakeJoinDependency([node2])],
     );
     expect(result).toBe(type1);
   });
@@ -58,7 +63,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "title",
-      [[fakeNode]] as unknown as JoinDependency[],
+      [fakeJoinDependency([fakeNode])],
     );
     expect(result).toBe(strType);
   });
@@ -69,7 +74,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "title",
-      [[fakeNode]] as unknown as JoinDependency[],
+      [fakeJoinDependency([fakeNode])],
     );
     expect(result).toBe(strType);
   });
@@ -81,7 +86,7 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     const result = lookupCastTypeFromJoinDependencies(
       {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
       "val",
-      [[nodeMissing, nodeGood]] as unknown as JoinDependency[],
+      [fakeJoinDependency([nodeMissing, nodeGood])],
     );
     expect(result).toBe(type);
   });

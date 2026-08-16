@@ -4,13 +4,8 @@
  *
  * Mirrors: ActiveRecord::QueryMethods
  */
-import {
-  Nodes,
-  SelectManager,
-  Table as ArelTable,
-  sql as arelSql,
-  relationName,
-} from "@blazetrails/arel";
+import * as Arel from "@blazetrails/arel";
+import { Nodes, SelectManager, Table as ArelTable, relationName } from "@blazetrails/arel";
 import {
   Attribute,
   ValueType,
@@ -34,7 +29,7 @@ import type { AliasTracker } from "../associations/alias-tracker.js";
 import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
-import { foreignKey } from "@blazetrails/activesupport";
+import { any, foreignKey } from "@blazetrails/activesupport";
 
 /**
  * Interface for the scope that WhereChain delegates to.
@@ -176,6 +171,9 @@ interface QueryMethodsHost {
   _limitValue: number | null;
   _offsetValue: number | null;
   _selectColumns: any[] | null;
+  // Public `select_values` value method (relation.ts getter); read over the
+  // backing field so extractCalls credits the Rails value-method read.
+  selectValues: any[];
   _isDistinct: boolean;
   _distinctOnColumns: string[];
   _groupColumns: string[];
@@ -314,12 +312,12 @@ export function referencesFromConditions(conditions: unknown): string[] {
 // `_buildSelectManager` cannot fully encode (set-op/eager body) returns null and
 // falls back to its inlined SQL as a bare `SqlLiteral`.
 function buildCteLeaf(q: unknown, nested: boolean): Nodes.Node {
-  if (typeof q === "string") return new Nodes.Grouping(arelSql(q) as any);
+  if (typeof q === "string") return new Nodes.Grouping(Arel.sql(q) as any);
   if (q instanceof Nodes.SqlLiteral) return new Nodes.Grouping(q as any);
   if (q instanceof SelectManager) return q.ast as unknown as Nodes.Node;
   const node = (q as any)._cteBodyArelNode?.(nested);
   if (node) return node as Nodes.Node;
-  return arelSql((q as any).toSql()) as unknown as Nodes.Node;
+  return Arel.sql((q as any).toSql()) as unknown as Nodes.Node;
 }
 
 /** Validate and resolve a CTE name+query into an arel expression node. */
@@ -1033,7 +1031,7 @@ export function buildWhereClause(
     // fragment (no `?`, no named hash) falls back to sanitize_sql.
     let parts: Nodes.Node[];
     if (rest.length === 0) {
-      parts = [arelSql(opts)];
+      parts = [Arel.sql(opts)];
     } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
       parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
     } else if (opts.includes("?")) {
@@ -1788,10 +1786,10 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
-    return arelSql(connectionFor(this._model).toSql(value));
+    return Arel.sql(connectionFor(this._model).toSql(value));
   }
   if (isRelationLike(value)) {
-    return arelSql((value as { toSql(): string }).toSql());
+    return Arel.sql((value as { toSql(): string }).toSql());
   }
   // Mirrors the array / id_for_database transforms in build_bound_sql_literal /
   // build_named_bound_sql_literal (query_methods.rb:1686-1715): a collection
@@ -1875,7 +1873,8 @@ export function isDoesNotSupportReverse(order: string): boolean {
   const plain = String(order);
   if (
     plain.includes(",") &&
-    plain.split(",").some((s) => s.split("(").length !== s.split(")").length)
+    plain.split(",").find((section) => section.split("(").length !== section.split(")").length) !==
+      undefined
   ) {
     return true;
   }
@@ -2221,21 +2220,13 @@ function connectionFor(modelClass: any): any {
   return threadedConnectionFor(modelClass) ?? modelClass?.connection;
 }
 
-function safeQuoteTableName(modelClass: any, name: string): string {
-  return connectionFor(modelClass).quoteTableName(name);
-}
-
-function safeQuoteColumnName(modelClass: any, name: string): string {
-  return connectionFor(modelClass).quoteColumnName(name);
-}
-
 /** @internal */
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   const table: any = this.table;
   if (!table) return false;
   const modelClass: any = this.model;
   const name = escapeRegex(table.name);
-  const quotedTableName = safeQuoteTableName(modelClass, table.name);
+  const quotedTableName = connectionFor(modelClass).quoteTableName(table.name);
   const quoted = escapeRegex(quotedTableName);
   // Mirror Rails: from.to_sql if from.respond_to?(:to_sql)
   const fromStr = typeof (from as any)?.toSql === "function" ? (from as any).toSql() : String(from);
@@ -2249,7 +2240,6 @@ export function arelColumn(
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
-  const table: any = this.table;
   // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
   // the block, else passes through unchanged (query_methods.rb:1996-2003).
   if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
@@ -2265,18 +2255,19 @@ export function arelColumn(
   const from = fromClause?.name || fromClause?.value;
 
   if (modelClass?.columnsHash?.()[fieldStr] && (!from || isTableNameMatches.call(this, from))) {
-    return table?.get(fieldStr) ?? arelSql(fieldStr);
+    const table: any = this.table;
+    return table.get(fieldStr);
   }
-  const dotMatch = fieldStr.match(/^(?<tbl>(?:\w+\.)?\w+)\.(?<col>\w+)$/);
+  const dotMatch = fieldStr.match(/^(?<table>(?:\w+\.)?\w+)\.(?<column>\w+)$/);
   if (dotMatch) {
-    return arelColumnWithTable.call(this, dotMatch.groups!.tbl, dotMatch.groups!.col);
+    return arelColumnWithTable.call(this, dotMatch.groups!.table, dotMatch.groups!.column);
   }
   if (fallback) return fallback(fieldStr);
   // Ruby `Arel.sql(is_symbol ? quote_table_name(field) : field)`
-  // (query_methods.rb:2003): a Symbol names a column and is quoted; a String is
+  // (query_methods.rb:2005): a Symbol names a column and is quoted; a String is
   // raw SQL and is not.
-  const quoted = isSymbol ? safeQuoteColumnName(modelClass, fieldStr) : fieldStr;
-  return arelSql(quoted);
+  const quoted = isSymbol ? connectionFor(modelClass).quoteTableName(fieldStr) : fieldStr;
+  return Arel.sql(quoted);
 }
 
 /** @internal */
@@ -2307,9 +2298,9 @@ export function arelColumnWithTable(
   // ArelTable — the visitor quotes the whole string as one identifier, producing
   // "schema.table"."col" instead of "schema"."table"."col".
   if (tableName.includes(".")) {
-    const quotedTable = safeQuoteTableName(modelClass, tableName);
-    const quotedCol = safeQuoteColumnName(modelClass, columnName);
-    return arelSql(`${quotedTable}.${quotedCol}`);
+    return Arel.sql(
+      `${connectionFor(modelClass).quoteTableName(tableName)}.${connectionFor(modelClass).quoteColumnName(columnName)}`,
+    );
   }
   if (isSymbol || !/\W/.test(columnName)) {
     const builder = (this as any).predicateBuilder;
@@ -2322,8 +2313,7 @@ export function arelColumnWithTable(
       ) ?? new ArelTable(tableName).get(columnName)
     );
   }
-  const quotedTable = safeQuoteTableName(modelClass, tableName);
-  return arelSql(`${quotedTable}.${columnName}`);
+  return Arel.sql(`${connectionFor(modelClass).quoteTableName(tableName)}.${columnName}`);
 }
 
 /** @internal */
@@ -2346,14 +2336,12 @@ export function arelColumnsFromHash(
 
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
-  const modelClass: any = this.model;
-  const table: any = this.table;
   return arelColumn.call(this, field, (attrName: string) => {
     if (attrName === "count" && ((this as any)._groupColumns ?? []).length > 0) {
-      return table?.get(attrName) ?? arelSql(attrName);
+      const table: any = this.table;
+      return table.get(attrName);
     }
-    const quoted = safeQuoteTableName(modelClass, attrName);
-    return new Nodes.SqlLiteral(quoted, { retryable: true });
+    return Arel.sql(connectionFor(this.model).quoteTableName(attrName), { retryable: true });
   });
 }
 
@@ -2372,7 +2360,7 @@ export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): un
 function nodeAs(attr: unknown, quotedAlias: string): unknown {
   if (typeof (attr as any)?.as === "function") return (attr as any).as(quotedAlias);
   const attrSql = typeof (attr as any)?.toSql === "function" ? (attr as any).toSql() : String(attr);
-  return arelSql(`${attrSql} AS ${quotedAlias}`);
+  return Arel.sql(`${attrSql} AS ${quotedAlias}`);
 }
 
 /** @internal */
@@ -2385,12 +2373,12 @@ export function arelColumnAliasesFromHash(
     const tableName = isRubySymbol(key) ? symbolToName(key) : key;
     const modelClass: any = this.model;
     const quoteAlias = (a: unknown): string =>
-      safeQuoteColumnName(modelClass, isRubySymbol(a) ? symbolToName(a) : String(a));
+      connectionFor(modelClass).quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
       return Object.keys(columnsAliases as object).map((col) => {
         const alias = (columnsAliases as any)[col];
         const attr = arelColumnWithTable.call(this, tableName, col);
-        return nodeAs(attr instanceof Nodes.Node ? attr : arelSql(String(col)), quoteAlias(alias));
+        return nodeAs(attr instanceof Nodes.Node ? attr : Arel.sql(String(col)), quoteAlias(alias));
       });
     }
     if (Array.isArray(columnsAliases)) {
@@ -2486,7 +2474,7 @@ function selectListColumns(
     }
     if (cols.length > 0) {
       const table: any = (host as any).table ?? modelClass?.arelTable;
-      return cols.map((f: string) => table?.get(f) ?? arelSql(f));
+      return cols.map((f: string) => table?.get(f) ?? Arel.sql(f));
     }
   }
   return null;
@@ -2504,7 +2492,7 @@ export function buildProjections(this: QueryMethodsHost): unknown[] {
   const cols = selectListColumns(this, this.model);
   if (cols) return cols;
   const table: any = (this as any).table ?? (this.model as any)?.arelTable;
-  return [table ? tableStar(table) : arelSql("*")];
+  return [table ? tableStar(table) : Arel.sql("*")];
 }
 
 // A table's `.*` projection. `Table#star` is a getter; a table ALIAS
@@ -2521,13 +2509,23 @@ function tableStar(table: any): unknown {
  * @internal
  */
 export function buildSelect(this: QueryMethodsHost, arel: any): void {
-  const cols = selectListColumns(this, this.model);
-  if (cols) {
-    arel.project(...cols);
-    return;
+  const model: any = this.model;
+  if (any(this.selectValues)) {
+    arel.project(...arelColumns.call(this, this.selectValues));
+  } else if (
+    (model?.ignoredColumns?.length ?? 0) > 0 ||
+    model?.enumerateColumnsInSelectStatements
+  ) {
+    arel.project(
+      ...(model?.columnNames?.() ?? []).map((field: string) => {
+        const table: any = (this as any).table ?? model?.arelTable;
+        return table.get(field);
+      }),
+    );
+  } else {
+    const table: any = (this as any).table ?? model?.arelTable;
+    arel.project(table ? tableStar(table) : Arel.sql("*"));
   }
-  const table: any = (this as any).table ?? (this.model as any)?.arelTable;
-  arel.project(table ? tableStar(table) : arelSql("*"));
 }
 
 /** @internal */
@@ -2670,12 +2668,11 @@ export function selectNamedJoins(
 ): unknown[] {
   // Mirror Rails: partition into CTEJoins (symbols matching a with_value key)
   // vs ordinary association specs.
-  const cteNames = new Set(this._ctes.map((c) => c.name));
   const cteJoins: string[] = [];
   const associations: unknown[] = [];
 
   for (const joinName of joinNames) {
-    if (isRubySymbol(joinName) && cteNames.has(symbolToName(joinName))) {
+    if (isRubySymbol(joinName) && any(this._ctes, (cte) => cte.name === symbolToName(joinName))) {
       cteJoins.push(symbolToName(joinName));
     } else {
       associations.push(joinName);
@@ -2847,7 +2844,7 @@ export function buildJoinBuckets(
   // stays a named join value instead of becoming a raw SQL fragment.
   for (const [i, v] of joins.entries()) {
     if (typeof v === "string" && !this._isNamedJoinValue(v)) {
-      joins[i] = new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join;
+      joins[i] = new Nodes.StringJoin(Arel.sql(v.trim()) as any) as Nodes.Join;
     }
   }
 
@@ -2946,7 +2943,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
         ? new ArelTable(j.table, { as: j.as })
         : new ArelTable(j.table)
       : j.table;
-    const onNode = typeof j.on === "string" ? arelSql(j.on) : j.on;
+    const onNode = typeof j.on === "string" ? Arel.sql(j.on) : j.on;
     if (j.type === "inner") {
       manager.join(tableNode);
     } else {
