@@ -445,8 +445,8 @@ export class Relation<T extends Base> {
   private _delegateToModel = false;
   private _records: T[] = [];
   // Rails `@take` / `@offsets` (finder_methods.rb:586, 599-600).
-  private _take?: T | null;
-  private _offsets?: Map<number, T | null>;
+  protected _take?: T | null;
+  protected _offsets?: Map<number, T | null>;
   /**
    * Per-record loader block, run on each freshly instantiated record BEFORE
    * its find/initialize callbacks fire — the trails analog of the block Rails
