@@ -457,7 +457,7 @@ export async function performFirst(this: FinderRelation, n?: number): Promise<an
   // crucially caps `limit` against an existing `limit_value` (`first(3)` on a
   // `.limit(2)` relation returns 2 rows, not 3).
   if (n !== undefined) return this.findNthWithLimit(0, n);
-  return (await this.findNthWithLimit(0, 1))[0] ?? null;
+  return findNth(this, 0);
 }
 
 /** @internal */
@@ -541,14 +541,8 @@ export async function performSole(this: FinderRelation): Promise<any> {
 
 /** @internal */
 export async function performTake(this: FinderRelation, limit?: number): Promise<any> {
-  const rel = this._clone();
-  if (limit !== undefined) {
-    rel._limitValue = limit;
-    return rel.toArray();
-  }
-  rel._limitValue = 1;
-  const records = await rel.toArray();
-  return records[0] ?? null;
+  // Rails: `limit ? find_take_with_limit(limit) : find_take` (finder_methods.rb:129).
+  return limit !== undefined ? findTakeWithLimit(this, limit) : findTake(this);
 }
 
 /** @internal */
@@ -599,27 +593,27 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
 
 /** @internal */
 export async function performSecond(this: FinderRelation): Promise<any | null> {
-  return (await this.findNthWithLimit(1, 1))[0] ?? null;
+  return findNth(this, 1);
 }
 
 /** @internal */
 export async function performThird(this: FinderRelation): Promise<any | null> {
-  return (await this.findNthWithLimit(2, 1))[0] ?? null;
+  return findNth(this, 2);
 }
 
 /** @internal */
 export async function performFourth(this: FinderRelation): Promise<any | null> {
-  return (await this.findNthWithLimit(3, 1))[0] ?? null;
+  return findNth(this, 3);
 }
 
 /** @internal */
 export async function performFifth(this: FinderRelation): Promise<any | null> {
-  return (await this.findNthWithLimit(4, 1))[0] ?? null;
+  return findNth(this, 4);
 }
 
 /** @internal */
 export async function performFortyTwo(this: FinderRelation): Promise<any | null> {
-  return (await this.findNthWithLimit(41, 1))[0] ?? null;
+  return findNth(this, 41);
 }
 
 /** @internal */
@@ -945,7 +939,10 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 /** @internal */
 export async function findTake(rel: FinderRelation): Promise<any | null> {
   if (rel.isLoaded) return (await rel.records())[0] ?? null;
-  return (await (rel as any).limit(1).records())[0] ?? null;
+  // Rails memoizes with `@take ||=` (finder_methods.rb:586): a nil result is
+  // not memoized, so the query re-runs until it finds a record.
+  (rel as any)._take ??= (await (rel as any).limit(1).records())[0] ?? null;
+  return (rel as any)._take;
 }
 
 /** @internal */
@@ -956,7 +953,15 @@ export async function findTakeWithLimit(rel: FinderRelation, limit: number): Pro
 
 /** @internal */
 export async function findNth(rel: FinderRelation, index: number): Promise<any | null> {
-  return (await rel.findNthWithLimit(index, 1))[0] ?? null;
+  // Rails: `@offsets ||= {}; @offsets[index] ||= find_nth_with_limit(index, 1).first`
+  // (finder_methods.rb:598-601) — a nil hit is not memoized, so it re-queries.
+  const offsets = ((rel as any)._offsets ??= new Map<number, any>());
+  let record = offsets.get(index) ?? null;
+  if (record == null) {
+    record = (await rel.findNthWithLimit(index, 1))[0] ?? null;
+    offsets.set(index, record);
+  }
+  return record;
 }
 
 /** @internal */

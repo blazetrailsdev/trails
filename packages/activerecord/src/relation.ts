@@ -444,6 +444,11 @@ export class Relation<T extends Base> {
   // `spawn`'s `model.all` branch) reachable at all.
   private _delegateToModel = false;
   private _records: T[] = [];
+  // Rails `@take` / `@offsets` (finder_methods.rb:586, 599-600): the memoized
+  // `find_take` record and the per-index `find_nth` cache, both cleared by
+  // `reset` (relation.rb:1199).
+  private _take?: T | null;
+  private _offsets?: Map<number, T | null>;
   /**
    * Per-record loader block, run on each freshly instantiated record BEFORE
    * its find/initialize callbacks fire — the trails analog of the block Rails
@@ -1992,6 +1997,9 @@ export class Relation<T extends Base> {
   reset(): this {
     this._loaded = false;
     this._delegateToModel = false;
+    // Rails: `@offsets = @take = nil` (relation.rb:1199).
+    this._offsets = undefined;
+    this._take = undefined;
     this._records = [];
     this._cacheKeys = undefined;
     this._cacheVersions = undefined;
