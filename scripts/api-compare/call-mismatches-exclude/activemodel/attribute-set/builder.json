@@ -9,16 +9,9 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-set/builder.ts",
-    "rubyName": "build_from_database",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:values",
-      "ref:types",
-      "ref:additionalTypes",
-      "ref:defaultAttributes"
-    ],
-    "reason": "builder.rb:16 `LazyAttributeSet.new(values, types, additional_types, default_attributes)` — trails has no LazyAttributeSet/LazyAttributeHash; `buildFromDatabase` materializes the attributes eagerly, so the only `new` in the body is the `AttributeSet(attrs)` it returns. Blocked on porting LazyAttributeSet, not on the argument list."
+    "rubyName": "attributes",
+    "call": "each_key",
+    "reason": "builder.rb:62-63 walks `values.each_key`/`types.each_key`; `values` is a plain object and `types` a Map here, neither of which has Ruby's Hash#each_key — `Object.keys(...)`/`Map#keys()` is the only spelling (same gap as the `materialize` -> `each_key` row below)."
   },
   {
     "package": "activemodel",
@@ -26,6 +19,20 @@
     "rubyName": "deep_dup",
     "call": "transform_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-set/builder.ts",
+    "rubyName": "default_attribute",
+    "call": "fetch",
+    "reason": "builder.rb:74 `additional_types.fetch(name, types[name])`; a JS Map has no two-argument `fetch`, and no type is ever stored as null, so `get(name) ?? types.get(name)` is exact (same gap as the `assign_default_value` -> `fetch` row)."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-set/builder.ts",
+    "rubyName": "fetch_value",
+    "call": "fetch",
+    "reason": "builder.rb:46,51 `@casted_values.fetch(name) { ... }` and `values.fetch(name) { value_present = false }`; JS Map/objects have no block-taking `fetch`, so the key-presence probe is `has`/`hasOwnProperty` and the miss arm is the surrounding branch."
   },
   {
     "package": "activemodel",

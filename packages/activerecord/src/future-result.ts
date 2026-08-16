@@ -1,6 +1,20 @@
 import { ActiveRecordError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import {
+  IsolatedExecutionState,
+  Notifications,
+  type NotificationEvent,
+  type EventPayload,
+  type Instrumenter,
+} from "@blazetrails/activesupport";
 import { Result } from "./result.js";
+
+/**
+ * Rails' `ActiveSupport::IsolatedExecutionState[:active_record_instrumenter]`
+ * slot (future_result.rb:111, abstract_adapter.rb:1152).
+ * @internal
+ */
+export const ACTIVE_RECORD_INSTRUMENTER = "active_record_instrumenter";
 
 /**
  * The pool surface `FutureResult` drives. Rails calls `pool.schedule_query` and
@@ -71,6 +85,62 @@ export class Complete {
 }
 
 /**
+ * Buffers the instrumentation events a scheduled query emits and republishes
+ * them once the foreground asks for the result, stamping each payload with the
+ * `lock_wait` the foreground spent waiting on the query.
+ *
+ * Rails installs it as the thread's `:active_record_instrumenter` for the
+ * duration of the scheduled query (future_result.rb:110-111); trails installs
+ * it for the duration of the awaited query via `IsolatedExecutionState.scope`,
+ * which is what a dedicated thread's fiber-local collapses to on one thread.
+ *
+ * Mirrors: ActiveRecord::FutureResult::EventBuffer (future_result.rb:24-47)
+ * @internal
+ */
+export class EventBuffer {
+  #futureResult: FutureResult;
+  #instrumenter: Instrumenter;
+  #events: NotificationEvent[];
+
+  constructor(futureResult: FutureResult, instrumenter: Instrumenter) {
+    this.#futureResult = futureResult;
+    this.#instrumenter = instrumenter;
+    this.#events = [];
+  }
+
+  /**
+   * Mirrors `EventBuffer#instrument` (future_result.rb:31-38).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby's `instrument` blocks on the query;
+   *   a JS query block can only be awaited, so trails splits the method the
+   *   same way `ActiveSupport::Notifications` already does
+   *   (`instrument`/`instrumentAsync`), and the query path is the async one.
+   */
+  async instrumentAsync<T>(
+    name: string,
+    payload: EventPayload = {},
+    block?: (payload: EventPayload) => Promise<T>,
+  ): Promise<T> {
+    const event = this.#instrumenter.newEvent(name, payload);
+    try {
+      return await event.recordAsync(block);
+    } finally {
+      this.#events.push(event);
+    }
+  }
+
+  /** Mirrors `EventBuffer#flush` (future_result.rb:40-46). */
+  flush(): void {
+    const events = this.#events;
+    this.#events = [];
+    for (const event of events) {
+      event.payload.lock_wait = this.#futureResult.lockWait;
+      Notifications.publishEvent(event);
+    }
+  }
+}
+
+/**
  * Mirrors: ActiveRecord::FutureResult::Canceled (future_result.rb:49)
  * @internal
  */
@@ -88,9 +158,8 @@ export class Canceled extends ActiveRecordError {
  * `#result` blocks until the worker thread is done. JS is single-threaded: the
  * query is already a native promise, so the mutex collapses to the in-flight
  * promise stored in `#executing` and `result()` returns a promise rather than
- * blocking. `EventBuffer` (future_result.rb:24-47) exists only to carry
- * instrumentation events across that thread boundary and has nothing to carry
- * here — events publish inline on the one thread there is.
+ * blocking. `EventBuffer` (future_result.rb:24-47) still buffers the scheduled
+ * query's events so `#result` can stamp each payload with `lock_wait`.
  *
  * Ruby's `#then(&block)` returns an `ActiveRecord::Promise` whose `#value`
  * blocks (promise.rb:36-38). The name is load-bearing in JS: ANY object with a
@@ -135,11 +204,14 @@ export class FutureResult {
   #error: unknown = null;
   #result: Result | null = null;
   #executing: Promise<void> | null = null;
+  #instrumenter: Instrumenter;
+  #eventBuffer: EventBuffer | null = null;
 
   constructor(pool: FutureResultPool, args: unknown[], kwargs: Record<string, unknown> = {}) {
     this.pool = pool;
     this.args = args;
     this.kwargs = kwargs;
+    this.#instrumenter = Notifications.instrumenter;
   }
 
   async isEmpty(): Promise<boolean> {
@@ -187,7 +259,10 @@ export class FutureResult {
         // already in flight for this FutureResult".
         if (this.#executing) return;
         if (this.pending()) {
-          await this.executeQuery(connection, { async: true });
+          this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
+          await IsolatedExecutionState.scope(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer, () =>
+            this.executeQuery(connection, { async: true }),
+          );
         }
       });
     });
@@ -195,6 +270,7 @@ export class FutureResult {
 
   async result(): Promise<Result> {
     await this.executeOrWait();
+    this.#eventBuffer?.flush();
 
     if (this.canceled()) {
       throw new Canceled();
@@ -217,13 +293,13 @@ export class FutureResult {
 
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
-      const start = Date.now();
+      const start = performance.now();
       // Ruby takes `@mutex` here and, if a worker thread already holds it,
       // records how long the wait was. The in-flight promise IS that lock on a
       // single thread (future_result.rb:142-156).
       if (this.#executing) {
         await this.#executing;
-        this.lockWait = Date.now() - start;
+        this.lockWait = performance.now() - start;
       } else {
         await this.pool.withConnection((connection) => this.executeQuery(connection));
       }

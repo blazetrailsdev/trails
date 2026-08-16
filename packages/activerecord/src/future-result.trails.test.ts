@@ -7,7 +7,14 @@ import { DatabaseStatements, select } from "./connection-adapters/abstract/datab
 import { makeCachedSelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { Executor, type CompletableExecution } from "@blazetrails/activesupport";
+import {
+  Executor,
+  IsolatedExecutionState,
+  Notifications,
+  type CompletableExecution,
+  type NotificationEvent,
+} from "@blazetrails/activesupport";
+import { ACTIVE_RECORD_INSTRUMENTER } from "./future-result.js";
 
 // Rails' own load_async_test.rb / asynchronous_queries_test.rb stay excluded
 // (scripts/parity/unported-files/unscoped.ts): every live test class there
@@ -418,6 +425,91 @@ describe("QueryCache#select_all", () => {
     ).toEqual(result);
   });
 });
+
+describe("FutureResult::EventBuffer", () => {
+  it("reports the wait on a contended read", async () => {
+    const events: NotificationEvent[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e: NotificationEvent) =>
+      events.push(e),
+    );
+    const pool = instrumentedDeferredPool(new Result(["id"], [[1]]));
+    const futureResult = new FutureResult(pool, ["SELECT 1", null, []]);
+
+    try {
+      futureResult.scheduleBang(new AsynchronousQueriesTracker.Session());
+      const pending = futureResult.result();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      pool.finish();
+      await pending;
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.lock_wait as number).toBeGreaterThan(0);
+  });
+
+  it("holds the events back until an uncontended read, which reports 0.0", async () => {
+    const events: NotificationEvent[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e: NotificationEvent) =>
+      events.push(e),
+    );
+    const pool = instrumentedDeferredPool(new Result(["id"], [[1]]));
+    const futureResult = new FutureResult(pool, ["SELECT 1", null, []]);
+
+    try {
+      futureResult.scheduleBang(new AsynchronousQueriesTracker.Session());
+      pool.finish();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(futureResult.pending()).toBe(false);
+      expect(events).toEqual([]);
+      await futureResult.result();
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.lock_wait).toBe(0.0);
+  });
+});
+
+/**
+ * A deferred pool whose connection instruments its query the way
+ * `AbstractAdapter#log` does — through
+ * `IsolatedExecutionState[:active_record_instrumenter]`
+ * (abstract_adapter.rb:1151-1153), which is the slot a scheduled
+ * FutureResult swaps its EventBuffer into.
+ */
+function instrumentedDeferredPool(outcome: Result) {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  return {
+    finish: () => release(),
+    scheduleQuery(futureResult: { executeOrSkip(): void }) {
+      futureResult.executeOrSkip();
+    },
+    async withConnection<T>(
+      fn: (connection: FutureResultConnection) => Promise<T> | T,
+    ): Promise<T> {
+      return fn({
+        rawExecQuery: async (sql, name, binds) => {
+          const instrumenter = IsolatedExecutionState.fetch(
+            ACTIVE_RECORD_INSTRUMENTER,
+            () => Notifications.instrumenter,
+          );
+          return instrumenter.instrumentAsync(
+            "sql.active_record",
+            { sql, name, binds, async: true },
+            async () => {
+              await gate;
+              return outcome;
+            },
+          );
+        },
+      });
+    },
+  };
+}
 
 /** A pool whose query stays in flight until `finish()` is called. */
 function deferredPool(outcome: Result) {

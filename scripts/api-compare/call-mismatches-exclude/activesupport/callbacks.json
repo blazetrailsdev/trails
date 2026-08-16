@@ -16,19 +16,6 @@
   {
     "package": "activesupport",
     "tsFile": "callbacks.ts",
-    "rubyName": "compiled",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:makeLambda",
-      "ref:userConditions",
-      "ref:chainConfig"
-    ],
-    "reason": "callbacks.rb:285 extracts `CallTemplate.build(@filter, self)`, whose returned template is then constructed into a `Filters::Before/After/Around`. trails inlines the CallTemplate dispatch into `compiled`, so the body's `new` occurrences are the InstanceExec/ObjectCall/MethodCall templates and the comparator pairs them positionally against the Filters constructions. Convergence is the `CallTemplate.build` extraction, not the argument list."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "callbacks.ts",
     "rubyName": "duplicates?",
     "call": "matches?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails callbacks.rb:272-279 delegates to `matches?(other.kind, other.filter)` for Symbol filters; trails callbacks.ts:629-634 isDuplicates inlines the kind/filter equality for string filters."

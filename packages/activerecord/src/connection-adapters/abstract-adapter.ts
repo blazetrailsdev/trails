@@ -28,6 +28,20 @@ import {
   Notifications,
 } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
+import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
+
+/**
+ * The instrumenter surface `#log` drives — `ActiveSupport::Notifications`'
+ * `Instrumenter` or a `FutureResult::EventBuffer` standing in for it.
+ * @internal
+ */
+type AdapterInstrumenter = {
+  instrumentAsync<T>(
+    name: string,
+    payload: EventPayload,
+    block: (payload: EventPayload) => Promise<T>,
+  ): Promise<T>;
+};
 import { ActiveRecord } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
@@ -2691,9 +2705,18 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /** @internal Mirrors: AbstractAdapter#instrumenter */
-  get instrumenter(): typeof Notifications {
-    return Notifications;
+  /**
+   * @internal Mirrors: AbstractAdapter#instrumenter (abstract_adapter.rb:1151-1153)
+   *
+   * A scheduled `FutureResult` swaps in its `EventBuffer` here for the duration
+   * of its query, so the events it emits carry `lock_wait` when the foreground
+   * finally flushes them (future_result.rb:110-111).
+   */
+  get instrumenter(): AdapterInstrumenter {
+    return IsolatedExecutionState.fetch<AdapterInstrumenter>(
+      ACTIVE_RECORD_INSTRUMENTER,
+      () => Notifications.instrumenter,
+    );
   }
 
   /** @internal Mirrors: AbstractAdapter#translate_exception */
