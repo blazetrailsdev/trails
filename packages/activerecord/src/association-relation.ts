@@ -92,7 +92,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     // The association memoized its `@association_scope` while the owner was
     // still new (that memo is what seeded this relation), so it carries the
     // unresolved FK too — drop it before rebuilding, exactly as Rails'
-    // `reset_scope` does when the target goes stale (association.rb:198-201).
+    // `reset_scope` does (association.rb:119-121).
     assoc.resetScope?.();
     const fresh = assoc.scope();
     if (fresh._isNone) return;

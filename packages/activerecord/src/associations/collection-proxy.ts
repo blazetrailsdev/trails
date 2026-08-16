@@ -3396,6 +3396,7 @@ const delegateMethods = (
   .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
   .concat([
     "scoping",
+    "values",
     "insert",
     "insertAll",
     "insertBang",
