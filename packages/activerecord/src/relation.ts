@@ -84,7 +84,6 @@ import {
   type TouchAllArgs,
   type CounterCacheTouchOption,
 } from "./timestamp.js";
-import { ExplainRegistry } from "./explain-registry.js";
 import { Explain } from "./explain.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -296,6 +295,106 @@ declare const relationNameBrand: unique symbol;
  * stay assignable to it at call sites.
  */
 export type RelationName = string | { readonly [relationNameBrand]: never };
+
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
+/**
+ * The chainable object `Relation#explain` returns. Every member runs one
+ * operation with query collection enabled and renders the EXPLAIN output for
+ * every query it emitted, so `.explain.count` explains the COUNT query rather
+ * than the main SELECT.
+ *
+ * Ruby reaches the rendered plan through `inspect` in the console; trails
+ * exposes the same terminal through the relation thenable idiom
+ * (`applyThenable(ExplainProxy.prototype, "inspect")` below), so
+ * `await rel.explain()` renders while `await rel.explain().count()` stays
+ * available.
+ *
+ * Mirrors: ActiveRecord::Relation::ExplainProxy (relation.rb:6-51)
+ * @internal
+ */
+export class ExplainProxy<T extends Base> {
+  private readonly _relation: Relation<T>;
+  private readonly _options: ExplainOption[];
+
+  constructor(relation: Relation<T>, options: ExplainOption[]) {
+    this._relation = relation;
+    this._options = options;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation::ExplainProxy#inspect (relation.rb:12-14) —
+   * `exec_explain { @relation.send(:exec_queries) }`, private-bypass included.
+   */
+  inspect(): Promise<string> {
+    return this.execExplain(() => (this._relation as any).execQueries());
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#average (relation.rb:16-18) */
+  average(columnName: string | Nodes.Node): Promise<string> {
+    return this.execExplain(() => this._relation.average(columnName as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#count (relation.rb:20-22) */
+  count(columnName?: string | Nodes.Node): Promise<string> {
+    return this.execExplain(() => this._relation.count(columnName as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#first (relation.rb:24-26) */
+  first(limit?: number): Promise<string> {
+    return this.execExplain(() => this._relation.first(limit as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#last (relation.rb:28-30) */
+  last(limit?: number): Promise<string> {
+    return this.execExplain(() => this._relation.last(limit as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#maximum (relation.rb:32-34) */
+  maximum(columnName: string | Nodes.Node): Promise<string> {
+    return this.execExplain(() => this._relation.maximum(columnName as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#minimum (relation.rb:36-38) */
+  minimum(columnName: string | Nodes.Node): Promise<string> {
+    return this.execExplain(() => this._relation.minimum(columnName as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#pluck (relation.rb:40-42) */
+  pluck(...columnNames: (string | Nodes.Node)[]): Promise<string> {
+    return this.execExplain(() => this._relation.pluck(...(columnNames as never[])));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#sum (relation.rb:44-46) */
+  sum(identityOrColumn?: string | Nodes.Node): Promise<string> {
+    return this.execExplain(() => this._relation.sum(identityOrColumn as never));
+  }
+
+  /** Mirrors: ActiveRecord::Relation::ExplainProxy#exec_explain (relation.rb:48-50) */
+  private async execExplain(block: () => unknown): Promise<string> {
+    const { queries } = await this._relation.collectingQueriesForExplain(async () => block());
+    return this._relation.execExplain(queries, this._options);
+  }
+}
+
+export interface ExplainProxy<T extends Base> {
+  then<TResult1 = string, TResult2 = never>(
+    onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2>;
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/relation.rb:12` —
+   *   JS Promise protocol; Ruby has no thenable).
+   */
+  catch<TResult = never>(
+    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
+  ): Promise<string | TResult>;
+  /**
+   * @noRailsEquivalent PERMANENT (`vendor/rails/activerecord/lib/active_record/relation.rb:12` —
+   *   JS Promise protocol; Ruby has no thenable).
+   */
+  finally(onfinally?: (() => void) | null): Promise<string>;
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
@@ -2758,12 +2857,12 @@ export class Relation<T extends Base> {
   // and their bang variants are mixed in from finder-methods.ts
 
   /**
-   * Return the query execution plan for this relation and every query run
-   * as a side effect of executing it (eager loads, preloads, association
-   * loads). Matches Rails' `ActiveRecord::Relation#explain`: the relation
-   * is actually executed while `ExplainRegistry.collect = true`, the
-   * subscriber captures every `sql.active_record` notification, and
-   * `exec_explain` runs EXPLAIN against each captured SQL.
+   * Return an {@link ExplainProxy} over this relation. Each of its members runs
+   * one operation while `ExplainRegistry.collect = true` — the subscriber
+   * captures every `sql.active_record` notification and `exec_explain` runs
+   * EXPLAIN against each captured SQL — so `.explain().count()` explains the
+   * COUNT query and `await .explain()` (the proxy's `inspect`) explains the main
+   * SELECT plus every query run as a side effect of it (eager loads, preloads).
    *
    * `options` is a mix of flag strings and an optional trailing keyword
    * hash. Supported keyword options are adapter-specific — PG and MySQL
@@ -2782,44 +2881,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#explain
    */
-  async explain(...options: ExplainOption[]): Promise<string> {
+  explain(...options: ExplainOption[]): ExplainProxy<T> {
     validateExplainOptions(options);
-    // Rails: `exec_explain(collecting_queries_for_explain { exec_queries })`.
-    // Collect over the always-executing exec_queries path, NOT the cache-aware
-    // `toArray()` — an already-loaded (or `.none()`-short-circuited) relation
-    // would otherwise collect zero queries and fall back to explaining
-    // `_toSql()`, whose Arel double-quoted identifiers diverge from the real
-    // adapter-quoted SQL the driver ran (backticks on MySQL).
-    const { queries } = await ExplainRegistry.collectingQueries(() =>
-      this._execQueriesForExplain(),
-    );
-    return this.execExplain(queries, options);
-  }
-
-  /**
-   * Always-executing query path used by `explain` — mirrors Rails
-   * `exec_queries`. Re-runs the SELECT (and any eager-load / preload queries)
-   * regardless of the load cache, so `collecting_queries_for_explain` captures
-   * the real adapter-quoted SQL emitted via `sql.active_record`. A `.none()`
-   * relation runs nothing (Rails yields empty EXPLAIN output for it).
-   *
-   * Rails' `ExplainProxy` calls `exec_queries` directly, bypassing the
-   * `@records ||= exec_queries` assignment in `#records`, so `.explain` does
-   * NOT mark the relation loaded. `_toArrayInner` ends in `loadRecords`, which
-   * sets `_loaded`/`_records`, so snapshot and restore that state around the
-   * call to keep `.explain` side-effect-free on the load cache.
-   * @internal
-   */
-  private async _execQueriesForExplain(): Promise<void> {
-    if (this._isNone) return;
-    const wasLoaded = this._loaded;
-    const priorRecords = this._records;
-    try {
-      await this.withConnection(() => this._toArrayInner());
-    } finally {
-      this._loaded = wasLoaded;
-      this._records = priorRecords;
-    }
+    return new ExplainProxy(this, options);
   }
 
   // count, sum, average, minimum, maximum are mixed in via
@@ -5252,11 +5316,33 @@ export class Relation<T extends Base> {
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
+  /**
+   * The always-executing load path. `ExplainProxy#inspect` calls it directly,
+   * bypassing the `@records ||= exec_queries` memo in `#records`, so `.explain`
+   * re-runs the SELECT (and any eager-load / preload queries) regardless of the
+   * load cache and `collecting_queries_for_explain` captures the real
+   * adapter-quoted SQL. A `.none()` relation runs nothing, and Rails yields
+   * empty EXPLAIN output for it.
+   *
+   * Rails' `exec_queries` does not touch `@records` — the assignment lives in
+   * `#load`. trails' `_toArrayInner` (this relation's `exec_main_query`) ends in
+   * `loadRecords`, so the load-cache state is snapshotted and restored here to
+   * keep `.explain` side-effect-free. The `@none` short-circuit is
+   * `exec_main_query`'s `return [] if @none` (relation.rb:1422-1429), which `_toArrayInner`
+   * does not carry. Both ride `split-load-records-out-of-exec-queries`.
+   *
+   * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1425)
+   */
   private async execQueries(): Promise<T[]> {
-    return this.skipQueryCacheIfNecessary(async () => {
-      const rows = await this.execMainQuery();
-      return this.instantiateRecords(rows);
-    });
+    if (this._isNone) return [];
+    const wasLoaded = this._loaded;
+    const priorRecords = this._records;
+    try {
+      return await this.withConnection(() => this._toArrayInner());
+    } finally {
+      this._loaded = wasLoaded;
+      this._records = priorRecords;
+    }
   }
 
   private async execMainQuery(): Promise<Record<string, unknown>[]> {
@@ -5564,6 +5650,10 @@ defineValueMethods(Relation);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);
+
+// Ruby reaches ExplainProxy's rendered plan through `inspect` in the console;
+// the same terminal is spelled `await rel.explain()` here.
+applyThenable(ExplainProxy.prototype, "inspect");
 
 /** @internal */
 async function computeCacheKey(

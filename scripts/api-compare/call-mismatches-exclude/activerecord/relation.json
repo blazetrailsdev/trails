@@ -87,8 +87,22 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
-    "call": "preload_associations",
-    "reason": "Newly comparable (RFC 0072 arity sweep): relation.ts has no `execQueries` — Rails' exec_queries body is split across `load`/`_executeEagerLoad`, which DO call preloadAssociations. Converge by porting exec_queries as one method."
+    "call": "instantiate_records",
+    "reason": "Verified per-site (RFC 0107): `exec_queries` runs the always-executing load through `_toArrayInner` — this relation's `exec_main_query` — which instantiates the records itself (relation.rb:1428). The row retires with `split-load-records-out-of-exec-queries`, which lifts `loadRecords` out of `_toArrayInner` and restores Rails' `instantiate_records(exec_main_query)` composition."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "first",
+    "call": "find_nth",
+    "reason": "Verified per-site (RFC 0107): this row is `ActiveRecord::Relation::ExplainProxy#first` (relation.rb:24-26), whose body is the one-line `exec_explain { @relation.first(...) }` it already makes. The extractor keys a row by <tsFile, rubyName>, so the proxy member collides with the homonymous `ActiveRecord::Relation#first` and inherits ITS Rails call set. No trails call can satisfy it; the row retires when the extractor disambiguates nested classes."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "first",
+    "call": "find_nth_with_limit",
+    "reason": "Verified per-site (RFC 0107): this row is `ActiveRecord::Relation::ExplainProxy#first` (relation.rb:24-26), whose body is the one-line `exec_explain { @relation.first(...) }` it already makes. The extractor keys a row by <tsFile, rubyName>, so the proxy member collides with the homonymous `ActiveRecord::Relation#first` and inherits ITS Rails call set. No trails call can satisfy it; the row retires when the extractor disambiguates nested classes."
   },
   {
     "package": "activerecord",
@@ -96,6 +110,20 @@
     "rubyName": "instantiate_records",
     "call": "instantiate",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "last",
+    "call": "find_last",
+    "reason": "Verified per-site (RFC 0107): this row is `ActiveRecord::Relation::ExplainProxy#last` (relation.rb:28-30), whose body is the one-line `exec_explain { @relation.last(...) }` it already makes. The extractor keys a row by <tsFile, rubyName>, so the proxy member collides with the homonymous `ActiveRecord::Relation#last` and inherits ITS Rails call set. No trails call can satisfy it; the row retires when the extractor disambiguates nested classes."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "last",
+    "call": "limit",
+    "reason": "Verified per-site (RFC 0107): this row is `ActiveRecord::Relation::ExplainProxy#last` (relation.rb:28-30), whose body is the one-line `exec_explain { @relation.last(...) }` it already makes. The extractor keys a row by <tsFile, rubyName>, so the proxy member collides with the homonymous `ActiveRecord::Relation#last` and inherits ITS Rails call set. No trails call can satisfy it; the row retires when the extractor disambiguates nested classes."
   },
   {
     "package": "activerecord",

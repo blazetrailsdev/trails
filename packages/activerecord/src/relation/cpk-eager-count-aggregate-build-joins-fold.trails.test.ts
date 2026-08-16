@@ -3,7 +3,7 @@
  * emitter.
  *
  * Two composite-key paths in `calculations.ts` previously skipped the eager
- * JoinDependency fold that `singleAggregate` / `groupedAggregate` use, diverging
+ * JoinDependency fold that `singleAggregate` / `executeGroupedCalculation` use, diverging
  * from Rails `apply_join_dependency` (which routes all arities through the one
  * `build_joins` path):
  *

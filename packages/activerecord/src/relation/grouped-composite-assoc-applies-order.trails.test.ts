@@ -7,7 +7,7 @@
  * relation's `order_values`, so
  * `group(<composite belongs_to>).order(...).limit(n)` picked arbitrary groups
  * on PG/MySQL instead of the ordered first n. The sibling scalar/expression
- * arm `groupedAggregate` already applied it.
+ * arm `executeGroupedCalculation` already applied it.
  *
  * Rails does not special-case key arity here: `execute_grouped_calculation`
  * builds ONE query from the relation's own arel, so `order_values` ride along

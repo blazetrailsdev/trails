@@ -368,35 +368,18 @@ function eagerJoinedRelation(rel: CalculationRelation, eagerLoading: boolean): C
 }
 
 /**
- * `execute_grouped_calculation`'s projection (calculations.rb:540-550): the
- * aggregate, then the relation's own `select_values` whenever the having clause
- * is non-empty — that is what makes an aliased select
- * (`select("MIN(x) AS min_x").having("min_x > 50")`) referencable from HAVING —
- * then the aliased group columns. Grouped only: `execute_simple_calculation`
- * REPLACES `select_values` with the lone aggregate (calculations.rb:484).
+ * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
+ * (calculations.rb:514-593)
  * @internal
  */
-function buildGroupedSelectValues(
+export async function executeGroupedCalculation(
   rel: CalculationRelation,
-  selectValue: Nodes.Node,
-  groupColumns: Nodes.Node[],
-): (string | symbol | Nodes.Node)[] {
-  const selectValues: Nodes.Node[] = [selectValue];
-  if (!rel.havingClause.isEmpty()) {
-    selectValues.push(
-      ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
-    );
-  }
-  selectValues.push(...groupColumns);
-  return selectValues;
-}
-
-async function groupedAggregate(
-  rel: CalculationRelation,
-  fn: AggFn,
-  column: string | Nodes.Node | number | null,
-  distinct: boolean | null = rel.distinctValue,
+  operation: string,
+  columnName: string | string[] | Nodes.Node | number | null,
+  distinct: boolean | null,
 ): Promise<Map<unknown, unknown>> {
+  const fn = operation.toLowerCase() as AggFn;
+  const column = aggregateTarget(columnName);
   rel._checkEagerLoadable();
   // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
   // group field, uniq'ing only when there is more than one. A belongs_to
@@ -404,7 +387,10 @@ async function groupedAggregate(
   // association's foreign key; the result is keyed by the loaded associated
   // records rather than by the raw key values.
   let groupFields: unknown[] = rel.groupValues;
-  if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
+  // `uniq` — spelled as a filter rather than `new Set(...)` so the body's first
+  // constructor call stays `ColumnAliasTracker.new` (calculations.rb:528), as it
+  // is in Rails.
+  if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
   const association =
     groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
   // calculations.rb:521 — `Array(association.foreign_key)` expands a
@@ -447,16 +433,24 @@ async function groupedAggregate(
   const aggAlias = columnAliasTracker.aliasFor(
     `${fn} ${(column == null ? "" : String(column)).toLowerCase()}`,
   );
-  const selectValues = buildGroupedSelectValues(
-    rel,
-    aggNode.as(rel._conn().quoteColumnName(aggAlias)),
-    groupKeyAliases,
-  );
+  // calculations.rb:541-551: the aggregate, then the relation's own
+  // `select_values` whenever the having clause is non-empty — that is what makes
+  // an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
+  // referencable from HAVING — then the aliased group columns. Grouped only:
+  // `execute_simple_calculation` REPLACES `select_values` with the lone
+  // aggregate (calculations.rb:484).
+  const selectValues: Nodes.Node[] = [aggNode.as(rel._conn().quoteColumnName(aggAlias))];
+  if (!rel.havingClause.isEmpty()) {
+    selectValues.push(
+      ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
+    );
+  }
+  selectValues.push(...groupKeyAliases);
   // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
   // `from(subquery)` group column stays unqualified instead of being re-pinned
   // to the model's table by `build_group`.
   relation.groupValues = groupNodes as unknown as string[];
-  relation.selectValues = selectValues;
+  relation.selectValues = selectValues as (string | Nodes.Node)[];
 
   // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
   // own type caster, then a type discovered through the join dependencies, then
@@ -481,7 +475,11 @@ async function groupedAggregate(
   const queryResult = await (
     rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
   ).skipQueryCacheIfNecessary(() =>
-    rel._conn().selectAll(sql, `${rel.model.name} ${opName}`, binds),
+    // calculations.rb:527/556 — `model.with_connection { |connection|
+    // connection.select_all(...) }`.
+    rel.withConnection((connection) =>
+      connection.selectAll(sql, `${rel.model.name} ${opName}`, binds),
+    ),
   );
   const rows = queryResult.toArray();
 
@@ -933,8 +931,12 @@ export async function pluck(
     // (adding joins Rails would not add for the pluck columns).
     const rel = this._clone();
     delete rel._values.select;
+    // calculations.rb:315-316 — `relation.select_values = columns; relation.arel`.
+    // Going through `select_values` (rather than overwriting `manager.projections`)
+    // is what makes a zero-column `pluck` project `table[Arel.star]` via
+    // `build_select`'s else arm instead of emitting a projection-less `SELECT FROM`.
+    rel.selectValues = projections as any;
     const manager = rel.toArel();
-    manager.projections = projections as any;
 
     const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
     const result = await this.skipQueryCacheIfNecessary(() =>
@@ -1479,17 +1481,6 @@ function typeCasterFor(column: unknown): unknown {
   const relation = (column as { relation?: { isAbleToTypeCast?(): boolean } } | null)?.relation;
   if (relation?.isAbleToTypeCast?.() !== true) return null;
   return tryCall(column as object, "typeCaster") ?? null;
-}
-
-/** @internal */
-export async function executeGroupedCalculation(
-  rel: CalculationRelation,
-  operation: string,
-  columnName: string | string[] | Nodes.Node | number | null,
-  distinct: boolean | null,
-): Promise<Map<unknown, unknown>> {
-  const fn = operation.toLowerCase() as AggFn;
-  return rel.withConnection(() => groupedAggregate(rel, fn, aggregateTarget(columnName), distinct));
 }
 
 /** @internal */

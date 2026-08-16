@@ -150,7 +150,7 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
 // (calculations.rb:567-570), so grouping by an Arel attribute keys the result
 // by the attribute's own decorated type — an enum keys by its labels, not the
 // raw stored integers. Guards the `groupNode instanceof Nodes.Attribute`
-// branch in groupedAggregate.
+// branch in executeGroupedCalculation.
 // ==========================================================================
 
 describe("grouped calculation keyed via Arel attribute type caster", () => {
@@ -207,7 +207,7 @@ describe("multi-field grouped calculation key shape", () => {
 //
 // trails-specific regression (no Rails analogue — Ruby has no Number
 // precision cliff): SQLite returns a large SUM as a lossy double, so
-// groupedAggregate wraps the query in a CAST(... AS TEXT) that must re-project
+// executeGroupedCalculation wraps the query in a CAST(... AS TEXT) that must re-project
 // EVERY group key alias. Guards wrapBigintAgg's grouped branch against
 // dropping the trailing keys once there is more than one group field.
 // ==========================================================================
