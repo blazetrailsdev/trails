@@ -107,4 +107,26 @@ describe("resetScope on owner save", () => {
     await author.save();
     expect(resetCount).toBeGreaterThan(0);
   });
+
+  it("clears the scope of a built association that never loaded a target", async () => {
+    const author = new Author({ name: "unloaded" });
+    // Build the association wrapper without loading or building any child, so
+    // it holds no cached target data. Rails' `association_instance_get` is a
+    // bare `@association_cache[name]` read (autosave_association.rb:420), so
+    // this association still reaches `association.reset_scope` (:428) on the
+    // owner's save; trails' `associationInstanceGet` gates on cached data.
+    const assoc = (author as any).association("posts");
+    let resetCount = 0;
+    const original = assoc.resetScope.bind(assoc);
+    assoc.resetScope = function () {
+      resetCount++;
+      return original();
+    };
+    // Memoize the scope while the owner is still new, so it carries the
+    // unresolved foreign key.
+    assoc.scope();
+    await author.save();
+    expect(resetCount).toBeGreaterThan(0);
+    expect(assoc.scope().toSql()).toContain(String(author.id));
+  });
 });
