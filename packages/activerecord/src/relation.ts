@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { except, hexdigest, isBlank, Notifications } from "@blazetrails/activesupport";
-import { Table, SelectManager, Nodes, Visitors, sql } from "@blazetrails/arel";
+import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import {
@@ -325,7 +325,30 @@ export class ExplainProxy<T extends Base> {
    * `exec_explain { @relation.send(:exec_queries) }`, private-bypass included.
    */
   inspect(): Promise<string> {
-    return this.execExplain(() => (this._relation as any).execQueries());
+    return this.execExplain(async () => {
+      // Rails' `exec_queries` leaves `@records` alone — the assignment lives in
+      // `#load` — so explaining a relation never loads it. trails' `exec_queries`
+      // ends in `loadRecords`, so the load-cache state is snapshotted and
+      // restored around the call to keep `.explain` side-effect-free, and the
+      // `@none` arm of `exec_main_query` (relation.rb:1424-1429) short-circuits
+      // before any query is issued. Both ride
+      // `split-load-records-out-of-exec-queries`.
+      const relation = this._relation as unknown as {
+        _isNone: boolean;
+        _loaded: boolean;
+        _records: T[];
+        execQueries(): Promise<T[]>;
+      };
+      if (relation._isNone) return [];
+      const wasLoaded = relation._loaded;
+      const priorRecords = relation._records;
+      try {
+        return await relation.execQueries();
+      } finally {
+        relation._loaded = wasLoaded;
+        relation._records = priorRecords;
+      }
+    });
   }
 
   /** Mirrors: ActiveRecord::Relation::ExplainProxy#average (relation.rb:16-18) */
@@ -526,8 +549,7 @@ export class Relation<T extends Base> {
   _instantiateBlock?: (record: T) => void;
   private _loadAsyncPromise?: Promise<T[]>;
   /**
-   * Set by `loadAsync()` so `_toArrayInner` — this relation's `exec_main_query`
-   * — issues its SELECT with `async:` on, the way Rails' `load_async` calls
+   * Set by `loadAsync()` so `execMainQuery` issues its SELECT with `async:` on, the way Rails' `load_async` calls
    * `exec_main_query(async: ...)` (relation.rb:1142).
    */
   private _asyncLoad = false;
@@ -2079,15 +2101,14 @@ export class Relation<T extends Base> {
     // .joinable?)`, keeping the returned FutureResult in `@future_result`
     // (relation.rb:1138-1154). Both of those reads need the connection that
     // will run the query, so trails makes them where it is in hand — in
-    // `_toArrayInner`, which is this relation's `exec_main_query` — and marks
-    // the load async here.
+    // `execMainQuery` — and marks the load async here.
     //
     // The `_loadAsyncPromise` memoization is retained in place of Rails'
     // `@future_result` + `scheduled?`: Rails' foreground `exec_queries` reads
     // `future.result` for the ROWS and still instantiates records itself, so
     // the future is all it has to hold. trails' loading path is a promise the
     // whole way down — instantiation, eager loading and preloading are awaited
-    // inside `_toArrayInner` — so the in-flight handle a second caller must
+    // inside `execQueries` — so the in-flight handle a second caller must
     // join is that promise, not the FutureResult, which covers only the first
     // of those steps.
     // Kick off the load in the background and stash the in-flight promise.
@@ -2420,10 +2441,13 @@ export class Relation<T extends Base> {
     // permanent under `permanent_connection_checkout = :deprecated | :disallowed`.
     // Mirrors Rails, whose read paths run inside `with_connection` and thread the
     // yielded connection.
-    return this.withConnection(() => this._toArrayInner());
+    return this.withConnection(() => this.execQueries());
   }
 
-  private async _toArrayInner(): Promise<T[]> {
+  /**
+   * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1403-1421).
+   */
+  private async execQueries(): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       // Lazily reflect the schema before issuing the query so consumers
       // don't have to call loadSchema explicitly. Idempotent and cheap.
@@ -2457,47 +2481,11 @@ export class Relation<T extends Base> {
       // matching includes to eager_load so the JOIN is present — otherwise
       // a raw where condition referring to that table would fail.
       // See ActiveRecord::Relation#references_eager_loaded_tables?
-      const promotedIncludes = [
-        ...new Set([
-          ...this._includesToPromoteFromReferences(),
-          ...this._includesToPromoteFromJoins(),
-        ]),
-      ];
+      const promotedIncludes = this._promotedIncludes();
 
-      // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
-      // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
-      // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
-      // the eager-loading `select_all(relation.arel, "SQL", async: async)`
-      // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
-      // querying.rb:67-68). This method is that `exec_main_query`, so the value
-      // is computed once here and threaded into both.
-      const c = this._conn();
-      const async =
-        this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
-
-      let loadedRecords: T[];
-      if (this.eagerLoadValues.length > 0 || promotedIncludes.length > 0) {
-        const allEager = [...new Set([...this.eagerLoadValues, ...promotedIncludes])];
-        await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
-        if (token !== this._loadToken) return [];
-        loadedRecords = this._records;
-        this.loadRecords(loadedRecords);
-      } else {
-        // Rails' `_query_by_sql(arel, async: async)` (relation.rb:1449 →
-        // querying.rb:67-68).
-        // Awaiting the FutureResult here is trails' `future.result` in
-        // `exec_queries` (relation.rb:1408).
-        const result = await this.skipQueryCacheIfNecessary(() =>
-          c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
-        );
-        if (token !== this._loadToken) return [];
-        const rows = result.toArray();
-        loadedRecords = this._instrumentInstantiation(
-          rows,
-          result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-        );
-        this.loadRecords(loadedRecords);
-      }
+      const loadedRecords = await this.execMainQuery();
+      if (token !== this._loadToken) return [];
+      this.loadRecords(loadedRecords);
 
       // Apply readonly and strict_loading flags to loaded records
       if (this.readonlyValue) {
@@ -2528,6 +2516,61 @@ export class Relation<T extends Base> {
 
       return [...this._records];
     });
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Relation#exec_main_query (relation.rb:1423-1452).
+   *
+   * Rails returns rows and lets `instantiate_records` route the eager case
+   * through `@_join_dependency`; trails' eager arm hydrates its records inside
+   * `_executeEagerLoad` (it owns the JoinDependency), so both arms return
+   * records here.
+   */
+  private async execMainQuery(): Promise<T[]> {
+    // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
+    // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
+    // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
+    // the eager-loading `select_all(relation.arel, "SQL", async: async)`
+    // (relation.rb:1436) and `_query_by_sql` (relation.rb:1449 →
+    // querying.rb:67-68).
+    const c = this._conn();
+    const async =
+      this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
+
+    // Rails' `eager_loading?`, which `exec_main_query` reads for itself
+    // (relation.rb:1428) exactly as `exec_queries` does for its preload list.
+    const promotedIncludes = this._promotedIncludes();
+    if (this.eagerLoadValues.length > 0 || promotedIncludes.length > 0) {
+      const allEager = [...new Set([...this.eagerLoadValues, ...promotedIncludes])];
+      await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
+      return this._records;
+    }
+
+    // Awaiting the FutureResult here is trails' `future.result` in
+    // `exec_queries` (relation.rb:1408).
+    const result = await this.skipQueryCacheIfNecessary(() =>
+      c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
+    );
+    return this.instantiateRecords(
+      result.toArray(),
+      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+    );
+  }
+
+  /**
+   * The includes this relation promotes to an eager JOIN — trails' per-
+   * association form of Rails' `eager_loading?` (relation.rb:1481-1487), read
+   * independently by `exec_main_query` and `exec_queries` the way Rails reads
+   * its memoized `@should_eager_load`.
+   * @internal
+   */
+  private _promotedIncludes(): AssociationSpec[] {
+    return [
+      ...new Set([
+        ...this._includesToPromoteFromReferences(),
+        ...this._includesToPromoteFromJoins(),
+      ]),
+    ];
   }
 
   /**
@@ -2711,7 +2754,7 @@ export class Relation<T extends Base> {
     const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
-      this._records = this._instrumentInstantiation(
+      this._records = this.instantiateRecords(
         result.toArray(),
         result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
       );
@@ -2801,11 +2844,11 @@ export class Relation<T extends Base> {
     this._records = parents as T[];
 
     // Fire `_instantiateBlock` on the JoinDependency path, which instantiates via
-    // `jd.instantiateFromRows` and so bypasses `_instrumentInstantiation` (where
+    // `jd.instantiateFromRows` and so bypasses `instantiateRecords` (where
     // the block otherwise runs). The bypass / degrade-to-preload sub-paths above
-    // already instantiate through `_instrumentInstantiation`, so firing here only
-    // — not in `_toArrayInner` — keeps the block once-per-record like Rails'
-    // `instantiate_records(rows, &block)`. Runs before the `_toArrayInner`
+    // already instantiate through `instantiateRecords`, so firing here only
+    // — not in `execQueries` — keeps the block once-per-record like Rails'
+    // `instantiate_records(rows, &block)`. Runs before the `execQueries`
     // preload, matching Rails' ordering.
     const block = this._instantiateBlock;
     if (block) for (const record of this._records) block(record);
@@ -3575,7 +3618,12 @@ export class Relation<T extends Base> {
     }
   }
 
-  private _instrumentInstantiation(
+  /**
+   * Mirrors: ActiveRecord::Relation#instantiate_records (relation.rb:1455-1464)
+   * — its non-eager arm (`model._load_from_sql(rows)`), instrumented with
+   * `instantiation.active_record` the way `_load_from_sql` is in Rails.
+   */
+  private instantiateRecords(
     rows: Record<string, unknown>[],
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): T[] {
@@ -5088,53 +5136,6 @@ export class Relation<T extends Base> {
     // Arel's `-`/`+` wrap the operation in a Grouping; Rails unwraps it again
     // with `.expr`, so build the bare operation node here.
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
-  }
-
-  /**
-   * The always-executing load path. `ExplainProxy#inspect` calls it directly,
-   * bypassing the `@records ||= exec_queries` memo in `#records`, so `.explain`
-   * re-runs the SELECT (and any eager-load / preload queries) regardless of the
-   * load cache and `collecting_queries_for_explain` captures the real
-   * adapter-quoted SQL. A `.none()` relation runs nothing, and Rails yields
-   * empty EXPLAIN output for it.
-   *
-   * Rails' `exec_queries` does not touch `@records` — the assignment lives in
-   * `#load`. trails' `_toArrayInner` (this relation's `exec_main_query`) ends in
-   * `loadRecords`, so the load-cache state is snapshotted and restored here to
-   * keep `.explain` side-effect-free. The `@none` short-circuit is
-   * `exec_main_query`'s `return [] if @none` (relation.rb:1422-1429), which `_toArrayInner`
-   * does not carry. Both ride `split-load-records-out-of-exec-queries`.
-   *
-   * Mirrors: ActiveRecord::Relation#exec_queries (relation.rb:1425)
-   */
-  private async execQueries(): Promise<T[]> {
-    return this.skipQueryCacheIfNecessary(async () => {
-      const rows = await this.execMainQuery();
-      const records = this.instantiateRecords(rows);
-      if (!this.skipPreloadingValue) await this.preloadAssociations(records);
-
-      if (this.readonlyValue) {
-        for (const record of records) (record as any)._readonly = true;
-      }
-      if (this.strictLoadingValue != null) {
-        for (const record of records) (record as any)._strictLoading = this.strictLoadingValue;
-      }
-
-      return records;
-    });
-  }
-
-  private async execMainQuery(): Promise<Record<string, unknown>[]> {
-    if (this._isNone) return [];
-    return this.skipQueryCacheIfNecessary(async () => {
-      const result = await this._conn().selectAll(this.toArel(), `${this.model.name} Load`);
-      return result.toArray();
-    });
-  }
-
-  private instantiateRecords(rows: Record<string, unknown>[]): T[] {
-    if (rows.length === 0) return [];
-    return rows.map((row) => this.model._instantiate(row) as T);
   }
 
   private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
