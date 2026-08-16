@@ -2,19 +2,24 @@
  * Array utilities mirroring Rails ActiveSupport array extensions.
  */
 
-import { assertValidKeys } from "./hash-utils.js";
+import { ArgumentError, assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { camelize } from "./inflector.js";
-import { toS } from "./core-ext/object/inspect.js";
+import { inspect, toS } from "./core-ext/object/inspect.js";
 
 /**
  * Wraps a value in an array. `null`/`undefined` → `[]`, arrays pass through,
  * scalars become `[value]`.
  */
-export function wrap<T>(value: T | T[] | null | undefined): T[] {
-  if (value === null || value === undefined) return [];
-  if (Array.isArray(value)) return value;
-  return [value] as T[];
+export function wrap<T>(object: T | T[] | null | undefined): T[] {
+  if (object === null || object === undefined) return [];
+  if (Array.isArray(object)) return object;
+  // Ruby's `object.respond_to?(:to_ary)` arm: `to_ary || [object]`, so a
+  // `to_ary` answering nil still wraps, and one answering a non-array is
+  // returned as-is.
+  const toAry = (object as { toAry?: () => T[] | null }).toAry;
+  if (typeof toAry === "function") return toAry.call(object) ?? ([object] as T[]);
+  return [object] as T[];
 }
 
 /**
@@ -46,19 +51,24 @@ export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
  */
 export function inGroupsOf<T>(
   array: T[],
-  n: number,
+  number: number,
   fillWith: T | null | false = null,
+  block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
+  if (!(Number(number) > 0)) {
+    throw new ArgumentError(`Group size must be a positive integer, was ${inspect(number)}`);
+  }
   const result: (T | null | false)[][] = [];
-  for (let i = 0; i < array.length; i += n) {
-    const group: (T | null | false)[] = array.slice(i, i + n);
+  for (let i = 0; i < array.length; i += number) {
+    const group: (T | null | false)[] = array.slice(i, i + number);
     if (fillWith !== false) {
-      while (group.length < n) {
+      while (group.length < number) {
         group.push(fillWith);
       }
     }
     result.push(group);
   }
+  if (block) result.forEach(block);
   return result;
 }
 
@@ -115,6 +125,7 @@ export function inGroups<T>(
   array: T[],
   n: number,
   fillWith: T | null | false = null,
+  block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
   const quotient = Math.floor(array.length / n);
   const remainder = array.length % n;
@@ -131,6 +142,7 @@ export function inGroups<T>(
     groups.push(group);
     start += size;
   }
+  if (block) groups.forEach(block);
   return groups;
 }
 

@@ -1,10 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { wrap } from "../../index.js";
+import { assertSame } from "../../testing/assertions.js";
 
 describe("WrapTest", () => {
+  class FakeCollection {
+    toAry(): string[] {
+      return ["foo", "bar"];
+    }
+  }
+
+  // Ruby forwards every call through `method_missing`, which — the point of
+  // `test_proxy_object` — leaves `respond_to?(:to_ary)` false. A plain class
+  // holding the target has the same property here: no `toAry` of its own.
+  class Proxy {
+    constructor(readonly target: unknown) {}
+  }
+
+  class DoubtfulToAry {
+    toAry(): string[] {
+      return ":not_an_array" as unknown as string[];
+    }
+  }
+
+  class NilToAry {
+    toAry(): string[] | null {
+      return null;
+    }
+  }
+
   it("array", () => {
-    const arr = [1, 2, 3];
-    expect(wrap(arr)).toBe(arr);
+    const ary = ["foo", "bar"];
+    assertSame(ary, wrap(ary));
   });
 
   it("nil", () => {
@@ -12,46 +38,43 @@ describe("WrapTest", () => {
   });
 
   it("object", () => {
-    expect(wrap(42)).toEqual([42]);
+    const o = {};
+    expect(wrap(o)).toEqual([o]);
   });
 
   it("string", () => {
-    expect(wrap("hello")).toEqual(["hello"]);
+    expect(wrap("foo")).toEqual(["foo"]);
   });
 
   it("string with newline", () => {
-    expect(wrap("hello\nworld")).toEqual(["hello\nworld"]);
+    expect(wrap("foo\nbar")).toEqual(["foo\nbar"]);
   });
 
   it("object with to ary", () => {
-    // Objects that are arrays pass through
-    const arr = [1, 2];
-    expect(wrap(arr)).toBe(arr);
+    expect(wrap(new FakeCollection())).toEqual(["foo", "bar"]);
   });
 
   it("proxy object", () => {
-    // A regular object gets wrapped
-    const obj = { x: 1 };
-    expect(wrap(obj as any)).toEqual([obj]);
+    const p = new Proxy({});
+    expect(wrap(p)).toEqual([p]);
   });
 
   it("proxy to object with to ary", () => {
-    const arr = [1, 2, 3];
-    expect(wrap(arr)).toBe(arr);
+    const p = new Proxy(new FakeCollection());
+    expect(wrap(p)).toEqual([p]);
   });
 
   it("struct", () => {
-    // Non-array object gets wrapped
-    const struct = { name: "alice" };
-    expect(wrap(struct as any)).toEqual([struct]);
+    const o = { foo: 123 };
+    expect(wrap(o)).toEqual([o]);
   });
 
   it("wrap returns wrapped if to ary returns nil", () => {
-    // undefined/null → empty array
-    expect(wrap(undefined)).toEqual([]);
+    const o = new NilToAry();
+    expect(wrap(o)).toEqual([o]);
   });
 
   it("wrap does not complain if to ary does not return an array", () => {
-    expect(() => wrap(42)).not.toThrow();
+    expect(wrap(new DoubtfulToAry())).toEqual(new DoubtfulToAry().toAry());
   });
 });

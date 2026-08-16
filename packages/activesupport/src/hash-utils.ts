@@ -2,7 +2,6 @@
  * Hash/object utilities mirroring Rails ActiveSupport hash extensions.
  */
 
-import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { isBlank } from "./core-ext/object/blank.js";
 
 type AnyObject = Record<string, unknown>;
@@ -179,7 +178,11 @@ export function isExtractableOptions(self: unknown): boolean {
  */
 export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
   const last = args[args.length - 1];
-  const isHash = isPlainObject(last) || last instanceof HashWithIndifferentAccess;
+  // Ruby's `last.is_a?(Hash)`: a plain object, or any Hash subclass — which in
+  // TS is an object declaring the `extractable_options?` override.
+  const isHash =
+    isPlainObject(last) ||
+    (last !== null && typeof last === "object" && "isExtractableOptions" in last);
   if (args.length > 0 && isHash && isExtractableOptions(last)) {
     return [args.slice(0, -1), last as unknown as AnyObject];
   }
