@@ -637,6 +637,21 @@ describe("DatabaseStatements", () => {
       );
       expect(sanitizeLimit(3.9)).toBe(3);
       expect(sanitizeLimit(-3.9)).toBe(-3);
+      // `Integer(str)` parses with base detection, not as plain decimal: a bare
+      // leading `0` is octal, `0x`/`0b`/`0o`/`0d` set the radix, and `_`
+      // separates digits. Every pair below was taken from `ruby -e`.
+      expect(sanitizeLimit("012")).toBe(10);
+      expect(sanitizeLimit("0x1f")).toBe(31);
+      expect(sanitizeLimit("0b101")).toBe(5);
+      expect(sanitizeLimit("0o17")).toBe(15);
+      expect(sanitizeLimit("0d19")).toBe(19);
+      expect(sanitizeLimit("1_000")).toBe(1000);
+      expect(sanitizeLimit("0_1")).toBe(1);
+      expect(sanitizeLimit(" 12 ")).toBe(12);
+      expect(sanitizeLimit("-0x10")).toBe(-16);
+      for (const bad of ["1__0", "1e3", "12.5", "08", "0b2", "0xg", "_1", "1_", "--5"]) {
+        expect(() => sanitizeLimit(bad)).toThrow(ArgumentError);
+      }
     });
 
     it("with yaml fallback passes scalar through", () => {
