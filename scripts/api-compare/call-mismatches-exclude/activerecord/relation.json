@@ -80,13 +80,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
-    "call": "instantiate_records",
-    "reason": "Verified per-site (RFC 0107): `exec_queries` runs the always-executing load through `_toArrayInner` — this relation's `exec_main_query` — which instantiates the records itself (relation.rb:1428). The row retires with `split-load-records-out-of-exec-queries`, which lifts `loadRecords` out of `_toArrayInner` and restores Rails' `instantiate_records(exec_main_query)` composition."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_queries",
     "call": "preload_associations",
     "kind": "args",
     "rubyArgs": [

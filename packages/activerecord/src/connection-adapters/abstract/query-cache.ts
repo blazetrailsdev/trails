@@ -441,7 +441,7 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     // preparable with collector.preparable for Arel inputs, and query_cache
     // forwards that returned value to super. Mirror that: compiledPreparable
     // (non-null only for Arel inputs via the visitor) wins; opts.preparable
-    // (relation._lastSelectPreparable for string inputs) is the fallback.
+    // (the caller's value for string inputs) is the fallback.
     const resolvedPreparable = compiledPreparable ?? opts?.preparable;
     // query_cache.rb:242,245,248: `allow_retry` comes back from
     // `to_sql_and_binds` (the collector's post-traversal flag for an Arel
