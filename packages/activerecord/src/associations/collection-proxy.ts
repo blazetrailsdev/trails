@@ -28,8 +28,6 @@ import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,
   performLast as basePerformLast,
-  findTake as baseFindTake,
-  findTakeWithLimit as baseFindTakeWithLimit,
 } from "../relation/finder-methods.js";
 import type { Nodes } from "@blazetrails/arel";
 import type { SumBlock } from "../relation/calculations.js";
@@ -809,47 +807,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * The relation that bounded finder requeries (`first`/`last`/`take`/
-   * `find_nth`) run against when the target is not loaded. An unmutated
-   * proxy's own copied relation clauses are seeded ONCE at construction, so
-   * when the owner was a new record then — its FK is unresolvable and the
-   * seed collapses to the `1=0` NullRelation — those clauses never pick up
-   * the primary key assigned on `save`, and the requery keeps returning
-   * nothing even though the collection is non-empty. `scope()` rebuilds the
-   * association scope fresh each call (picking up the now-persisted FK),
-   * mirroring Rails' CollectionProxy whose queries delegate to
-   * `association.scope`. Once a scope-mutator bang has run (`_cpMutated`) the
-   * proxy's own diverged state is the intended target, so we keep it.
-   */
-  private _finderScope(): this {
-    // A loaded proxy never reaches the scope at all: in Rails only the query
-    // builders (`limit`, `reverse_order`, …) delegate to `scope`, and the
-    // `loaded?` arm of `find_take` / `find_nth_with_limit` / `find_last` returns
-    // before any of them runs. Handing back `this` keeps that arm reading the
-    // target through the proxy's `loaded?` / `records` overrides.
-    if (this.isLoaded) return this;
-    if (!this._cpMutated) return this.scope() as unknown as this;
-    // A diverged proxy keeps its own clauses — UNLESS they sit on a stale
-    // new-owner `1=0` seed and the owner has since been saved. Then rebase the
-    // accumulated mutations onto the freshly resolved scope so the persisted
-    // FK is picked up, mirroring Rails' CollectionProxy delegating to
-    // `association.scope`.
-    if (this._seededNoneNewOwner) {
-      const fresh = this.scope() as unknown as { _isNone: boolean };
-      if (!fresh._isNone) {
-        const clone = super._clone();
-        rebaseNewOwnerSeed(
-          clone as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
-          fresh as unknown,
-          this._seedWherePredicates,
-        );
-        return clone as unknown as this;
-      }
-    }
-    return this;
-  }
-
-  /**
    * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`), overridden
    * so mutation terminals invoked on the PROXY itself resolve a stale new-owner
    * `1=0` seed once the owner is saved. `updateAll`/`touchAll`/`updateCounters`
@@ -857,7 +814,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * proxy — and `deleteAll`'s diverged branch calls `super.deleteAll()` on the
    * proxy; all reach this before building SQL. Rebasing here (mirroring the
    * `AssociationRelation` override) gives the mutation side the same rebase that
-   * reads already get through `_finderScope`, from one place.
+   * reads already get through the `scope` delegation, from one place.
    */
   _isEmptyRelation(): boolean {
     this._maybeRebaseProxySeed();
@@ -867,7 +824,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * @internal Rebase this proxy in place when it still carries a stale new-owner
    * `1=0` seed and the owner has since been saved (so `scope()` resolves a real
-   * FK). Mirrors `_finderScope`'s rebase, but mutates `this` — a mutation
+   * FK). Mirrors `AssociationRelation`'s rebase, but mutates `this` — a mutation
    * terminal runs against the proxy's own relation state, so the resolved FK
    * must land there. Clears the seed marker so it runs exactly once.
    */
@@ -1955,9 +1912,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _invalidateAssociationIds(): void {
-    // `@offsets = @take = nil; @scope = nil` (collection_proxy.rb:1112-1116) —
-    // all three slots, since the `@take` memo now lives on the memoized scope
-    // that `_finderScope()` hands the base `find_take`.
+    // `@offsets = @take = nil; @scope = nil` (collection_proxy.rb:1112-1116).
     this.resetScope();
     const assocInstance = (this._record as any)._associationInstances?.get(this._assocName);
     if (assocInstance) {
@@ -2348,14 +2303,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override last(n: number): Promise<T[]>;
   override async last(n?: number): Promise<T | T[] | null> {
     if (n !== undefined) assertValidLimit(n);
-    // Rails CollectionProxy#last: `load_target if find_from_target?; super`
-    // (collection_proxy.rb:259-262). `super` is `Relation#last`, whose `loaded?`
-    // arm (finder_methods.rb:203) now fires on the proxy via the `isLoaded` /
-    // `records` overrides, so the tail read is the base body's. `_finderScope()`
-    // stands in for Rails' `delegate(*QueryMethods, to: :scope)` — it returns
-    // `this` once loaded, so only the reverse-order query goes to the scope.
+    // `load_target if find_from_target?; super` (collection_proxy.rb:259-262).
+    // `super` is `Relation#last`, whose `loaded?` arm (finder_methods.rb:203)
+    // fires on the proxy via the `isLoaded` / `records` overrides; the
+    // unloaded arm's `reverse_order.limit(...)` reaches the association scope
+    // through `delegate(*QueryMethods, to: :scope)` (:1128-1137).
     if (this.isFindFromTarget()) await this.loadTarget();
-    return basePerformLast.call(this._finderScope() as any, n);
+    return basePerformLast.call(this as any, n);
   }
 
   /**
@@ -2387,30 +2341,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#find_take. Rails has no
-   * `CollectionProxy` override — the base body runs with `self` = the proxy and
-   * reaches the association scope because `limit` is one of the
-   * `delegate(*QueryMethods, to: :scope)` methods (collection_proxy.rb:1128-1137).
-   * `_finderScope()` is that delegation, applied at the one place the base body
-   * builds a query, so the `@take` memo still lands on the (memoized) scope and
-   * survives until `resetScope` drops it, exactly as Rails' `reset_scope`
-   * clears `@scope` and `@take` together (:1112-1116).
-   * @internal
-   */
-  protected override async findTake(): Promise<T | null> {
-    return baseFindTake.call(this._finderScope() as any);
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation::FinderMethods#find_take_with_limit; see
-   * `findTake` for why the query is routed through `_finderScope()`.
-   * @internal
-   */
-  protected override async findTakeWithLimit(limit: number): Promise<T[]> {
-    return baseFindTakeWithLimit.call(this._finderScope() as any, limit);
-  }
-
-  /**
    * Mirrors: ActiveRecord::Relation::FinderMethods#take!
    */
   override async takeBang(): Promise<T> {
@@ -2425,16 +2355,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Associations::CollectionProxy#find_nth_with_limit
    * (`load_target if find_from_target?; super`, collection_proxy.rb:1140-1143).
    * Once the target is loaded the base FinderMethods body reads it through the
-   * proxy's `isLoaded` / `records` overrides (`_finderScope()` hands back `this`
-   * then); otherwise it falls through to the same ordered `LIMIT`/`OFFSET`
-   * query, built against the live association scope. This is the single override
-   * point that makes the inherited `second`/`third`/`fourth`/`fifth` (and their
-   * bang variants) read a loaded/dirty target without re-querying.
+   * proxy's `isLoaded` / `records` overrides; otherwise it falls through to the
+   * same ordered `LIMIT`/`OFFSET` query, built against the live association
+   * scope by `delegate(*QueryMethods, to: :scope)` (:1128-1137). This is the
+   * single override point that makes the inherited `second`/`third`/`fourth`/
+   * `fifth` (and their bang variants) read a loaded/dirty target without
+   * re-querying.
    * @internal
    */
   protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthWithLimit.call(this._finderScope() as any, index, limit);
+    return baseFindNthWithLimit.call(this as any, index, limit);
   }
 
   /**
@@ -2445,7 +2376,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    */
   protected override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthFromLast.call(this._finderScope() as any, index);
+    return baseFindNthFromLast.call(this as any, index);
   }
 
   /**
@@ -2721,7 +2652,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // (collection_proxy.rb:728-730). A fidelity pin, not a bug fix: the paths
     // below already return nothing for a null scope, but only incidentally —
     // the loaded-target arm happens to filter new records, and the `super` arm
-    // happens to sit on the `1=0` seed `_finderScope` describes. Routing
+    // happens to sit on the new-owner `1=0` seed. Routing
     // explicitly through the `none!`d scope makes the guarantee structural, so
     // neither of those incidental properties can be refactored away silently.
     if (this.isNullScope()) return this.scope().pluck(...columns);
@@ -2833,9 +2764,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    return (this._scope ??= (
+    const scope = (this._scope ??= (
       this._record.association(this._assocName) as { scope(): unknown }
-    ).scope());
+    ).scope() as any);
+    // A new owner has no primary key yet, so the association scope collapses to
+    // the `1=0` NullRelation. Mark it, so a relation spawned off it
+    // (`owner.things.where(...)`, now built by the `scope` delegation above)
+    // rebases onto the resolved scope once the owner is saved — see
+    // `AssociationRelation#_maybeRebaseAssociationSeed`. The proxy's own `@scope`
+    // memo is dropped on the next read by `reader`'s `@proxy.reset_scope`
+    // (collection_association.rb:41) and the owner's save by
+    // `association.reset_scope` (autosave_association.rb:428).
+    if (scope?._isNone === true && this._record.isNewRecord()) {
+      scope._seededNoneNewOwner = true;
+      scope._seedWherePredicates = [...scope._whereClause.predicates];
+    }
+    return scope;
   }
 
   private _buildThroughScope(): any {
@@ -3376,6 +3320,98 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const Ctor = associationRelationClassFor(this.model);
     return new Ctor(this.model, this) as Relation<T>;
   }
+}
+
+// Mirrors: collection_proxy.rb:1128-1137
+//
+//   delegate_methods = [QueryMethods, SpawnMethods].flat_map { |klass|
+//     klass.public_instance_methods(false)
+//   } - self.public_instance_methods(false) - [:select] + [
+//     :scoping, :values, :insert, :insert_all, :insert!, :insert_all!, :upsert, :upsert_all, :load_async
+//   ]
+//   delegate(*delegate_methods, to: :scope)
+//
+// trails mixes QueryMethods / SpawnMethods into `Relation` itself rather than
+// keeping them as standalone modules, so their `public_instance_methods(false)`
+// can't be reflected off a module object — the two name lists below stand in for
+// that reflection, in Rails' source order (`query_methods.rb`, `spawn_methods.rb`).
+// The bang builders are NOT delegated: `CollectionProxy`'s constructor seeds its
+// own inherited `Relation` state through `noneBang` / `extendingBang` /
+// `_copyStateFrom`, and `toSql` / `toArray` read that state, so a proxy-wide
+// bang delegation would send the seed to the memoized scope instead of the proxy —
+// converging that half is story `collection-proxy-delegate-query-method-bangs-to-scope`.
+const QUERY_METHODS_PUBLIC_INSTANCE_METHODS = [
+  "includes",
+  "all",
+  "eagerLoad",
+  "preload",
+  "extractAssociated",
+  "references",
+  "select",
+  "with",
+  "withRecursive",
+  "reselect",
+  "group",
+  "regroup",
+  "order",
+  "inOrderOf",
+  "reorder",
+  "unscope",
+  "joins",
+  "leftOuterJoins",
+  "where",
+  "rewhere",
+  "invertWhere",
+  "structurallyCompatible",
+  "and",
+  "or",
+  "having",
+  "limit",
+  "offset",
+  "lock",
+  "none",
+  "isNullRelation",
+  "readonly",
+  "strictLoading",
+  "createWith",
+  "from",
+  "distinct",
+  "extending",
+  "optimizerHints",
+  "reverseOrder",
+  "annotate",
+  "excluding",
+  "arel",
+  "constructJoinDependency",
+] as const;
+
+const SPAWN_METHODS_PUBLIC_INSTANCE_METHODS = ["spawn", "merge", "except", "only"] as const;
+
+const delegateMethods = (
+  [...QUERY_METHODS_PUBLIC_INSTANCE_METHODS, ...SPAWN_METHODS_PUBLIC_INSTANCE_METHODS] as string[]
+)
+  .filter((name) => !Object.hasOwn(CollectionProxy.prototype, name) && name !== "select")
+  .concat([
+    "scoping",
+    "values",
+    "insert",
+    "insertAll",
+    "insertBang",
+    "insertAllBang",
+    "upsert",
+    "upsertAll",
+    "loadAsync",
+  ]);
+
+for (const name of delegateMethods) {
+  Object.defineProperty(CollectionProxy.prototype, name, {
+    value: function (this: CollectionProxy<Base>, ...args: unknown[]): unknown {
+      const scope = this.scope() as Record<string, (...a: unknown[]) => unknown>;
+      return scope[name](...args);
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 // Route `await proxy` through `load()` (not `toArray`) so the thenable
