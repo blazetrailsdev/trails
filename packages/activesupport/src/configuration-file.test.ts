@@ -15,18 +15,32 @@ describe("ConfigurationFileTest", () => {
   }
 
   it("backtrace contains YAML path", () => {
-    const path = writeYaml("bad.yml", "a: [invalid\n");
+    const path = writeYaml("bad.yml", "wrong: <%= foo %>");
     try {
-      expect(() => ConfigurationFile.parse(path)).toThrow(/bad\.yml/);
+      let error: Error | undefined;
+      try {
+        ConfigurationFile.parse(path);
+      } catch (e) {
+        error = e as Error;
+      }
+      expect(error).toBeDefined();
+      expect(error!.stack!.split("\n")[1]).toContain(path);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
   it("backtrace contains YAML path (when Pathname given)", () => {
-    const path = writeYaml("bad2.yml", "a: [invalid\n");
+    const path = writeYaml("bad2.yml", "wrong: <%= foo %>");
     try {
-      expect(() => ConfigurationFile.parse(path)).toThrow(/bad2\.yml/);
+      let error: Error | undefined;
+      try {
+        ConfigurationFile.parse(path);
+      } catch (e) {
+        error = e as Error;
+      }
+      expect(error).toBeDefined();
+      expect(error!.stack!.split("\n")[1]).toContain(path);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

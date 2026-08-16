@@ -17,12 +17,7 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 
 import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
-import {
-  habtmTargetFk,
-  joinHabtmTableNames,
-  modelRegistry,
-  _cacheSingularTarget,
-} from "./associations.js";
+import { habtmTargetFk, joinHabtmTableNames, modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { isStiSubclass } from "./inheritance.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -571,6 +566,18 @@ export class Relation<T extends Base> {
   // that started before the reset can detect it lost the race and skip
   // committing stale records/loaded state.
   private _loadToken = 0;
+
+  /**
+   * Rails' `@_join_dependency` (relation.rb:1435): set by `exec_main_query`'s
+   * eager arm and consumed — then cleared — by `instantiate_records` (:1457-1459).
+   */
+  private _joinDependency: JoinDependency | null = null;
+  /**
+   * The eager associations `_executeEagerLoad` degraded to a preload, handed to
+   * `exec_queries`' preload step. No Rails counterpart: Rails' eager arm always
+   * builds the JOIN.
+   */
+  private _eagerBypassPreloads: AssociationSpec[] | null = null;
 
   private _table: Table | null = null;
 
@@ -2492,9 +2499,9 @@ export class Relation<T extends Base> {
       // See ActiveRecord::Relation#references_eager_loaded_tables?
       const promotedIncludes = this._promotedIncludes();
 
-      const loadedRecords = await this.execMainQuery();
+      const rows = await this.execMainQuery();
       if (token !== this._loadToken) return [];
-      this.loadRecords(loadedRecords);
+      this.loadRecords(this.instantiateRecords(rows));
 
       // Apply readonly and strict_loading flags to loaded records
       if (this.readonlyValue) {
@@ -2514,9 +2521,12 @@ export class Relation<T extends Base> {
       // already eager-loaded via JOIN. Order matters now that each spec runs as
       // its own sequential `Preloader.call()`, so the query-issue sequence matches
       // Rails for relations mixing `.preload(...)` and `.includes(...)`.
+      const bypassPreloads = this._eagerBypassPreloads ?? [];
+      this._eagerBypassPreloads = null;
       const preloadAssocs = [
         ...this.preloadValues,
         ...this.includesValues.filter((n) => !promotedIncludes.includes(n)),
+        ...bypassPreloads.filter((n) => !this.preloadValues.includes(n)),
       ];
       if (preloadAssocs.length > 0 && this._records.length > 0) {
         await this.preloadAssociations(this._records, preloadAssocs);
@@ -2529,13 +2539,9 @@ export class Relation<T extends Base> {
 
   /**
    * Mirrors: ActiveRecord::Relation#exec_main_query (relation.rb:1423-1452).
-   *
-   * Rails returns rows and lets `instantiate_records` route the eager case
-   * through `@_join_dependency`; trails' eager arm hydrates its records inside
-   * `_executeEagerLoad` (it owns the JoinDependency), so both arms return
-   * records here.
+   * Returns rows; `instantiateRecords` turns them into records.
    */
-  private async execMainQuery(): Promise<T[]> {
+  private async execMainQuery(): Promise<Result> {
     // Rails' load_async bails to a plain `load` unless `c.async_enabled?` and
     // passes `async: !c.current_transaction.joinable?` into `exec_main_query`
     // (relation.rb:1140-1142), which forwards it to BOTH of its query arms —
@@ -2551,18 +2557,13 @@ export class Relation<T extends Base> {
     const promotedIncludes = this._promotedIncludes();
     if (this.eagerLoadValues.length > 0 || promotedIncludes.length > 0) {
       const allEager = [...new Set([...this.eagerLoadValues, ...promotedIncludes])];
-      await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
-      return this._records;
+      return this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
     }
 
     // Awaiting the FutureResult here is trails' `future.result` in
     // `exec_queries` (relation.rb:1408).
-    const result = await this.skipQueryCacheIfNecessary(() =>
+    return this.skipQueryCacheIfNecessary(() =>
       c.selectAll(this.toArel(), `${this.model.name} Load`, [], { async }),
-    );
-    return this.instantiateRecords(
-      result.toArray(),
-      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
     );
   }
 
@@ -2749,17 +2750,13 @@ export class Relation<T extends Base> {
     // `exec_main_query`'s `async:` (relation.rb:1423), which its eager arm
     // hands to `select_all` (relation.rb:1436).
     { async = false }: { async?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<Result> {
     const eagerAssociations = eagerAssocs ?? this.eagerLoadValues;
     const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
-      this._records = this.instantiateRecords(
-        result.toArray(),
-        result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-      );
-      await this.preloadAssociations(this._records, eagerAssociations);
-      return;
+      this._eagerBypassPreloads = eagerAssociations;
+      return result;
     }
 
     const jd = this._buildEagerJoinDependency(eagerAssociations);
@@ -2772,8 +2769,8 @@ export class Relation<T extends Base> {
     if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       limitedIds = await this._materializeLimitedIds(jd, basePk);
       if (limitedIds.length === 0) {
-        this._records = [];
-        return;
+        // Rails' `relation.null_relation? ? [].freeze` (relation.rb:1438-1440).
+        return Result.empty();
       }
     }
 
@@ -2789,69 +2786,9 @@ export class Relation<T extends Base> {
     // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
     // which slices `result_set.column_types`.
     const result = await this._conn().selectAll(manager, "SQL", [], { async });
-    const rows = result.toArray();
-
-    // Mirrors JoinDependency#instantiate: record_count is the raw JOIN
-    // result-set length (rows, including duplicated parent rows), not the
-    // distinct-parent count, and class_name is the join_root's `base_klass`
-    // name — the STI base, not the queried subclass.
-    const eagerPayload = {
-      record_count: rows.length,
-      class_name: this._model.baseClass.name,
-    };
-    const { parents, associations, parentKeys } = Notifications.instrument(
-      "instantiation.active_record",
-      eagerPayload,
-      () =>
-        jd.instantiateFromRows(
-          rows,
-          this.strictLoadingValue,
-          result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-        ),
-    );
-
-    const inverseMap = new Map<string, string | undefined>();
-    const modelAssocs: any[] = (this._model as any)._associations ?? [];
-    for (const assoc of modelAssocs) {
-      inverseMap.set(assoc.name, assoc.options?.inverseOf);
-    }
-
-    for (const parent of parents) {
-      // Look `associations` up by the SAME raw aliased key `instantiateFromRows`
-      // stored the parent under — not by re-reading the instantiated record's
-      // PK, which is deserialized and can diverge from the raw row value (e.g.
-      // bigint / composite HABTM keys), missing the lookup and skipping inverse
-      // caching.
-      const pk = parentKeys.get(parent);
-      const assocs = associations.get(pk);
-      for (const node of jd.nodes) {
-        // Skip intermediate through nodes and nested nodes (handled in instantiateFromRows).
-        if (node.immediateAssocName.startsWith("_through_")) continue;
-        if (node.parentPath !== null) continue;
-        const children = assocs?.get(node.immediateAssocName) ?? [];
-        const isSingular = node.assocType === "hasOne" || node.assocType === "belongsTo";
-
-        const inverseName = inverseMap.get(node.immediateAssocName);
-        if (inverseName) {
-          const targets = isSingular ? (children[0] ? [children[0]] : []) : children;
-          for (const child of targets) {
-            _cacheSingularTarget(child, inverseName, parent);
-          }
-        }
-      }
-    }
-
-    this._records = parents as T[];
-
-    // Fire `_instantiateBlock` on the JoinDependency path, which instantiates via
-    // `jd.instantiateFromRows` and so bypasses `instantiateRecords` (where
-    // the block otherwise runs). The bypass / degrade-to-preload sub-paths above
-    // already instantiate through `instantiateRecords`, so firing here only
-    // — not in `execQueries` — keeps the block once-per-record like Rails'
-    // `instantiate_records(rows, &block)`. Runs before the `execQueries`
-    // preload, matching Rails' ordering.
-    const block = this._instantiateBlock;
-    if (block) for (const record of this._records) block(record);
+    // Rails' `@_join_dependency = join_dependency` (relation.rb:1435).
+    this._joinDependency = jd;
+    return result;
   }
 
   /**
@@ -3619,17 +3556,26 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirrors: ActiveRecord::Relation#instantiate_records (relation.rb:1455-1464)
-   * — its non-eager arm (`model._load_from_sql(rows)`), instrumented with
+   * Mirrors: ActiveRecord::Relation#instantiate_records (relation.rb:1455-1464).
+   * The non-eager arm is `model._load_from_sql(rows)`, instrumented with
    * `instantiation.active_record` the way `_load_from_sql` is in Rails.
    */
-  private instantiateRecords(
-    rows: Record<string, unknown>[],
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): T[] {
-    if (rows.length === 0) return [];
-    const payload = { record_count: rows.length, class_name: this._model.name };
+  private instantiateRecords(result: Result): T[] {
+    if (result.isEmpty()) return [];
+    const rows = result.toArray();
+    const columnTypes = result.columnTypes as Record<
+      string,
+      { deserialize(value: unknown): unknown }
+    >;
     const block = this._instantiateBlock;
+
+    const joinDependency = this._joinDependency;
+    if (joinDependency) {
+      this._joinDependency = null;
+      return joinDependency.instantiate(rows, this.strictLoadingValue, columnTypes, block) as T[];
+    }
+
+    const payload = { record_count: rows.length, class_name: this._model.name };
     return Notifications.instrument("instantiation.active_record", payload, () =>
       rows.map((row) => this._model._instantiate(row, block as never, columnTypes) as T),
     );

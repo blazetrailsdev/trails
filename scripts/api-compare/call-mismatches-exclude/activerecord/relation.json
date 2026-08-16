@@ -104,13 +104,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "instantiate_records",
-    "call": "instantiate",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "last",
     "call": "find_last",
     "reason": "Verified per-site (RFC 0107): this row is `ActiveRecord::Relation::ExplainProxy#last` (relation.rb:28-30), whose body is the one-line `exec_explain { @relation.last(...) }` it already makes. The extractor keys a row by <tsFile, rubyName>, so the proxy member collides with the homonymous `ActiveRecord::Relation#last` and inherits ITS Rails call set. No trails call can satisfy it; the row retires when the extractor disambiguates nested classes."
