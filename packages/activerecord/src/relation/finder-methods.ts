@@ -735,7 +735,8 @@ export async function exists(
   if (relation.whereClause.isContradiction()) return false;
   return await this.skipQueryCacheIfNecessary(() =>
     this.withConnection(
-      async (c) => (await c.selectRows(relation.toArel(), `${this.model.name} Exists?`)).length === 1,
+      async (c) =>
+        (await c.selectRows(relation.toArel(), `${this.model.name} Exists?`)).length === 1,
     ),
   );
 }
