@@ -46,6 +46,7 @@ import { Math as MathMixin } from "./math.js";
 import { FactoryMethods } from "./factory-methods.js";
 import { Expressions } from "./expressions.js";
 import { AliasPredication } from "./alias-predication.js";
+import { Table as _TableClass } from "./table.js";
 import { OrderPredications } from "./order-predications.js";
 import { FilterPredications } from "./filter-predications.js";
 import { WindowPredications } from "./window-predications.js";
@@ -59,6 +60,8 @@ const _SqlLiteral = SqlLiteral as unknown as new (...args: unknown[]) => SqlLite
 type RuntimeModule = Record<string, (...args: unknown[]) => unknown>;
 const asRuntime = <T>(m: T): RuntimeModule => m as unknown as RuntimeModule;
 include(_Node, asRuntime(FactoryMethods));
+// Arel::Table includes FactoryMethods and AliasPredication (table.rb:5-6).
+include(_TableClass as unknown as new (...args: unknown[]) => object, asRuntime(AliasPredication));
 include(_TreeManager, asRuntime(FactoryMethods));
 // Mirrors Rails: Arel::Nodes::NodeExpression includes Expressions,
 // Predications, AliasPredication, OrderPredications, Math.

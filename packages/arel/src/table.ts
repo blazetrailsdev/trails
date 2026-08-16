@@ -250,15 +250,6 @@ export class Table extends Node {
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
-  /**
-   * Alias as a subquery — wraps in a TableAlias.
-   *
-   * Mirrors: Arel::FactoryMethods#as (Table delegation)
-   */
-  as(name: string): TableAlias {
-    return new TableAlias(this, name);
-  }
-
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
@@ -268,7 +259,7 @@ export class Table extends Node {
 // matches them against table.rb (Rails Arel's `Table` includes
 // FactoryMethods directly, expecting the methods to belong here).
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+type _AliasPredication = import("./alias-predication.js").AliasPredicationModule;
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface Table extends _FactoryMethodsModule {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Table extends _FactoryMethodsModule, _AliasPredication {}

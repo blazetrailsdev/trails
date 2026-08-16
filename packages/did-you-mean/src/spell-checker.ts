@@ -34,44 +34,42 @@ export class SpellChecker {
 
   correct(input: string): string[] {
     const normalizedInput = normalize(input);
-    const inputLen = codepointLength(normalizedInput);
-    const jwThreshold = inputLen > 3 ? 0.834 : 0.77;
+    let threshold = codepointLength(normalizedInput) > 3 ? 0.834 : 0.77;
 
-    const candidates: Array<{ word: string; index: number; score: number }> = [];
-    for (let i = 0; i < this.#dictionary.length; i++) {
-      const word = this.#dictionary[i];
-      if (String(input) === String(word)) continue;
-      const jw = JaroWinkler.distance(normalize(word), normalizedInput);
-      if (jw < jwThreshold) continue;
-      candidates.push({
-        word,
-        index: i,
-        score: JaroWinkler.distance(String(word), normalizedInput),
-      });
-    }
+    let words = this.#dictionary.filter(
+      (word) => JaroWinkler.distance(normalize(word), normalizedInput) >= threshold,
+    );
+    words = words.filter((word) => String(input) !== String(word));
+    // MRI's sort is not stable, but the observable effect on ties is that
+    // elements come out in reverse insertion order; JS's stable ascending sort
+    // plus `reverse()` reproduces exactly that.
+    words = words
+      .sort(
+        (a, b) =>
+          JaroWinkler.distance(String(a), normalizedInput) -
+          JaroWinkler.distance(String(b), normalizedInput),
+      )
+      .reverse();
 
-    candidates.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      // Ruby does `sort_by` then `reverse!`. MRI's sort is not stable, but
-      // the observable effect on ties in practice is that elements come out
-      // in reverse insertion order — match that.
-      return b.index - a.index;
-    });
+    // Correct mistypes
+    threshold = Math.ceil(codepointLength(normalizedInput) * 0.25);
+    let corrections = words.filter(
+      (c) => Levenshtein.distance(normalize(c), normalizedInput) <= threshold,
+    );
 
-    const mistypeThreshold = Math.ceil(inputLen * 0.25);
-    let corrections = candidates
-      .filter((c) => Levenshtein.distance(normalize(c.word), normalizedInput) <= mistypeThreshold)
-      .map((c) => c.word);
-
+    // Correct misspells
     if (corrections.length === 0) {
-      corrections = candidates
-        .filter((c) => {
-          const word = normalize(c.word);
-          const length = Math.min(inputLen, codepointLength(word));
+      corrections = words
+        .filter((word) => {
+          word = normalize(word);
+          const length =
+            codepointLength(normalizedInput) < codepointLength(word)
+              ? codepointLength(normalizedInput)
+              : codepointLength(word);
+
           return Levenshtein.distance(word, normalizedInput) < length;
         })
-        .slice(0, 1)
-        .map((c) => c.word);
+        .slice(0, 1);
     }
 
     return corrections;

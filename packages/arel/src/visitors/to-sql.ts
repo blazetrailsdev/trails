@@ -1593,12 +1593,16 @@ export class ToSql extends Visitor {
   /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
+    // `toS` is Ruby's implicit `name.to_s` inside `quote_table_name`: trails
+    // reaches here with an Array name for a composite primary key, which Ruby
+    // renders as `["a", "b"]`, not `a,b`.
     return this.connection.quoteTableName(toS(name));
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
+    // See `quoteTableName` — `toS` is Ruby's implicit `name.to_s`.
     return this.connection.quoteColumnName(toS(name));
   }
 

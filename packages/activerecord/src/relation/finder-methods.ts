@@ -18,6 +18,9 @@ import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } f
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { compactUniqIds, compactUniqTuples } from "./compact-uniq-ids.js";
 
+/** Mirrors: `ActiveRecord::FinderMethods::ONE_AS_ONE` (finder_methods.rb:7). */
+const ONE_AS_ONE = "1 AS one";
+
 // ---------------------------------------------------------------------------
 // Shared id-normalization + not-found helpers.
 //
@@ -302,6 +305,9 @@ interface FinderRelation {
   order(...args: any[]): any;
   reverseOrder(): any;
   toArray(): Promise<any[]>;
+  /** Relation#loaded? / Relation#records (relation.ts). */
+  isLoaded: boolean;
+  records(): Promise<any[]>;
   /** @internal */
   findNthWithLimit(index: number, limit: number): Promise<any[]>;
   /** @internal */
@@ -560,8 +566,8 @@ export async function findNthWithLimit(
   index: number,
   limit: number,
 ): Promise<any[]> {
-  if ((this as any)._loaded) {
-    return (this as any)._records.slice(index, index + limit) ?? [];
+  if (this.isLoaded) {
+    return (await this.records()).slice(index, index + limit) ?? [];
   }
   let relation: any = orderedRelation(this);
   if ((this as any)._limitValue != null) {
@@ -576,8 +582,8 @@ export async function findNthWithLimit(
 
 /** @internal */
 export async function findNthFromLast(this: FinderRelation, index: number): Promise<any | null> {
-  if ((this as any)._loaded) {
-    const records: any[] = (this as any)._records;
+  if (this.isLoaded) {
+    const records: any[] = await this.records();
     return records[records.length - 1 - index] ?? null;
   }
   const relation: any = orderedRelation(this);
@@ -585,7 +591,7 @@ export async function findNthFromLast(this: FinderRelation, index: number): Prom
   // Use hasOrder() on the result so _rawOrderClauses (e.g. inOrderOf) are also
   // treated as "has an order" — avoids loading all records for those relations.
   if (!hasOrder(relation) || relation._limitValue != null || relation._offsetValue != null) {
-    const records = await relation.toArray();
+    const records = await relation.records();
     return records[records.length - 1 - index] ?? null;
   }
   return relation.reverseOrder().offset(index).first();
@@ -816,17 +822,14 @@ export function constructRelationForExists(rel: FinderRelation, conditions: unkn
   if (conditions !== undefined) {
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
   }
-  // Rails: except(:select, :distinct, :order)._select!("1 AS one").limit!(1)
-  // (or except(:order).limit!(1) when distinct+offset are both set)
   let relation: any;
   if ((rel as any)._isDistinct && (rel as any)._offsetValue != null) {
-    relation = (rel as any).unscope("order").limit(1);
+    relation = (rel as any).except("order").limitBang(1);
   } else {
-    // Rails: except(:select, :distinct, :order) — "distinct" is not a valid
-    // unscope() key so clear _isDistinct directly on the cloned relation.
-    relation = (rel as any).unscope("select", "order");
-    relation._isDistinct = false;
-    relation = relation.select(new Nodes.SqlLiteral("1 AS one")).limit(1);
+    relation = (rel as any)
+      .except("select", "distinct", "order")
+      ._selectBang(new Nodes.SqlLiteral(ONE_AS_ONE))
+      .limitBang(1);
   }
   // Rails only skips `where!` for `conditions == :none` (our `undefined`
   // sentinel for "no argument passed"). Every other value — including `true`
@@ -912,19 +915,18 @@ export async function findSome(rel: FinderRelation, ids: unknown[]): Promise<any
 
 /** @internal */
 export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const primaryKey = rel.model.primaryKey as string;
   const offsetValue: number = (rel as any)._offsetValue ?? 0;
   const limitValue: number | null = (rel as any)._limitValue ?? null;
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
-  let relation = (rel as any).where({ [primaryKey]: ids });
-  relation._limitValue = null;
-  relation._offsetValue = null;
+  let relation = (rel as any).except("limit", "offset");
+  relation = relation.where({ [rel.model.primaryKey as string]: ids });
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select(rel.table.get(primaryKey));
+    relation = relation.select(rel.table.get(rel.model.primaryKey as string));
   }
-  const records: any[] = await relation.toArray();
+  const records: any[] = await relation.records();
 
+  const primaryKey = rel.model.primaryKey as string;
   const primaryKeyType = (rel.model as any).typeForAttribute(primaryKey);
   const castKey = (id: unknown) => String(primaryKeyType.cast(id));
 
@@ -942,14 +944,13 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
 
 /** @internal */
 export async function findTake(rel: FinderRelation): Promise<any | null> {
-  if ((rel as any)._loaded) return (rel as any)._records[0] ?? null;
-  const records = await (rel as any).limit(1).toArray();
-  return records[0] ?? null;
+  if (rel.isLoaded) return (await rel.records())[0] ?? null;
+  return (await (rel as any).limit(1).records())[0] ?? null;
 }
 
 /** @internal */
 export async function findTakeWithLimit(rel: FinderRelation, limit: number): Promise<any[]> {
-  if ((rel as any)._loaded) return (rel as any)._records.slice(0, limit);
+  if (rel.isLoaded) return (await rel.records()).slice(0, limit);
   return (rel as any).limit(limit).toArray();
 }
 
@@ -972,9 +973,7 @@ export function orderedRelation(rel: FinderRelation): any {
   if (!hasOrder(rel) && (implicitOrder || constraintsList != null || pk)) {
     const cols = _orderColumns(rel);
     if (cols.length > 0) {
-      // Hash-form { col: "asc" } so preprocess_order_args resolves each column
-      // against the model's table, matching Rails' ordered_relation.
-      return (rel as any).order(...cols.map((col: string) => ({ [col]: "asc" as const })));
+      return (rel as any).order(cols.map((column: string) => (rel as any).table.get(column).asc()));
     }
   }
   return rel;
