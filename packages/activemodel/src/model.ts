@@ -794,9 +794,6 @@ export class Model {
       }
       this._registerValidator(validator, explicitAttributes);
 
-      // Only the CLASS-side `validates_with` (with.rb:88-105) is ported; the
-      // instance one (with.rb:143-151) is a real gap, filed as
-      // `activemodel-instance-validates-with`.
       let callbackFn: CallbackFn;
       if (isStrict) {
         callbackFn = (record: object) => {

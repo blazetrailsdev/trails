@@ -82,8 +82,8 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "`block(this.owner)` — the block is a plain function and the receiver its argument, so " +
       "the recorder sees `instance_exec` against `block`. Same for a Ruby block passed as a " +
       "trailing `{ }` (`model_class.unscoped { yield }`, locator.rb:223) where trails passes " +
-      "the callback as an argument: a TS argument spelled `block` IS the Ruby block, whatever " +
-      "Ruby wrote at that position.",
+      "the callback as an argument. Scoped to the cited Ruby call sites " +
+      "(BLOCK_IDIOM_RUBY_REFS), never to the TS spelling alone.",
   },
   {
     name: "ivar-reflection",
@@ -133,6 +133,19 @@ export const IVAR_REFLECTION_ACCESSORS = new Set([
   "instance_variable_set",
   "instanceVariableSet",
 ]);
+
+/**
+ * Ruby identifiers whose call site passes a block that trails spells as a
+ * plain callback argument named `block`. Kept as an explicit, cited list
+ * rather than keying on the TS spelling alone: a Ruby parameter that merely
+ * happens to be named `block` is ordinary burndown, and the safe direction for
+ * a permanent class is to under-match.
+ *
+ *   - `instance_exec` — `owner.instance_exec(&block)`, belongs_to_association.rb:47
+ *   - `modelClass`    — `model_class.unscoped { yield }`, locator.rb:223, whose
+ *                       receiver the recorder records as the argument
+ */
+export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "modelClass"]);
 
 /** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
 export const JS_RESERVED_WORDS = new Set(
@@ -218,9 +231,10 @@ function isThisTypedFunction(rubyRef: string, thisTypedFunctions?: ReadonlySet<s
  * - `toS`/`toString` on the TS side alone is Ruby's implicit `to_s` made
  *   explicit, so that arm runs right after {@link NO_JS_EQUIVALENT} — which
  *   already answers `inspect` → `toString` for the stronger reason.
- * - `block` is a TS-side artifact of the block idiom, so that arm keys on the
- *   TS spelling alone — a TS argument named `block` is the Ruby block whatever
- *   Ruby wrote at that position; `call` is one too, but a bare `ref:call` proves nothing on its
+ * - `block` is a TS-side artifact of the block idiom, so that arm reads the TS
+ *   spelling — but only against {@link BLOCK_IDIOM_RUBY_REFS}, the cited Ruby
+ *   call sites that actually pass a block, so a Ruby parameter that merely
+ *   happens to be named `block` stays burndown; `call` is one too, but a bare `ref:call` proves nothing on its
  *   own, so that arm additionally requires the Ruby name to BE a `this`-typed
  *   function — `thisTypedFunctions`, which the caller reads off the TS API
  *   manifest. Without that set the arm never fires and the row stays burndown,
@@ -248,7 +262,7 @@ export function classifyPair(
   if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
     return "module-mixin-call";
   }
-  if (tsRef === "block") return "block-idiom";
+  if (tsRef === "block" && BLOCK_IDIOM_RUBY_REFS.has(rubyRef)) return "block-idiom";
   const ivar = rubyRef.startsWith("@");
   const bare = ivar ? rubyRef.slice(1) : rubyRef;
   const converted = rubyMethodToTsIgnoringSkip(bare);

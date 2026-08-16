@@ -86,6 +86,9 @@ describe("classifyPair", () => {
     // → `klass.unscoped(block)`), so the arm keys on the TS spelling alone.
     expect(classifyPair("modelClass", "block")).toBe("block-idiom");
     expect(classifyPair("instance_exec", "proc")).toBe("burndown");
+    // A Ruby parameter that merely happens to be named `block` is ordinary
+    // burndown — the arm is scoped to the cited Ruby call sites.
+    expect(classifyPair("payload", "block")).toBe("burndown");
   });
 
   // to_sql.rb:874 `quote_table_name(name)` with a composite-PK Array vs
