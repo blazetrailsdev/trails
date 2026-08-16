@@ -49,11 +49,12 @@ describe("unprepared statements inline binds", () => {
     // reported non-retryable on the unprepared path too.
     const conn = (await Topic.leaseConnection()) as unknown as {
       unpreparedStatement(fn: () => Promise<void>): Promise<void>;
+      toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
     };
     await conn.unpreparedStatement(async () => {
-      const rel = Topic.where("id = ?", 1) as unknown as { _lastSelectRetryable?: boolean };
-      await rel;
-      expect(rel._lastSelectRetryable).toBe(false);
+      const rel = Topic.where("id = ?", 1) as unknown as { arel(): unknown };
+      const [, , , allowRetry] = conn.toSqlAndBinds(rel.arel());
+      expect(allowRetry).toBe(false);
     });
   });
 });

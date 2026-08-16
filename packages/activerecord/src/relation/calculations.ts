@@ -94,8 +94,9 @@ interface CalculationConnection {
     orders?: (string | Nodes.Node)[],
   ): string | string[];
   execute(sql: string): Promise<Record<string, unknown>[]>;
+  /** Rails `select_all(arel, name, binds)` (database_statements.rb:69-71). */
   selectAll(
-    sql: string,
+    arel: unknown,
     name?: string | null,
     binds?: unknown[],
   ): Promise<import("../result.js").Result>;
@@ -231,8 +232,6 @@ interface CalculationRelation {
   _materializeLimitedIds(jd: JoinDependency, primaryKey: string | string[]): Promise<unknown[]>;
   /** @internal Rails `build_arel` (query_methods.rb:1750). */
   toArel(aliases?: unknown): SelectManager;
-  /** @internal trails: compiles an AST to `[sql, binds]`. */
-  _compileAstWithBinds(ast: unknown): [string, unknown[]];
 }
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
@@ -940,9 +939,9 @@ export async function pluck(
     rel.selectValues = projections as any;
     const manager = rel.toArel();
 
-    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    // Rails: `select_all(relation.arel, "#{model.name} Pluck")` (calculations.rb:317).
     const result = await this.skipQueryCacheIfNecessary(() =>
-      this._conn().selectAll(pluckSql, `${this.model.name} Pluck`, pluckBinds),
+      this._conn().selectAll(manager, `${this.model.name} Pluck`),
     );
 
     // Type-cast results positionally through each result column's type
@@ -1072,8 +1071,7 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
           await this._model.ensureSchemaLoaded();
           await relation._materializeDeferredDistinctPkPredicates();
           const manager = relation.arel();
-          const [idsSql, idsBinds] = relation._compileAstWithBinds(manager.ast);
-          return c.selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
+          return c.selectAll(manager, `${this.model.name} Ids`);
         }),
       );
 

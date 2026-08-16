@@ -23,6 +23,13 @@
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
+    "rubyName": "initialize",
+    "call": "reject!",
+    "reason": "Ruby `Hash#reject!` prunes the zero-valued entries of `@parts` in place; the TS constructor omits them while building the parts object, so there is no receiver to reject from. Surfaced by the DescendantsTracker `reject!` port making the name resolvable, not by a change in this file."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "duration.ts",
     "rubyName": "iso8601",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

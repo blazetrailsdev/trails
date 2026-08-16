@@ -9,10 +9,11 @@
  * These spot-checks drive the *relation* API (`Relation#with` / `#from`) and
  * inspect the compiled SQL +
  * threaded binds, so a regression back to string assembly in the relation
- * layer fails here. `_toSql()` is the pre-substitution compile (public
- * `toSql()` inlines bind values for human-readable output, mirroring Rails
- * `to_sql`), so it exposes the raw `?` / `$N` placeholders; `_lastSelectBinds`
- * is the single ordered bind array the collector produced.
+ * layer fails here. The connection's own `to_sql_and_binds` is the
+ * pre-substitution compile (public `toSql()` inlines bind values for
+ * human-readable output, mirroring Rails `to_sql`), so it exposes the raw
+ * `?` / `$N` placeholders and the single ordered bind array the collector
+ * produced.
  *
  * The dialect-specific assertions key off `adapterType` so each CI lane
  * (sqlite / postgres / mysql) verifies its own quoting + placeholder style:
@@ -40,16 +41,24 @@ class Post extends Base {
 Post.attribute("id", "integer");
 Post.attribute("author", "string");
 
+// Compile the relation's arel the way `select_all` does — through the
+// connection's `to_sql_and_binds` (database_statements.rb:69-71).
+function compile(rel: unknown): [string, unknown[]] {
+  const conn = Base.connection as unknown as {
+    toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
+  };
+  const [sql, binds] = conn.toSqlAndBinds((rel as { arel(): unknown }).arel());
+  return [sql, binds];
+}
+
 // Pre-substitution SQL (raw `?` / `$N` placeholders) for the relation.
 function rawSql(rel: unknown): string {
-  return (rel as { _toSql(): string })._toSql();
+  return compile(rel)[0];
 }
 
 // The single ordered bind array the collector threaded, projected to values.
 function bindValues(rel: unknown): unknown[] {
-  rawSql(rel); // populates _lastSelectBinds as a side effect of compilation
-  const binds = (rel as { _lastSelectBinds?: unknown[] })._lastSelectBinds ?? [];
-  return binds.map((b) => (b as { _value?: unknown })?._value ?? b);
+  return compile(rel)[1].map((b) => (b as { _value?: unknown })?._value ?? b);
 }
 
 const openQuote = adapterType === "mysql" ? "`" : '"';

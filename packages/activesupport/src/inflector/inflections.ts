@@ -3,6 +3,8 @@
  * Mirrors ActiveSupport::Inflector::Inflections from Rails.
  */
 
+import { I18n } from "../i18n.js";
+
 export interface InflectionRule {
   rule: RegExp;
   replacement: string;
@@ -55,14 +57,14 @@ export class Uncountables extends Array<string> {
 }
 
 export class Inflections {
-  plurals: InflectionRule[] = [];
-  singulars: InflectionRule[] = [];
-  uncountables: Uncountables = new Uncountables();
-  humans: HumanRule[] = [];
-  acronyms: Map<string, string> = new Map();
-  acronymRegex: RegExp = /(?=a)b/; // matches nothing by default
-  acronymsCamelizeRegex: RegExp = /^\w/;
-  acronymsUnderscoreRegex: RegExp = /(?=a)b/;
+  plurals!: InflectionRule[];
+  singulars!: InflectionRule[];
+  uncountables!: Uncountables;
+  humans!: HumanRule[];
+  acronyms!: Map<string, string>;
+  acronymRegex!: RegExp;
+  acronymsCamelizeRegex!: RegExp;
+  acronymsUnderscoreRegex!: RegExp;
 
   private static instances: Map<string, Inflections> = new Map();
 
@@ -71,6 +73,27 @@ export class Inflections {
       this.instances.set(locale, new Inflections());
     }
     return this.instances.get(locale)!;
+  }
+
+  /**
+   * Mirrors: inflections.rb:70-75 — walks the locale's fallback chain and
+   * returns the first instance already built for one of them, falling back to
+   * building the requested locale's own.
+   */
+  static instanceOrFallback(locale: string): Inflections {
+    for (const k of I18n.fallbacks().get(locale)) {
+      if (this.instances.has(k)) return this.instances.get(k)!;
+    }
+    return this.instance(locale);
+  }
+
+  constructor() {
+    this.plurals = [];
+    this.singulars = [];
+    this.uncountables = new Uncountables();
+    this.humans = [];
+    this.acronyms = new Map();
+    this.defineAcronymRegexPatterns();
   }
 
   static clear(locale: string = "en"): void {
@@ -172,6 +195,23 @@ export class Inflections {
       this.acronyms = new Map();
       this.defineAcronymRegexPatterns();
     }
+  }
+}
+
+/**
+ * Mirrors: ActiveSupport::Inflector#inflections (inflections.rb:265-271) —
+ * yields the locale's singleton so rules can be added, or returns it.
+ */
+export function inflections(
+  locale: string = "en",
+  block?: (inflect: Inflections) => void,
+): Inflections {
+  if (block !== undefined) {
+    const inflect = Inflections.instance(locale);
+    block(inflect);
+    return inflect;
+  } else {
+    return Inflections.instanceOrFallback(locale);
   }
 }
 

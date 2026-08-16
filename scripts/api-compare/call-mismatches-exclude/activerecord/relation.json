@@ -73,13 +73,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exec_main_query",
     "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -87,8 +80,12 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
-    "call": "instantiate_records",
-    "reason": "Verified per-site (RFC 0107): `exec_queries` runs the always-executing load through `_toArrayInner` — this relation's `exec_main_query` — which instantiates the records itself (relation.rb:1428). The row retires with `split-load-records-out-of-exec-queries`, which lifts `loadRecords` out of `_toArrayInner` and restores Rails' `instantiate_records(exec_main_query)` composition."
+    "call": "preload_associations",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:records"
+    ],
+    "reason": "Rails' `preload_associations(records)` derives its spec list inside the method; trails promotes `includes` to an eager JOIN per association rather than all-or-nothing, so the caller passes the specs NOT already promoted as a second argument. Pre-existing shape, surfaced now that the live load path carries the `exec_queries` name."
   },
   {
     "package": "activerecord",

@@ -3,7 +3,7 @@
  * Mirrors ActiveSupport::Inflector from Rails.
  */
 
-import { Inflections } from "./inflector/inflections.js";
+import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
 import { I18n } from "./i18n.js";
 
@@ -15,8 +15,7 @@ function applyInflections(
 ): string {
   if (!word || word.length === 0) return word;
 
-  const inflections = Inflections.instance(locale);
-  if (inflections.uncountables.isUncountable(word)) {
+  if (inflections(locale).uncountables.isUncountable(word)) {
     return word;
   }
 
@@ -30,11 +29,11 @@ function applyInflections(
 }
 
 export function pluralize(word: string, locale = "en"): string {
-  return applyInflections(word, Inflections.instance(locale).plurals, locale);
+  return applyInflections(word, inflections(locale).plurals, locale);
 }
 
 export function singularize(word: string, locale = "en"): string {
-  return applyInflections(word, Inflections.instance(locale).singulars, locale);
+  return applyInflections(word, inflections(locale).singulars, locale);
 }
 
 export function camelize(
@@ -46,22 +45,21 @@ export function camelize(
   else if (typeof uppercaseFirstLetter === "string") {
     throw new Error("Invalid option, use either :upper or :lower.");
   }
-  const inflections = Inflections.instance("en");
   let result = term;
 
   if (uppercaseFirstLetter) {
     result = result.replace(/^[a-z\d]*/, (match) => {
       // Check if the match is an acronym
-      const acronym = inflections.acronyms.get(match);
+      const acronym = inflections().acronyms.get(match);
       if (acronym) return acronym;
       return match.charAt(0).toUpperCase() + match.slice(1);
     });
   } else {
-    result = result.replace(inflections.acronymsCamelizeRegex, (match) => match.toLowerCase());
+    result = result.replace(inflections().acronymsCamelizeRegex, (match) => match.toLowerCase());
   }
 
   result = result.replace(/(?:_|(\/))([a-z\d]*)/gi, (_match, slash, rest) => {
-    const acronym = inflections.acronyms.get(rest);
+    const acronym = inflections().acronyms.get(rest);
     const replacement = acronym || rest.charAt(0).toUpperCase() + rest.slice(1);
     return (slash || "") + replacement;
   });
@@ -74,13 +72,12 @@ export function camelize(
 export function underscore(camelCasedWord: string): string {
   if (!/[A-Z-]|::/.test(camelCasedWord)) return camelCasedWord;
 
-  const inflections = Inflections.instance("en");
   let word = camelCasedWord;
 
   word = word.replace(/::/g, "/");
 
-  if (inflections.acronyms.size > 0) {
-    word = word.replace(inflections.acronymsUnderscoreRegex, (_match, pre, acronym) => {
+  if (inflections().acronyms.size > 0) {
+    word = word.replace(inflections().acronymsUnderscoreRegex, (_match, pre, acronym) => {
       return (pre ? "_" : "") + acronym.toLowerCase();
     });
   }
@@ -97,10 +94,9 @@ export function humanize(
   options: { capitalize?: boolean; keepIdSuffix?: boolean } = {},
 ): string {
   const { capitalize: cap = true, keepIdSuffix = false } = options;
-  const inflections = Inflections.instance("en");
   let result = lowerCaseAndUnderscoredWord;
 
-  for (const { rule, replacement } of inflections.humans) {
+  for (const { rule, replacement } of inflections().humans) {
     if (typeof rule === "string") {
       if (result === rule) {
         result = replacement;
@@ -122,7 +118,7 @@ export function humanize(
 
   // Handle acronyms
   result = result.replace(/([a-z\d]*)/gi, (match) => {
-    const acronym = inflections.acronyms.get(match.toLowerCase());
+    const acronym = inflections().acronyms.get(match.toLowerCase());
     return acronym || match.toLowerCase();
   });
 
