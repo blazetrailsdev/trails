@@ -3120,8 +3120,8 @@ export class Relation<T extends Base> {
     // No `none?` guard here: Rails' touch_all (relation.rb:969-971) is a bare
     // `update_all model.touch_attributes_with_time(...)` and inherits the
     // `return 0 if @none` from update_all (relation.rb:592). Delegating rather
-    // than short-circuiting also routes the new-owner seed rebase through
-    // updateAll's chokepoint.
+    // than short-circuiting is also what puts a CollectionProxy's touchAll on
+    // `CollectionProxy#updateAll`, and so on the association scope.
 
     // Use touchAttributesWithTime so alias-resolved column names are used
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
@@ -4224,7 +4224,8 @@ export class Relation<T extends Base> {
   ): Promise<number> {
     // No `none?` guard here: Rails' update_counters (relation.rb:926-944) ends
     // in `update_all updates` and inherits the `return 0 if @none` from there
-    // (relation.rb:592), which is also what routes the new-owner seed rebase.
+    // (relation.rb:592), and — on a CollectionProxy — the association scope,
+    // via `CollectionProxy#updateAll`.
 
     // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
     const touchFromCounters = (counters as Record<string, unknown>).touch;
