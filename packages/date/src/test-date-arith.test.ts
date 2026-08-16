@@ -139,12 +139,9 @@ describe("TestDateArith", () => {
     d = new Date(2000, 12, 31).succ();
     expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
 
-    // `Date.today` / `DateTime.now` answer the `Temporal` seat (RFC 0088), which
-    // carries no `next`/`succ`, so Ruby's own receiver is fed back through the
-    // `Temporal` constructor overload — `d_simple_new_internal`'s other entry
-    // point (`date_core.c:3036`), the same idiom `test_date_new.rb`'s
-    // "civil reform" uses. `d2 - 1` is `minus(1)` (`d_lite_minus`, `:6343-6360`)
-    // and `assert_equal` is `Comparable#==` (`equals`).
+    // `Date.today` / `DateTime.now` answer the `Temporal` seat (RFC 0088), so
+    // Ruby's receiver is fed back through the `Temporal` constructor overload —
+    // `d_simple_new_internal`'s other entry point, `date_core.c:3036`.
     d = new Date(Date.today());
     let d2 = d.next();
     expect(d.equals(d2.minus(1))).toBe(true);
@@ -152,12 +149,12 @@ describe("TestDateArith", () => {
     d2 = d.succ();
     expect(d.equals(d2.minus(1))).toBe(true);
 
-    let dt = new DateTime(DateTime.now());
-    let dt2 = dt.next();
-    expect(dt.equals(dt2.minus(1))).toBe(true);
-    dt = new DateTime(DateTime.now());
-    dt2 = dt.succ();
-    expect(dt.equals(dt2.minus(1))).toBe(true);
+    d = new DateTime(DateTime.now());
+    d2 = d.next();
+    expect(d.equals(d2.minus(1))).toBe(true);
+    d = new DateTime(DateTime.now());
+    d2 = d.succ();
+    expect(d.equals(d2.minus(1))).toBe(true);
   });
 
   it("next day", () => {
