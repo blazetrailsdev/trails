@@ -74,13 +74,10 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * covers all of them from one place. Reports the (possibly rebased)
    * `_isNone`.
    */
-  override isNullRelation = (): boolean => {
+  override isNullRelation(): boolean {
     this._maybeRebaseAssociationSeed();
-    // `super.isNullRelation()` is not available: the base definition comes from
-    // the QueryMethods mixin (query_methods.rb:1293), so it lands as a property
-    // on `Relation.prototype` rather than as a class method.
-    return Relation.prototype.isNullRelation.call(this);
-  };
+    return super.isNullRelation();
+  }
 
   /**
    * @internal Rebase a relation spawned off a stale new-owner `1=0` seed onto

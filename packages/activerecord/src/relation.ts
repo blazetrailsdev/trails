@@ -4943,6 +4943,10 @@ _registerRelationFamily("relation", Relation);
 // ---------------------------------------------------------------------------
 
 export interface Relation<T extends Base> {
+  // Declared as a METHOD signature (the mixin's object-literal type makes it a
+  // function-valued PROPERTY) so `AssociationRelation` can override it with a
+  // plain method and reach `super.isNullRelation()`.
+  isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
