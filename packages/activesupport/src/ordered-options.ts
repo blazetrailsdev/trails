@@ -28,8 +28,14 @@ export class OrderedOptions {
    */
   protected defaultBlock?: (key: string) => unknown;
 
-  constructor(initial: Record<string, unknown> = {}) {
-    this.data = new Map(Object.entries(initial));
+  /**
+   * `Hash.new` — Rails' `OrderedOptions < Hash` inherits it untouched, so it
+   * takes no entries; a subclass hands it a default block instead
+   * (ordered_options.rb:89-99).
+   */
+  constructor(defaultBlock?: (key: string) => unknown) {
+    this.data = new Map();
+    this.defaultBlock = defaultBlock;
     return new Proxy(this, {
       // Mirrors `method_missing` (ordered_options.rb:49-58) and
       // `respond_to_missing?` (:60-62), which answers true for every name.
@@ -160,9 +166,18 @@ export class OrderedOptions {
     return this.entries().length;
   }
 
-  /** `Object#dup`. */
-  dup(): OrderedOptions {
-    return new OrderedOptions(this.toH());
+  /**
+   * `Object#dup` — allocates the receiver's OWN class and copies its ivars, so
+   * an `InheritableOptions` dup stays an `InheritableOptions` reading through
+   * the same parent (`Hash#dup` carries the default block over too).
+   */
+  dup(): this {
+    const copy = new (this.constructor as new (parent?: unknown) => this)(
+      (this as unknown as { parent?: unknown }).parent,
+    );
+    for (const [key, value] of this.data) copy.set(key, value);
+    if (copy.defaultBlock === undefined) copy.defaultBlock = this.defaultBlock;
+    return copy;
   }
 }
 
@@ -178,15 +193,17 @@ export class OrderedOptions {
 export class InheritableOptions extends OrderedOptions {
   private readonly parent: OrderedOptions | Record<string, unknown>;
 
-  constructor(parent: OrderedOptions | null = null, initial: Record<string, unknown> = {}) {
-    super(initial);
+  /** Mirrors `initialize(parent = nil)` (ordered_options.rb:89-99). */
+  constructor(parent: OrderedOptions | Record<string, unknown> | null = null) {
     if (parent instanceof OrderedOptions) {
+      // use the faster _get when dealing with OrderedOptions
+      super((k) => (parent as unknown as { _get(key: string): unknown })._get(k));
       this.parent = parent;
-      this.defaultBlock = (k) => (parent as any)._get(k);
-    } else if (parent) {
+    } else if (parent != null) {
+      super((k) => parent[k]);
       this.parent = parent;
-      this.defaultBlock = (k) => (parent as Record<string, unknown>)[k];
     } else {
+      super();
       this.parent = {};
     }
   }
