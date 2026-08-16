@@ -2390,7 +2390,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Mirrors: ActiveRecord::Relation::FinderMethods#find_take. Rails has no
    * `CollectionProxy` override — the base body runs with `self` = the proxy and
    * reaches the association scope because `limit` is one of the
-   * `delegate(*QueryMethods, to: :scope)` methods (collection_proxy.rb:1119-1137).
+   * `delegate(*QueryMethods, to: :scope)` methods (collection_proxy.rb:1128-1137).
    * `_finderScope()` is that delegation, applied at the one place the base body
    * builds a query, so the `@take` memo still lands on the (memoized) scope and
    * survives until `resetScope` drops it, exactly as Rails' `reset_scope`
