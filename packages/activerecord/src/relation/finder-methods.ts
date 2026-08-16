@@ -920,13 +920,13 @@ export async function findSomeOrdered(rel: FinderRelation, ids: unknown[]): Prom
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
   let relation = (rel as any).except("limit", "offset");
-  const primaryKey = rel.model.primaryKey as string;
-  relation = relation.where({ [primaryKey]: ids });
+  relation = relation.where({ [rel.model.primaryKey as string]: ids });
   if ((rel as any).selectValues.length > 0) {
-    relation = relation.select(rel.table.get(primaryKey));
+    relation = relation.select(rel.table.get(rel.model.primaryKey as string));
   }
   const records: any[] = await relation.records();
 
+  const primaryKey = rel.model.primaryKey as string;
   const primaryKeyType = (rel.model as any).typeForAttribute(primaryKey);
   const castKey = (id: unknown) => String(primaryKeyType.cast(id));
 
@@ -973,8 +973,6 @@ export function orderedRelation(rel: FinderRelation): any {
   if (!hasOrder(rel) && (implicitOrder || constraintsList != null || pk)) {
     const cols = _orderColumns(rel);
     if (cols.length > 0) {
-      // Rails: `order(_order_columns.map { |column| table[column].asc })`
-      // (finder_methods.rb:648).
       return (rel as any).order(cols.map((column: string) => (rel as any).table.get(column).asc()));
     }
   }

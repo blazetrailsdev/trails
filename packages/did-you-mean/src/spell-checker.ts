@@ -39,14 +39,11 @@ export class SpellChecker {
     let words = this.#dictionary.filter(
       (word) => JaroWinkler.distance(normalize(word), normalizedInput) >= threshold,
     );
-    // Ruby: `words.reject! { |word| input.to_s == word.to_s }`.
     words = words.filter((word) => String(input) !== String(word));
-    // Ruby does `sort_by!` then `reverse!`. MRI's sort is not stable, but the
-    // observable effect on ties in practice is that elements come out in
-    // reverse insertion order — JS's stable ascending sort plus `reverse()`
-    // reproduces exactly that.
+    // MRI's sort is not stable, but the observable effect on ties is that
+    // elements come out in reverse insertion order; JS's stable ascending sort
+    // plus `reverse()` reproduces exactly that.
     words = words
-      .slice()
       .sort(
         (a, b) =>
           JaroWinkler.distance(String(a), normalizedInput) -

@@ -1,4 +1,3 @@
-import { AliasPredication } from "./alias-predication.js";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node, NodeVisitor } from "./nodes/node.js";
@@ -251,9 +250,6 @@ export class Table extends Node {
     return new JoinClass(to as Node, (constraint ?? null) as Node | null);
   }
 
-  /** Rails: `include Arel::AliasPredication` (table.rb:6). */
-  as = AliasPredication.as;
-
   accept<T>(visitor: NodeVisitor<T>): T {
     return visitor.visit(this);
   }
@@ -263,7 +259,7 @@ export class Table extends Node {
 // matches them against table.rb (Rails Arel's `Table` includes
 // FactoryMethods directly, expecting the methods to belong here).
 type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
+type _AliasPredication = import("./alias-predication.js").AliasPredicationModule;
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface Table extends _FactoryMethodsModule {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Table extends _FactoryMethodsModule, _AliasPredication {}
