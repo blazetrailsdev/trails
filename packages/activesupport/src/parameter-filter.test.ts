@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { ParameterFilter } from "./parameter-filter.js";
 
+/** Ruby's `String#swapcase`, which JS has no built-in for. */
+function swapcase(str: string): string {
+  return str.replace(/\p{L}/gu, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()));
+}
+
 describe("ParameterFilterTest", () => {
   it("process parameter filter", () => {
     const f = new ParameterFilter(["password", "credit_card"]);
@@ -63,7 +68,19 @@ describe("ParameterFilterTest", () => {
     const precompiled = ParameterFilter.precompileFilters([...patterns, ...deepPatterns, ...procs]);
 
     const regexps = precompiled.filter((f): f is RegExp => f instanceof RegExp);
-    expect(precompiled.length).toBe(regexps.length + procs.length);
+    expect(regexps.length).toBe(2);
+    expect(precompiled.length).toBe(2 + procs.length);
+
+    const regexp = regexps.find((r) => r.source.includes((patterns[0] as RegExp).source))!;
+    for (const key of keys) expect(regexp.test(key)).toBe(true);
+    expect(regexp.test(swapcase(keys[0]))).toBe(false);
+
+    const deepRegexp = regexps.find((r) => r.source.includes((deepPatterns[0] as RegExp).source))!;
+    for (const deepKey of deepKeys) expect(deepRegexp.test(deepKey)).toBe(true);
+    expect(deepRegexp.test(swapcase(deepKeys[0]))).toBe(false);
+
+    expect(regexp).not.toEqual(deepRegexp);
+    expect(precompiled.filter((f) => procs.includes(f as () => void))).toEqual(procs);
 
     const filter = new ParameterFilter(precompiled);
     for (const key of keys) expect(filter.filterParam(key, "x")).toBe("[FILTERED]");

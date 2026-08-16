@@ -2,13 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "parameter-filter.ts",
-    "rubyName": "call",
-    "call": "new",
-    "reason": "`params.class.new` (parameter_filter.rb:126) allocates a hash of the receiver's class; a plain JS object has no constructor to call, so `Object.create(Object.getPrototypeOf(params))` is the same allocation and keeps a null-prototype params hash null-prototype."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "parameter-filter.ts",
     "rubyName": "compile_filters!",
     "call": "new",
     "kind": "args",
@@ -16,6 +9,6 @@
       "ref:join",
       "bool:true"
     ],
-    "reason": "`Regexp.new(strings.join(\"|\"), true)` (parameter_filter.rb:121-122) — Ruby's second Regexp argument is the ignore-case boolean; the JS constructor takes a flag string, so `\"i\"` is the same argument spelled the way the language spells it. Language shortcoming."
+    "reason": "`Regexp.new(strings.join(\"|\"), true)` (parameter_filter.rb:121-122) — Ruby's second Regexp argument is the ignore-case boolean; the JS constructor's second argument is a flag string, so `\"i\"` is the same argument spelled the way the language spells it. Irreducible language shortcoming, demonstrated under burn-down-parameter-filter-regexp-and-block-deviations (RFC 0098): the flag is whole-pattern in both languages here, so there is no closer spelling."
   }
 ]

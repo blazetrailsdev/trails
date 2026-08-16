@@ -30,7 +30,8 @@
  * hands the block `key.dup` (parameter_filter.rb:149), a copy local to
  * `value_for_key`, while `call` writes `filtered_params[key]` with its own
  * unmutated key (:129) — so a key mutation never reaches the filtered hash in
- * Rails either. `value_for_key` returns the value alone in both.
+ * Rails either. `value_for_key` returns the value alone in both, which is why
+ * a `{ key, value }` return shape would be surface Rails' block does not have.
  */
 export type FilterProc = (
   key: string,
@@ -55,21 +56,24 @@ export class ParameterFilter {
    * precompiled filters can be retained).
    *
    * Ruby joins the escaped string patterns and the given Regexps into a single
-   * Regexp, spelling each string's case-insensitivity with the inline
-   * `(?i:...)` group. JS regular expressions have no inline flag groups — `i`
-   * is a whole-pattern flag — so the case-insensitive patterns are joined into
-   * their own Regexp rather than sharing one with the case-sensitive ones. The
-   * shallow-before-deep ordering, and the contents of each group, are Rails'.
+   * Regexp per group, spelling each case-insensitive part with the inline
+   * `(?i:...)` group (parameter_filter.rb:58-65). JS has no inline flag group,
+   * so {@link ignoreCaseSource} spells the same matching case-sensitively —
+   * each cased character expanded to a `[aA]` class — and the group is joined
+   * into ONE Regexp exactly as Rails'. A source that expansion cannot rewrite
+   * safely (a character class, a Unicode property escape, a named group or
+   * backreference) rides on as the caller's own Regexp after the joined one,
+   * rather than being folded into it.
    */
   static precompileFilters(filters: Filter[]): Array<FilterProc | RegExp> {
-    const patterns: Array<{ source: string; ignoreCase: boolean }> = [];
+    const patterns: Array<{ source: string; ignoreCase: boolean; regexp?: RegExp }> = [];
     const compiled: Array<FilterProc | RegExp> = [];
 
     for (const filter of filters) {
       if (typeof filter === "function") {
         compiled.push(filter);
       } else if (filter instanceof RegExp) {
-        patterns.push({ source: filter.source, ignoreCase: filter.ignoreCase });
+        patterns.push({ source: filter.source, ignoreCase: filter.ignoreCase, regexp: filter });
       } else {
         patterns.push({ source: escapeRegexp(String(filter)), ignoreCase: true });
       }
@@ -81,12 +85,15 @@ export class ParameterFilter {
     }
 
     for (const group of [patterns, deepPatterns]) {
-      for (const ignoreCase of [false, true]) {
-        const sources = group.filter((p) => p.ignoreCase === ignoreCase).map((p) => p.source);
-        if (sources.length > 0) {
-          compiled.push(new RegExp(sources.join("|"), ignoreCase ? "i" : ""));
-        }
+      const sources: string[] = [];
+      const unexpandable: RegExp[] = [];
+      for (const pattern of group) {
+        const source = pattern.ignoreCase ? ignoreCaseSource(pattern.source) : pattern.source;
+        if (source === null) unexpandable.push(pattern.regexp!);
+        else sources.push(source);
       }
+      if (sources.length > 0) compiled.push(new RegExp(sources.join("|")));
+      compiled.push(...unexpandable);
     }
 
     return compiled;
@@ -167,9 +174,13 @@ export class ParameterFilter {
     fullParentKey: string | null = null,
     originalParams: Record<string, unknown> | null = params,
   ): Record<string, unknown> {
-    // `params.class.new` (parameter_filter.rb:126): a plain JS object has no
-    // constructor to call, so the same prototype is the same class.
-    const filteredParams = Object.create(Object.getPrototypeOf(params)) as Record<string, unknown>;
+    // `params.class.new` (parameter_filter.rb:126). A null-prototype hash has
+    // no constructor — no class, in Ruby's terms — so it allocates a plain
+    // Object, the nearest thing JS has to its class.
+    const filteredParams = new ((params.constructor ?? Object) as ObjectConstructor)() as Record<
+      string,
+      unknown
+    >;
 
     for (const [key, value] of Object.entries(params)) {
       filteredParams[key] = this.valueForKey(key, value, fullParentKey, originalParams);
@@ -206,6 +217,39 @@ export class ParameterFilter {
 
     return value;
   }
+}
+
+/**
+ * Ruby spells a case-insensitive alternative inline as `(?i:...)`
+ * (parameter_filter.rb:59) so one Regexp can carry both case-sensitive and
+ * case-insensitive parts. JS has no inline flag group, so the same matching is
+ * spelled case-sensitively by expanding each cased character to a `[aA]` class.
+ *
+ * Returns null for a source whose letters are not all literal — a character
+ * class (where `[aA]` cannot be nested and a range must not be expanded), a
+ * Unicode property escape, a named group or a named backreference — where the
+ * expansion would silently corrupt the pattern. `Regexp.escape`d strings, the
+ * only sources Rails itself wraps in `(?i:...)`, never contain any of them.
+ */
+function ignoreCaseSource(source: string): string | null {
+  let out = "";
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === "\\") {
+      const next = source[i + 1];
+      if (next === "p" || next === "P" || next === "k") return null;
+      out += char + (next ?? "");
+      i++;
+      continue;
+    }
+    if (char === "[") return null;
+    if (source.startsWith("(?<", i) && source[i + 3] !== "=" && source[i + 3] !== "!") return null;
+    const lower = char.toLowerCase();
+    const upper = char.toUpperCase();
+    out +=
+      lower === upper || lower.length !== 1 || upper.length !== 1 ? char : `[${lower}${upper}]`;
+  }
+  return out;
 }
 
 /** Mirrors Ruby's `Regexp.escape`, which JS has no built-in for. */
