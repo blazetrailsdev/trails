@@ -532,6 +532,22 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`ConfigurationFile#render` (configuration_file.rb:54-58) evaluates the " +
+      "file's ERB against a binding — `ERB.new(@content).result(context)` — i.e. " +
+      "it compiles the template to Ruby source and evals it at runtime, so a " +
+      "config file can interpolate arbitrary expressions before the YAML is " +
+      "parsed. trails' ERB analogue is the TSE handler, which is a compile-time " +
+      "construct in actionview: it emits a module that trails-tsc builds ahead " +
+      "of time, there is no runtime template evaluator, and activesupport sits " +
+      "below actionview in the package graph so it could not reach one anyway. " +
+      "`parse` therefore has no render branch to take and always parses the file " +
+      "as written. Scoped to configuration_file.rb so `render` stays expected " +
+      "everywhere a real renderer is ported.",
+    names: ["render"],
+    rubyFiles: ["configuration_file.rb"],
+  },
+  {
+    reason:
       "The GC and allocation counters on Notifications::Event " +
       "(notifications/instrumenter.rb:174-186, :213-227): `gc_time` and " +
       "`allocations` are differences of `now_gc` / `now_allocations`, which read " +

@@ -34,6 +34,10 @@ describe("OrderedOptionsTest", () => {
     expect((opts as any).color).toBe("red");
   });
 
+  it("extractable options", () => {
+    expect(new OrderedOptions().isExtractableOptions()).toBe(true);
+  });
+
   it("introspection", () => {
     const opts = new OrderedOptions({ x: 1, y: 2 });
     expect(opts.keys()).toEqual(["x", "y"]);
@@ -130,6 +134,10 @@ describe("OrderedOptionsTest", () => {
     const child = new InheritableOptions(parent);
     (child as any).val = "child";
     expect(child.get("val")).toBe("child");
+    expect(child.isOverridden("val")).toBe(true);
+    expect(child.isOverridden("other")).toBe(false);
+    expect(child.has("val")).toBe(true);
+    expect(new InheritableOptions(parent).isOverridden("val")).toBe(false);
   });
 
   it("inheritable options overridden with nil", () => {

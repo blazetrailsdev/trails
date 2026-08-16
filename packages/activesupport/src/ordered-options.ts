@@ -65,6 +65,15 @@ export class OrderedOptions {
   // Hash-like interface
   // -------------------------------------------------------------------------
 
+  /**
+   * Mirrors `alias_method :_get, :[]` (ordered_options.rb:34-35) — the
+   * original, un-overridden Hash read, kept so InheritableOptions can reach a
+   * parent's own storage without going through the subclass's `[]`.
+   */
+  protected _get(key: string): unknown {
+    return this._data.get(key);
+  }
+
   get(key: string): unknown {
     return this._data.get(key);
   }
@@ -118,6 +127,11 @@ export class OrderedOptions {
   }
   get size(): number {
     return this._data.size;
+  }
+
+  /** Mirrors `extractable_options?` (ordered_options.rb:64-66). */
+  isExtractableOptions(): boolean {
+    return true;
   }
 
   /** inspect — like Ruby's inspect */
@@ -185,6 +199,24 @@ export class InheritableOptions extends OrderedOptions {
     const local = super.get(key);
     if (local !== undefined) return local;
     return this._parent?.get(key);
+  }
+
+  /**
+   * Mirrors `alias_method :own_key?, :key?` (ordered_options.rb:123-124) — the
+   * un-overridden `key?`, which sees only this object's own entries.
+   */
+  protected ownKey(key: string): boolean {
+    return super.has(key);
+  }
+
+  /** Mirrors `key?` (ordered_options.rb:126-128). */
+  override has(key: string): boolean {
+    return super.has(key) || (this._parent?.has(key) ?? false);
+  }
+
+  /** Mirrors `overridden?` (ordered_options.rb:130-132). */
+  isOverridden(key: string): boolean {
+    return !!(this._parent && this._parent.has(key) && this.ownKey(key));
   }
 
   /** inheritable_copy — new InheritableOptions parented to self */
