@@ -611,32 +611,14 @@ describe("DatabaseStatements", () => {
 
     it("sanitize limit with integer", () => {
       expect(sanitizeLimit(10)).toBe(10);
+      // A non-Integer Float falls to `Integer(limit)` (database_statements.rb:512),
+      // which truncates toward zero rather than flooring.
+      expect(sanitizeLimit(3.9)).toBe(3);
+      expect(sanitizeLimit(-3.9)).toBe(-3);
     });
 
     it("sanitize limit with string integer", () => {
       expect(sanitizeLimit("10")).toBe(10);
-    });
-
-    it("sanitize limit with invalid value", () => {
-      // `Integer("abc")` (database_statements.rb:512) raises ArgumentError, not
-      // TypeError — TypeError is Ruby's arm for a value with no integer
-      // conversion at all (`Integer(nil)`).
-      expect(() => sanitizeLimit("abc")).toThrow(ArgumentError);
-      expect(() => sanitizeLimit(null)).toThrow(TypeError);
-      // `Integer(nil)` / `Integer([1])` / `Integer(true)` name the value's class
-      // (nil/true/false render as themselves); `Integer(Float::NAN)` and
-      // `Integer(Float::INFINITY)` raise FloatDomainError, not TypeError.
-      expect(() => sanitizeLimit(null)).toThrow("can't convert nil into Integer");
-      expect(() => sanitizeLimit([1])).toThrow("can't convert Array into Integer");
-      expect(() => sanitizeLimit(true)).toThrow("can't convert true into Integer");
-      expect(() => sanitizeLimit(NaN)).toThrow(
-        expect.objectContaining({ name: "FloatDomainError", message: "NaN" }),
-      );
-      expect(() => sanitizeLimit(Infinity)).toThrow(
-        expect.objectContaining({ name: "FloatDomainError", message: "Infinity" }),
-      );
-      expect(sanitizeLimit(3.9)).toBe(3);
-      expect(sanitizeLimit(-3.9)).toBe(-3);
       // `Integer(str)` parses with base detection, not as plain decimal: a bare
       // leading `0` is octal, `0x`/`0b`/`0o`/`0d` set the radix, and `_`
       // separates digits. Every pair below was taken from `ruby -e`.
@@ -649,9 +631,27 @@ describe("DatabaseStatements", () => {
       expect(sanitizeLimit("0_1")).toBe(1);
       expect(sanitizeLimit(" 12 ")).toBe(12);
       expect(sanitizeLimit("-0x10")).toBe(-16);
-      for (const bad of ["1__0", "1e3", "12.5", "08", "0b2", "0xg", "_1", "1_", "--5"]) {
+    });
+
+    it("sanitize limit with invalid value", () => {
+      // `Integer("abc")` (database_statements.rb:512) raises ArgumentError, not
+      // TypeError — TypeError is Ruby's arm for a value with no integer
+      // conversion at all, and it names the value's class (nil/true/false render
+      // as themselves). `Integer(Float::NAN)` / `Integer(Float::INFINITY)` raise
+      // FloatDomainError.
+      for (const bad of ["abc", "1__0", "1e3", "12.5", "08", "0b2", "0xg", "_1", "1_", "--5"]) {
         expect(() => sanitizeLimit(bad)).toThrow(ArgumentError);
       }
+      expect(() => sanitizeLimit(null)).toThrow(TypeError);
+      expect(() => sanitizeLimit(null)).toThrow("can't convert nil into Integer");
+      expect(() => sanitizeLimit([1])).toThrow("can't convert Array into Integer");
+      expect(() => sanitizeLimit(true)).toThrow("can't convert true into Integer");
+      expect(() => sanitizeLimit(NaN)).toThrow(
+        expect.objectContaining({ name: "FloatDomainError", message: "NaN" }),
+      );
+      expect(() => sanitizeLimit(Infinity)).toThrow(
+        expect.objectContaining({ name: "FloatDomainError", message: "Infinity" }),
+      );
     });
 
     it("with yaml fallback passes scalar through", () => {
