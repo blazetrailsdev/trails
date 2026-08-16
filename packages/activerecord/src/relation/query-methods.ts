@@ -251,7 +251,7 @@ interface QueryMethodsHost {
   annotateValues: string[];
   withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   limitValue: number | null;
-  offsetValue: number | null;
+  offsetValue: number | string | null;
   lockValue: string | null;
   readonlyValue: boolean | null;
   reorderingValue: boolean | null;
@@ -506,7 +506,9 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>
     // raw args, so `relation.with!(*with_values)` round-trips through Merger's
     // NORMAL_VALUES loop (merger.rb:57-66) and two CTEs sharing an alias both
     // survive, leaving the database to object. trails resolves at `with!` time,
-    // so a fed-back entry is unioned in as-is rather than re-parsed.
+    // so a fed-back entry is unioned in as-is rather than re-parsed. Converging
+    // the storage shape (which retires this branch and `isCteEntry`) is tracked
+    // by 0107/converge-with-values-to-rails-raw-args.
     if (isCteEntry(cte)) {
       if (!this.withValues.includes(cte)) this.withValues = [...this.withValues, cte];
       continue;
@@ -1305,7 +1307,7 @@ function limitBang(this: QueryMethodsHost, value: number | null): any {
   return this;
 }
 
-function offsetBang(this: QueryMethodsHost, value: number | null): any {
+function offsetBang(this: QueryMethodsHost, value: number | string | null): any {
   // Mirrors `offset!` (query_methods.rb:1231-1234): the raw value is stored and
   // integer-coerced later, by `build_arel`'s `offset_value.to_i` (:1758).
   this.offsetValue = value;

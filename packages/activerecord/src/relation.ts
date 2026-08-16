@@ -271,7 +271,7 @@ export type ValuesHash = {
   annotate?: string[];
   with?: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   limit?: number | null;
-  offset?: number | null;
+  offset?: number | string | null;
   lock?: string | null;
   readonly?: boolean;
   reordering?: boolean;
@@ -968,7 +968,7 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#offset
    */
-  offset(value: number | null): Relation<T> {
+  offset(value: number | string | null): Relation<T> {
     return this._clone().offsetBang(value);
   }
 

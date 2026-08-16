@@ -109,14 +109,6 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
-  // loop (`relation.eager_load!(*value)`, merger.rb:52-68), not as part of
-  // merge_preloads — it crosses the model boundary untouched.
-  private mergeEagerLoad(rel: any): void {
-    const otherEagerLoad = this.other.eagerLoadValues;
-    if (otherEagerLoad.length > 0) rel.eagerLoadBang(...otherEagerLoad);
-  }
-
   private mergePreloads(rel: any): void {
     if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
 

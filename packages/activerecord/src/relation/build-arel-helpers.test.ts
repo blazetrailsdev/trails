@@ -207,9 +207,7 @@ describe("Relation#offset float truncation", () => {
   });
 
   it("emits OFFSET 5 in SQL when offset is a numeric string", () => {
-    const sql = relation()
-      .offset("5" as unknown as number)
-      .toSql();
+    const sql = relation().offset("5").toSql();
     expect(sql).toContain("OFFSET 5");
   });
 });
