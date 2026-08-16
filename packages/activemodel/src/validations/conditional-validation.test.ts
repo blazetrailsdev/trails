@@ -1,161 +1,196 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { assertEmpty, assertPredicate } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 
+// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
+class Topic extends Model {
+  static {
+    this.attribute("title", "string");
+    this.attribute("content", "string");
+  }
+
+  conditionIsTrue(): boolean {
+    return true;
+  }
+
+  conditionIsFalse(): boolean {
+    return false;
+  }
+}
+
 describe("ConditionalValidationTest", () => {
-  it("if validation using block true", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: () => true });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(false);
-  });
-
-  it("if validation using block false", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: () => false });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("unless validation using block true", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: () => true });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("unless validation using block false", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: () => false });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(false);
-  });
-
-  it("validation using combining if true and unless true conditions", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: () => true, unless: () => true });
-      }
-    }
-    // unless returns true, so validation is skipped
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("validation using combining if true and unless false conditions", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: () => true, unless: () => false });
-      }
-    }
-    // both conditions met, validation runs
-    expect(await new Person({}).isValid()).toBe(false);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("if validation using method true", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: "shouldValidateName" });
-      }
-      shouldValidateName() {
-        return true;
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(false);
-  });
-
-  it("if validation using method false", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: "shouldValidateName" });
-      }
-      shouldValidateName() {
-        return false;
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("unless validation using method true", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: "skipValidation" });
-      }
-      skipValidation() {
-        return true;
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("unless validation using method false", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: "skipValidation" });
-      }
-      skipValidation() {
-        return false;
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(false);
+    // When the method returns true
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: "conditionIsTrue",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
   });
 
   it("if validation using array of true methods", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: [() => true, () => true] });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(false);
-  });
-
-  it("if validation using array of true and false methods", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, if: [() => true, () => false] });
-      }
-    }
-    // One returns false, so validation is skipped
-    expect(await new Person({}).isValid()).toBe(true);
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: ["conditionIsTrue", "conditionIsTrue"],
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
   });
 
   it("unless validation using array of false methods", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: [() => false, () => false] });
-      }
-    }
-    // None return true, so validation runs
-    expect(await new Person({}).isValid()).toBe(false);
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: ["conditionIsFalse", "conditionIsFalse"],
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("unless validation using method true", async () => {
+    // When the method returns true
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: "conditionIsTrue",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("if validation using array of true and false methods", async () => {
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: ["conditionIsTrue", "conditionIsFalse"],
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
   });
 
   it("unless validation using array of true and false methods", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, unless: [() => true, () => false] });
-      }
-    }
-    // One returns true, so validation is skipped
-    expect(await new Person({}).isValid()).toBe(true);
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: ["conditionIsTrue", "conditionIsFalse"],
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("if validation using method false", async () => {
+    // When the method returns false
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: "conditionIsFalse",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("unless validation using method false", async () => {
+    // When the method returns false
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: "conditionIsFalse",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("if validation using block true", async () => {
+    // When the block returns true
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: (r: Topic) => (r.content as string).length > 4,
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("unless validation using block true", async () => {
+    // When the block returns true
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: (r: Topic) => (r.content as string).length > 4,
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("if validation using block false", async () => {
+    // When the block returns false
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: (r: Topic) => r.title !== "uhohuhoh",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("unless validation using block false", async () => {
+    // When the block returns false
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      unless: (r: Topic) => r.title !== "uhohuhoh",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("validation using combining if true and unless true conditions", async () => {
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: "conditionIsTrue",
+      unless: "conditionIsTrue",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertEmpty(t.errors.get("title"));
+  });
+
+  it("validation using combining if true and unless false conditions", async () => {
+    Topic.validatesLengthOf("title", {
+      maximum: 5,
+      tooLong: "hoo %{count}",
+      if: "conditionIsTrue",
+      unless: "conditionIsFalse",
+    });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
   });
 });
