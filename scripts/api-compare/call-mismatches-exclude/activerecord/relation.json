@@ -58,27 +58,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "arel",
-    "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "arel_columns",
-    "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "order:primaryKey,applyJoinDependency",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
     "call": "apply_join_dependency",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -159,20 +138,6 @@
     "rubyName": "to_sql",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "arel",
-    "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "arel_columns",
-    "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
   },
   {
     "package": "activerecord",

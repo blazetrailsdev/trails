@@ -442,13 +442,6 @@ function hasOrder(rel: FinderRelation): boolean {
   return rel._orderClauses.length > 0 || rel._rawOrderClauses.length > 0;
 }
 
-function hasReversibleOrder(rel: FinderRelation): boolean {
-  // Only _orderClauses can be reversed by reverseOrder().
-  // _rawOrderClauses (e.g. from inOrderOf) contain arbitrary SQL
-  // that can't be reliably reversed.
-  return rel._orderClauses.length > 0;
-}
-
 /** @internal */
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
   // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
@@ -469,14 +462,6 @@ export async function performFirstBang(this: FinderRelation): Promise<any> {
   return record;
 }
 
-function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
-  const pk = rel.primaryKey;
-  if (Array.isArray(pk)) {
-    return rel.order(...pk.map((col: string) => ({ [col]: direction })));
-  }
-  return rel.order({ [pk]: direction });
-}
-
 /** @internal */
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
   // `return find_last(limit) if loaded? || has_limit_or_offset?`
@@ -487,20 +472,12 @@ export async function performLast(this: FinderRelation, n?: number): Promise<any
   if (this.isLoaded || (this as any)._limitValue != null || (this as any)._offsetValue != null) {
     return findLast.call(this, n);
   }
-  let rel: any;
-  if (!hasReversibleOrder(this)) {
-    rel = orderByPk(this, "desc");
-  } else {
-    rel = this.reverseOrder();
-  }
-  if (n !== undefined) {
-    rel = rel.limit(n);
-    const records = await rel.toArray();
-    return records.reverse();
-  }
-  rel = rel.limit(1);
-  const records = await rel.toArray();
-  return records[0] ?? null;
+  // `result = ordered_relation.limit(limit); result = result.reverse_order!;
+  //  limit ? result.reverse : result.first` (finder_methods.rb:205-207).
+  let result: any = orderedRelation.call(this).limit(n ?? null);
+  result = result.reverseOrderBang();
+  if (n !== undefined) return (await result.toArray()).reverse();
+  return await performFirst.call(result);
 }
 
 /** @internal */

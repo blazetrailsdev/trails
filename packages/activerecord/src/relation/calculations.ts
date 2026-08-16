@@ -630,60 +630,61 @@ export function asyncCount(
   return this.count(columnName);
 }
 
-/**
- * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
- */
-export async function calculate(
+export async function performAverage(
   this: CalculationRelation,
-  operation: string,
-  columnName?: string | Nodes.Node | number | null,
-): Promise<unknown> {
-  operation = operation.toLowerCase();
+  column: string | Nodes.Node,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  // Returns `unknown` (not just number) because non-numeric column types
+  // — interval (Duration), money, time — route through the column type's
+  // deserialize and yield a domain object. Rails' AVG return type is
+  // similarly polymorphic (BigDecimal for integer/decimal, Duration for
+  // interval, etc.). Numeric averages still narrow to JS number at the
+  // call site.
+  return calculate.call(this, "average", column);
+}
 
-  // Rails' `@none`. `_isEmptyRelation()` is the shared none-short-circuit
-  // chokepoint: on an AssociationRelation it first rebases a stale new-owner
-  // `1=0` seed onto the live association scope, so a calculation on a relation
-  // spawned off a new owner picks up the persisted FK after `save`.
-  if (this._isEmptyRelation()) {
-    switch (operation) {
-      case "count":
-      case "sum":
-        return any(this.groupValues) ? new Map() : 0;
-      case "average":
-      case "minimum":
-      case "maximum":
-        return any(this.groupValues) ? new Map() : null;
-    }
-  }
+/**
+ * Mirrors: ActiveRecord::Calculations#async_average (calculations.rb:122).
+ */
+export function asyncAverage(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.average(columnName);
+}
 
-  if (hasInclude(this, columnName ?? null)) {
-    // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
-    // thenable, so the joined relation is delivered to a block instead (the
-    // block form `apply_join_dependency` also has).
-    return this._applyJoinDependencyAsync(async (relation) => {
-      if (operation === "count") {
-        if (
-          !this._isDistinct &&
-          !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
-        ) {
-          relation.distinctBang();
-          const primaryKey = this.model.primaryKey;
-          relation._selectColumns =
-            primaryKey == null
-              ? [new Nodes.SqlLiteral("*")]
-              : Array.isArray(primaryKey)
-                ? [...primaryKey]
-                : [primaryKey];
-        }
-        // PostgreSQL: ORDER BY expressions must appear in SELECT list when using DISTINCT
-        if (this.groupValues.length === 0) relation._orderClauses = [];
-      }
+export async function performMinimum(
+  this: CalculationRelation,
+  column: string | Nodes.Node,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return calculate.call(this, "minimum", column);
+}
 
-      return relation.calculate(operation, columnName);
-    });
-  } else {
-    return performCalculation(this, operation, columnName ?? null);
-  }
+/**
+ * Mirrors: ActiveRecord::Calculations#async_minimum (calculations.rb:137).
+ */
+export function asyncMinimum(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.minimum(columnName);
+}
+
+export async function performMaximum(
+  this: CalculationRelation,
+  column: string | Nodes.Node,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return calculate.call(this, "maximum", column);
+}
+
+/**
+ * Mirrors: ActiveRecord::Calculations#async_maximum (calculations.rb:152).
+ */
+export function asyncMaximum(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.maximum(columnName);
 }
 
 /**
@@ -760,61 +761,60 @@ export function asyncSum(
   return this.sum(identityOrColumn);
 }
 
-export async function performAverage(
-  this: CalculationRelation,
-  column: string | Nodes.Node,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  // Returns `unknown` (not just number) because non-numeric column types
-  // — interval (Duration), money, time — route through the column type's
-  // deserialize and yield a domain object. Rails' AVG return type is
-  // similarly polymorphic (BigDecimal for integer/decimal, Duration for
-  // interval, etc.). Numeric averages still narrow to JS number at the
-  // call site.
-  return calculate.call(this, "average", column);
-}
-
 /**
- * Mirrors: ActiveRecord::Calculations#async_average (calculations.rb:122).
+ * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
  */
-export function asyncAverage(
+export async function calculate(
   this: CalculationRelation,
-  columnName: string,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.average(columnName);
-}
+  operation: string,
+  columnName?: string | Nodes.Node | number | null,
+): Promise<unknown> {
+  operation = operation.toLowerCase();
 
-export async function performMinimum(
-  this: CalculationRelation,
-  column: string | Nodes.Node,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "minimum", column);
-}
+  // Rails' `@none`. `_isEmptyRelation()` is the shared none-short-circuit
+  // chokepoint: on an AssociationRelation it first rebases a stale new-owner
+  // `1=0` seed onto the live association scope, so a calculation on a relation
+  // spawned off a new owner picks up the persisted FK after `save`.
+  if (this._isEmptyRelation()) {
+    switch (operation) {
+      case "count":
+      case "sum":
+        return any(this.groupValues) ? new Map() : 0;
+      case "average":
+      case "minimum":
+      case "maximum":
+        return any(this.groupValues) ? new Map() : null;
+    }
+  }
 
-/**
- * Mirrors: ActiveRecord::Calculations#async_minimum (calculations.rb:137).
- */
-export function asyncMinimum(
-  this: CalculationRelation,
-  columnName: string,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.minimum(columnName);
-}
+  if (hasInclude(this, columnName ?? null)) {
+    // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
+    // thenable, so the joined relation is delivered to a block instead (the
+    // block form `apply_join_dependency` also has).
+    return this._applyJoinDependencyAsync(async (relation) => {
+      if (operation === "count") {
+        if (
+          !this._isDistinct &&
+          !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
+        ) {
+          relation.distinctBang();
+          const primaryKey = this.model.primaryKey;
+          relation._selectColumns =
+            primaryKey == null
+              ? [new Nodes.SqlLiteral("*")]
+              : Array.isArray(primaryKey)
+                ? [...primaryKey]
+                : [primaryKey];
+        }
+        // PostgreSQL: ORDER BY expressions must appear in SELECT list when using DISTINCT
+        if (this.groupValues.length === 0) relation._orderClauses = [];
+      }
 
-export async function performMaximum(
-  this: CalculationRelation,
-  column: string | Nodes.Node,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "maximum", column);
-}
-
-/**
- * Mirrors: ActiveRecord::Calculations#async_maximum (calculations.rb:152).
- */
-export function asyncMaximum(
-  this: CalculationRelation,
-  columnName: string,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.maximum(columnName);
+      return relation.calculate(operation, columnName);
+    });
+  } else {
+    return performCalculation(this, operation, columnName ?? null);
+  }
 }
 
 /**
@@ -1197,17 +1197,17 @@ function inQueryConnection<A extends unknown[], R>(
 }
 
 export const Calculations = {
-  calculate: inQueryConnection(calculate),
   count: inQueryConnection(performCount),
   asyncCount,
-  sum: inQueryConnection(performSum),
-  asyncSum,
   average: inQueryConnection(performAverage),
   asyncAverage,
   minimum: inQueryConnection(performMinimum),
   asyncMinimum,
   maximum: inQueryConnection(performMaximum),
   asyncMaximum,
+  sum: inQueryConnection(performSum),
+  asyncSum,
+  calculate: inQueryConnection(calculate),
   // `pluck` / `ids` do their own `with_connection` (and `skip_query_cache_if_necessary`)
   // around the one query they issue, exactly as calculations.rb:316/396 does —
   // so they are NOT wrapped in `inQueryConnection`, which is the seam for the
