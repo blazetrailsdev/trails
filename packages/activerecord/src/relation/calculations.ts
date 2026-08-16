@@ -21,9 +21,12 @@ import { defaultValue } from "../type.js";
 import {
   arelColumn,
   arelColumns,
+  argumentError,
   buildJoinDependencies,
   eachJoinDependencies,
 } from "./query-methods.js";
+import { disallowRawSqlBang } from "../sanitization.js";
+import { columnNameMatcher as abstractColumnNameMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 
 /**
  * Mirrors: ActiveRecord::Calculations::ColumnAliasTracker
@@ -134,6 +137,10 @@ interface CalculationRelation {
     _attributeDefinitions?: { has(name: string): boolean };
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     connection: CalculationConnection;
+    /** Mirrors `Model.load_schema` — `type_cast_pluck_values` needs attribute_types. */
+    ensureSchemaLoaded(): Promise<void>;
+    /** Mirrors `Model.attribute_names` — stands in for `columns_hash.key?`. */
+    attributeNames(): string[];
   };
   /**
    * The connection threaded by the enclosing `withConnection` wrap, else
@@ -191,6 +198,68 @@ interface CalculationRelation {
   _buildFromNode(): Nodes.Node | string | undefined;
   _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
+  // --- read by pluck / pick / ids (calculations.rb:291-412) ---
+  /** Mirrors `Relation#loaded?`. */
+  loaded: boolean;
+  /** Mirrors `Relation#@records`; the `loaded?` arm of `ids` reads it directly. */
+  _records: Array<{ _readAttribute(name: string): unknown }>;
+  /** Mirrors `Relation#records` (relation.rb:250). */
+  records(): Promise<any[]>;
+  /** Mirrors `Relation#table`. */
+  table: Table;
+  /** Mirrors `Relation#limit` (query_methods.rb:407). */
+  limit(value: number | null): CalculationRelation;
+  /** Mirrors `Relation#where` (query_methods.rb:668). */
+  where(opts: unknown): CalculationRelation;
+  /** Mirrors `Relation#group` (query_methods.rb:390). */
+  group(...args: unknown[]): CalculationRelation;
+  /** Mirrors `QueryMethods#left_outer_joins` (query_methods.rb:341). */
+  leftOuterJoins(...args: unknown[]): CalculationRelation;
+  /** Mirrors `Calculations#pluck` — the recursive arms re-enter through the prototype. */
+  pluck(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]>;
+  /** Mirrors `Calculations#pick`. */
+  pick(
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown>;
+  /** Mirrors `Calculations#ids` — the has_include? arm recurses through the prototype. */
+  ids(): Promise<unknown[]>;
+  /** Mirrors `Calculations#count` / `#sum` / `#average` / `#minimum` / `#maximum`. */
+  count(columnName?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  sum(
+    initialValueOrColumn?: string | Nodes.Node | number | null,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  average(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  minimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  maximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  /** Mirrors `Relation#arel_columns` (query_methods.rb:1735). */
+  arelColumns(columns: unknown[]): unknown[];
+  /** Mirrors `Relation#flattened_args` (relation.rb). */
+  flattenedArgs(args: unknown[]): unknown[];
+  /** Mirrors `Relation#skip_query_cache_if_necessary` (relation.rb:1000). */
+  skipQueryCacheIfNecessary<R>(fn: () => Promise<R>): Promise<R>;
+  /** @internal trails: resolves deferred distinct-PK markers; see Relation. */
+  _materializeDeferredDistinctPkPredicates(): Promise<void>;
+  /** @internal trails: the eager-load spec stores backing `has_include?`. */
+  _eagerLoadAssociations: unknown[];
+  _includesAssociations: unknown[];
+  /** @internal trails: `spawn` without the scoping re-application; see Relation. */
+  _clone(): CalculationRelation;
+  /** @internal trails: builds the JoinDependency `apply_join_dependency` would. */
+  _buildEagerJoinDependency(specs: unknown[]): JoinDependency;
+  /** Mirrors `Relation#limit_or_offset?`. */
+  hasLimitOrOffset: boolean;
+  /** @internal trails: `using_limitable_reflections?` (finder_methods.rb:475). */
+  _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean;
+  /** @internal trails: `distinct_relation_for_primary_key`'s executed half. */
+  _materializeLimitedIds(jd: JoinDependency, primaryKey: string | string[]): Promise<unknown[]>;
+  /** @internal trails: the select manager `build_arel` builds. */
+  _buildSelectManager(): SelectManager;
+  /** @internal trails: folds `WITH` and `annotate()` into a built manager. */
+  _applyCtesAndAnnotationsToManager(manager: SelectManager): void;
+  /** @internal trails: compiles an AST to `[sql, binds]`. */
+  _compileAstWithBinds(ast: unknown): [string, unknown[]];
 }
 
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
@@ -558,6 +627,16 @@ export async function performCount(
 }
 
 /**
+ * Mirrors: ActiveRecord::Calculations#async_count (calculations.rb:108).
+ */
+export function asyncCount(
+  this: CalculationRelation,
+  columnName?: string,
+): Promise<number | Map<unknown, number>> {
+  return this.count(columnName);
+}
+
+/**
  * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
  */
 export async function calculate(
@@ -677,6 +756,16 @@ export async function performSum(
   return (sum as number | bigint) ?? 0;
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#async_sum (calculations.rb:182).
+ */
+export function asyncSum(
+  this: CalculationRelation,
+  identityOrColumn: string | Nodes.Node | number | null = null,
+): Promise<number | bigint | Map<unknown, number | bigint>> {
+  return this.sum(identityOrColumn);
+}
+
 export async function performAverage(
   this: CalculationRelation,
   column: string | Nodes.Node,
@@ -690,6 +779,16 @@ export async function performAverage(
   return calculate.call(this, "average", column);
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#async_average (calculations.rb:122).
+ */
+export function asyncAverage(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.average(columnName);
+}
+
 export async function performMinimum(
   this: CalculationRelation,
   column: string | Nodes.Node,
@@ -697,11 +796,337 @@ export async function performMinimum(
   return calculate.call(this, "minimum", column);
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#async_minimum (calculations.rb:137).
+ */
+export function asyncMinimum(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.minimum(columnName);
+}
+
 export async function performMaximum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return calculate.call(this, "maximum", column);
+}
+
+/**
+ * Mirrors: ActiveRecord::Calculations#async_maximum (calculations.rb:152).
+ */
+export function asyncMaximum(
+  this: CalculationRelation,
+  columnName: string,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return this.maximum(columnName);
+}
+
+/**
+ * Pluck values for columns.
+ *
+ * Mirrors: ActiveRecord::Calculations#pluck (calculations.rb:291).
+ */
+export async function pluck(
+  this: CalculationRelation,
+  ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+): Promise<unknown[]> {
+  // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
+  if (this._isEmptyRelation()) return [];
+
+  // calculations.rb:300 — a loaded relation whose plucked columns are all
+  // attributes reads the materialized records instead of issuing SQL, the same
+  // arm `pick` carries (:353).
+  if (this.loaded && isAllAttributes(this, columns as unknown as string[])) {
+    const records = await this.records();
+    return records.map((record) =>
+      columns.length > 1
+        ? columns.map((column) => record.get(String(column)))
+        : record.get(String(columns[0])),
+    );
+  }
+
+  return this.withConnection(async () => {
+    // Resolve any deferred distinct-PK subquery markers to a literal id list
+    // before compiling, so pluck (like Rails) emits `pk IN (ids)` rather than
+    // the inline `IN (SELECT … LIMIT n)` MySQL rejects.
+    await this._materializeDeferredDistinctPkPredicates();
+    // Mirrors Calculations#pluck: a contradictory where-clause (`where(col: [])`,
+    // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
+    // Checked after materialization so a deferred distinct-PK
+    // predicate that resolves to an empty id set also short-circuits.
+    if (this._whereClause.isContradiction()) {
+      return typeCastPluckValues(Result.empty(), columns, this as any);
+    }
+    // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
+    // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
+    // the eager values) and recurses, so the plucked columns can reference the
+    // joined tables. Rails builds the JoinDependency over `eager_load_values |
+    // includes_values` (finder_methods.rb:457); we model that with leftOuterJoins
+    // over the cleared specs below. The cleared recursion takes the plain (else)
+    // branch, so there is no infinite loop. For a limit/offset over a collection
+    // reflection we also materialize the limited DISTINCT primary keys
+    // (distinct_relation_for_primary_key) before recursing.
+    const firstColumnName =
+      columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : "\0arel";
+    if (hasInclude(this as any, firstColumnName)) {
+      // hasInclude is true only when _eagerLoadAssociations or
+      // _includesAssociations is non-empty, so the union is always non-empty here.
+      const eagerSpecs = [
+        ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
+      ];
+      const rel = this._clone();
+      rel._eagerLoadAssociations = [];
+      rel._includesAssociations = [];
+
+      const basePk = (this._model as any).primaryKey ?? "id";
+      const jd = this._buildEagerJoinDependency(eagerSpecs);
+
+      if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+        // A composite base PK can't be materialized here — `_materializeLimitedIds`
+        // (Rails' zip/transpose over `Array(primary_key)`) has no composite
+        // support, so it would emit a wrong single-column `"col1,col2"` predicate.
+        // Surface the same explicit NotImplementedError the cache_version path
+        // raises for this shape (tracked by
+        // 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization).
+        if (Array.isArray(basePk)) this.applyJoinDependency();
+        // Rails apply_join_dependency, for a limit/offset over a collection
+        // reflection, replaces the relation via distinct_relation_for_primary_key
+        // (finder_methods.rb:463): execute a query to materialize the limited
+        // DISTINCT primary keys, rewrite as `WHERE pk IN (ids)`, and clear
+        // limit/offset. Limiting the joined rows directly would be wrong under
+        // fan-out (it limits associated rows, not parents).
+        const limitedIds = await this._materializeLimitedIds(jd, basePk);
+        const limited = rel.leftOuterJoins(eagerSpecs).where({
+          [basePk]: limitedIds,
+        });
+        limited._limitValue = null;
+        limited._offsetValue = null;
+        return limited.pluck(...columns);
+      }
+      return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
+    }
+
+    // Reflect the schema before casting results so the model's attribute
+    // types are available — Rails' type_cast_pluck_values reads
+    // model.attribute_types, which runs load_schema first. pluck issues a
+    // raw query (no toArray()), so it must trigger the load itself.
+    await this._model.ensureSchemaLoaded();
+
+    // Mirrors Rails' disallow_raw_sql! check on pluck arguments.
+    // Uses the broader column_name_matcher (allows functions like UPPER(col))
+    // rather than column_name_with_order_matcher (which is stricter, for order).
+    const stringColumns = this.flattenedArgs(columns).filter(
+      (c): c is string => typeof c === "string",
+    );
+    if (stringColumns.length > 0) {
+      disallowRawSqlBang(stringColumns, { permit: resolveColumnNameMatcher(this._conn()) });
+    }
+
+    const table = this.table;
+    // Rails columns_hash.key? — qualify a bare known column to the base table.
+    const knownColumns = new Set(this._model.attributeNames());
+    const isKnownColumn = (name: string): boolean => knownColumns.has(name);
+    const projections = columns.map((c) => {
+      if (c instanceof Nodes.SqlLiteral) {
+        // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
+        // it through arel_column: a bare known-column literal is qualified to the
+        // base table (e.g. "id" → "posts"."id"), which keeps pluck unambiguous once
+        // apply_join_dependency adds a LEFT OUTER JOIN. Complex or unknown literals
+        // (functions, dotted names, non-columns) pass through verbatim.
+        const v = c.value.trim();
+        return /^\w+$/.test(v) && isKnownColumn(v) ? table.get(v) : c;
+      }
+      if (typeof c !== "string") return c;
+      // Table-qualified ("table.col"), quoted ('"table"."col"'), function expressions,
+      // or comma-separated lists must pass through as raw SQL.
+      // Comma-separated lists are not allowed in a single pluck argument —
+      // each column must be passed as a separate argument for correct result mapping.
+      if (hasTopLevelComma(c)) {
+        throw argumentError(
+          `pluck does not allow comma-separated column lists in a single argument. ` +
+            `Pass each column as a separate argument: pluck("col1", "col2")`,
+        );
+      }
+      const isComplex =
+        c.includes(".") ||
+        c.includes("(") ||
+        c.includes('"') ||
+        c.includes("`") ||
+        c.includes("::") ||
+        /\s+AS\s+/i.test(c);
+      if (isComplex) return new Nodes.SqlLiteral(c);
+      // Mirrors Rails arel_column: only a column in the base model's
+      // columns_hash is qualified to the base table. A bare column absent
+      // from columns_hash stays unqualified so the database resolves it
+      // against a joined table (test_pluck_not_auto_table_name_prefix_if_column_*).
+      return isKnownColumn(c) ? table.get(c) : new Nodes.SqlLiteral(c);
+    });
+    // Rails' pluck spawns, sets select_values = columns, then executes the full
+    // relation arel (calculations.rb), so build the same manager as a normal
+    // read — joins/wheres/order/group/having/from/lock/optimizer-hints thread
+    // through identically — but with the pluck columns as the select. Clearing
+    // the spawn's select before building is essential: resolving the discarded
+    // select list would mutate _referencesValues and could promote includes
+    // (adding joins Rails would not add for the pluck columns).
+    const rel = this._clone();
+    rel._selectColumns = null;
+    const manager = rel._buildSelectManager();
+    manager.projections = projections as any;
+    // Fold CTEs (`WITH`) and annotate() comments into the manager AST — exactly
+    // as the main SELECT path does (`_buildArel` → `_applyCtesAndAnnotationsToManager`)
+    // — so a single visitor collector numbers every bind in document order (CTE
+    // binds precede the main query's; PG `$N` placeholders fall out by
+    // construction). Replaces the former `buildCteSql` string prefix and its
+    // manual `$N` renumbering.
+    this._applyCtesAndAnnotationsToManager(manager);
+
+    const [pluckSql, pluckBinds] = this._compileAstWithBinds(manager.ast);
+    const result = await this.skipQueryCacheIfNecessary(() =>
+      this._conn().selectAll(pluckSql, `${this.model.name} Pluck`, pluckBinds),
+    );
+
+    // Type-cast results positionally through each result column's type
+    // (model attribute type → join dependency → driver OID → identity),
+    // mirroring Rails' Calculations#type_cast_pluck_values.
+    return typeCastPluckValues(result, columns, this as any);
+  });
+}
+
+/**
+ * Mirrors: ActiveRecord::Calculations#async_pluck (calculations.rb:334).
+ */
+export function asyncPluck(
+  this: CalculationRelation,
+  ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+): Promise<unknown[]> {
+  return this.pluck(...columns);
+}
+
+/**
+ * Pick values for columns from the first matching record.
+ *
+ * Mirrors: ActiveRecord::Calculations#pick (calculations.rb:352).
+ */
+export async function pick(
+  this: CalculationRelation,
+  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+): Promise<unknown> {
+  if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
+    const records = await this.records();
+    if (records.length === 0) return null;
+    const first = records[0] as unknown as { get(attrName: string): unknown };
+    return columnNames.length > 1
+      ? columnNames.map((columnName) => first.get(String(columnName)))
+      : first.get(String(columnNames[0]));
+  }
+
+  const values = await this.limit(1).pluck(...columnNames);
+  return values[0] ?? null;
+}
+
+/**
+ * Mirrors: ActiveRecord::Calculations#async_pick (calculations.rb:363).
+ */
+export function asyncPick(
+  this: CalculationRelation,
+  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+): Promise<unknown> {
+  return this.pick(...columnNames);
+}
+
+/**
+ * Pluck the primary key values.
+ *
+ * Mirrors: ActiveRecord::Calculations#ids (calculations.rb:371).
+ */
+export async function ids(this: CalculationRelation): Promise<unknown[]> {
+  const pk = this.model.primaryKey as string | string[] | null;
+  const primaryKeyArray = Array.isArray(pk) ? pk : pk == null ? [] : [pk];
+
+  if (this.loaded) {
+    const result = this._records.map((record) => {
+      if (primaryKeyArray.length === 1) {
+        return record._readAttribute(primaryKeyArray[0]);
+      }
+      return primaryKeyArray.map((column) => record._readAttribute(column));
+    });
+    return result;
+  }
+
+  if (hasInclude(this as any, pk as string)) {
+    // DIVERGENCE (finder_methods.rb:457-463): trails' `applyJoinDependency`
+    // no-ops unless the relation already eager-loads for SQL, so the plain
+    // `apply_join_dependency` call would not terminate this recursion. Spell
+    // it as `pluck` does — clear the eager values, LEFT OUTER JOIN
+    // `eager_load_values | includes_values`, and materialize the limited
+    // DISTINCT primary keys (`distinct_relation_for_primary_key`, :463) that
+    // a synchronous applyJoinDependency cannot execute.
+    // Deduped without a `Set`: the `new` Rails records for `ids` is
+    // `Promise::Complete.new` in the `loaded?` arm (calculations.rb:382),
+    // which trails models with the native async surface, so a `new Set` here
+    // would be the body's first constructor and land after `hasInclude`.
+    // Measured, not assumed: spelling it `[...new Set([...])]` adds a
+    // `relation.ts ids order:hasInclude,constructor` row to
+    // `pnpm parity:api:calls`. `pluck`'s arm keeps its `Set` because its body
+    // is compared through the `_pluckInner` helper union, not directly.
+    const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
+      (spec, i, all) => all.indexOf(spec) === i,
+    );
+    const rel = this._clone();
+    rel._eagerLoadAssociations = [];
+    rel._includesAssociations = [];
+
+    const jd = this._buildEagerJoinDependency(eagerSpecs);
+    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
+      // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
+      // `_eagerLoadAssociations` alone, so `pk` can still be null here (a
+      // view), and `_materializeLimitedIds` — Rails' zip/transpose over
+      // `Array(primary_key)` (schema_statements.rb:1448) — has neither a null
+      // nor a composite arm, so the composite case surfaces
+      // applyJoinDependency's explicit NotImplementedError instead.
+      const basePk = pk ?? "id";
+      if (Array.isArray(basePk)) this.applyJoinDependency();
+      const limitedIds = await this._materializeLimitedIds(jd, basePk);
+      const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
+      limited._limitValue = null;
+      limited._offsetValue = null;
+      return limited.group(...primaryKeyArray).ids();
+    }
+    const relation = rel.leftOuterJoins(eagerSpecs).group(...primaryKeyArray);
+    return relation.ids();
+  }
+
+  const columns = this.arelColumns(primaryKeyArray);
+  const relation = this.spawn();
+  relation._selectColumns = columns as (string | Nodes.Node)[];
+
+  const result = relation._whereClause.isContradiction()
+    ? Result.empty()
+    : await this.skipQueryCacheIfNecessary(() =>
+        this.withConnection(async (c) => {
+          // trails preliminaries the Rails body has no counterpart for,
+          // carried over from the delegation this replaces:
+          // `type_cast_pluck_values` reads `model.attribute_types`, and a
+          // deferred distinct-PK marker must resolve to a literal id list
+          // before the arel compiles.
+          await this._model.ensureSchemaLoaded();
+          await relation._materializeDeferredDistinctPkPredicates();
+          const manager = relation.arel();
+          const [idsSql, idsBinds] = relation._compileAstWithBinds(manager.ast);
+          return c.selectAll(idsSql, `${this.model.name} Ids`, idsBinds);
+        }),
+      );
+
+  return typeCastPluckValues(result, columns, this as any);
+}
+
+/**
+ * Mirrors: ActiveRecord::Calculations#async_ids (calculations.rb:409).
+ */
+export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
+  return this.ids();
 }
 
 /**
@@ -737,6 +1162,27 @@ export interface CalculationMethods {
   average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   maximum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncCount(columnName?: string): Promise<number | Map<unknown, number>>;
+  asyncSum(
+    identityOrColumn?: string | Nodes.Node | number | null,
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  asyncAverage(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncMinimum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
+  asyncMaximum(columnName: string): Promise<unknown | null | Map<unknown, unknown>>;
+  pluck(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]>;
+  asyncPluck(
+    ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]>;
+  pick(
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown>;
+  asyncPick(
+    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown>;
+  ids(): Promise<unknown[]>;
+  asyncIds(): Promise<unknown[]>;
 }
 
 /**
@@ -766,15 +1212,72 @@ function inQueryConnection<A extends unknown[], R>(
 export const Calculations = {
   calculate: inQueryConnection(calculate),
   count: inQueryConnection(performCount),
+  asyncCount,
   sum: inQueryConnection(performSum),
+  asyncSum,
   average: inQueryConnection(performAverage),
+  asyncAverage,
   minimum: inQueryConnection(performMinimum),
+  asyncMinimum,
   maximum: inQueryConnection(performMaximum),
+  asyncMaximum,
+  // `pluck` / `ids` do their own `with_connection` (and `skip_query_cache_if_necessary`)
+  // around the one query they issue, exactly as calculations.rb:316/396 does —
+  // so they are NOT wrapped in `inQueryConnection`, which is the seam for the
+  // aggregate methods whose query is built inside `calculate`.
+  pluck,
+  asyncPluck,
+  pick,
+  asyncPick,
+  ids,
+  asyncIds,
 } as const;
 
 // ---------------------------------------------------------------------------
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
 // ---------------------------------------------------------------------------
+
+/**
+ * Split a pluck argument on a top-level comma — one outside every quote and
+ * paren nesting. Backs the comma-separated-list rejection in `pluck`, which
+ * Rails gets for free because `arel_column` never sees a list.
+ * @internal
+ */
+function hasTopLevelComma(s: string): boolean {
+  let depth = 0;
+  let quote: '"' | "'" | "`" | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) {
+      if (ch === "\\") {
+        i++;
+        continue;
+      }
+      // SQL doubled-quote escape ("" or ``)
+      if (ch === quote && s[i + 1] === quote) {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === "," && depth === 0) return true;
+  }
+  return false;
+}
+
+/** @internal */
+function resolveColumnNameMatcher(adapter: any): RegExp {
+  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
+  // lookup on the concrete adapter class.
+  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
+}
 
 /** @internal */
 export function aggregateColumn(

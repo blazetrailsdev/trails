@@ -11,8 +11,14 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
-import { performMerge } from "./relation/spawn-methods.js";
-import { reverseSqlOrder } from "./relation/query-methods.js";
+import { performMerge, SpawnMethods } from "./relation/spawn-methods.js";
+import { reverseSqlOrder, QueryMethodBangs } from "./relation/query-methods.js";
+import { Relation } from "./relation.js";
+import { FinderMethods } from "./relation/finder-methods.js";
+import { Calculations } from "./relation/calculations.js";
+import { Batches } from "./relation/batches.js";
+import { Explain } from "./explain.js";
+import { DelegationMethods } from "./relation/delegation.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
@@ -937,5 +943,59 @@ describe("apply_join_dependency limitable reflections (trails)", () => {
     const sql = CanonPost.eagerLoad("author").limit(1).toSql();
     expect(sql).not.toContain("SELECT DISTINCT");
     expect(sql).toMatch(/\bLIMIT 1\s*$/);
+  });
+});
+
+describe("relation.rb:68 mixin ancestry", () => {
+  // `relation.rb:68` is a single multi-argument include:
+  //
+  //   include FinderMethods, Calculations, SpawnMethods, QueryMethods,
+  //           Batches, Explain, Delegation
+  //
+  // Ruby inserts those so the FIRST argument ends up highest in the ancestry
+  // (`K.ancestors == [K, A, B, C]` for `include A, B, C`), so a name defined by
+  // two of them resolves to the one nearer the front of this list. All seven
+  // are listed here in relation.rb order.
+  const modules: [string, Record<string, unknown>][] = [
+    ["FinderMethods", FinderMethods as unknown as Record<string, unknown>],
+    ["Calculations", Calculations as unknown as Record<string, unknown>],
+    ["SpawnMethods", SpawnMethods as unknown as Record<string, unknown>],
+    ["QueryMethods", QueryMethodBangs as unknown as Record<string, unknown>],
+    ["Batches", Batches as unknown as Record<string, unknown>],
+    ["Explain", Explain as unknown as Record<string, unknown>],
+    ["Delegation", DelegationMethods as unknown as Record<string, unknown>],
+  ];
+
+  it("resolves a colliding method to the module highest in relation.rb:68's order", () => {
+    const proto = Relation.prototype as unknown as Record<string, unknown>;
+
+    // Every (module, key) pair whose key is ALSO defined by a module lower in
+    // relation.rb:68's order — i.e. every place the include() order matters.
+    const collisions = modules.flatMap(([name, mod], i) =>
+      Object.keys(mod)
+        .filter((key) => typeof mod[key] === "function" && !/^[A-Z]/.test(key))
+        .map((key) => ({
+          name,
+          key,
+          mod,
+          lower: modules.slice(i + 1).find(([, other]) => typeof other[key] === "function"),
+        }))
+        .filter((entry) => entry.lower !== undefined),
+    );
+
+    // The class body outranks every mixin (include() never replaces it), so a
+    // key whose installed value came from neither module is not this gate's
+    // business. Of the rest, the higher module must be the one that won.
+    const misresolved = collisions
+      .filter(({ key, mod, lower }) => proto[key] === lower![1][key] && proto[key] !== mod[key])
+      .map(({ name, key, lower }) => `${key}: ${lower![0]} outranks ${name}`);
+    expect(misresolved).toEqual([]);
+
+    // Today nothing collides, so the check above is vacuous. This line records
+    // that fact and turns red the moment a collision appears — at which point
+    // the check becomes the real gate on the include() order at the bottom of
+    // relation.ts, and whoever added the collision must confirm it against
+    // relation.rb:68 before updating this expectation.
+    expect(collisions.map(({ name, key }) => `${name}#${key}`)).toEqual([]);
   });
 });

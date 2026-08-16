@@ -146,9 +146,46 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
+    "rubyName": "ids",
+    "call": "new",
+    "reason": "Rails' `@async` arms wrap the result in `Promise::Complete.new` (calculations.rb:294, :306, :382); trails has no ActiveRecord::Promise — every reader is already a native Promise — so the body has no constructor at that point and the first `new` it does reach lands later."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
     "rubyName": "lookup_cast_type_from_join_dependencies",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "pluck",
+    "call": "disallow_raw_sql!",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:model",
+      "ref:flattenedArgs"
+    ],
+    "reason": "Rails' `model.disallow_raw_sql!(flattened_args(column_names))` (calculations.rb:315) is spelled here as the free `disallowRawSqlBang(stringColumns, { permit: … })` from sanitization.ts, which takes the permit matcher explicitly rather than reading it off the model; the string filter is the flattened_args result narrowed to strings."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "pluck",
+    "call": "empty",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{async=ref:async}"
+    ],
+    "reason": "`ActiveRecord::Result.empty(async: @async)` (calculations.rb:320): trails has no `@async` flag — every reader is already a native Promise — so `Result.empty()` takes no kwarg."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "pluck",
+    "call": "order:loaded,constructor",
+    "reason": "Rails' `@async` arms wrap the result in `Promise::Complete.new` (calculations.rb:294, :306, :382); trails has no ActiveRecord::Promise — every reader is already a native Promise — so the body has no constructor at that point and the first `new` it does reach lands later."
   },
   {
     "package": "activerecord",
