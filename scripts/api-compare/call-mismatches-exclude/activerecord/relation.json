@@ -17,13 +17,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "arel",
-    "call": "build_arel",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "arel",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -75,13 +68,6 @@
     "rubyName": "delete_all",
     "call": "arel_columns",
     "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "build_arel",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -194,13 +180,6 @@
     "rubyName": "update_all",
     "call": "arel_columns",
     "reason": "Surfaced, not introduced (RFC 0107 fan-out): relation.ts's updateAll/deleteAll build the statement in the private helpers _execUpdateAll/_execDeleteAll, which Rails inlines into update_all/delete_all (relation.rb:606-616, :1023-1033) — so the gate reads only the outer body and cannot see the helper's `applyJoinDependency()._buildArel()` / `groupColumnToArel(...)`. The rows appeared when `pluck`/`ids` moved to relation/calculations.ts and took relation.ts's last `arel()`/`arelColumns(...)` call sites with them. The real convergence is inlining the two helpers back per CLAUDE.md's Decomposition rule; tracked separately."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update_all",
-    "call": "build_arel",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
