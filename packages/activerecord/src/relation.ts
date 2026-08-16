@@ -78,11 +78,7 @@ import { Result } from "./result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import {
-  Calculations,
-  type CalculationMethods,
-  groupColumnToArel,
-} from "./relation/calculations.js";
+import { Calculations, type CalculationMethods } from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
@@ -2951,66 +2947,59 @@ export class Relation<T extends Base> {
     // Mirrors Rails relation.rb#update_all: accepts a Hash, a SQL string, or an
     // Array [sql, *binds] (sanitize_sql_for_assignment). The blank/none checks
     // mirror Rails' order (blank precedes none?).
+    const table = this.table;
+    let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral;
     if (Array.isArray(updates)) {
       const [sql, ...binds] = updates;
       if (!sql || typeof sql !== "string")
         throw new ArgumentError("Empty list of attributes to change");
       if (this._isEmptyRelation()) return 0;
       await this._materializeDeferredDistinctPkPredicates();
-      const boundSql = new Nodes.BoundSqlLiteral(
-        sql,
-        binds.map((v) => {
-          return _qm.normalizeBoundValue.call(this as any, v);
-        }),
-        {},
-      );
-      return this._execUpdateAll(boundSql);
-    }
-    if (typeof updates === "string") {
+      const normalizedBinds: unknown[] = [];
+      for (const v of binds) {
+        normalizedBinds.push(_qm.normalizeBoundValue.call(this as any, v));
+      }
+      values = new Nodes.BoundSqlLiteral(sql, normalizedBinds, {});
+    } else if (typeof updates === "string") {
       if (!updates) throw new ArgumentError("Empty list of attributes to change");
       if (this._isEmptyRelation()) return 0;
       await this._materializeDeferredDistinctPkPredicates();
-      return this._execUpdateAll(new Nodes.SqlLiteral(updates));
-    }
-    // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
-    if (Object.keys(updates).length === 0)
-      throw new ArgumentError("Empty list of attributes to change");
-    if (this._isEmptyRelation()) return 0;
-    await this._materializeDeferredDistinctPkPredicates();
+      values = new Nodes.SqlLiteral(updates);
+    } else {
+      // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
+      if (Object.keys(updates).length === 0)
+        throw new ArgumentError("Empty list of attributes to change");
+      if (this._isEmptyRelation()) return 0;
+      await this._materializeDeferredDistinctPkPredicates();
 
-    const table = this.table;
-    if (
-      this.model.lockingEnabled &&
-      !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
-    ) {
-      const attr = table.get(this.model.lockingColumn);
-      updates[attr.name] = this._incrementAttribute(attr);
+      if (
+        this.model.lockingEnabled &&
+        !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
+      ) {
+        const attr = table.get(this.model.lockingColumn);
+        updates[attr.name] = this._incrementAttribute(attr);
+      }
+      values = this._substituteValues(Object.entries(updates));
     }
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = this._substituteValues(
-      Object.entries(updates),
-    );
-    return this._execUpdateAll(updateValues);
-  }
 
-  private async _execUpdateAll(
-    updateValues: [Nodes.Node, unknown][] | Nodes.SqlLiteral | Nodes.BoundSqlLiteral,
-  ): Promise<number> {
-    const table = this.table;
+    // Mirrors `relation.rb:606-616`.
+    const arel = this._eagerLoadingForSql()
+      ? this.applyJoinDependency().arel()
+      : this.buildArel(this._conn());
+    arel.source.left = table;
+    const groupValuesArelColumns = this.arelColumns(
+      Array.from(new Set(this._groupColumns)),
+    ) as Nodes.Node[];
+    const havingClauseAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
     const primaryKey = this.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency().buildArel()
-        : this.buildArel(this._conn());
-      arel.source.left = table;
-      const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
-      const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
       const key = Array.isArray(primaryKey)
         ? primaryKey.map((pk) => table.get(pk))
         : table.get(primaryKey);
-      stmtAst = arel.compileUpdate(updateValues, key, havingAst, groupColumns).ast;
+      stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
     } else {
-      const um = new UpdateManager().table(table).set(updateValues);
+      const um = new UpdateManager().table(table).set(values);
       for (const node of this._whereClause.predicatesWithWrappedSqlLiterals()) {
         um.where(node);
       }
@@ -3063,41 +3052,43 @@ export class Relation<T extends Base> {
     }
 
     const table = this.table;
+    // Mirrors Rails `delete_all`: always run `build_arel` + `compile_delete`
+    // with the primary key, having clause, and group columns. For a
+    // limited/ordered/grouped delete the visitor rewrites it into
+    // `WHERE (pk...) IN (SELECT pk... ORDER BY ... LIMIT ...)`; for the
+    // unconstrained case it emits a plain `DELETE FROM ... WHERE`, identical
+    // to a hand-built DeleteManager. A composite primary key maps each column
+    // into a row-value tuple (`relation.rb`: `primary_key.map { |pk| table[pk] }`).
+    // Routing both PK shapes through one path keeps the TS port structurally
+    // faithful to Rails (no second code path to sync).
+    //
+    // Mirrors `relation.rb:1023`: when the relation requires eager loading
+    // (e.g. an `includes` promoted to a join by a `where`/`order` reference),
+    // build the arel from the join-dependency relation
+    // (`apply_join_dependency.arel`) instead of the plain `build_arel`. Rails
+    // passes `apply_join_dependency(eager_loading: group_values.empty?)`
+    // implicitly here (the no-arg default, finder_methods.rb:457), so a
+    // grouped delete skips the limit/offset materialization guard.
+    const arel = this._eagerLoadingForSql()
+      ? this.applyJoinDependency().arel()
+      : this.buildArel(this._conn());
+    // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
+    // target back to the bare table before `compile_delete`. For the common
+    // and join cases `source.left` is already the table, but an explicit
+    // `from(custom)` would otherwise leave the DELETE targeting the custom
+    // FROM node rather than the model table.
+    arel.source.left = table;
+    const groupValuesArelColumns = this.arelColumns(
+      Array.from(new Set(this._groupColumns)),
+    ) as Nodes.Node[];
+    const havingClauseAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
     const primaryKey = this.model.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
-      // Mirrors Rails `delete_all`: always run `build_arel` + `compile_delete`
-      // with the primary key, having clause, and group columns. For a
-      // limited/ordered/grouped delete the visitor rewrites it into
-      // `WHERE (pk...) IN (SELECT pk... ORDER BY ... LIMIT ...)`; for the
-      // unconstrained case it emits a plain `DELETE FROM ... WHERE`, identical
-      // to a hand-built DeleteManager. A composite primary key maps each column
-      // into a row-value tuple (`relation.rb`: `primary_key.map { |pk| table[pk] }`).
-      // Routing both PK shapes through one path keeps the TS port structurally
-      // faithful to Rails (no second code path to sync).
-      //
-      // Mirrors `relation.rb:1023`: when the relation requires eager loading
-      // (e.g. an `includes` promoted to a join by a `where`/`order` reference),
-      // build the arel from the join-dependency relation
-      // (`apply_join_dependency.arel`) instead of the plain `build_arel`. Rails
-      // passes `apply_join_dependency(eager_loading: group_values.empty?)`
-      // implicitly here (the no-arg default, finder_methods.rb:457), so a
-      // grouped delete skips the limit/offset materialization guard.
-      const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependency().buildArel()
-        : this.buildArel(this._conn());
-      // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
-      // target back to the bare table before `compile_delete`. For the common
-      // and join cases `source.left` is already the table, but an explicit
-      // `from(custom)` would otherwise leave the DELETE targeting the custom
-      // FROM node rather than the model table.
-      arel.source.left = table;
-      const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
-      const groupColumns = this._groupColumns.map((col) => groupColumnToArel(col, table));
       const key = Array.isArray(primaryKey)
         ? primaryKey.map((pk) => table.get(pk))
         : table.get(primaryKey);
-      stmtAst = arel.compileDelete(key, havingAst, groupColumns).ast;
+      stmtAst = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
     } else {
       // No primary key — fall back to a plain DeleteManager.
       const dm = new DeleteManager().from(table);
