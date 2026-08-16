@@ -3049,17 +3049,29 @@ export class PostgreSQLAdapter
     newConnection = false,
   }: { newConnection?: boolean } = {}): void | Promise<void> {
     void super.clearCacheBang({ newConnection });
-    if (newConnection) {
-      // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
-      // map without DEALLOCATE: the session that owned those statement names is
-      // gone, so naming them again is an error, not a cleanup.
-      this._statements.reset();
-    } else if (this._rawConnection) {
-      return this._statements.clear();
-    } else {
-      this._statements.reset();
-      this._needsDeallocateAll = true;
-    }
+    // Rails wraps the whole pool mutation in `@lock.synchronize`
+    // (abstract_adapter.rb:741-747), which is what `dealloc`'s own comment
+    // relies on: "the statement pool is only accessed while holding the
+    // connection's lock" (postgresql_adapter.rb:308-310). Without it the
+    // eviction DEALLOCATEs go onto the wire beside a chain that owns the
+    // connection, and `_commandSettled` is false while they are in flight — so
+    // a rollback sampling `transactionStatus` reads PQTRANS_ACTIVE where Rails
+    // reads PQTRANS_INTRANS and fires a CancelRequest at a backend it does not
+    // own. A CancelRequest is addressed to a backend, not to a statement, so
+    // that one lands on whatever query the backend runs next.
+    return this.lock.synchronize(() => {
+      if (newConnection) {
+        // Rails' `new_connection: true` branch (statement_pool.rb:44-46) drops the
+        // map without DEALLOCATE: the session that owned those statement names is
+        // gone, so naming them again is an error, not a cleanup.
+        this._statements.reset();
+      } else if (this._rawConnection) {
+        return this._statements.clear();
+      } else {
+        this._statements.reset();
+        this._needsDeallocateAll = true;
+      }
+    });
   }
 
   /**

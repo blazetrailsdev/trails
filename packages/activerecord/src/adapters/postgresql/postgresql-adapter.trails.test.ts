@@ -448,6 +448,39 @@ describeIfPg("PostgreSQLAdapter", () => {
     // `synchronize`, the shape RFC 0085 removed; there is no Rails-faithful way
     // to put a query on the wire under a lock this chain holds.
 
+    // Regression for RFC 0061 pg-query-canceled-unhandled-rejection-recurrence:
+    // `clear_cache!` mutates the statement pool under `@lock`
+    // (abstract_adapter.rb:741-747), which is the precondition `dealloc` states
+    // outright — "the statement pool is only accessed while holding the
+    // connection's lock" (postgresql_adapter.rb:308-310). The port skipped that
+    // lock, so `resetColumnInformation`'s sync, promise-dropping call left
+    // eviction DEALLOCATEs on the wire beside a chain that owned the
+    // connection; the rollback behind it read PQTRANS_ACTIVE where Rails reads
+    // PQTRANS_INTRANS and fired a CancelRequest, which — being addressed to a
+    // backend, not a statement — landed on a later query and surfaced as
+    // vitest's run-end unhandled QueryCanceled.
+    it("clearCacheBang deallocates under the connection lock", async () => {
+      const PQTRANS_INTRANS = 2;
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        other.preparedStatements = true;
+        await other.execute("SELECT $1::integer AS n", [1]);
+        await other.beginDbTransaction();
+        // `resetColumnInformation`'s shape (model-schema.rb:441): a sync caller
+        // that drops the returned chain.
+        void other.clearCacheBang();
+        // The DEALLOCATE is dispatched from a microtask off the pool's chain,
+        // so let the turn end before sampling — a read in the same tick sees
+        // the wire before it has anything on it.
+        await new Promise<void>((r) => setTimeout(r, 0));
+        const status = await other.lock.synchronize(() => other.transactionStatus);
+        expect(status).toBe(PQTRANS_INTRANS);
+        await other.rollbackDbTransaction();
+      } finally {
+        await other.close();
+      }
+    });
+
     it("translate exception serialization failure", async () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);
