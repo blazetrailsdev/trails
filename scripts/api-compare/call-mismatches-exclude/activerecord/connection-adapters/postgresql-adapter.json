@@ -44,20 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "internal_exec_query",
-    "reason": "currval() is session-scoped, so the INSERT and the currval probe are pinned to one client inside a single withRawConnection; Rails gets that pinning free from its already-held connection."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "last_insert_id_result",
-    "reason": "The currval read is inlined into the pinned withRawConnection block for the same session-scoping reason, so there is no separate lastInsertIdResult call site to make."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "get_database_version",
     "call": "with_raw_connection",
     "reason": "Rails' with_raw_connection is re-entrant on @raw_connection; ours is not, and this runs inside the very acquire configureConnection is warming, so it takes the published `_rawConnection` directly."

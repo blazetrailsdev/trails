@@ -357,6 +357,50 @@ describe("PostgreSQLAdapter#executeMutation", () => {
   });
 });
 
+describe("PostgreSQLAdapter#execInsert sequence probe", () => {
+  let adapter: PostgreSQLAdapter;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  // Rails' exec_insert runs the INSERT and `last_insert_id_result`'s
+  // `SELECT currval(...)` on the connection it already holds
+  // (postgresql/database_statements.rb:48-59, :204-206). `currval()` is
+  // session-scoped AND session-mutable, so a second INSERT landing between one
+  // call's INSERT and its own probe hands back the wrong id. The fake session
+  // below models exactly that: `currval` answers with whatever the session
+  // inserted last.
+  it("reads currval on the session that ran its own INSERT", async () => {
+    let sequence = 0;
+    let currval = 0;
+    adapter = makeAdapter(async (sql: unknown) => {
+      const text = typeof sql === "string" ? sql : String((sql as { text: string }).text);
+      if (text.includes("INSERT INTO")) {
+        await Promise.resolve();
+        currval = ++sequence;
+        return { rows: [], fields: [] };
+      }
+      return { rows: [[currval]], fields: [{ name: "currval", dataTypeID: 23 }] };
+    });
+    (adapter as unknown as { _useInsertReturning: boolean })._useInsertReturning = false;
+
+    const insert = (title: string) =>
+      adapter.execInsert(
+        `INSERT INTO posts (title) VALUES ('${title}')`,
+        "SQL",
+        [],
+        "id",
+        "posts_id_seq",
+      ) as Promise<Result>;
+    const [first, second] = await Promise.all([insert("a"), insert("b")]);
+
+    expect(first.rows[0][0]).toBe(1);
+    expect(second.rows[0][0]).toBe(2);
+  });
+});
+
 describe("PostgreSQLAdapter#execInsert query cache", () => {
   let adapter: PostgreSQLAdapter;
 

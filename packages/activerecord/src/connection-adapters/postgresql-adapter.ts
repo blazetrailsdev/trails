@@ -2541,29 +2541,30 @@ export class PostgreSQLAdapter
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    // Mirrors Rails: `if use_insert_returning? || pk == false`.
-    if (pk === false) {
-      // Explicit caller opt-out: skip the pk-derived RETURNING column.
-      // Cannot delegate to super here — our mixed-in DatabaseStatements
-      // default routes through executeMutation, which auto-appends
-      // `RETURNING id` for bare INSERTs when use_insert_returning is on
-      // (postgresql-adapter.ts:1238-1243). That would defeat the opt-out.
-      // Cannot use execQuery either — it intentionally skips
-      // materializeTransactions / dirtyCurrentTransaction (read-path
-      // optimisation), so an INSERT inside a lazy transaction would
-      // escape rollback. Use the same write-path scaffolding the
-      // pk-non-false branch below uses, just without the currval probe.
-      if (returning && returning.length > 0) {
-        const cols = returning.map((c) => this.quoteColumnName(c)).join(", ");
-        sql = `${sql} RETURNING ${cols}`;
+    // Mirrors Rails' single `if use_insert_returning? || pk == false` arm
+    // (postgresql/database_statements.rb:46-47).
+    if (this._useInsertReturning || pk === false) {
+      if (pk === false) {
+        // Explicit caller opt-out: skip the pk-derived RETURNING column.
+        // Cannot delegate to super here — our mixed-in DatabaseStatements
+        // default routes through executeMutation, which auto-appends
+        // `RETURNING id` for bare INSERTs when use_insert_returning is on
+        // (postgresql-adapter.ts:1238-1243). That would defeat the opt-out.
+        // Cannot use execQuery either — it intentionally skips
+        // materializeTransactions / dirtyCurrentTransaction (read-path
+        // optimisation), so an INSERT inside a lazy transaction would
+        // escape rollback. Use the same write-path scaffolding the
+        // pk-non-false branch below uses, just without the currval probe.
+        if (returning && returning.length > 0) {
+          const cols = returning.map((c) => this.quoteColumnName(c)).join(", ");
+          sql = `${sql} RETURNING ${cols}`;
+        }
+        sql = this.preprocessQuery(sql);
+        return this.withRawConnection(async (conn) => {
+          const client = conn as unknown as pg.Client;
+          return this._instrumentedQueryOnClient(client, sql, name, binds);
+        });
       }
-      sql = this.preprocessQuery(sql);
-      return this.withRawConnection(async (conn) => {
-        const client = conn as unknown as pg.Client;
-        return this._instrumentedQueryOnClient(client, sql, name, binds);
-      });
-    }
-    if (this._useInsertReturning) {
       // A multi-column RETURNING list is the auto-populated-columns read-back
       // (Rails `_create_record` zips every returning column). The shared helper
       // runs it through the bind-aware internalExecQuery (which materializes) and
@@ -2598,27 +2599,35 @@ export class PostgreSQLAdapter
       }
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);
     }
-    // Resolve sequence name before acquiring the INSERT client so the
-    // metadata queries (primaryKey, defaultSequenceName) don't consume
-    // an extra connection while the INSERT client is held.
-    if (!sequenceName) {
-      const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
-      if (tableRef) {
-        if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
-        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+    // Rails' else arm (database_statements.rb:48-59). In Rails the whole method
+    // runs on the connection the calling thread has checked out, so the INSERT
+    // and `currval()` — which is session-scoped *and* session-mutable — cannot
+    // be separated by another thread's INSERT on the same session. JS has no
+    // per-thread checkout, so the adapter's own reentrant monitor (the same
+    // `@lock` withRawConnection takes, abstract_adapter.rb:972-984) is the lease:
+    // the two internalExecQuery calls below re-enter it and stay a unit.
+    return this.lock.synchronize(async () => {
+      const result = await this.internalExecQuery(sql, name, binds);
+      if (!sequenceName) {
+        const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
+        if (tableRef) {
+          if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
+          pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
+          sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+        }
+        if (!sequenceName) return result;
       }
-    }
-    sql = this.preprocessQuery(sql);
-    // currval() is session-scoped: INSERT and SELECT currval(...) must
-    // run on the same connection. withRawConnection pins both to one client.
-    return this.withRawConnection(async (conn) => {
-      const client = conn as unknown as pg.Client;
-      const insertResult = await this._instrumentedQueryOnClient(client, sql, name, binds);
-      if (!sequenceName) return insertResult;
-      const currvalSql = `SELECT currval(${this.quote(sequenceName)})`;
-      return this._instrumentedQueryOnClient(client, currvalSql, "SQL", []);
+      return this.lastInsertIdResult(sequenceName);
     });
+  }
+
+  /**
+   * Mirrors: PostgreSQL::DatabaseStatements#last_insert_id_result
+   * (postgresql/database_statements.rb:204-206) — the current id of a table's
+   * sequence.
+   */
+  private async lastInsertIdResult(sequenceName: string): Promise<Result> {
+    return this.internalExecQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
   }
 
   /** Mirrors: PostgreSQL::DatabaseStatements#returning_column_values — the full
