@@ -25,10 +25,7 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 import { disallowRawSqlBang } from "./sanitization.js";
 import { sanitizeAsSqlComment } from "./connection-adapters/abstract/quoting.js";
-import {
-  columnNameMatcher as abstractColumnNameMatcher,
-  defaultSqlTimezone,
-} from "./connection-adapters/abstract/sql-formatting.js";
+import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
 import {
   habtmTargetFk,
   joinHabtmTableNames,
@@ -230,41 +227,6 @@ function validateExplainOptions(options: ExplainOption[]): void {
  *
  * Mirrors: ActiveRecord::Relation
  */
-
-function hasTopLevelComma(s: string): boolean {
-  let depth = 0;
-  let quote: '"' | "'" | "`" | null = null;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (quote) {
-      if (ch === "\\") {
-        i++;
-        continue;
-      }
-      // SQL doubled-quote escape ("" or ``)
-      if (ch === quote && s[i + 1] === quote) {
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      continue;
-    }
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    else if (ch === "," && depth === 0) return true;
-  }
-  return false;
-}
-
-function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
-  // lookup on the concrete adapter class.
-  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
-}
 
 /**
  * Sentinel preload scope threaded into the preloader when the parent relation

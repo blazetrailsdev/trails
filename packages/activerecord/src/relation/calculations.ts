@@ -627,6 +627,16 @@ export async function performCount(
 }
 
 /**
+ * Mirrors: ActiveRecord::Calculations#async_count (calculations.rb:108).
+ */
+export function asyncCount(
+  this: CalculationRelation,
+  columnName?: string,
+): Promise<number | Map<unknown, number>> {
+  return this.count(columnName);
+}
+
+/**
  * Mirrors: ActiveRecord::Calculations#calculate (calculations.rb:217-246).
  */
 export async function calculate(
@@ -746,6 +756,16 @@ export async function performSum(
   return (sum as number | bigint) ?? 0;
 }
 
+/**
+ * Mirrors: ActiveRecord::Calculations#async_sum (calculations.rb:182).
+ */
+export function asyncSum(
+  this: CalculationRelation,
+  identityOrColumn: string | Nodes.Node | number | null = null,
+): Promise<number | bigint | Map<unknown, number | bigint>> {
+  return this.sum(identityOrColumn);
+}
+
 export async function performAverage(
   this: CalculationRelation,
   column: string | Nodes.Node,
@@ -759,30 +779,6 @@ export async function performAverage(
   return calculate.call(this, "average", column);
 }
 
-export async function performMinimum(
-  this: CalculationRelation,
-  column: string | Nodes.Node,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "minimum", column);
-}
-
-export async function performMaximum(
-  this: CalculationRelation,
-  column: string | Nodes.Node,
-): Promise<unknown | null | Map<unknown, unknown>> {
-  return calculate.call(this, "maximum", column);
-}
-
-/**
- * Mirrors: ActiveRecord::Calculations#async_count (calculations.rb:108).
- */
-export function asyncCount(
-  this: CalculationRelation,
-  columnName?: string,
-): Promise<number | Map<unknown, number>> {
-  return this.count(columnName);
-}
-
 /**
  * Mirrors: ActiveRecord::Calculations#async_average (calculations.rb:122).
  */
@@ -791,6 +787,13 @@ export function asyncAverage(
   columnName: string,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.average(columnName);
+}
+
+export async function performMinimum(
+  this: CalculationRelation,
+  column: string | Nodes.Node,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return calculate.call(this, "minimum", column);
 }
 
 /**
@@ -803,6 +806,13 @@ export function asyncMinimum(
   return this.minimum(columnName);
 }
 
+export async function performMaximum(
+  this: CalculationRelation,
+  column: string | Nodes.Node,
+): Promise<unknown | null | Map<unknown, unknown>> {
+  return calculate.call(this, "maximum", column);
+}
+
 /**
  * Mirrors: ActiveRecord::Calculations#async_maximum (calculations.rb:152).
  */
@@ -811,58 +821,6 @@ export function asyncMaximum(
   columnName: string,
 ): Promise<unknown | null | Map<unknown, unknown>> {
   return this.maximum(columnName);
-}
-
-/**
- * Mirrors: ActiveRecord::Calculations#async_sum (calculations.rb:182).
- */
-export function asyncSum(
-  this: CalculationRelation,
-  identityOrColumn: string | Nodes.Node | number | null = null,
-): Promise<number | bigint | Map<unknown, number | bigint>> {
-  return this.sum(identityOrColumn);
-}
-
-/**
- * Split a pluck argument on a top-level comma — one outside every quote and
- * paren nesting. Backs the comma-separated-list rejection in `pluck`, which
- * Rails gets for free because `arel_column` never sees a list.
- * @internal
- */
-function hasTopLevelComma(s: string): boolean {
-  let depth = 0;
-  let quote: '"' | "'" | "`" | null = null;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (quote) {
-      if (ch === "\\") {
-        i++;
-        continue;
-      }
-      // SQL doubled-quote escape ("" or ``)
-      if (ch === quote && s[i + 1] === quote) {
-        i++;
-        continue;
-      }
-      if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      continue;
-    }
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    else if (ch === "," && depth === 0) return true;
-  }
-  return false;
-}
-
-/** @internal */
-function resolveColumnNameMatcher(adapter: any): RegExp {
-  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
-  // lookup on the concrete adapter class.
-  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
 }
 
 /**
@@ -1278,6 +1236,48 @@ export const Calculations = {
 // ---------------------------------------------------------------------------
 // Private helpers (mirrors Rails' ActiveRecord::Calculations private methods)
 // ---------------------------------------------------------------------------
+
+/**
+ * Split a pluck argument on a top-level comma — one outside every quote and
+ * paren nesting. Backs the comma-separated-list rejection in `pluck`, which
+ * Rails gets for free because `arel_column` never sees a list.
+ * @internal
+ */
+function hasTopLevelComma(s: string): boolean {
+  let depth = 0;
+  let quote: '"' | "'" | "`" | null = null;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (quote) {
+      if (ch === "\\") {
+        i++;
+        continue;
+      }
+      // SQL doubled-quote escape ("" or ``)
+      if (ch === quote && s[i + 1] === quote) {
+        i++;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === "," && depth === 0) return true;
+  }
+  return false;
+}
+
+/** @internal */
+function resolveColumnNameMatcher(adapter: any): RegExp {
+  // Mirrors Rails' `model.adapter_class.column_name_matcher` — a direct static
+  // lookup on the concrete adapter class.
+  return adapter?.constructor?.columnNameMatcher?.() ?? abstractColumnNameMatcher();
+}
 
 /** @internal */
 export function aggregateColumn(
