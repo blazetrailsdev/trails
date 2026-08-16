@@ -910,9 +910,17 @@ function deepEqual(a: unknown, b: unknown): boolean {
   // boundary: paired with the `a instanceof Date` branch above.
   if (b instanceof Date) return false;
 
+  // boundary: every caller here is a Ruby `Array#|` union or a `Hash#eql?`
+  // comparison, both of which dispatch `eql?` — never `==`. `Relation` defines
+  // only `==` (relation.rb:1253) and inherits `Object#eql?`, so two distinct
+  // Relations are NOT eql? and `with(a: relX).with(a: relY)` keeps both entries,
+  // as `with_values |= args` does. The async guard is what enforces that here:
+  // trails' `Relation#equals` is async, and an unawaited `Promise` is truthy,
+  // so consulting it would report every pair of Relations equal. Same `async`
+  // convention `Object#blank?` relies on (core_ext/object/blank.rb:19).
   const aAny = a as { eql?: (x: unknown) => boolean; equals?: (x: unknown) => boolean };
-  if (typeof aAny.eql === "function") return aAny.eql(b);
-  if (typeof aAny.equals === "function") return aAny.equals(b);
+  if (typeof aAny.eql === "function" && !isAsyncFunction(aAny.eql)) return aAny.eql(b);
+  if (typeof aAny.equals === "function" && !isAsyncFunction(aAny.equals)) return aAny.equals(b);
 
   if (!isPlainObject(a) || !isPlainObject(b)) return false;
 
@@ -924,6 +932,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
     if (!deepEqual(a[ak[i]], b[bk[i]])) return false;
   }
   return true;
+}
+
+function isAsyncFunction(fn: object): boolean {
+  return Object.prototype.toString.call(fn) === "[object AsyncFunction]";
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -2287,6 +2299,11 @@ export function buildWithExpressionFromValue(
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
 
     const parts = value.map((query) => buildWithExpressionFromValue.call(this, query, true));
+    // Ruby's `reduce` with no initial value answers `nil` on an empty
+    // collection (query_methods.rb:1946-1948); JS's throws `TypeError: Reduce
+    // of empty array`. `with(cte: [])` therefore builds a `TableAlias` over a
+    // nil relation and fails downstream, exactly where Rails fails.
+    if (parts.length === 0) return undefined;
     return parts.reduce(
       (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
     );
