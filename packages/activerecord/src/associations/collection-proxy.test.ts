@@ -907,17 +907,17 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     expect((await Post.find(theirs.id)).author_id).toBe(otherAuthor.id);
   });
 
-  // #6609 made `scope()` memoize (`@scope ||= @association.scope`,
-  // collection_proxy.rb:949-950), so a proxy whose scope was built while the
-  // owner was still new holds a `1=0` unresolved-FK memo that outlives the save.
-  // The memo is an AssociationRelation, so the FIRST mutation terminal rebases
-  // it in place through `AssociationRelation#_isEmptyRelation` — this pins that
-  // the terminals routed through `scope()` still land on the resolved FK.
-  it("resolves the persisted FK on updateAll when the proxy scope was memoized before save", async () => {
+  // Rails' `reader` (collection_association.rb:34-43) ends in
+  // `@proxy.reset_scope`, so every collection read drops the memoized `@scope`
+  // (collection_proxy.rb:1112-1116) and rebuilds it from the association. A
+  // proxy whose scope was memoized while the owner was new therefore resolves
+  // the persisted FK on the next read — which is how #6612's delegated value
+  // readers reach a live scope rather than the stale `1=0` seed.
+  it("resolves the persisted FK on updateAll read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Four" });
-    const posts = association<Post>(author, "posts") as any;
-    // `whereBang` is delegated to `scope()`, so this memoizes the `1=0` scope.
-    posts.whereBang({ title: "mine" });
+    // `whereBang` is delegated to `scope()`, so this memoizes the `1=0` scope
+    // while the owner is still new.
+    (association<Post>(author, "posts") as any).whereBang({ title: "mine" });
 
     await author.save();
     const authorId = author.id as number;
@@ -925,22 +925,18 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     const otherAuthor = await Author.create({ name: "Someone Else Three" });
     const theirs = await Post.create({ title: "mine", body: "2", author_id: otherAuthor.id });
 
-    // A stale `1=0` memo would update nothing; a memo carrying no owner FK
-    // would also catch the other author's identically-titled post.
+    // Re-read through the reader, as Rails' `person.posts.update_all` does.
+    const posts = association<Post>(author, "posts") as any;
     expect(await posts.updateAll({ body: "updated" })).toBe(1);
     expect((await Post.find(mine.id)).body).toBe("updated");
     expect((await Post.find(theirs.id)).body).toBe("2");
   });
 
-  // A read terminal on the SAME proxy, before and after the save: the first call
-  // happens while the owner is new, so the proxy keeps its `1=0` seed; the second
-  // must still count against the resolved FK. `calculate`'s non-null-scope arm
-  // reads the proxy's own state, and `null_scope?` is already false by then
-  // (collection_proxy.rb:1150-1152), so the seed has to defer to `scope()`.
-  it("counts against the persisted FK when the proxy was first read before save", async () => {
+  // The same reader contract on a read terminal: a count taken while the owner
+  // was new must not pin the collection to the `1=0` seed for later reads.
+  it("counts against the persisted FK when read again after save", async () => {
     const author = new Author({ name: "Proxy Mutation Five" });
-    const posts = association<Post>(author, "posts") as any;
-    expect(await posts.count()).toBe(0);
+    expect(await (association<Post>(author, "posts") as any).count()).toBe(0);
 
     await author.save();
     const authorId = author.id as number;
@@ -948,7 +944,7 @@ describe("CollectionProxy — mutation terminals invoked on the proxy itself on 
     const otherAuthor = await Author.create({ name: "Someone Else Four" });
     await Post.create({ title: "theirs", body: "2", author_id: otherAuthor.id });
 
-    // A stale `1=0` seed counts 0; a seed with no owner FK counts both posts.
+    const posts = association<Post>(author, "posts") as any;
     expect(await posts.count()).toBe(1);
     expect(await posts.size()).toBe(1);
   });

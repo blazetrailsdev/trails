@@ -500,16 +500,16 @@ export class Relation<T extends Base> {
   private _isNone = false;
   /**
    * @internal True when this relation's WHERE base is the stale new-owner
-   * `1=0` NullRelation seed of a `CollectionProxy` (owner was a NEW record when
-   * the proxy was constructed). Set on the proxy at construction and propagated
-   * to every spawned relation via `initializeCopy`, so a query executed after
-   * the owner is saved can rebase the dead seed onto the resolved association
-   * scope. See `associations/new-owner-seed-rebase.ts`.
+   * `1=0` NullRelation seed of an association scope built while the owner was a
+   * NEW record. Set on that scope and propagated to every spawned relation via
+   * `initializeCopy`, so a query executed after the owner is saved can rebase
+   * the dead seed onto the resolved association scope. See
+   * `associations/new-owner-seed-rebase.ts`.
    */
   _seededNoneNewOwner = false;
   /**
    * @internal Identity snapshot of the seed WHERE predicates captured when a
-   * `CollectionProxy` is constructed, so a rebase can separate accumulated
+   * new-owner association scope is built, so a rebase can separate accumulated
    * mutation predicates from the stale `1=0` seed. Empty on ordinary relations.
    */
   _seedWherePredicates: readonly unknown[] = [];
@@ -3120,8 +3120,8 @@ export class Relation<T extends Base> {
     // No `none?` guard here: Rails' touch_all (relation.rb:969-971) is a bare
     // `update_all model.touch_attributes_with_time(...)` and inherits the
     // `return 0 if @none` from update_all (relation.rb:592). Delegating rather
-    // than short-circuiting is also what puts a CollectionProxy's touchAll on
-    // `CollectionProxy#updateAll`, and so on the association scope.
+    // than short-circuiting is also what lets a CollectionProxy's touchAll build
+    // from the value readers delegated to `scope` (collection_proxy.rb:1128-1137).
 
     // Use touchAttributesWithTime so alias-resolved column names are used
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
@@ -4225,7 +4225,7 @@ export class Relation<T extends Base> {
     // No `none?` guard here: Rails' update_counters (relation.rb:926-944) ends
     // in `update_all updates` and inherits the `return 0 if @none` from there
     // (relation.rb:592), and — on a CollectionProxy — the association scope,
-    // via `CollectionProxy#updateAll`.
+    // through the value readers delegated to `scope` (collection_proxy.rb:1128-1137).
 
     // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
     const touchFromCounters = (counters as Record<string, unknown>).touch;
@@ -4444,8 +4444,8 @@ export class Relation<T extends Base> {
    * (`owner.things.where(...)`) resolves the persisted FK once the owner is
    * saved — mirroring Rails' CollectionProxy delegating every query to
    * `association.scope`, rather than each terminal carrying its own rebase hook.
-   * `CollectionProxy` needs no rebase at all: its mutation terminals route
-   * through `scope()`, which the association rebuilds against the resolved FK.
+   * `CollectionProxy` needs no rebase at all: it is never `@none` itself, and
+   * its value readers are delegated to `scope` (collection_proxy.rb:1128-1137).
    *
    * @internal
    */

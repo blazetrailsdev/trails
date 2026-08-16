@@ -603,6 +603,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // proxy's own inherited state rather than called on the proxy.
     const seedNone = (): void => {
       proxySelf.initializeCopy((targetModel as any).all().noneBang() as Relation<T>);
+      // Rails never sets `@none` on a CollectionProxy: `none!` is one of the
+      // methods delegated to `scope` (collection_proxy.rb:1128-1137), so it
+      // flips the SCOPE's flag and the proxy sees the `1=0` only through the
+      // delegated `where_clause` reader. Copying the seed's predicates onto our
+      // own inherited state must not also copy that flag, or the inherited
+      // `update_all`'s `return 0 if @none` (relation.rb:1013) — and every other
+      // `@none` short-circuit — fires on the proxy itself.
+      (this as unknown as { _isNone: boolean })._isNone = false;
     };
     if (assocDef.options.through) {
       // Config validation FIRST, outside the try — missing through
@@ -2678,16 +2686,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // the whole table. Route those through the DJAR, which resolves the walk first.
     // Convergence story: 0106-wide-call-set-direct-burndown/
     // djar-eager-chain-ids-drop-disable-joins-arms.
-    // `null_scope?` is evaluated at CALL time (collection_proxy.rb:1150-1152 →
-    // `@association.null_scope?`), so Rails' `super` arm never reads a stale
-    // seed: the proxy owns no relation state, and its `where_clause` comes from
-    // `scope` through the delegated readers (:1128-1137). trails' proxy DOES own
-    // that state, and a proxy built for a then-new owner still carries the `1=0`
-    // seed after the owner is saved — so a proxy whose own state is a none
-    // relation defers to the rebuilt scope, exactly as the mutation terminals do.
-    if (this.isNullScope() || this._isEmptyRelation()) {
-      return this.scope().calculate(operation, columnName);
-    }
+    if (this.isNullScope()) return this.scope().calculate(operation, columnName);
     if (this._assocDef.options.disableJoins) {
       return this.scope().calculate(operation, columnName);
     }
