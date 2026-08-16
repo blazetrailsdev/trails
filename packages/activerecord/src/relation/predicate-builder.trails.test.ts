@@ -81,7 +81,7 @@ describe("PredicateBuilder nested-hash recursion skips dot re-normalization", ()
   });
 });
 
-type HasWhereClause = { _whereClause: { predicates: Nodes.Node[] } };
+type HasWhereClause = { whereClause: { predicates: Nodes.Node[] } };
 
 describe("association hash expansion grouping shape", () => {
   const { treasures, cars, comments } = fixtures([
@@ -98,7 +98,7 @@ describe("association hash expansion grouping shape", () => {
     const rel = PriceEstimate.where({
       estimateOf: [treasures("diamond"), cars("honda")],
     }) as unknown as HasWhereClause;
-    const preds = rel._whereClause.predicates;
+    const preds = rel.whereClause.predicates;
     expect(preds).toHaveLength(1);
     expect(preds[0]).toBeInstanceOf(Nodes.Grouping);
     const or = (preds[0] as Nodes.Grouping).expr as Nodes.Or;
@@ -118,7 +118,7 @@ describe("association hash expansion grouping shape", () => {
       chapters: [[1, 2]],
     }) as unknown as HasWhereClause;
     // One tuple → one query group → predicates spliced flat, one per PK column.
-    const preds = rel._whereClause.predicates;
+    const preds = rel.whereClause.predicates;
     expect(preds).toHaveLength(2);
     for (const pred of preds) expect(pred).not.toBeInstanceOf(Nodes.Grouping);
 
@@ -128,7 +128,7 @@ describe("association hash expansion grouping shape", () => {
         [3, 4],
       ],
     }) as unknown as HasWhereClause;
-    const multiPreds = multi._whereClause.predicates;
+    const multiPreds = multi.whereClause.predicates;
     expect(multiPreds).toHaveLength(1);
     expect(multiPreds[0]).toBeInstanceOf(Nodes.Grouping);
     const or = (multiPreds[0] as Nodes.Grouping).expr as Nodes.Or;
@@ -146,7 +146,7 @@ describe("association hash expansion grouping shape", () => {
 
   it("through-association single query group stays flat, without an And wrapper", () => {
     const rel = Author.where({ comments: comments("greetings") }) as unknown as HasWhereClause;
-    const preds = rel._whereClause.predicates;
+    const preds = rel.whereClause.predicates;
     expect(preds).toHaveLength(1);
     expect(preds[0]).not.toBeInstanceOf(Nodes.And);
     expect(preds[0]).not.toBeInstanceOf(Nodes.Grouping);

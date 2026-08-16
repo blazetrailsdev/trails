@@ -144,7 +144,7 @@ describe("RelationTest", () => {
     // Car.incl_engines.incl_tyres). Rails' includes! unions (`|=`), so a repeat
     // of the SAME include folds to one — only distinct ones accumulate.
     const relation = (Car.inclEngines() as any).inclTyres();
-    expect(relation._includesAssociations.map(String)).toEqual(["engines", "tyres"]);
+    expect(relation.includesValues.map(String)).toEqual(["engines", "tyres"]);
   });
 
   it("dynamic finder", () => {
@@ -648,7 +648,7 @@ describe("RelationTest", () => {
 
   it("reorder deduplication", () => {
     const topicsRel = Topic.reorder("id desc", "id desc");
-    const orderClauses = (topicsRel as any)._orderClauses as unknown[];
+    const orderClauses = (topicsRel as any).orderValues as unknown[];
     expect(orderClauses).toEqual(["id desc"]);
   });
 
@@ -808,8 +808,8 @@ describe("RelationTest", () => {
   // blank hash/array must not linger in relation state (query_methods.rb:868-890).
   it("blank join arguments are not retained in relation state", () => {
     expect((Topic as any).joins({}).joinsValues).toEqual([]);
-    expect((Topic as any).leftJoins({})._leftOuterJoinsValues).toEqual([]);
-    expect((Topic as any).leftJoins([])._leftOuterJoinsValues).toEqual([]);
+    expect((Topic as any).leftJoins({}).leftOuterJoinsValues).toEqual([]);
+    expect((Topic as any).leftJoins([]).leftOuterJoinsValues).toEqual([]);
   });
 
   it("respond to dynamic finders", () => {
@@ -890,7 +890,7 @@ describe("RelationTest", () => {
       .order("ranking")
       .includes("comments")
       .where({ comments: { id: 1 } });
-    expect((query as any)._selectColumns).toEqual(["legacy_comments_count AS ranking"]);
+    expect((query as any).selectValues).toEqual(["legacy_comments_count AS ranking"]);
     expect(await query.size()).toBe(1);
   });
 
@@ -925,7 +925,7 @@ describe("RelationTest", () => {
     // via eager_load!, never gated on model equality nor nested under a
     // reflection, so it crosses the model boundary untouched.
     const merged = Comment.joins("post").merge(Post.eagerLoad("readers")) as any;
-    expect(merged._eagerLoadAssociations).toContain("readers");
+    expect(merged.eagerLoadValues).toContain("readers");
 
     // merge! (in-place) shares Merger#merge in Rails; trails routes both through
     // the same foldMerge* helpers, so the cross-model reflection-nesting applies
@@ -933,7 +933,7 @@ describe("RelationTest", () => {
     // Comment to preload `:readers` directly.
     const bang = Comment.joins("post") as any;
     bang.mergeBang(Post.preload("readers").where({ title: "Uhuu" }));
-    expect(bang._preloadAssociations).toEqual([{ post: ["readers"] }]);
+    expect(bang.preloadValues).toEqual([{ post: ["readers"] }]);
     const bangComment = (await bang.toArray())[0];
     const bangPost = bangComment.association("post");
     expect(bangPost.isLoaded()).toBe(true);
@@ -1179,7 +1179,7 @@ describe("RelationTest", () => {
     const subquery = Author.where({ id: david.id });
     const rel = Author.where({ id: subquery });
     expect((await rel).map((a) => a.id)).toEqual([david.id]);
-    expect((subquery as any)._selectColumns ?? []).toHaveLength(0);
+    expect((subquery as any).selectValues ?? []).toHaveLength(0);
   });
 
   it("find all using where with relation with joins", async () => {
@@ -2069,16 +2069,16 @@ describe("RelationTest", () => {
 
   it("automatically added where references", () => {
     const scope1 = Post.where({ comments: { body: "Bla" } });
-    expect((scope1 as any)._referencesValues).toEqual(["comments"]);
+    expect((scope1 as any).referencesValues).toEqual(["comments"]);
     const scope2 = Post.where({ "comments.body": "Bla" });
-    expect((scope2 as any)._referencesValues).toEqual(["comments"]);
+    expect((scope2 as any).referencesValues).toEqual(["comments"]);
   });
 
   it("automatically added where not references", () => {
     const scope1 = Post.all().whereNot({ comments: { body: "Bla" } });
-    expect((scope1 as any)._referencesValues).toEqual(["comments"]);
+    expect((scope1 as any).referencesValues).toEqual(["comments"]);
     const scope2 = Post.all().whereNot({ "comments.body": "Bla" });
-    expect((scope2 as any)._referencesValues).toEqual(["comments"]);
+    expect((scope2 as any).referencesValues).toEqual(["comments"]);
   });
 
   it("automatically added having references", () => {
@@ -2087,29 +2087,29 @@ describe("RelationTest", () => {
   });
 
   it("automatically added order references", () => {
-    expect((Post.order("comments.body") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.id") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.body", "yaks.body") as any)._referencesValues).toEqual([
+    expect((Post.order("comments.body") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.order("comments.id") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.order("comments.body", "yaks.body") as any).referencesValues).toEqual([
       "comments",
       "yaks",
     ]);
-    expect((Post.order("comments.body, yaks.body") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.order("comments.body asc") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.order("foo(comments.body)") as any)._referencesValues).toEqual([]);
+    expect((Post.order("comments.body, yaks.body") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.order("comments.body asc") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.order("foo(comments.body)") as any).referencesValues).toEqual([]);
   });
 
   it("automatically added reorder references", () => {
-    expect((Post.reorder("comments.body") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("comments.id") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("comments.body", "yaks.body") as any)._referencesValues).toEqual([
+    expect((Post.reorder("comments.body") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.reorder("comments.id") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.reorder("comments.body", "yaks.body") as any).referencesValues).toEqual([
       "comments",
       "yaks",
     ]);
-    expect((Post.reorder("comments.body, yaks.body") as any)._referencesValues).toEqual([
+    expect((Post.reorder("comments.body, yaks.body") as any).referencesValues).toEqual([
       "comments",
     ]);
-    expect((Post.reorder("comments.body asc") as any)._referencesValues).toEqual(["comments"]);
-    expect((Post.reorder("foo(comments.body)") as any)._referencesValues).toEqual([]);
+    expect((Post.reorder("comments.body asc") as any).referencesValues).toEqual(["comments"]);
+    expect((Post.reorder("foo(comments.body)") as any).referencesValues).toEqual([]);
   });
 
   it("order with reorder nil removes the order", () => {

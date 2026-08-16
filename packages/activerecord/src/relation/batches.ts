@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
+import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
@@ -165,7 +166,7 @@ export class Batches {
     const ensureValidOptions = () =>
       ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
 
-    if (this._orderClauses.length > 0) {
+    if (this.orderValues.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
@@ -185,8 +186,8 @@ export class Batches {
 
     let remaining: number | null = null;
     let batchLimit = of;
-    if (this._limitValue !== null) {
-      remaining = this._limitValue as number;
+    if (this.limitValue !== null) {
+      remaining = this.limitValue as number;
       if (remaining < batchLimit) batchLimit = remaining;
     }
 
@@ -206,7 +207,7 @@ export class Batches {
         await ensureValidOptions();
         for (const batchRows of loadedBatches) {
           const batchRel = self._clone();
-          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+          batchRel.orderValues = batchOrders.map(([col, dir]) =>
             dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );
           batchRel._records = batchRows;
@@ -229,7 +230,7 @@ export class Batches {
           useRanges,
         })) {
           const batchRel = self._clone();
-          batchRel._orderClauses = batchOrders.map(([col, dir]) =>
+          batchRel.orderValues = batchOrders.map(([col, dir]) =>
             dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );
           const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
@@ -243,15 +244,17 @@ export class Batches {
             const attr = self.table.get(col);
             const lo = dir === "desc" ? last : first;
             const hi = dir === "desc" ? first : last;
-            batchRel._whereClause.predicates.push(attr.gteq(lo).and(attr.lteq(hi)));
+            batchRel.whereClause = batchRel.whereClause.plus(
+              new WhereClause([attr.gteq(lo).and(attr.lteq(hi))]),
+            );
           } else if (cursor.length === 1) {
             const ids = tuples.map((t: unknown[]) => t[0]);
-            batchRel._whereClause.predicates.push(
-              ...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids }),
+            batchRel.whereClause = batchRel.whereClause.plus(
+              new WhereClause([...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids })]),
             );
           } else {
-            batchRel._whereClause.predicates.push(
-              ...self.predicateBuilder.buildComposite(cursor, tuples),
+            batchRel.whereClause = batchRel.whereClause.plus(
+              new WhereClause([...self.predicateBuilder.buildComposite(cursor, tuples)]),
             );
           }
           if (load) {

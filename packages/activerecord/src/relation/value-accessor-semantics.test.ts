@@ -4,7 +4,7 @@
  * writer, the nil-vs-false tri-state of the single-value flags, and the
  * stored-reference reader semantics of the array readers. These exercise
  * trails-specific storage details (the unified `joins_values` store,
- * the `boolean | undefined` flag fields), so the names are descriptive rather
+ * the `boolean | null` flag fields), so the names are descriptive rather
  * than mirrored from a metaprogrammed Rails test.
  */
 import { describe, it, expect } from "vitest";
@@ -14,13 +14,14 @@ import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 import { EXCEPT_ONLY_KEYS } from "./query-methods.js";
+import { WhereClause } from "./where-clause.js";
 
 fixtures([]);
 /** The split join-storage and group fields the reader semantics build on. */
 type JoinInternals = {
-  _joinsValues: unknown[];
-  _groupColumns: string[];
-  _orderClauses: unknown[];
+  joinsValues: unknown[];
+  groupValues: string[];
+  orderValues: unknown[];
 };
 
 function relation(): Relation<Post> {
@@ -35,7 +36,7 @@ describe("Relation value accessor Rails semantics", () => {
   it("joins_values= split-routes association hashes and raw joins", () => {
     const rel = relation();
     rel.joinsValues = [{ category: {} }, "LEFT JOIN comments ON comments.post_id = posts.id"];
-    expect(internals(rel)._joinsValues).toEqual([
+    expect(internals(rel).joinsValues).toEqual([
       { category: {} },
       "LEFT JOIN comments ON comments.post_id = posts.id",
     ]);
@@ -51,19 +52,19 @@ describe("Relation value accessor Rails semantics", () => {
     const rel = relation();
     rel.joinsValues = [{ category: {} }];
     rel.joinsValues = ["RAW JOIN x"];
-    expect(internals(rel)._joinsValues).toEqual(["RAW JOIN x"]);
+    expect(internals(rel).joinsValues).toEqual(["RAW JOIN x"]);
   });
 
-  it("readonly_value defaults to nil (undefined) when unset", () => {
-    expect(relation().readonlyValue).toBeUndefined();
+  it("readonly_value defaults to nil (null) when unset", () => {
+    expect(relation().readonlyValue).toBeNull();
   });
 
-  it("reordering_value defaults to nil (undefined) when unset", () => {
-    expect(relation().reorderingValue).toBeUndefined();
+  it("reordering_value defaults to nil (null) when unset", () => {
+    expect(relation().reorderingValue).toBeNull();
   });
 
-  it("skip_query_cache_value defaults to nil (undefined) when unset", () => {
-    expect(relation().skipQueryCacheValue).toBeUndefined();
+  it("skip_query_cache_value defaults to nil (null) when unset", () => {
+    expect(relation().skipQueryCacheValue).toBeNull();
   });
 
   it("readonly_value reflects an explicit false distinct from unset", () => {
@@ -73,26 +74,26 @@ describe("Relation value accessor Rails semantics", () => {
     expect(rel.isReadonly).toBe(false);
   });
 
-  it("unscope(:readonly) clears readonly_value back to nil (undefined)", () => {
+  it("unscope(:readonly) clears readonly_value back to nil (null)", () => {
     const rel = relation().readonly();
     expect(rel.readonlyValue).toBe(true);
-    expect(rel.unscope("readonly").readonlyValue).toBeUndefined();
+    expect(rel.unscope("readonly").readonlyValue).toBeNull();
   });
 
-  it("except(:strict_loading) clears strict_loading_value back to nil (undefined)", () => {
+  it("except(:strict_loading) clears strict_loading_value back to nil (null)", () => {
     const rel = relation().strictLoading();
     expect(rel.strictLoadingValue).toBe(true);
-    expect(rel.except("strictLoading").strictLoadingValue).toBeUndefined();
+    expect(rel.except("strictLoading").strictLoadingValue).toBeNull();
   });
 
   it("group_values returns the stored reference", () => {
     const rel = relation().group("title");
-    expect(rel.groupValues).toBe(internals(rel)._groupColumns);
+    expect(rel.groupValues).toBe(internals(rel).groupValues);
   });
 
   it("order_values returns the stored reference", () => {
     const rel = relation().order("title");
-    expect(rel.orderValues).toBe(internals(rel)._orderClauses);
+    expect(rel.orderValues).toBe(internals(rel).orderValues);
   });
 
   it("order_values stores a raw SQL bind ordering as an Arel SqlLiteral node", () => {
@@ -100,7 +101,7 @@ describe("Relation value accessor Rails semantics", () => {
     // stored as a SqlLiteral node directly, so the reader returns it by
     // reference (no on-read normalization).
     const rel = relation().order([new Nodes.SqlLiteral("id = ?"), 1]);
-    expect(rel.orderValues).toBe(internals(rel)._orderClauses);
+    expect(rel.orderValues).toBe(internals(rel).orderValues);
     expect(rel.orderValues[0]).toBeInstanceOf(Nodes.SqlLiteral);
     // Bind is interpolated (quoting is adapter-specific, so match loosely).
     expect((rel.orderValues[0] as Nodes.SqlLiteral).value).toMatch(/^id = '?1'?$/);
@@ -111,11 +112,32 @@ describe("Relation value accessor Rails semantics", () => {
     expect(relation().selectValues).toEqual([]);
   });
 
+  it("an unset clause reader hands back a fresh clause, so only the writer persists", () => {
+    // `where_clause` defaults to `Relation::WhereClause.empty` — a NEW instance
+    // per call while the `:where` key is absent, unlike the array readers'
+    // shared FROZEN_EMPTY_ARRAY. Callers that append must go through the writer
+    // (Rails' `scope.where_clause += item.where_clause`,
+    // association_scope.rb:153); mutating the value a reader returned is lost.
+    const rel = relation();
+    expect(rel.whereClause).not.toBe(rel.whereClause);
+
+    rel.whereClause.predicates.push(new Nodes.SqlLiteral("1=0"));
+    expect(rel.whereClause.predicates).toEqual([]);
+
+    rel.whereClause = rel.whereClause.plus(new WhereClause([new Nodes.SqlLiteral("1=0")]));
+    expect(rel.whereClause.predicates).toHaveLength(1);
+  });
+
   it("values() covers exactly the Relation::VALUE_METHODS key set", () => {
-    // `except`/`only` round-trip through `values()` and `setValues`
-    // (spawn_methods.rb:59-68), so a VALUE_METHODS key present in
-    // EXCEPT_ONLY_KEYS but absent from `values()` would reset that field on
-    // every call, named or not, and an extra key would never be resettable.
-    expect(new Set(Object.keys(Post.all().values()))).toEqual(new Set(EXCEPT_ONLY_KEYS));
+    // `values` is `@values.dup` (relation.rb:1281-1283), so it carries only the
+    // keys actually set — a fresh relation has none — and every key it can
+    // carry is a `Relation::VALUE_METHODS` entry, which is what `except`/`only`
+    // slice against (spawn_methods.rb:59-68).
+    expect(Object.keys(Post.all().values())).toEqual([]);
+    const rel = Post.all().order("id").limit(2).distinct();
+    expect(new Set(Object.keys(rel.values()))).toEqual(new Set(["order", "limit", "distinct"]));
+    for (const key of Object.keys(rel.values())) {
+      expect(EXCEPT_ONLY_KEYS).toContain(key);
+    }
   });
 });

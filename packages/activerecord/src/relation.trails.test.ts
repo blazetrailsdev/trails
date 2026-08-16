@@ -139,13 +139,13 @@ describe("RelationTest", () => {
   // then double-loads.
   it("merge unions preload/includes/eager_load specs without duplicating", () => {
     const preloadMerged = CanonPost.preload("comments").merge(CanonPost.preload("comments"));
-    expect((preloadMerged as any)._preloadAssociations).toEqual(["comments"]);
+    expect((preloadMerged as any).preloadValues).toEqual(["comments"]);
 
     const includesMerged = CanonPost.includes("comments").merge(CanonPost.includes("comments"));
-    expect((includesMerged as any)._includesAssociations).toEqual(["comments"]);
+    expect((includesMerged as any).includesValues).toEqual(["comments"]);
 
     const eagerMerged = CanonPost.eagerLoad("comments").merge(CanonPost.eagerLoad("comments"));
-    expect((eagerMerged as any)._eagerLoadAssociations).toEqual(["comments"]);
+    expect((eagerMerged as any).eagerLoadValues).toEqual(["comments"]);
   });
 
   // No like-named Rails test: guards the documented proc-merge path
@@ -274,7 +274,7 @@ describe("RelationTest", () => {
     );
   });
 
-  it("leftJoins(:assoc) stores in _leftOuterJoinsValues and generates LEFT OUTER JOIN", () => {
+  it("leftJoins(:assoc) stores in leftOuterJoinsValues and generates LEFT OUTER JOIN", () => {
     class Author extends Base {
       static {
         this.tableName = "authors";
@@ -291,8 +291,8 @@ describe("RelationTest", () => {
     registerModel("LeftJoinPost2", Post);
 
     const rel = Author.leftJoins("posts");
-    // Association name stored in _leftOuterJoinsValues, not pre-resolved to _joinClauses
-    expect((rel as any)._leftOuterJoinsValues).toContain("posts");
+    // Association name stored in leftOuterJoinsValues, not pre-resolved to _joinClauses
+    expect((rel as any).leftOuterJoinsValues).toContain("posts");
     expect((rel as any)._joinClauses.some((j: any) => j.table === "posts")).toBe(false);
     // SQL still contains LEFT OUTER JOIN
     expect(rel.toSql()).toMatch(/LEFT OUTER JOIN/i);
@@ -318,7 +318,7 @@ describe("RelationTest", () => {
     // raises in build_join_buckets — for ANY non-Hash/Symbol/Array arg, not just
     // a whitespace string. A bare Integer is neither, so building raises.
     const rel = Author.leftJoins(5 as any);
-    expect((rel as any)._leftOuterJoinsValues).toContain(5);
+    expect((rel as any).leftOuterJoinsValues).toContain(5);
     expect(() => rel.toSql()).toThrow("only Hash, Symbol and Array are allowed");
   });
 
@@ -351,7 +351,7 @@ describe("RelationTest", () => {
 
   it("eagerLoad + leftJoins: buildJoinBuckets short-circuit does not drop eager stash", () => {
     // Regression: when joins_values and _joinClauses are empty, buildJoinBuckets
-    // short-circuits for the left-outer-only path. If _eagerLoadAssociations is
+    // short-circuits for the left-outer-only path. If eagerLoadValues is
     // also present, the short-circuit must not fire — eager stash would be skipped.
     class Author extends Base {
       static {
@@ -369,8 +369,8 @@ describe("RelationTest", () => {
     registerModel("EagerLeftPost", Post);
     // Both eagerLoad and leftJoins present, no explicit joins_values/_joinClauses
     const rel = Author.leftJoins("posts").eagerLoad("posts");
-    expect((rel as any)._eagerLoadAssociations).toContain("posts");
-    expect((rel as any)._leftOuterJoinsValues).toContain("posts");
+    expect((rel as any).eagerLoadValues).toContain("posts");
+    expect((rel as any).leftOuterJoinsValues).toContain("posts");
     // buildJoinBuckets must not short-circuit; SQL must be non-empty (no throw)
     expect(() => rel.toSql()).not.toThrow();
   });

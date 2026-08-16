@@ -7,7 +7,7 @@
  * in place, returns `self` (`assert relation.foo!(...).equal?(relation)`), and
  * writes the value into the matching internal accessor (`foo_values` /
  * `foo_value`). The trails port asserts the same contract against trails'
- * internal fields (`_orderClauses`, `_selectColumns`, `_lockValue`, …), which
+ * internal fields (`orderValues`, `selectValues`, `lockValue`, …), which
  * are the camelCase equivalents of Rails' `*_values` / `*_value`.
  */
 import { describe, it, expect } from "vitest";
@@ -28,15 +28,15 @@ describe("RelationMutationTest", () => {
   // name; we sweep the supported multi-value bang methods to honor it.
   it("#!", () => {
     const MULTI: ReadonlyArray<[string, string]> = [
-      ["includesBang", "_includesAssociations"],
-      ["eagerLoadBang", "_eagerLoadAssociations"],
-      ["preloadBang", "_preloadAssociations"],
-      ["groupBang", "_groupColumns"],
-      ["joinsBang", "_joinsValues"],
-      ["leftOuterJoinsBang", "_leftOuterJoinsValues"],
-      ["referencesBang", "_referencesValues"],
-      ["optimizerHintsBang", "_optimizerHints"],
-      ["annotateBang", "_annotations"],
+      ["includesBang", "includesValues"],
+      ["eagerLoadBang", "eagerLoadValues"],
+      ["preloadBang", "preloadValues"],
+      ["groupBang", "groupValues"],
+      ["joinsBang", "joinsValues"],
+      ["leftOuterJoinsBang", "leftOuterJoinsValues"],
+      ["referencesBang", "referencesValues"],
+      ["optimizerHintsBang", "optimizerHintsValues"],
+      ["annotateBang", "annotateValues"],
     ];
     for (const [bang, field] of MULTI) {
       const rel = relation();
@@ -48,13 +48,13 @@ describe("RelationMutationTest", () => {
   it("#_select!", () => {
     const rel = relation();
     expect(rel._selectBang("foo")).toBe(rel);
-    expect(rel._selectColumns).toEqual(["foo"]);
+    expect(rel.selectValues).toEqual(["foo"]);
   });
 
   it("#order!", () => {
     const rel = relation();
     expect(rel.orderBang("title ASC")).toBe(rel);
-    expect(rel._orderClauses).toEqual(["title ASC"]);
+    expect(rel.orderValues).toEqual(["title ASC"]);
   });
 
   it("#order! with symbol prepends the table name", () => {
@@ -66,7 +66,7 @@ describe("RelationMutationTest", () => {
     const rel = relation();
     const attr = Post.arelTable.get("title");
     expect(rel.orderBang(attr)).toBe(rel);
-    const node = rel._orderClauses[0];
+    const node = rel.orderValues[0];
     expect(node.name).toBe("title");
     expect(node.relation.name).toBe("posts");
   });
@@ -78,7 +78,7 @@ describe("RelationMutationTest", () => {
     const rel = relation();
     const node = Post.arelTable.get("title");
     expect(rel.orderBang(node)).toBeTruthy();
-    expect(rel._orderClauses).toEqual([node]);
+    expect(rel.orderValues).toEqual([node]);
   });
 
   it("extending!", () => {
@@ -94,37 +94,37 @@ describe("RelationMutationTest", () => {
       },
     };
     expect(rel.extendingBang(mod)).toBe(rel);
-    expect(rel._extending).toEqual([mod]);
+    expect(rel.extendingValues).toEqual([mod]);
     // Rails asserts `relation.is_a?(mod)`; the trails analogue is that the
     // module's methods are mixed onto the relation instance.
     expect(typeof rel.greeting).toBe("function");
     rel.extendingBang(mod2);
-    expect(rel._extending).toEqual([mod, mod2]);
+    expect(rel.extendingValues).toEqual([mod, mod2]);
   });
 
   it("extending! with empty args", () => {
     const rel = relation();
     rel.extendingBang();
-    expect(rel._extending).toEqual([]);
+    expect(rel.extendingValues).toEqual([]);
   });
 
   it("#from!", () => {
     const rel = relation();
     expect(rel.fromBang("foo")).toBe(rel);
-    expect(rel._fromClause.value).toBe("foo");
+    expect(rel.fromClause.value).toBe("foo");
   });
 
   it("#lock!", () => {
     const rel = relation();
     expect(rel.lockBang("foo")).toBe(rel);
-    expect(rel._lockValue).toBe("foo");
+    expect(rel.lockValue).toBe("foo");
   });
 
   it("#reorder!", () => {
     const rel: any = Post.order("foo");
     expect(rel.reorderBang("bar")).toBe(rel);
-    expect(rel._orderClauses).toEqual(["bar"]);
-    expect(rel._reordering).toBe(true);
+    expect(rel.orderValues).toEqual(["bar"]);
+    expect(rel.reorderingValue).toBe(true);
   });
 
   it("#reorder! with symbol prepends the table name", () => {
@@ -132,7 +132,7 @@ describe("RelationMutationTest", () => {
     const rel = relation();
     const attr = Post.arelTable.get("title");
     expect(rel.reorderBang(attr)).toBe(rel);
-    const node = rel._orderClauses[0];
+    const node = rel.orderValues[0];
     expect(node.name).toBe("title");
     expect(node.relation.name).toBe("posts");
   });
@@ -142,7 +142,7 @@ describe("RelationMutationTest", () => {
     // String order args stay bare (matching Rails), so reversing them keeps them
     // as SqlLiteral strings with the trailing direction flipped — never
     // re-qualified against the table.
-    const litValues = (): string[] => rel._orderClauses.map((c: any) => String(c.value));
+    const litValues = (): string[] => rel.orderValues.map((c: any) => String(c.value));
     rel.reverseOrderBang();
     expect(litValues()).toEqual(["title DESC", "comments_count ASC"]);
     rel.reverseOrderBang();
@@ -152,7 +152,7 @@ describe("RelationMutationTest", () => {
   it("create_with!", () => {
     const rel = relation();
     expect(rel.createWithBang({ foo: "bar" })).toBe(rel);
-    expect(rel._createWithAttrs).toEqual({ foo: "bar" });
+    expect(rel.createWithValue).toEqual({ foo: "bar" });
   });
 
   it("merge!", () => {
@@ -163,7 +163,7 @@ describe("RelationMutationTest", () => {
     // returns self. Restore to the hash form once that story lands.
     const rel = relation();
     expect(rel.mergeBang(Post.select("body"))).toBe(rel);
-    expect(rel._selectColumns).toEqual(["body"]);
+    expect(rel.selectValues).toEqual(["body"]);
   });
 
   it("merge with a proc", () => {
@@ -175,7 +175,7 @@ describe("RelationMutationTest", () => {
     rel.mergeBang(function (this: any) {
       this._selectBang("body");
     });
-    expect(rel._selectColumns).toEqual(["body"]);
+    expect(rel.selectValues).toEqual(["body"]);
   });
 
   it("none!", async () => {
@@ -188,7 +188,7 @@ describe("RelationMutationTest", () => {
   it("skip_query_cache!", () => {
     const rel = relation();
     expect(rel.skipQueryCacheBang()).toBe(rel);
-    expect(rel._skipQueryCache).toBe(true);
+    expect(rel.skipQueryCacheValue).toBe(true);
   });
 
   it("skip_preloading!", () => {
@@ -200,7 +200,7 @@ describe("RelationMutationTest", () => {
   it("#regroup!", () => {
     const rel: any = Post.group("foo");
     expect(rel.regroupBang("bar")).toBe(rel);
-    expect(rel._groupColumns).toEqual(["bar"]);
+    expect(rel.groupValues).toEqual(["bar"]);
   });
 
   // Rails generates two separate loops that both produce "##{method}!" test names:
@@ -209,10 +209,10 @@ describe("RelationMutationTest", () => {
   it("#!", () => {
     // Every single-value bang returns self and sets its `*_value` scalar.
     const SINGLE: ReadonlyArray<[string, unknown, string, unknown]> = [
-      ["limitBang", 5, "_limitValue", 5],
-      ["offsetBang", 5, "_offsetValue", 5],
-      ["readonlyBang", true, "_isReadonly", true],
-      ["distinctBang", true, "_isDistinct", true],
+      ["limitBang", 5, "limitValue", 5],
+      ["offsetBang", 5, "offsetValue", 5],
+      ["readonlyBang", true, "readonlyValue", true],
+      ["distinctBang", true, "distinctValue", true],
     ];
     for (const [bang, arg, field, expected] of SINGLE) {
       const rel = relation();
@@ -224,14 +224,14 @@ describe("RelationMutationTest", () => {
   it("distinct!", () => {
     const rel = relation();
     rel.distinctBang("foo");
-    expect(rel._isDistinct).toBe("foo");
+    expect(rel.distinctValue).toBe("foo");
   });
 
   it("uniq! deduplicates the named clause array", () => {
     const rel: any = Post.group("title").group("title").group("author");
-    expect(rel._groupColumns).toEqual(["title", "title", "author"]);
+    expect(rel.groupValues).toEqual(["title", "title", "author"]);
     rel.uniqBang("group");
-    expect(rel._groupColumns).toEqual(["title", "author"]);
+    expect(rel.groupValues).toEqual(["title", "author"]);
   });
 
   it("uniq! is a no-op for unknown clause names", () => {

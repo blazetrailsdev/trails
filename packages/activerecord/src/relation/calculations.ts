@@ -129,13 +129,13 @@ interface CalculationRelation {
   _conn(): CalculationConnection;
   /** Rails `delegate :with_connection, to: :model` (delegation.rb:106). */
   withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
-  _limitValue: number | null;
-  _offsetValue: number | null;
-  _optimizerHints: string[];
+  limitValue: number | null;
+  offsetValue: number | null;
+  optimizerHintsValues: string[];
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
   _isEmptyRelation(): boolean;
-  _isDistinct: boolean;
+  distinctValue: boolean;
   /** Mirrors `Relation#distinct!` (query_methods.rb). */
   distinctBang(value?: boolean): unknown;
   /** Mirrors `Relation#unscope` (query_methods.rb). */
@@ -148,22 +148,21 @@ interface CalculationRelation {
   buildSubquery(subqueryAlias: string, selectValue: unknown): SelectManager;
   /** Mirrors `Relation#spawn` (spawn_methods.rb:10). */
   spawn(): CalculationRelation;
-  _groupColumns: string[];
+  /** Rails `@values` (relation.rb:86) — the hash behind every value method. */
+  _values: Record<string, unknown>;
   /** Mirrors `Relation#group_values`. */
   groupValues: string[];
-  /** The `select_values` store — written by `calculate`'s has_include? arm. */
-  _selectColumns: (string | symbol | Nodes.Node)[] | null;
   /**
    * Mirrors `Relation#order_values`; read by the count-column resolution and
    * cleared by `calculate`'s has_include? arm.
    */
-  _orderClauses: Array<string | Nodes.Node>;
-  _whereClause: { isContradiction(): boolean };
+  orderValues: Array<string | Nodes.Node>;
+  whereClause: { isContradiction(): boolean };
   /** Mirrors `Relation#having_clause`; grouped calculations ride the relation's own arel. */
   havingClause: { isEmpty(): boolean; ast: Nodes.Node };
   /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
   selectValues: (string | symbol | Nodes.Node)[];
-  _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   /** @internal Rails `apply_join_dependency`; see Relation. */
   applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
   /** @internal Awaitable `apply_join_dependency`; see Relation. */
@@ -216,8 +215,8 @@ interface CalculationRelation {
   /** @internal trails: resolves deferred distinct-PK markers; see Relation. */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
   /** @internal trails: the eager-load spec stores backing `has_include?`. */
-  _eagerLoadAssociations: unknown[];
-  _includesAssociations: unknown[];
+  eagerLoadValues: unknown[];
+  includesValues: unknown[];
   /** @internal trails: `spawn` without the scoping re-application; see Relation. */
   _clone(): CalculationRelation;
   /** @internal trails: builds the JoinDependency `apply_join_dependency` would. */
@@ -396,7 +395,7 @@ async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
   column: string | Nodes.Node | number | null,
-  distinct: boolean | null = rel._isDistinct,
+  distinct: boolean | null = rel.distinctValue,
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
@@ -404,7 +403,7 @@ async function groupedAggregate(
   // reflection is attempted from a LONE field, which then expands to that
   // association's foreign key; the result is keyed by the loaded associated
   // records rather than by the raw key values.
-  let groupFields: unknown[] = rel._groupColumns;
+  let groupFields: unknown[] = rel.groupValues;
   if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
   const association =
     groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
@@ -456,8 +455,8 @@ async function groupedAggregate(
   // calculations.rb:552: Rails assigns the `arel_columns`-RESOLVED fields, so a
   // `from(subquery)` group column stays unqualified instead of being re-pinned
   // to the model's table by `build_group`.
-  relation._groupColumns = groupNodes as unknown as string[];
-  relation._selectColumns = selectValues;
+  relation.groupValues = groupNodes as unknown as string[];
+  relation.selectValues = selectValues;
 
   // calculations.rb:580-583: the aggregate's cast type is the aggregate column's
   // own type caster, then a type discovered through the join dependencies, then
@@ -725,7 +724,7 @@ export async function performSum(
     return records.map(block).reduce(sumAdd, initialValueOrColumn as number | bigint);
   }
   const sum = await calculate.call(this, "sum", initialValueOrColumn);
-  if (this._groupColumns.length > 0) return sum as Map<unknown, number | bigint>;
+  if (this.groupValues.length > 0) return sum as Map<unknown, number | bigint>;
   return (sum as number | bigint) ?? 0;
 }
 
@@ -772,12 +771,12 @@ export async function calculate(
     return this._applyJoinDependencyAsync(async (relation) => {
       if (operation === "count") {
         if (
-          !this._isDistinct &&
+          !this.distinctValue &&
           !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
         ) {
           relation.distinctBang();
           const primaryKey = this.model.primaryKey;
-          relation._selectColumns =
+          relation.selectValues =
             primaryKey == null
               ? [new Nodes.SqlLiteral("*")]
               : Array.isArray(primaryKey)
@@ -785,7 +784,7 @@ export async function calculate(
                 : [primaryKey];
         }
         // PostgreSQL: ORDER BY expressions must appear in SELECT list when using DISTINCT
-        if (this.groupValues.length === 0) relation._orderClauses = [];
+        if (this.groupValues.length === 0) relation.orderValues = [];
       }
 
       return relation.calculate(operation, columnName);
@@ -828,7 +827,7 @@ export async function pluck(
     // an empty `IN`) returns `ActiveRecord::Result.empty` without issuing SQL.
     // Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
-    if (this._whereClause.isContradiction()) {
+    if (this.whereClause.isContradiction()) {
       return typeCastPluckValues(Result.empty(), columns, this as any);
     }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
@@ -843,14 +842,12 @@ export async function pluck(
     const firstColumnName =
       columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : "\0arel";
     if (hasInclude(this as any, firstColumnName)) {
-      // hasInclude is true only when _eagerLoadAssociations or
-      // _includesAssociations is non-empty, so the union is always non-empty here.
-      const eagerSpecs = [
-        ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
-      ];
+      // hasInclude is true only when eagerLoadValues or
+      // includesValues is non-empty, so the union is always non-empty here.
+      const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
       const rel = this._clone();
-      rel._eagerLoadAssociations = [];
-      rel._includesAssociations = [];
+      rel.eagerLoadValues = [];
+      rel.includesValues = [];
 
       const basePk = (this._model as any).primaryKey ?? "id";
       const jd = this._buildEagerJoinDependency(eagerSpecs);
@@ -873,8 +870,8 @@ export async function pluck(
         const limited = rel.leftOuterJoins(eagerSpecs).where({
           [basePk]: limitedIds,
         });
-        limited._limitValue = null;
-        limited._offsetValue = null;
+        limited.limitValue = null;
+        limited.offsetValue = null;
         return limited.pluck(...columns);
       }
       return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
@@ -940,10 +937,10 @@ export async function pluck(
     // read — joins/wheres/order/group/having/from/lock/optimizer-hints thread
     // through identically — but with the pluck columns as the select. Clearing
     // the spawn's select before building is essential: resolving the discarded
-    // select list would mutate _referencesValues and could promote includes
+    // select list would mutate referencesValues and could promote includes
     // (adding joins Rails would not add for the pluck columns).
     const rel = this._clone();
-    rel._selectColumns = null;
+    delete rel._values.select;
     const manager = rel.buildArel();
     manager.projections = projections as any;
 
@@ -1036,17 +1033,17 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     // `relation.ts ids order:hasInclude,constructor` row to
     // `pnpm parity:api:calls`. `pluck`'s arm keeps its `Set` because its body
     // is compared through the `_pluckInner` helper union, not directly.
-    const eagerSpecs = [...this._eagerLoadAssociations, ...this._includesAssociations].filter(
+    const eagerSpecs = [...this.eagerLoadValues, ...this.includesValues].filter(
       (spec, i, all) => all.indexOf(spec) === i,
     );
     const rel = this._clone();
-    rel._eagerLoadAssociations = [];
-    rel._includesAssociations = [];
+    rel.eagerLoadValues = [];
+    rel.includesValues = [];
 
     const jd = this._buildEagerJoinDependency(eagerSpecs);
     if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
-      // `_eagerLoadAssociations` alone, so `pk` can still be null here (a
+      // `eagerLoadValues` alone, so `pk` can still be null here (a
       // view), and `_materializeLimitedIds` — Rails' zip/transpose over
       // `Array(primary_key)` (schema_statements.rb:1448) — has neither a null
       // nor a composite arm, so the composite case surfaces
@@ -1055,8 +1052,8 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
       if (Array.isArray(basePk)) this.applyJoinDependency();
       const limitedIds = await this._materializeLimitedIds(jd, basePk);
       const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
-      limited._limitValue = null;
-      limited._offsetValue = null;
+      limited.limitValue = null;
+      limited.offsetValue = null;
       return limited.group(...primaryKeyArray).ids();
     }
     const relation = rel.leftOuterJoins(eagerSpecs).group(...primaryKeyArray);
@@ -1065,9 +1062,9 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
 
   const columns = this.arelColumns(primaryKeyArray);
   const relation = this.spawn();
-  relation._selectColumns = columns as (string | Nodes.Node)[];
+  relation.selectValues = columns as (string | Nodes.Node)[];
 
-  const result = relation._whereClause.isContradiction()
+  const result = relation.whereClause.isContradiction()
     ? Result.empty()
     : await this.skipQueryCacheIfNecessary(() =>
         this.withConnection(async (c) => {
@@ -1285,13 +1282,13 @@ export function hasInclude(
 ): boolean {
   const anyRel = rel as any;
   // eager_load_values.any? → always triggers (part of eager_loading?)
-  if (anyRel._eagerLoadAssociations?.length > 0) return true;
+  if (anyRel.eagerLoadValues?.length > 0) return true;
   // includes_values with references → triggers via references_eager_loaded_tables?
   const promoted = anyRel._includesToPromoteFromReferences?.() as string[] | undefined;
   if (promoted && promoted.length > 0) return true;
   // Plain includes: triggers when a non-:all column is specified.
   // Rails excludes only the :all symbol (calculations.rb:94); explicit "*" is not excluded.
-  if (anyRel._includesAssociations?.length > 0) {
+  if (anyRel.includesValues?.length > 0) {
     return columnName != null && columnName !== "all";
   }
   return false;
@@ -1324,16 +1321,16 @@ export async function performCalculation(
   // effective `distinct` flag and count column before dispatching. `:all` is
   // spelled "*"/"all" here (the JS analogue Rails' aggregate_column maps to
   // Arel.star — calculations.rb:414-423).
-  let distinct: boolean | null = rel._isDistinct;
+  let distinct: boolean | null = rel.distinctValue;
   if (operation === "count") {
     columnName ??= await selectForCount(rel);
     if (columnName === "*" || columnName === "all") {
       if (!distinct) {
-        if (rel._groupColumns.length === 0)
+        if (rel.groupValues.length === 0)
           distinct = isDistinctSelect(rel, await selectForCount(rel));
       } else if (
         any(rel.groupValues) ||
-        (rel.selectValues.length === 0 && rel._orderClauses.length === 0)
+        (rel.selectValues.length === 0 && rel.orderValues.length === 0)
       ) {
         columnName = rel.primaryKey;
       }
@@ -1381,13 +1378,13 @@ function buildCountSubquery(
   let columnAlias: Nodes.Node;
   if (isAll) {
     columnAlias = new Nodes.SqlLiteral("*");
-    if (!distinct) relation._selectColumns = [new Nodes.SqlLiteral("1 AS one")];
+    if (!distinct) relation.selectValues = [new Nodes.SqlLiteral("1 AS one")];
   } else {
     columnAlias = new Nodes.SqlLiteral("count_column");
     const column = aggregateColumn(relation, columnName) as Nodes.Node & {
       as(alias: string): Nodes.Node;
     };
-    relation._selectColumns = [column.as("count_column")];
+    relation.selectValues = [column.as("count_column")];
   }
 
   const subqueryAlias = "subquery_for_count";
@@ -1415,7 +1412,7 @@ export async function executeSimpleCalculation(
 
   if (isBuildCountSubquery(rel, operation, columnName, distinct === true)) {
     // Shortcut when limit is zero (calculations.rb:471-472).
-    if (rel._limitValue === 0) return 0;
+    if (rel.limitValue === 0) return 0;
 
     const queryBuilder = buildCountSubquery(
       rel.spawn(),
@@ -1427,7 +1424,7 @@ export async function executeSimpleCalculation(
     // Rails routes aggregates through apply_join_dependency when eager loading,
     // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
     rel._checkEagerLoadable();
-    const joined = eagerJoinedRelation(rel, rel._groupColumns.length === 0);
+    const joined = eagerJoinedRelation(rel, rel.groupValues.length === 0);
     // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
     // (calculations.rb:477-478).
     const relation = joined.unscope("order").distinctBang(false) as CalculationRelation;
@@ -1448,7 +1445,7 @@ export async function executeSimpleCalculation(
     // `selectValues` is a reader in trails, so the assignment lands on its
     // store. DIVERGENCE: the "val" alias is the anchor the SQLite bigint CAST
     // wrapper reads back, so it is added only on that path.
-    relation._selectColumns = [castsBigint ? selectValue.as("val") : selectValue];
+    relation.selectValues = [castsBigint ? selectValue.as("val") : selectValue];
 
     const [rawSql, managerBinds] = compileManagerWithBinds(relation, relation.arel());
     sql = castsBigint ? wrapBigintAgg(rawSql) : rawSql;
@@ -1460,7 +1457,7 @@ export async function executeSimpleCalculation(
   // query at all, and `type_cast_calculated_value` folds that empty result to
   // the operation's identity. Checked after the query builder is chosen, as
   // Rails does.
-  const queryResult = rel._whereClause.isContradiction()
+  const queryResult = rel.whereClause.isContradiction()
     ? Result.empty()
     : await (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
@@ -1679,7 +1676,7 @@ export function isBuildCountSubquery(
   return (
     operation === "count" &&
     (((isAll || many(selectValues)) && distinct) ||
-      rel._limitValue !== null ||
-      rel._offsetValue !== null)
+      rel.limitValue !== null ||
+      rel.offsetValue !== null)
   );
 }

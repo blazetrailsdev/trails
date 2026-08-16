@@ -56,6 +56,7 @@ import {
   arelColumns as _arelColumns,
   arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
+  defineValueMethods,
   type UnscopeType,
   type ExceptSkip,
   type AssociationSpec,
@@ -250,11 +251,47 @@ type JoinClauseSpec = {
 };
 
 /**
- * Shared frozen empty array returned by value readers whose backing field is
- * unset. Mirrors Rails' `FROZEN_EMPTY_ARRAY` constant — a single shared
- * instance so the unset read is a stable reference, not a fresh allocation.
+ * A `Relation::VALUE_METHODS` key — the Ruby Symbol the `@values` hash is keyed
+ * by, camelCased (`:eager_load` → `"eagerLoad"`).
  */
-const EMPTY_VALUE_ARRAY: readonly never[] = Object.freeze([]);
+export type ValueMethod =
+  | (typeof Relation.MULTI_VALUE_METHODS)[number]
+  | (typeof Relation.SINGLE_VALUE_METHODS)[number]
+  | (typeof Relation.CLAUSE_METHODS)[number];
+
+/**
+ * The shape of Rails' `@values` hash: every `VALUE_METHODS` key, optional
+ * (an absent key reads back as its default) and typed as that method's value.
+ */
+export type ValuesHash = {
+  includes?: AssociationSpec[];
+  eagerLoad?: AssociationSpec[];
+  preload?: AssociationSpec[];
+  select?: (string | Nodes.Node)[];
+  group?: string[];
+  order?: Array<string | Nodes.Node>;
+  joins?: (AssociationSpec | string | Nodes.Join)[];
+  leftOuterJoins?: AssociationSpec[];
+  references?: string[];
+  extending?: Array<Record<string, (...args: any[]) => any>>;
+  unscope?: Array<string | { where: string | string[] }>;
+  optimizerHints?: string[];
+  annotate?: string[];
+  with?: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  limit?: number | null;
+  offset?: number | null;
+  lock?: string | null;
+  readonly?: boolean;
+  reordering?: boolean;
+  strictLoading?: boolean;
+  reverseOrder?: boolean;
+  distinct?: boolean;
+  createWith?: Record<string, unknown>;
+  skipQueryCache?: boolean;
+  where?: WhereClause;
+  having?: WhereClause;
+  from?: FromClause;
+};
 
 declare const relationNameBrand: unique symbol;
 
@@ -279,36 +316,65 @@ export class Relation<T extends Base> {
    */
   static _railsClassName = "ActiveRecord::Relation";
 
+  /** Mirrors: ActiveRecord::Relation::MULTI_VALUE_METHODS (relation.rb:54-57). */
+  static readonly MULTI_VALUE_METHODS = [
+    "includes",
+    "eagerLoad",
+    "preload",
+    "select",
+    "group",
+    "order",
+    "joins",
+    "leftOuterJoins",
+    "references",
+    "extending",
+    "unscope",
+    "optimizerHints",
+    "annotate",
+    "with",
+  ] as const;
+
+  /** Mirrors: ActiveRecord::Relation::SINGLE_VALUE_METHODS (relation.rb:59-60). */
+  static readonly SINGLE_VALUE_METHODS = [
+    "limit",
+    "offset",
+    "lock",
+    "readonly",
+    "reordering",
+    "strictLoading",
+    "reverseOrder",
+    "distinct",
+    "createWith",
+    "skipQueryCache",
+  ] as const;
+
+  /** Mirrors: ActiveRecord::Relation::CLAUSE_METHODS (relation.rb:62). */
+  static readonly CLAUSE_METHODS = ["where", "having", "from"] as const;
+
+  /** Mirrors: ActiveRecord::Relation::VALUE_METHODS (relation.rb:65). */
+  static readonly VALUE_METHODS: readonly ValueMethod[] = [
+    ...Relation.MULTI_VALUE_METHODS,
+    ...Relation.SINGLE_VALUE_METHODS,
+    ...Relation.CLAUSE_METHODS,
+  ];
+
   private _model: typeof Base;
-  /** @internal */
-  _whereClause: WhereClause = WhereClause.empty();
-  private _orderClauses: Array<string | Nodes.Node> = [];
+  /**
+   * Rails `@values` (relation.rb:86) — the single hash holding every
+   * `VALUE_METHODS` entry, read and written through the accessors
+   * `query_methods.rb:162-183` generates. An absent key reads back as that
+   * method's default.
+   * @internal
+   */
+  _values: ValuesHash = {};
   private _rawOrderClauses: string[] = [];
-  // Tri-state (Rails `@values.fetch(:reordering, nil)`): `undefined` = unset,
-  // distinct from an explicit `false`. Mirrors `_isStrictLoading` below.
-  private _reordering: boolean | undefined = undefined;
-  // `:reverse_order` is in SINGLE_VALUE_METHODS, so query_methods.rb's
-  // `VALUE_METHODS.each` generates a `reverse_order_value` reader/writer pair
-  // (`@values.fetch(:reverse_order, nil)`). In the pinned Rails, `reverse_order!`
-  // realizes the flip *eagerly* via `reverse_sql_order` (it rewrites
-  // `order_values`) and never touches `reverse_order_value`, so the accessor is a
-  // vestigial stored flag defaulting to nil. reverseOrderBang mirrors that eager
-  // rewrite; this field just backs the generated accessor.
-  private _reverseOrderValue: boolean | undefined = undefined;
-  private _limitValue: number | null = null;
-  private _offsetValue: number | null = null;
-  private _selectColumns: (string | Nodes.Node)[] | null = null;
-  private _isDistinct = false;
   private _distinctOnColumns: string[] = [];
-  private _groupColumns: string[] = [];
-  /** @internal */
-  _havingClause: WhereClause = WhereClause.empty();
   private _isNone = false;
   /**
    * @internal True when this relation's WHERE base is the stale new-owner
    * `1=0` NullRelation seed of a `CollectionProxy` (owner was a NEW record when
    * the proxy was constructed). Set on the proxy at construction and propagated
-   * to every spawned relation via `_copyStateFrom`, so a query executed after
+   * to every spawned relation via `initializeCopy`, so a query executed after
    * the owner is saved can rebase the dead seed onto the resolved association
    * scope. See `associations/new-owner-seed-rebase.ts`.
    */
@@ -319,7 +385,6 @@ export class Relation<T extends Base> {
    * mutation predicates from the stale `1=0` seed. Empty on ordinary relations.
    */
   _seedWherePredicates: readonly unknown[] = [];
-  private _lockValue: string | null = null;
   private _joinClauses: Array<{
     type: "inner" | "left";
     table: string;
@@ -334,21 +399,12 @@ export class Relation<T extends Base> {
     // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
     aliasBase?: string;
   }> = [];
-  // Single insertion-ordered backing store for `joins_values` (mirrors Rails'
-  // one `@values[:joins]` array). Every `.joins` argument lands here in call
-  // order — Arel join nodes and raw SQL strings alongside association names and
-  // nested-association hashes — so `joins_values=`/`joins_values` round-trip
-  // faithfully with no named-before-raw reorder. The named-vs-raw split the
-  // builders need is derived on read by `select_association_list`, not
-  // stored separately.
-  private _joinsValues: (AssociationSpec | string | Nodes.Join)[] = [];
-  private _leftOuterJoinsValues: AssociationSpec[] = [];
   // A `joins_values` entry is a "named" inner association join (resolved through
   // JoinDependency) when it is a nested-association hash, a Symbol — spelled as
   // a leading-colon string, trails' signal for an association/CTE name, e.g.
   // `joins(":name")` — or a string naming an association; everything else (Arel
   // join nodes, raw SQL strings) is a raw join value. The two derived getters
-  // below partition `_joinsValues` by this rule — the same rule `joins` uses at
+  // below partition `joinsValues` by this rule — the same rule `joins` uses at
   // insert time. A raw Symbol routed to the raw-join bucket would reach the arel
   // visitor and raise "Unknown node type: Symbol", so Symbols must be named.
   private _isNamedJoinValue(v: unknown): boolean {
@@ -358,26 +414,8 @@ export class Relation<T extends Base> {
       (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
     );
   }
-  private _includesAssociations: AssociationSpec[] = [];
-  private _preloadAssociations: AssociationSpec[] = [];
-  private _eagerLoadAssociations: AssociationSpec[] = [];
-  // Tri-state (Rails `@values.fetch(:readonly, nil)`): `undefined` = unset.
-  private _isReadonly: boolean | undefined = undefined;
-  private _isStrictLoading: boolean | undefined = undefined;
-  private _annotations: string[] = [];
-  private _optimizerHints: string[] = [];
-  private _referencesValues: string[] = [];
   private _manualReferences: string[] = [];
-  private _fromClause: FromClause = FromClause.empty();
-  private _createWithAttrs: Record<string, unknown> = {};
-  // Rails' unscope_values: the scopes passed to unscope! are remembered so that
-  // merging this relation into another re-applies the resets (merger.rb NORMAL_VALUES).
-  private _unscopeValues: Array<string | { where: string | string[] }> = [];
-  private _extending: Array<Record<string, (...args: any[]) => any>> = [];
-  private _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }> = [];
   private _skipPreloading = false;
-  // Tri-state (Rails `@values.fetch(:skip_query_cache, nil)`): `undefined` = unset.
-  private _skipQueryCache: boolean | undefined = undefined;
   private _loaded = false;
   // Rails `@delegate_to_model` (relation.rb:90) — true only while a scope body
   // runs via `_exec_scope`, which is what makes `already_in_scope?` (and hence
@@ -528,7 +566,7 @@ export class Relation<T extends Base> {
       );
       if (nodes.length === 0) return this._clone().noneBang();
       const rel = this._clone();
-      rel._whereClause.predicates.push(...nodes);
+      rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
       return rel;
     }
     return this._clone().whereBang(
@@ -555,8 +593,8 @@ export class Relation<T extends Base> {
     // the *columns the new predicates reference* — not the hash keys — drops both
     // of those columns before re-adding them.
     const newClause = rel.buildWhereClause(conditions);
-    rel._whereClause = rel._whereClause.except(...newClause.extractAttributes());
-    rel._whereClause = rel._whereClause.plus(newClause);
+    rel.whereClause = rel.whereClause.except(...newClause.extractAttributes());
+    rel.whereClause = rel.whereClause.plus(newClause);
     return rel;
   }
 
@@ -728,7 +766,7 @@ export class Relation<T extends Base> {
       | string[];
     const rel = this._clone();
     for (const t of referencesFromConditions(conditions)) {
-      if (!rel._referencesValues.includes(t)) rel._referencesValues.push(t);
+      if (!rel.referencesValues.includes(t)) rel.referencesValues = [...rel.referencesValues, t];
     }
     if (
       Array.isArray(conditions) &&
@@ -762,7 +800,7 @@ export class Relation<T extends Base> {
         // in place (`IN` → `NOT IN`, `Grouping(Or)` → `NOT (...)`), while a flat
         // multi-predicate single tuple ANDs then negates → `NOT (c1 = ? AND
         // c2 = ?)` — the same shape as inverting the hash-key `where.not`.
-        rel._whereClause = rel._whereClause.plus(new WhereClause(nodes).invert());
+        rel.whereClause = rel.whereClause.plus(new WhereClause(nodes).invert());
       }
       return rel;
     }
@@ -776,7 +814,7 @@ export class Relation<T extends Base> {
         throw argumentError("Relation#whereNot: unsupported argument (empty array)");
       }
       const clause = rel.buildWhereClause(conditions);
-      rel._whereClause = rel._whereClause.plus(clause.invert());
+      rel.whereClause = rel.whereClause.plus(clause.invert());
       return rel;
     }
     // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
@@ -787,7 +825,7 @@ export class Relation<T extends Base> {
     // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
     // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
     const clause = rel.buildWhereClause(conditions);
-    rel._whereClause = rel._whereClause.plus(clause.invert());
+    rel.whereClause = rel.whereClause.plus(clause.invert());
     return rel;
   }
 
@@ -829,7 +867,8 @@ export class Relation<T extends Base> {
       combined = combined.or(buildClause(conditions[i]));
     }
     const rel = this._clone();
-    if (combined.predicates.length > 0) rel._whereClause.predicates.push(combined.ast);
+    if (combined.predicates.length > 0)
+      rel.whereClause = rel.whereClause.plus(new WhereClause([combined.ast]));
     return rel;
   }
 
@@ -995,7 +1034,7 @@ export class Relation<T extends Base> {
    */
   distinctOn(...columns: string[]): Relation<T> {
     const rel = this._clone();
-    rel._isDistinct = true;
+    rel.distinctValue = true;
     rel._distinctOnColumns = columns;
     return rel;
   }
@@ -1081,7 +1120,8 @@ export class Relation<T extends Base> {
     // up-front rather than at Rails' `spawn.order!`.
     const references = _qm.columnReferences([column]);
     for (const reference of references) {
-      if (!rel._referencesValues.includes(reference)) rel._referencesValues.push(reference);
+      if (!rel.referencesValues.includes(reference))
+        rel.referencesValues = [...rel.referencesValues, reference];
     }
 
     // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
@@ -1128,7 +1168,7 @@ export class Relation<T extends Base> {
       const whereNode: Nodes.Node = hasNull
         ? (arelCol.in(nonNull) as Nodes.Node).or(arelCol.eq(null))
         : arelCol.in(nonNull);
-      rel._whereClause.predicates.push(whereNode);
+      rel.whereClause = rel.whereClause.plus(new WhereClause([whereNode]));
     }
 
     return rel;
@@ -1163,7 +1203,7 @@ export class Relation<T extends Base> {
     // rendering each one's namespace-qualified Rails constant path.
     const className = (this.constructor as typeof Relation)._railsClassName;
     if (this._loaded) {
-      const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+      const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${className} [${entries.join(", ")}]>`;
@@ -1190,7 +1230,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#pretty_print
    */
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
-    const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
+    const max = this.limitValue !== null ? Math.min(this.limitValue, 11) : 11;
     const subject = this._loaded ? this._records : await this.annotate("loading for pp").limit(max);
     const entries = subject.slice(0, max) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
@@ -1230,7 +1270,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#readonly?
    */
   get isReadonly(): boolean {
-    return this._isReadonly ?? false;
+    return this.readonlyValue ?? false;
   }
 
   /**
@@ -1239,7 +1279,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#locked? (`alias :locked? :lock_value`)
    */
   get isLocked(): boolean {
-    return this._lockValue !== null;
+    return this.lockValue !== null;
   }
 
   /**
@@ -1248,7 +1288,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#lock_value (SINGLE_VALUE_METHODS).
    */
   get lockValue(): string | null {
-    return this._lockValue;
+    return this.lockValue;
   }
 
   /**
@@ -1257,7 +1297,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#strict_loading?
    */
   get isStrictLoading(): boolean {
-    return this._isStrictLoading ?? false;
+    return this.strictLoadingValue ?? false;
   }
 
   /**
@@ -1473,8 +1513,8 @@ export class Relation<T extends Base> {
     if (typeof scope !== "function") return;
     const baseRel = targetModel._allForPreload();
     const scopeRel = invokeScopeLambda(scope, baseRel, undefined as unknown as Base) || baseRel;
-    if (scopeRel?._whereClause && !scopeRel._whereClause.isEmpty()) {
-      predicates.push(scopeRel._whereClause.ast);
+    if (scopeRel?.whereClause && !scopeRel.whereClause.isEmpty()) {
+      predicates.push(scopeRel.whereClause.ast);
     }
   }
 
@@ -2321,7 +2361,7 @@ export class Relation<T extends Base> {
       // to a frozen `[]` *before* issuing any SQL. Mirror that here so no
       // SELECT is sent and `.explain` collects zero queries. Distinct from
       // `.none()` (`_isNone`), handled in toArray/_execQueriesForExplain.
-      if (this._whereClause.isContradiction()) {
+      if (this.whereClause.isContradiction()) {
         this.loadRecords([]);
         return [];
       }
@@ -2354,8 +2394,8 @@ export class Relation<T extends Base> {
         this._asyncLoad && c.asyncEnabled?.() === true && !c.currentTransaction?.()?.joinable;
 
       let loadedRecords: T[];
-      if (this._eagerLoadAssociations.length > 0 || promotedIncludes.length > 0) {
-        const allEager = [...new Set([...this._eagerLoadAssociations, ...promotedIncludes])];
+      if (this.eagerLoadValues.length > 0 || promotedIncludes.length > 0) {
+        const allEager = [...new Set([...this.eagerLoadValues, ...promotedIncludes])];
         await this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
         if (token !== this._loadToken) return [];
         loadedRecords = this._records;
@@ -2386,14 +2426,14 @@ export class Relation<T extends Base> {
       }
 
       // Apply readonly and strict_loading flags to loaded records
-      if (this._isReadonly) {
+      if (this.readonlyValue) {
         for (const record of this._records) {
           (record as any)._readonly = true;
         }
       }
-      if (this._isStrictLoading !== undefined) {
+      if (this.strictLoadingValue != null) {
         for (const record of this._records) {
-          (record as any)._strictLoading = this._isStrictLoading;
+          (record as any)._strictLoading = this.strictLoadingValue;
         }
       }
 
@@ -2404,8 +2444,8 @@ export class Relation<T extends Base> {
       // its own sequential `Preloader.call()`, so the query-issue sequence matches
       // Rails for relations mixing `.preload(...)` and `.includes(...)`.
       const preloadAssocs = [
-        ...this._preloadAssociations,
-        ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
+        ...this.preloadValues,
+        ...this.includesValues.filter((n) => !promotedIncludes.includes(n)),
       ];
       if (preloadAssocs.length > 0 && this._records.length > 0) {
         await this.preloadAssociations(this._records, preloadAssocs);
@@ -2423,12 +2463,12 @@ export class Relation<T extends Base> {
    */
   private _includesToPromoteFromReferences(): AssociationSpec[] {
     if (!this.referencesEagerLoadedTables()) return [];
-    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
+    const alreadyEagerLoaded = new Set(this.eagerLoadValues);
     // Rails promotes ALL includes to eager_load when references points to an
     // unjoined table. The eager JoinDependency recursively JOINs
     // nested hash and dotted-path specs, so we promote every include shape;
     // any spec it can't JOIN falls back to preload at execution time.
-    return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
+    return this.includesValues.filter((spec) => !alreadyEagerLoaded.has(spec));
   }
 
   /**
@@ -2436,10 +2476,10 @@ export class Relation<T extends Base> {
    * `joined_includes_values = includes_values & joins_values`.
    */
   private _joinedIncludesValues(): string[] {
-    if (this._includesAssociations.length === 0) return [];
-    if (this._joinsValues.length === 0) return [];
-    const joined = new Set(this._joinsValues.filter((v): v is string => typeof v === "string"));
-    return this._includesAssociations.filter(
+    if (this.includesValues.length === 0) return [];
+    if (this.joinsValues.length === 0) return [];
+    const joined = new Set(this.joinsValues.filter((v): v is string => typeof v === "string"));
+    return this.includesValues.filter(
       (spec): spec is string => typeof spec === "string" && joined.has(spec),
     );
   }
@@ -2457,8 +2497,8 @@ export class Relation<T extends Base> {
    */
   private _includesToPromoteFromJoins(): AssociationSpec[] {
     if (this._joinedIncludesValues().length === 0) return [];
-    const alreadyEagerLoaded = new Set(this._eagerLoadAssociations);
-    return this._includesAssociations.filter((spec) => !alreadyEagerLoaded.has(spec));
+    const alreadyEagerLoaded = new Set(this.eagerLoadValues);
+    return this.includesValues.filter((spec) => !alreadyEagerLoaded.has(spec));
   }
 
   /**
@@ -2489,23 +2529,23 @@ export class Relation<T extends Base> {
    * calls, which promote includes to eager_load but never rename the join.
    */
   private _aliasableReferences(): string[] {
-    return this._referencesValues.filter((r) => !this._manualReferences.includes(r));
+    return this.referencesValues.filter((r) => !this._manualReferences.includes(r));
   }
 
   private referencesEagerLoadedTables(): boolean {
-    if (this._includesAssociations.length === 0) return false;
-    if (this._referencesValues.length === 0) return false;
+    if (this.includesValues.length === 0) return false;
+    if (this.referencesValues.length === 0) return false;
 
     // Mirrors Rails references_eager_loaded_tables? (relation.rb:1474-1488): calls
     // build_joins([]) and extracts table names from the returned join nodes
     // (StringJoin → tables_in_string(join.left), other → join.left.name), then checks
     // whether any references_values are NOT in that joined-tables set. Only
     // references_values are consulted; Rails does not scan WHERE predicates.
-    // _leftOuterJoinsValues holds association names (not table names). Rails
+    // leftOuterJoinsValues holds association names (not table names). Rails
     // build_joins([]) processes left_outer_joins_values and extracts table names
     // from the resulting join nodes. We resolve via _resolveAssocTables to
     // get the actual table name (handles camelCase → snake_case mappings).
-    const leftOuterTables = this._resolveAssocTables(this._leftOuterJoinsValues);
+    const leftOuterTables = this._resolveAssocTables(this.leftOuterJoinsValues);
     // joins_values holds association names too (joins(:assoc) routed through
     // JoinDependency with InnerJoin). Run them through `select_association_list`
     // — the same partition build_joins applies — and resolve the surviving specs
@@ -2514,7 +2554,7 @@ export class Relation<T extends Base> {
     // `tablesInString` arm below, exactly as Rails' StringJoin branch does.
     const rawJoinValues: (string | Nodes.Join)[] = [];
     const namedInnerTables = this._resolveAssocTables(
-      this.selectAssociationList(this._joinsValues, null, (join) =>
+      this.selectAssociationList(this.joinsValues, null, (join) =>
         rawJoinValues.push(join as string | Nodes.Join),
       ) as AssociationSpec[],
     );
@@ -2537,7 +2577,7 @@ export class Relation<T extends Base> {
       String((this._model as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
     ]);
 
-    return this._referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
+    return this.referencesValues.some((ref) => !joinedTables.has(ref.toLowerCase()));
   }
 
   /**
@@ -2564,7 +2604,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#limited_count
    */
   private limitedCount(): Promise<number> {
-    if (this._limitValue != null) return this.count() as Promise<number>;
+    if (this.limitValue != null) return this.count() as Promise<number>;
     return this.limit(2).count() as Promise<number>;
   }
 
@@ -2593,7 +2633,7 @@ export class Relation<T extends Base> {
     // hands to `select_all` (relation.rb:1436).
     { async = false }: { async?: boolean } = {},
   ): Promise<void> {
-    const eagerAssociations = eagerAssocs ?? this._eagerLoadAssociations;
+    const eagerAssociations = eagerAssocs ?? this.eagerLoadValues;
     const basePk = (this._model as any).primaryKey ?? "id";
     if (this._eagerLoadBypassesJoinDependency()) {
       const sql = this._toSql();
@@ -2653,7 +2693,7 @@ export class Relation<T extends Base> {
       () =>
         jd.instantiateFromRows(
           rows,
-          this._isStrictLoading,
+          this.strictLoadingValue,
           result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
         ),
     );
@@ -2825,7 +2865,7 @@ export class Relation<T extends Base> {
       !this._eagerJoinDependencyIsLimitable(
         this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
       );
-    return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
+    return compositePkBypass || this.withValues.length > 0 || !this.fromClause.isEmpty();
   }
 
   /**
@@ -2856,7 +2896,7 @@ export class Relation<T extends Base> {
   _checkEagerLoadable(): void {
     if (this._eagerLoadBypassesJoinDependency()) return;
     const specs = [
-      ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
+      ...new Set([...this.eagerLoadValues, ...this._includesToPromoteFromReferences()]),
     ];
     if (specs.length === 0) return;
     new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
@@ -2880,7 +2920,7 @@ export class Relation<T extends Base> {
     // Rails FinderMethods#exists?: `return false if !conditions || limit_value == 0`
     // (finder_methods.rb:367). A relation limited to zero rows can never match, so
     // short-circuit to false without emitting any query.
-    if (this._limitValue === 0) return false;
+    if (this.limitValue === 0) return false;
     // Rails FinderMethods#exists? (finder_methods.rb:360-364): reject an
     // ActiveRecord instance argument with `if Base === conditions` before any
     // query is built. Detect it via the inherited `_isActiveRecordBase` marker
@@ -2922,7 +2962,7 @@ export class Relation<T extends Base> {
     await probe._materializeDeferredDistinctPkPredicates();
     // Rails: `return false if relation.where_clause.contradiction?`
     // (finder_methods.rb:375) — evaluated on the post-construct relation.
-    if (probe._whereClause.isContradiction()) return false;
+    if (probe.whereClause.isContradiction()) return false;
     // Tag the probe query `<Model> Exists?` — the name Rails passes to its
     // existence query (`select_rows(relation.arel, "#{model.name} Exists?")`,
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
@@ -2988,9 +3028,9 @@ export class Relation<T extends Base> {
       : this.buildArel(this._conn());
     arel.source.left = table;
     const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this._groupColumns)),
+      Array.from(new Set(this.groupValues)),
     ) as Nodes.Node[];
-    const havingClauseAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
+    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
     const primaryKey = this.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
@@ -3000,7 +3040,7 @@ export class Relation<T extends Base> {
       stmtAst = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
     } else {
       const um = new UpdateManager().table(table).set(values);
-      for (const node of this._whereClause.predicatesWithWrappedSqlLiterals()) {
+      for (const node of this.whereClause.predicatesWithWrappedSqlLiterals()) {
         um.where(node);
       }
       stmtAst = um.ast;
@@ -3041,12 +3081,12 @@ export class Relation<T extends Base> {
     // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
     // :with_recursive]`: `delete_all` cannot honor these clauses, so it raises
     // rather than silently dropping them. The TS port stores `with` /
-    // `with_recursive` together in `_ctes` (distinguished by the `recursive`
+    // `with_recursive` together in `withValues` (distinguished by the `recursive`
     // flag), so split them back out to reproduce Rails' message verbatim.
     const invalidMethods: string[] = [];
-    if (this._isDistinct) invalidMethods.push("distinct");
-    if (this._ctes.some((cte) => !cte.recursive)) invalidMethods.push("with");
-    if (this._ctes.some((cte) => cte.recursive)) invalidMethods.push("with_recursive");
+    if (this.distinctValue) invalidMethods.push("distinct");
+    if (this.withValues.some((cte) => !cte.recursive)) invalidMethods.push("with");
+    if (this.withValues.some((cte) => cte.recursive)) invalidMethods.push("with_recursive");
     if (invalidMethods.length > 0) {
       throw new ActiveRecordError(`delete_all doesn't support ${invalidMethods.join(", ")}`);
     }
@@ -3079,9 +3119,9 @@ export class Relation<T extends Base> {
     // FROM node rather than the model table.
     arel.source.left = table;
     const groupValuesArelColumns = this.arelColumns(
-      Array.from(new Set(this._groupColumns)),
+      Array.from(new Set(this.groupValues)),
     ) as Nodes.Node[];
-    const havingClauseAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
+    const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
     const primaryKey = this.model.primaryKey;
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
@@ -3092,7 +3132,7 @@ export class Relation<T extends Base> {
     } else {
       // No primary key — fall back to a plain DeleteManager.
       const dm = new DeleteManager().from(table);
-      for (const node of this._whereClause.predicatesWithWrappedSqlLiterals()) {
+      for (const node of this.whereClause.predicatesWithWrappedSqlLiterals()) {
         dm.where(node);
       }
       stmtAst = dm.ast;
@@ -3308,7 +3348,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#scope_for_create
    */
   scopeForCreate(): Record<string, unknown> {
-    return { ...this._scopeAttributes(), ...this._createWithAttrs };
+    return { ...this._scopeAttributes(), ...this.createWithValue };
   }
 
   /**
@@ -3322,310 +3362,7 @@ export class Relation<T extends Base> {
    * through model's table).
    */
   whereValuesHash(relationTableName: string = this.model.tableName): Record<string, unknown> {
-    return this._whereClause.toH(relationTableName);
-  }
-
-  // -- Value accessors (for introspection) --
-
-  /**
-   * Return the LIMIT clause value.
-   *
-   * Mirrors: ActiveRecord::Relation#limit_value
-   */
-  get limitValue(): number | null {
-    return this._limitValue;
-  }
-
-  /**
-   * Return the OFFSET clause value.
-   *
-   * Mirrors: ActiveRecord::Relation#offset_value
-   */
-  get offsetValue(): number | null {
-    return this._offsetValue;
-  }
-
-  /**
-   * Return the SELECT columns.
-   *
-   * Mirrors: ActiveRecord::Relation#select_values — `@values.fetch(:select,
-   * FROZEN_EMPTY_ARRAY)`: the stored array is returned by reference (not a
-   * copy). trails stores `null` for the unset state, so the unset read returns
-   * the shared `EMPTY_VALUE_ARRAY` (Rails' frozen-empty-array) rather than a
-   * fresh allocation, matching the stored-reference semantics of the other
-   * value readers.
-   */
-  get selectValues(): (string | Nodes.Node)[] {
-    return this._selectColumns ?? (EMPTY_VALUE_ARRAY as unknown as (string | Nodes.Node)[]);
-  }
-
-  /**
-   * Return the ORDER clauses.
-   *
-   * Mirrors: ActiveRecord::Relation#order_values — returns the stored array by
-   * reference (Rails' `@values.fetch` semantics), matching the other value
-   * readers. Raw SQL orderings are stored as `Arel::Nodes::SqlLiteral` nodes
-   * directly (like Rails), so no on-read normalization or fresh allocation is
-   * needed.
-   */
-  get orderValues(): Array<string | Nodes.Node> {
-    return this._orderClauses;
-  }
-
-  /**
-   * Return the GROUP BY columns.
-   *
-   * Mirrors: ActiveRecord::Relation#group_values — returns the stored array by
-   * reference (Rails' `@values.fetch` semantics), matching the other value
-   * readers; no defensive copy.
-   */
-  get groupValues(): string[] {
-    return this._groupColumns;
-  }
-
-  /**
-   * Return the DISTINCT flag.
-   *
-   * Mirrors: ActiveRecord::Relation#distinct_value
-   */
-  get distinctValue(): true | undefined {
-    return this._isDistinct || undefined;
-  }
-
-  /**
-   * Return the WHERE clause.
-   *
-   * Mirrors: ActiveRecord::Relation#where_clause — `query_methods.rb` defines
-   * this via `VALUE_METHODS.each` over `CLAUSE_METHODS`, so it reads the stored
-   * `WhereClause` object (not a `*_values` array). Use `whereValuesHash` for
-   * the equality-condition hash.
-   */
-  get whereClause(): WhereClause {
-    return this._whereClause;
-  }
-  set whereClause(value: WhereClause) {
-    this.assertModifiableBang();
-    this._whereClause = value;
-  }
-
-  // The remaining `VALUE_METHODS.each`-generated accessors (query_methods.rb:162):
-  // Rails generates a reader (`@values.fetch(:<name>, default)`) and a writer
-  // (`assert_modifiable!; @values[:<name>] = value`) for each. trails keeps each
-  // value in a dedicated private field, so the reader returns that field directly
-  // (mirroring Rails' stored-reference semantics, not a copy) and the writer
-  // asserts modifiability then assigns. The Ruby `*=` setter name camelizes to
-  // the same symbol as the reader (`includes_values=` → `includesValues`).
-
-  /** Mirrors: ActiveRecord::Relation#includes_values */
-  get includesValues(): AssociationSpec[] {
-    return this._includesAssociations;
-  }
-  set includesValues(value: AssociationSpec[]) {
-    this.assertModifiableBang();
-    this._includesAssociations = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#eager_load_values */
-  get eagerLoadValues(): AssociationSpec[] {
-    return this._eagerLoadAssociations;
-  }
-  set eagerLoadValues(value: AssociationSpec[]) {
-    this.assertModifiableBang();
-    this._eagerLoadAssociations = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#preload_values */
-  get preloadValues(): AssociationSpec[] {
-    return this._preloadAssociations;
-  }
-  set preloadValues(value: AssociationSpec[]) {
-    this.assertModifiableBang();
-    this._preloadAssociations = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#joins_values — Rails stores every `.joins`
-   * argument (association names and raw SQL/Arel joins) in one insertion-ordered
-   * array. trails backs that directly with `_joinsValues`, so the reader returns
-   * the stored array (a copy) and preserves the exact order in which joins were
-   * added. The named-vs-raw split the builders need is derived from this store
-   * on read by `select_association_list`.
-   */
-  get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
-    return [...this._joinsValues];
-  }
-  /**
-   * Writer for `joins_values=` (query_methods.rb:162-181, `@values[:joins] =
-   * value`). Assigns the unified backing store directly, so a value assigned
-   * then read back round-trips faithfully in insertion order. The SQL-emitted
-   * `_joinClauses` (the explicit-ON `leftJoins(table, on)` form and
-   * where-association joins) are not part of `joins_values` and are left
-   * untouched.
-   */
-  set joinsValues(value: (AssociationSpec | string | Nodes.Join)[]) {
-    this.assertModifiableBang();
-    this._joinsValues = [...value];
-  }
-
-  /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
-  get leftOuterJoinsValues(): AssociationSpec[] {
-    return this._leftOuterJoinsValues;
-  }
-  set leftOuterJoinsValues(value: AssociationSpec[]) {
-    this.assertModifiableBang();
-    this._leftOuterJoinsValues = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#references_values */
-  get referencesValues(): string[] {
-    return this._referencesValues;
-  }
-  set referencesValues(value: string[]) {
-    this.assertModifiableBang();
-    this._referencesValues = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#extending_values */
-  get extendingValues(): Array<Record<string, (...args: any[]) => any>> {
-    return this._extending;
-  }
-  set extendingValues(value: Array<Record<string, (...args: any[]) => any>>) {
-    this.assertModifiableBang();
-    this._extending = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#extensions — `alias extensions
-   * extending_values` (query_methods.rb:183), a reader-only alias, so it returns
-   * the same stored array.
-   */
-  get extensions(): Array<Record<string, (...args: any[]) => any>> {
-    return this.extendingValues;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#unscope_values */
-  get unscopeValues(): Array<string | { where: string | string[] }> {
-    return this._unscopeValues;
-  }
-  set unscopeValues(value: Array<string | { where: string | string[] }>) {
-    this.assertModifiableBang();
-    this._unscopeValues = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#optimizer_hints_values */
-  get optimizerHintsValues(): string[] {
-    return this._optimizerHints;
-  }
-  set optimizerHintsValues(value: string[]) {
-    this.assertModifiableBang();
-    this._optimizerHints = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#annotate_values */
-  get annotateValues(): string[] {
-    return this._annotations;
-  }
-  set annotateValues(value: string[]) {
-    this.assertModifiableBang();
-    this._annotations = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#with_values */
-  get withValues(): Array<{ name: string; expression: Nodes.Node; recursive: boolean }> {
-    return this._ctes;
-  }
-  set withValues(value: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>) {
-    this.assertModifiableBang();
-    this._ctes = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#readonly_value — `@values.fetch(:readonly,
-   * nil)`: `undefined` when unset, distinct from an explicit `false`.
-   */
-  get readonlyValue(): boolean | undefined {
-    return this._isReadonly;
-  }
-  set readonlyValue(value: boolean | undefined) {
-    this.assertModifiableBang();
-    this._isReadonly = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#reverse_order_value — the
-   * `VALUE_METHODS.each`-generated accessor over the `:reverse_order` single
-   * value. In the pinned Rails `reverse_order!` flips the order eagerly through
-   * `reverse_sql_order` and leaves this flag at its `nil` default, so the reader
-   * returns `undefined` unless a caller assigns it directly.
-   */
-  get reverseOrderValue(): boolean | undefined {
-    return this._reverseOrderValue;
-  }
-  set reverseOrderValue(value: boolean | undefined) {
-    this.assertModifiableBang();
-    this._reverseOrderValue = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#reordering_value — `@values.fetch(
-   * :reordering, nil)`: `undefined` when unset, distinct from an explicit
-   * `false`.
-   */
-  get reorderingValue(): boolean | undefined {
-    return this._reordering;
-  }
-  set reorderingValue(value: boolean | undefined) {
-    this.assertModifiableBang();
-    this._reordering = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#strict_loading_value */
-  get strictLoadingValue(): boolean | undefined {
-    return this._isStrictLoading;
-  }
-  set strictLoadingValue(value: boolean | undefined) {
-    this.assertModifiableBang();
-    this._isStrictLoading = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#create_with_value */
-  get createWithValue(): Record<string, unknown> {
-    return this._createWithAttrs;
-  }
-  set createWithValue(value: Record<string, unknown>) {
-    this.assertModifiableBang();
-    this._createWithAttrs = value;
-  }
-
-  /**
-   * Mirrors: ActiveRecord::Relation#skip_query_cache_value — `@values.fetch(
-   * :skip_query_cache, nil)`: `undefined` when unset, distinct from an explicit
-   * `false`.
-   */
-  get skipQueryCacheValue(): boolean | undefined {
-    return this._skipQueryCache;
-  }
-  set skipQueryCacheValue(value: boolean | undefined) {
-    this.assertModifiableBang();
-    this._skipQueryCache = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#having_clause (CLAUSE_METHODS). */
-  get havingClause(): WhereClause {
-    return this._havingClause;
-  }
-  set havingClause(value: WhereClause) {
-    this.assertModifiableBang();
-    this._havingClause = value;
-  }
-
-  /** Mirrors: ActiveRecord::Relation#from_clause (CLAUSE_METHODS). */
-  get fromClause(): FromClause {
-    return this._fromClause;
-  }
-  set fromClause(value: FromClause) {
-    this.assertModifiableBang();
-    this._fromClause = value;
+    return this.whereClause.toH(relationTableName);
   }
 
   // -- Collection convenience methods --
@@ -3669,7 +3406,7 @@ export class Relation<T extends Base> {
 
   /** @internal */
   protected _scopeAttributes(): Record<string, unknown> {
-    return this._whereClause.toH(this.model.tableName, { equalityOnly: true });
+    return this.whereClause.toH(this.model.tableName, { equalityOnly: true });
   }
 
   // -- SQL generation --
@@ -3706,12 +3443,10 @@ export class Relation<T extends Base> {
    * @internal
    */
   applyJoinDependency({
-    eagerLoading = this._groupColumns.length === 0,
+    eagerLoading = this.groupValues.length === 0,
   }: { eagerLoading?: boolean } = {}): Relation<T> {
     if (!this._eagerLoadingForSql()) return this;
-    const eagerSpecs = [
-      ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
-    ];
+    const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     const joinDependency = QueryMethodBangs.constructJoinDependency.call(
       this as any,
       eagerSpecs as any,
@@ -3765,11 +3500,9 @@ export class Relation<T extends Base> {
    */
   async _applyJoinDependencyAsync<R>(
     run: (relation: Relation<T>) => Promise<R>,
-    { eagerLoading = this._groupColumns.length === 0 }: { eagerLoading?: boolean } = {},
+    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
   ): Promise<R> {
-    const eagerSpecs = [
-      ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
-    ];
+    const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     if (eagerSpecs.length === 0) return run(this);
     const jd = this._buildEagerJoinDependency(eagerSpecs);
     const basePk = (this._model as any).primaryKey ?? "id";
@@ -3795,7 +3528,7 @@ export class Relation<T extends Base> {
 
   /** Eager-load specs that `apply_join_dependency` would join (eager_load ∪ includes). */
   private _deferredDistinctPkEagerSpecs(): AssociationSpec[] {
-    return [...new Set([...this._eagerLoadAssociations, ...this._includesAssociations])];
+    return [...new Set([...this.eagerLoadValues, ...this.includesValues])];
   }
 
   /**
@@ -3814,7 +3547,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   _isDeferredDistinctPkSubquery(): boolean {
-    if (this._groupColumns.length > 0) return false;
+    if (this.groupValues.length > 0) return false;
     if (!this._eagerLoadingForSql()) return false;
     if (!this.hasLimitOrOffset) return false;
     return !this._eagerJoinDependencyIsLimitable(
@@ -3861,7 +3594,7 @@ export class Relation<T extends Base> {
    * result (Rails' `none!` semantics). Idempotent: substituted nodes are plain
    * `In`/`NotIn`, so a re-load finds nothing to do.
    *
-   * Substitution mutates `this._whereClause.predicates` in place and bakes the
+   * Substitution mutates `this.whereClause.predicates` in place and bakes the
    * ids permanently, mirroring Rails, which fixes the materialized ids at
    * `.where()`-build time. Consequence: reloading the SAME relation object after
    * the underlying rows change reuses the first load's parent ids rather than
@@ -3872,7 +3605,7 @@ export class Relation<T extends Base> {
    * @internal
    */
   async _materializeDeferredDistinctPkPredicates(): Promise<void> {
-    const predicates = this._whereClause.predicates;
+    const predicates = this.whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];
       if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
@@ -3981,7 +3714,7 @@ export class Relation<T extends Base> {
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
   private _eagerLoadingForSql(): boolean {
-    if (this._eagerLoadAssociations.length > 0) return true;
+    if (this.eagerLoadValues.length > 0) return true;
     return this._includesToPromoteFromReferences().length > 0;
   }
 
@@ -4021,8 +3754,8 @@ export class Relation<T extends Base> {
         const ids = limitedIds ?? this._buildEagerIdSubquery(jd, basePk);
         rel = rel.where(this.table.get(basePk).in(ids as never));
       }
-      rel._limitValue = null;
-      rel._offsetValue = null;
+      rel.limitValue = null;
+      rel.offsetValue = null;
     }
     return rel;
   }
@@ -4053,7 +3786,7 @@ export class Relation<T extends Base> {
           _qm.selectAssociationList
             .call(this as any, this.joinsValues, null)
             .concat(
-              _qm.selectAssociationList.call(this as any, this._leftOuterJoinsValues, null),
+              _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
             ) as AssociationSpec[],
           null,
         ).reflections as never,
@@ -4103,10 +3836,10 @@ export class Relation<T extends Base> {
     const joined = this._clone();
     QueryMethodBangs.joinsBang.call(joined as any, jd as any);
     _qm.buildJoins.call(joined as any, idSubquery);
-    if (!this._whereClause.isEmpty()) idSubquery.where(this._whereClause.ast);
+    if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
     this.buildOrder(idSubquery);
-    if (this._limitValue !== null) idSubquery.take(this._limitValue);
-    if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+    if (this.limitValue !== null) idSubquery.take(this.limitValue);
+    if (this.offsetValue !== null) idSubquery.skip(this.offsetValue);
     return idSubquery;
   }
 
@@ -4215,7 +3948,7 @@ export class Relation<T extends Base> {
     if (this._eagerLoadBypassesJoinDependency()) return null;
 
     const allEager = [
-      ...new Set([...this._eagerLoadAssociations, ...this._includesToPromoteFromReferences()]),
+      ...new Set([...this.eagerLoadValues, ...this._includesToPromoteFromReferences()]),
     ];
     if (allEager.length === 0) return null;
 
@@ -4271,7 +4004,7 @@ export class Relation<T extends Base> {
     // Mirror build_arel: uniq the annotate values when more than one before
     // rendering the comment node (query_methods.rb `annotates.uniq`).
     const annotations =
-      this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
     return annotations.map((c) => `/* ${sanitize(c)} */`).join(" ");
   }
 
@@ -4485,8 +4218,8 @@ export class Relation<T extends Base> {
   async preloadAssociations(
     records: T[],
     assocNames: AssociationSpec[] = [
-      ...this._preloadAssociations,
-      ...(this._eagerLoadingForSql() ? [] : this._includesAssociations),
+      ...this.preloadValues,
+      ...(this._eagerLoadingForSql() ? [] : this.includesValues),
     ],
   ): Promise<void> {
     if (assocNames.length === 0) return;
@@ -4501,7 +4234,7 @@ export class Relation<T extends Base> {
     // `categories_posts`) on distinct middle-loader passes, so each join-table
     // row is instantiated as its own anonymous `HABTM_*` join model instead of
     // whichever sibling wins a conflated group.
-    const scope = this._isStrictLoading ? StrictLoadingScope : undefined;
+    const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
     for (const assocName of assocNames) {
       const preloader = new Preloader({
         records: records as unknown as import("./base.js").Base[],
@@ -4576,7 +4309,7 @@ export class Relation<T extends Base> {
     // later bare `references("foo")` does not un-alias an earlier
     // `references(Arel.sql("foo"))`. Mirror that by only tagging bare strings
     // whose value is not already a known reference before this call.
-    const seen = new Set(this._referencesValues);
+    const seen = new Set(this.referencesValues);
     const manual: string[] = [];
     for (const t of tableNames) {
       const name = t instanceof Nodes.SqlLiteral ? t.value : t;
@@ -4994,9 +4727,9 @@ export class Relation<T extends Base> {
     if (!(record instanceof this.model)) return false;
     if (
       this.isLoaded ||
-      this._offsetValue !== null ||
-      this._limitValue !== null ||
-      !this._havingClause.isEmpty()
+      this.offsetValue !== null ||
+      this.limitValue !== null ||
+      !this.havingClause.isEmpty()
     ) {
       const records = await this.toArray();
       return records.some((r) => r.equals(record));
@@ -5060,49 +4793,22 @@ export class Relation<T extends Base> {
 
   get isEagerLoading(): boolean {
     return (
-      this._eagerLoadAssociations.length > 0 ||
-      (this._includesAssociations.length > 0 && this._joinClauses.length > 0)
+      this.eagerLoadValues.length > 0 ||
+      (this.includesValues.length > 0 && this._joinClauses.length > 0)
     );
   }
 
   get joinedIncludesValues(): string[] {
     if (this._joinClauses.length === 0) return [];
-    return this._includesAssociations.filter(
+    return this.includesValues.filter(
       (assoc): assoc is string =>
         typeof assoc === "string" && this._joinClauses.some((j) => j.table === assoc),
     );
   }
 
+  /** Mirrors: ActiveRecord::Relation#values (relation.rb:1281-1283) — `@values.dup`. */
   values(): Record<string, unknown> {
-    return {
-      includes: [...this._includesAssociations],
-      eagerLoad: [...this._eagerLoadAssociations],
-      preload: [...this._preloadAssociations],
-      select: this._selectColumns ? [...this._selectColumns] : null,
-      group: [...this._groupColumns],
-      order: [...this._orderClauses],
-      joins: [...this._joinClauses],
-      leftOuterJoins: [...this._leftOuterJoinsValues],
-      where: this._whereClause.clone(),
-      having: this._havingClause.clone(),
-      limit: this._limitValue,
-      offset: this._offsetValue,
-      lock: this._lockValue,
-      readonly: this._isReadonly,
-      distinct: this._isDistinct,
-      strictLoading: this._isStrictLoading,
-      from: this._fromClause,
-      reordering: this._reordering,
-      reverseOrder: this._reverseOrderValue,
-      skipQueryCache: this._skipQueryCache,
-      annotate: [...this._annotations],
-      optimizerHints: [...this._optimizerHints],
-      references: [...this._referencesValues],
-      extending: [...this._extending],
-      with: [...this._ctes],
-      createWith: { ...this._createWithAttrs },
-      unscope: [...this._unscopeValues],
-    };
+    return { ...this._values };
   }
 
   /** Mirrors Rails' `Relation#values_for_queries` (relation.rb:1286):
@@ -5110,7 +4816,7 @@ export class Relation<T extends Base> {
    *  the canonical key the preloader uses to decide whether two loaders
    *  coalesce (Preloader::Association::LoaderQuery#eql?/#hash). */
   valuesForQueries(): Record<string, unknown> {
-    return except(this.values(), "extending", "skipQueryCache", "strictLoading");
+    return except(this._values, "extending", "skipQueryCache", "strictLoading");
   }
 
   /** True when this relation's WHERE equals the model's unscoped baseline —
@@ -5119,7 +4825,7 @@ export class Relation<T extends Base> {
    *  so an STI subclass's unscoped relation still reports as an empty scope.
    *  @internal */
   private _whereMatchesUnscopedBaseline(): boolean {
-    if (this._whereClause.isEmpty()) return true;
+    if (this.whereClause.isEmpty()) return true;
     const klass = this._model as any;
     // Only a finder-type-condition class has a non-empty unscoped baseline; for
     // anything else a non-empty WHERE means a real, non-empty scope.
@@ -5133,8 +4839,8 @@ export class Relation<T extends Base> {
     if (!baseline) return false;
     try {
       return (
-        _whereClauseToSql(this._whereClause, connection) ===
-        _whereClauseToSql(baseline._whereClause, connection)
+        _whereClauseToSql(this.whereClause, connection) ===
+        _whereClauseToSql(baseline.whereClause, connection)
       );
     } catch {
       return false;
@@ -5147,41 +4853,41 @@ export class Relation<T extends Base> {
     // (rather than being literally empty) is still an empty scope.
     return (
       this._whereMatchesUnscopedBaseline() &&
-      this._orderClauses.length === 0 &&
-      this._limitValue === null &&
-      this._offsetValue === null &&
-      this._selectColumns === null &&
+      this.orderValues.length === 0 &&
+      this.limitValue === null &&
+      this.offsetValue === null &&
+      this.selectValues.length === 0 &&
       // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and a
       // `readonly` relation carries `@values[:readonly]`, so it is NOT empty.
       // Omitting this dropped a `readonly()` reflection scope on the preload
       // through/HABTM source path (build_scope skips merging an empty scope).
-      this._isReadonly !== true &&
+      this.readonlyValue !== true &&
       // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and
       // `unscope_values` is a VALUE_METHOD, so a relation carrying only
       // `unscope(where: ...)` is NOT empty. Omitting this dropped an
       // `unscope(...)` reflection scope on the preload through/HABTM source path
       // (build_scope skips merging an empty scope), so a target `default_scope`
       // the association meant to unscope survived the eager load.
-      this._unscopeValues.length === 0 &&
-      !this._isDistinct &&
-      this._groupColumns.length === 0 &&
-      this._havingClause.isEmpty() &&
+      this.unscopeValues.length === 0 &&
+      !this.distinctValue &&
+      this.groupValues.length === 0 &&
+      this.havingClause.isEmpty() &&
       this._joinClauses.length === 0 &&
-      this._joinsValues.length === 0 &&
-      this._leftOuterJoinsValues.length === 0 &&
-      this._includesAssociations.length === 0 &&
-      this._eagerLoadAssociations.length === 0 &&
-      this._preloadAssociations.length === 0 &&
-      this._lockValue === null &&
-      this._fromClause.isEmpty() &&
-      this._ctes.length === 0 &&
-      this._annotations.length === 0 &&
-      this._optimizerHints.length === 0
+      this.joinsValues.length === 0 &&
+      this.leftOuterJoinsValues.length === 0 &&
+      this.includesValues.length === 0 &&
+      this.eagerLoadValues.length === 0 &&
+      this.preloadValues.length === 0 &&
+      this.lockValue === null &&
+      this.fromClause.isEmpty() &&
+      this.withValues.length === 0 &&
+      this.annotateValues.length === 0 &&
+      this.optimizerHintsValues.length === 0
     );
   }
 
   get hasLimitOrOffset(): boolean {
-    return this._limitValue !== null || this._offsetValue !== null;
+    return this.limitValue !== null || this.offsetValue !== null;
   }
 
   aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
@@ -5407,12 +5113,10 @@ export class Relation<T extends Base> {
       // is awaited; the relation is built with synchronous assignments.
       let collection: Relation<T> = this;
       if (this._eagerLoadingForSql()) {
-        const eagerSpecs = [
-          ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
-        ];
+        const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
         const rel = this._clone();
-        rel._eagerLoadAssociations = [];
-        rel._includesAssociations = [];
+        rel.eagerLoadValues = [];
+        rel.includesValues = [];
         const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
         const jd = this._buildEagerJoinDependency(eagerSpecs);
         if (
@@ -5431,8 +5135,8 @@ export class Relation<T extends Base> {
           // than emitting a wrong single-column `"col1,col2"` predicate.
           const limitedIds = await this._materializeLimitedIds(jd, pk);
           collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
-          collection._limitValue = null;
-          collection._offsetValue = null;
+          collection.limitValue = null;
+          collection.offsetValue = null;
         } else if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
@@ -5456,19 +5160,13 @@ export class Relation<T extends Base> {
         // survive so its aliases (e.g. an `ORDER BY` on a `name AS dev_name`
         // select) still resolve in the subquery. Replacing the select list here
         // dropped those aliases and broke ordering.
-        inner._selectColumns = [
-          ...(inner._selectColumns ?? []),
-          tsColumn.as("collection_cache_key_timestamp"),
-        ];
-        if (
-          collection._isDistinct &&
-          (!collection._selectColumns || collection._selectColumns.length === 0)
-        ) {
+        inner.selectValues = [...inner.selectValues, tsColumn.as("collection_cache_key_timestamp")];
+        if (collection.distinctValue && collection.selectValues.length === 0) {
           // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
           // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
           // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
           const star = (this.table as { star?: Nodes.Node }).star ?? this.table.get("*");
-          inner._selectColumns = [star, ...inner._selectColumns];
+          inner.selectValues = [star, ...inner.selectValues];
         }
         // Build a proper Arel SelectManager for the outer COUNT/MAX query so
         // quoting and adapter differences are handled by the AST visitor.
@@ -5494,9 +5192,9 @@ export class Relation<T extends Base> {
         timestamp = rows[0]?.timestamp;
       } else {
         const query = collection._clone();
-        query._orderClauses = [];
+        query.orderValues = [];
         query._rawOrderClauses = [];
-        query._selectColumns = [countStar.as("size"), maxNode.as("timestamp")];
+        query.selectValues = [countStar.as("size"), maxNode.as("timestamp")];
         const rows = await this._conn().execute(query._toSql(), query._lastSelectBinds);
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
@@ -5567,58 +5265,36 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * @internal Copy query state from `source` onto `this`. Extracted from
-   * `_clone()` so subclasses (and helpers like AssociationRelation) can
-   * reuse it without duplicating the field list.
+   * Copy query state from `source` onto `this`.
+   *
+   * Mirrors: ActiveRecord::Relation#initialize_copy (relation.rb:97-100) —
+   * `@values = @values.dup` then `reset`. Ruby's `dup` copies the receiver's
+   * ivars first and `initialize_copy` re-dups the values hash; TypeScript has
+   * no `dup`, so the copy is spelled as an explicit assignment from `source`.
+   * The stores trails still keeps beside `@values` are copied alongside it.
    */
-  _copyStateFrom(source: Relation<T>): void {
+  initializeCopy(source: Relation<T>): void {
     this._table = source._table;
-    this._whereClause = source._whereClause.clone();
-    this._orderClauses = [...source._orderClauses];
+    this._values = { ...source._values };
     this._rawOrderClauses = [...source._rawOrderClauses];
-    this._reordering = source._reordering;
-    this._reverseOrderValue = source._reverseOrderValue;
-    this._limitValue = source._limitValue;
-    this._offsetValue = source._offsetValue;
-    this._selectColumns = source._selectColumns ? [...source._selectColumns] : null;
-    this._isDistinct = source._isDistinct;
     this._distinctOnColumns = [...source._distinctOnColumns];
-    this._groupColumns = [...source._groupColumns];
-    this._havingClause = source._havingClause.clone();
     this._isNone = source._isNone;
-    this._lockValue = source._lockValue;
     this._joinClauses = [...source._joinClauses];
-    this._joinsValues = [...source._joinsValues];
-    this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
-    this._includesAssociations = [...source._includesAssociations];
-    this._preloadAssociations = [...source._preloadAssociations];
-    this._eagerLoadAssociations = [...source._eagerLoadAssociations];
-    this._isReadonly = source._isReadonly;
-    this._isStrictLoading = source._isStrictLoading;
-    this._annotations = [...source._annotations];
-    this._optimizerHints = [...source._optimizerHints];
-    this._referencesValues = [...source._referencesValues];
     this._manualReferences = [...source._manualReferences];
-    this._fromClause = source._fromClause;
-    this._createWithAttrs = { ...source._createWithAttrs };
-    this._unscopeValues = [...source._unscopeValues];
-    this._extending = [...source._extending];
     // Rebind extension-module methods onto this clone. Ruby's `extend`
     // mutates the singleton class, so a cloned relation keeps the mixed-in
-    // methods; here `_extending` only carries the module objects, so we
+    // methods; here `extending_values` only carries the module objects, so we
     // re-bind each method to the new instance. Without this, extension
     // methods applied to a CollectionProxy (or via `extending(...)`) are
     // lost the moment the relation is spawned (`rel.where(...).fooExt()`).
-    for (const mod of this._extending) {
+    for (const mod of this.extendingValues) {
       for (const [name, fn] of Object.entries(mod)) {
         if (typeof fn === "function") {
           (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
         }
       }
     }
-    this._ctes = [...source._ctes];
     this._skipPreloading = source._skipPreloading;
-    this._skipQueryCache = source._skipQueryCache;
     this._seededNoneNewOwner = source._seededNoneNewOwner;
     this._seedWherePredicates = [...source._seedWherePredicates];
     // `_delegateToModel` is deliberately NOT copied: Rails' `initialize_copy`
@@ -5631,7 +5307,7 @@ export class Relation<T extends Base> {
   /** @internal */
   _clone(): Relation<T> {
     const rel = this._newRelation();
-    rel._copyStateFrom(this);
+    rel.initializeCopy(this);
     return wrapWithScopeProxy(rel);
   }
 
@@ -5810,6 +5486,72 @@ export interface Relation<T extends Base> {
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
+/**
+ * The `*_values` / `*_value` / `*_clause` accessors generated by
+ * `defineValueMethods` (query_methods.rb:162-183). Each reader is
+ * `@values.fetch(:<name>, <default>)` and each writer asserts modifiability
+ * before storing into `@values`; `extensions` is the reader-only
+ * `alias extensions extending_values` (query_methods.rb:183).
+ */
+export interface Relation<T extends Base> {
+  /** Mirrors: ActiveRecord::Relation#includes_values */
+  includesValues: AssociationSpec[];
+  /** Mirrors: ActiveRecord::Relation#eager_load_values */
+  eagerLoadValues: AssociationSpec[];
+  /** Mirrors: ActiveRecord::Relation#preload_values */
+  preloadValues: AssociationSpec[];
+  /** Mirrors: ActiveRecord::Relation#select_values */
+  selectValues: (string | Nodes.Node)[];
+  /** Mirrors: ActiveRecord::Relation#group_values */
+  groupValues: string[];
+  /** Mirrors: ActiveRecord::Relation#order_values */
+  orderValues: Array<string | Nodes.Node>;
+  /** Mirrors: ActiveRecord::Relation#joins_values */
+  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
+  leftOuterJoinsValues: AssociationSpec[];
+  /** Mirrors: ActiveRecord::Relation#references_values */
+  referencesValues: string[];
+  /** Mirrors: ActiveRecord::Relation#extending_values */
+  extendingValues: Array<Record<string, (...args: any[]) => any>>;
+  /** Mirrors: ActiveRecord::Relation#extensions */
+  readonly extensions: Array<Record<string, (...args: any[]) => any>>;
+  /** Mirrors: ActiveRecord::Relation#unscope_values */
+  unscopeValues: Array<string | { where: string | string[] }>;
+  /** Mirrors: ActiveRecord::Relation#optimizer_hints_values */
+  optimizerHintsValues: string[];
+  /** Mirrors: ActiveRecord::Relation#annotate_values */
+  annotateValues: string[];
+  /** Mirrors: ActiveRecord::Relation#with_values */
+  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  /** Mirrors: ActiveRecord::Relation#limit_value */
+  limitValue: number | null;
+  /** Mirrors: ActiveRecord::Relation#offset_value */
+  offsetValue: number | null;
+  /** Mirrors: ActiveRecord::Relation#lock_value */
+  lockValue: string | null;
+  /** Mirrors: ActiveRecord::Relation#readonly_value */
+  readonlyValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#reordering_value */
+  reorderingValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#strict_loading_value */
+  strictLoadingValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#reverse_order_value */
+  reverseOrderValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#distinct_value */
+  distinctValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#create_with_value */
+  createWithValue: Record<string, unknown>;
+  /** Mirrors: ActiveRecord::Relation#skip_query_cache_value */
+  skipQueryCacheValue: boolean | null;
+  /** Mirrors: ActiveRecord::Relation#where_clause */
+  whereClause: WhereClause;
+  /** Mirrors: ActiveRecord::Relation#having_clause */
+  havingClause: WhereClause;
+  /** Mirrors: ActiveRecord::Relation#from_clause */
+  fromClause: FromClause;
+}
+
 // QueryMethodBangs doesn't involve T — Included<> works fine.
 // Calculations uses the explicit CalculationMethods interface (method-syntax)
 // so subclasses (CollectionProxy, AssociationRelation, DJAR) can override
@@ -5979,6 +5721,10 @@ include(Relation, QueryMethodBangs);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);
+
+// Mirrors `Relation::VALUE_METHODS.each { ... }` in query_methods.rb:162-183,
+// which generates every `*_values` / `*_value` / `*_clause` accessor over @values.
+defineValueMethods(Relation);
 
 // Thenable: make Relation directly awaitable (delegates to toArray).
 applyThenable(Relation.prototype);

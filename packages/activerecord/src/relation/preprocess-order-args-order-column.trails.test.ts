@@ -45,11 +45,11 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
   });
 
   it("resolves the nested Hash arm through Rails' dotted form, recording the reference", () => {
-    const rel = Topic.all() as unknown as { _referencesValues?: string[] };
+    const rel = Topic.all() as unknown as { referencesValues?: string[] };
     const [node] = preprocess(rel, [{ topics: { title: "desc" } }]);
     expect(node).toBeInstanceOf(Nodes.Descending);
     expect(sqlOf(node)).toMatch(/"topics"\."title" DESC|`topics`\.`title` DESC/);
-    expect(rel._referencesValues).toContain("topics");
+    expect(rel.referencesValues).toContain("topics");
   });
 
   it("leaves a String arg unchanged", () => {

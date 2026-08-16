@@ -61,12 +61,5 @@
     "rubyName": "merge_select_values",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `other.select_values.empty?` (merger.rb:85) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_select_values",
-    "call": "select_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

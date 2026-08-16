@@ -136,6 +136,76 @@ export type AssociationSpec =
  */
 export type JoinSpec = AssociationSpec | Nodes.Join | JoinSpec[];
 
+/** Mirrors: ActiveRecord::QueryMethods::FROZEN_EMPTY_ARRAY (query_methods.rb:159). */
+export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
+
+/** Mirrors: ActiveRecord::QueryMethods::FROZEN_EMPTY_HASH (query_methods.rb:160). */
+export const FROZEN_EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
+
+/**
+ * Generate the `*_values` / `*_value` / `*_clause` accessors over `@values` —
+ * one reader/writer pair per `Relation::VALUE_METHODS` entry, plus the trailing
+ * `alias extensions extending_values`.
+ *
+ * Mirrors: the `Relation::VALUE_METHODS.each` / `class_eval` loop at
+ * query_methods.rb:162-183. The reader is `@values.fetch(:<name>, <default>)`,
+ * so a *stored* `null`/`false` is returned rather than the default; the writer
+ * is `assert_modifiable!` then `@values[:<name>] = value`.
+ *
+ * @noRailsEquivalent PERMANENT: Ruby reopens `module QueryMethods` and `class_eval`s the
+ *   accessors, naming `Relation::VALUE_METHODS` at load time under Zeitwerk.
+ *   ESM has neither reopening nor autoload, so the loop is exported as a
+ *   function `relation.ts` calls on its own class beside its other
+ *   `include(Relation, …)` mixins — which is also what keeps the constant
+ *   resolution call-time.
+ */
+export function defineValueMethods(relationClass: {
+  prototype: object;
+  MULTI_VALUE_METHODS: readonly string[];
+  SINGLE_VALUE_METHODS: readonly string[];
+  CLAUSE_METHODS: readonly string[];
+  VALUE_METHODS: readonly string[];
+}): void {
+  for (const name of relationClass.VALUE_METHODS) {
+    let methodName: string;
+    let defaultValue: () => unknown;
+    if (relationClass.MULTI_VALUE_METHODS.includes(name)) {
+      methodName = `${name}Values`;
+      defaultValue = () => FROZEN_EMPTY_ARRAY;
+    } else if (relationClass.SINGLE_VALUE_METHODS.includes(name)) {
+      methodName = `${name}Value`;
+      // Ruby `nil` is spelled `null`, never `undefined`: an unset single value
+      // is passed straight through to callees with Ruby-style optional
+      // parameters (`arel.distinct(distinct_value)` over Arel's
+      // `distinct(value = true)`), and a JS default parameter would swallow an
+      // `undefined` and substitute its own default (CLAUDE.md, "kwargs").
+      defaultValue = name === "createWith" ? () => FROZEN_EMPTY_HASH : () => null;
+    } else {
+      methodName = `${name}Clause`;
+      defaultValue = name === "from" ? () => FromClause.empty() : () => WhereClause.empty();
+    }
+
+    Object.defineProperty(relationClass.prototype, methodName, {
+      configurable: true,
+      get(this: QueryMethodsHost): unknown {
+        const values = this._values;
+        return name in values ? values[name] : defaultValue();
+      },
+      set(this: QueryMethodsHost, value: unknown) {
+        assertModifiableBang.call(this);
+        this._values[name] = value;
+      },
+    });
+  }
+
+  Object.defineProperty(relationClass.prototype, "extensions", {
+    configurable: true,
+    get(this: QueryMethodsHost) {
+      return this.extendingValues;
+    },
+  });
+}
+
 type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
 
 /**
@@ -161,25 +231,39 @@ export type OrderArg =
 interface QueryMethodsHost {
   /** Rails `delegate :primary_key, to: :model` (delegation.rb:106). */
   primaryKey: string | string[];
-  _whereClause: WhereClause;
-  /** Rails' `where_clause` / `having_clause` readers (CLAUSE_METHODS). */
+  /** Rails `@values` (relation.rb:86) — the hash behind every value method. */
+  _values: Record<string, unknown>;
+  // The `VALUE_METHODS.each`-generated accessors (query_methods.rb:162-181).
   whereClause: WhereClause;
   havingClause: WhereClause;
-  _orderClauses: Array<string | Nodes.Node>;
-  _rawOrderClauses: string[];
-  _reordering: boolean | undefined;
-  _limitValue: number | null;
-  _offsetValue: number | null;
-  _selectColumns: any[] | null;
-  // Public `select_values` value method (relation.ts getter); read over the
-  // backing field so extractCalls credits the Rails value-method read.
+  fromClause: FromClause;
+  includesValues: AssociationSpec[];
+  eagerLoadValues: AssociationSpec[];
+  preloadValues: AssociationSpec[];
   selectValues: any[];
-  _isDistinct: boolean;
+  groupValues: string[];
+  orderValues: Array<string | Nodes.Node>;
+  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  leftOuterJoinsValues: AssociationSpec[];
+  referencesValues: string[];
+  extendingValues: Array<Record<string, (...args: any[]) => any>>;
+  unscopeValues: Array<string | { where: string | string[] }>;
+  optimizerHintsValues: string[];
+  annotateValues: string[];
+  withValues: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
+  limitValue: number | null;
+  offsetValue: number | null;
+  lockValue: string | null;
+  readonlyValue: boolean | null;
+  reorderingValue: boolean | null;
+  strictLoadingValue: boolean | null;
+  reverseOrderValue: boolean | null;
+  distinctValue: boolean | null;
+  createWithValue: Record<string, unknown>;
+  skipQueryCacheValue: boolean | null;
+  _rawOrderClauses: string[];
   _distinctOnColumns: string[];
-  _groupColumns: string[];
-  _havingClause: WhereClause;
   _isNone: boolean;
-  _lockValue: string | null;
   _joinClauses: Array<{
     type: "inner" | "left";
     table: string;
@@ -193,41 +277,20 @@ interface QueryMethodsHost {
     // global registry scan by table name.
     klass?: unknown;
   }>;
-  // Unified insertion-ordered `joins_values` backing store; `joinsValues`
-  // exposes it (Rails' `@values[:joins]`). The named-vs-raw split is derived on
-  // read by `select_association_list` / `select_named_joins`, which discriminate
-  // with `_isNamedJoinValue`.
-  _joinsValues: (AssociationSpec | string | Nodes.Join)[];
-  joinsValues: (AssociationSpec | string | Nodes.Join)[];
   // Converged Rails `Relation#alias_tracker(joins, aliases)` (relation.rb:1307);
   // `buildJoins` reads it to build the shared `build_joins` tracker.
   aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
+  // A `joins_values` entry is a "named" inner association join (resolved through
+  // JoinDependency) when it is a nested-association hash, a Symbol — spelled as a
+  // leading-colon string — or a string naming an association; everything else
+  // (Arel join nodes, raw SQL strings) is a raw join value.
   _isNamedJoinValue(v: unknown): boolean;
-  _leftOuterJoinsValues: AssociationSpec[];
-  // Public `left_outer_joins_values` value method (relation.ts getter); reads it
-  // over the backing field so extractCalls credits the Rails value-method read.
-  leftOuterJoinsValues: AssociationSpec[];
-  _includesAssociations: AssociationSpec[];
-  _preloadAssociations: AssociationSpec[];
-  _eagerLoadAssociations: AssociationSpec[];
-  _isReadonly: boolean | undefined;
-  _isStrictLoading: boolean | undefined;
-  _annotations: string[];
-  _optimizerHints: string[];
-  _referencesValues: string[];
   // References added by an explicit `.references(...)` call. Rails only seeds
   // JoinDependency's alias map from SqlLiteral references (those auto-derived by
   // column_references / arel_column_with_table), NOT from these bare-string
   // manual references — so they are excluded when aliasing eager-load joins.
   _manualReferences: string[];
-  _fromClause: FromClause;
-  _createWithAttrs: Record<string, unknown>;
-  _unscopeValues: Array<string | { where: string | string[] }>;
-  _extending: Array<Record<string, (...args: any[]) => any>>;
-  _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _skipPreloading: boolean;
-  _skipQueryCache: boolean | undefined;
-  _reverseOrderValue: boolean | undefined;
   _model: typeof import("../base.js").Base;
   model: QueryMethodsHost["_model"];
   /** Rails `attr_reader :table` (relation.rb:71) — the relation's own Arel table. */
@@ -250,33 +313,36 @@ interface QueryMethodsHost {
 // that with structuralUnionEq so a repeated `includes(:x)`/`preload(:x)` folds
 // to one spec instead of making the preloader load it twice.
 function unionAppendAssociations(
-  target: AssociationSpec[],
+  target: readonly AssociationSpec[],
   incoming: readonly AssociationSpec[],
-): void {
+): AssociationSpec[] {
+  const union = [...target];
   for (const spec of incoming) {
-    if (!target.some((seen) => structuralUnionEq(seen, spec))) target.push(spec);
+    if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
   }
+  return union;
 }
 
 function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  unionAppendAssociations(this._includesAssociations, associations);
+  this.includesValues = unionAppendAssociations(this.includesValues, associations);
   return this;
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  unionAppendAssociations(this._eagerLoadAssociations, associations);
+  this.eagerLoadValues = unionAppendAssociations(this.eagerLoadValues, associations);
   return this;
 }
 
 function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
-  unionAppendAssociations(this._preloadAssociations, associations);
+  this.preloadValues = unionAppendAssociations(this.preloadValues, associations);
   return this;
 }
 
 function referencesBang(this: QueryMethodsHost, ...tables: Array<string | Nodes.SqlLiteral>): any {
   for (const t of tables) {
     const name = t instanceof Nodes.SqlLiteral ? t.value : t;
-    if (name && !this._referencesValues.includes(name)) this._referencesValues.push(name);
+    if (name && !this.referencesValues.includes(name))
+      this.referencesValues = [...this.referencesValues, name];
   }
   return this;
 }
@@ -366,19 +432,21 @@ function resolveCteEntry(name: string, query: unknown): Nodes.Node {
   return buildCteLeaf(query, false);
 }
 
-/** Upsert a CTE into _ctes by name (last-write-wins), matching Rails behavior. */
+/** Upsert a CTE into withValues by name (last-write-wins), matching Rails behavior. */
 function upsertCte(
-  ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>,
+  ctes: ReadonlyArray<{ name: string; expression: Nodes.Node; recursive: boolean }>,
   name: string,
   expression: Nodes.Node,
   recursive: boolean,
-): void {
-  const existing = ctes.findIndex((c) => c.name === name);
+): Array<{ name: string; expression: Nodes.Node; recursive: boolean }> {
+  const next = [...ctes];
+  const existing = next.findIndex((c) => c.name === name);
   if (existing >= 0) {
-    ctes[existing] = { name, expression, recursive };
+    next[existing] = { name, expression, recursive };
   } else {
-    ctes.push({ name, expression, recursive });
+    next.push({ name, expression, recursive });
   }
+  return next;
 }
 
 /**
@@ -437,7 +505,7 @@ function withBang(this: QueryMethodsHost, ...ctes: Array<Record<string, unknown>
     }
     for (const [name, query] of Object.entries(cte)) {
       const expression = resolveCteEntry(name, query);
-      upsertCte(this._ctes, name, expression, false);
+      this.withValues = upsertCte(this.withValues, name, expression, false);
     }
   }
   return this;
@@ -454,14 +522,14 @@ function withRecursiveBang(this: QueryMethodsHost, ...ctes: Array<Record<string,
     }
     for (const [name, query] of Object.entries(cte)) {
       const expression = resolveCteEntry(name, query);
-      upsertCte(this._ctes, name, expression, true);
+      this.withValues = upsertCte(this.withValues, name, expression, true);
     }
   }
   return this;
 }
 
 function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
-  this._selectColumns = columns.map((c: any) => {
+  this.selectValues = columns.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
@@ -487,7 +555,6 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
       return new Nodes.SqlLiteral((c as { value: string }).value);
     return String(c);
   });
-  if (this._selectColumns === null) this._selectColumns = [];
   const seenStrings = new Set<string>();
   const seenNodeHashes = new Map<number, Nodes.Node[]>();
   const nodeIsDuplicate = (node: Nodes.Node): boolean => {
@@ -503,7 +570,7 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
     else seenNodeHashes.set(h, [node]);
   };
   const seenThunks = new Set<unknown>();
-  for (const existing of this._selectColumns) {
+  for (const existing of this.selectValues) {
     if (typeof existing === "string") seenStrings.add(existing);
     else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
     else if (typeof existing === "function") seenThunks.add(existing);
@@ -512,24 +579,24 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   for (const col of normalized) {
     if (typeof col === "string") {
       if (!seenStrings.has(col)) {
-        this._selectColumns.push(col);
+        this.selectValues = [...this.selectValues, col];
         seenStrings.add(col);
       }
     } else if (col instanceof Nodes.Node) {
       if (!nodeIsDuplicate(col)) {
-        this._selectColumns.push(col);
+        this.selectValues = [...this.selectValues, col];
         addNodeToSeen(col);
       }
     } else if (typeof col === "function") {
       // Ruby `|=` dedups Procs by object identity.
       if (!seenThunks.has(col)) {
-        this._selectColumns.push(col);
+        this.selectValues = [...this.selectValues, col];
         seenThunks.add(col);
       }
     } else {
       const key = (col as { value: string }).value;
       if (!seenStrings.has(key)) {
-        this._selectColumns.push(col);
+        this.selectValues = [...this.selectValues, col];
         seenStrings.add(key);
       }
     }
@@ -541,7 +608,7 @@ function groupBang(
   this: QueryMethodsHost,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): any {
-  this._groupColumns.push(...(columns as string[]));
+  this.groupValues = [...this.groupValues, ...(columns as string[])];
   return this;
 }
 
@@ -549,25 +616,25 @@ function regroupBang(
   this: QueryMethodsHost,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): any {
-  this._groupColumns = [...(columns as string[])];
+  this.groupValues = [...(columns as string[])];
   return this;
 }
 
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
   // Mirrors Rails' `self.order_values |= args`: union dedupes repeated terms.
-  this._orderClauses = dedupeOrderClauses([
-    ...this._orderClauses,
+  this.orderValues = dedupeOrderClauses([
+    ...this.orderValues,
     ...(args as unknown[]),
-  ]) as typeof this._orderClauses;
+  ]) as typeof this.orderValues;
   return this;
 }
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   preprocessOrderArgs.call(this, args as unknown[]);
   this._rawOrderClauses = [];
-  this._reordering = true;
-  this._orderClauses = dedupeOrderClauses(args as unknown[]) as typeof this._orderClauses;
+  this.reorderingValue = true;
+  this.orderValues = dedupeOrderClauses(args as unknown[]) as typeof this.orderValues;
   return this;
 }
 // Remove duplicate order terms while preserving first-seen order. orderBang
@@ -676,7 +743,7 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
  * `reverseOrder` (`:reverse_order`, a SINGLE_VALUE_METHOD) is included for
  * surface parity with `Relation::VALUE_METHODS` and the merger, but resetting it
  * is a faithful no-op: trails applies `reverseOrder` eagerly (flipping
- * `_orderClauses` in place), leaving `_reverseOrderValue` vestigial-nil — exactly
+ * `orderValues` in place), leaving `reverseOrderValue` vestigial-nil — exactly
  * as the pinned Rails' `reverse_order!` leaves `values[:reverse_order]` nil.
  */
 export type ExceptKey =
@@ -717,227 +784,56 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 export type ExceptSkip = ExceptKey | (string & {});
 
 /**
- * Reset a single value-key to its default, with no merge-replay side effect.
+ * Reset a single value-key: delete it from `@values` so it reads back as its
+ * default, then clear the trails-only sidecar store that backs it outside the
+ * hash.
  *
- * Shared by `unscope!` (which additionally records the key in
- * `_unscopeValues` so a later merge re-applies the reset) and by `setValues`
- * (the write half of the `@values` hash, which `relation_with` replaces
- * wholesale): a `Relation::VALUE_METHODS` key that is absent from the hash
- * reads back as its default, which here means resetting the field(s) that back
- * it. `unscope!` validates against `VALID_UNSCOPING_VALUES` first, so the arms
- * below that key has no `unscope` equivalent are reachable only from
- * `setValues`.
+ * Mirrors: the `@values.delete(scope)` half of `QueryMethods#unscope!`. Rails
+ * keeps every value in `@values`, so deleting the key is the whole reset; the
+ * switch below covers only the stores trails still keeps beside the hash.
  */
 export function resetValueForScope(host: QueryMethodsHost, scope: ExceptKey): void {
+  delete host._values[scope];
   switch (scope) {
-    case "where":
-      host._whereClause = WhereClause.empty();
-      break;
     case "order":
-      host._orderClauses = [];
-      break;
-    case "limit":
-      host._limitValue = null;
-      break;
-    case "offset":
-      host._offsetValue = null;
-      break;
-    case "group":
-      host._groupColumns = [];
-      break;
-    case "having":
-      host._havingClause = WhereClause.empty();
-      break;
-    case "select":
-      host._selectColumns = null;
-      break;
-    case "lock":
-      host._lockValue = null;
-      break;
-    case "readonly":
-      // unscope(:readonly) deletes the value key → unset (`nil`).
-      host._isReadonly = undefined;
-      break;
-    case "from":
-      host._fromClause = FromClause.empty();
+      host._rawOrderClauses = [];
       break;
     case "joins":
       host._joinClauses = [];
-      host._joinsValues = [];
       break;
     case "leftOuterJoins":
       host._joinClauses = host._joinClauses.filter((j) => j.type !== "left");
-      host._leftOuterJoinsValues = [];
-      break;
-    case "includes":
-      // Rails: `unscope(:includes)` clears includes only — preload
-      // and eager_load are independent and have their own keys
-      // below (matches Rails `query_methods.rb` switch on
-      // :includes / :preload / :eager_load).
-      host._includesAssociations = [];
-      break;
-    case "preload":
-      host._preloadAssociations = [];
-      break;
-    case "eagerLoad":
-      host._eagerLoadAssociations = [];
-      break;
-    case "createWith":
-      host._createWithAttrs = {};
-      break;
-    case "optimizerHints":
-      host._optimizerHints = [];
-      break;
-    case "annotate":
-      host._annotations = [];
-      break;
-    case "with":
-      host._ctes = [];
-      break;
-    case "distinct":
-      host._isDistinct = false;
-      break;
-    case "strictLoading":
-      // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
-      // the key reads back as unset, distinct from an explicit `false`.
-      host._isStrictLoading = undefined;
       break;
     case "references":
-      // `:references` is a single Rails value key; trails splits its local
-      // representation into the values list and the manual-vs-derived marker,
-      // so both must be cleared together.
-      host._referencesValues = [];
       host._manualReferences = [];
-      break;
-    case "extending":
-      host._extending = [];
-      break;
-    case "unscope":
-      host._unscopeValues = [];
-      break;
-    case "reordering":
-      host._reordering = undefined;
-      break;
-    case "skipQueryCache":
-      host._skipQueryCache = undefined;
-      break;
-    case "reverseOrder":
-      // `:reverse_order` is in VALUE_METHODS, so `values.except`/`values.slice`
-      // touch it; but trails (like the pinned Rails' `reverse_order!`) flips
-      // order eagerly and leaves `_reverseOrderValue` vestigial-nil, so this
-      // reset is a faithful no-op — the flipped order lives in `_orderClauses`
-      // (the `order` key).
-      host._reverseOrderValue = undefined;
       break;
   }
 }
 
 /**
- * The write half of the `@values` hash: assign each `Relation::VALUE_METHODS`
- * key present in `values`, and reset the ones that are absent.
+ * The value keys whose trails representation spills outside `@values` into a
+ * sidecar store, so replacing the hash wholesale has to clear them too.
+ */
+const SIDECAR_BACKED_KEYS: readonly ExceptKey[] = [
+  "order",
+  "joins",
+  "leftOuterJoins",
+  "references",
+];
+
+/**
+ * Replace `@values` wholesale.
  *
- * Ruby's `relation_with` replaces `@values` wholesale
- * (`spawn_methods.rb:71-74`), so a key `values.except`/`values.slice` deleted
- * simply reads back as its default. trails keeps the values in typed fields
- * rather than a hash, so the wholesale replacement is spelled as a per-key
- * assign-or-reset over the same key set — the TypeScript counterpart of the
- * `VALUE_METHODS.each`-generated writers (`query_methods.rb:162-172`).
+ * Mirrors: the assignment in `SpawnMethods#relation_with` (spawn_methods.rb:71-74),
+ * `spawn.tap { |r| r.values = values }` — a key the incoming hash omits simply
+ * reads back as its default.
  *
  * @internal
  */
 export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
-  for (const key of EXCEPT_ONLY_KEYS) {
-    if (!(key in values)) {
-      resetValueForScope(host, key);
-      continue;
-    }
-    setValueForScope(host, key, values[key]);
-  }
-}
-
-function setValueForScope(host: QueryMethodsHost, scope: ExceptKey, value: any): void {
-  switch (scope) {
-    case "where":
-      host._whereClause = value;
-      break;
-    case "having":
-      host._havingClause = value;
-      break;
-    case "from":
-      host._fromClause = value;
-      break;
-    case "order":
-      host._orderClauses = value;
-      break;
-    case "limit":
-      host._limitValue = value;
-      break;
-    case "offset":
-      host._offsetValue = value;
-      break;
-    case "group":
-      host._groupColumns = value;
-      break;
-    case "select":
-      host._selectColumns = value;
-      break;
-    case "lock":
-      host._lockValue = value;
-      break;
-    case "readonly":
-      host._isReadonly = value;
-      break;
-    case "joins":
-      host._joinClauses = value;
-      break;
-    case "leftOuterJoins":
-      host._leftOuterJoinsValues = value;
-      break;
-    case "includes":
-      host._includesAssociations = value;
-      break;
-    case "preload":
-      host._preloadAssociations = value;
-      break;
-    case "eagerLoad":
-      host._eagerLoadAssociations = value;
-      break;
-    case "createWith":
-      host._createWithAttrs = value;
-      break;
-    case "optimizerHints":
-      host._optimizerHints = value;
-      break;
-    case "annotate":
-      host._annotations = value;
-      break;
-    case "with":
-      host._ctes = value;
-      break;
-    case "distinct":
-      host._isDistinct = value;
-      break;
-    case "strictLoading":
-      host._isStrictLoading = value;
-      break;
-    case "references":
-      host._referencesValues = value;
-      break;
-    case "extending":
-      host._extending = value;
-      break;
-    case "unscope":
-      host._unscopeValues = value;
-      break;
-    case "reordering":
-      host._reordering = value;
-      break;
-    case "skipQueryCache":
-      host._skipQueryCache = value;
-      break;
-    case "reverseOrder":
-      host._reverseOrderValue = value;
-      break;
+  host._values = values;
+  for (const scope of SIDECAR_BACKED_KEYS) {
+    if (!(scope in values)) resetValueForScope(host, scope);
   }
 }
 
@@ -947,7 +843,7 @@ function unscopeBang(
 ): any {
   // Rails unscope! does `self.unscope_values += args` so a later merge of this
   // relation re-applies the resets (query_methods.rb / merger.rb).
-  this._unscopeValues.push(...types);
+  this.unscopeValues = [...this.unscopeValues, ...types];
   for (const rawScope of types) {
     if (typeof rawScope === "string") {
       // Rails: `scope = :left_outer_joins if scope == :left_joins` — the
@@ -968,7 +864,7 @@ function unscopeBang(
           );
         }
         const targets = Array.isArray(target) ? target : [target];
-        this._whereClause = this._whereClause.except(...targets);
+        this.whereClause = this.whereClause.except(...targets);
       }
     } else {
       throw argumentError(
@@ -986,8 +882,8 @@ function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): an
   // structuralUnionEq mirrors that: === first, then deepEqual (which delegates
   // to a node's own eql for Arel nodes).
   for (const arg of args) {
-    if (!this._joinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this._joinsValues.push(arg);
+    if (!this.joinsValues.some((seen) => structuralUnionEq(seen, arg)))
+      this.joinsValues = [...this.joinsValues, arg];
   }
   return this;
 }
@@ -997,8 +893,8 @@ function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]):
   // (separate from joins_values, which is the inner-join path).
   // |= dedups by eql?/hash — structural for Hash specs, not JS reference.
   for (const arg of args) {
-    if (!this._leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this._leftOuterJoinsValues.push(arg);
+    if (!this.leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
+      this.leftOuterJoinsValues = [...this.leftOuterJoinsValues, arg];
   }
   return this;
 }
@@ -1072,7 +968,7 @@ export function buildWhereClause(
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   if (opts == null) return this;
   const clause = buildWhereClause.call(this, opts, rest);
-  this._whereClause = this._whereClause.plus(clause);
+  this.whereClause = this.whereClause.plus(clause);
   return this;
 }
 
@@ -1092,7 +988,7 @@ function isRelationLike(value: unknown): boolean {
 }
 
 function invertWhereBang(this: QueryMethodsHost): any {
-  this._whereClause = this._whereClause.invert();
+  this.whereClause = this.whereClause.invert();
   return this;
 }
 
@@ -1191,63 +1087,61 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Names of the relation fields that are structurally compared by and!/or!.
- * Mirrors Rails' STRUCTURAL_VALUE_METHODS (Relation::VALUE_METHODS minus
- * extending, where, having, unscope, references, annotate, optimizer_hints).
+ * Mirrors: ActiveRecord::QueryMethods::STRUCTURAL_VALUE_METHODS
+ * (query_methods.rb:2261-2264) — `Relation::VALUE_METHODS - [:extending, :where,
+ * :having, :unscope, :references, :annotate, :optimizer_hints]`.
  */
-const STRUCTURAL_FIELDS: ReadonlyArray<[string, keyof QueryMethodsHost]> = [
-  ["includes", "_includesAssociations"],
-  ["eagerLoad", "_eagerLoadAssociations"],
-  ["preload", "_preloadAssociations"],
-  ["select", "_selectColumns"],
-  ["group", "_groupColumns"],
-  ["order", "_orderClauses"],
-  ["rawOrder", "_rawOrderClauses"],
-  ["joins", "_joinClauses"],
-  ["joins", "_joinsValues"],
-  ["leftOuterJoinsValues", "_leftOuterJoinsValues"],
-  ["limit", "_limitValue"],
-  ["offset", "_offsetValue"],
-  ["lock", "_lockValue"],
-  ["distinct", "_isDistinct"],
-  ["distinctOn", "_distinctOnColumns"],
-  ["readonly", "_isReadonly"],
-  ["strictLoading", "_isStrictLoading"],
-  ["from", "_fromClause"],
-  ["createWith", "_createWithAttrs"],
+const STRUCTURAL_VALUE_METHODS: readonly string[] = [
+  "includes",
+  "eagerLoad",
+  "preload",
+  "select",
+  "group",
+  "order",
+  "joins",
+  "leftOuterJoins",
+  "with",
+  "limit",
+  "offset",
+  "lock",
+  "readonly",
+  "reordering",
+  "strictLoading",
+  "reverseOrder",
+  "distinct",
+  "createWith",
+  "skipQueryCache",
+  "from",
 ];
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::QueryMethods#structurally_incompatible_values_for
+ * (query_methods.rb:2266-2277) — compare `@values[method]` on both sides,
+ * treating a non-Array on the other side as compatible and comparing Arrays
+ * after `uniq`.
+ * @internal
+ */
 export function structurallyIncompatibleValuesFor(
   this: QueryMethodsHost,
   other: QueryMethodsHost,
 ): string[] {
+  const values = other._values;
   const incompat: string[] = [];
-  for (const [label, field] of STRUCTURAL_FIELDS) {
-    const a = this[field] as unknown;
-    const b = other[field] as unknown;
-    // Mirrors Rails' structurally_incompatible_values_for (query_methods.rb):
-    // for Array-valued methods it does `next true unless v2.is_a?(Array)` —
-    // i.e. when the *other* relation never set this value (Ruby `nil`) the
-    // pair is compatible regardless of `self`'s value. trails represents an
-    // unset multi-value as an empty array, so an empty `b` stands in for nil.
-    // `unscope(<dim>)` is no exception: Rails `unscope!` *deletes* the value
-    // key (`@values.delete(scope)`), so an unscoped dimension on the other
-    // relation also reads back as `nil` → compatible. trails represents both
-    // "never set" and "unscoped" as an empty array, so an empty `b` always
-    // stands in for that `nil`. Matching populated values are compared after
-    // `uniq` (see relation/or_test.rb `test_or_with_unscope_order`).
-    // Rails' `:joins` is one value method; trails splits its storage across the
-    // joins_values store and the trails-only `_joinClauses`, so two rows carry
-    // the same label and the name must not be reported twice.
-    if (Array.isArray(a)) {
-      if (!Array.isArray(b)) continue;
-      if (b.length === 0) continue;
-      if (!deepEqual(uniqArray(a), uniqArray(b as unknown[])) && !incompat.includes(label))
-        incompat.push(label);
-      continue;
+  for (const method of STRUCTURAL_VALUE_METHODS) {
+    let v1 = this._values[method];
+    let v2 = values[method];
+    if (Array.isArray(v1)) {
+      if (!Array.isArray(v2)) continue;
+      v1 = uniqArray(v1);
+      v2 = uniqArray(v2);
     }
-    if (!deepEqual(a, b) && !incompat.includes(label)) incompat.push(label);
+    if (!deepEqual(v1, v2)) incompat.push(method);
+  }
+  // trails splits `:joins` storage across `@values[:joins]` and the trails-only
+  // `_joinClauses` (the explicit-ON and where-association joins), so the second
+  // store is compared too — under the same `:joins` name, never reported twice.
+  if (!deepEqual(this._joinClauses, other._joinClauses) && !incompat.includes("joins")) {
+    incompat.push("joins");
   }
   return incompat;
 }
@@ -1255,8 +1149,8 @@ export function structurallyIncompatibleValuesFor(
 function isRelationForCombining(value: unknown): value is QueryMethodsHost {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  const wc = v._whereClause as Record<string, unknown> | undefined;
-  const hc = v._havingClause as Record<string, unknown> | undefined;
+  const wc = v.whereClause as Record<string, unknown> | undefined;
+  const hc = v.havingClause as Record<string, unknown> | undefined;
   return (
     typeof wc === "object" &&
     wc !== null &&
@@ -1266,7 +1160,7 @@ function isRelationForCombining(value: unknown): value is QueryMethodsHost {
     hc !== null &&
     typeof hc.merge === "function" &&
     typeof hc.or === "function" &&
-    Array.isArray(v._referencesValues)
+    Array.isArray(v.referencesValues)
   );
 }
 
@@ -1328,10 +1222,10 @@ function andBang(this: QueryMethodsHost, other: any): any {
   // Mirrors Rails: where_clause |= other.where_clause;
   //                having_clause |= other.having_clause;
   //                references_values |= other.references_values
-  this._whereClause = this._whereClause.union(other._whereClause);
-  this._havingClause = this._havingClause.union(other._havingClause);
+  this.whereClause = this.whereClause.union(other.whereClause);
+  this.havingClause = this.havingClause.union(other.havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
-  this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
+  this.referencesValues = unionStrings(this.referencesValues, other.referencesValues);
   this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
   return this;
 }
@@ -1342,7 +1236,7 @@ function orBang(this: QueryMethodsHost, other: any): any {
   this.whereClause = this.whereClause.or(other.whereClause);
   this.havingClause = this.havingClause.or(other.havingClause);
   const unionStrings = (a: string[], b: string[]): string[] => [...new Set([...a, ...b])];
-  this._referencesValues = unionStrings(this._referencesValues, other._referencesValues);
+  this.referencesValues = unionStrings(this.referencesValues, other.referencesValues);
   this._manualReferences = unionStrings(this._manualReferences, other._manualReferences ?? []);
   return this;
 }
@@ -1361,12 +1255,12 @@ function havingBang(
 
   if (typeof opts === "string") {
     const sql = rest.length > 0 ? this._model.sanitizeSqlArray(opts, ...rest) : opts;
-    this._havingClause.predicates.push(new Nodes.SqlLiteral(sql));
+    this.havingClause = this.havingClause.plus(new WhereClause([new Nodes.SqlLiteral(sql)]));
     return this;
   }
 
   if (opts instanceof Nodes.Node) {
-    this._havingClause.predicates.push(opts);
+    this.havingClause = this.havingClause.plus(new WhereClause([opts]));
     return this;
   }
 
@@ -1374,40 +1268,42 @@ function havingBang(
     throw argumentError(`Unsupported argument type for having: ${typeof opts} (${String(opts)})`);
   }
 
-  this._havingClause.predicates.push(...this.predicateBuilder.buildFromHash(opts));
+  this.havingClause = this.havingClause.plus(
+    new WhereClause([...this.predicateBuilder.buildFromHash(opts)]),
+  );
   return this;
 }
 
 function limitBang(this: QueryMethodsHost, value: number | null): any {
   if (value == null) {
-    this._limitValue = null;
+    this.limitValue = null;
     return this;
   }
   const num = Number(value);
   if (!Number.isSafeInteger(num) || num < 0) {
     throw new Error(`Invalid limit value: ${String(value)}`);
   }
-  this._limitValue = num;
+  this.limitValue = num;
   return this;
 }
 
 function offsetBang(this: QueryMethodsHost, value: number | null): any {
-  this._offsetValue = value === null ? null : Math.trunc(value);
+  this.offsetValue = value === null ? null : Math.trunc(value);
   return this;
 }
 
 function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
   if (typeof locks === "string") {
-    this._lockValue = locks;
+    this.lockValue = locks;
   } else {
-    this._lockValue = locks ? "FOR UPDATE" : null;
+    this.lockValue = locks ? "FOR UPDATE" : null;
   }
   return this;
 }
 
 function noneBang(this: QueryMethodsHost): any {
   if (!this._isNone) {
-    this._whereClause.predicates.push(new Nodes.SqlLiteral("1=0"));
+    this.whereClause = this.whereClause.plus(new WhereClause([new Nodes.SqlLiteral("1=0")]));
     this._isNone = true;
   }
   return this;
@@ -1418,12 +1314,12 @@ function isNullRelation(this: QueryMethodsHost): boolean {
 }
 
 function readonlyBang(this: QueryMethodsHost, value = true): any {
-  this._isReadonly = value;
+  this.readonlyValue = value;
   return this;
 }
 
 function strictLoadingBang(this: QueryMethodsHost, value = true): any {
-  this._isStrictLoading = value;
+  this.strictLoadingValue = value;
   return this;
 }
 
@@ -1431,20 +1327,20 @@ function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> |
   if (value) {
     // Mirrors create_with! (query_methods.rb:1352): forbid un-permitted params.
     value = sanitizeForbiddenAttributes(value);
-    this._createWithAttrs = { ...this._createWithAttrs, ...value };
+    this.createWithValue = { ...this.createWithValue, ...value };
   } else {
-    this._createWithAttrs = {};
+    this.createWithValue = {};
   }
   return this;
 }
 
 function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): any {
-  this._fromClause = new FromClause(value ?? null, subqueryName ?? null);
+  this.fromClause = new FromClause(value ?? null, subqueryName ?? null);
   return this;
 }
 
 function distinctBang(this: QueryMethodsHost, value = true): any {
-  this._isDistinct = value;
+  this.distinctValue = value;
   return this;
 }
 
@@ -1456,7 +1352,7 @@ function extendingBang(
     if (typeof mod === "function") {
       mod(this);
     } else {
-      this._extending.push(mod);
+      this.extendingValues = [...this.extendingValues, mod];
       // Bind extension methods to the scope-proxy-wrapped relation, not the
       // raw one, so a bare named-scope call inside an extension body (Rails'
       // `has_many :comments do; def newest; created.last; end; end`) resolves
@@ -1471,7 +1367,7 @@ function extendingBang(
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...hints: string[]): any {
-  this._optimizerHints.push(...hints);
+  this.optimizerHintsValues = [...this.optimizerHintsValues, ...hints];
   return this;
 }
 
@@ -1495,18 +1391,18 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       String(clause),
     );
   }
-  const clauses = this._orderClauses.filter(
+  const clauses = this.orderValues.filter(
     (clause) => clause != null && !(typeof clause === "string" && /^\s*$/.test(clause)),
   );
   if (clauses.length === 0) {
     // A raw order clause is still an order_values entry in Rails, so the
     // default ORDER BY <pk> DESC branch does not apply when one is present.
     if (rawClauses.length === 0) {
-      this._orderClauses = reverseSqlOrder.call(this, []) as typeof this._orderClauses;
+      this.orderValues = reverseSqlOrder.call(this, []) as typeof this.orderValues;
     }
     return this;
   }
-  this._orderClauses = clauses.map((clause) => {
+  this.orderValues = clauses.map((clause) => {
     if (clause instanceof Nodes.Node) {
       // Arel::Nodes::SqlLiteral is a String subclass in Rails, so reverse_sql_order
       // reverses it via the `when String` branch (flip trailing ASC↔DESC), not .desc.
@@ -1550,7 +1446,7 @@ function reverseOrderBang(this: QueryMethodsHost): any {
 }
 
 function skipQueryCacheBang(this: QueryMethodsHost, value = true): any {
-  this._skipQueryCache = value;
+  this.skipQueryCacheValue = value;
   return this;
 }
 
@@ -1560,33 +1456,19 @@ function skipPreloadingBang(this: QueryMethodsHost): any {
 }
 
 function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {
-  this._annotations.push(...comments);
+  this.annotateValues = [...this.annotateValues, ...comments];
   return this;
 }
 
-const UNIQ_BANG_FIELDS: Partial<Record<string, keyof QueryMethodsHost>> = {
-  includes: "_includesAssociations",
-  eager_load: "_eagerLoadAssociations",
-  preload: "_preloadAssociations",
-  select: "_selectColumns",
-  group: "_groupColumns",
-  order: "_orderClauses",
-  joins: "_joinsValues",
-  left_outer_joins: "_leftOuterJoinsValues",
-  references: "_referencesValues",
-  extending: "_extending",
-  optimizer_hints: "_optimizerHints",
-  annotate: "_annotations",
-  with: "_ctes",
-};
-
+/**
+ * Mirrors: ActiveRecord::QueryMethods#uniq! (query_methods.rb:1541-1546) —
+ * `if values = @values[name]` then `values.uniq! if values.is_a?(Array) && !values.empty?`.
+ */
 function uniqBang(this: QueryMethodsHost, name?: string): any {
   if (name === undefined) return this;
-  const field = UNIQ_BANG_FIELDS[name];
-  if (!field) return this;
-  const arr = this[field] as unknown[];
-  if (Array.isArray(arr) && arr.length > 0) {
-    (this as any)[field] = [...new Set(arr)];
+  const values = this._values[name];
+  if (Array.isArray(values) && values.length > 0) {
+    this._values[name] = [...new Set(values)];
   }
   return this;
 }
@@ -1613,10 +1495,12 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   if (unloadedRelations.length === 0) {
     // Rails `predicate_builder[primary_key, records].invert` — `#[]` reads the
     // attribute straight off the builder's arel table (predicate_builder.rb:53-55).
-    this._whereClause.predicates.push(
-      this.predicateBuilder
-        .build(this.predicateBuilder.table.arelTable.get(pk), literalRecords)
-        .invert(),
+    this.whereClause = this.whereClause.plus(
+      new WhereClause([
+        this.predicateBuilder
+          .build(this.predicateBuilder.table.arelTable.get(pk), literalRecords)
+          .invert(),
+      ]),
     );
     return this;
   }
@@ -1638,8 +1522,10 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // only its subquery `right` is needed for the marker's display fallback.
   const inlineSubquery = (this.predicateBuilder.build(attribute, unloadedRelations[0]) as Nodes.In)
     .right as Nodes.Node;
-  this._whereClause.predicates.push(
-    new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, unloadedRelations),
+  this.whereClause = this.whereClause.plus(
+    new WhereClause([
+      new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, unloadedRelations),
+    ]),
   );
   return this;
 }
@@ -1875,7 +1761,7 @@ export function buildSubquery(
   const subquery = relation.toArel().as(subqueryAlias);
   const sm = new SelectManager(subquery);
   sm.project(selectValue as any);
-  const hints: string[] = (this as any)._optimizerHints ?? [];
+  const hints: string[] = (this as any).optimizerHintsValues ?? [];
   if (hints.length > 0) sm.optimizerHints(...hints);
   return sm;
 }
@@ -2063,8 +1949,8 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
   validateOrderArgs.call(this, orderArgs);
   const refs = columnReferences(orderArgs);
   if (refs.length > 0) {
-    const existing: string[] = (this as any)._referencesValues ?? [];
-    (this as any)._referencesValues = [...new Set([...existing, ...refs])];
+    const existing: string[] = (this as any).referencesValues ?? [];
+    (this as any).referencesValues = [...new Set([...existing, ...refs])];
   }
   const mapped: unknown[] = [];
   for (const arg of orderArgs) {
@@ -2110,7 +1996,7 @@ export function buildOrder(this: QueryMethodsHost, arel: any): void {
   }
   // An Arel::Nodes::SqlLiteral is a String subclass in Ruby, so compact_blank
   // drops a blank one along with nil and "".
-  const orders = ((this as any)._orderClauses ?? []).filter((o: unknown) => {
+  const orders = ((this as any).orderValues ?? []).filter((o: unknown) => {
     if (o === null || o === undefined) return false;
     if (typeof o === "string") return o.trim() !== "";
     if (o instanceof Nodes.SqlLiteral) return String((o as any).value ?? "").trim() !== "";
@@ -2307,7 +2193,7 @@ export function arelColumn(
   let fieldStr = isSymbol ? symbolToName(field) : field == null ? "" : String(field);
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
 
-  const fromClause = (this as any)._fromClause;
+  const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;
 
   if (modelClass?.columnsHash?.()[fieldStr] && (!from || isTableNameMatches.call(this, from))) {
@@ -2343,8 +2229,8 @@ export function arelColumnWithTable(
   tableName: string,
   columnName: string,
 ): unknown {
-  const existing = (this as any)._referencesValues ?? [];
-  if (!existing.includes(tableName)) (this as any)._referencesValues = [...existing, tableName];
+  const existing = (this as any).referencesValues ?? [];
+  if (!existing.includes(tableName)) (this as any).referencesValues = [...existing, tableName];
   // Ruby discriminates `column_name.is_a?(Symbol)` (query_methods.rb:1980): a
   // Symbol names a column, a String may be an expression.
   const isSymbol = isRubySymbol(columnName);
@@ -2393,7 +2279,7 @@ export function arelColumnsFromHash(
 /** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
-    if (attrName === "count" && ((this as any)._groupColumns ?? []).length > 0) {
+    if (attrName === "count" && ((this as any).groupValues ?? []).length > 0) {
       const table: any = this.table;
       return table.get(attrName);
     }
@@ -2451,7 +2337,7 @@ export function arelColumnAliasesFromHash(
 
 /** @internal */
 export function buildFrom(this: QueryMethodsHost): unknown {
-  const fromClause = (this as any)._fromClause;
+  const fromClause = (this as any).fromClause;
   const opts = fromClause?.value;
   let name = fromClause?.name;
   if (opts && typeof opts.toArel === "function") {
@@ -2610,8 +2496,8 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   };
   addNames(this.joinsValues as AssociationSpec[]);
   addNames(this.leftOuterJoinsValues);
-  addNames(this._eagerLoadAssociations);
-  addNames(this._includesAssociations);
+  addNames(this.eagerLoadValues);
+  addNames(this.includesValues);
 
   const stashedJoins: JoinDependency[] = [];
   const named = selectNamedJoins.call(this, joinNames, stashedJoins);
@@ -2631,31 +2517,31 @@ export function buildArel(
 
   buildJoins.call(this, arel, aliases);
 
-  if (!this._whereClause.isEmpty()) arel.where(this._whereClause.ast);
-  if (!this._havingClause.isEmpty()) arel.having(this._havingClause.ast);
+  if (!this.whereClause.isEmpty()) arel.where(this.whereClause.ast);
+  if (!this.havingClause.isEmpty()) arel.having(this.havingClause.ast);
 
-  if (this._limitValue !== null) arel.take(sanitizeLimit(this._limitValue));
-  if (this._offsetValue !== null) arel.skip(this._offsetValue);
+  if (this.limitValue !== null) arel.take(sanitizeLimit(this.limitValue));
+  if (this.offsetValue !== null) arel.skip(this.offsetValue);
 
-  if (this._groupColumns.length > 0)
+  if (this.groupValues.length > 0)
     arel.group(
-      ...(arelColumns.call(this, [...new Set(this._groupColumns)]) as (Nodes.Node | string)[]),
+      ...(arelColumns.call(this, [...new Set(this.groupValues)]) as (Nodes.Node | string)[]),
     );
 
   buildOrder.call(this, arel);
   buildWith.call(this, arel);
   buildSelect.call(this, arel);
 
-  if (this._optimizerHints.length > 0) arel.optimizerHints?.(...this._optimizerHints);
-  arel.distinct(this._isDistinct);
+  if (this.optimizerHintsValues.length > 0) arel.optimizerHints?.(...this.optimizerHintsValues);
+  arel.distinct(this.distinctValue);
 
-  if (!this._fromClause.isEmpty()) arel.from(buildFrom.call(this) as any);
+  if (!this.fromClause.isEmpty()) arel.from(buildFrom.call(this) as any);
 
-  if (this._lockValue) arel.lock(this._lockValue);
+  if (this.lockValue) arel.lock(this.lockValue);
 
-  if (this._annotations.length > 0) {
+  if (this.annotateValues.length > 0) {
     const annotates =
-      this._annotations.length > 1 ? [...new Set(this._annotations)] : this._annotations;
+      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
     arel.comment?.(...annotates);
   }
 
@@ -2675,7 +2561,10 @@ export function selectNamedJoins(
   const associations: unknown[] = [];
 
   for (const joinName of joinNames) {
-    if (isRubySymbol(joinName) && any(this._ctes, (cte) => cte.name === symbolToName(joinName))) {
+    if (
+      isRubySymbol(joinName) &&
+      any(this.withValues, (cte) => cte.name === symbolToName(joinName))
+    ) {
       cteJoins.push(symbolToName(joinName));
     } else {
       associations.push(joinName);
@@ -3063,10 +2952,10 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
 
 /** @internal */
 export function buildWith(this: QueryMethodsHost, arel: any): void {
-  if (!this._ctes || this._ctes.length === 0) return;
+  if (!this.withValues || this.withValues.length === 0) return;
 
-  const hasRecursive = this._ctes.some((c) => c.recursive);
-  const withNodes = this._ctes.map((c) => new Nodes.Cte(c.name, c.expression as any));
+  const hasRecursive = this.withValues.some((c) => c.recursive);
+  const withNodes = this.withValues.map((c) => new Nodes.Cte(c.name, c.expression as any));
 
   if (hasRecursive) {
     arel.withRecursive?.(...withNodes);

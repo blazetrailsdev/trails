@@ -337,7 +337,7 @@ describe("RelationTest", () => {
     // merge()'s type only accepts a Relation; Rails accepts a hash, so cast the
     // empty hash to exercise the HashMerger empty-hash path (relation_test.rb:160).
     const merged = CanonPost.all().merge({} as any);
-    expect(merged._whereClause).toEqual(WhereClause.empty());
+    expect(merged.whereClause).toEqual(WhereClause.empty());
   });
 
   // Rails `Relation::HashMerger#initialize` validates keys with

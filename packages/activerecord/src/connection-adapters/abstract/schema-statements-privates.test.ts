@@ -653,8 +653,8 @@ describe("distinctRelationForPrimaryKey", () => {
       primaryKey: "id",
       table: { name: "posts" },
       orderValues: [],
-      _limitValue: 5,
-      _offsetValue: 2,
+      limitValue: 5,
+      offsetValue: 2,
       reselect(...cols: unknown[]) {
         calls.reselect = cols;
         // Rails reselect spawns a clone; return a distinct object so a stray
@@ -668,10 +668,10 @@ describe("distinctRelationForPrimaryKey", () => {
         return this;
       },
       limitBang(v: unknown) {
-        this._limitValue = v;
+        this.limitValue = v;
       },
       offsetBang(v: unknown) {
-        this._offsetValue = v;
+        this.offsetValue = v;
       },
       ...over,
     };
@@ -688,8 +688,8 @@ describe("distinctRelationForPrimaryKey", () => {
     expect(rel._calls.reselect).toEqual(['"posts"."id"']);
     expect(selectRows).toHaveBeenCalledWith(arelNode, "SQL");
     expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
-    expect(rel._limitValue).toBeNull();
-    expect(rel._offsetValue).toBeNull();
+    expect(rel.limitValue).toBeNull();
+    expect(rel.offsetValue).toBeNull();
     expect(result).toBe(rel);
   });
 

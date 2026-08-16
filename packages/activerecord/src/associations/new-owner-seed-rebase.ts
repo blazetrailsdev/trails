@@ -1,3 +1,4 @@
+import { WhereClause } from "../relation/where-clause.js";
 import { Merger } from "../relation/merger.js";
 
 /**
@@ -19,9 +20,9 @@ import { Merger } from "../relation/merger.js";
  * resolved FK plus any HABTM/through join) and the result is copied back.
  */
 interface Rebaseable {
-  _whereClause: { predicates: unknown[] };
+  whereClause: WhereClause;
   _isNone: boolean;
-  _copyStateFrom(source: unknown): void;
+  initializeCopy(source: unknown): void;
 }
 
 export function rebaseNewOwnerSeed(
@@ -31,13 +32,16 @@ export function rebaseNewOwnerSeed(
 ): void {
   // Drop the stale seed predicates (the `1=0`), keeping only the mutations
   // layered on top, and clear the NullRelation flag so the merge is live.
-  target._whereClause.predicates = target._whereClause.predicates.filter(
-    (p) => !seedPredicates.includes(p),
+  // Assigned through the writer, not mutated through the reader: an unset
+  // `:where` key returns a fresh `WhereClause.empty()` per getter call, so the
+  // read-filter-write shape would silently drop the result.
+  target.whereClause = new WhereClause(
+    target.whereClause.predicates.filter((p) => !seedPredicates.includes(p)),
   );
   target._isNone = false;
   // Merge the surviving mutations onto the freshly resolved scope, then adopt
   // the merged state — the scope contributes the resolved FK + join, the
   // mutations contribute the accumulated where/order/limit/etc.
   const merged = new Merger(freshScope, target).merge();
-  target._copyStateFrom(merged);
+  target.initializeCopy(merged);
 }

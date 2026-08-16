@@ -7,6 +7,7 @@ import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js"
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { JoinDependency } from "./join-dependency.js";
+import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
 
 /**
@@ -915,36 +916,30 @@ export class AssociationScope {
     // where clause is appended, so a `unscope(where: :skimmer)` chain entry
     // strips the target's default-scope predicate without dropping the item's
     // additions. Apply the item's recorded unscope directives to the main scope.
-    const evalUnscope = (evaluated as { _unscopeValues?: unknown[] })._unscopeValues ?? [];
+    const evalUnscope = (evaluated as { unscopeValues?: unknown[] }).unscopeValues ?? [];
     if (evalUnscope.length > 0) {
       (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...evalUnscope);
     }
-    const evalWhere = (evaluated as { _whereClause?: { predicates?: unknown[] } })._whereClause;
+    const evalWhere = (evaluated as { whereClause?: { predicates?: unknown[] } }).whereClause;
     const evalPredicates = evalWhere?.predicates ?? [];
-    const evalOrders = (evaluated as { _orderClauses?: unknown[] })._orderClauses ?? [];
+    const evalOrders = (evaluated as { orderValues?: unknown[] }).orderValues ?? [];
     const evalRawOrders = (evaluated as { _rawOrderClauses?: string[] })._rawOrderClauses ?? [];
     const merged = scope as {
-      _whereClause?: { predicates?: unknown[] };
-      _orderClauses?: unknown[];
+      whereClause: WhereClause;
+      orderValues?: unknown[];
       _rawOrderClauses?: string[];
     };
-    // Mutate the existing _whereClause's predicates array in place —
-    // appending all entry predicates in one shot — instead of looping
-    // with `.where()` which would clone the relation per-predicate.
-    // Safe because `scope` here is owned by this addConstraints call
-    // (built fresh from klass.unscoped + per-step .where clones; not
-    // shared externally).
+    // Rails: `scope.where_clause += item.where_clause` (association_scope.rb:153).
+    // The assignment matters: the preceding `unscope!` deletes the `:where` key,
+    // and an unset clause reader returns a fresh `WhereClause.empty()` per call,
+    // so appending to the read value would never reach `@values`.
     if (evalPredicates.length > 0) {
-      const existingPredicates = merged._whereClause?.predicates ?? [];
-      existingPredicates.push(...evalPredicates);
-      if (merged._whereClause) {
-        merged._whereClause.predicates = existingPredicates;
-      }
+      merged.whereClause = merged.whereClause.plus(new WhereClause(evalPredicates as Nodes.Node[]));
     }
     // Rails: `scope.order_values = item.order_values | scope.order_values`
     // (association_scope.rb:153). Chain-entry-first + structural dedup.
     if (evalOrders.length > 0) {
-      merged._orderClauses = unionOrderClauses(evalOrders, merged._orderClauses ?? []);
+      merged.orderValues = unionOrderClauses(evalOrders, merged.orderValues ?? []);
     }
     if (evalRawOrders.length > 0) {
       const existingRaw = merged._rawOrderClauses ?? [];
@@ -975,22 +970,21 @@ export class AssociationScope {
    */
   private _mergeReferencedJoins(scope: unknown, evaluated: unknown): void {
     const item = evaluated as {
-      _referencesValues?: string[];
+      referencesValues?: string[];
       joinsValues?: unknown[];
       _isNamedJoinValue?: (v: unknown) => boolean;
       _joinClauses?: unknown[];
-      _leftOuterJoinsValues?: unknown[];
-      _includesAssociations?: unknown[];
-      _eagerLoadAssociations?: unknown[];
+      leftOuterJoinsValues?: unknown[];
+      includesValues?: unknown[];
+      eagerLoadValues?: unknown[];
       _model?: typeof Base;
     };
-    const refs = item._referencesValues ?? [];
+    const refs = item.referencesValues ?? [];
     if (refs.length === 0) return;
     const target = scope as {
-      _joinsValues: unknown[];
       joinsValues: unknown[];
       _joinClauses: unknown[];
-      _leftOuterJoinsValues: unknown[];
+      leftOuterJoinsValues: unknown[];
       _model?: typeof Base;
     };
     const sameKlass = item._model !== undefined && item._model === target._model;
@@ -1010,44 +1004,47 @@ export class AssociationScope {
         others.push(v);
       }
     }
-    for (const v of others) target._joinsValues.push(v);
+    for (const v of others) target.joinsValues = [...target.joinsValues, v];
     if (namedInner.length > 0) {
       if (sameKlass) {
         for (const v of namedInner)
           if (!target.joinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-            target._joinsValues.push(v);
+            target.joinsValues = [...target.joinsValues, v];
       } else {
-        target._joinsValues.push(
+        target.joinsValues = [
+          ...target.joinsValues,
           constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),
-        );
+        ];
       }
     }
-    const namedLeft = (item._leftOuterJoinsValues ?? []).filter(
+    const namedLeft = (item.leftOuterJoinsValues ?? []).filter(
       (v) => !(v instanceof JoinDependency),
     );
-    const leftDeps = (item._leftOuterJoinsValues ?? []).filter((v) => v instanceof JoinDependency);
+    const leftDeps = (item.leftOuterJoinsValues ?? []).filter((v) => v instanceof JoinDependency);
     if (namedLeft.length > 0) {
       if (sameKlass) {
         for (const v of namedLeft)
-          if (!target._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-            target._leftOuterJoinsValues.push(v);
+          if (!target.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
+            target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, v];
       } else {
-        target._leftOuterJoinsValues.push(
+        target.leftOuterJoinsValues = [
+          ...target.leftOuterJoinsValues,
           constructJoinDependency.call(item as never, namedLeft as never, Nodes.OuterJoin),
-        );
+        ];
       }
     }
-    target._leftOuterJoinsValues.push(...leftDeps);
+    target.leftOuterJoinsValues = [...target.leftOuterJoinsValues, ...leftDeps];
     // associations = eager_load_values | includes_values → OuterJoin. Rails'
     // `|` unions with dedup, so an association named in BOTH eager_load and
     // includes yields a single JoinDependency entry (not a double join).
     const associations = [
-      ...new Set([...(item._eagerLoadAssociations ?? []), ...(item._includesAssociations ?? [])]),
+      ...new Set([...(item.eagerLoadValues ?? []), ...(item.includesValues ?? [])]),
     ];
     if (associations.length > 0) {
-      target._leftOuterJoinsValues.push(
+      target.leftOuterJoinsValues = [
+        ...target.leftOuterJoinsValues,
         constructJoinDependency.call(item as never, associations as never, Nodes.OuterJoin),
-      );
+      ];
     }
   }
 }
@@ -1070,7 +1067,7 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
 }
 
 /**
- * Structurally dedupe `_orderClauses` entries (plain strings or
+ * Structurally dedupe `orderValues` entries (plain strings or
  * `[col, "asc"|"desc"]` tuples). `Array#includes` only does reference
  * equality, so two tuples with equal contents created separately
  * wouldn't match. Rails' `|` operator on order_values is structural.

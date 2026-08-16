@@ -2183,7 +2183,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
     const newClub = new Club();
     const val = (newClub as any).specialFavorites.distinctValue;
-    expect(val).toBeUndefined();
+    expect(val).toBeNull();
   });
 
   it("has many through do not cache association reader if the though method has default scopes", async () => {

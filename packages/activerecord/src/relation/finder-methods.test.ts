@@ -354,14 +354,14 @@ function makeFindSomeRel(
     model: postModelStub,
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
-    _limitValue: opts.limit ?? null,
-    _offsetValue: opts.offset ?? null,
+    limitValue: opts.limit ?? null,
+    offsetValue: opts.offset ?? null,
     // ordered=true simulates a relation with ORDER BY (findSome stays in the accounting path)
-    _orderClauses: opts.ordered !== false ? ["id ASC"] : [],
+    orderValues: opts.ordered !== false ? ["id ASC"] : [],
     _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
-    _whereClause: { isEmpty: () => true },
+    whereClause: { isEmpty: () => true },
     findSomeOrdered(ids: unknown[]) {
       return findSomeOrdered.call(this, ids);
     },
@@ -420,9 +420,9 @@ describe("findSome — narrows to pk column when select_values non-empty (ordere
       model: postModelStub,
       table: postModelStub.arelTable,
       primaryKey: postModelStub.primaryKey,
-      _limitValue: null,
-      _offsetValue: null,
-      _orderClauses: ["id ASC"],
+      limitValue: null,
+      offsetValue: null,
+      orderValues: ["id ASC"],
       _rawOrderClauses: [],
       selectValues: ["title"],
       where(_cond: any) {
@@ -468,13 +468,13 @@ function makeFindSomeOrderedRel(
     model: postModelStub,
     table: postModelStub.arelTable,
     primaryKey: postModelStub.primaryKey,
-    _limitValue: opts.limit ?? null,
-    _offsetValue: opts.offset ?? null,
-    _orderClauses: [],
+    limitValue: opts.limit ?? null,
+    offsetValue: opts.offset ?? null,
+    orderValues: [],
     _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
-    _whereClause: { isEmpty: () => true },
+    whereClause: { isEmpty: () => true },
     except(..._skips: string[]) {
       return this;
     },
@@ -668,7 +668,7 @@ describe("finder not-found message fidelity", () => {
       model: carModelStub,
       primaryKey: carModelStub.primaryKey,
       raiseRecordNotFoundExceptionBang,
-      _whereClause: { isEmpty: () => true },
+      whereClause: { isEmpty: () => true },
       where: () => ({ take: async () => null }),
     };
     try {
@@ -689,11 +689,11 @@ describe("finder not-found message fidelity", () => {
       _model: mercedesModelStub,
       model: mercedesModelStub,
       primaryKey: mercedesModelStub.primaryKey,
-      _limitValue: null,
-      _offsetValue: null,
+      limitValue: null,
+      offsetValue: null,
       selectValues: [],
       raiseRecordNotFoundExceptionBang,
-      _whereClause: { isEmpty: () => true },
+      whereClause: { isEmpty: () => true },
       except(..._skips: string[]) {
         return this;
       },

@@ -142,8 +142,8 @@ export class JoinAssociation extends JoinPart {
       // construct_join_dependency are implemented.
 
       let nodes: Nodes.Node;
-      if (scope && scope._whereClause && !scope._whereClause.isEmpty()) {
-        nodes = scope._whereClause.ast;
+      if (scope && scope.whereClause && !scope.whereClause.isEmpty()) {
+        nodes = scope.whereClause.ast;
       } else {
         // Scope produced no constraints — build direct key equality
         const rawPk = (refl as any).joinPrimaryKey ?? klass.primaryKey ?? "id";
@@ -236,7 +236,7 @@ export class JoinAssociation extends JoinPart {
    */
   override isReadonly(): boolean {
     if (this._readonly !== undefined) return this._readonly;
-    this._readonly = !!this._scopeRelation()?._isReadonly;
+    this._readonly = !!this._scopeRelation()?.readonlyValue;
     return this._readonly;
   }
 
@@ -252,7 +252,7 @@ export class JoinAssociation extends JoinPart {
   override isStrictLoading(): boolean {
     if (this._strictLoading !== undefined) return this._strictLoading;
     this._strictLoading =
-      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?._isStrictLoading;
+      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?.strictLoadingValue;
     return this._strictLoading;
   }
 

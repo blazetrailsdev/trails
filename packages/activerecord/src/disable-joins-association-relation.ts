@@ -307,8 +307,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * Implementation: use `Relation#merge` for state where overlay
    * REPLACES walker (limit / offset / wheres get the standard merger
    * semantics), then selectively recompose fields whose normal chain
-   * behavior is additive (`_orderClauses`, `_rawOrderClauses`,
-   * `_selectColumns`). `Relation#merge` replaces orders/select
+   * behavior is additive (`orderValues`, `_rawOrderClauses`,
+   * `selectValues`). `Relation#merge` replaces orders/select
    * outright (relation/merger.ts:21-32), but `.order(...)` /
    * `.select(...)` chains conventionally APPEND elsewhere — so a
    * blanket merge would drop the walker's existing orders/projection
@@ -317,40 +317,40 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    */
   private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
     type ComposeFields = {
-      _orderClauses?: unknown[];
+      orderValues?: unknown[];
       _rawOrderClauses?: unknown[];
-      _selectColumns?: unknown[];
+      selectValues?: unknown[];
     };
     // Snapshot walker's pre-merge order/select state — the merge
     // would otherwise replace these.
     const source = walkerResult as unknown as ComposeFields;
-    const sourceOrders = [...(source._orderClauses ?? [])];
+    const sourceOrders = [...(source.orderValues ?? [])];
     const sourceRawOrders = [...(source._rawOrderClauses ?? [])];
-    const sourceSelects = source._selectColumns ? [...source._selectColumns] : null;
+    const sourceSelects = [...(source.selectValues ?? [])];
 
     const merged = (walkerResult as unknown as { merge: (o: unknown) => Relation<T> }).merge(this);
     const target = merged as unknown as ComposeFields;
-    const overlay = this as unknown as ComposeFields & { _reordering?: boolean };
-    const overlayOrders = overlay._orderClauses ?? [];
+    const overlay = this as unknown as ComposeFields & { reorderingValue?: boolean };
+    const overlayOrders = overlay.orderValues ?? [];
     const overlayRawOrders = overlay._rawOrderClauses ?? [];
-    const overlaySelects = overlay._selectColumns ?? [];
-    const isReordering = overlay._reordering ?? false;
+    const overlaySelects = overlay.selectValues ?? [];
+    const isReordering = overlay.reorderingValue ?? false;
 
     if (isReordering) {
       // `reorder()` signals "replace, don't append": use overlay's orders only.
-      target._orderClauses = [...overlayOrders];
+      target.orderValues = [...overlayOrders];
       target._rawOrderClauses = [...overlayRawOrders];
     } else if (overlayRawOrders.length > 0 && overlayOrders.length === 0) {
       // `inOrderOf(column, values)` is the only `_rawOrderClauses`
-      // producer today; it CLEARS `_orderClauses` to express
+      // producer today; it CLEARS `orderValues` to express
       // "replace existing order with this CASE order"
       // (relation.ts:610). Honor that reset: drop BOTH walker's
       // parsed orders AND any pre-existing raw orders so the
       // overlay's CASE order wins outright (not as a tiebreaker).
-      target._orderClauses = [];
+      target.orderValues = [];
       target._rawOrderClauses = [...overlayRawOrders];
     } else {
-      target._orderClauses = [...sourceOrders, ...overlayOrders];
+      target.orderValues = [...sourceOrders, ...overlayOrders];
       target._rawOrderClauses = [...sourceRawOrders, ...overlayRawOrders];
     }
 
@@ -359,7 +359,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // identity for primitive entries; complex AST nodes will dedupe
     // by reference (matches Relation#select chain behavior).
     if (sourceSelects && sourceSelects.length > 0) {
-      target._selectColumns = Array.from(new Set([...sourceSelects, ...overlaySelects]));
+      target.selectValues = Array.from(new Set([...sourceSelects, ...overlaySelects]));
     }
 
     return merged;
@@ -496,7 +496,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // re-emit in `ids` order so the caller sees join-table ordering
     // (Rails' `load` override).
     //
-    // Build a clone with `_limitValue` / `_offsetValue` cleared and
+    // Build a clone with `limitValue` / `offsetValue` cleared and
     // load through that — never mutate `this`. Reason: deferred-mode
     // composition (via `_composeChainedState`'s `merge`) can copy a
     // chained `.limit(n)` / offset onto this loaded-chain DJAR.
@@ -506,15 +506,15 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // Cloning (rather than mutating `this` across the await) keeps
     // concurrent `toSql()` / `ids()` / second `toArray()` calls
     // observing the original configured state.
-    type LimitOffset = { _limitValue?: number | null; _offsetValue?: number | null };
+    type LimitOffset = { limitValue?: number | null; offsetValue?: number | null };
     const self = this as unknown as LimitOffset & {
       _clone: () => DisableJoinsAssociationRelation<T>;
     };
-    const limitVal = self._limitValue ?? null;
-    const offsetVal = self._offsetValue ?? null;
+    const limitVal = self.limitValue ?? null;
+    const offsetVal = self.offsetValue ?? null;
     const loadClone = self._clone() as unknown as LimitOffset;
-    loadClone._limitValue = null;
-    loadClone._offsetValue = null;
+    loadClone.limitValue = null;
+    loadClone.offsetValue = null;
     // Call Relation's toArray directly on the clone — going through
     // DJAR.toArray would re-enter the deferred/loaded branching and
     // recurse forever for the loaded-chain mode.

@@ -75,7 +75,7 @@ describe("Base static query delegations", () => {
     // defaults to nil. Rails' initialize_copy dups @values, so the flag is
     // preserved across every spawn/clone.
     const rel = Topic.all();
-    expect(rel.reverseOrderValue).toBeUndefined();
+    expect(rel.reverseOrderValue).toBeNull();
 
     rel.reverseOrderValue = true;
     expect(rel.reverseOrderValue).toBe(true);
