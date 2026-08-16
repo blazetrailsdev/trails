@@ -94,8 +94,7 @@ interface CalculationConnection {
     orders?: (string | Nodes.Node)[],
   ): string | string[];
   execute(sql: string): Promise<Record<string, unknown>[]>;
-  // Rails' `select_all(arel, name, binds)` takes an Arel manager or a SQL
-  // string and compiles the former itself (database_statements.rb:69-71).
+  /** Rails `select_all(arel, name, binds)` (database_statements.rb:69-71). */
   selectAll(
     arel: unknown,
     name?: string | null,
@@ -938,8 +937,7 @@ export async function pluck(
     rel.selectValues = projections as any;
     const manager = rel.toArel();
 
-    // Rails: `select_all(relation.arel, "#{model.name} Pluck")`
-    // (calculations.rb:317) — the connection compiles the manager itself.
+    // Rails: `select_all(relation.arel, "#{model.name} Pluck")` (calculations.rb:317).
     const result = await this.skipQueryCacheIfNecessary(() =>
       this._conn().selectAll(manager, `${this.model.name} Pluck`),
     );

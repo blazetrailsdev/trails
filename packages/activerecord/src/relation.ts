@@ -2484,9 +2484,7 @@ export class Relation<T extends Base> {
         this.loadRecords(loadedRecords);
       } else {
         // Rails' `_query_by_sql(arel, async: async)` (relation.rb:1449 →
-        // querying.rb:67-68): the ARel manager goes to `select_all`, which
-        // compiles it through `to_sql_and_binds` — that is where the binds,
-        // `preparable` and `allow_retry` come from.
+        // querying.rb:67-68).
         // Awaiting the FutureResult here is trails' `future.result` in
         // `exec_queries` (relation.rb:1408).
         const result = await this.skipQueryCacheIfNecessary(() =>
@@ -3560,20 +3558,18 @@ export class Relation<T extends Base> {
    * association, falls through to the plain arel).
    */
   toSql(): string {
-    let node: Nodes.Node | undefined;
-    if (this._eagerLoadingForSql()) {
-      node = this._buildEagerOperandManager()?.ast;
-    }
-    node ??= this.toArel().ast;
-    // `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`
-    // (relation.rb:1217-1218), applied synchronously: `to_sql` is sync here, so
+    // `unprepared_statement` applied synchronously: `to_sql` is sync here, so
     // the flag is saved and restored around the render rather than through the
     // async `unpreparedStatement` wrapper.
     const conn = this._conn();
     const wasPrepared = conn.preparedStatements;
     conn.preparedStatements = false;
     try {
-      return conn.toSql(node);
+      if (this._eagerLoadingForSql()) {
+        const manager = this._buildEagerOperandManager();
+        if (manager !== null) return conn.toSql(manager.ast);
+      }
+      return conn.toSql(this.toArel().ast);
     } finally {
       conn.preparedStatements = wasPrepared;
     }
@@ -3748,7 +3744,7 @@ export class Relation<T extends Base> {
       this._buildEagerIdSubquery(jd, basePk, distinctSelect),
       "SQL",
     );
-    const idRows = (await idResult).toArray();
+    const idRows = idResult.toArray();
     // Rails `results.last(Array(relation.primary_key).length)`
     // (schema_statements.rb:1441) — a composite key yields one tuple per row.
     if (Array.isArray(basePk)) return idRows.map((row) => basePk.map((column) => row[column]));
@@ -3837,8 +3833,8 @@ export class Relation<T extends Base> {
    * `with_connection` block parameter so internal reads don't re-lease via the
    * deprecated `.connection` getter. The pool-identity guard in
    * {@link threadedConnectionFor} prevents a cross-pool outer wrap from handing
-   * this model a foreign connection (and keeps `_resolveAdapter`'s
-   * `ConnectionNotEstablished` path reachable for unconnected HABTM join models).
+   * this model a foreign connection, so an unconnected HABTM join model still
+   * raises `ConnectionNotEstablished`.
    * @internal
    */
   private _conn(): DatabaseAdapter {
@@ -4859,7 +4855,7 @@ export class Relation<T extends Base> {
           subColumn.maximum().as("timestamp"),
         );
         const outerResult = await this._conn().selectAll(outerManager, "SQL");
-        const rows = (await outerResult).toArray();
+        const rows = outerResult.toArray();
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       } else {
@@ -4868,7 +4864,7 @@ export class Relation<T extends Base> {
         query._rawOrderClauses = [];
         query.selectValues = [countStar.as("size"), maxNode.as("timestamp")];
         const queryResult = await this._conn().selectAll(query.toArel(), "SQL");
-        const rows = (await queryResult).toArray();
+        const rows = queryResult.toArray();
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       }
@@ -5127,7 +5123,7 @@ export class Relation<T extends Base> {
     if (this._isNone) return [];
     return this.skipQueryCacheIfNecessary(async () => {
       const result = await this._conn().selectAll(this.toArel(), `${this.model.name} Load`);
-      return (await result).toArray();
+      return result.toArray();
     });
   }
 
