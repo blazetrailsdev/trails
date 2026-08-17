@@ -1,6 +1,7 @@
 import { Temporal } from "@blazetrails/date";
 import { except, hexdigest, isBlank, Notifications, toFs } from "@blazetrails/activesupport";
 import { isEmpty } from "./ruby-empty.js";
+import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
@@ -3381,11 +3382,7 @@ export class Relation<T extends Base> {
     return this._cacheVersions.get(timestampColumn)!;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — Ruby's `Array#first` on the `select_rows` result; JS
-   *   arrays have no such method and `[0]` is the whole of it.
-   */
+  /** @internal */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     timestampColumn = String(timestampColumn);
 
@@ -3460,7 +3457,7 @@ export class Relation<T extends Base> {
         arel = query.toArel();
       }
 
-      [size, timestamp] = (await c.selectRows(arel, null))[0] ?? [];
+      [size, timestamp] = first(await c.selectRows(arel, null)) ?? [];
 
       if (size != null) {
         const columnType = this.model.typeForAttribute(timestampColumn);

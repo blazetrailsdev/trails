@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Request, PassNotFound } from "../request.js";
 import { MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
+import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -203,42 +204,59 @@ describe("RequestMethod", () => {
   });
 
   it("allow request method hacking", () => {
-    const req = new Request({
-      REQUEST_METHOD: "POST",
-      "action_dispatch.request.parameters": { _method: "put" },
-    });
-    expect(req.method).toBe("PUT");
+    const req = new Request({ REQUEST_METHOD: "POST" });
+
+    expect(req.requestMethod).toBe("POST");
+    expect(req.env["REQUEST_METHOD"]).toBe("POST");
+
+    req.requestMethod = "GET";
+
+    expect(req.requestMethod).toBe("GET");
+    expect(req.env["REQUEST_METHOD"]).toBe("GET");
+    expect(req.isGet).toBe(true);
   });
 
   it("method returns original value of environment request method on POST", () => {
-    const req = new Request({
-      REQUEST_METHOD: "POST",
-      HTTP_X_HTTP_METHOD_OVERRIDE: "PATCH",
-    });
-    expect(req.method).toBe("PATCH");
-    expect(req.requestMethod).toBe("POST");
+    const req = new Request({ "rack.methodoverride.original_method": "POST" });
+    expect(req.method).toBe("POST");
   });
 
   it("post masquerading as patch", () => {
     const req = new Request({
-      REQUEST_METHOD: "POST",
-      HTTP_X_HTTP_METHOD_OVERRIDE: "PATCH",
+      REQUEST_METHOD: "PATCH",
+      "rack.methodoverride.original_method": "POST",
     });
-    expect(req.method).toBe("PATCH");
+
+    expect(req.method).toBe("POST");
+    expect(req.requestMethod).toBe("PATCH");
     expect(req.isPatch).toBe(true);
   });
 
   it("post masquerading as put", () => {
     const req = new Request({
-      REQUEST_METHOD: "POST",
-      HTTP_X_HTTP_METHOD_OVERRIDE: "PUT",
+      REQUEST_METHOD: "PUT",
+      "rack.methodoverride.original_method": "POST",
     });
-    expect(req.method).toBe("PUT");
+    expect(req.method).toBe("POST");
+    expect(req.requestMethod).toBe("PUT");
     expect(req.isPut).toBe(true);
   });
 
-  it.skip("invalid http method raises exception", () => {}); // checkMethod not wired into requestMethod getter
-  it.skip("method raises exception on invalid HTTP method", () => {}); // checkMethod not wired into method getter
+  it("invalid http method raises exception", () => {
+    expect(() => new Request({ REQUEST_METHOD: "RANDOM_METHOD" }).requestMethod).toThrow(
+      UnknownHttpMethod,
+    );
+  });
+
+  it("method raises exception on invalid HTTP method", () => {
+    expect(
+      () => new Request({ "rack.methodoverride.original_method": "_RANDOM_METHOD" }).method,
+    ).toThrow(UnknownHttpMethod);
+
+    expect(() => new Request({ REQUEST_METHOD: "_RANDOM_METHOD" }).method).toThrow(
+      UnknownHttpMethod,
+    );
+  });
   it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {}); // no I18n
   it.skip("post uneffected by local inflections", () => {}); // no Inflector integration
   it.skip("delegates to Object#method if an argument is passed", () => {}); // TS getter cannot accept arguments

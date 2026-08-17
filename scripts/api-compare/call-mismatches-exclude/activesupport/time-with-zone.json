@@ -65,17 +65,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-with-zone.ts",
-    "rubyName": "to_fs",
-    "call": "strftime",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:formatter"
-    ],
-    "reason": "trails has no `Time::DATE_FORMATS` registry, so `to_fs` switches on the format name and passes that entry's format string literally where Rails passes the looked-up `formatter`. Porting the registry is tracked as its own story (0023-surfaced-deviations/port-time-date-formats-registry)."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-with-zone.ts",
     "rubyName": "to_s",
     "call": "strftime",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

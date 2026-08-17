@@ -829,6 +829,27 @@ describe("TimeWithZoneTest", () => {
     expect(twz.toFs("iso8601")).toBe(twz.xmlschema());
   });
 
+  it("to fs", () => {
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
+    expect(twz.toFs()).toBe("1999-12-31 19:00:00 -0500");
+  });
+
+  it("to fs db", () => {
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
+    expect(twz.toFs("db")).toBe("2000-01-01 00:00:00");
+    expect(twz.toFormattedS("db")).toBe("2000-01-01 00:00:00");
+  });
+
+  it("to fs inspect", () => {
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
+    expect(twz.toFs("inspect")).toBe("1999-12-31 19:00:00.000000000 -0500");
+  });
+
+  it("to fs not existent", () => {
+    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
+    expect(twz.toFs("not_existent")).toBe("1999-12-31 19:00:00 -0500");
+  });
+
   it("strftime with composite format", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.strftime("%Y-%m-%d %H:%M:%S %Z %z")).toBe("1999-12-31 19:00:00 EST -0500");
