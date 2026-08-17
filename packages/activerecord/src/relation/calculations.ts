@@ -137,7 +137,7 @@ interface CalculationRelation {
   optimizerHintsValues: string[];
   _isNone: boolean;
   /** @internal Rebase-then-report none short-circuit; see Relation. */
-  _isEmptyRelation(): boolean;
+  isNullRelation(): boolean;
   distinctValue: boolean;
   /** Mirrors `Relation#distinct!` (query_methods.rb). */
   distinctBang(value?: boolean): unknown;
@@ -221,7 +221,7 @@ interface CalculationRelation {
   eagerLoadValues: unknown[];
   includesValues: unknown[];
   /** @internal trails: `spawn` without the scoping re-application; see Relation. */
-  _clone(): CalculationRelation;
+  clone(): CalculationRelation;
   /** @internal trails: builds the JoinDependency `apply_join_dependency` would. */
   _buildEagerJoinDependency(specs: unknown[]): JoinDependency;
   /** Mirrors `Relation#limit_or_offset?`. */
@@ -747,11 +747,11 @@ export async function calculate(
 ): Promise<unknown> {
   operation = operation.toLowerCase();
 
-  // Rails' `@none`. `_isEmptyRelation()` is the shared none-short-circuit
+  // Rails' `@none`. `isNullRelation()` is the shared none-short-circuit
   // chokepoint: on an AssociationRelation it first rebases a stale new-owner
   // `1=0` seed onto the live association scope, so a calculation on a relation
   // spawned off a new owner picks up the persisted FK after `save`.
-  if (this._isEmptyRelation()) {
+  if (this.isNullRelation()) {
     switch (operation) {
       case "count":
       case "sum":
@@ -803,7 +803,7 @@ export async function pluck(
   ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
 ): Promise<unknown[]> {
   // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
-  if (this._isEmptyRelation()) return [];
+  if (this.isNullRelation()) return [];
 
   // calculations.rb:300 — a loaded relation whose plucked columns are all
   // attributes reads the materialized records instead of issuing SQL, the same
@@ -844,7 +844,7 @@ export async function pluck(
       // hasInclude is true only when eagerLoadValues or
       // includesValues is non-empty, so the union is always non-empty here.
       const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-      const rel = this._clone();
+      const rel = this.clone();
       rel.eagerLoadValues = [];
       rel.includesValues = [];
 
@@ -930,7 +930,7 @@ export async function pluck(
     // the spawn's select before building is essential: resolving the discarded
     // select list would mutate referencesValues and could promote includes
     // (adding joins Rails would not add for the pluck columns).
-    const rel = this._clone();
+    const rel = this.clone();
     delete rel._values.select;
     // calculations.rb:315-316 — `relation.select_values = columns; relation.arel`.
     // Going through `select_values` (rather than overwriting `manager.projections`)
@@ -1031,7 +1031,7 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     const eagerSpecs = [...this.eagerLoadValues, ...this.includesValues].filter(
       (spec, i, all) => all.indexOf(spec) === i,
     );
-    const rel = this._clone();
+    const rel = this.clone();
     rel.eagerLoadValues = [];
     rel.includesValues = [];
 

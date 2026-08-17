@@ -249,7 +249,7 @@ export class ThroughAssociation extends Association {
     const sourceIsNested = (sourceRefl as any).isThroughReflection?.() ?? false;
     const hasSourceType = !!(this.reflection as any).options?.sourceType;
     if (!sourceIsNested && !this.reflectionScope.isEmptyScope) {
-      sourceScope = this.reflectionScope._clone();
+      sourceScope = this.reflectionScope.clone();
       if (!hasSourceType) {
         sourceScope.whereClause = new WhereClause([]);
       }

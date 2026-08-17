@@ -1,14 +1,17 @@
 import { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
-import { disableJoinsAssociationRelationClassFor } from "./relation/delegation.js";
+import {
+  disableJoinsAssociationRelationClassFor,
+  wrapWithScopeProxy,
+} from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import type { Base } from "./base.js";
 import type { Nodes } from "@blazetrails/arel";
 
 /**
  * Module-private token for the DJAR fast-clone path. Unexported — only
- * `_newRelation` inside this module can forge a payload carrying it,
+ * `clone` inside this module can forge a payload carrying it,
  * so external callers can't reach the trusted constructor branch even
  * via `any`/`unknown` erasure (they have no reference to the symbol).
  */
@@ -140,7 +143,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   );
   // The implementation signature accepts an internal
   // `TrustedClonePayload<T>` (gated by the unexported `TRUSTED_CLONE`
-  // symbol) as the fourth argument so `_newRelation` can take the
+  // symbol) as the fourth argument so `clone` can take the
   // fast-clone path. It is intentionally NOT declared as a public
   // overload — external callers only see the two correlated forms
   // above, and they can't construct a valid trusted payload without
@@ -152,7 +155,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     chainWalkerOrTrusted?: (() => Promise<{ relation: Relation<T> }>) | TrustedClonePayload<T>,
   ) {
     super(klass);
-    // Fast clone path: `_newRelation` hands us already-normalized
+    // Fast clone path: `clone` hands us already-normalized
     // state from another DJAR. Skip dedup / arity checks / per-tuple
     // JSON.stringify and just adopt the frozen outputs.
     if (
@@ -518,13 +521,15 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   }
 
   /**
-   * Preserve the subclass on `_clone()` (and any chained `where`/`order`
+   * Preserve the subclass on `clone()` (and any chained `where`/`order`
    * /`merge`) so the custom `toArray` reordering and `limit`/`first`
-   * overrides survive chaining. Without this, Relation#_clone() would
+   * overrides survive chaining. Without this, Relation#clone() would
    * spawn a plain Relation and silently drop the wrapping behavior.
+   *
+   * @internal
    */
-  protected override _newRelation(): Relation<T> {
-    // `_newRelation` runs on every `_clone()` — including the
+  override clone(): Relation<T> {
+    // This runs on every `clone()` — including the
     // limit/offset-free load clone inside `toArray()`, and every
     // chained `.where(...)` / `.order(...)` — so re-running the
     // full constructor (dedup + per-tuple JSON.stringify) on every
@@ -547,10 +552,16 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // module.
     const trusted = payload as unknown as () => Promise<{ relation: Relation<T> }>;
     const Ctor = disableJoinsAssociationRelationClassFor(this.model);
-    const clone = this._composite
+    const rel = (this._composite
       ? new Ctor(this.model, this.key as string[], this._storedIds as unknown[][], trusted)
-      : new Ctor(this.model, this.key as string, this._storedIds as unknown[], trusted);
-    return clone as unknown as Relation<T>;
+      : new Ctor(
+          this.model,
+          this.key as string,
+          this._storedIds as unknown[],
+          trusted,
+        )) as unknown as Relation<T>;
+    rel.initializeCopy(this as unknown as Relation<T>);
+    return wrapWithScopeProxy(rel);
   }
 
   override async toArray(): Promise<T[]> {
@@ -581,11 +592,11 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // observing the original configured state.
     type LimitOffset = { limitValue?: number | null; offsetValue?: number | null };
     const self = this as unknown as LimitOffset & {
-      _clone: () => DisableJoinsAssociationRelation<T>;
+      clone: () => DisableJoinsAssociationRelation<T>;
     };
     const limitVal = self.limitValue ?? null;
     const offsetVal = self.offsetValue ?? null;
-    const loadClone = self._clone() as unknown as LimitOffset;
+    const loadClone = self.clone() as unknown as LimitOffset;
     loadClone.limitValue = null;
     loadClone.offsetValue = null;
     // Call Relation's toArray directly on the clone — going through

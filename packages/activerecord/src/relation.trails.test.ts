@@ -70,9 +70,9 @@ describe("RelationTest", () => {
   // No like-named Rails test: relation_test.rb only covers the invalid-key path
   // ("merging a hash with unknown keys raises"). This guards the positive
   // HashMerger path — a valid VALUE_METHODS-keyed hash builds a fresh base
-  // Relation (via `_newRelation`) and dispatches each key to its value-method
+  // Relation (merger.rb:26-30) and dispatches each key to its value-method
   // bang setter, then merges through Merger — so a regression to the old
-  // where-conditions behavior (or a missing base-class `_newRelation`) is caught.
+  // where-conditions behavior is caught.
   it("merging a valid-key hash dispatches to value-methods", () => {
     const rel = CanonPost.all().merge({ where: { title: "a" }, limit: 5, order: "id" } as any);
     const sql = rel.toSql();

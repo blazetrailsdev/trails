@@ -206,7 +206,7 @@ export class Batches {
       generator = async function* () {
         await ensureValidOptions();
         for (const batchRows of loadedBatches) {
-          const batchRel = self._clone();
+          const batchRel = self.clone();
           batchRel.orderValues = batchOrders.map(([col, dir]) =>
             dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );
@@ -229,7 +229,7 @@ export class Batches {
           remaining,
           useRanges,
         })) {
-          const batchRel = self._clone();
+          const batchRel = self.clone();
           batchRel.orderValues = batchOrders.map(([col, dir]) =>
             dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
           );

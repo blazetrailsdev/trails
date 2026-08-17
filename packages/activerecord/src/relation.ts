@@ -58,7 +58,10 @@ import {
   type ToSentenceOptions,
   type ToXmlOptions,
 } from "./relation/delegation.js";
-import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import {
+  _registerRelationFamily,
+  _relationFamilySlot,
+} from "./relation/uncacheable-methods-slot.js";
 import { resolveAliasedColumn } from "./reflection.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { Result } from "./result.js";
@@ -647,7 +650,7 @@ export class Relation<T extends Base> {
     conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
-    if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
+    if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this.clone());
     // Rails: a single blank-ish argument (`args.length == 1 && args.first.blank?`,
     // query_methods.rb:1036) makes `where` a no-op returning the relation
     // unchanged — `where({})` / `where([])` / `where(null)` / `where("")` all
@@ -658,7 +661,7 @@ export class Relation<T extends Base> {
     // lets a NESTED empty hash (`where(posts: {})`) still expand to the `1=0`
     // contradiction Rails' `expand_from_hash` returns.
     if (rest.length === 0 && _qm.isBlankArgument(conditionsOrSql)) {
-      return this._clone();
+      return this.clone();
     }
     // Composite-key form: array of column names + array of tuples. It is
     // always a two-argument call (`where(cols, tuples)`), so it is
@@ -692,12 +695,12 @@ export class Relation<T extends Base> {
         tuples,
         (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
       );
-      if (nodes.length === 0) return this._clone().noneBang();
-      const rel = this._clone();
+      if (nodes.length === 0) return this.clone().noneBang();
+      const rel = this.clone();
       rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
       return rel;
     }
-    return this._clone().whereBang(
+    return this.clone().whereBang(
       conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
       ...rest,
     );
@@ -712,7 +715,7 @@ export class Relation<T extends Base> {
     // Mirrors rewhere (query_methods.rb): `return unscope(:where) if conditions.nil?`.
     if (conditions == null) return this.unscope("where");
     conditions = sanitizeForbiddenAttributes(conditions);
-    const rel = this._clone();
+    const rel = this.clone();
     // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
     // `unscope!(where: where_clause.extract_attributes)`, `where_clause += ...`.
     // Building through the same `build_where_clause` path as `where` keeps the
@@ -739,7 +742,7 @@ export class Relation<T extends Base> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
       const reflection = rel._whereChainReflection(assocName);
-      const scope = rel._clone();
+      const scope = rel.clone();
       // Rails query_methods.rb:89-91: `@scope.joins!(association)` unless it is
       // already present in joins_values / left_outer_joins_values. Routing the
       // join through JoinDependency (joins!) rather than a bespoke resolver is
@@ -770,7 +773,7 @@ export class Relation<T extends Base> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
       const reflection = rel._whereChainReflection(assocName);
-      const scope = rel._clone();
+      const scope = rel.clone();
       // Rails query_methods.rb:126-128: `@scope.left_outer_joins!(association)`
       // then `@scope.where!(reflection.table_name => Array(pk).index_with(nil))`
       // (or `association => …` for a `:class_name` self-join).
@@ -892,7 +895,7 @@ export class Relation<T extends Base> {
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
       | Record<string, unknown>
       | string[];
-    const rel = this._clone();
+    const rel = this.clone();
     rel.referencesBang(...referencesFromConditions(conditions));
     if (
       Array.isArray(conditions) &&
@@ -962,8 +965,8 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#or
    */
   or(other: Relation<T>): Relation<T> {
-    if (this._isNone) return other._clone();
-    return this._clone().orBang(other);
+    if (this._isNone) return other.clone();
+    return this.clone().orBang(other);
   }
 
   /**
@@ -973,7 +976,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#and
    */
   and(other: Relation<T>): Relation<T> {
-    return this._clone().andBang(other);
+    return this.clone().andBang(other);
   }
 
   /**
@@ -993,7 +996,7 @@ export class Relation<T extends Base> {
     for (let i = 1; i < conditions.length; i++) {
       combined = combined.or(buildClause(conditions[i]));
     }
-    const rel = this._clone();
+    const rel = this.clone();
     if (combined.predicates.length > 0)
       rel.whereClause = rel.whereClause.plus(new WhereClause([combined.ast]));
     return rel;
@@ -1021,7 +1024,7 @@ export class Relation<T extends Base> {
   excluding(...records: unknown[]): Relation<T> {
     const combined = this._excludingArgs(records, "excluding");
     if (combined.length === 0) return this;
-    return this._clone().excludingBang(combined);
+    return this.clone().excludingBang(combined);
   }
 
   /**
@@ -1032,7 +1035,7 @@ export class Relation<T extends Base> {
   without(...records: unknown[]): Relation<T> {
     const combined = this._excludingArgs(records, "without");
     if (combined.length === 0) return this;
-    return this._clone().excludingBang(combined);
+    return this.clone().excludingBang(combined);
   }
 
   /**
@@ -1086,7 +1089,7 @@ export class Relation<T extends Base> {
     this.checkIfMethodHasArgumentsBang(":order", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
-    return this._clone().orderBang(...args);
+    return this.clone().orderBang(...args);
   }
 
   /**
@@ -1095,7 +1098,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#limit
    */
   limit(value: number | string | null): Relation<T> {
-    return this._clone().limitBang(value);
+    return this.clone().limitBang(value);
   }
 
   /**
@@ -1104,7 +1107,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#offset
    */
   offset(value: number | string | null): Relation<T> {
-    return this._clone().offsetBang(value);
+    return this.clone().offsetBang(value);
   }
 
   /**
@@ -1131,7 +1134,7 @@ export class Relation<T extends Base> {
     }
     this.checkIfMethodHasArgumentsBang(":select", fields, "Call `select' with at least one field.");
     fields = this.processSelectArgs(fields);
-    return this._clone()._selectBang(...fields);
+    return this.clone()._selectBang(...fields);
   }
 
   /**
@@ -1142,7 +1145,7 @@ export class Relation<T extends Base> {
   reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":reselect", args as unknown[]);
     args = this.processSelectArgs(args as unknown[]) as typeof args;
-    return this._clone().reselectBang(...args);
+    return this.clone().reselectBang(...args);
   }
 
   /**
@@ -1151,7 +1154,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#distinct
    */
   distinct(value = true): Relation<T> {
-    return this._clone().distinctBang(value);
+    return this.clone().distinctBang(value);
   }
 
   /**
@@ -1160,7 +1163,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
    */
   distinctOn(...columns: string[]): Relation<T> {
-    const rel = this._clone();
+    const rel = this.clone();
     rel.distinctValue = true;
     rel._distinctOnColumns = columns;
     return rel;
@@ -1173,7 +1176,7 @@ export class Relation<T extends Base> {
    */
   group(...args: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":group", args as unknown[]);
-    return this._clone().groupBang(...(args as string[]));
+    return this.clone().groupBang(...(args as string[]));
   }
 
   /**
@@ -1189,7 +1192,7 @@ export class Relation<T extends Base> {
     condition: string | Record<string, unknown> | Nodes.Node,
     ...binds: unknown[]
   ): Relation<T> {
-    return this._clone().havingBang(condition, ...binds);
+    return this.clone().havingBang(condition, ...binds);
   }
 
   /**
@@ -1199,7 +1202,7 @@ export class Relation<T extends Base> {
    */
   regroup(...args: string[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":regroup", args);
-    return this._clone().regroupBang(...args);
+    return this.clone().regroupBang(...args);
   }
 
   /**
@@ -1211,7 +1214,7 @@ export class Relation<T extends Base> {
     this.checkIfMethodHasArgumentsBang(":reorder", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
-    return this._clone().reorderBang(...args);
+    return this.clone().reorderBang(...args);
   }
 
   /**
@@ -1220,7 +1223,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reverse_order
    */
   reverseOrder(): Relation<T> {
-    return this._clone().reverseOrderBang();
+    return this.clone().reverseOrderBang();
   }
 
   /**
@@ -1239,7 +1242,7 @@ export class Relation<T extends Base> {
 
     if (values.length === 0) return this.none();
 
-    const rel = this._clone();
+    const rel = this.clone();
 
     // Mirrors Rails: `references = column_references([column]);
     // self.references_values |= references unless references.empty?`
@@ -1305,7 +1308,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#invert_where
    */
   invertWhere(): Relation<T> {
-    return this._clone().invertWhereBang();
+    return this.clone().invertWhereBang();
   }
 
   /**
@@ -1419,7 +1422,7 @@ export class Relation<T extends Base> {
     // named and raw joins; the named-vs-raw partition the builders need is
     // derived on read by `select_association_list`.
     return QueryMethodBangs.joinsBang.call(
-      this._clone() as any,
+      this.clone() as any,
       ...(args as (string | Nodes.Join)[]),
     ) as Relation<T>;
   }
@@ -1479,7 +1482,7 @@ export class Relation<T extends Base> {
     // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
     // `buildJoinBuckets` for the raise.
     return QueryMethodBangs.leftOuterJoinsBang.call(
-      this._clone() as any,
+      this.clone() as any,
       ...(args as AssociationSpec[]),
     ) as Relation<T>;
   }
@@ -1908,7 +1911,7 @@ export class Relation<T extends Base> {
    */
   includes(...args: AssociationSpec[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":includes", args);
-    return this._clone().includesBang(...args);
+    return this.clone().includesBang(...args);
   }
 
   /**
@@ -1918,7 +1921,7 @@ export class Relation<T extends Base> {
    */
   preload(...args: AssociationSpec[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":preload", args);
-    return this._clone().preloadBang(...args);
+    return this.clone().preloadBang(...args);
   }
 
   /**
@@ -1928,7 +1931,7 @@ export class Relation<T extends Base> {
    */
   eagerLoad(...args: AssociationSpec[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":eager_load", args);
-    return this._clone().eagerLoadBang(...args);
+    return this.clone().eagerLoadBang(...args);
   }
 
   // -- Relation state --
@@ -2149,7 +2152,7 @@ export class Relation<T extends Base> {
    * the `loaded?` short-circuit lives in `empty?` (relation.rb:362-370).
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
-    if (this._isEmptyRelation()) return false;
+    if (this.isNullRelation()) return false;
     if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
     return !(await this.isEmpty());
   }
@@ -2160,7 +2163,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#many?
    */
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
-    if (this._isEmptyRelation()) return false;
+    if (this.isNullRelation()) return false;
     if (predicate !== undefined) return (await this._countMatching(predicate, 2)) > 1;
     if (this._loaded) return this._records.length > 1;
     return (await this.limitedCount()) > 1;
@@ -2172,7 +2175,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#one?
    */
   async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
-    if (this._isEmptyRelation()) return false;
+    if (this.isNullRelation()) return false;
     if (pattern !== undefined) return (await this._countMatching(pattern, 2)) === 1;
     if (this._loaded) return this._records.length === 1;
     return (await this.limitedCount()) === 1;
@@ -2319,7 +2322,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#to_a / #load
    */
   async toArray(): Promise<T[]> {
-    if (this._isEmptyRelation()) return [];
+    if (this.isNullRelation()) return [];
     if (this._loaded) return [...this._records];
     if (this._loadAsyncPromise) {
       // A prior loadAsync() kicked off the query — share the in-flight
@@ -2813,7 +2816,7 @@ export class Relation<T extends Base> {
     const table = this.table;
     // Mirrors Rails: blank check precedes none? check (relation.rb:589-591).
     if (isBlank(updates)) throw new ArgumentError("Empty list of attributes to change");
-    if (this._isEmptyRelation()) return 0;
+    if (this.isNullRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
@@ -2870,7 +2873,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#delete_all
    */
   async deleteAll(): Promise<number> {
-    if (this._isEmptyRelation()) return 0;
+    if (this.isNullRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL.select` (relation.rb:1014):
@@ -3589,7 +3592,7 @@ export class Relation<T extends Base> {
     // shared `AliasTracker` spanning the eager JoinDependency and the manual
     // joins, deduping coinciding nodes via `walk` — same threading as the
     // relation `_applyEagerJoinDependency` yields.
-    const joined = this._clone();
+    const joined = this.clone();
     QueryMethodBangs.joinsBang.call(joined as any, jd as any);
     _qm.buildJoins.call(joined as any, idSubquery);
     if (!this.whereClause.isEmpty()) idSubquery.where(this.whereClause.ast);
@@ -3839,7 +3842,7 @@ export class Relation<T extends Base> {
     // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
     // `with(null)` no-ops). It mutates `args` in place.
     this.checkIfMethodHasArgumentsBang(":with", args);
-    return this._clone().withBang(...args);
+    return this.clone().withBang(...args);
   }
 
   /**
@@ -3856,7 +3859,7 @@ export class Relation<T extends Base> {
     // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
     // (so `withRecursive(null)` no-ops). It mutates `args` in place.
     this.checkIfMethodHasArgumentsBang(":with_recursive", args);
-    return this._clone().withRecursiveBang(...args);
+    return this.clone().withRecursiveBang(...args);
   }
 
   // -- Other query methods --
@@ -3868,7 +3871,7 @@ export class Relation<T extends Base> {
    */
   references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":references", tableNames);
-    return this._clone().referencesBang(...tableNames) as Relation<T>;
+    return this.clone().referencesBang(...tableNames) as Relation<T>;
   }
 
   /**
@@ -4141,15 +4144,37 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Check equality with another relation.
+   * Compares two relations for equality.
    *
-   * Mirrors: ActiveRecord::Relation#==
+   * Mirrors: ActiveRecord::Relation#== (relation.rb:1253-1262) — a
+   * `case/when` whose arms are, in order: a `CollectionProxy`/
+   * `AssociationRelation` (re-dispatch on its `records`), any other `Relation`
+   * (compare `to_sql`), an Array (compare the loaded `records`). Anything else
+   * falls off the `case` and returns `nil`.
+   *
+   * The two relation-family classes are read off the zero-import registration
+   * slot rather than imported: they are `Relation` subclasses, so a value
+   * import here would close a subclass cycle. Reading them at call time is
+   * where Ruby resolves the constants anyway.
    */
-  async equals(other: Relation<T>): Promise<boolean> {
-    const a = await this.toArray();
-    const b = await other;
-    if (a.length !== b.length) return false;
-    return a.every((rec, i) => rec.equals(b[i]));
+  async equals(other: unknown): Promise<boolean | undefined> {
+    const CollectionProxyCtor = _relationFamilySlot.collectionProxy;
+    const AssociationRelationCtor = _relationFamilySlot.associationRelation;
+    if (
+      (CollectionProxyCtor && other instanceof CollectionProxyCtor) ||
+      (AssociationRelationCtor && other instanceof AssociationRelationCtor)
+    ) {
+      return this.equals(await (other as Relation<T>).records());
+    }
+    if (other instanceof Relation) {
+      return other.toSql() === this.toSql();
+    }
+    if (Array.isArray(other)) {
+      const records = await this.records();
+      if (records.length !== other.length) return false;
+      return records.every((rec, i) => rec.equals(other[i]));
+    }
+    return undefined;
   }
 
   /**
@@ -4228,31 +4253,9 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#none?
    */
   async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
-    if (this._isEmptyRelation()) return true;
+    if (this.isNullRelation()) return true;
     if (pattern !== undefined) return !(await this.toArray()).some(this._patternMatcher(pattern));
     return this.isEmpty();
-  }
-
-  /**
-   * The single none-short-circuit chokepoint consulted by every query terminal
-   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and by the mutation
-   * terminals (`updateAll`/`deleteAll`) BEFORE returning an empty result.
-   * `touchAll`/`updateCounters` reach it by delegating to `updateAll`, as they
-   * do in Rails.
-   *
-   * On a plain relation this is just `_isNone`; the override in
-   * `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
-   * live association scope, so a relation SPAWNED off a new owner
-   * (`owner.things.where(...)`) resolves the persisted FK once the owner is
-   * saved — mirroring Rails' CollectionProxy delegating every query to
-   * `association.scope`, rather than each terminal carrying its own rebase hook.
-   * `CollectionProxy` needs no rebase at all: it is never `@none` itself, and
-   * its value readers are delegated to `scope` (collection_proxy.rb:1128-1137).
-   *
-   * @internal
-   */
-  _isEmptyRelation(): boolean {
-    return this._isNone;
   }
 
   /**
@@ -4615,7 +4618,7 @@ export class Relation<T extends Base> {
       let collection: Relation<T> = this;
       if (this._eagerLoadingForSql()) {
         const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-        const rel = this._clone();
+        const rel = this.clone();
         rel.eagerLoadValues = [];
         rel.includesValues = [];
         const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
@@ -4655,7 +4658,7 @@ export class Relation<T extends Base> {
       if (collection.hasLimitOrOffset) {
         // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
         const subqueryAlias = "subquery_for_cache_key";
-        const inner = collection._clone();
+        const inner = collection.clone();
         // Rails appends `select("<col> AS collection_cache_key_timestamp")` to
         // whatever the collection already selects — a custom `select(...)` must
         // survive so its aliases (e.g. an `ORDER BY` on a `name AS dev_name`
@@ -4691,7 +4694,7 @@ export class Relation<T extends Base> {
         size = Number(rows[0]?.size ?? 0);
         timestamp = rows[0]?.timestamp;
       } else {
-        const query = collection._clone();
+        const query = collection.clone();
         query.orderValues = [];
         query._rawOrderClauses = [];
         query.selectValues = [countStar.as("size"), maxNode.as("timestamp")];
@@ -4752,20 +4755,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * @internal Subclasses (e.g. AssociationRelation) override this to return
-   * an instance of themselves so `_clone()` preserves the subclass through
-   * chains like `blog.posts.where(...).order(...)`.
-   */
-  protected _newRelation(): Relation<T> {
-    // Spawn from the per-model `Relation` subclass carrier (`relationClassFor`)
-    // so cloned relations keep the prototype that carries generated relation
-    // methods — otherwise `.where(...).someClassMethod()` would spawn a bare
-    // shared `Relation` and lose the real-method resolution.
-    const ctor = relationClassFor(this._model as unknown as typeof Base);
-    return new ctor(this._model) as Relation<T>;
-  }
-
-  /**
    * Copy query state from `source` onto `this`.
    *
    * Mirrors: ActiveRecord::Relation#initialize_copy (relation.rb:97-100) —
@@ -4809,9 +4798,22 @@ export class Relation<T extends Base> {
     // spawn `model.all` and discard the values accumulated so far.
   }
 
-  /** @internal */
-  _clone(): Relation<T> {
-    const rel = this._newRelation();
+  /**
+   * Ruby's `Object#clone` — the allocation `spawn` (spawn_methods.rb:10) copies
+   * through. Ruby copies the receiver's ivars into a same-class allocation and
+   * then runs `initialize_copy`; TypeScript has no `allocate`, so the class is
+   * re-instantiated here (subclasses override to reach their own constructor)
+   * and `initializeCopy` does the ivar copy.
+   *
+   * @internal
+   */
+  clone(): Relation<T> {
+    // Allocate from the per-model `Relation` subclass carrier
+    // (`relationClassFor`) so cloned relations keep the prototype that carries
+    // generated relation methods — otherwise `.where(...).someClassMethod()`
+    // would spawn a bare shared `Relation` and lose the real-method resolution.
+    const ctor = relationClassFor(this._model as unknown as typeof Base);
+    const rel = new ctor(this._model) as Relation<T>;
     rel.initializeCopy(this);
     return wrapWithScopeProxy(rel);
   }
@@ -4941,6 +4943,10 @@ _registerRelationFamily("relation", Relation);
 // ---------------------------------------------------------------------------
 
 export interface Relation<T extends Base> {
+  // Declared as a METHOD signature (the mixin's object-literal type makes it a
+  // function-valued PROPERTY) so `AssociationRelation` can override it with a
+  // plain method and reach `super.isNullRelation()`.
+  isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
