@@ -231,10 +231,14 @@ export class ConnectionHandler {
     return poolConfig.pool;
   }
 
+  /**
+   * Mirrors: `active_connections?` (`connection_handler.rb:157-159`).
+   *
+   * `each_connection_pool(role)` is an Enumerator when Ruby calls it without a
+   * block; the TS signature always takes one, so the pools are collected before
+   * `any?`.
+   */
   activeConnectionsQ(role?: string | null): boolean {
-    // `each_connection_pool(role)` (connection_handler.rb:158) is an Enumerator
-    // when called without a block; the TS overload always takes one, so the
-    // pools are collected before `any?`.
     const pools: ConnectionPool[] = [];
     this.eachConnectionPool(role, (pool) => {
       pools.push(pool);
