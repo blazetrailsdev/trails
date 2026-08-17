@@ -322,7 +322,7 @@ describe("PostgreSQL quoting", () => {
     };
     const column = { oid: 23, fmod: -1, sqlType: "integer" };
 
-    expect(lookupCastTypeFromColumn(column, typeMap)).toEqual({ sentinel: true });
+    expect(lookupCastTypeFromColumn.call({ typeMap }, column)).toEqual({ sentinel: true });
     expect(calls).toEqual([[23, -1, "integer"]]);
   });
 

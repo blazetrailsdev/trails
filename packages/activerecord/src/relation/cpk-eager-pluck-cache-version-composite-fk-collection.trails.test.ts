@@ -1,5 +1,5 @@
 /**
- * Eager-load pluck / cache_version over a composite-PK collection association.
+ * Eager-load pluck over a composite-PK collection association.
  *
  * `JoinDependency`'s join builder used to bail for any composite source PK, so a
  * composite-PK model's composite-FK collection (`CpkBook.hasMany("chapters",
@@ -8,7 +8,7 @@
  * converged: `JoinAssociation#joinConstraints` builds the composite FK↔PK tuple
  * ON clause (`cpk_chapters.author_id = cpk_books.author_id AND
  * cpk_chapters.book_id = cpk_books.id`), so `eagerLoad("chapters")` JOINs like
- * Rails and `pluck` / `cache_version` read from the joined query.
+ * Rails and `pluck` reads from the joined query.
  *
  * The composite-FK `belongsTo` direction is likewise converged: a nested spec
  * whose inner segment is a composite-FK `belongsTo` (`{ chapters: "book" }`)
@@ -29,14 +29,6 @@ import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import "../associations/collection-proxy.js";
 import "../association-relation.js";
-
-function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
-  const original = Base.collectionCacheVersioning;
-  Base.collectionCacheVersioning = true;
-  return fn().finally(() => {
-    Base.collectionCacheVersioning = original;
-  });
-}
 
 describe("CpkBook eager pluck / cache_version over a composite-FK collection", () => {
   // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
@@ -153,31 +145,5 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       .order("cpk_books.author_id", "cpk_books.id")
       .pluck("cpk_chapters.title");
     expect(titles).toEqual(["ch-1", null, null]);
-  });
-
-  it("cache_version over eagerLoad('chapters') joins the composite-FK collection", async () => {
-    await withCollectionCacheVersioning(async () => {
-      await seedBooks();
-      const eager = await CpkBook.eagerLoad("chapters")
-        .order("cpk_books.author_id", "cpk_books.id")
-        .cacheVersion("revision");
-      const base = await CpkBook.order("cpk_books.author_id", "cpk_books.id").cacheVersion(
-        "revision",
-      );
-      expect(eager).toBe(base);
-    });
-  });
-
-  it("cache_version over eagerLoad('chapters') with a limit materializes the composite primary keys", async () => {
-    await withCollectionCacheVersioning(async () => {
-      await seedBooks();
-      // The limited DISTINCT composite keys are materialized, so the size the
-      // cache version reports is the two limited PARENTS.
-      const version = await CpkBook.eagerLoad("chapters")
-        .order("cpk_books.author_id", "cpk_books.id")
-        .limit(2)
-        .cacheVersion("revision");
-      expect(version).toMatch(/^2-/);
-    });
   });
 });

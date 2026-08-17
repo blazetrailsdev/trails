@@ -143,12 +143,12 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
   });
 
   it("resolves the OID → Type via the type_map", () => {
-    const type = adapter.lookupCastTypeFromColumn({ oid: UUID_OID, name: "guid" });
+    const type = adapter.lookupCastTypeFromColumn({ oid: UUID_OID });
     expect(type).toBeInstanceOf(Uuid);
   });
 
   it("returns a ValueType when oid is missing", () => {
-    const type = adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "uuid", name: "guid" });
+    const type = adapter.lookupCastTypeFromColumn({ oid: null, sqlType: "uuid" });
     expect(type).toBeInstanceOf(ValueType);
   });
 

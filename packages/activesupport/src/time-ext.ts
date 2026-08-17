@@ -745,17 +745,25 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
  * A JS `Date` is an instant with no zone of its own, so it is bridged onto the
  * ruby/date `Time` the Rails body formats as a `Time.utc` — the reading
  * `Date#toISOString` answers, and the receiver Rails' own tests of this
- * method's callers build (`range_ext_test.rb`'s `Time.utc` endpoints).
+ * method's callers build (`range_ext_test.rb`'s `Time.utc` endpoints). A
+ * `Temporal.Instant` is the same receiver with sub-millisecond precision — the
+ * seat an ActiveRecord datetime attribute's cast value sits on — and is bridged
+ * the same way, so `:usec`/`:nsec` still read the microseconds a `Date` cannot
+ * carry.
  */
-export function toFs(date: Date, format: string = "default"): string {
-  const time = new RubyTime(
-    date.getUTCFullYear(),
-    date.getUTCMonth() + 1,
-    date.getUTCDate(),
-    date.getUTCHours(),
-    date.getUTCMinutes(),
-    date.getUTCSeconds() + date.getUTCMilliseconds() / 1000,
-    "UTC",
+export function toFs(date: Date | Temporal.Instant, format: string = "default"): string {
+  const utc =
+    date instanceof Date
+      ? Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO("UTC")
+      : date.toZonedDateTimeISO("UTC");
+  const time = RubyTime.utc(
+    utc.year,
+    utc.month,
+    utc.day,
+    utc.hour,
+    utc.minute,
+    utc.second,
+    utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
   );
   const formatter = DATE_FORMATS[format];
   if (formatter != null) {

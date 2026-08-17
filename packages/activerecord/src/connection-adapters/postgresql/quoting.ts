@@ -391,27 +391,31 @@ export function columnNameWithOrderMatcher(): RegExp {
   );
 }
 
-/**
- * Mirrors: PostgreSQL::Quoting#lookup_cast_type_from_column. Rails reaches
- * into the adapter's type_map via `type_map.lookup(oid, fmod, sql_type)`.
- * We accept the TypeMap as a parameter since this module has no adapter
- * instance.
- */
 export interface LookupableTypeMap {
   lookup(oid: number, fmod: number, sqlType: string): unknown;
 }
 
 export interface CastableColumn {
-  oid: number;
-  fmod: number;
-  sqlType: string;
+  oid?: number | null;
+  fmod?: number | null;
+  sqlType?: string | null;
 }
 
+/**
+ * Mirrors: PostgreSQL::Quoting#lookup_cast_type_from_column
+ * (postgresql/quoting.rb:189-192).
+ *
+ * `verify! if type_map.nil?` is the lazy build of the adapter's type map;
+ * trails' `typeMap` getter (postgresql-adapter.ts) performs that build on
+ * first read, so reading it here is the guard. Rails' `verify!` is `verifyBang`
+ * here and is async, and this method has sync callers (the attribute-read type
+ * caster), so it cannot be awaited at this site.
+ */
 export function lookupCastTypeFromColumn(
+  this: { typeMap: LookupableTypeMap },
   column: CastableColumn,
-  typeMap: LookupableTypeMap,
 ): unknown {
-  return typeMap.lookup(column.oid, column.fmod, column.sqlType);
+  return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 
 /**
