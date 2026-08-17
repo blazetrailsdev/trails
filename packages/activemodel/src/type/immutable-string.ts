@@ -37,12 +37,15 @@ export class ImmutableStringType extends ValueType<string> {
    *
    * `super` is Value#serialize — identity — so an Object, an Array or a Hash
    * comes straight back out (string_test.rb:17-23 pins that). A Ruby Symbol is
-   * a `":name"` string in trails and so takes the `else` arm rather than the
-   * `to_s` one; the two only differ in the leading colon.
+   * a `":name"` string in trails, and the leading colon is the discriminator
+   * the `when ::Symbol` arm gets from the type: `:bob.to_s` is `"bob"`, so the
+   * Symbol arm is `.slice(1)` while a String falls through to `super`
+   * unchanged.
    */
   serialize(value: unknown): unknown {
     if (typeof value === "number" || typeof value === "bigint") return String(value);
     if (value instanceof BigDecimal || value instanceof Duration) return String(value);
+    if (typeof value === "string" && value.startsWith(":")) return value.slice(1);
     if (value === true) return this.true;
     if (value === false) return this.false;
     return super.serialize(value);
