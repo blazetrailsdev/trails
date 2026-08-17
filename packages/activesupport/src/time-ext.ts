@@ -761,6 +761,9 @@ export function toFs(date: Date, format: string = "default"): string {
   return time.toS();
 }
 
+/** Mirrors: `alias_method :to_formatted_s, :to_fs` (`core_ext/time/conversions.rb:62`). */
+export { toFs as toFormattedS };
+
 /**
  * Creates a Time instance from an RFC 3339 string — time/calculations.rb:68-81.
  *
