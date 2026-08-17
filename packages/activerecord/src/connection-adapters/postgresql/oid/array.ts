@@ -70,9 +70,12 @@ export class PgTextDecoderArray {
 
   decode(str: string): unknown[] {
     const trimmed = str.trim();
-    // A malformed array string decodes to `[]` rather than raising, which is
-    // the behaviour `cast`'s TypeError rescue documents (oid/array.rb:39-42).
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [];
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+      // Ruby's core TypeError, which oid/array.rb:39 rescues by name — there
+      // is no Rails error class to port here.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`malformed array literal: "${str}"`);
+    }
     const inner = trimmed.slice(1, -1);
     if (inner === "") return [];
 
@@ -202,7 +205,14 @@ export class Array extends ValueType<unknown> {
 
   cast(value: unknown): unknown {
     if (typeof value === "string") {
-      value = this.pgDecoder.decode(value);
+      try {
+        value = this.pgDecoder.decode(value);
+      } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
+        // malformed array string is treated as [], will raise in PG 2.0 gem
+        // this keeps a consistent implementation
+        value = [];
+      }
     }
     return this.typeCastArray(value, "cast");
   }
