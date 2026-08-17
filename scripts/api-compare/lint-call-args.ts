@@ -58,7 +58,11 @@ import {
   missingScope,
   rowsOfKind,
 } from "./call-mismatch-baseline.js";
-import { listJsonFiles, reportNonCanonicalBaselines } from "./baseline-json.js";
+import {
+  listJsonFiles,
+  reportEmptyBaselines,
+  reportNonCanonicalBaselines,
+} from "./baseline-json.js";
 import {
   NO_REGEN_FLAG,
   artifactIsStale,
@@ -153,6 +157,7 @@ export async function main(write: boolean): Promise<number> {
 
   const files = await listJsonFiles(BASELINE_DIR);
   if (await reportNonCanonicalBaselines(files, "call-args ratchet")) return 1;
+  if (await reportEmptyBaselines(files, "call-args ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
   if (added.length === 0 && stale.length === 0) {

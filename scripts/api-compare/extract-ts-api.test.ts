@@ -196,7 +196,7 @@ describe("body call capture", () => {
     // sorted + de-duped (runCallbacks appears twice, recorded once). The
     // intermediate read `obj.nested` in `obj.nested.touch()` is credited as
     // `nested` — a non-callee property read mirrors a Ruby method send.
-    expect(save.calls).toEqual([".nested", "helper", "nested", "runCallbacks", "touch"]);
+    expect(save.calls).toEqual([".nested", ".touch", "helper", "nested", "runCallbacks", "touch"]);
   });
 
   it("records the call-set of a get accessor body, as it does for a method", () => {
@@ -455,7 +455,16 @@ describe("body call capture", () => {
       }`,
     );
     const check = cls.instanceMethods.find((m) => m.name === "check")!;
-    expect(check.calls).toEqual(["!has", "!includes", "!loaded", "has", "includes", "loaded"]);
+    expect(check.calls).toEqual([
+      "!has",
+      "!includes",
+      "!loaded",
+      ".has",
+      ".includes",
+      "has",
+      "includes",
+      "loaded",
+    ]);
   });
 
   it("marks a read off another object with the foreign-read prefix", () => {
@@ -474,6 +483,46 @@ describe("body call capture", () => {
     expect(m.calls).toEqual([".locale", "defaults", "formats", "locale"]);
   });
 
+  it("marks a call INVOKED on another object with the foreign-read prefix", () => {
+    // `details.digest(x)` runs a member of `details`, not the same-file method
+    // `digest` — the closure must not union that one's call-set (RFC 0108).
+    const cls = extractFromSource(
+      `class Foo {
+        cacheKey(details: { digest(x: string): string }) {
+          return details.digest(this.name) + Registry.defaults();
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
+    // `defaults` is called on a class reference, whose static of that name may
+    // genuinely be a same-file member, so it stays resolvable.
+    expect(m.calls).toEqual([".digest", "defaults", "digest", "name"]);
+  });
+
+  it("keeps a name resolvable when the same body also calls it on this", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        cacheKey(details: { digest(x: string): string }) {
+          return details.digest("a") + this.digest("b");
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
+    expect(m.calls).toEqual(["digest"]);
+  });
+
+  it("does not mark the identifier an X.call(...) dispatch credits", () => {
+    // The `this`-typed mixin convention (CLAUDE.md): `emitJoinPlan` really is a
+    // same-file body, so it must stay resolvable by the closure.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return emitJoinPlan.call(this, 1); }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "build")!;
+    expect(m.calls).toEqual([".call", "call", "emitJoinPlan"]);
+  });
+
   it("does not mark a call the ! does not actually negate", () => {
     // `!a &&` binds the negation to `a`; `!!` is a truthiness cast, not a
     // negation — crediting either would be the same false positive the marker
@@ -487,7 +536,7 @@ describe("body call capture", () => {
       }`,
     );
     const check = cls.instanceMethods.find((m) => m.name === "check")!;
-    expect(check.calls).toEqual(["includes"]);
+    expect(check.calls).toEqual([".includes", "includes"]);
   });
 
   it("omits calls entirely for a body that invokes nothing", () => {
@@ -536,7 +585,15 @@ describe("body call capture", () => {
     const m = cls.instanceMethods.find((m) => m.name === "withLock")!;
     // Additive: the dispatched identifier is credited alongside the literal
     // call/apply name (so a Ruby `Proc#call` match is never lost).
-    expect(m.calls).toEqual(["apply", "call", "helper", "lockBang", "transaction"]);
+    expect(m.calls).toEqual([
+      ".apply",
+      ".call",
+      "apply",
+      "call",
+      "helper",
+      "lockBang",
+      "transaction",
+    ]);
   });
 
   it('records `new Foo(...)` as a "constructor" call (Ruby `Foo.new`)', () => {
@@ -659,6 +716,7 @@ describe("body call capture", () => {
        class Foo { buildJoins(arel) { _qm.emitJoinPlan.call(this, arel); } }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
+      ".call",
       ".emitJoinPlan",
       "call",
       "emitJoinPlan",
@@ -750,6 +808,7 @@ describe("body call capture", () => {
     );
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
       ".buildJoins",
+      ".call",
       "buildJoins",
       "call",
     ]);
@@ -787,7 +846,14 @@ describe("body call capture", () => {
     );
     const unpin = cls.instanceMethods.find((m) => m.name === "unpin")!;
     expect(unpin.callSeq).toEqual(["connection", "lock", "synchronize"]);
-    expect(unpin.calls).toEqual([".lock", "checkin", "connection", "lock", "synchronize"]);
+    expect(unpin.calls).toEqual([
+      ".lock",
+      ".synchronize",
+      "checkin",
+      "connection",
+      "lock",
+      "synchronize",
+    ]);
   });
 
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
@@ -867,7 +933,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "buildJoins")!;
-    expect(m.calls).toEqual(["concat", "joinsValues", "leftOuterJoinsValues"]);
+    expect(m.calls).toEqual([".concat", "concat", "joinsValues", "leftOuterJoinsValues"]);
   });
 
   it("does not double-record a call's callee property as a value read", () => {
@@ -903,7 +969,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "reset")!;
-    expect(m.calls).toEqual(["build", "pop"]);
+    expect(m.calls).toEqual([".build", ".pop", "build", "pop"]);
   });
 });
 
@@ -927,7 +993,7 @@ describe("body call capture — renamed-import aliases", () => {
     const m = cls.instanceMethods.find((m) => m.name === "touchDeferredAttributes")!;
     // `touch` (resolved from `timestampTouch` via both the aliased direct call
     // and the `.call` dispatch) plus the retained literal `call`.
-    expect(m.calls).toEqual(["call", "timestampTouch", "touch"]);
+    expect(m.calls).toEqual([".call", "call", "timestampTouch", "touch"]);
   });
 
   it("does not leak one file's aliases into another", () => {

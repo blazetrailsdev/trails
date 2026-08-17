@@ -41,6 +41,8 @@ import {
   resolveTsOwner,
   ambiguousTsOwner,
   ambiguousRubyOwner,
+  rubyOwnerSeat,
+  tsOwnerSeat,
   writerPairedWithReader,
   staleCallTags,
   suppressTaggedCalls,
@@ -1881,6 +1883,101 @@ describe("ambiguousTsOwner", () => {
   });
 });
 
+describe("resolveTsOwner — include graph and seats", () => {
+  // relation.ts declares `first` on `Relation` and on the nested `ExplainProxy`
+  // (relation.rb:24-26); `FinderMethods` names neither, but `Relation` is the
+  // class the module is mixed onto (relation.rb's include chain).
+  it("resolves a Ruby module flattened onto a TS host through the include graph", () => {
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect(
+      resolveTsOwner(owners, "ActiveRecord::FinderMethods", { hosts: new Set(["Relation"]) }),
+    ).toBe("Relation");
+  });
+
+  it("stays ambiguous when several owners mix the module in", () => {
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect(
+      resolveTsOwner(owners, "ActiveRecord::FinderMethods", {
+        hosts: new Set(["Relation", "ExplainProxy"]),
+      }),
+    ).toBeUndefined();
+  });
+
+  // persistence.rb declares `_update_record` on `ClassMethods` (:687-692) and on
+  // the instance (:900-916); persistence.ts spells the class half as the free
+  // export and the instance half as the `InstanceMethods` grouping.
+  const persistence = {
+    owners: new Set(["", "InstanceMethods"]),
+    seatOf: (o: string) => (o === "InstanceMethods" ? ("instance" as const) : undefined),
+    rubySeats: new Set(["class", "instance"] as const),
+  };
+
+  it("pairs a Ruby ClassMethods owner with the seatless top-level export", () => {
+    expect(
+      resolveTsOwner(persistence.owners, "ActiveRecord::Persistence::ClassMethods", {
+        seatOf: persistence.seatOf,
+        rubySeat: "class",
+        rubySeats: persistence.rubySeats,
+      }),
+    ).toBe("");
+  });
+
+  it("pairs the bare Ruby owner with the prototype member", () => {
+    expect(
+      resolveTsOwner(persistence.owners, "ActiveRecord::Persistence", {
+        seatOf: persistence.seatOf,
+        rubySeat: "instance",
+        rubySeats: persistence.rubySeats,
+      }),
+    ).toBe("InstanceMethods");
+  });
+
+  it("leaves the seats alone when the Ruby file poses no seat question", () => {
+    // time-ext.ts declares `toTime` as a free export AND on the `TimeExt`
+    // grouping, but `Date#to_time` is the only Ruby owner: the seat cannot say
+    // which class the module ported to, so picking one would be a mispairing.
+    expect(
+      resolveTsOwner(new Set(["", "TimeExt"]), "Date", {
+        seatOf: (o: string) => (o === "TimeExt" ? ("instance" as const) : undefined),
+        rubySeat: "instance",
+        rubySeats: new Set(["instance"] as const),
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("tsOwnerSeat", () => {
+  it("reads the trails grouping names before staticness", () => {
+    // An object literal's members are prototype members of the grouping, so
+    // `isStatic` would call `ClassMethods` the instance seat.
+    expect(tsOwnerSeat("ClassMethods", undefined, new Set(["ClassMethods"]))).toBe("class");
+    expect(tsOwnerSeat("InstanceMethods", undefined, new Set(["InstanceMethods"]))).toBe(
+      "instance",
+    );
+  });
+
+  it("reads a class declaration's staticness", () => {
+    expect(tsOwnerSeat("Base", new Set(["Base"]), undefined)).toBe("class");
+    expect(tsOwnerSeat("Base", undefined, new Set(["Base"]))).toBe("instance");
+  });
+
+  it("states no seat for a declaration that is both, or for neither", () => {
+    expect(tsOwnerSeat("Base", new Set(["Base"]), new Set(["Base"]))).toBeUndefined();
+    expect(tsOwnerSeat("", undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe("rubyOwnerSeat", () => {
+  it("reads the ClassMethods suffix as the singleton seat", () => {
+    expect(rubyOwnerSeat("ActiveRecord::Persistence::ClassMethods", false)).toBe("class");
+    expect(rubyOwnerSeat("ActiveRecord::Persistence", false)).toBe("instance");
+  });
+
+  it("reads a `def self.` method as the singleton seat wherever it lives", () => {
+    expect(rubyOwnerSeat("ActiveRecord::Base", true)).toBe("class");
+  });
+});
+
 describe("ambiguousRubyOwner", () => {
   it("records nothing when two Ruby owners share one TS member", () => {
     // persistence.rb defines `_update_record` on both `Persistence` (:900) and
@@ -1903,6 +2000,36 @@ describe("ambiguousRubyOwner", () => {
 
   it("compares when only one Ruby owner declares the name", () => {
     expect(ambiguousRubyOwner(new Set(["ActiveRecord::Persistence"]), new Set([""]))).toBe(false);
+  });
+
+  it("compares the arm whose seat the single TS member is declared on", () => {
+    const rubyOwners = new Set([
+      "ActiveRecord::Persistence",
+      "ActiveRecord::Persistence::ClassMethods",
+    ]);
+    const resolution = { tsSeat: "class" as const, rubyOwnersOnTsSeat: 1 };
+    expect(
+      ambiguousRubyOwner(rubyOwners, new Set(["Base"]), { ...resolution, rubySeat: "class" }),
+    ).toBe(false);
+    expect(
+      ambiguousRubyOwner(rubyOwners, new Set(["Base"]), { ...resolution, rubySeat: "instance" }),
+    ).toBe(true);
+  });
+
+  it("still records nothing when several Ruby owners share the TS member's seat", () => {
+    // routing/mapper.rb declares `add_route` on `Base`, `Resources` and
+    // `Scoping`, all instance: the seat answers nothing the count did not.
+    const rubyOwners = new Set([
+      "ActionDispatch::Routing::Mapper::Base",
+      "ActionDispatch::Routing::Mapper::Resources",
+    ]);
+    expect(
+      ambiguousRubyOwner(rubyOwners, new Set(["Mapper"]), {
+        rubySeat: "instance",
+        tsSeat: "instance",
+        rubyOwnersOnTsSeat: 2,
+      }),
+    ).toBe(true);
   });
 });
 

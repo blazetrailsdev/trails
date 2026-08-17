@@ -142,6 +142,7 @@ import {
 import {
   listJsonFiles,
   pruneEmptyDirs,
+  reportEmptyBaselines,
   reportNonCanonicalBaselines,
   serializeBaseline,
 } from "./baseline-json.js";
@@ -685,6 +686,7 @@ async function main(write: boolean, showSeededKeys: boolean): Promise<number> {
   // files, so they are held to the same canonical form.
   const files = [...(await listJsonFiles(BASELINE_DIR)), ...(await listJsonFiles(MARK_DIR))];
   if (await reportNonCanonicalBaselines(files, "call-mismatches ratchet")) return 1;
+  if (await reportEmptyBaselines(files, "call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, baseline);
   const staleTags = artifact.staleTags ?? [];

@@ -3055,6 +3055,13 @@ function collectCalls(
         const prop = callee.name.text;
         called.push(prop);
         negated.push(prop);
+        // `obj.someMethod()` invokes a member of ANOTHER object, exactly as
+        // `obj.someMethod` reads one, so it gets the same foreign tally: the
+        // same-file closure must not resolve the bare name against a same-file
+        // method of that name (RFC 0108). The `X.call(...)` identifier credited
+        // below is NOT tallied — that dispatch really does run a same-file body
+        // (the `this`-typed mixin convention, CLAUDE.md).
+        if (isForeignReadReceiver(callee.expression)) tally(foreignReadOccurrences, prop);
         // `X.call(...)` / `X.apply(...)` also dispatch the function bound to
         // `X` (the project's `this`-typed mixin convention, plus Ruby's
         // `meth.call`/`send` indirection). Additionally credit the dispatched

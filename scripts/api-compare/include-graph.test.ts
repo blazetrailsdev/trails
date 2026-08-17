@@ -4,6 +4,7 @@ import {
   buildIncludeGraph,
   includeGraphCallSets,
   includeGraphEntities,
+  includeGraphHosts,
   type GraphEntity,
 } from "./include-graph.js";
 import type { ClassInfo, MethodInfo } from "@blazetrails/parity/types";
@@ -197,5 +198,35 @@ describe("includeGraphCallSets", () => {
     const sets = includeGraphCallSets(includeGraphEntities("a.ts", graph), "run", graph);
     expect([...sets.calls]).toEqual(["map"]);
     expect([...sets.negated]).toEqual(["includes"]);
+  });
+});
+
+describe("includeGraphHosts", () => {
+  it("names the file's owner that mixes the Ruby module in", () => {
+    // relation.rb's `FinderMethods#first` is attributed to relation.ts, where
+    // `Relation` records the edge and the sibling `ExplainProxy` does not.
+    const graph = buildIncludeGraph([
+      entity("Relation", "relation.ts", { extends: ["FinderMethods"] }),
+      entity("ExplainProxy", "relation.ts"),
+      entity("FinderMethods", "relation/finder-methods.ts"),
+    ]);
+    expect([...includeGraphHosts("relation.ts", "FinderMethods", graph)]).toEqual(["Relation"]);
+  });
+
+  it("reaches a module through a transitive edge", () => {
+    const graph = buildIncludeGraph([
+      entity("Relation", "relation.ts", { extends: ["QueryMethods"] }),
+      entity("QueryMethods", "relation/query-methods.ts", { includes: ["FinderMethods"] }),
+      entity("FinderMethods", "relation/finder-methods.ts"),
+    ]);
+    expect([...includeGraphHosts("relation.ts", "FinderMethods", graph)]).toEqual(["Relation"]);
+  });
+
+  it("names nobody when no edge reaches the module", () => {
+    const graph = buildIncludeGraph([
+      entity("Relation", "relation.ts"),
+      entity("FinderMethods", "relation/finder-methods.ts"),
+    ]);
+    expect([...includeGraphHosts("relation.ts", "FinderMethods", graph)]).toEqual([]);
   });
 });

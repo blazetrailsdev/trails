@@ -23,6 +23,13 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
+    "rubyName": "handle_mime_head",
+    "call": "new",
+    "reason": "Rails accumulates the quoted parameter value into a `String.new` (multipart/parser.rb:334); the port extracts that loop into `parseDispositionParams` (parser.ts:366) and accumulates into a plain JS string — as for the `find_encoding` row beside it."
+  },
+  {
+    "package": "rack",
+    "tsFile": "multipart/parser.ts",
     "rubyName": "normalize_filename",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

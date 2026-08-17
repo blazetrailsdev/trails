@@ -4,6 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
+  findEmptyBaselines,
   findNonCanonicalBaselines,
   reportNonCanonicalBaselines,
   serializeBaseline,
@@ -74,6 +75,31 @@ describe("findNonCanonicalBaselines", () => {
   });
 });
 
+describe("findEmptyBaselines", () => {
+  async function withFile<T>(text: string, fn: (file: string) => Promise<T>): Promise<T> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "empty-baseline-"));
+    const file = path.join(dir, "a.json");
+    await fs.writeFile(file, text);
+    try {
+      return await fn(file);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("flags a shard holding no rows", async () => {
+    await withFile(serializeBaseline([]), async (file) => {
+      expect(await findEmptyBaselines([file])).toEqual([file]);
+    });
+  });
+
+  it("passes a shard holding a row", async () => {
+    await withFile(serializeBaseline([{ reason: "plain" }]), async (file) => {
+      expect(await findEmptyBaselines([file])).toEqual([]);
+    });
+  });
+});
+
 describe("reportNonCanonicalBaselines", () => {
   it("reports nothing for canonical files", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "canon-report-"));
@@ -110,5 +136,15 @@ describe("committed api-compare baselines", () => {
       ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-unreviewed"))),
     ];
     expect(await findNonCanonicalBaselines(files)).toEqual([]);
+  });
+
+  // An empty shard is deleted by every reseed, so committing one makes the
+  // mandatory reseed-drift check report a diff its caller did not cause.
+  it("hold no empty shards", async () => {
+    const files = [
+      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-exclude"))),
+      ...(await jsonFilesUnder(path.join(HERE, "call-mismatches-unreviewed"))),
+    ];
+    expect(await findEmptyBaselines(files)).toEqual([]);
   });
 });
