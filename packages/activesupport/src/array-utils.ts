@@ -192,10 +192,13 @@ export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[]
 
 /**
  * Remove elements from `array` that match `predicate`, returning the removed elements.
- * Mirrors Rails' `Array#extract!`.
+ *
+ * Mirrors: `Array#extract!` (core_ext/array/extract.rb:10-20). Ruby's no-block
+ * arm (`return to_enum(:extract!) { size } unless block_given?`, line 11) has
+ * no JS analogue — there is no Enumerator to return, as at `Enumerable#index_with`
+ * and `Deprecators#each` — so the predicate is required.
  */
-export function extractBang<T>(array: T[], predicate?: (item: T) => boolean): T[] {
-  if (!predicate) return array.splice(0, array.length);
+export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[] {
   const extracted: T[] = [];
   for (let i = array.length - 1; i >= 0; i--) {
     if (predicate(array[i])) {
