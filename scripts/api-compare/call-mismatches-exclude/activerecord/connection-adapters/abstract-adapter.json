@@ -9,48 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_delete",
-    "call": "affected_rows",
-    "reason": "RFC 0106: recorder shape — the matched TS member is the bodiless `execDelete` signature on the DatabaseStatements surface in abstract-adapter.ts; the ported body lives in abstract/database-statements.ts and is RFC 0076's execute-primitive work (abstract/database_statements.rb:191-193)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_delete",
-    "call": "internal_execute",
-    "reason": "RFC 0106: recorder shape — bodiless `execDelete` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:191-193)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "internal_exec_query",
-    "reason": "RFC 0106: recorder shape — bodiless `execInsert` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:157-170)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_insert",
-    "call": "sql_for_insert",
-    "reason": "RFC 0106: recorder shape — bodiless `execInsert` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:157-170)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_update",
-    "call": "affected_rows",
-    "reason": "RFC 0106: recorder shape — bodiless `execUpdate` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:186-188)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
-    "rubyName": "exec_update",
-    "call": "internal_execute",
-    "reason": "RFC 0106: recorder shape — bodiless `execUpdate` signature; the ported body is in abstract/database-statements.ts, owned by RFC 0076 (abstract/database_statements.rb:186-188)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-adapter.ts",
     "rubyName": "initialize",
     "call": "build_statement_pool",
     "reason": "RFC 0106: the base ctor takes no config (concrete adapters assign `_config`), so Rails' config-derived initialize tail has nowhere to run here; converging it is the constructor reshape owned by RFC 0094 (abstract_adapter.rb:155-172)."

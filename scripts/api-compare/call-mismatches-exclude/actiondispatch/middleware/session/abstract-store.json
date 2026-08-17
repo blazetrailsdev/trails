@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/session/abstract-store.ts",
-    "rubyName": "initialize_sid",
-    "call": "delete",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails abstract_store.rb:35-38 calls `@default_options.delete` twice; trails abstract-store.ts:124-127 uses the JS `delete this.defaultOptions.*` operator."
-  }
-]

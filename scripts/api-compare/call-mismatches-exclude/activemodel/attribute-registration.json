@@ -7,12 +7,5 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "attribute_registration.rb:93 `subclasses` is `Class#subclasses` on self. trails tracks descendants in `DescendantsTracker`, whose `subclasses(cls)` takes the class as its first argument because a JS class has no such built-in. Receiver-as-first-argument, not a dropped argument."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-registration.ts",
-    "rubyName": "type_for_attribute",
-    "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

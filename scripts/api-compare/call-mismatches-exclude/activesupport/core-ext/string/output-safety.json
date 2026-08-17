@@ -9,17 +9,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/string/output-safety.ts",
-    "rubyName": "html_safe",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:this"
-    ],
-    "reason": "output_safety.rb:226 `ActiveSupport::SafeBuffer.new(self)` — Ruby's SafeBuffer is a String subclass whose `html_safe?` is true by construction. A JS class cannot subclass the primitive `string`, so trails' SafeBuffer carries an explicit `safe` flag and `htmlSafe()` passes `true` for it. Language shortcoming."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/string/output-safety.ts",
     "rubyName": "safe_concat",
     "call": "html_safe?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

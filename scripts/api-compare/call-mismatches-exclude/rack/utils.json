@@ -23,20 +23,6 @@
   {
     "package": "rack",
     "tsFile": "utils.ts",
-    "rubyName": "parse_nested_query",
-    "call": "default_query_parser",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "utils.ts",
-    "rubyName": "parse_query",
-    "call": "default_query_parser",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "utils.ts",
     "rubyName": "status_code",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
