@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defineCallbacks, runCallbacks, setCallback, skipCallback } from "./callbacks.js";
+import { assertNotPredicate, assertPredicate } from "./testing/assertions.js";
 
 describe("BasicCallbacksTest", () => {
   it("basic conditional callback1", () => {
@@ -52,17 +53,18 @@ describe("InheritedCallbacksTest", () => {
     const child = Object.create(base);
     child.log = [];
     runCallbacks(child, "save", () => child.log.push("action"));
-    expect(child.log).toContain("action");
+    expect(child.log).toEqual(["base_cb", "action"]);
   });
 
   it("partially excluded", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb1"));
+    const cb1 = (t: any) => t.log.push("cb1");
+    setCallback(target, "save", "before", cb1);
     setCallback(target, "save", "before", (t: any) => t.log.push("cb2"));
-    skipCallback(target, "save", "before");
+    skipCallback(target, "save", "before", cb1);
     runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toContain("action");
+    expect(target.log).toEqual(["cb2", "action"]);
   });
 });
 
@@ -90,11 +92,16 @@ describe("InheritedCallbacksTest2", () => {
 
 describe("DynamicInheritedCallbacks", () => {
   it("callbacks looks to the superclass before running", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("parent_cb"));
-    runCallbacks(target, "save", () => target.log.push("action"));
-    expect(target.log).toEqual(["parent_cb", "action"]);
+    const emptyParent = { performed: false };
+    defineCallbacks(emptyParent, "dispatch");
+    let child: { performed: boolean } = Object.create(emptyParent);
+    runCallbacks(child, "dispatch");
+    assertNotPredicate(child, (c) => c.performed);
+
+    setCallback(emptyParent, "dispatch", "before", (c: any) => (c.performed = true));
+    child = Object.create(emptyParent);
+    runCallbacks(child, "dispatch");
+    assertPredicate(child, (c) => c.performed);
   });
 
   it("callbacks should be performed once in child class", () => {

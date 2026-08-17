@@ -3,6 +3,7 @@ import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ConfigurationFile } from "./configuration-file.js";
+import { assertRaises } from "./testing/assertions.js";
 
 describe("ConfigurationFileTest", () => {
   let dir: string;
@@ -14,33 +15,27 @@ describe("ConfigurationFileTest", () => {
     return path;
   }
 
-  it("backtrace contains YAML path", () => {
+  it("backtrace contains YAML path", async () => {
     const path = writeYaml("bad.yml", "wrong: <%= foo %>");
     try {
-      let error: Error | undefined;
-      try {
+      const error = await assertRaises([Error], {}, () => {
         ConfigurationFile.parse(path);
-      } catch (e) {
-        error = e as Error;
-      }
-      expect(error).toBeDefined();
-      expect(error!.stack!.split("\n")[1]).toContain(path);
+      });
+
+      expect(error.stack!.split("\n")[1]).toMatch(path);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("backtrace contains YAML path (when Pathname given)", () => {
+  it("backtrace contains YAML path (when Pathname given)", async () => {
     const path = writeYaml("bad2.yml", "wrong: <%= foo %>");
     try {
-      let error: Error | undefined;
-      try {
+      const error = await assertRaises([Error], {}, () => {
         ConfigurationFile.parse(path);
-      } catch (e) {
-        error = e as Error;
-      }
-      expect(error).toBeDefined();
-      expect(error!.stack!.split("\n")[1]).toContain(path);
+      });
+
+      expect(error.stack!.split("\n")[1]).toMatch(path);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

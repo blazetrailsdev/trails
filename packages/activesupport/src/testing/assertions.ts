@@ -541,6 +541,19 @@ export function assertPredicate<T>(
   );
 }
 
+/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_predicate` / `refute_predicate`. */
+export function assertNotPredicate<T>(
+  actual: T,
+  predicate: (value: T) => unknown,
+  message?: string,
+): void {
+  const result = predicate(actual);
+  assert(
+    result == null || result === false,
+    message ?? `Expected ${inspect(actual)} to not satisfy the predicate`,
+  );
+}
+
 /**
  * @noRailsEquivalent PERMANENT — Minitest's `assert_empty` (minitest/assertions.rb),
  * which sends `empty?` to the collection. Rails inherits it from Minitest, so

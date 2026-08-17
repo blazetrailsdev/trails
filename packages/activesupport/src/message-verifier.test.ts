@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { assertNot, assertRaises } from "./testing/assertions.js";
 
 import { getCrypto } from "./crypto-adapter.js";
 import { ActiveSupportJSON } from "./json.js";
@@ -33,12 +34,12 @@ describe("MessageVerifierTest", () => {
 
   it("valid message", () => {
     const [encoded, hash] = verifier.generate(data).split("--") as [string, string];
-    expect(verifier.validMessage(null as unknown as string)).toBe(false);
-    expect(verifier.validMessage("")).toBe(false);
-    expect(verifier.validMessage("\xff")).toBe(false); // invalid encoding
-    expect(verifier.validMessage(`${[...encoded].reverse().join("")}--${hash}`)).toBe(false);
-    expect(verifier.validMessage(`${encoded}--${[...hash].reverse().join("")}`)).toBe(false);
-    expect(verifier.validMessage("purejunk")).toBe(false);
+    assertNot(verifier.validMessage(null as unknown as string));
+    assertNot(verifier.validMessage(""));
+    assertNot(verifier.validMessage("\xff")); // invalid encoding
+    assertNot(verifier.validMessage(`${[...encoded].reverse().join("")}--${hash}`));
+    assertNot(verifier.validMessage(`${encoded}--${[...hash].reverse().join("")}`));
+    assertNot(verifier.validMessage("purejunk"));
   });
 
   it("simple round tripping", () => {
@@ -136,10 +137,12 @@ describe("MessageVerifierTest", () => {
     ).toEqual("hi");
   });
 
-  it("raise error when secret is nil", () => {
-    expect(() => new MessageVerifier(null as unknown as string)).toThrow(
-      new ArgumentError("Secret should not be nil."),
-    );
+  it("raise error when secret is nil", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      new MessageVerifier(null as unknown as string);
+    });
+
+    expect(exception.message).toEqual("Secret should not be nil.");
   });
 
   // Ruby's `inspect` is a core value-protocol method with no TypeScript

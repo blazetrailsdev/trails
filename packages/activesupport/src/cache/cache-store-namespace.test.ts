@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MemoryStore } from "./memory-store.js";
 import type { Entry } from "./entry.js";
+import { assert, assertNot } from "../testing/assertions.js";
 
 // Mirrors Rails' `cache.instance_variable_get(:@data)["tester:foo"].value`
 // peek at the raw namespaced key.
@@ -31,8 +32,8 @@ describe("CacheStoreNamespaceTest", () => {
     cache.write("foo", "bar");
     cache.write("fu", "baz");
     cache.deleteMatched(/^fo/);
-    expect(cache.exist("foo")).toBe(false);
-    expect(cache.exist("fu")).toBe(true);
+    assertNot(cache.exist("foo"));
+    assert(cache.exist("fu"));
   });
 
   it("delete matched key", () => {
@@ -40,7 +41,7 @@ describe("CacheStoreNamespaceTest", () => {
     cache.write("foo", "bar");
     cache.write("fu", "baz");
     cache.deleteMatched(/OO/i);
-    expect(cache.exist("foo")).toBe(false);
-    expect(cache.exist("fu")).toBe(true);
+    assertNot(cache.exist("foo"));
+    assert(cache.exist("fu"));
   });
 });

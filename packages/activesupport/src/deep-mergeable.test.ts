@@ -3,6 +3,13 @@ import { deepMerge, deepMergeBang } from "./index.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 
 describe("DeepMergeableTest", () => {
+  // deep_mergeable_test.rb:38-45 — the shared setup fixtures.
+  const hash1 = { a: 1, b: 1, c: { d1: 1, d2: 1, d3: { e1: 1, e3: 1 } } };
+  const hash2 = { a: 2, c: { d2: 2, d3: { e2: 2, e3: 2 } } };
+  const summed = { a: 3, b: 1, c: { d1: 1, d2: 3, d3: { e1: 1, e2: 2, e3: 3 } } };
+  const sumValues = (_key: string, value1: unknown, value2: unknown) =>
+    (value1 as number) + (value2 as number);
+
   it("deep_merge works", () => {
     const a = { x: { y: 1, z: 2 } };
     const b = { x: { y: 99 } };
@@ -17,12 +24,7 @@ describe("DeepMergeableTest", () => {
   });
 
   it("deep_merge supports a merge block", () => {
-    // In TS deepMerge uses standard overwrite; we can test custom behavior using spread
-    const a = { x: 1, y: 2 };
-    const b = { y: 3, z: 4 };
-    const merged = deepMerge(a, b) as any;
-    expect(merged.y).toBe(3);
-    expect(merged.z).toBe(4);
+    expect(DeepMergeable.deepMerge(hash1, hash2, sumValues)).toEqual(summed);
   });
 
   it("deep_merge! supports a merge block", () => {
@@ -33,11 +35,9 @@ describe("DeepMergeableTest", () => {
   });
 
   it("deep_merge does not mutate the instance", () => {
-    const a = { x: { y: 1 } };
-    const b = { x: { y: 2 } };
-    const result = deepMerge(a, b);
-    expect(a.x.y).toBe(1);
-    expect(result.x.y).toBe(2);
+    const instance = { ...hash1 };
+    deepMerge(instance, hash2);
+    expect(instance).toEqual(hash1);
   });
 
   it("deep_merge! mutates the instance", () => {

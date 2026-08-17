@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { RuntimeError } from "../rexml/document.js";
 import * as XmlMini from "../xml-mini.js";
 import * as XmlMini_REXML from "./rexml.js";
+import { assertRaises } from "../testing/assertions.js";
 
 /**
  * `REXMLEngineTest#engine` (`rexml_engine_test.rb:20-22`), which Ruby uses
@@ -63,7 +64,7 @@ describe("XMLMiniEngineTest", () => {
   it("exception thrown on expansion attack", async () => {
     // Rails goes through `Hash.from_xml`, which is unported; the raise is
     // `XmlMini.parse`'s either way (`xml_mini_engine_test.rb:51-68`).
-    await expect(
+    await assertRaises([expansionAttackError], {}, () =>
       XmlMini.parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE member [
   <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
@@ -78,7 +79,7 @@ describe("XMLMiniEngineTest", () => {
   &a;
 </member>
 `),
-    ).rejects.toBeInstanceOf(expansionAttackError);
+    );
   });
 
   it("setting backend", () => {

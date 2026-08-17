@@ -11,6 +11,22 @@ import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
 import type { Event } from "../../notifications/instrumenter.js";
 import { Notifications } from "../../notifications.js";
+import { assert, assertNot, assertSame } from "../../testing/assertions.js";
+
+/** Rails' `with_instrumentation` (cache/behaviors/cache_instrumentation_behavior.rb). */
+function withInstrumentation(operation: string, block: () => void): Event[] {
+  const eventName = `cache_${operation}.active_support`;
+  const events: Event[] = [];
+  try {
+    Notifications.subscribe(eventName, (event: Event) => events.push(event));
+    block();
+    return events;
+  } finally {
+    Notifications.unsubscribe(eventName);
+  }
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
 // (memory_store_test.rb:101-104), the record size the pruning budget is sized in.
@@ -33,44 +49,70 @@ describe("MemoryStoreTest", () => {
   });
 
   it("increment preserves expiry", async () => {
-    store.write("counter", 0, { expiresIn: 0.2 });
-    store.increment("counter", 1);
-    expect(store.read("counter")).toBe(1);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(store.read("counter")).toBe(1); // not expired yet
+    // Rails stubs `Time.now` forward a minute (memory_store_test.rb:31-46); the
+    // port sleeps past a short `expires_in` instead, since the store reads the
+    // wall clock directly and JS has no equivalent of Ruby's `Time.stub`.
+    const cache = new MemoryStore();
+    cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
+    expect(cache.read("counter", { raw: true })).toEqual(1);
+
+    await sleep(60);
+    expect(cache.read("counter", { raw: true })).toBeNull();
+
+    cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
+    cache.increment("counter");
+    expect(cache.read("counter", { raw: true })).toEqual(2);
+    await sleep(60);
+    expect(cache.read("counter", { raw: true })).toBeNull();
+
+    cache.write("counter", 1, { raw: true });
+    cache.increment("counter", 1, { expiresIn: 0.05 });
+    expect(cache.read("counter", { raw: true })).toEqual(2);
+    await sleep(60);
+    expect(cache.read("counter2", { raw: true })).toBeNull();
   });
 
   it("cleanup instrumentation", () => {
-    store.write("k1", "v1");
-    store.write("k2", "v2");
-    store.cleanup();
-    // Cleanup removes expired entries — with non-expired entries, store still has them
-    expect(store.read("k1")).toBe("v1");
+    const size = 3;
+    for (let i = 0; i < size; i++) store.write(String(i), i);
+
+    const events = withInstrumentation("cleanup", () => {
+      store.cleanup();
+    });
+
+    expect(events.map((event) => event.name)).toEqual(["cache_cleanup.active_support"]);
+    expect(events[0].payload.size).toEqual(size);
+    expect(events[0].payload.store).toEqual(store.constructor.name);
   });
 
   it("nil coder bypasses mutation safeguard", () => {
-    store.write("key", { nested: true });
-    const result = store.read("key");
-    expect(result).toEqual({ nested: true });
+    const cache = new MemoryStore({ coder: null });
+    const value = {};
+    cache.write("key", value);
+
+    assertSame(value, cache.read("key"));
   });
 
   it("namespaced write with unless exist", () => {
-    store.write("ns:key", "first", { unlessExist: true });
-    store.write("ns:key", "second", { unlessExist: true });
-    expect(store.read("ns:key")).toBe("first");
+    const namespacedCache = new MemoryStore({ expiresIn: 60, namespace: "foo" });
+
+    expect(namespacedCache.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    namespacedCache.write("1", null);
+    expect(namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
   it("write expired value with unless exist", async () => {
-    store.write("key", "expired", { expiresIn: 0.01 });
-    await new Promise((r) => setTimeout(r, 20));
-    store.write("key", "new", { unlessExist: true });
-    expect(store.read("key")).toBe("new");
+    expect(store.write("1", "aaaa", { expiresIn: 0.05 })).toEqual(true);
+    await sleep(60);
+    expect(store.write("1", "bbbb", { expiresIn: 0.05, unlessExist: true })).toEqual(true);
   });
 
   it("write with unless exist", () => {
-    store.write("key", "original", { unlessExist: true });
-    store.write("key", "overwrite", { unlessExist: true });
-    expect(store.read("key")).toBe("original");
+    expect(store.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    store.write("1", null);
+    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
   // Mirrors `include CacheStoreBehavior` (memory_store_test.rb:16).
@@ -194,11 +236,11 @@ describe("MemoryStorePruningTest", () => {
     store.read("2");
     store.read("4");
     store.prune(recordSize * 3);
-    expect(store.exist("5")).toBe(true);
-    expect(store.exist("4")).toBe(true);
-    expect(store.exist("3")).toBe(false);
-    expect(store.exist("2")).toBe(true);
-    expect(store.exist("1")).toBe(false);
+    assert(store.exist("5"));
+    assert(store.exist("4"));
+    assertNot(store.exist("3"), "no entry");
+    assert(store.exist("2"));
+    assertNot(store.exist("1"), "no entry");
   });
 
   it("prune size on write", () => {
@@ -207,17 +249,17 @@ describe("MemoryStorePruningTest", () => {
     store.read("2");
     store.read("4");
     store.write("11", "llllllllll");
-    expect(store.exist("11")).toBe(true);
-    expect(store.exist("10")).toBe(true);
-    expect(store.exist("9")).toBe(true);
-    expect(store.exist("8")).toBe(true);
-    expect(store.exist("7")).toBe(true);
-    expect(store.exist("6")).toBe(false);
-    expect(store.exist("5")).toBe(false);
-    expect(store.exist("4")).toBe(true);
-    expect(store.exist("3")).toBe(false);
-    expect(store.exist("2")).toBe(true);
-    expect(store.exist("1")).toBe(false);
+    assert(store.exist("11"));
+    assert(store.exist("10"));
+    assert(store.exist("9"));
+    assert(store.exist("8"));
+    assert(store.exist("7"));
+    assertNot(store.exist("6"), "no entry");
+    assertNot(store.exist("5"), "no entry");
+    assert(store.exist("4"));
+    assertNot(store.exist("3"), "no entry");
+    assert(store.exist("2"));
+    assertNot(store.exist("1"), "no entry");
   });
 
   it("prune size on write based on key length", () => {
@@ -225,16 +267,16 @@ describe("MemoryStorePruningTest", () => {
     for (let i = 1; i <= 9; i++) store.write(String(i), values[i - 1].repeat(10));
     const longKey = "*".repeat(2 * recordSize);
     store.write(longKey, "llllllllll");
-    expect(store.exist(longKey)).toBe(true);
-    expect(store.exist("9")).toBe(true);
-    expect(store.exist("8")).toBe(true);
-    expect(store.exist("7")).toBe(true);
-    expect(store.exist("6")).toBe(true);
-    expect(store.exist("5")).toBe(false);
-    expect(store.exist("4")).toBe(false);
-    expect(store.exist("3")).toBe(false);
-    expect(store.exist("2")).toBe(false);
-    expect(store.exist("1")).toBe(false);
+    assert(store.exist(longKey));
+    assert(store.exist("9"));
+    assert(store.exist("8"));
+    assert(store.exist("7"));
+    assert(store.exist("6"));
+    assertNot(store.exist("5"), "no entry");
+    assertNot(store.exist("4"), "no entry");
+    assertNot(store.exist("3"), "no entry");
+    assertNot(store.exist("2"), "no entry");
+    assertNot(store.exist("1"), "no entry");
   });
 
   it("pruning is capped at a max time", () => {
@@ -253,11 +295,11 @@ describe("MemoryStorePruningTest", () => {
     store.write("4", "dddddddddd");
     store.write("5", "eeeeeeeeee");
     store.prune(30, 0.001);
-    expect(store.exist("5")).toBe(true);
-    expect(store.exist("4")).toBe(true);
-    expect(store.exist("3")).toBe(true);
-    expect(store.exist("2")).toBe(true);
-    expect(store.exist("1")).toBe(false);
+    assert(store.exist("5"));
+    assert(store.exist("4"));
+    assert(store.exist("3"));
+    assert(store.exist("2"));
+    assertNot(store.exist("1"), "no entry");
   });
 
   it("cache not mutated", () => {
@@ -278,13 +320,13 @@ describe("MemoryStorePruningTest", () => {
   });
 
   it("cache different object ids string", () => {
-    // In JS, string primitives are compared by value not reference.
-    // The important thing is that reading the same key multiple times returns equal values.
-    store.write("test_key", "my_string");
-    const r1 = store.read("test_key");
-    const r2 = store.read("test_key");
-    expect(r1).toBe("my_string");
-    expect(r2).toBe("my_string");
+    // Rails compares `object_id`s (memory_store_test.rb:216-217); JS has no
+    // object_id, so the deep-clone contract is spelled as reference inequality —
+    // which a string primitive cannot carry, hence the wrapper object.
+    const item = { toS: "my_string" };
+    store.write("test_key", item);
+    expect(store.read("test_key")).not.toBe(item);
+    expect(store.read("test_key")).not.toBe(store.read("test_key"));
   });
 });
 

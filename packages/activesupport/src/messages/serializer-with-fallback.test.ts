@@ -3,6 +3,7 @@ import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
 import { MessagePack } from "../message-pack/index.js";
+import { assert } from "../testing/assertions.js";
 import {
   SERIALIZERS,
   SerializerWithFallback,
@@ -75,7 +76,7 @@ describe("MessagesSerializerWithFallbackTest", () => {
   it(":json serializer recognizes regular JSON", () => {
     for (const value of [null, false, true, 0, 1, -1, 0.0, 1.0, -1.0, 0.1, -0.1, "", [], {}]) {
       const dumped = serializer("json").dump(value);
-      expect(serializer("json").dumped(dumped)).toBe(true);
+      assert(serializer("json").dumped(dumped));
     }
   });
 

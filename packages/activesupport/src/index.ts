@@ -615,6 +615,7 @@ export {
   assert,
   assertNot,
   assertPredicate,
+  assertNotPredicate,
   assertEmpty,
   assertNotEmpty,
   assertSame,
