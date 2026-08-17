@@ -44,6 +44,13 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
+    "rubyName": "current_environment",
+    "call": "call",
+    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "migration.ts",
     "rubyName": "drop_table",
     "call": "compatible_table_definition",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

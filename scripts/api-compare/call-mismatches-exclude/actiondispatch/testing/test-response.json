@@ -3,6 +3,13 @@
     "package": "actiondispatch",
     "tsFile": "testing/test-response.ts",
     "rubyName": "parsed_body",
+    "call": "call",
+    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "testing/test-response.ts",
+    "rubyName": "parsed_body",
     "call": "response_parser",
     "kind": "args",
     "rubyArgs": [],
