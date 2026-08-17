@@ -1,7 +1,7 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 import { RangeError as ActiveModelRangeError } from "../errors.js";
-import { applyNumericMixin } from "./helpers/numeric.js";
+import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
 
 /** Mirrors: ActiveModel::Type::Integer::DEFAULT_LIMIT (integer.rb:43). */
 const DEFAULT_LIMIT = 4;
@@ -26,20 +26,26 @@ export class IntegerType extends NumericValueType {
    *     value.to_i
    *   end
    *
-   * Trails divergence: Rails calls `value.to_i`, which returns `0` for purely
-   * non-numeric strings (`"abc".to_i # => 0`) and parses leading digits
-   * (`"12abc".to_i # => 12`). Trails delegates to `castValue`, which uses
-   * `parseInt`: leading-digit strings still parse (`"12abc" → 12`), but
-   * fully non-numeric strings return `null` rather than `0`. Deserialize
-   * inputs come from the database driver — non-numeric junk is not a real
-   * input — so the divergence is theoretical, but documented here for fidelity.
+   * `castValue` is Rails' `value.to_i rescue nil`, so this is the `to_i` Rails
+   * calls here.
    */
   deserialize(value: unknown): number | null {
     if (isBlank(value)) return null;
     return this.castValue(value);
   }
 
+  /**
+   * Mirrors: ActiveModel::Type::Integer#serialize (integer.rb:65-68).
+   *   def serialize(value)
+   *     return if value.is_a?(::String) && non_numeric_string?(value)
+   *     ensure_in_range(super)
+   *   end
+   *
+   * The leading guard is why `serialize("wibble")` is nil where
+   * `cast("wibble")` is `0` (integer_test.rb:52-58).
+   */
   serialize(value: unknown): unknown {
+    if (typeof value === "string" && isNonNumericString(value)) return null;
     return this.ensureInRange(this.cast(value));
   }
 
@@ -47,7 +53,7 @@ export class IntegerType extends NumericValueType {
     return this.ensureInRange(value) as number | null;
   }
 
-  isSerializable(value: unknown): boolean {
+  isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
     // Mirrors integer.rb:74-80 — `cast_value = cast(value)` then
     // `in_range?(cast_value)`. The leading cast is load-bearing and must not be
     // re-derived via `Number(value)`: `cast` routes a BigInt through
@@ -59,7 +65,12 @@ export class IntegerType extends NumericValueType {
     // `!value` => true. Casting here rather than trusting the caller keeps this
     // predicate correct for a raw value, whether or not the caller pre-cast.
     const castValue = this.cast(value) as number | bigint | null;
-    return this.isInRange(castValue);
+    if (this.isInRange(castValue)) return true;
+    // `in_range?(cast_value) || begin; yield cast_value if block_given?; false; end`
+    // — the block receives the CAST value, which is the only place a caller can
+    // get it without casting a second time.
+    block?.(castValue);
+    return false;
   }
 
   /**
@@ -133,20 +144,22 @@ export class IntegerType extends NumericValueType {
     if (typeof value === "bigint") {
       return this.narrowBigInt(value);
     }
-    // The `rescue nil` of integer.rb:90 is scoped to the conversion itself, so
-    // `cast` answers nil — never raises — for a value with no numeric
-    // conversion. Ruby: `Object.new.to_i` raises NoMethodError (integer_test.rb:30-32
-    // asserts `assert_nil type.cast(::Object.new)`). Here: `String(value)` throws
-    // for an object with no `toString` (a null-prototype object, say). A Symbol is
-    // NOT that case — `String(sym)` returns "Symbol(x)", which parses to NaN => null.
-    let str: string;
-    try {
-      str = String(value);
-    } catch {
-      return null;
+    if (typeof value === "string") {
+      // Ruby String#to_i parses a leading integer and answers 0 when there is
+      // none: `"1ignore".to_i == 1`, `"bad1".to_i == 0`, `"bad".to_i == 0`
+      // (integer_test.rb:12-15). `parseInt(_, 10)` agrees on the leading-digit
+      // and sign-prefixed forms; only the no-digits case needs the 0.
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? 0 : parsed;
     }
-    const parsed = parseInt(str, 10);
-    return isNaN(parsed) ? null : parsed;
+    // Anything that answers `to_i` converts — a Duration, say
+    // (integer_test.rb:47-50).
+    const toI = (value as { toI?: unknown } | null)?.toI;
+    if (typeof toI === "function") return toI.call(value) as number;
+    // Ruby's `rescue nil` is real for the receivers that genuinely have no
+    // `to_i`: `Object.new`, `[1, 2]`, `{ 1 => 2 }`, `(1..2)`, `:sym`
+    // (integer_test.rb:24-32). Anything Ruby would convert answers `toI` above.
+    return null;
   }
 
   /**

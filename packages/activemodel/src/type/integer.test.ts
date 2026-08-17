@@ -1,233 +1,134 @@
 import { describe, it, expect } from "vitest";
-import { Model, Types } from "../index.js";
-
-const type = new Types.IntegerType();
+import { minutes, hours, Range } from "@blazetrails/activesupport";
+import { Types } from "../index.js";
+import { IntegerType as Integer } from "./integer.js";
+import { RangeError as ActiveModelRangeError } from "../errors.js";
 
 describe("IntegerTest", () => {
-  it("changed?", () => {
-    class MyModel extends Model {
-      static {
-        this.attribute("count", "integer");
-      }
-    }
-    const m = new MyModel({ count: "1" });
-    m.writeAttribute("count", "1");
-    expect(m.attributeChanged("count")).toBe(false);
-  });
-
   it("simple values", () => {
+    const type = new Types.IntegerType();
+    expect(type.cast("")).toBeNull();
     expect(type.cast(1)).toBe(1);
-    expect(type.cast(0)).toBe(0);
-    expect(type.cast(-1)).toBe(-1);
-    expect(type.cast(100)).toBe(100);
+    expect(type.cast("1")).toBe(1);
+    expect(type.cast("1ignore")).toBe(1);
+    expect(type.cast("bad1")).toBe(0);
+    expect(type.cast("bad")).toBe(0);
+    expect(type.cast(1.7)).toBe(1);
+    expect(type.cast(false)).toBe(0);
+    expect(type.cast(true)).toBe(1);
+    expect(type.cast(null)).toBeNull();
   });
 
   it("random objects cast to nil", () => {
-    expect(type.cast({})).toBeNull();
-    expect(type.cast([])).toBeNull();
-    expect(type.cast("abc")).toBeNull();
+    const type = new Types.IntegerType();
+    expect(type.cast([1, 2])).toBeNull();
+    // Rails' `1 => 2` Hash and `1..2` Range are both receivers with no `to_i`.
+    expect(type.cast({ 1: 2 })).toBeNull();
+    expect(type.cast(new Range(1, 2))).toBeNull();
   });
 
   it("casting objects without to_i", () => {
-    // Rails integer_test.rb:30-32 asserts `assert_nil type.cast(::Object.new)`:
-    // Object has no `to_i`, so `to_i rescue nil` (integer.rb:90) yields nil.
-    expect(type.cast({})).toBeNull();
-    // Same case, the way it arises in JS: an object with no `toString` makes
-    // `String(value)` throw. `cast` must answer null, not raise — the rescue is
-    // scoped to the conversion in Rails.
-    expect(type.cast(Object.create(null))).toBeNull();
-    // Objects without a numeric representation cast to null
-    expect(type.cast("not_a_number")).toBeNull();
-    expect(type.cast(undefined)).toBeNull();
+    const type = new Types.IntegerType();
+    expect(type.cast(new Object())).toBeNull();
   });
 
   it("casting nan and infinity", () => {
-    // Rails integer_test.rb:35-39 asserts nil for BOTH: `cast_value` is
-    // `value.to_i rescue nil` (integer.rb:90) and Float#to_i raises
-    // FloatDomainError for NaN and ±Infinity alike.
-    expect(type.cast(NaN)).toBeNull();
-    expect(type.cast(Infinity)).toBeNull();
-    expect(type.cast(-Infinity)).toBeNull();
+    const type = new Types.IntegerType();
+    expect(type.cast(Number.NaN)).toBeNull();
+    expect(type.cast(1.0 / 0.0)).toBeNull();
   });
 
   it("casting booleans for database", () => {
-    // Rails Helpers::Numeric#cast converts true → 1, false → 0 before castValue
-    expect(type.cast(true)).toBe(1);
-    expect(type.cast(false)).toBe(0);
+    const type = new Types.IntegerType();
+    expect(type.serialize(true)).toBe(1);
+    expect(type.serialize(false)).toBe(0);
   });
 
   it("casting duration", () => {
-    // Duration-like values - a number in seconds
-    expect(type.cast(3600)).toBe(3600);
+    const type = new Types.IntegerType();
+    expect(type.cast(minutes(30))).toBe(1800);
+    expect(type.cast(hours(2))).toBe(7200);
   });
 
   it("casting string for database", () => {
-    expect(type.cast("123")).toBe(123);
-    expect(type.cast("-45")).toBe(-45);
-    expect(type.cast("0")).toBe(0);
-  });
-
-  // Mirrors: ActiveModel::Type::Integer#deserialize (integer.rb:60-63).
-  // Rails: blank → nil; otherwise value.to_i.
-  it("deserialize returns null for blank values", () => {
-    expect(type.deserialize(null)).toBeNull();
-    expect(type.deserialize(undefined)).toBeNull();
-    expect(type.deserialize("")).toBeNull();
-    expect(type.deserialize("   ")).toBeNull();
-  });
-
-  it("deserialize parses numeric strings", () => {
-    expect(type.deserialize("123")).toBe(123);
-    expect(type.deserialize("-45")).toBe(-45);
-    expect(type.deserialize("0")).toBe(0);
-  });
-
-  it("deserialize passes numbers through truncated like Rails to_i", () => {
-    expect(type.deserialize(42)).toBe(42);
-    expect(type.deserialize(3.9)).toBe(3);
-    expect(type.deserialize(-3.9)).toBe(-3);
-  });
-
-  it("deserialize on booleans bypasses Numeric helper (Rails to_i path)", () => {
-    // Rails: true.to_i raises NoMethodError; isBlank(false) is true, so false → null.
-    // true is not blank → castValue(true) → parseInt("true") → null.
-    expect(type.deserialize(false)).toBeNull();
-    expect(type.deserialize(true)).toBeNull();
+    const type = new Types.IntegerType();
+    expect(type.serialize("wibble")).toBeNull();
+    expect(type.serialize("5wibble")).toBe(5);
+    expect(type.serialize(" +5")).toBe(5);
+    expect(type.serialize(" -5")).toBe(-5);
   });
 
   it("casting empty string", () => {
+    const type = new Types.IntegerType();
     expect(type.cast("")).toBeNull();
+    expect(type.serialize("")).toBeNull();
+    expect(type.deserialize("")).toBeNull();
   });
 
-  it("serialize raises ActiveModelRangeError for out-of-range values (default 4-byte limit)", () => {
-    // 2**31 — 1 over the default signed 4-byte upper bound
-    expect(() => type.serialize(2147483648)).toThrowError(/out of range for IntegerType/);
-    // -2**31 - 1 — 1 below the default signed 4-byte lower bound
-    expect(() => type.serialize(-2147483649)).toThrowError(/out of range for IntegerType/);
-  });
+  it("changed?", () => {
+    const type = new Types.IntegerType();
 
-  it("serialize honors a custom 1-byte limit", () => {
-    const tinyType = new Types.IntegerType({ limit: 1 });
-    expect(tinyType.serialize(127)).toBe(127);
-    expect(tinyType.serialize(-128)).toBe(-128);
-    expect(() => tinyType.serialize(128)).toThrowError(
-      /out of range for IntegerType with limit 1 bytes/,
-    );
-    expect(() => tinyType.serialize(-129)).toThrowError(
-      /out of range for IntegerType with limit 1 bytes/,
-    );
+    expect(type.isChanged(0, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5, 5, "5wibble")).toBeFalsy();
+    expect(type.isChanged(5, 5, "5")).toBeFalsy();
+    expect(type.isChanged(5, 5, "5.0")).toBeFalsy();
+    expect(type.isChanged(5, 5, "+5")).toBeFalsy();
+    expect(type.isChanged(5, 5, "+5.0")).toBeFalsy();
+    expect(type.isChanged(-5, -5, "-5")).toBeFalsy();
+    expect(type.isChanged(-5, -5, "-5.0")).toBeFalsy();
+    expect(type.isChanged(null, null, null)).toBeFalsy();
   });
 
   it("values below int min value are out of range", () => {
-    // JavaScript doesn't have the same integer limits as Ruby,
-    // but we can test that very negative numbers still cast
-    const minSafe = Number.MIN_SAFE_INTEGER;
-    expect(type.cast(minSafe)).toBe(minSafe);
+    expect(() => new Integer().serialize(-2147483649)).toThrow(ActiveModelRangeError);
   });
 
   it("values above int max value are out of range", () => {
-    const maxSafe = Number.MAX_SAFE_INTEGER;
-    expect(type.cast(maxSafe)).toBe(maxSafe);
+    expect(() => new Integer().serialize(2147483648)).toThrow(ActiveModelRangeError);
   });
 
   it("very small numbers are out of range", () => {
-    // Numbers beyond safe integer range
-    const verySmall = -1e20;
-    expect(type.cast(verySmall)).toBe(Math.trunc(verySmall));
+    expect(() => new Integer().serialize(-9999999999999999999999999999999n)).toThrow(
+      ActiveModelRangeError,
+    );
   });
 
   it("very large numbers are out of range", () => {
-    const veryLarge = 1e20;
-    expect(type.cast(veryLarge)).toBe(Math.trunc(veryLarge));
+    expect(() => new Integer().serialize(9999999999999999999999999999999n)).toThrow(
+      ActiveModelRangeError,
+    );
   });
 
   it("normal numbers are in range", () => {
-    expect(type.cast(42)).toBe(42);
-    expect(type.cast(-42)).toBe(-42);
-    expect(type.cast(0)).toBe(0);
+    const type = new Integer();
+    expect(type.serialize(0)).toBe(0);
+    expect(type.serialize(-1)).toBe(-1);
+    expect(type.serialize(1)).toBe(1);
   });
 
   it("int max value is in range", () => {
-    expect(type.cast(2147483647)).toBe(2147483647);
+    expect(new Integer().serialize(2147483647)).toBe(2147483647);
   });
 
   it("int min value is in range", () => {
-    expect(type.cast(-2147483648)).toBe(-2147483648);
+    expect(new Integer().serialize(-2147483648)).toBe(-2147483648);
   });
 
   it("columns with a larger limit have larger ranges", () => {
-    const type = new Types.IntegerType({ limit: 8 });
+    const type = new Integer({ limit: 8 });
 
     expect(type.serialize(9223372036854775807n)).toBe(9223372036854775807n);
     expect(type.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);
-    expect(() => type.serialize(-9999999999999999999999999999999n)).toThrowError(
-      /out of range for IntegerType/,
-    );
-    expect(() => type.serialize(9999999999999999999999999999999n)).toThrowError(
-      /out of range for IntegerType/,
-    );
-  });
-
-  it("serializable? checks an 8-byte column bound in BigInt space (2^63 exclusive)", () => {
-    // float64 collapses 2^63 and 2^63-1 to the same value, so the range check
-    // must compare in BigInt space to honor Rails' half-open `min...max`.
-    const int8 = new Types.IntegerType({ limit: 8 });
-    expect(int8.isSerializable(2n ** 63n)).toBe(false);
-    expect(int8.isSerializable(2n ** 63n - 1n)).toBe(true);
-    expect(int8.isSerializable(-(2n ** 63n))).toBe(true);
-    expect(int8.isSerializable(-(2n ** 63n) - 1n)).toBe(false);
-  });
-
-  it("serializable? casts before the range check, so nan and infinity are in range", () => {
-    // integer.rb:74-80 opens with `cast_value = cast(value)`; `cast_value` is
-    // `to_i rescue nil` (integer.rb:90), so NaN/±Infinity cast to nil and
-    // `in_range?(nil)` is `!value` => true (integer.rb:86). Reading the raw value
-    // instead would answer false.
-    const type = new Types.IntegerType();
-    expect(type.isSerializable(Infinity)).toBe(true);
-    expect(type.isSerializable(-Infinity)).toBe(true);
-    expect(type.isSerializable(NaN)).toBe(true);
-    // A non-numeric string is `to_i`-able to nil here (Rails: "abc".to_i == 0),
-    // and either way it is in range — not out of it.
-    expect(type.isSerializable("abc")).toBe(true);
-    // Genuinely out-of-range values still answer false.
-    expect(type.isSerializable(2 ** 40)).toBe(false);
+    expect(() => type.serialize(-9999999999999999999999999999999n)).toThrow(ActiveModelRangeError);
+    expect(() => type.serialize(9999999999999999999999999999999n)).toThrow(ActiveModelRangeError);
   });
 
   it("serialize_cast_value enforces range", () => {
-    const values = [1, "123", 0, -5, null];
-    for (const v of values) {
-      const cast = type.cast(v);
-      const serialized = type.serialize(v);
-      expect(serialized).toBe(cast);
-    }
-  });
+    const type = new Integer();
 
-  it("blank string casts to null via Helpers::Numeric", () => {
-    expect(type.cast("   ")).toBeNull();
-  });
+    expect(() => type.serializeCastValue(-2147483649)).toThrow(ActiveModelRangeError);
 
-  it("serialize casts first via mixin — serialize(10.5) returns 10", () => {
-    expect(type.serialize(10.5)).toBe(10);
-  });
-
-  it("isChanged returns true for number-to-non-number — number_to_non_number? forces change", () => {
-    // Old value 0, new raw "wibble" casts to null in Trails (0 in Ruby): still flagged changed
-    expect(type.isChanged(0, null, "wibble")).toBe(true);
-  });
-
-  it("isChanged returns true when old and new cast values are equal but raw is non-numeric — number_to_non_number? path", () => {
-    // type.isChanged(old, new_cast, raw): old=0, new_cast=0, raw="wibble"
-    // super.isChanged returns false (0 === 0), but number_to_non_number? forces true.
-    // This is the path Rails numeric.rb:31-34 adds on top of Value#changed?.
-    expect(type.isChanged(0, 0, "wibble")).toBe(true);
-  });
-
-  it("isChanged returns true for a genuine numeric change — real value differs", () => {
-    expect(type.isChanged(10, 5, "5")).toBe(true);
-  });
-
-  it("isChanged returns false when old and new cast values are equal and raw is numeric", () => {
-    expect(type.isChanged(5, 5, "5")).toBe(false);
+    expect(() => type.serializeCastValue(2147483648)).toThrow(ActiveModelRangeError);
   });
 });

@@ -683,3 +683,4 @@ export { NumberToHumanConverter } from "./number-helper/number-to-human-converte
 export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
 export { RoundingHelper } from "./number-helper/rounding-helper.js";
 export { Railtie, registerRailtie } from "./railtie.js";
+export { inspect, toS } from "./core-ext/object/inspect.js";

@@ -31,7 +31,7 @@ export abstract class Type<T = unknown> {
     return this.#limit;
   }
 
-  isSerializable(_value: unknown): boolean {
+  isSerializable(_value: unknown, _block?: (castValue: unknown) => void): boolean {
     return true;
   }
 

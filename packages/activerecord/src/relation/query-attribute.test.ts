@@ -24,13 +24,15 @@ const stringType = new StringType();
 const intType = new IntType();
 
 describe("QueryAttribute", () => {
-  it("casts value via type", () => {
+  it("does not cast value via type", () => {
+    // query_attribute.rb:22-24 is `def type_cast(value) = value` — the type is
+    // applied by `value_for_database`, never on the way in.
     const attr = new QueryAttribute("age", "25", intType);
-    expect(attr.value).toBe(25);
-    expect(attr.typeCast("25")).toBe(25);
+    expect(attr.value).toBe("25");
+    expect(attr.typeCast("25")).toBe("25");
   });
 
-  it("memoizes cast value", () => {
+  it("never calls cast for its value", () => {
     let callCount = 0;
     const countingType = {
       cast: (v: unknown) => {
@@ -43,7 +45,7 @@ describe("QueryAttribute", () => {
     void attr.value;
     void attr.value;
     void attr.value;
-    expect(callCount).toBe(1);
+    expect(callCount).toBe(0);
   });
 
   it("memoizes serialized value", () => {
@@ -131,7 +133,7 @@ describe("QueryAttribute", () => {
   it("valueBeforeTypeCast preserves original value", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
-    expect(attr.value).toBe(25);
+    expect(attr.value).toBe("25");
   });
 
   it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {
@@ -147,6 +149,16 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("id", 2n ** 63n, int8).isUnboundable()).toBe(1);
     expect(new QueryAttribute("id", -(2n ** 63n) - 1n, int8).isUnboundable()).toBe(-1);
     expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable signs a STRING bound by its cast value", () => {
+    // `serializable?` yields `cast_value` (integer.rb:75-79), not the raw value,
+    // and a QueryAttribute's value IS raw (query_attribute.rb:22-24). Reading the
+    // raw string here would make `value <=> 0` answer 1 for both signs.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", "1099511627776", int4).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", "5", int4).isUnboundable()).toBe(false);
   });
 
   it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
@@ -171,6 +183,16 @@ describe("QueryAttribute", () => {
     // isInfinite reads value_before_type_cast, so it still reports the sign.
     expect(new QueryAttribute("id", Infinity, int4).isInfinite()).toBe(1);
     expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
+  });
+
+  it("isUnboundable casts the value exactly once", () => {
+    // `serializable?` computes `cast_value` once and yields it (integer.rb:75-79);
+    // Ruby's single local is one cast, so reading the sign must not cast again.
+    const int4 = new IntegerType({ limit: 4 });
+    const spy = vi.spyOn(int4, "cast");
+    expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 
   it("isUnboundable memoizes so the value is inspected exactly once", () => {

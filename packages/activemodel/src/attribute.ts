@@ -128,8 +128,8 @@ export abstract class Attribute {
     return this._cachedValueForDatabase;
   }
 
-  isSerializable(): boolean {
-    return this.type.isSerializable(this.value);
+  isSerializable(block?: (castValue: unknown) => void): boolean {
+    return this.type.isSerializable(this.value, block);
   }
 
   isChanged(): boolean {

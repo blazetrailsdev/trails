@@ -48,16 +48,13 @@ export class QueryAttribute extends Attribute {
   }
 
   /**
-   * `query_attribute.rb:22-24` is `def type_cast(value) = value` — a
-   * QueryAttribute never puts its raw value through the type. Trails casts
-   * here instead, which is why the `Substitute` arm has to be spelled out: a
-   * StatementCache placeholder stands in for a value not supplied yet, and
-   * Rails' own constructor names it as the one value it will not route through
-   * the type (query_attribute.rb:13-14). `nil?` below carries the same guard.
+   * Mirrors: ActiveRecord::Relation::QueryAttribute#type_cast
+   * (query_attribute.rb:22-24) — `def type_cast(value) = value`. A
+   * QueryAttribute never puts its raw value through the type; `value` stays the
+   * raw one and `_value_for_database` is what routes it through `serialize`.
    */
   typeCast(value: unknown): unknown {
-    if (value instanceof Substitute) return value;
-    return this.type.cast(value);
+    return value;
   }
 
   static override withCastValue(name: string, value: unknown, type: CastType): QueryAttribute {
@@ -128,12 +125,16 @@ export class QueryAttribute extends Attribute {
    */
   isUnboundable(): 1 | -1 | false {
     if (this._unboundable === undefined) {
-      // Ruby's `value <=> 0` on the value `serializable?` yields, which is
-      // `cast(value)` (integer.rb:75). `this.value` is already cast here —
-      // trails' `typeCast` above casts, where Rails' QueryAttribute#type_cast is
-      // a no-op (query_attribute.rb:22-24) — so it is passed through as-is
-      // rather than cast a second time.
-      this._unboundable = this.isSerializable() ? false : compareToZero(this.value);
+      // `serializable? { |value| @_unboundable = value <=> 0 } && @_unboundable = nil`
+      // — the yielded value is `cast_value` (integer.rb:75-79), not the attribute's
+      // own `value`, which for a QueryAttribute is the raw one
+      // (query_attribute.rb:22-24). Taking it from the block is what casts exactly
+      // once, as Ruby's single `cast_value` local does.
+      let unboundable: 1 | -1 | false = false;
+      const serializable = this.isSerializable((castValue) => {
+        unboundable = compareToZero(castValue);
+      });
+      this._unboundable = serializable ? false : unboundable;
     }
     return this._unboundable;
   }

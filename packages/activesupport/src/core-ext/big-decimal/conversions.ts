@@ -70,6 +70,31 @@ export class BigDecimal {
   }
 
   /**
+   * Ruby `BigDecimal#to_i` — the integer part, truncated toward zero
+   * (`BigDecimal("7.9").to_i == 7`, `BigDecimal("-7.9").to_i == -7`,
+   * `BigDecimal("-0.4").to_i == 0`, verified on MRI 3.3).
+   *
+   * A BigDecimal is a `::Numeric`, so this is the conversion
+   * `ActiveModel::Type::Integer#cast_value`'s `value.to_i` (integer.rb:90)
+   * performs when a decimal aggregate is cast to an integer column's type —
+   * without it that cast has nothing to call and answers nil.
+   *
+   * Digits beyond float64's safe-integer range keep their exact value as a
+   * `bigint` carried under a `number` cast, the convention the numeric type
+   * primitives already use (see `IntegerType#narrowBigInt`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  toI(): number {
+    const magnitude = BigInt(this.intDigits === "" ? "0" : this.intDigits);
+    const signed = this.sign === "-" ? -magnitude : magnitude;
+    const num = Number(signed);
+    return Number.isSafeInteger(num) ? num : (signed as unknown as number);
+  }
+
+  /**
    * Ruby `BigDecimal#zero?`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.

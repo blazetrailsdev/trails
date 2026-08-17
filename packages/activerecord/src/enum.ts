@@ -357,10 +357,10 @@ export class EnumType extends ValueType<string> {
   }
 
   // Mirrors Rails: `subtype.serializable?(mapping.fetch(value, value))`.
-  isSerializable(value: unknown): boolean {
+  isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
     const mapped =
       typeof value === "string" && this._mapping.has(value) ? this._mapping.get(value)! : value;
-    return this._subtypeType.isSerializable(mapped);
+    return this._subtypeType.isSerializable(mapped, block);
   }
 
   assertValidValue(value: unknown): void {
