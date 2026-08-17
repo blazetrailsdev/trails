@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
+import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray } from "@blazetrails/activesupport";
 import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -321,11 +322,17 @@ export async function ensureValidOptionsForBatchingBang(
     }
   }
 
-  const orderArr = Array.isArray(order) ? order : [order];
-  for (const o of orderArr) {
-    if (o !== "asc" && o !== "desc") {
-      throw new Error(`:order must be :asc or :desc, got ${String(o)}`);
-    }
+  if (kernelArray(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
+    // `:order` takes Symbols, which trails spells as bare strings (CLAUDE.md,
+    // "A Ruby Symbol is a JS string"), so the colon Ruby's `order.inspect`
+    // prints at batches.rb:324 has to be restored here for the message to read
+    // as it does in Rails.
+    const inspected = Array.isArray(order)
+      ? `[${order.map((o) => `:${o}`).join(", ")}]`
+      : `:${order}`;
+    throw new ArgumentError(
+      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${inspected}`,
+    );
   }
 }
 

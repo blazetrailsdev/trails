@@ -33,4 +33,22 @@ describe("BatchEnumerator (trails)", () => {
     const expected = (await Post.order({ id: "desc" })).map((p) => Number(p.id));
     expect(records.map((p) => Number(p.id))).toEqual(expected);
   });
+
+  it("an invalid order raises the ArgumentError batches.rb:324 raises", async () => {
+    await expect(
+      Post.inBatches({ of: 1, order: "invalid" as "asc" }).eachRecord(() => {}),
+    ).rejects.toThrow(
+      ":order must be :asc or :desc or an array consisting of :asc or :desc, got :invalid",
+    );
+  });
+
+  it("an invalid order inside an array raises with the array inspected", async () => {
+    await expect(
+      Post.inBatches({ of: 1, cursor: ["id"], order: ["asc", "sideways"] as "asc"[] }).eachRecord(
+        () => {},
+      ),
+    ).rejects.toThrow(
+      ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
+    );
+  });
 });
