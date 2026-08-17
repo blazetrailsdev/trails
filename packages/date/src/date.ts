@@ -1259,12 +1259,21 @@ export class Rational {
    * `float_to_r` ({@link floatToR}) — `Rational(0.5, 86400)` is `(1/172800)` on
    * ruby 3.3.11 — and an Integer one is itself over one, which is the
    * `BigInt(num) / BigInt(den)` this constructor used to be limited to.
+   *
+   * `nurat_s_canonicalize_internal` (`rational.c`) then canonicalizes the SIGN
+   * onto the numerator before it cancels: its `switch (FIX2INT(f_cmp(den,
+   * ZERO)))` negates BOTH parts on a negative denominator, which is why
+   * `Rational(3, -4)` is `(-3/4)` on ruby 3.3.11 and not `(3/-4)`.
    */
   constructor(num: number | bigint, den: number | bigint) {
     const a = floatToR(num);
     const b = floatToR(den);
-    const n = a.numerator * b.denominator;
-    const d = a.denominator * b.numerator;
+    let n = a.numerator * b.denominator;
+    let d = a.denominator * b.numerator;
+    if (d < 0n) {
+      n = -n;
+      d = -d;
+    }
     const g = iGcd(n, d);
     this.numerator = n / g;
     this.denominator = d / g;
@@ -7538,6 +7547,26 @@ export class Date {
   }
 
   /**
+   * Ruby `Date#iso8601` (ruby/date, `date_core.c` `d_lite_iso8601`,
+   * `date_core.c:7298-7302`) — `strftimev("%Y-%m-%d", self, set_tmx)`.
+   */
+  iso8601(): string {
+    return this.strftime("%Y-%m-%d");
+  }
+
+  /**
+   * Ruby `Date#rfc2822` (ruby/date, `date_core.c` `d_lite_rfc2822`,
+   * `date_core.c:7330-7334`) — `strftimev("%a, %-d %b %Y %T %z", self,
+   * set_tmx)`. `::DateTime` does not override it (`date_core.c:10020-10025`
+   * defines `to_s`, `iso8601` and `xmlschema` on `cDateTime` but not this), so
+   * a `DateTime` receiver reaches it and `set_tmx` carries its own time and
+   * offset into `%T`/`%z`.
+   */
+  rfc2822(): string {
+    return this.strftime("%a, %-d %b %Y %T %z");
+  }
+
+  /**
    * Ruby `Date#deconstruct_keys(array_of_names_or_nil)` (ruby/date,
    * `date_core.c` `d_lite_deconstruct_keys`, `date_core.c:7500-7504`), the
    * pattern-matching reader. The key names are Ruby Symbols and stay in the
@@ -8816,6 +8845,39 @@ export class DateTime extends DateWithoutParseStatics {
    */
   override toS(): string {
     return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
+  }
+
+  /**
+   * @internal ruby/date's `iso8601_timediv(self, n)` (`date_core.c:8728-8742`),
+   * which builds `"T%H:%M:%S"`, appends `".%<n>N"` only when `n > 0`, then
+   * `"%:z"`, and runs the result through `strftimev`.
+   *
+   * @noRailsEquivalent PERMANENT — a file-static C helper with no Ruby name,
+   * extracted here exactly as the C extracts it.
+   */
+  #iso8601Timediv(n: number): string {
+    let fmt = "T%H:%M:%S";
+    if (n > 0) fmt += `.%${n}N`;
+    fmt += "%:z";
+    return this.strftime(fmt);
+  }
+
+  /**
+   * Ruby `DateTime#iso8601(n = 0)` (ruby/date, `date_core.c`
+   * `dt_lite_iso8601`, `date_core.c:8755-8766`) — `strftimev("%Y-%m-%d")`
+   * appended with {@link DateTime.#iso8601Timediv}. `n` is the number of
+   * digits of fractional seconds.
+   */
+  iso8601(n = 0): string {
+    return this.strftime("%Y-%m-%d") + this.#iso8601Timediv(n);
+  }
+
+  /**
+   * Ruby `DateTime#xmlschema(n = 0)`, which `date_core.c:10025` binds to the
+   * same `dt_lite_iso8601`.
+   */
+  xmlschema(n = 0): string {
+    return this.iso8601(n);
   }
 
   /**

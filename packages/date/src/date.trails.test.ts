@@ -2427,4 +2427,16 @@ describe("Rational", () => {
     expect(() => new Rational(Infinity, 1)).toThrow("Infinity");
     expect(() => new Rational(NaN, 1)).toThrow("NaN");
   });
+
+  it("canonicalizes the sign onto the numerator, as nurat_s_canonicalize_internal does", () => {
+    // ruby 3.3.11:
+    //   Rational(3, -4)   #=> (-3/4)
+    //   Rational(-3, -4)  #=> (3/4)
+    //   Rational(1, -0.5) #=> (-2/1)
+    expect(new Rational(3, -4).numerator).toBe(-3n);
+    expect(new Rational(3, -4).denominator).toBe(4n);
+    expect(new Rational(3, -4).inspect()).toBe("(-3/4)");
+    expect(new Rational(-3, -4).inspect()).toBe("(3/4)");
+    expect(new Rational(1, -0.5).inspect()).toBe("(-2/1)");
+  });
 });

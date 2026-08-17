@@ -9,8 +9,14 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
+import { ordinalize } from "./inflector.js";
+// `time-ext.ts` declares its own `formattedOffset` over a JS `Date`
+// (`core_ext/time/conversions.rb`'s arm), so the DateTime arm — the one
+// `Time::DATE_FORMATS[:rfc822]`'s `time.formatted_offset(false)` reaches on a
+// `DateTime` receiver — comes in under an alias.
+import { formattedOffset as dateTimeFormattedOffset } from "./core-ext/date-time/conversions.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
@@ -659,6 +665,43 @@ export function secFraction(
 // Time direction is the mirror image (`Time#sec_fraction` is `subsec`,
 // time/calculations.rb:107-109), so one function answers both names.
 export { secFraction as subsec };
+
+/**
+ * The named formats `to_fs` resolves, either a `strftime` string or a callable
+ * taking the receiver.
+ *
+ * Mirrors: `Time::DATE_FORMATS` (`core_ext/time/conversions.rb:8-27`). The
+ * Ruby keys are Symbols and the four lambdas duck-type their argument — a
+ * `Time`, a `Date` or a `DateTime` all answer `day`, `strftime`,
+ * `formatted_offset`, `rfc2822` and `iso8601` — so the hash is shared by every
+ * `to_fs` in ActiveSupport. Its only caller in trails today is
+ * `core-ext/date-time/conversions.ts`'s `toFs`, so the callables are typed over
+ * that receiver; `time-ext.ts`'s own `toFs` below still answers a JS `Date`
+ * through a hand-rolled `switch` and is converged separately.
+ */
+export const DATE_FORMATS: Record<
+  string,
+  string | ((time: Temporal.PlainDateTime | Temporal.ZonedDateTime) => string)
+> = {
+  db: "%Y-%m-%d %H:%M:%S",
+  inspect: "%Y-%m-%d %H:%M:%S.%9N %z",
+  number: "%Y%m%d%H%M%S",
+  nsec: "%Y%m%d%H%M%S%9N",
+  usec: "%Y%m%d%H%M%S%6N",
+  time: "%H:%M",
+  short: "%d %b %H:%M",
+  long: "%B %d, %Y %H:%M",
+  long_ordinal: (time) => {
+    const dayFormat = ordinalize(time.day);
+    return new RubyDateTime(time).strftime(`%B ${dayFormat}, %Y %H:%M`);
+  },
+  rfc822: (time) => {
+    const offsetFormat = dateTimeFormattedOffset(time, false);
+    return new RubyDateTime(time).strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
+  },
+  rfc2822: (time) => new RubyDateTime(time).rfc2822(),
+  iso8601: (time) => new RubyDateTime(time).iso8601(),
+};
 
 /**
  * toFs — formats a Date as a string using various named formats.
