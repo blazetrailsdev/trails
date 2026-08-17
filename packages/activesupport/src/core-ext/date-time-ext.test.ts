@@ -19,11 +19,22 @@ import {
   subsec,
   utcOffset,
 } from "./date-time/calculations.js";
-import { civilFromFormat, formattedOffset, nsec, toF, toI, usec } from "./date-time/conversions.js";
+import {
+  civilFromFormat,
+  formattedOffset,
+  nsec,
+  readableInspect,
+  toF,
+  toFormattedS,
+  toFs,
+  toI,
+  usec,
+} from "./date-time/conversions.js";
 import { setFrozenTime } from "../time-travel.js";
 import { setZone } from "../time-zone-config.js";
 import { ArgumentError } from "../hash-utils.js";
 import {
+  DATE_FORMATS,
   advance as timeAdvance,
   beginningOfQuarter,
   endOfMonth,
@@ -36,7 +47,6 @@ import {
   nextDay,
   prevDay,
   toDate,
-  toFs,
   toTime,
   xmlschema,
 } from "../time-ext.js";
@@ -71,21 +81,49 @@ const END_OF_PERIOD_SEC = new Rational(59999999999, 1000000000);
 
 describe("DateTimeExtCalculationsTest", () => {
   it("to fs", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = toFs(dt);
-    expect(result).toContain("2005");
+    const datetime = dt(2005, 2, 21, 14, 30, 0);
+    expect(toFs(datetime, "db")).toBe("2005-02-21 14:30:00");
+    expect(toFs(datetime, "inspect")).toBe("2005-02-21 14:30:00.000000000 +0000");
+    expect(toFs(datetime, "time")).toBe("14:30");
+    expect(toFs(datetime, "short")).toBe("21 Feb 14:30");
+    expect(toFs(datetime, "long")).toBe("February 21, 2005 14:30");
+    expect(toFs(datetime, "rfc822")).toBe("Mon, 21 Feb 2005 14:30:00 +0000");
+    expect(toFs(datetime, "rfc2822")).toBe("Mon, 21 Feb 2005 14:30:00 +0000");
+    expect(toFs(datetime, "long_ordinal")).toBe("February 21st, 2005 14:30");
+    expect(toFs(datetime)).toMatch(/^2005-02-21T14:30:00(Z|\+00:00)$/);
+    expect(toFs(datetime, "not_existent")).toMatch(/^2005-02-21T14:30:00(Z|\+00:00)$/);
+
+    // Rails wraps these three in `with_env_tz "US/Central"`; a `DateTime`
+    // carries its own offset, so the ambient zone never reaches `:iso8601`.
+    expect(
+      toFs(DateTime.civil(2009, 2, 5, 14, 30, 5, new Rational(-21600, 86400)), "iso8601"),
+    ).toBe("2009-02-05T14:30:05-06:00");
+    expect(toFs(DateTime.civil(2008, 6, 9, 4, 5, 1, new Rational(-18000, 86400)), "iso8601")).toBe(
+      "2008-06-09T04:05:01-05:00",
+    );
+    expect(toFs(DateTime.civil(2009, 2, 5, 14, 30, 5), "iso8601")).toBe(
+      "2009-02-05T14:30:05+00:00",
+    );
+
+    expect(toFormattedS(datetime, "db")).toBe("2005-02-21 14:30:00");
   });
 
   it("readable inspect", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = toFs(dt);
-    expect(typeof result).toBe("string");
+    const datetime = dt(2005, 2, 21, 14, 30, 0);
+    expect(readableInspect(datetime)).toBe("Mon, 21 Feb 2005 14:30:00 +0000");
+    // Rails asserts `datetime.readable_inspect == datetime.inspect`, the alias
+    // its `alias_method :inspect, :readable_inspect` installs; trails reopens
+    // no `::DateTime`, so the alias target is compared directly.
+    expect(readableInspect(datetime)).toBe(toFs(datetime, "rfc822"));
   });
 
   it("to fs with custom date format", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const result = toFs(dt, "db");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    DATE_FORMATS.custom = "%Y%m%d%H%M%S";
+    try {
+      expect(toFs(dt(2005, 2, 21, 14, 30, 0), "custom")).toBe("20050221143000");
+    } finally {
+      delete DATE_FORMATS.custom;
+    }
   });
 
   it("localtime", () => {

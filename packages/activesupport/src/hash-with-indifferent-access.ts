@@ -426,14 +426,14 @@ export class HashWithIndifferentAccess<V = unknown> {
   /**
    * Mirrors `slice!` (hash_with_indifferent_access.rb:366-369) — the keys are
    * converted, then `Hash#slice!` (core_ext/hash/slice.rb:10-17) replaces the
-   * hash with the given keys and returns the removed pairs. The `default` /
-   * `default_proc` lines have no counterpart here: this class does not model a
-   * Hash default (see `initialize`).
+   * hash with the given keys and returns the removed pairs.
    */
   sliceBang(...keys: string[]): HashWithIndifferentAccess<V> {
     keys = keys.map((key) => this.convertKey(key));
     const omit = this.slice(...[...this.keys()].filter((key) => !keys.includes(key)));
     const hash = this.slice(...keys);
+    hash.setDefault(this.default());
+    if (this.defaultProc()) hash.setDefaultProc(this.defaultProc());
     this.replace(hash);
     return omit;
   }

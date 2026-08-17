@@ -2410,6 +2410,44 @@ describe("builder seats answer rb_obj_class(self)", () => {
   });
 });
 
+describe("the instance formatters", () => {
+  it("answers iso8601 and rfc2822 off the date, as d_lite_iso8601 and d_lite_rfc2822 do", () => {
+    // ruby 3.3.11:
+    //   Date.new(2001,2,3).iso8601  #=> "2001-02-03"
+    //   Date.new(2001,2,3).rfc2822  #=> "Sat, 3 Feb 2001 00:00:00 +0000"
+    //   Date.new(2001,2,3).xmlschema #=> "2001-02-03"
+    //   Date.new(2001,2,3).rfc822    #=> "Sat, 3 Feb 2001 00:00:00 +0000"
+    const d = new RubyDate(2001, 2, 3);
+    expect(d.iso8601()).toBe("2001-02-03");
+    expect(d.rfc2822()).toBe("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(d.xmlschema()).toBe(d.iso8601());
+    expect(d.rfc822()).toBe(d.rfc2822());
+  });
+
+  it("carries the time of day and the offset into a DateTime's, as dt_lite_iso8601 does", () => {
+    // ruby 3.3.11:
+    //   DateTime.new(2001,2,3).iso8601   #=> "2001-02-03T00:00:00+00:00"
+    //   DateTime.new(2001,2,3).xmlschema #=> "2001-02-03T00:00:00+00:00"
+    //   DateTime.new(2001,2,3).rfc2822   #=> "Sat, 3 Feb 2001 00:00:00 +0000"
+    const dt = new RubyDateTime(2001, 2, 3);
+    expect(dt.iso8601()).toBe("2001-02-03T00:00:00+00:00");
+    expect(dt.xmlschema()).toBe("2001-02-03T00:00:00+00:00");
+    expect(dt.rfc2822()).toBe("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(dt.rfc822()).toBe(dt.rfc2822());
+  });
+
+  it("takes n digits of fractional seconds through iso8601_timediv", () => {
+    // ruby 3.3.11:
+    //   DateTime.parse("2001-02-03T04:05:06.123456").iso8601(3)
+    //     #=> "2001-02-03T04:05:06.123+00:00"
+    //   ...iso8601(9) #=> "2001-02-03T04:05:06.123456000+00:00"
+    const d2 = new RubyDateTime(RubyDateTime.parse("2001-02-03T04:05:06.123456"));
+    expect(d2.iso8601(3)).toBe("2001-02-03T04:05:06.123+00:00");
+    expect(d2.iso8601(9)).toBe("2001-02-03T04:05:06.123456000+00:00");
+    expect(d2.xmlschema(3)).toBe("2001-02-03T04:05:06.123+00:00");
+  });
+});
+
 describe("Rational", () => {
   it("takes a Float on either side, as nurat_s_convert does", () => {
     // ruby 3.3.11:
@@ -2426,5 +2464,17 @@ describe("Rational", () => {
     // ruby 3.3.11: Rational(Float::INFINITY, 1) #=> FloatDomainError: Infinity
     expect(() => new Rational(Infinity, 1)).toThrow("Infinity");
     expect(() => new Rational(NaN, 1)).toThrow("NaN");
+  });
+
+  it("canonicalizes the sign onto the numerator, as nurat_s_canonicalize_internal does", () => {
+    // ruby 3.3.11:
+    //   Rational(3, -4)   #=> (-3/4)
+    //   Rational(-3, -4)  #=> (3/4)
+    //   Rational(1, -0.5) #=> (-2/1)
+    expect(new Rational(3, -4).numerator).toBe(-3n);
+    expect(new Rational(3, -4).denominator).toBe(4n);
+    expect(new Rational(3, -4).inspect()).toBe("(-3/4)");
+    expect(new Rational(-3, -4).inspect()).toBe("(3/4)");
+    expect(new Rational(1, -0.5).inspect()).toBe("(-2/1)");
   });
 });
