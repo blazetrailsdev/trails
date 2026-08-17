@@ -256,10 +256,9 @@ export class Branch {
 
   get loaders(): Association[] {
     if (this._loaders !== null) return this._loaders;
-    this._loaders = [];
-    for (const [reflection, reflectionRecords] of this.groupedRecords()) {
-      this._loaders.push(...this.preloadersForReflection(reflection, reflectionRecords));
-    }
+    this._loaders = [...this.groupedRecords()].flatMap(([reflection, reflectionRecords]) =>
+      this.preloadersForReflection(reflection, reflectionRecords),
+    );
     return this._loaders;
   }
 
