@@ -2,7 +2,7 @@
 // the TS spellings of a Ruby Range (`{ begin, end, excludeEnd }` and the
 // `[min, max]` tuple) and the option-leak / definition-time-error paths.
 import { describe, it, expect, afterEach } from "vitest";
-import { Model } from "../index.js";
+import { Model, NoMethodError } from "../index.js";
 
 class Person extends Model {
   static {
@@ -56,6 +56,12 @@ describe("LengthValidator (trails)", () => {
     Person.validatesLengthOf("title", { minimum: ":minLength" });
     expect(await new Person({ title: "abc" }).isValid()).toBe(true);
     expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+  });
+
+  it("raises NoMethodError when a Symbol names a method the record lacks", async () => {
+    // resolve_value.rb:14-15 is `record.send(value)` with no respond_to? guard.
+    Person.validatesLengthOf("title", { maximum: ":nonexistent" });
+    await expect(new Person({ title: "abc" }).isValid()).rejects.toThrow(NoMethodError);
   });
 
   it("does not leak reserved keys into errors.add options (minimum/maximum path)", async () => {

@@ -1,3 +1,5 @@
+import { NoMethodError } from "../attribute-assignment.js";
+
 /**
  * ResolveValue — resolves a validator option to its runtime value.
  *
@@ -23,13 +25,22 @@ export function resolveValue(record: unknown, value: unknown): unknown {
   if (typeof value === "string" && record && typeof record === "object") {
     // A Ruby Symbol reaches us as a colon-prefixed string (`":five"`); the
     // colon is the discriminator Ruby gets from the type.
-    const name = value.startsWith(":") ? value.slice(1) : value;
-    if (!(name in record)) return value;
-    const method = (record as Record<string, unknown>)[name];
-    if (typeof method === "function") {
-      return (method as () => unknown).call(record);
+    if (value.startsWith(":")) {
+      // resolve_value.rb:14-15 — `record.send(value)`, unguarded, so a Symbol
+      // naming a missing method raises rather than falling through.
+      const name = value.slice(1);
+      if (!(name in record)) {
+        throw new NoMethodError(
+          `undefined method '${name}' for an instance of ${record.constructor.name}`,
+        );
+      }
+      const method = (record as Record<string, unknown>)[name];
+      return typeof method === "function" ? (method as () => unknown).call(record) : method;
     }
-    return method;
+    if (value in record) {
+      const method = (record as Record<string, unknown>)[value];
+      return typeof method === "function" ? (method as () => unknown).call(record) : method;
+    }
   }
   return value;
 }

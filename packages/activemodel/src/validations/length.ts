@@ -161,20 +161,21 @@ export class LengthValidator extends EachValidator {
   }
 
   override checkValidity(): void {
-    const hasCheck =
-      this.options.minimum !== undefined ||
-      this.options.maximum !== undefined ||
-      this.options.is !== undefined;
+    // Mirrors length.rb:30 — `CHECKS.keys & options.keys`, which keeps CHECKS'
+    // declaration order (is, minimum, maximum). An explicitly-passed
+    // `undefined` is Ruby's absent kwarg, so it does not count as a key.
+    const keys = (Object.keys(CHECKS) as CheckKey[]).filter(
+      (key) => this.options[key] !== undefined,
+    );
 
-    if (!hasCheck) {
+    if (keys.length === 0) {
       throw new ArgumentError(
         "Range unspecified. Specify the :in, :within, :maximum, :minimum, or :is option.",
       );
     }
 
-    for (const key of ["minimum", "maximum", "is"] as const) {
+    for (const key of keys) {
       const value = this.options[key];
-      if (value === undefined) continue;
       // Mirrors length.rb:39-42. A Ruby Symbol reaches us as a colon-prefixed
       // string, which is what separates `:five` (a method name) from `"a"`.
       if (
