@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "create_or_find_by",
-    "call": "with_connection",
-    "reason": "Surfaced by RFC 0108's closure fix: the same-file call closure used to bridge relation.ts bodies through the `xs.length` property read into `Relation#length` and on to `toArray`'s `withConnection`, crediting a call neither body makes. Rails wraps both in `with_connection` (relation.rb:274, :291); trails' `toSql` is synchronous and `createOrFindBy` runs inside the caller's checkout, so neither can take one. Convergence tracked by RFC 0107."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "exec_main_query",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
@@ -65,12 +58,5 @@
     "rubyName": "to_sql",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "to_sql",
-    "call": "with_connection",
-    "reason": "Surfaced by RFC 0108's closure fix: the same-file call closure used to bridge relation.ts bodies through the `xs.length` property read into `Relation#length` and on to `toArray`'s `withConnection`, crediting a call neither body makes. Rails wraps both in `with_connection` (relation.rb:274, :291); trails' `toSql` is synchronous and `createOrFindBy` runs inside the caller's checkout, so neither can take one. Convergence tracked by RFC 0107."
   }
 ]
