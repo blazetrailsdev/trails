@@ -162,7 +162,6 @@ export class Request {
 
   // --- HTTP method ---
 
-  /** Rails' `@request_method` memo (request.rb:153). */
   private _requestMethod?: string;
 
   get method(): string {
@@ -181,9 +180,7 @@ export class Request {
   }
 
   get requestMethod(): string {
-    return (this._requestMethod ??= this.checkMethod(
-      ((this.getHeader("REQUEST_METHOD") as string) || "GET").toUpperCase(),
-    )!);
+    return (this._requestMethod ??= this.checkMethod(this.getHeader("REQUEST_METHOD"))!);
   }
 
   /** Mirrors: `alias raw_request_method request_method` (request.rb:145). */

@@ -497,20 +497,15 @@ export class Association {
   }
 
   get extensions(): any[] {
-    // Ruby `|` is an order-preserving set union (association.rb:170, :173).
     let extensions = [
-      ...new Set([
-        ...(this.klass as any).defaultExtensions(),
-        ...(this.reflection as any).extensions(),
-      ]),
+      ...new Set([...this.klass.defaultExtensions(), ...this.reflection.extensions!()]),
     ];
 
     if (this.reflection.scope) {
       extensions = [
         ...new Set([
           ...extensions,
-          ...(this.reflection as any).scopeFor((this.klass as any).unscoped(), this.owner)
-            .extensions,
+          ...this.reflection.scopeFor!(this.klass.unscoped(), this.owner).extensions,
         ]),
       ];
     }

@@ -184,6 +184,10 @@ export interface AssociationDefinition {
    * read this.
    */
   macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
+  /** Rails' `MacroReflection#extensions`. See {@link macro}. */
+  extensions?: () => any[];
+  /** Rails' `AbstractReflection#scope_for`. See {@link macro}. */
+  scopeFor?: (relation: any, owner?: any) => any;
   /** Rails' `AssociationReflection#foreign_key`. See {@link macro}. */
   foreignKey?: string | string[];
   /** Rails' `AssociationReflection#association_primary_key`. See {@link macro}. */

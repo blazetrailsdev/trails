@@ -364,7 +364,6 @@ export class ForeignKeyDefinition {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
-    // Rails guards the whole body with `if name` (schema_definitions.rb:157-159).
     return this.name ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
   }
 
