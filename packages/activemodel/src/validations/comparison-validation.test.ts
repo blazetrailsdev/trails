@@ -1,567 +1,437 @@
-import { describe, it, expect } from "vitest";
-import { instant, plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { describe, it, expect, afterEach } from "vitest";
+import { assertPredicate } from "@blazetrails/activesupport";
+import {
+  instant,
+  plainDate,
+  plainDateTime,
+} from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "../index.js";
+import { ArgumentError } from "../attribute-assignment.js";
+
+// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
+// Rails' Topic declares `attr_accessor :approved` with no type, which is the
+// untyped ValueType here (type/registry.ts:47).
+class Topic extends Model {
+  static {
+    this.attribute("title", "string");
+    this.attribute("content", "string");
+    this.attribute("approved", "value");
+  }
+}
+
+/**
+ * Mirrors the `Struct.new(:amount) { include Comparable; def <=> ... }` of
+ * `test_validates_comparison_with_custom_compare`. `compareTo` is trails'
+ * spelling of Ruby's `<=>` (date/src/date.ts:5147).
+ */
+class Custom {
+  constructor(readonly amount: number) {}
+
+  compareTo(other: Custom): number {
+    return (this.amount % 100) - (other.amount % 100);
+  }
+}
 
 describe("ComparisonValidationTest", () => {
-  it("validates comparison with less than or equal to using date", async () => {
-    class Event extends Model {
-      static {
-        this.attribute("startDate", "string");
-      }
-    }
-    // Use numbers for comparison since dates need special handling
-    Event.validates("startDate", { comparison: { lessThanOrEqualTo: "2025-12-31" } });
-    const e = new Event({ startDate: "2025-01-01" });
-    expect(await e.isValid()).toBe(true);
-  });
-
-  it("validates comparison with other than using string", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("status", "string");
-        this.validates("status", { comparison: { otherThan: "banned" } });
-      }
-    }
-    expect(await new Person({ status: "active" }).isValid()).toBe(true);
-    expect(await new Person({ status: "banned" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with blank allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { comparison: { greaterThan: 0, allowBlank: true } });
-      }
-    }
-    const p = new Person();
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates comparison with less than or equal to using time", () => {
-    class Event extends Model {
-      static {
-        this.attribute("start_time", "datetime");
-        this.attribute("end_time", "datetime");
-      }
-    }
-    const e = new Event({});
-    expect(e.readAttribute("start_time")).toBeNull();
-  });
-
-  it("validates comparison with less than or equal to using string", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { lessThanOrEqualTo: "zzz" } });
-      }
-    }
-    const p = new Person({ code: "abc" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates comparison with other than using date", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { otherThan: 0 } });
-      }
-    }
-    const p = new Person({ score: 5 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates comparison with other than using time", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { otherThan: 0 } });
-      }
-    }
-    const p = new Person({ score: 1 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates comparison with custom compare", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { greaterThan: 0 } });
-      }
-    }
-    const p = new Person({ score: 5 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates comparison of incomparables", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { greaterThan: 0 } });
-      }
-    }
-    const p = new Person({ score: -1 });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates comparison non-ArgumentError propagates", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", {
-          comparison: {
-            greaterThan: () => {
-              throw new TypeError("unexpected");
-            },
-          },
-        });
-      }
-    }
-    const p = new Person({ score: 5 });
-    await expect(p.isValid()).rejects.toThrow(TypeError);
-  });
-
-  it("validates comparison of no options", () => {
-    expect(() => {
-      class Person extends Model {
-        static {
-          this.attribute("score", "integer");
-          this.validates("score", { comparison: {} });
-        }
-      }
-      return Person;
-    }).toThrow();
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("validates comparison with greater than using numeric", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0 } });
-      }
-    }
-    expect(await new Order({ quantity: 1 }).isValid()).toBe(true);
-    expect(await new Order({ quantity: 0 }).isValid()).toBe(false);
-    expect(await new Order({ quantity: -1 }).isValid()).toBe(false);
+    Topic.validatesComparisonOf("approved", { greaterThan: 10 });
+
+    await assertInvalidValues([-12, 10], "must be greater than 10");
+    await assertValidValues([11]);
   });
 
   it("validates comparison with greater than using date", async () => {
-    const fixedDate = plainDate("2024-01-01");
-    class Event extends Model {
-      static {
-        this.attribute("date", "date");
-        this.validates("date", { comparison: { greaterThan: fixedDate } });
-      }
-    }
-    expect(await new Event({ date: "2024-01-02" }).isValid()).toBe(true);
-    expect(await new Event({ date: "2023-12-31" }).isValid()).toBe(false);
-  });
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { greaterThan: dateValue });
 
-  it("validates comparison with greater than using string", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { greaterThan: "A" } });
-      }
-    }
-    expect(await new Item({ code: "B" }).isValid()).toBe(true);
-    expect(await new Item({ code: "A" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with greater than or equal to using numeric", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThanOrEqualTo: 1 } });
-      }
-    }
-    expect(await new Order({ quantity: 1 }).isValid()).toBe(true);
-    expect(await new Order({ quantity: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with equal to using numeric", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { comparison: { equalTo: 42 } });
-      }
-    }
-    expect(await new Item({ value: 42 }).isValid()).toBe(true);
-    expect(await new Item({ value: 43 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with less than using numeric", async () => {
-    class Rating extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { lessThan: 10 } });
-      }
-    }
-    expect(await new Rating({ score: 9 }).isValid()).toBe(true);
-    expect(await new Rating({ score: 10 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with less than or equal to using numeric", async () => {
-    class Rating extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { lessThanOrEqualTo: 10 } });
-      }
-    }
-    expect(await new Rating({ score: 10 }).isValid()).toBe(true);
-    expect(await new Rating({ score: 11 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with other than using numeric", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("status", "integer");
-        this.validates("status", { comparison: { otherThan: 0 } });
-      }
-    }
-    expect(await new Item({ status: 1 }).isValid()).toBe(true);
-    expect(await new Item({ status: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with proc", async () => {
-    class Event extends Model {
-      static {
-        this.attribute("startDate", "date");
-        this.attribute("endDate", "date");
-        this.validates("endDate", {
-          comparison: { greaterThan: (record: any) => record.readAttribute("startDate") },
-        });
-      }
-    }
-    expect(await new Event({ startDate: "2024-01-01", endDate: "2024-01-02" }).isValid()).toBe(
-      true,
+    await assertInvalidValues(
+      [
+        plainDate("2019-08-03"),
+        plainDate("2020-07-03"),
+        plainDate("2020-08-01"),
+        plainDate("2020-08-02"),
+        plainDateTime("2020-08-01T12:34:00"),
+      ],
+      "must be greater than 2020-08-02",
     );
-    expect(await new Event({ startDate: "2024-01-02", endDate: "2024-01-01" }).isValid()).toBe(
-      false,
-    );
-  });
-
-  it("validates comparison with nil allowed", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0, allowNil: true } });
-      }
-    }
-    expect(await new Item({}).isValid()).toBe(true);
+    await assertValidValues([plainDate("2020-08-03"), plainDateTime("2020-08-02T12:34:00")]);
   });
 
   it("validates comparison with greater than using time", async () => {
-    const baseTime = instant("2024-01-01T12:00:00Z");
-    class Event extends Model {
-      static {
-        this.attribute("startTime", "datetime");
-        this.validates("startTime", { comparison: { greaterThan: baseTime } });
-      }
-    }
-    expect(await new Event({ startTime: "2024-01-01T13:00:00Z" }).isValid()).toBe(true);
-    expect(await new Event({ startTime: "2024-01-01T11:00:00Z" }).isValid()).toBe(false);
-  });
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { greaterThan: timeValue });
 
-  it("validates comparison with greater than or equal to using date", async () => {
-    const baseDate = plainDate("2024-06-01");
-    class Event extends Model {
-      static {
-        this.attribute("date", "date");
-        this.validates("date", { comparison: { greaterThanOrEqualTo: baseDate } });
-      }
-    }
-    expect(await new Event({ date: "2024-06-01" }).isValid()).toBe(true);
-    expect(await new Event({ date: "2024-05-31" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with greater than or equal to using time", async () => {
-    const baseTime = instant("2024-01-01T12:00:00Z");
-    class Event extends Model {
-      static {
-        this.attribute("time", "datetime");
-        this.validates("time", { comparison: { greaterThanOrEqualTo: baseTime } });
-      }
-    }
-    expect(await new Event({ time: "2024-01-01T12:00:00Z" }).isValid()).toBe(true);
-    expect(await new Event({ time: "2024-01-01T11:59:59Z" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with greater than or equal to using string", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { greaterThanOrEqualTo: "B" } });
-      }
-    }
-    expect(await new Item({ code: "B" }).isValid()).toBe(true);
-    expect(await new Item({ code: "C" }).isValid()).toBe(true);
-    expect(await new Item({ code: "A" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with equal to using date", async () => {
-    const target = plainDate("2024-06-15");
-    class Event extends Model {
-      static {
-        this.attribute("date", "date");
-        this.validates("date", { comparison: { equalTo: target } });
-      }
-    }
-    expect(await new Event({ date: "2024-06-15" }).isValid()).toBe(true);
-    expect(await new Event({ date: "2024-06-16" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with equal to using time", async () => {
-    const target = instant("2024-01-01T12:00:00Z");
-    class Event extends Model {
-      static {
-        this.attribute("time", "datetime");
-        this.validates("time", { comparison: { equalTo: target } });
-      }
-    }
-    expect(await new Event({ time: "2024-01-01T12:00:00Z" }).isValid()).toBe(true);
-    expect(await new Event({ time: "2024-01-01T12:00:01Z" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with equal to using string", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { equalTo: "ABC" } });
-      }
-    }
-    expect(await new Item({ code: "ABC" }).isValid()).toBe(true);
-    expect(await new Item({ code: "ABD" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with less than using date", async () => {
-    const limit = plainDate("2025-01-01");
-    class Event extends Model {
-      static {
-        this.attribute("date", "date");
-        this.validates("date", { comparison: { lessThan: limit } });
-      }
-    }
-    expect(await new Event({ date: "2024-12-31" }).isValid()).toBe(true);
-    expect(await new Event({ date: "2025-01-01" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with less than using time", async () => {
-    const limit = instant("2024-01-01T12:00:00Z");
-    class Event extends Model {
-      static {
-        this.attribute("time", "datetime");
-        this.validates("time", { comparison: { lessThan: limit } });
-      }
-    }
-    expect(await new Event({ time: "2024-01-01T11:59:59Z" }).isValid()).toBe(true);
-    expect(await new Event({ time: "2024-01-01T12:00:00Z" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with less than using string", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { lessThan: "Z" } });
-      }
-    }
-    expect(await new Item({ code: "A" }).isValid()).toBe(true);
-    expect(await new Item({ code: "Z" }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with lambda", async () => {
-    class Event extends Model {
-      static {
-        this.attribute("startDate", "date");
-        this.attribute("endDate", "date");
-        this.validates("endDate", {
-          comparison: { greaterThan: (r: any) => r.readAttribute("startDate") },
-        });
-      }
-    }
-    expect(await new Event({ startDate: "2024-01-01", endDate: "2024-02-01" }).isValid()).toBe(
-      true,
+    await assertInvalidValues(
+      [instant("2020-08-01T12:34:00Z"), instant("2020-07-02T18:30:00Z")],
+      `must be greater than ${timeValue}`,
     );
-    expect(await new Event({ startDate: "2024-02-01", endDate: "2024-01-01" }).isValid()).toBe(
-      false,
-    );
-  });
-
-  it("validates comparison with method", async () => {
-    class Event extends Model {
-      static {
-        this.attribute("startDate", "date");
-        this.attribute("endDate", "date");
-        this.validates("endDate", {
-          comparison: { greaterThan: (r: any) => r.getStartDate() },
-        });
-      }
-      getStartDate() {
-        return this.readAttribute("startDate");
-      }
-    }
-    expect(await new Event({ startDate: "2024-01-01", endDate: "2024-02-01" }).isValid()).toBe(
-      true,
-    );
-  });
-
-  it("validates comparison of multiple values", async () => {
-    class Score extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", {
-          comparison: { greaterThanOrEqualTo: 0, lessThanOrEqualTo: 100 },
-        });
-      }
-    }
-    expect(await new Score({ value: 50 }).isValid()).toBe(true);
-    expect(await new Score({ value: -1 }).isValid()).toBe(false);
-    expect(await new Score({ value: 101 }).isValid()).toBe(false);
-  });
-});
-describe("ComparisonValidator", () => {
-  it("validates greaterThan", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0 } });
-      }
-    }
-    expect(await new Order({ quantity: 5 }).isValid()).toBe(true);
-    expect(await new Order({ quantity: 0 }).isValid()).toBe(false);
-    expect(await new Order({ quantity: -1 }).isValid()).toBe(false);
-  });
-
-  it("validates greaterThanOrEqualTo", async () => {
-    class Order extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThanOrEqualTo: 1 } });
-      }
-    }
-    expect(await new Order({ quantity: 1 }).isValid()).toBe(true);
-    expect(await new Order({ quantity: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates lessThan", async () => {
-    class Rating extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { lessThan: 10 } });
-      }
-    }
-    expect(await new Rating({ score: 9 }).isValid()).toBe(true);
-    expect(await new Rating({ score: 10 }).isValid()).toBe(false);
-  });
-
-  it("validates lessThanOrEqualTo", async () => {
-    class Rating extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { comparison: { lessThanOrEqualTo: 10 } });
-      }
-    }
-    expect(await new Rating({ score: 10 }).isValid()).toBe(true);
-    expect(await new Rating({ score: 11 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with equal to using numeric", async () => {
-    class Confirmation extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { comparison: { equalTo: 42 } });
-      }
-    }
-    expect(await new Confirmation({ value: 42 }).isValid()).toBe(true);
-    expect(await new Confirmation({ value: 43 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with other than using numeric", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("status", "integer");
-        this.validates("status", { comparison: { otherThan: 0 } });
-      }
-    }
-    expect(await new Item({ status: 1 }).isValid()).toBe(true);
-    expect(await new Item({ status: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates comparison with proc", async () => {
-    class Event extends Model {
-      static {
-        this.attribute("startDate", "date");
-        this.attribute("endDate", "date");
-        this.validates("endDate", {
-          comparison: { greaterThan: (record: any) => record.readAttribute("startDate") },
-        });
-      }
-    }
-    const valid = new Event({ startDate: "2024-01-01", endDate: "2024-01-02" });
-    expect(await valid.isValid()).toBe(true);
-
-    const invalid = new Event({ startDate: "2024-01-02", endDate: "2024-01-01" });
-    expect(await invalid.isValid()).toBe(false);
-  });
-
-  it("validates comparison with greater than using date", async () => {
-    const tomorrow = plainDate("2024-06-02");
-    class Booking extends Model {
-      static {
-        this.attribute("checkIn", "date");
-        this.validates("checkIn", { comparison: { greaterThanOrEqualTo: tomorrow } });
-      }
-    }
-    expect(await new Booking({ checkIn: "2024-06-02" }).isValid()).toBe(true);
-    expect(await new Booking({ checkIn: "2024-06-01" }).isValid()).toBe(false);
+    await assertValidValues([instant("2020-08-02T12:34:00Z"), instant("2020-08-02T18:30:00Z")]);
   });
 
   it("validates comparison with greater than using string", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("code", "string");
-        this.validates("code", { comparison: { greaterThan: "A" } });
-      }
+    Topic.validatesComparisonOf("approved", { greaterThan: "cat" });
+
+    await assertInvalidValues(["ant", "cat"], "must be greater than cat");
+    await assertValidValues(["dog", "whale"]);
+  });
+
+  it("validates comparison with greater than or equal to using numeric", async () => {
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: 10 });
+
+    await assertInvalidValues([-12, 5], "must be greater than or equal to 10");
+    await assertValidValues([11, 10]);
+  });
+
+  it("validates comparison with greater than or equal to using date", async () => {
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: dateValue });
+
+    await assertInvalidValues(
+      [
+        plainDate("2019-08-03"),
+        plainDate("2020-07-03"),
+        plainDate("2020-08-01"),
+        plainDateTime("2020-08-01T12:34:00"),
+      ],
+      "must be greater than or equal to 2020-08-02",
+    );
+    await assertValidValues([
+      plainDate("2020-08-03"),
+      plainDateTime("2020-08-02T12:34:00"),
+      plainDate("2020-08-02"),
+    ]);
+  });
+
+  it("validates comparison with greater than or equal to using time", async () => {
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: timeValue });
+
+    await assertInvalidValues(
+      [instant("2019-08-01T12:34:00Z"), instant("2020-08-01T12:33:50Z")],
+      `must be greater than or equal to ${timeValue}`,
+    );
+    await assertValidValues([instant("2020-08-01T12:34:00Z"), instant("2020-08-01T12:34:01Z")]);
+  });
+
+  it("validates comparison with greater than or equal to using string", async () => {
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: "cat" });
+
+    await assertInvalidValues(["ant"], "must be greater than or equal to cat");
+    await assertValidValues(["cat", "dog", "whale"]);
+  });
+
+  it("validates comparison with equal to using numeric", async () => {
+    Topic.validatesComparisonOf("approved", { equalTo: 10 });
+
+    await assertInvalidValues([-12, 5, 11], "must be equal to 10");
+    await assertValidValues([10]);
+  });
+
+  it("validates comparison with equal to using date", async () => {
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { equalTo: dateValue });
+
+    await assertInvalidValues(
+      [
+        plainDate("2019-08-03"),
+        plainDate("2020-07-03"),
+        plainDate("2020-08-01"),
+        plainDateTime("2020-08-01T12:34:00"),
+        plainDate("2020-08-03"),
+        plainDateTime("2020-08-02T12:34:00"),
+      ],
+      "must be equal to 2020-08-02",
+    );
+    await assertValidValues([plainDate("2020-08-02"), plainDateTime("2020-08-02T00:00:00")]);
+  });
+
+  it("validates comparison with equal to using time", async () => {
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { equalTo: timeValue });
+
+    await assertInvalidValues(
+      [instant("2019-08-01T12:34:00Z"), instant("2020-08-01T12:33:50Z")],
+      `must be equal to ${timeValue}`,
+    );
+    await assertValidValues([instant("2020-08-01T12:34:00Z")]);
+  });
+
+  it("validates comparison with equal to using string", async () => {
+    Topic.validatesComparisonOf("approved", { equalTo: "cat" });
+
+    await assertInvalidValues(["dog", "whale"], "must be equal to cat");
+    await assertValidValues(["cat"]);
+  });
+
+  it("validates comparison with less than using numeric", async () => {
+    Topic.validatesComparisonOf("approved", { lessThan: 10 });
+
+    await assertInvalidValues([11, 10], "must be less than 10");
+    await assertValidValues([-12, -5, 5]);
+  });
+
+  it("validates comparison with less than using date", async () => {
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { lessThan: dateValue });
+
+    await assertInvalidValues(
+      [plainDate("2020-08-02"), plainDate("2020-08-03"), plainDateTime("2020-08-02T12:34:00")],
+      "must be less than 2020-08-02",
+    );
+    await assertValidValues([
+      plainDate("2019-08-03"),
+      plainDate("2020-07-03"),
+      plainDate("2020-08-01"),
+      plainDateTime("2020-08-01T12:34:00"),
+    ]);
+  });
+
+  it("validates comparison with less than using time", async () => {
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { lessThan: timeValue });
+
+    await assertInvalidValues(
+      [instant("2020-08-02T12:34:00Z"), instant("2020-08-02T18:30:00Z")],
+      `must be less than ${timeValue}`,
+    );
+    await assertValidValues([instant("2020-08-01T12:33:59Z"), instant("2020-07-02T18:30:00Z")]);
+  });
+
+  it("validates comparison with less than using string", async () => {
+    Topic.validatesComparisonOf("approved", { lessThan: "dog" });
+
+    await assertInvalidValues(["whale"], "must be less than dog");
+    await assertValidValues(["ant", "cat"]);
+  });
+
+  it("validates comparison with less than or equal to using numeric", async () => {
+    Topic.validatesComparisonOf("approved", { lessThanOrEqualTo: 10 });
+
+    await assertInvalidValues([12], "must be less than or equal to 10");
+    await assertValidValues([-11, 5, 10]);
+  });
+
+  it("validates comparison with less than or equal to using date", async () => {
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { lessThanOrEqualTo: dateValue });
+
+    await assertInvalidValues(
+      [plainDate("2020-08-03"), plainDateTime("2020-08-02T12:34:00")],
+      "must be less than or equal to 2020-08-02",
+    );
+    await assertValidValues([
+      plainDate("2019-08-03"),
+      plainDate("2020-07-03"),
+      plainDate("2020-08-01"),
+      plainDate("2020-08-02"),
+      plainDateTime("2020-08-01T12:34:00"),
+    ]);
+  });
+
+  it("validates comparison with less than or equal to using time", async () => {
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { lessThanOrEqualTo: timeValue });
+
+    await assertInvalidValues(
+      [instant("2020-09-01T12:34:00Z"), instant("2020-08-01T12:34:01Z")],
+      `must be less than or equal to ${timeValue}`,
+    );
+    await assertValidValues([instant("2020-08-01T12:34:00Z"), instant("2020-08-01T12:33:50Z")]);
+  });
+
+  it("validates comparison with less than or equal to using string", async () => {
+    Topic.validatesComparisonOf("approved", { lessThanOrEqualTo: "dog" });
+
+    await assertInvalidValues(["whale"], "must be less than or equal to dog");
+    await assertValidValues(["ant", "cat", "dog"]);
+  });
+
+  it("validates comparison with other than using numeric", async () => {
+    Topic.validatesComparisonOf("approved", { otherThan: 10 });
+
+    await assertInvalidValues([10], "must be other than 10");
+    await assertValidValues([-12, 5, 11]);
+  });
+
+  it("validates comparison with other than using date", async () => {
+    const dateValue = plainDate("2020-08-02");
+    Topic.validatesComparisonOf("approved", { otherThan: dateValue });
+
+    await assertInvalidValues(
+      [plainDate("2020-08-02"), plainDateTime("2020-08-02T00:00:00")],
+      "must be other than 2020-08-02",
+    );
+    await assertValidValues([
+      plainDate("2019-08-03"),
+      plainDate("2020-07-03"),
+      plainDate("2020-08-01"),
+      plainDateTime("2020-08-01T12:34:00"),
+      plainDate("2020-08-03"),
+      plainDateTime("2020-08-02T12:34:00"),
+    ]);
+  });
+
+  it("validates comparison with other than using time", async () => {
+    const timeValue = instant("2020-08-01T12:34:00Z");
+    Topic.validatesComparisonOf("approved", { otherThan: timeValue });
+
+    await assertInvalidValues([instant("2020-08-01T12:34:00Z")], `must be other than ${timeValue}`);
+    await assertValidValues([instant("2019-08-01T12:34:00Z"), instant("2020-08-01T12:33:50Z")]);
+  });
+
+  it("validates comparison with other than using string", async () => {
+    Topic.validatesComparisonOf("approved", { otherThan: "whale" });
+
+    await assertInvalidValues(["whale"], "must be other than whale");
+    await assertValidValues(["ant", "cat", "dog"]);
+  });
+
+  it("validates comparison with proc", async () => {
+    defineRequested();
+    Topic.validatesComparisonOf("approved", {
+      greaterThanOrEqualTo: (topic: Topic) => (topic as unknown as Requested).requested(),
+    });
+
+    try {
+      await assertInvalidValues(
+        [plainDate("2020-07-01"), plainDate("2019-07-01"), plainDateTime("2020-07-01T22:34:00")],
+        "must be greater than or equal to 2020-08-01",
+      );
+      await assertValidValues([plainDate("2020-08-02"), plainDateTime("2021-08-01T00:00:00")]);
+    } finally {
+      removeRequested();
     }
-    expect(await new Item({ code: "B" }).isValid()).toBe(true);
-    expect(await new Item({ code: "A" }).isValid()).toBe(false);
+  });
+
+  it("validates comparison with lambda", async () => {
+    Topic.validatesComparisonOf("approved", {
+      greaterThanOrEqualTo: () => plainDate("2020-08-01"),
+    });
+
+    await assertInvalidValues(
+      [plainDate("2020-07-01"), plainDate("2019-07-01"), plainDateTime("2020-07-01T22:34:00")],
+      "must be greater than or equal to 2020-08-01",
+    );
+    await assertValidValues([plainDate("2020-08-02"), plainDateTime("2021-08-01T00:00:00")]);
+  });
+
+  it("validates comparison with method", async () => {
+    defineRequested();
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: "requested" });
+
+    try {
+      await assertInvalidValues(
+        [plainDate("2020-07-01"), plainDate("2019-07-01"), plainDateTime("2020-07-01T22:34:00")],
+        "must be greater than or equal to 2020-08-01",
+      );
+      await assertValidValues([plainDate("2020-08-02"), plainDateTime("2021-08-01T00:00:00")]);
+    } finally {
+      removeRequested();
+    }
+  });
+
+  it("validates comparison with custom compare", async () => {
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: new Custom(1150) });
+
+    await assertInvalidValues([new Custom(530), new Custom(2325)]);
+    await assertValidValues([new Custom(575), new Custom(250), new Custom(1999)]);
+  });
+
+  it("validates comparison with blank allowed", async () => {
+    Topic.validatesComparisonOf("approved", { greaterThan: "cat", allowBlank: true });
+
+    await assertInvalidValues(["ant"]);
+    await assertValidValues([null, ""]);
   });
 
   it("validates comparison with nil allowed", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("quantity", "integer");
-        this.validates("quantity", { comparison: { greaterThan: 0, allowNil: true } });
-      }
-    }
-    expect(await new Item({}).isValid()).toBe(true);
+    Topic.validatesComparisonOf("approved", { lessThan: 100, allowNil: true });
+
+    await assertInvalidValues([200]);
+    await assertValidValues([null, 50]);
   });
 
-  it("supports custom message", async () => {
-    class Item extends Model {
-      static {
-        this.attribute("qty", "integer");
-        this.validates("qty", {
-          comparison: { greaterThan: 0, message: "must be positive" },
-        });
-      }
-    }
-    const item = new Item({ qty: 0 });
-    expect(await item.isValid()).toBe(false);
-    expect(item.errors.fullMessages).toContain("Qty must be positive");
+  it("validates comparison of incomparables", async () => {
+    Topic.validatesComparisonOf("approved", { lessThan: "cat" });
+
+    await assertInvalidValues([12], "comparison of Integer with String failed");
+    await assertInvalidValues([null]);
+    await assertValidValues([]);
   });
 
   it("validates comparison of multiple values", async () => {
-    class Score extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", {
-          comparison: { greaterThanOrEqualTo: 0, lessThanOrEqualTo: 100 },
-        });
-      }
-    }
-    expect(await new Score({ value: 50 }).isValid()).toBe(true);
-    expect(await new Score({ value: -1 }).isValid()).toBe(false);
-    expect(await new Score({ value: 101 }).isValid()).toBe(false);
+    Topic.validatesComparisonOf("approved", { otherThan: 17, greaterThan: 13 });
+
+    await assertInvalidValues([12, null, 17]);
+    await assertValidValues([15]);
   });
+
+  it("validates comparison of no options", () => {
+    let error: Error | undefined;
+    expect(() => {
+      try {
+        Topic.validatesComparisonOf("approved");
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+    expect(error?.message).toEqual(
+      "Expected one of :greater_than, :greater_than_or_equal_to," +
+        " :equal_to, :less_than, :less_than_or_equal_to, or :other_than option to be supplied.",
+    );
+  });
+
+  // -- private --
+
+  async function assertInvalidValues(values: unknown[], error?: string): Promise<void> {
+    await withEachTopicApprovedValue(values, async (topic, value) => {
+      assertPredicate(await topic.isInvalid(), (invalid) => invalid, `${value} failed comparison`);
+      assertPredicate(
+        topic.errors.get("approved"),
+        (errors) => errors.length > 0,
+        `FAILED for ${value}`,
+      );
+      if (error) expect(topic.errors.get("approved")[0]).toEqual(error);
+    });
+  }
+
+  async function assertValidValues(values: unknown[]): Promise<void> {
+    await withEachTopicApprovedValue(values, async (topic, value) => {
+      assertPredicate(
+        await topic.isValid(),
+        (valid) => valid,
+        `${value} failed comparison with validation error: ${topic.errors.get("approved")[0]}`,
+      );
+    });
+  }
+
+  async function withEachTopicApprovedValue(
+    values: unknown[],
+    block: (topic: Topic, value: unknown) => Promise<void>,
+  ): Promise<void> {
+    const topic = new Topic({ title: "comparison test", content: "whatever" });
+    for (const value of values) {
+      topic.approved = value;
+      await block(topic, value);
+    }
+  }
 });
+
+interface Requested {
+  requested(): unknown;
+}
+
+/** Rails' `Topic.define_method(:requested) { Date.new(2020, 8, 1) }`. */
+function defineRequested(): void {
+  (Topic.prototype as unknown as Requested).requested = () => plainDate("2020-08-01");
+}
+
+/** Rails' `ensure Topic.remove_method :requested`. */
+function removeRequested(): void {
+  delete (Topic.prototype as unknown as Partial<Requested>).requested;
+}

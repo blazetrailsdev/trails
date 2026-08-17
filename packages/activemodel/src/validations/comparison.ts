@@ -7,6 +7,21 @@ import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.j
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 
+/** Ruby `Comparable`'s `<=>`, spelled `compareTo` in trails. */
+function hasCompareTo(value: unknown): value is { compareTo(other: unknown): number | null } {
+  return value != null && typeof (value as { compareTo?: unknown }).compareTo === "function";
+}
+
+/** The `rb_cmperr` message from `value.public_send(op, other)`: "comparison of Integer with String failed". */
+function comparisonFailed(a: unknown, b: unknown): string {
+  const nameOf = (x: unknown) => {
+    if (x === null || x === undefined) return "NilClass";
+    if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
+    return (x as object).constructor?.name ?? typeof x;
+  };
+  return `comparison of ${nameOf(a)} with ${nameOf(b)} failed`;
+}
+
 export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
   errorOptions = errorOptions;
@@ -41,6 +56,20 @@ export class ComparisonValidator extends EachValidator {
   }
 
   private compare(a: unknown, b: unknown): number {
+    // Ruby dispatches the operator off the value, so any object that
+    // `include Comparable` and defines `<=>` compares. `compareTo` is trails'
+    // spelling of `<=>` (see date/src/date.ts:5147).
+    if (hasCompareTo(a)) {
+      const cmp = a.compareTo(b);
+      if (cmp === null || cmp === undefined) throw new ArgumentError(comparisonFailed(a, b));
+      return cmp;
+    }
+    // Ruby's Date and DateTime compare against each other through the same
+    // astronomical Julian day; a Date is that day at midnight.
+    if (a instanceof Temporal.PlainDate && b instanceof Temporal.PlainDateTime)
+      return Temporal.PlainDateTime.compare(a.toPlainDateTime(), b);
+    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDate)
+      return Temporal.PlainDateTime.compare(a, b.toPlainDateTime());
     if (a instanceof Temporal.Instant && b instanceof Temporal.Instant)
       return Temporal.Instant.compare(a, b);
     if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDateTime)
@@ -55,21 +84,14 @@ export class ComparisonValidator extends EachValidator {
     if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
     // boundary: comparison validator accepts Date pairs by Rails parity.
     if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
-    // Match Rails ArgumentError format from value.public_send(op, other):
-    //   "comparison of Integer with String failed"
-    const nameOf = (x: unknown) =>
-      x === null
-        ? "NilClass"
-        : x === undefined
-          ? "NilClass"
-          : ((x as object).constructor?.name ?? typeof x);
-    throw new ArgumentError(`comparison of ${nameOf(a)} with ${nameOf(b)} failed`);
+    throw new ArgumentError(comparisonFailed(a, b));
   }
 
   override checkValidity(): void {
     if (!Object.keys(COMPARE_CHECKS).some((k) => this.options[k] !== undefined)) {
       throw new ArgumentError(
-        "One of :greater_than, :greater_than_or_equal_to, :less_than, :less_than_or_equal_to, :equal_to, or :other_than must be supplied",
+        "Expected one of :greater_than, :greater_than_or_equal_to, " +
+          ":equal_to, :less_than, :less_than_or_equal_to, or :other_than option to be supplied.",
       );
     }
   }
