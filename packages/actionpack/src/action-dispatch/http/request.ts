@@ -891,8 +891,17 @@ export class Request {
     this.resetCsrfToken();
   }
 
+  /** Rails: `session=` (request.rb:385-387) — `Session.set self, session`. */
+  set session(session: Record<string, unknown>) {
+    Session.set(this, session);
+  }
+
+  /**
+   * Rails: `session_options=` (request.rb:389-391) —
+   * `Session::Options.set self, options`.
+   */
   set sessionOptions(options: Record<string, unknown>) {
-    this.env["rack.session.options"] = options;
+    Session.Options.set(this, options);
   }
 
   /** @internal Rails: `default_session` — returns a disabled-session sentinel. */

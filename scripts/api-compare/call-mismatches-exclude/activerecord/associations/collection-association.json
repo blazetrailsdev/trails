@@ -19,19 +19,5 @@
     "rubyName": "size",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `target.empty?` / `association_scope.group_values.empty?` (collection_association.rb:214, :216) are `.length === 0` property reads, which the gate deliberately does not credit as calls (JS_ENUMERABLE_ALIASES, RFC 0092)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "target=",
-    "call": "klass",
-    "reason": "Verified per-site (RFC 0106): `reflection.klass.has_many_inversing` (collection_association.rb:286) — the whole `target=` body is the inverse-wiring arm, ported in `inversedFrom` (collection-association.ts), which is where trails' `set_inverse_instance` → `inversed_from` chain lands; the `target` setter itself is only the holder write Rails reaches via `super`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "target=",
-    "call": "replace_on_target",
-    "reason": "Verified per-site (RFC 0106): `replace_on_target(record, true, replace: true, inversing: true)` (collection_association.rb:294) is likewise ported in `inversedFrom`, which routes the inverse record into the canonical `CollectionProxy` store (RFC 0022); the `target` setter is the plain `super` holder write."
   }
 ]

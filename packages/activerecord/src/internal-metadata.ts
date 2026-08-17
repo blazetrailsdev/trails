@@ -12,6 +12,7 @@ import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
+import { first } from "./ruby-first.js";
 import {
   Table,
   SelectManager,
@@ -189,8 +190,8 @@ export class InternalMetadata {
   }
 
   /**
-   * `internal_metadata.rb:64-71`. Rails ends the body in `.first`; Ruby's `Enumerable#first` has no JS
-   * array counterpart, so the single value is read as `values[0]`.
+   * `internal_metadata.rb:64-71`. Rails ends the body in `.first`, ported as `ruby-first.ts`'s
+   * `first(values)` since JS arrays have no `first`.
    *
    * `COUNT(*)` always yields exactly one row, and Rails' `.first` would answer
    * `nil` for an empty set, not zero, so there is no `?? 0` fallback.
@@ -201,7 +202,6 @@ export class InternalMetadata {
    * precision and needs no such reading; this carries the bignum under a
    * `number` the way `IntegerType#narrowBigInt` (`integer.ts:218-221`) does.
    *
-   * @missingRailsCall first — Enumerable#first; a JS array indexes as values[0].
    */
   async count(): Promise<number> {
     const sm = new SelectManager(this.arelTable);
@@ -209,7 +209,7 @@ export class InternalMetadata {
     const values = await this._withConnection((connection) =>
       connection.selectValues(sm, `${this.constructor.name} Count`),
     );
-    return values[0] as number;
+    return first(values) as number;
   }
 
   /**

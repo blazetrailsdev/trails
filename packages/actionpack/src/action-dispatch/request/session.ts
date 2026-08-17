@@ -35,6 +35,20 @@ export class DisabledSessionError extends Error {
   }
 }
 
+/**
+ * Mirrors: ActionDispatch::Request::Session::Options (`request/session.rb:47`).
+ */
+export class Options {
+  /**
+   * Mirrors: ActionDispatch::Request::Session::Options.set
+   * (`request/session.rb:48-50`) —
+   * `req.set_header ENV_SESSION_OPTIONS_KEY, options`.
+   */
+  static set(req: { env: Record<string, unknown> }, options: unknown): void {
+    req.env[ENV_SESSION_OPTIONS_KEY] = options;
+  }
+}
+
 export class Session {
   private store: SessionStore | null;
   private env: Record<string, unknown>;
@@ -101,6 +115,22 @@ export class Session {
     if (session instanceof Session) return session;
     return null;
   }
+
+  /**
+   * Mirrors: ActionDispatch::Request::Session.set
+   * (`request/session.rb:39-41`) — `req.set_header ENV_SESSION_KEY, session`.
+   */
+  static set(req: { env: Record<string, unknown> }, session: unknown): void {
+    req.env[ENV_SESSION_KEY] = session;
+  }
+
+  /**
+   * Mirrors: ActionDispatch::Request::Session::Options
+   * (`request/session.rb:47`). Ruby nests the class inside `Session`; TS has no
+   * nested-class syntax, so it is declared alongside and re-exported as
+   * `Session.Options` so call sites read as Ruby does.
+   */
+  static Options = Options;
 
   private loadData(): void {
     if (!this.loaded && !this.destroyed && this.store) {

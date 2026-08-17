@@ -225,7 +225,11 @@ export class Association {
 
   reset(): void {
     this.loaded = false;
-    this.target = null;
+    // Ruby's `@target` ivar write, not `self.target =`: Rails' collection
+    // `target=` (collection_association.rb:285) folds a record into the inverse
+    // and reads `reflection.klass`, which `reset` must not force — a habtm
+    // through-reflection resolves its class lazily.
+    this._targetStore = null;
     this._staleState = undefined;
     this._staleStateSnapshotted = false;
     this._explicitTarget = false;
@@ -442,31 +446,15 @@ export class Association {
   }
 
   inversedFrom(record: Base | null): void {
-    this.assignInversedTarget(record);
+    this.target = record;
     this.loadedBang();
   }
 
   inversedFromQueries(record: Base | null): void {
     if (this.inversable(record)) {
-      this.assignInversedTarget(record);
+      this.target = record;
       this.loadedBang();
     }
-  }
-
-  private assignInversedTarget(record: Base | null): void {
-    if (!this.isCollection()) {
-      this.target = record;
-      return;
-    }
-    if (record === null) {
-      this.target = [];
-      return;
-    }
-    const target = Array.isArray(this.target) ? this.target : [];
-    if (!target.includes(record)) {
-      target.push(record);
-    }
-    this.target = target;
   }
 
   /**
