@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "array-inquirer.ts",
-    "rubyName": "inquiry",
-    "call": "new",
-    "reason": "Rails' `Array#inquiry` is `ArrayInquirer.new(self)`; trails' `arrayInquiry` does construct one (`new ArrayInquirer<T>(...items)`, array-inquirer.ts:58) — the spread makes it a different arity, so the matcher does not pair the two."
-  }
-]

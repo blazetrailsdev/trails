@@ -15,7 +15,7 @@
  * contract) have no Rails analog but ride the same canonical tables.
  */
 import { describe, it, expect } from "vitest";
-import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, assertNotRespondTo } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 
 import { Contact, ContactSti } from "./test-helpers/models/contact.js";
@@ -310,6 +310,7 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
       await david.asJson({ include: "posts", methods: ["favoriteQuote"] }),
     );
 
+    assertNotRespondTo((await david.posts.first())!, "favoriteQuote");
     expect(json).toMatch(/"favoriteQuote":"Constraints are liberating"/);
     expect(json.match(/"favoriteQuote":/g)!.length).toBe(1);
   });

@@ -636,8 +636,8 @@ describe("StringInflectionsTest", () => {
 
   it("string inquiry", () => {
     const env = new StringInquirer("production") as any;
-    expect(env.isProduction()).toBe(true);
-    expect(env.isDevelopment()).toBe(false);
+    expect(env["production?"]()).toBe(true);
+    expect(env["development?"]()).toBe(false);
   });
 
   it("truncate", () => {

@@ -1,57 +1,74 @@
-import { describe, it, expect } from "vitest";
-import { ArrayInquirer, arrayInquiry } from "./array-inquirer.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import { ArrayInquirer, inquiry } from "./array-inquirer.js";
+import {
+  assert,
+  assertNot,
+  assertNotPredicate,
+  assertNotRespondTo,
+  assertPredicate,
+  assertRespondTo,
+} from "./testing/assertions.js";
 
 describe("ArrayInquirerTest", () => {
+  // Ruby `[:mobile, :tablet, "api"]` — a Symbol is a JS string, so all three
+  // elements are plain strings here.
+  let arrayInquirer: ArrayInquirer<string>;
+
+  beforeEach(() => {
+    arrayInquirer = new ArrayInquirer("mobile", "tablet", "api");
+  });
+
   it("individual", () => {
-    const kinds = arrayInquiry(["phone", "tablet"]);
-    expect((kinds as any).phone()).toBe(true);
-    expect((kinds as any).laptop()).toBe(false);
+    assertPredicate(arrayInquirer, (a) => (a as any)["mobile?"]());
+    assertPredicate(arrayInquirer, (a) => (a as any)["tablet?"]());
+    assertNotPredicate(arrayInquirer, (a) => (a as any)["desktop?"]());
   });
 
   it("any", () => {
-    const kinds = arrayInquiry(["phone", "tablet"]);
-    expect(kinds.any("phone", "laptop")).toBe(true);
-    expect(kinds.any("laptop", "desktop")).toBe(false);
+    assert(arrayInquirer.any("mobile", "desktop"));
+    assert(arrayInquirer.any("watch", "tablet"));
+    assertNot(arrayInquirer.any("desktop", "watch"));
   });
 
   it("any string symbol mismatch", () => {
-    const kinds = arrayInquiry(["phone"]);
-    // "phone" vs "Phone" — case sensitive
-    expect(kinds.any("Phone")).toBe(false);
-    expect(kinds.any("phone")).toBe(true);
+    assert(arrayInquirer.any("mobile"));
+    assert(arrayInquirer.any("api"));
   });
 
   it("any with block", () => {
-    const kinds = arrayInquiry(["phone", "tablet"]);
-    expect(kinds.any((k) => k.startsWith("ph"))).toBe(true);
-    expect(kinds.any((k) => k.startsWith("x"))).toBe(false);
+    assert(arrayInquirer.any((v) => v === "mobile"));
+    assertNot(arrayInquirer.any((v) => v === "desktop"));
   });
 
   it("respond to", () => {
-    const kinds = arrayInquiry(["phone"]);
-    expect(typeof (kinds as any).phone).toBe("function");
+    assertRespondTo(arrayInquirer, "development?");
   });
 
   it("inquiry", () => {
-    const arr = arrayInquiry(["a", "b"]);
-    expect(arr.inquiry()).toBe(arr);
+    const result = inquiry.call(["mobile", "tablet", "api"]);
+
+    expect(result).toBeInstanceOf(ArrayInquirer);
+    expect(result).toEqual(arrayInquirer);
   });
 
   it("respond to fallback to array respond to", () => {
-    const kinds = arrayInquiry(["phone"]);
-    // Standard array methods still work
-    expect(kinds.length).toBe(1);
-    expect(Array.isArray(kinds)).toBe(true);
+    // Rails reopens `Array` with a `respond_to_missing?` that answers `:foo`.
+    // The `super` arm of the inquirer's `has` trap is the prototype chain, so
+    // teaching `Array` one more name is `Array.prototype`.
+    Object.defineProperty(Array.prototype, "foo", { value: () => true, configurable: true });
+    const arr = new ArrayInquirer("x");
+
+    try {
+      assertRespondTo(arr, "can_you_hear_me?");
+      assertRespondTo(arr, "foo");
+      assertNotRespondTo(arr, "nope");
+    } finally {
+      delete (Array.prototype as any).foo;
+    }
   });
 });
 
 describe("ArrayInquirer", () => {
-  it("can be created directly", () => {
-    const ai = new ArrayInquirer("foo", "bar");
-    expect((ai as any).foo()).toBe(true);
-    expect((ai as any).baz()).toBe(false);
-  });
-
   it("any() with no args returns true when non-empty", () => {
     const ai = new ArrayInquirer("a", "b");
     expect(ai.any()).toBe(true);
@@ -60,5 +77,10 @@ describe("ArrayInquirer", () => {
   it("any() with no args returns false when empty", () => {
     const ai = new ArrayInquirer();
     expect(ai.any()).toBe(false);
+  });
+
+  it("a name without a question mark raises NoMethodError", () => {
+    const ai = new ArrayInquirer("a");
+    expect(() => (ai as any).mobile()).toThrow(/undefined method 'mobile'/);
   });
 });

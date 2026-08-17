@@ -108,7 +108,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  if (!(Trails.env as unknown as { isDevelopment(): boolean }).isDevelopment()) return;
+  if (!(Trails.env as unknown as Record<string, () => boolean>)["development?"]()) return;
   this.routes().prepend((mapper) => {
     mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
     mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });

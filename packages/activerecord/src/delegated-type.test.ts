@@ -102,10 +102,10 @@ describe("DelegatedTypeTest", () => {
     // `entryable_name.message?` works in addition to string equality.
     expect(String((entryWithMessage as any).entryableName)).toBe("message");
     expect((entryWithMessage as any).entryableName).toBeInstanceOf(StringInquirer);
-    expect((entryWithMessage as any).entryableName.message()).toBe(true);
+    expect((entryWithMessage as any).entryableName["message?"]()).toBe(true);
 
     expect(String((entryWithComment as any).entryableName)).toBe("comment");
-    expect((entryWithComment as any).entryableName.comment()).toBe(true);
+    expect((entryWithComment as any).entryableName["comment?"]()).toBe(true);
   });
 
   it("delegated type predicates", () => {
