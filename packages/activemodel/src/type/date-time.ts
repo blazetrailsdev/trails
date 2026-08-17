@@ -167,8 +167,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     const missing = [1, 2, 3].filter((k) => !Object.hasOwn(values, k));
     if (missing.length > 0) {
       throw new ArgumentError(
-        // `#{missing_parameters}` is Array#to_s, which spaces its elements —
-        // `[1, 2, 3]`, not `[1,2,3]` (date_time_test.rb:34-38 asserts on it).
         `Provided hash ${JSON.stringify(values)} doesn't contain necessary keys: [${missing.join(", ")}]`,
       );
     }

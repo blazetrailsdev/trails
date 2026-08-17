@@ -26,7 +26,7 @@ function includeSerializeCastValue(klass: { prototype: object }): void {
  * Mirrors Ruby's `DelegateClass(klass)` (stdlib `delegate`): a fresh class
  * wrapping one object and forwarding `klass`'s public instance methods to it.
  */
-function delegateClass(protoToForward: object): {
+function DelegateClass(protoToForward: object): {
   new (delegated: object): { __getobj__: object };
   prototype: object;
 } {
@@ -136,23 +136,23 @@ describe("SerializeCastValueTest", () => {
     // wrapped object, so it answers the *wrapped* object, never the delegate —
     // `type.equal?(...)` is false and `serialize` is used. This is the case the
     // comment at serialize_cast_value.rb:26-29 is guarding.
-    const delegate_class = delegateClass(IncludesModule.prototype);
-    assertSerializesUsing("serialize", new delegate_class(new IncludesModule()));
+    const delegateClass = DelegateClass(IncludesModule.prototype);
+    assertSerializesUsing("serialize", new delegateClass(new IncludesModule()));
   });
 
   it("uses #serialize_cast_value when a delegate class prepends SerializeCastValue", () => {
-    const delegate_class = delegateClass(IncludesModule.prototype);
-    includeSerializeCastValue(delegate_class);
-    assertSerializesUsing("serialize_cast_value", new delegate_class(new IncludesModule()));
+    const delegateClass = DelegateClass(IncludesModule.prototype);
+    includeSerializeCastValue(delegateClass);
+    assertSerializesUsing("serialize_cast_value", new delegateClass(new IncludesModule()));
   });
 
   it("uses #serialize_cast_value when a delegate class subclass includes SerializeCastValue", () => {
-    class delegate_subclass extends delegateClass(IncludesModule.prototype) {
+    class delegateSubclass extends DelegateClass(IncludesModule.prototype) {
       static {
         includeSerializeCastValue(this);
       }
     }
-    assertSerializesUsing("serialize_cast_value", new delegate_subclass(new IncludesModule()));
+    assertSerializesUsing("serialize_cast_value", new delegateSubclass(new IncludesModule()));
   });
 
   function assertSerializesUsing(methodName: string, type: object): void {
