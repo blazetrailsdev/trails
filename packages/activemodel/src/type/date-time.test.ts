@@ -8,10 +8,17 @@ describe("DateTimeTest", () => {
   const type = new Types.DateTimeType();
 
   it("type cast datetime and timestamp", () => {
-    const result = type.cast("2024-01-15T10:30:00Z");
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect((result as Temporal.Instant).epochMilliseconds).toBe(
-      Temporal.Instant.from("2024-01-15T10:30:00Z").epochMilliseconds,
+    const type = new Types.DateTimeType();
+    expect(type.cast(null)).toBeNull();
+    expect(type.cast("")).toBeNull();
+    expect(type.cast("  ")).toBeNull();
+    expect(type.cast("ABC")).toBeNull();
+    expect(type.cast(" ".repeat(129))).toBeNull();
+
+    // Rails' `strftime("%FT%T")` is the ISO form truncated at seconds.
+    const datetimeString = Temporal.Now.instant().toString().slice(0, 19);
+    expect((type.cast(datetimeString) as Temporal.Instant).toString().slice(0, 19)).toBe(
+      datetimeString,
     );
   });
 
@@ -94,8 +101,27 @@ describe("DateTimeTest", () => {
     }
   });
 
+  it("hash to time", () => {
+    const type = new Types.DateTimeType();
+    expect(type.cast({ 1: 2018, 2: 10, 3: 15 })).toEqual(
+      Temporal.Instant.from("2018-10-15T00:00:00Z"),
+    );
+  });
+
   it("hash with wrong keys", () => {
-    expect(type.cast("not-a-date")).toBe(null);
+    const type = new Types.DateTimeType();
+    let error: unknown;
+    expect(() => {
+      try {
+        type.cast({ a: 1 });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(expect.objectContaining({ name: "ArgumentError" }));
+    expect((error as Error).message).toBe(
+      `Provided hash ${JSON.stringify({ a: 1 })} doesn't contain necessary keys: [1, 2, 3]`,
+    );
   });
 
   it("serialize returns the cast Instant (not a SQL string)", () => {
@@ -178,10 +204,7 @@ describe("DateTimeTest", () => {
     const type = new Types.DateTimeType({ precision: 1 });
     const value = type.cast("1999-12-31 12:34:56.789 -1000");
 
-    expect(type.serializeCastValue(value)).toEqual(type.serialize(value));
-    expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
-      "1999-12-31T22:34:56.7Z",
-    );
+    expect(type.serialize(value)).toEqual(type.serializeCastValue(value));
   });
 });
 

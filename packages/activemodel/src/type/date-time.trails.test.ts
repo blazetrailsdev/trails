@@ -112,3 +112,15 @@ describe("DateTimeType offsets sourced from Date._parse", () => {
     expect(cast("2013-09-04 03:00:00 IST")).toBe("2013-09-03T21:30:00Z");
   });
 });
+
+describe("DateTimeType#serializeCastValue", () => {
+  it("applies the column precision to the cast Instant", () => {
+    // The concrete value date_time_test.rb:40-45 only compares against
+    // `serialize`, pinned here so a change of precision handling is visible.
+    const type = new Types.DateTimeType({ precision: 1 });
+    const value = type.cast("1999-12-31 12:34:56.789 -1000");
+    expect((type.serializeCastValue(value) as Temporal.Instant).toString()).toBe(
+      "1999-12-31T22:34:56.7Z",
+    );
+  });
+});

@@ -1,79 +1,166 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "../index.js";
+import { Type } from "./value.js";
+import { SerializeCastValue } from "./serialize-cast-value.js";
+
+/**
+ * Mirrors `include SerializeCastValue` / `prepend SerializeCastValue`
+ * (activemodel/lib/active_model/type/serialize_cast_value.rb:6,22-24):
+ * `DefaultImplementation#serialize_cast_value` is installed unless the class
+ * already defines one (Ruby's `method_defined?` — the whole ancestor chain,
+ * which `in` is), alongside `itself_if_serialize_cast_value_compatible` and
+ * the `ClassMethods` `serialize_cast_value_compatible?`. TypeScript has no
+ * `include`, so the settled trails idiom applies: assign the module's members
+ * directly to the class (CLAUDE.md "Module mixins").
+ */
+function includeSerializeCastValue(klass: { prototype: object }): void {
+  const proto = klass.prototype as Record<string, unknown>;
+  if (!("serializeCastValue" in proto)) {
+    proto.serializeCastValue = SerializeCastValue.serializeCastValue;
+  }
+  proto.itselfIfSerializeCastValueCompatible = Type.prototype.itselfIfSerializeCastValueCompatible;
+  (klass as unknown as Record<string, unknown>).serializeCastValueCompatible =
+    Type.serializeCastValueCompatible;
+}
+
+/**
+ * Mirrors Ruby's `DelegateClass(klass)` (stdlib `delegate`): a fresh class
+ * wrapping one object and forwarding `klass`'s public instance methods to it.
+ */
+function delegateClass(protoToForward: object): {
+  new (delegated: object): { __getobj__: object };
+  prototype: object;
+} {
+  class Delegator {
+    constructor(readonly __getobj__: object) {}
+  }
+  const names = new Set<string>();
+  for (let proto: object | null = protoToForward; proto && proto !== Object.prototype; ) {
+    for (const name of Object.getOwnPropertyNames(proto)) names.add(name);
+    proto = Object.getPrototypeOf(proto);
+  }
+  for (const name of names) {
+    if (name === "constructor") continue;
+    (Delegator.prototype as unknown as Record<string, unknown>)[name] = function (
+      this: { __getobj__: Record<string, (...a: unknown[]) => unknown> },
+      ...args: unknown[]
+    ) {
+      return this.__getobj__[name](...args);
+    };
+  }
+  return Delegator;
+}
 
 describe("SerializeCastValueTest", () => {
+  class DoesNotIncludeModule {
+    serialize(value: unknown): string {
+      return `serialize(${value})`;
+    }
+  }
+
+  class IncludesModule extends DoesNotIncludeModule {
+    serializeCastValue(value: unknown): string {
+      // Rails: `"serialize_cast_value(#{super})"` — `super` is
+      // `DefaultImplementation#serialize_cast_value`, the identity.
+      return `serialize_cast_value(${SerializeCastValue.serializeCastValue(value)})`;
+    }
+
+    static {
+      includeSerializeCastValue(this);
+    }
+  }
+
   it("provides a default #serialize_cast_value implementation", () => {
-    const type = new Types.ValueType();
-    expect(type.serialize("hello")).toBe("hello");
+    class type extends DoesNotIncludeModule {
+      static {
+        includeSerializeCastValue(this);
+      }
+    }
+    const serializeCastValue = (new type() as unknown as Record<string, (v: unknown) => unknown>)
+      .serializeCastValue;
+    expect(serializeCastValue("foo")).toBe("foo");
   });
 
   it("uses #serialize when a class does not include SerializeCastValue", () => {
-    const type = new Types.StringType();
-    expect(type.serialize(123)).toBe("123");
+    assertSerializesUsing("serialize", new DoesNotIncludeModule());
   });
 
   it("uses #serialize_cast_value when a class includes SerializeCastValue", () => {
-    const type = new Types.IntegerType();
-    const cast = type.cast("42");
-    expect(type.serialize(cast)).toBe(42);
+    assertSerializesUsing("serialize_cast_value", new IncludesModule());
   });
 
   it("uses #serialize_cast_value when a subclass inherits both #serialize and #serialize_cast_value", () => {
-    class CustomType extends Types.IntegerType {}
-    const type = new CustomType();
-    expect(type.serialize("42")).toBe(42);
+    class subclass extends IncludesModule {}
+    assertSerializesUsing("serialize_cast_value", new subclass());
   });
 
   it("uses #serialize when a subclass defines a newer #serialize implementation", () => {
-    class CustomType extends Types.IntegerType {
-      override serialize(value: unknown) {
-        return `custom:${value}`;
+    class subclass extends IncludesModule {
+      override serialize(value: unknown): string {
+        return super.serialize(value);
       }
     }
-    const type = new CustomType();
-    expect(type.serialize(42)).toBe("custom:42");
+    assertSerializesUsing("serialize", new subclass());
   });
 
   it("uses #serialize_cast_value when a subclass defines a newer #serialize_cast_value implementation", () => {
-    class CustomType extends Types.IntegerType {}
-    const type = new CustomType();
-    const cast = type.cast("5");
-    expect(type.serialize(cast)).toBe(5);
+    class subclass extends IncludesModule {
+      override serializeCastValue(value: unknown): string {
+        return super.serializeCastValue(value);
+      }
+    }
+    assertSerializesUsing("serialize_cast_value", new subclass());
   });
 
   it("uses #serialize when a subclass defines a newer #serialize implementation via a module", () => {
-    class CustomType extends Types.StringType {
-      override serialize(value: unknown) {
-        return `mod:${value}`;
+    const mod = { serialize: DoesNotIncludeModule.prototype.serialize };
+    class subclass extends IncludesModule {
+      static {
+        Object.assign(this.prototype, mod);
       }
     }
-    const type = new CustomType();
-    expect(type.serialize("test")).toBe("mod:test");
+    assertSerializesUsing("serialize", new subclass());
   });
 
   it("uses #serialize_cast_value when a subclass defines a newer #serialize_cast_value implementation via a module", () => {
-    const type = new Types.FloatType();
-    const cast = type.cast("3.14");
-    expect(type.serialize(cast)).toBe(3.14);
+    const mod = { serializeCastValue: IncludesModule.prototype.serializeCastValue };
+    class subclass extends IncludesModule {
+      static {
+        Object.assign(this.prototype, mod);
+      }
+    }
+    assertSerializesUsing("serialize_cast_value", new subclass());
   });
 
   it("uses #serialize when a delegate class does not include SerializeCastValue", () => {
-    const type = new Types.BooleanType();
-    expect(type.serialize("true")).toBe(true);
+    // The delegate forwards `itself_if_serialize_cast_value_compatible` to the
+    // wrapped object, so it answers the *wrapped* object, never the delegate —
+    // `type.equal?(...)` is false and `serialize` is used. This is the case the
+    // comment at serialize_cast_value.rb:26-29 is guarding.
+    const delegate_class = delegateClass(IncludesModule.prototype);
+    assertSerializesUsing("serialize", new delegate_class(new IncludesModule()));
   });
 
   it("uses #serialize_cast_value when a delegate class prepends SerializeCastValue", () => {
-    const type = new Types.DecimalType();
-    const cast = type.cast("3.14");
-    // Cast decimals are BigDecimal values; serialize re-casts to an equal
-    // BigDecimal (compare by value, not object identity).
-    expect(type.serialize(cast)).toEqual(cast);
+    const delegate_class = delegateClass(IncludesModule.prototype);
+    includeSerializeCastValue(delegate_class);
+    assertSerializesUsing("serialize_cast_value", new delegate_class(new IncludesModule()));
   });
 
   it("uses #serialize_cast_value when a delegate class subclass includes SerializeCastValue", () => {
-    class CustomDecimal extends Types.DecimalType {}
-    const type = new CustomDecimal();
-    const cast = type.cast("2.71");
-    expect(type.serialize(cast)).toEqual(cast);
+    class delegate_subclass extends delegateClass(IncludesModule.prototype) {
+      static {
+        includeSerializeCastValue(this);
+      }
+    }
+    assertSerializesUsing("serialize_cast_value", new delegate_subclass(new IncludesModule()));
   });
+
+  function assertSerializesUsing(methodName: string, type: object): void {
+    expect(
+      SerializeCastValue.serialize(
+        type as Parameters<typeof SerializeCastValue.serialize>[0],
+        "foo",
+      ),
+    ).toBe(`${methodName}(foo)`);
+  }
 });

@@ -258,6 +258,16 @@ export class Duration {
   // Conversion
   // ---------------------------------------------------------------------------
 
+  /**
+   * Mirrors: ActiveSupport::Duration#to_i (duration.rb:377-380) — `@value.to_i`,
+   * with `in_seconds` declared as its alias. trails carries the body on
+   * `inSeconds`; `toI` is the Rails-primary spelling of the same value,
+   * truncated the way `Integer#to_i` is.
+   */
+  toI(): number {
+    return Math.trunc(this.inSeconds());
+  }
+
   inSeconds(): number {
     return (
       this.parts.years * SECONDS_PER_YEAR +

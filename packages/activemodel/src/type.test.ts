@@ -1,17 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { Types } from "./index.js";
+import { register, lookup } from "./type.js";
 
 describe("TypeTest", () => {
   it("registering a new type", () => {
-    class CustomType extends Types.Type<string> {
-      readonly name = "custom";
-      cast(value: unknown) {
-        return value === null ? null : `custom:${value}`;
+    // Rails uses `Struct.new(:args)` and `Type.lookup(:foo, :arg)` — a bare
+    // positional argument. trails' registry models Rails'
+    // `proc { |_, *args| klass.new(*args) }` (registry.rb:16) as a single
+    // options object, so the forwarded argument is spelled as one here; what
+    // the test pins either way is that `lookup` forwards it at all.
+    class type extends Types.ValueType {
+      constructor(readonly args: unknown) {
+        super();
       }
     }
-    Types.typeRegistry.register("custom_test", () => new CustomType());
-    const type = Types.typeRegistry.lookup("custom_test");
-    expect(type.cast("hello")).toBe("custom:hello");
+    register("foo", (_name, args) => new type(args));
+
+    expect(lookup("foo", { precision: 1 })).toEqual(new type({ precision: 1 }));
+    expect(lookup("foo", {})).toEqual(new type({}));
   });
 });
 
