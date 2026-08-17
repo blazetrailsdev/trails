@@ -37,18 +37,17 @@ describe("IntegerType", () => {
     expect(type.deserialize(true)).toBeNull();
   });
 
-  it("casts a driver numeric wrapper through its decimal string form", () => {
-    // MRI sees an Integer or a BigDecimal for a numeric column/aggregate and
-    // `value.to_i` (integer.rb:90) converts. node-postgres and mysql2 hand back
-    // wrapper objects carrying the decimal string instead, so that string is the
-    // conversion. Regression: dropping this arm made every PG/MariaDB `sum`
-    // deserialize to nil and report 0 — invisible on better-sqlite3, which
-    // returns plain numbers.
-    expect(type.cast({ toString: () => "15" })).toBe(15);
-    expect(type.cast({ toString: () => "7.9" })).toBe(7);
-    expect(type.cast(new BigDecimal("42"))).toBe(42);
-    // Still nil for the receivers Ruby has no `to_i` on (integer_test.rb:24-32).
-    expect(type.cast({ toString: () => "not a number" })).toBeNull();
+  it("casts a BigDecimal through its to_i", () => {
+    // A BigDecimal is a ::Numeric, so `value.to_i` (integer.rb:90) converts it.
+    // Regression: without `BigDecimal#toI` this answered nil, and every
+    // PG/MariaDB `sum` over an integer column deserialized to nil and reported
+    // 0 — invisible on better-sqlite3, which returns plain numbers.
+    expect(type.cast(new BigDecimal("15.0"))).toBe(15);
+    expect(type.cast(new BigDecimal("7.9"))).toBe(7);
+    expect(type.cast(new BigDecimal("-7.9"))).toBe(-7);
+    // An object with a numeric `to_s` but no `to_i` is still nil: Ruby raises
+    // NoMethodError and integer.rb:90 rescues it (integer_test.rb:24-32).
+    expect(type.cast({ toString: () => "15" })).toBeNull();
   });
 
   it("serialize truncates a fractional number toward zero", () => {
