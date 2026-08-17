@@ -45,23 +45,34 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirrors `initialize` (hash_with_indifferent_access.rb:70-83). The
    * `respond_to?(:to_hash)` arm goes through `update`, so every key gets
    * `convert_key` and every value `convert_value`, then carries the source
-   * hash's `default` / `default_proc` over; the `else` arm is `Hash.new(obj)`,
-   * which sets the default value.
+   * hash's `default` / `default_proc` over — both under Ruby truthiness, so a
+   * stored `false` default is left behind exactly as `if hash.default` does;
+   * the `else` arm is `Hash.new(obj)`, which sets the default value.
+   *
+   * `Hash.new { |hash, key| ... }` takes its default_proc as a block. A block
+   * is a single trailing function argument here, the same spelling `fetch`
+   * uses (:195).
    */
-  constructor(constructor?: AnyObject | HashWithIndifferentAccess<V> | NoInfer<V>) {
+  constructor(
+    constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<V> | NoInfer<V>,
+  ) {
     this.data = new Map();
     if (constructor instanceof HashWithIndifferentAccess || isPlainObject(constructor)) {
       this.update(constructor);
 
       const hash = constructor;
       if (hash instanceof HashWithIndifferentAccess) {
-        if (hash._default != null) this._default = hash._default;
-        if (hash._defaultProc != null) this._defaultProc = hash._defaultProc;
+        if (hash.default() != null && (hash.default() as unknown) !== false) {
+          this.setDefault(hash.default());
+        }
+        if (hash.defaultProc()) this.setDefaultProc(hash.defaultProc());
       }
     } else if (constructor == null) {
       // super()
+    } else if (typeof constructor === "function") {
+      this.setDefaultProc(constructor as DefaultProc<V>);
     } else {
-      this._default = constructor as V;
+      this.setDefault(constructor as V);
     }
   }
 
@@ -96,6 +107,40 @@ export class HashWithIndifferentAccess<V = unknown> {
       const key = this.convertKey(args[0]);
       return this._defaultProc ? this._defaultProc(this, key) : this._default;
     }
+  }
+
+  /**
+   * `Hash#default=`, which `initialize` (:76) and `set_defaults` (:420) write
+   * through. A TS `set` accessor cannot share a name with the `default()`
+   * reader, so it takes the conventions' `setX()` spelling. MRI clears
+   * default_proc on this write, and `test_dup_with_default_proc_sets_proc`
+   * (hash_with_indifferent_access_test.rb:837-838) depends on it.
+   */
+  setDefault(value: V | undefined): void {
+    this._default = value;
+    this._defaultProc = undefined;
+  }
+
+  /**
+   * `Hash#default_proc`, read by `set_defaults` (:417-418).
+   *
+   * @noRailsEquivalent inherited from Ruby's Hash, which this class subclasses;
+   * core Ruby has no file in the mapped Rails source to match against
+   */
+  defaultProc(): DefaultProc<V> | undefined {
+    return this._defaultProc;
+  }
+
+  /**
+   * `Hash#default_proc=`, which `initialize` (:77) and `set_defaults` (:418)
+   * write through. MRI clears the default value on this write.
+   *
+   * @noRailsEquivalent inherited from Ruby's Hash, which this class subclasses;
+   * core Ruby has no file in the mapped Rails source to match against
+   */
+  setDefaultProc(proc: DefaultProc<V> | undefined): void {
+    this._defaultProc = proc;
+    this._default = undefined;
   }
 
   /**
@@ -226,7 +271,7 @@ export class HashWithIndifferentAccess<V = unknown> {
   merge(
     ...hashes: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]
   ): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this).update(...hashes);
+    return this.dup().update(...hashes);
   }
 
   /**
@@ -644,10 +689,10 @@ export class HashWithIndifferentAccess<V = unknown> {
    * (`dup`) reach it.
    */
   private setDefaults(target: HashWithIndifferentAccess<V>): void {
-    if (this._defaultProc) {
-      target._defaultProc = this._defaultProc;
+    if (this.defaultProc()) {
+      target.setDefaultProc(this.defaultProc());
     } else {
-      target._default = this.default();
+      target.setDefault(this.default());
     }
   }
 

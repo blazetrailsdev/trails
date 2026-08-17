@@ -508,21 +508,24 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent reverse merging", () => {
-    // reverse_merge: other's keys only if not already present
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    const other = new HashWithIndifferentAccess({ a: 99, b: 2 });
-    // Simulate reverse merge: other merged with h overriding
-    const reversed = other.merge(h);
-    expect(reversed.get("a")).toBe(1);
-    expect(reversed.get("b")).toBe(2);
+    let hash = new HashWithIndifferentAccess<unknown>({ key: ":old_value" });
+    hash.reverseMergeBang({ key: ":new_value" });
+    expect(hash.get(":key")).toBe(":old_value");
+
+    hash = new HashWithIndifferentAccess<unknown>({ some: "value", other: "value" });
+    hash.reverseMergeBang({ some: "noclobber", another: "clobber" });
+    expect(hash.get(":some")).toBe("value");
+    expect(hash.get(":another")).toBe("clobber");
   });
 
   it("indifferent with defaults aliases reverse merge", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    const defaults = new HashWithIndifferentAccess({ a: 99, b: 2 });
-    const merged = defaults.merge(h);
-    expect(merged.get("a")).toBe(1);
-    expect(merged.get("b")).toBe(2);
+    let hash = new HashWithIndifferentAccess<unknown>({ key: ":old_value" });
+    const actual = hash.withDefaults({ key: ":new_value" });
+    expect(actual.get(":key")).toBe(":old_value");
+
+    hash = new HashWithIndifferentAccess<unknown>({ key: ":old_value" });
+    hash.withDefaultsBang({ key: ":new_value" });
+    expect(hash.get(":key")).toBe(":old_value");
   });
 
   it("indifferent deleting", () => {
@@ -711,20 +714,23 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("argless default with existing nil key", () => {
-    const h = new HashWithIndifferentAccess<unknown>({ a: null });
-    expect(h.get("a")).toBeNull();
-    expect(h.hasKey("a")).toBe(true);
+    const h = new HashWithIndifferentAccess<unknown>(":default").merge({ a: "defined" });
+
+    expect(h.default()).toBe(":default");
   });
 
   it("default with argument", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.get("missing")).toBeUndefined();
+    const h = new HashWithIndifferentAccess<unknown>(() => 5).merge({ "1": 2 });
+
+    expect(h.default("1")).toBe(5);
   });
 
   it("default proc", () => {
-    // We don't support default procs; verify missing key returns undefined
-    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
-    expect(h.get("nonexistent")).toBeUndefined();
+    const h = new HashWithIndifferentAccess<unknown>((_hash: unknown, key: string) => key);
+
+    expect(h.default()).toBeUndefined();
+    expect(h.default("foo")).toBe("foo");
+    expect(h.default(":foo")).toBe("foo");
   });
 
   it("double conversion with nil key", () => {
@@ -817,21 +823,31 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("dup with default proc", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const dup = h.withIndifferentAccess();
-    expect(dup.get("a")).toBe(1);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.setDefaultProc(() => {
+      throw new Error("walrus");
+    });
+    expect(() => hash.dup()).not.toThrow();
   });
 
   it("dup with default proc sets proc", () => {
-    // We don't support default procs; verify dup works
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const dup = h.withIndifferentAccess();
-    expect(dup).toBeInstanceOf(HashWithIndifferentAccess);
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.setDefaultProc((_h: unknown, k: string) => Number(k) + 1);
+    const newHash = hash.dup();
+
+    expect(newHash.get("2")).toBe(3);
+
+    newHash.setDefault(2);
+    expect(newHash.get(":non_existent")).toBe(2);
   });
 
   it("to hash with raising default proc", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.toHash()).toEqual({ a: 1 });
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.setDefaultProc(() => {
+      throw new Error("walrus");
+    });
+
+    expect(() => hash.toHash()).not.toThrow();
   });
 
   it("new with to hash conversion copies default", () => {

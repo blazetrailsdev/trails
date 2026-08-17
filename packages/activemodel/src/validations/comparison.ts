@@ -60,7 +60,8 @@ export class ComparisonValidator extends EachValidator {
    * (comparison.rb:27). Ruby dispatches the operator off the value, so any
    * object that `include Comparable` and defines `<=>` compares — `compareTo`
    * is trails' spelling of `<=>` (date/src/date.ts:5147) and is tried first.
-   * A Date and a DateTime compare through the same astronomical Julian day,
+   * A Date and a DateTime compare through the same astronomical Julian day
+   * (`Date#<=>` is `d_lite_cmp` over `ajd` in the date gem's `date_core.c`),
    * a Date being that day at midnight.
    */
   private compare(a: unknown, b: unknown): number {
