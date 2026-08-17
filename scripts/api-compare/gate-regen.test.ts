@@ -78,8 +78,8 @@ describe("artifactIsStale", () => {
     await fs.writeFile(artifact, "{}");
     // Backdate the artifact rather than touching a real source file: the roots
     // are the live repo, and moving one file's mtime would race sibling tests.
-    const long_ago = new Date(Date.now() - 86_400_000);
-    await fs.utimes(artifact, long_ago, long_ago);
+    const longAgo = new Date(Date.now() - 86_400_000);
+    await fs.utimes(artifact, longAgo, longAgo);
     expect(await artifactIsStale(artifact)).toBe(true);
   });
 
