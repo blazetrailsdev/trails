@@ -21,7 +21,7 @@ describe("PostgreSQLDatabaseTasks", () => {
   it("test_registers_with_database_tasks", () => {
     DatabaseTasks.clearRegisteredTasks();
     PostgreSQLDatabaseTasks.register();
-    expect(DatabaseTasks.resolveTask("postgresql")).toBeDefined();
+    expect(DatabaseTasks["classForAdapter"]("postgresql")).toBeDefined();
   });
 
   it("test_purge_drops_then_recreates_with_already_connected_flag", async () => {

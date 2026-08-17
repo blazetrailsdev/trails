@@ -4,6 +4,6 @@
     "tsFile": "asynchronous-queries-tracker.ts",
     "rubyName": "current_session",
     "call": "last",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `@stack.last or raise ActiveRecordError` (`asynchronous_queries_tracker.rb:50`) — the TS body reads `this.#stack[this.#stack.length - 1]` and raises the same error with the same message. `first`/`last`/`size` are positional/property idioms with no JS call form, deliberately left uncredited by RFC 0092 (`positional-idiom-analogues`, see JS_ENUMERABLE_ALIASES' header comment) so the reason-text route is the sanctioned one; nothing was dropped from the TS body."
   }
 ]

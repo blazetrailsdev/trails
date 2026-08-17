@@ -245,12 +245,12 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("active connections?", async () => {
-    expect(handler.activeConnections).toBe(false);
+    expect(handler.activeConnectionsQ()).toBe(false);
     const config = new HashConfig("development", "primary", ambientPoolConfiguration());
     handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
-    expect(handler.activeConnections).toBe(true);
+    expect(handler.activeConnectionsQ()).toBe(true);
     pool.releaseConnection();
   });
 

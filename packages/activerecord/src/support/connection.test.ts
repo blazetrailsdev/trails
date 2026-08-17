@@ -107,7 +107,7 @@ describe("connect", () => {
     const { adapter, envConfig } = await connect();
     expect(adapter).toBe("sqlite");
     expect(envConfig.adapter).toMatch(/sqlite/i);
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBeDefined();
+    expect(DatabaseTasks["classForAdapter"]("sqlite3")).toBeDefined();
   });
 
   it("falls back to the default_connection (sqlite3) when ARCONN is unset", async () => {

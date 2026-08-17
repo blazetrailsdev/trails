@@ -12,7 +12,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { stdout, stderr, setEnv } from "@blazetrails/activesupport";
-import { DatabaseTasks } from "./database-tasks.js";
+import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
@@ -256,11 +256,11 @@ describe("DatabaseTasksRegisterTask", () => {
     };
     DatabaseTasks.registerTask("sqlite", first);
     DatabaseTasks.registerTask("sqlite", second);
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBe(second);
+    expect(DatabaseTasks["classForAdapter"]("sqlite3")).toBe(second);
   });
 
   it("unregistered task", () => {
-    expect(DatabaseTasks.resolveTask("nonexistent")).toBeUndefined();
+    expect(() => DatabaseTasks["classForAdapter"]("nonexistent")).toThrow(DatabaseNotSupported);
   });
 });
 

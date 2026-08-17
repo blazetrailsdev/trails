@@ -232,12 +232,14 @@ export class ConnectionHandler {
   }
 
   activeConnectionsQ(role?: string | null): boolean {
-    const pools = this.connectionPoolList(role);
+    // `each_connection_pool(role)` (connection_handler.rb:158) is an Enumerator
+    // when called without a block; the TS overload always takes one, so the
+    // pools are collected before `any?`.
+    const pools: ConnectionPool[] = [];
+    this.eachConnectionPool(role, (pool) => {
+      pools.push(pool);
+    });
     return pools.some((pool) => pool.activeConnection != null);
-  }
-
-  get activeConnections(): boolean {
-    return this.activeConnectionsQ();
   }
 
   clearActiveConnectionsBang(role?: string | null): void {

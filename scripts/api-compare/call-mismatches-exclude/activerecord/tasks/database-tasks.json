@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "class_for_adapter",
-    "call": "detect",
-    "reason": "Verified per-site (RFC 0106): `@tasks.reverse_each.detect` (`database_tasks.rb:575`) is `resolveTask`, the same newest-first walk over the same registrations, extracted because `registerTask` stores the handler rather than its name so `task.is_a?(String) ? task.constantize : task` has no analogue; inlining it back is filed as its own story."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "dump_schema",
     "call": "open",
     "reason": "Verified per-site (RFC 0106): `File.open(filename, \"w:utf-8\") { |file| ... }` (`database_tasks.rb:439`) — the fs port models no open-file handle, so the dumper writes into a line buffer that `writeFileSync` flushes; there is no TS call spelling for the block form."

@@ -32,6 +32,6 @@
     "tsFile": "database-configurations/hash-config.ts",
     "rubyName": "seeds?",
     "call": "fetch",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `configuration_hash.fetch(:seeds, primary?)` (`database_configurations/hash_config.rb:138`) — same Hash#fetch shortcoming as `validate?`: the configuration hash is a plain TS object, so the body spells the stored-key test explicitly and falls back to `isPrimary()`."
   }
 ]
