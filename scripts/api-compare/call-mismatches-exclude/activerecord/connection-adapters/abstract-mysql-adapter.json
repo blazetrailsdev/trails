@@ -16,15 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
-    "rubyName": "columns_for_distinct",
-    "call": "compact_blank",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Verified per-site (RFC 0106): Ruby's `orders.compact_blank` (abstract_mysql_adapter.rb:620,625) is Enumerable#compact_blank, a receiver method. trails does not monkey-patch Array, so ActiveSupport's `compactBlank(collection)` takes the receiver as its only argument — the zero-vs-one arg delta is the standalone-function spelling, not a dropped argument."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "dbconsole",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `mysql_config[:password].to_s.empty?` (abstract_mysql_adapter.rb:76) — `empty?` on a Ruby String, whose faithful JS spelling is `s === \"\"`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
