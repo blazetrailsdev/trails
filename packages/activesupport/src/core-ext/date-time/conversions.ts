@@ -11,7 +11,7 @@
  * Mirrors: `class DateTime` (`core_ext/date_time/conversions.rb`)
  */
 
-import { Rational, Temporal, Time, cCivilToJd } from "@blazetrails/date";
+import { DateTime as RubyDateTime, Temporal, Time, cCivilToJd } from "@blazetrails/date";
 import { secFraction } from "../../time-ext.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { isUtc, secondsSinceMidnight, utcOffset } from "./calculations.js";
@@ -122,27 +122,13 @@ export function nsec(datetime: DateTime): number {
 }
 
 /**
- * Ruby `DateTime#offset` (ruby/date, `date_core.c` `d_lite_offset`) over the
- * seat this file's `DateTime` methods take: the offset as a Rational fraction
- * of a day, built from `of` in seconds. `@blazetrails/date`'s `DateTime#offset`
- * is the same reader over the ruby/date receiver; a `PlainDateTime` stands in
- * for the `+00:00` a `DateTime` defaults to (date.rb's `civil`).
- */
-function offset(datetime: DateTime): Rational {
-  const of =
-    datetime instanceof Temporal.PlainDateTime
-      ? 0
-      : Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
-  return new Rational(of, 86_400);
-}
-
-/**
  * Mirrors: `DateTime#offset_in_seconds`
  * (`core_ext/date_time/conversions.rb:99-101`) — `(offset * 86400).to_i`,
- * where Ruby's `offset` is the fraction of a day.
+ * where `offset` is ruby/date's own reader (`date_core.c` `d_lite_offset`),
+ * the offset as a Rational fraction of a day.
  */
 export function offsetInSeconds(datetime: DateTime): number {
-  return offset(datetime).mul(86400).toI();
+  return new RubyDateTime(datetime).offset.mul(86400).toI();
 }
 
 /**

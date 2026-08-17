@@ -11,11 +11,13 @@ import {
   endOfDay,
   endOfHour,
   endOfMinute,
+  isUtc,
   middleOfDay,
   secondsSinceMidnight,
   secondsUntilEndOfDay,
   since,
   subsec,
+  utcOffset,
 } from "./date-time/calculations.js";
 import { civilFromFormat, formattedOffset, nsec, toF, toI, usec } from "./date-time/conversions.js";
 import { setFrozenTime } from "../time-travel.js";
@@ -365,15 +367,18 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("utc?", () => {
-    const utcDate = new Date(Date.UTC(2005, 1, 22, 10, 10, 10));
-    expect(utcDate.getUTCHours()).toBe(10);
-    expect(utcDate.toISOString()).toContain("T10:10:10");
+    expect(isUtc(dt(2005, 2, 21, 10, 11, 12))).toBe(true);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBe(true);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, 0.25))).toBe(false);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, -0.25))).toBe(false);
   });
 
   it("utc offset", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const offsetMin = -dt.getTimezoneOffset();
-    expect(typeof offsetMin).toBe("number");
+    expect(utcOffset(dt(2005, 2, 21, 10, 11, 12))).toBe(0);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBe(0);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, 0.25))).toBe(21600);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, -0.25))).toBe(-21600);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-5, 24)))).toBe(-18000);
   });
 
   it("utc", () => {
