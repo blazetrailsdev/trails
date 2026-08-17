@@ -201,7 +201,6 @@ export class Array extends ValueType<unknown> {
   }
 
   cast(value: unknown): unknown {
-    if (value == null) return null;
     if (typeof value === "string") {
       value = this.pgDecoder.decode(value);
     }
@@ -209,25 +208,19 @@ export class Array extends ValueType<unknown> {
   }
 
   override serialize(value: unknown): unknown {
-    if (value == null) return null;
     if (globalThis.Array.isArray(value)) {
       const castedValues = this.typeCastArray(value, "serialize") as unknown[];
       return new Data(this.pgEncoder, castedValues);
     }
-    return value;
+    return super.serialize(value);
   }
 
   override deserialize(value: unknown): unknown {
-    if (value == null) return null;
     if (typeof value === "string") {
       return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
-    // Divergence: Rails' deserialize only sees strings and Data. node-pg can
-    // return an already-decoded JS array, so route it through the subtype here
-    // the same way cast() does.
-    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
-    return value;
+    return super.deserialize(value);
   }
 
   private formatValueForSchema(value: unknown): string {
