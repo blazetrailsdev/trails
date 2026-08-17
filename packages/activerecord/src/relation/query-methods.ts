@@ -330,7 +330,7 @@ function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
  */
 function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":includes", args);
-  return includesBang.apply(this.clone(), args);
+  return includesBang.apply(this.spawn(), args);
 }
 
 function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
@@ -352,7 +352,7 @@ function all(this: QueryMethodsHost): any {
  */
 function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":eager_load", args);
-  return eagerLoadBang.apply(this.clone(), args);
+  return eagerLoadBang.apply(this.spawn(), args);
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
@@ -367,7 +367,7 @@ function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[
  */
 function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":preload", args);
-  return preloadBang.apply(this.clone(), args);
+  return preloadBang.apply(this.spawn(), args);
 }
 
 function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
@@ -393,7 +393,7 @@ async function extractAssociated(this: QueryMethodsHost, association: string): P
  */
 function references(this: QueryMethodsHost, ...tableNames: Array<string | Nodes.SqlLiteral>): any {
   checkIfMethodHasArgumentsBang.call(this, ":references", tableNames);
-  return referencesBang.apply(this.clone(), tableNames);
+  return referencesBang.apply(this.spawn(), tableNames);
 }
 
 function referencesBang(
@@ -463,7 +463,7 @@ function withCte(this: QueryMethodsHost, ...args: any[]): any {
     throw argumentError("ActiveRecord::Relation#with does not accept a block");
   }
   checkIfMethodHasArgumentsBang.call(this, ":with", args);
-  return withBang.apply(this.clone(), args);
+  return withBang.apply(this.spawn(), args);
 }
 
 function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
@@ -480,7 +480,7 @@ function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
  */
 function withRecursive(this: QueryMethodsHost, ...args: any[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":with_recursive", args);
-  return withRecursiveBang.apply(this.clone(), args);
+  return withRecursiveBang.apply(this.spawn(), args);
 }
 
 function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
@@ -801,7 +801,7 @@ function unscope(
   ...args: Array<UnscopeType | { where: string | string[] }>
 ): any {
   checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
-  return unscopeBang.apply(this.clone(), args as any);
+  return unscopeBang.apply(this.spawn(), args as any);
 }
 
 function unscopeBang(
@@ -854,7 +854,7 @@ function unscopeBang(
  */
 function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":joins", args as unknown[]);
-  return joinsBang.apply(this.clone(), args as (string | Nodes.Join)[]);
+  return joinsBang.apply(this.spawn(), args as (string | Nodes.Join)[]);
 }
 
 function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
@@ -884,7 +884,7 @@ function leftOuterJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any
   // `left_outer_joins!` stores args verbatim and only raises for a
   // non-Hash/Symbol/Array arg lazily at SQL-build time, in `build_join_buckets`
   // (query_methods.rb:1828-1834) — not eagerly here.
-  return leftOuterJoinsBang.apply(this.clone(), args);
+  return leftOuterJoinsBang.apply(this.spawn(), args);
 }
 
 /**
@@ -892,7 +892,7 @@ function leftOuterJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any
  */
 function leftJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":left_joins", args);
-  return leftOuterJoinsBang.apply(this.clone(), args);
+  return leftOuterJoinsBang.apply(this.spawn(), args);
 }
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
@@ -1312,7 +1312,7 @@ function offsetBang(this: QueryMethodsHost, value: number | string | null): any 
  * Mirrors: ActiveRecord::QueryMethods#lock (query_methods.rb:1238-1240)
  */
 function lock(this: QueryMethodsHost, locks: string | boolean = true): any {
-  return lockBang.call(this.clone(), locks);
+  return lockBang.call(this.spawn(), locks);
 }
 
 function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
@@ -1330,7 +1330,7 @@ function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
  * Mirrors: ActiveRecord::QueryMethods#none (query_methods.rb:1281-1283)
  */
 function none(this: QueryMethodsHost): any {
-  return noneBang.call(this.clone());
+  return noneBang.call(this.spawn());
 }
 
 function noneBang(this: QueryMethodsHost): any {
@@ -1363,7 +1363,7 @@ function isNullRelation(this: QueryMethodsHost): boolean {
  * Mirrors: ActiveRecord::QueryMethods#readonly (query_methods.rb:1309-1311)
  */
 function readonly(this: QueryMethodsHost, value = true): any {
-  return readonlyBang.call(this.clone(), value);
+  return readonlyBang.call(this.spawn(), value);
 }
 
 function readonlyBang(this: QueryMethodsHost, value = true): any {
@@ -1377,7 +1377,7 @@ function readonlyBang(this: QueryMethodsHost, value = true): any {
  * Mirrors: ActiveRecord::QueryMethods#strict_loading (query_methods.rb:1324-1326)
  */
 function strictLoading(this: QueryMethodsHost, value = true): any {
-  return strictLoadingBang.call(this.clone(), value);
+  return strictLoadingBang.call(this.spawn(), value);
 }
 
 function strictLoadingBang(this: QueryMethodsHost, value = true): any {
@@ -1391,7 +1391,7 @@ function strictLoadingBang(this: QueryMethodsHost, value = true): any {
  * Mirrors: ActiveRecord::QueryMethods#create_with (query_methods.rb:1346-1348)
  */
 function createWith(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
-  return createWithBang.call(this.clone(), value);
+  return createWithBang.call(this.spawn(), value);
 }
 
 function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
@@ -1411,7 +1411,7 @@ function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> |
  * Mirrors: ActiveRecord::QueryMethods#from (query_methods.rb:1391-1393)
  */
 function from(this: QueryMethodsHost, value: any, subqueryName?: string): any {
-  return fromBang.call(this.clone(), value, subqueryName);
+  return fromBang.call(this.spawn(), value, subqueryName);
 }
 
 function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): any {
@@ -1434,8 +1434,8 @@ function extending(
   this: QueryMethodsHost,
   mod?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
 ): any {
-  if (!mod) return this.clone();
-  return extendingBang.call(this.clone(), mod);
+  if (!mod) return this;
+  return extendingBang.call(this.spawn(), mod);
 }
 
 function extendingBang(
@@ -1467,7 +1467,7 @@ function extendingBang(
  */
 function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":optimizer_hints", args);
-  return optimizerHintsBang.apply(this.clone(), args);
+  return optimizerHintsBang.apply(this.spawn(), args);
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
@@ -1568,7 +1568,7 @@ function skipPreloadingBang(this: QueryMethodsHost): any {
  */
 function annotate(this: QueryMethodsHost, ...args: string[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":annotate", args);
-  return annotateBang.apply(this.clone(), args);
+  return annotateBang.apply(this.spawn(), args);
 }
 
 function annotateBang(this: QueryMethodsHost, ...comments: string[]): any {

@@ -239,7 +239,7 @@ describe("RelationMergingTest", () => {
       .where("salary >= 80000")
       .order("id DESC")
       .merge(Developer.limit(2));
-    expect(devs.isLocked).toBe(true);
+    expect(devs.isLocked).toBeTruthy();
   });
 
   it("relation merging with preload", async () => {

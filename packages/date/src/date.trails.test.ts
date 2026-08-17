@@ -2367,3 +2367,45 @@ describe("Date#inspect", () => {
     );
   });
 });
+
+// `dup_obj_with_new_start` (date_core.c:5801-5810) and `d_simple_new_internal`
+// / `d_complex_new_internal` (date_core.c:3036-3071) all build
+// `rb_obj_class(self)`, so every copy/builder seat answers the RECEIVER's
+// class. The construction statics (`Date.today`, `Date.jd`, ...) are a separate
+// question — they answer the `Temporal` seat under RFC 0088.
+describe("builder seats answer rb_obj_class(self)", () => {
+  class DateSub extends RubyDate {}
+  class DateTimeSub extends RubyDateTime {}
+
+  it("propagates a Date subclass through plus/minus/shift/succ/next", () => {
+    const d = new DateSub(2001, 2, 3);
+    expect(d.plus(1)).toBeInstanceOf(DateSub);
+    expect(d.minus(1)).toBeInstanceOf(DateSub);
+    expect(d.rshift(1)).toBeInstanceOf(DateSub);
+    expect(d.lshift(1)).toBeInstanceOf(DateSub);
+    expect(d.succ()).toBeInstanceOf(DateSub);
+    expect(d.next()).toBeInstanceOf(DateSub);
+  });
+
+  it("propagates a Date subclass through the new_start family", () => {
+    const d = new DateSub(2001, 2, 3);
+    expect(d.italy()).toBeInstanceOf(DateSub);
+    expect(d.england()).toBeInstanceOf(DateSub);
+    expect(d.julian()).toBeInstanceOf(DateSub);
+    expect(d.gregorian()).toBeInstanceOf(DateSub);
+  });
+
+  it("propagates a DateTime subclass through both seats", () => {
+    const dt = new DateTimeSub(2001, 2, 3);
+    expect(dt.plus(1)).toBeInstanceOf(DateTimeSub);
+    expect(dt.minus(1)).toBeInstanceOf(DateTimeSub);
+    expect(dt.rshift(1)).toBeInstanceOf(DateTimeSub);
+    expect(dt.lshift(1)).toBeInstanceOf(DateTimeSub);
+    expect(dt.succ()).toBeInstanceOf(DateTimeSub);
+    expect(dt.next()).toBeInstanceOf(DateTimeSub);
+    expect(dt.italy()).toBeInstanceOf(DateTimeSub);
+    expect(dt.england()).toBeInstanceOf(DateTimeSub);
+    expect(dt.julian()).toBeInstanceOf(DateTimeSub);
+    expect(dt.gregorian()).toBeInstanceOf(DateTimeSub);
+  });
+});

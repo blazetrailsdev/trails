@@ -2737,6 +2737,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * Mirrors `CollectionProxy#==` (collection_proxy.rb:980-982) — `load_target
+   * == other`, so the loaded target does the comparing: `Array#==` is
+   * element-wise against another Array, and against anything that converts to
+   * one (another proxy) MRI re-dispatches as `other == load_target`.
+   */
+  override async equals(other: unknown): Promise<boolean | undefined> {
+    const loadTarget = await this.loadTarget();
+    if (Array.isArray(other)) {
+      return sameRecordList(loadTarget, other as Base[]);
+    }
+    const otherEquals = (other as { equals?: (o: unknown) => unknown } | null)?.equals;
+    if (typeof otherEquals === "function") {
+      return (await otherEquals.call(other, loadTarget)) as boolean | undefined;
+    }
+    return false;
+  }
+
+  /**
    * Alias for push/<<.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append

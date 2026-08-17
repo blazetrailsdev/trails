@@ -649,7 +649,7 @@ export class Relation<T extends Base> {
     conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
-    if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this.clone());
+    if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this.spawn());
     // Rails: a single blank-ish argument (`args.length == 1 && args.first.blank?`,
     // query_methods.rb:1036) makes `where` a no-op returning the relation
     // unchanged — `where({})` / `where([])` / `where(null)` / `where("")` all
@@ -660,7 +660,7 @@ export class Relation<T extends Base> {
     // lets a NESTED empty hash (`where(posts: {})`) still expand to the `1=0`
     // contradiction Rails' `expand_from_hash` returns.
     if (rest.length === 0 && _qm.isBlankArgument(conditionsOrSql)) {
-      return this.clone();
+      return this;
     }
     // Composite-key form: array of column names + array of tuples. It is
     // always a two-argument call (`where(cols, tuples)`), so it is
@@ -694,12 +694,12 @@ export class Relation<T extends Base> {
         tuples,
         (tableName) => this.lookupTableKlassFromJoinDependencies(tableName) as typeof Base | null,
       );
-      if (nodes.length === 0) return this.clone().noneBang();
-      const rel = this.clone();
+      if (nodes.length === 0) return this.spawn().noneBang();
+      const rel = this.spawn();
       rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
       return rel;
     }
-    return this.clone().whereBang(
+    return this.spawn().whereBang(
       conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
       ...rest,
     );
@@ -714,7 +714,7 @@ export class Relation<T extends Base> {
     // Mirrors rewhere (query_methods.rb): `return unscope(:where) if conditions.nil?`.
     if (conditions == null) return this.unscope("where");
     conditions = sanitizeForbiddenAttributes(conditions);
-    const rel = this.clone();
+    const rel = this.spawn();
     // Mirrors rewhere (query_methods.rb): `where_clause = build_where_clause(...)`,
     // `unscope!(where: where_clause.extract_attributes)`, `where_clause += ...`.
     // Building through the same `build_where_clause` path as `where` keeps the
@@ -894,7 +894,7 @@ export class Relation<T extends Base> {
     conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>) as
       | Record<string, unknown>
       | string[];
-    const rel = this.clone();
+    const rel = this.spawn();
     rel.referencesBang(...referencesFromConditions(conditions));
     if (
       Array.isArray(conditions) &&
@@ -965,7 +965,7 @@ export class Relation<T extends Base> {
    */
   or(other: Relation<T>): Relation<T> {
     if (this._isNone) return other.clone();
-    return this.clone().orBang(other);
+    return this.spawn().orBang(other);
   }
 
   /**
@@ -975,7 +975,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#and
    */
   and(other: Relation<T>): Relation<T> {
-    return this.clone().andBang(other);
+    return this.spawn().andBang(other);
   }
 
   /**
@@ -995,7 +995,7 @@ export class Relation<T extends Base> {
     for (let i = 1; i < conditions.length; i++) {
       combined = combined.or(buildClause(conditions[i]));
     }
-    const rel = this.clone();
+    const rel = this.spawn();
     if (combined.predicates.length > 0)
       rel.whereClause = rel.whereClause.plus(new WhereClause([combined.ast]));
     return rel;
@@ -1051,7 +1051,7 @@ export class Relation<T extends Base> {
       else combined.push(relation);
     }
     if (combined.length === 0) return this;
-    return this.clone().excludingBang(combined);
+    return this.spawn().excludingBang(combined);
   }
 
   /**
@@ -1086,7 +1086,7 @@ export class Relation<T extends Base> {
       else combined.push(relation);
     }
     if (combined.length === 0) return this;
-    return this.clone().excludingBang(combined);
+    return this.spawn().excludingBang(combined);
   }
 
   /**
@@ -1098,7 +1098,7 @@ export class Relation<T extends Base> {
     this.checkIfMethodHasArgumentsBang(":order", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
-    return this.clone().orderBang(...args);
+    return this.spawn().orderBang(...args);
   }
 
   /**
@@ -1107,7 +1107,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#limit
    */
   limit(value: number | string | null): Relation<T> {
-    return this.clone().limitBang(value);
+    return this.spawn().limitBang(value);
   }
 
   /**
@@ -1116,7 +1116,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#offset
    */
   offset(value: number | string | null): Relation<T> {
-    return this.clone().offsetBang(value);
+    return this.spawn().offsetBang(value);
   }
 
   /**
@@ -1143,7 +1143,7 @@ export class Relation<T extends Base> {
     }
     this.checkIfMethodHasArgumentsBang(":select", fields, "Call `select' with at least one field.");
     fields = this.processSelectArgs(fields);
-    return this.clone()._selectBang(...fields);
+    return this.spawn()._selectBang(...fields);
   }
 
   /**
@@ -1154,7 +1154,7 @@ export class Relation<T extends Base> {
   reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":reselect", args as unknown[]);
     args = this.processSelectArgs(args as unknown[]) as typeof args;
-    return this.clone().reselectBang(...args);
+    return this.spawn().reselectBang(...args);
   }
 
   /**
@@ -1163,7 +1163,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#distinct
    */
   distinct(value = true): Relation<T> {
-    return this.clone().distinctBang(value);
+    return this.spawn().distinctBang(value);
   }
 
   /**
@@ -1172,7 +1172,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
    */
   distinctOn(...columns: string[]): Relation<T> {
-    const rel = this.clone();
+    const rel = this.spawn();
     rel.distinctValue = true;
     rel._distinctOnColumns = columns;
     return rel;
@@ -1185,7 +1185,7 @@ export class Relation<T extends Base> {
    */
   group(...args: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":group", args as unknown[]);
-    return this.clone().groupBang(...(args as string[]));
+    return this.spawn().groupBang(...(args as string[]));
   }
 
   /**
@@ -1201,7 +1201,7 @@ export class Relation<T extends Base> {
     condition: string | Record<string, unknown> | Nodes.Node,
     ...binds: unknown[]
   ): Relation<T> {
-    return this.clone().havingBang(condition, ...binds);
+    return this.spawn().havingBang(condition, ...binds);
   }
 
   /**
@@ -1211,7 +1211,7 @@ export class Relation<T extends Base> {
    */
   regroup(...args: string[]): Relation<T> {
     this.checkIfMethodHasArgumentsBang(":regroup", args);
-    return this.clone().regroupBang(...args);
+    return this.spawn().regroupBang(...args);
   }
 
   /**
@@ -1223,7 +1223,7 @@ export class Relation<T extends Base> {
     this.checkIfMethodHasArgumentsBang(":reorder", args as unknown[], undefined, () => {
       this.sanitizeOrderArguments(args as unknown[]);
     });
-    return this.clone().reorderBang(...args);
+    return this.spawn().reorderBang(...args);
   }
 
   /**
@@ -1232,7 +1232,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#reverse_order
    */
   reverseOrder(): Relation<T> {
-    return this.clone().reverseOrderBang();
+    return this.spawn().reverseOrderBang();
   }
 
   /**
@@ -1251,7 +1251,7 @@ export class Relation<T extends Base> {
 
     if (values.length === 0) return this.none();
 
-    const rel = this.clone();
+    const rel = this.spawn();
 
     // Mirrors Rails: `references = column_references([column]);
     // self.references_values |= references unless references.empty?`
@@ -1317,7 +1317,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#invert_where
    */
   invertWhere(): Relation<T> {
-    return this.clone().invertWhereBang();
+    return this.spawn().invertWhereBang();
   }
 
   /**
@@ -1376,19 +1376,23 @@ export class Relation<T extends Base> {
   /**
    * Check if this relation is marked readonly.
    *
-   * Mirrors: ActiveRecord::Relation#readonly?
+   * Mirrors: ActiveRecord::Relation#readonly? (relation.rb:1278-1280) — the
+   * stored `readonly_value` itself, so an unset relation answers `null` the way
+   * Rails answers `nil`.
    */
-  get isReadonly(): boolean {
-    return this.readonlyValue ?? false;
+  get isReadonly(): boolean | null {
+    return this.readonlyValue;
   }
 
   /**
    * Check if this relation carries a lock clause.
    *
-   * Mirrors: ActiveRecord::Relation#locked? (`alias :locked? :lock_value`)
+   * Mirrors: ActiveRecord::Relation#locked? (relation.rb:75,
+   * `alias :locked? :lock_value`) — the lock clause itself, so `lock("FOR
+   * UPDATE")` answers the string rather than a boolean.
    */
-  get isLocked(): boolean {
-    return this.lockValue !== null;
+  get isLocked(): string | null {
+    return this.lockValue;
   }
 
   /**

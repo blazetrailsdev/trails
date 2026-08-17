@@ -930,7 +930,7 @@ export async function pluck(
     // the spawn's select before building is essential: resolving the discarded
     // select list would mutate referencesValues and could promote includes
     // (adding joins Rails would not add for the pluck columns).
-    const rel = this.clone();
+    const rel = this.spawn();
     delete rel._values.select;
     // calculations.rb:315-316 — `relation.select_values = columns; relation.arel`.
     // Going through `select_values` (rather than overwriting `manager.projections`)
