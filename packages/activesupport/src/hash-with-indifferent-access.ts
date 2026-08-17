@@ -124,8 +124,8 @@ export class HashWithIndifferentAccess<V = unknown> {
   /**
    * `Hash#default_proc`, read by `set_defaults` (:417-418).
    *
-   * @noRailsEquivalent inherited from Ruby's Hash, which this class subclasses;
-   * core Ruby has no file in the mapped Rails source to match against
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
+   * subclasses; core Ruby has no file in the mapped Rails source to match against
    */
   defaultProc(): DefaultProc<V> | undefined {
     return this._defaultProc;
@@ -135,8 +135,8 @@ export class HashWithIndifferentAccess<V = unknown> {
    * `Hash#default_proc=`, which `initialize` (:77) and `set_defaults` (:418)
    * write through. MRI clears the default value on this write.
    *
-   * @noRailsEquivalent inherited from Ruby's Hash, which this class subclasses;
-   * core Ruby has no file in the mapped Rails source to match against
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
+   * subclasses; core Ruby has no file in the mapped Rails source to match against
    */
   setDefaultProc(proc: DefaultProc<V> | undefined): void {
     this._defaultProc = proc;
