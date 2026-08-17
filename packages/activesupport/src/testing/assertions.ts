@@ -555,29 +555,6 @@ export function assertNotPredicate<T>(
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_respond_to`
- * (minitest/assertions.rb). Rails inherits it from Minitest, so there is no Ruby
- * counterpart in a mapped file. Ruby sends `respond_to?`; the JS analogue is
- * whether the property resolves to a callable.
- */
-export function assertRespondTo(actual: unknown, name: string, message?: string): void {
-  assert(respondsTo(actual, name), message ?? `Expected ${inspect(actual)} to respond to ${name}`);
-}
-
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_respond_to` / `refute_respond_to`. */
-export function assertNotRespondTo(actual: unknown, name: string, message?: string): void {
-  assert(
-    !respondsTo(actual, name),
-    message ?? `Expected ${inspect(actual)} to not respond to ${name}`,
-  );
-}
-
-function respondsTo(actual: unknown, name: string): boolean {
-  if (actual == null) return false;
-  return typeof (actual as Record<string, unknown>)[name] === "function";
-}
-
-/**
  * @noRailsEquivalent PERMANENT — Minitest's `assert_empty` (minitest/assertions.rb),
  * which sends `empty?` to the collection. Rails inherits it from Minitest, so
  * there is no Ruby counterpart in a mapped file. JS has no `empty?` protocol, so
