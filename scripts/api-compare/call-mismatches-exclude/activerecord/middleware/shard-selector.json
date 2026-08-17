@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "middleware/shard-selector.ts",
-    "rubyName": "selected_shard",
-    "call": "call",
-    "reason": "Ratified (RFC 0099, 2026-08-14): a JS function IS the Ruby Proc. Rails stores the caller's lambda and hands it back unchanged through attr_reader (shard_selector.rb:34,37; normalization.rb:90,121-126), so `resolver.call(request)` vs `resolver(request)` is a spelling difference with no behavioral gap. Function.prototype.call cannot be the receiver (it rebinds `this`), and a trails Proc wrapper would either force `new Proc(fn)` on the public API or break the normalizer identity check at normalization.rb:146,152."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "middleware/shard-selector.ts",
     "rubyName": "set_shard",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

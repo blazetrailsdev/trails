@@ -341,6 +341,10 @@ class ApiExtractor
     # as instance methods of every `include`r drowns hosts like
     # `Rack::ContentLength` in 30+ phantom misses.
     @module_function_stack = [false]
+    # The `attr_reader`/`attr_writer`/`attr_accessor` names declared on the
+    # class body currently being walked, innermost last. See
+    # collect_attr_declarations / attr_reader_read?.
+    @attr_names_stack = [Set.new]
     # `VALID_OPTIONS`-named symbol arrays per class FQN, expanded when a method
     # body passes the constant to `assert_valid_keys`. See collect_option_keys.
     @const_symbol_arrays = {}
@@ -589,7 +593,9 @@ class ApiExtractor
     fqn = current_fqn
     @modules[fqn] ||= new_class_info(name, fqn)
 
+    @attr_names_stack.push(collect_attr_declarations(node[2]))
     walk_body(node[2])
+    @attr_names_stack.pop
 
     @module_function_stack.pop
     @visibility_stack.pop
@@ -610,7 +616,10 @@ class ApiExtractor
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
 
-    walk_body(node[3] || node[2])
+    body = node[3] || node[2]
+    @attr_names_stack.push(collect_attr_declarations(body))
+    walk_body(body)
+    @attr_names_stack.pop
 
     @module_function_stack.pop
     @visibility_stack.pop
@@ -2407,6 +2416,12 @@ class ApiExtractor
     lambdas = []
     args.each { |child| walk_arg_node(child, calls, weak, lambdas) }
 
+    # The call-set half of record_call_site's reader-receiver verdict: the
+    # receiver walk above has already recorded the reader's own name, which is
+    # the one the port's direct invocation spells, so recording `call` on top of
+    # it demands a callee no faithful port writes (RFC 0108).
+    name = nil if name == "call" && recv && attr_reader_receiver_name(recv)
+
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
@@ -2438,6 +2453,96 @@ class ApiExtractor
     else
       walk_for_calls(node, calls, weak)
     end
+  end
+
+  ATTR_DECLARATION_COMMANDS = %w[attr_reader attr_writer attr_accessor].freeze
+
+  # The attribute names a class body declares with `attr_reader` /
+  # `attr_writer` / `attr_accessor`, collected up front rather than as the walk
+  # reaches them: `association_scope.rb:52` declares `value_transformation`
+  # above its readers, but nothing in Ruby requires that order.
+  #
+  # Nested `class`/`module` bodies are NOT descended into — their declarations
+  # belong to their own scope, which gets its own stack frame — but `class <<
+  # self` is, since those readers are read from the same file's class methods.
+  def collect_attr_declarations(node, names = Set.new)
+    return names unless node.is_a?(Array)
+    return names if %i[class module def defs].include?(node[0])
+
+    args =
+      case node[0]
+      when :command
+        node[2] if ATTR_DECLARATION_COMMANDS.include?(ident_name(node[1]))
+      when :method_add_arg
+        node[2] if node[1].is_a?(Array) && node[1][0] == :fcall &&
+                   ATTR_DECLARATION_COMMANDS.include?(ident_name(node[1][1]))
+      end
+    extract_symbol_args(args).each { |name| names << name } if args
+
+    node.each { |child| collect_attr_declarations(child, names) if child.is_a?(Array) }
+    names
+  end
+
+  # A bare `value_transformation` in a body that declares it `attr_reader` is an
+  # ATTRIBUTE READ, not a method call — Ruby just has no other spelling for one.
+  # Its port is a getter or a plain field, and reading one emits no call node on
+  # the TS side, so emitting one here pairs the surviving TS calls against the
+  # wrong Ruby ones and reports an argument mismatch against a faithful port
+  # (RFC 0108). Only the 0-arg, block-less, implicit-receiver (or `self.`) form
+  # qualifies: `record.association(association)` (branch.rb:84) passes arguments
+  # and stays a call, as does the same name on any other receiver.
+  def attr_reader_read?(callee, args, flags)
+    names = @attr_names_stack.last
+    return false if names.nil? || names.empty?
+    return false if flags.include?("block")
+    return false unless empty_arg_list?(args)
+
+    case callee[0]
+    when :vcall, :fcall then names.include?(ident_name(callee[1]))
+    when :call
+      return false unless self_receiver?(callee[1])
+      name = callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+      !name.nil? && names.include?(name)
+    else false
+    end
+  end
+
+  # The name of the `attr_reader` a bare receiver reads, or nil. A stored Proc
+  # is invoked as `value_transformation.call(value)` (association_scope.rb:78)
+  # because Ruby has no other spelling for it; the port's callable field is
+  # invoked directly, `this.valueTransformation(value)`. So the two bodies do
+  # the same one thing, and the site belongs under the READER's name on both
+  # sides — recording `call` demands a TS callee that a faithful port cannot
+  # write (RFC 0108).
+  def attr_reader_receiver_name(recv)
+    return nil unless recv.is_a?(Array)
+
+    names = @attr_names_stack.last
+    return nil if names.nil? || names.empty?
+
+    name =
+      case recv[0]
+      when :vcall, :fcall then ident_name(recv[1])
+      when :call
+        self_receiver?(recv[1]) && recv[3].is_a?(Array) ? ident_name(recv[3]) : nil
+      end
+    name if name && names.include?(name)
+  end
+
+  def empty_arg_list?(args)
+    return true if args.nil?
+    return false unless args.is_a?(Array)
+    return true if args.empty? || args[0] == :args_new
+    return empty_arg_list?(args[1]) if args[0] == :arg_paren
+    return empty_arg_list?(args[1]) if args[0] == :args_add_block && !args[2].is_a?(Array)
+    false
+  end
+
+  def self_receiver?(recv)
+    return false unless recv.is_a?(Array) && recv[0] == :var_ref
+
+    inner = recv[1]
+    inner.is_a?(Array) && inner[0] == :@kw && inner[1] == "self"
   end
 
   # The argument half of walk_for_calls (RFC 0025 §1). Every syntactic call
@@ -2484,6 +2589,10 @@ class ApiExtractor
     # would let the argument gate flag a site the other extractor says is gone.
     name = nil if name == "new" && (callee[0] == :call || callee[0] == :command_call) &&
                   proc_new_receiver?(callee[1])
+    name = nil if name && attr_reader_read?(callee, args, flags)
+    if name == "call" && (callee[0] == :call || callee[0] == :command_call)
+      name = attr_reader_receiver_name(callee[1]) || name
+    end
     if name
       site_flags = flags.dup
       # The per-SITE half of walk_for_calls' `weak` tally, from the same
