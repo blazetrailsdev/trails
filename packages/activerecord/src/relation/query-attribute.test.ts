@@ -151,6 +151,16 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBe(false);
   });
 
+  it("isUnboundable signs a STRING bound by its cast value", () => {
+    // `serializable?` yields `cast_value` (integer.rb:75-79), not the raw value,
+    // and a QueryAttribute's value IS raw (query_attribute.rb:22-24). Reading the
+    // raw string here would make `value <=> 0` answer 1 for both signs.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", "1099511627776", int4).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", "5", int4).isUnboundable()).toBe(false);
+  });
+
   it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
     // big_integer.rb:33 — in_range? is always true, so serializable? never
     // yields and unboundable? stays nil however large the value.
