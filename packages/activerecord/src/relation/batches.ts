@@ -3,8 +3,10 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
+import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray } from "@blazetrails/activesupport";
 import { WhereClause } from "./where-clause.js";
+import { rubyInspect } from "./ruby-inspect.js";
 import { ActiveRecord } from "../ar-config.js";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
@@ -321,11 +323,10 @@ export async function ensureValidOptionsForBatchingBang(
     }
   }
 
-  const orderArr = Array.isArray(order) ? order : [order];
-  for (const o of orderArr) {
-    if (o !== "asc" && o !== "desc") {
-      throw new Error(`:order must be :asc or :desc, got ${String(o)}`);
-    }
+  if (kernelArray(order).filter((o) => o !== "asc" && o !== "desc").length > 0) {
+    throw new ArgumentError(
+      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${rubyInspect(order)}`,
+    );
   }
 }
 
