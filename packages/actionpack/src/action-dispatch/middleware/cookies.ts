@@ -559,7 +559,7 @@ export class Cookies {
  */
 export interface RequestCookieMethodsHost {
   env: RackEnv;
-  // `@env[name]` (rack/lib/rack/request.rb:100-102) is untyped in Ruby.
+  /** Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby. */
   getHeader(name: string): any;
   hasHeader(name: string): boolean;
   cookiesAppOptions?: CookieJarOptions;

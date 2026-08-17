@@ -3117,17 +3117,8 @@ function collectCalls(
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
       visit(n.expression);
       if (n.name.text === "constructor") return;
-      //   - in the ORDER stream only, the read that GUARDS a call of the same
-      //     name (`this.logger.pushTags ? this.logger.pushTags(…) : 0`): that
-      //     is the port's spelling of Ruby's `logger.respond_to?(:push_tags)`
-      //     (railties/lib/rails/rack/logger.rb:23), which Ruby records as
-      //     `respond_to?` at that position, not as `push_tags`. Letting the
-      //     read claim the guard's position puts the name ahead of the
-      //     arguments Rails evaluates first (`compute_tags`) and reports an
-      //     inversion in a body whose order matches Rails. The call itself
-      //     still takes its own position, and the SET is untouched — this is
-      //     the same "a position must be attributable to exactly one call"
-      //     rule as compare.ts#ambiguousTsNames.
+      //   - in the ORDER stream only, a `respond_to?` guard read — see
+      //     isGuardConditionRead.
       if (invoked?.has(propertyAccessKey(n)) === true && isGuardConditionRead(n)) {
         return;
       }
@@ -3176,9 +3167,17 @@ function isForeignReadReceiver(receiver: ts.Node): boolean {
 /**
  * Whether a property read sits in the CONDITION of a guard — `if (x.foo)`,
  * `x.foo ? … : …`, `x.foo && …`, `x.foo ?? …`, and the negated/parenthesized
- * spellings of each. TS has no `respond_to?`, so reading the method itself is
- * the only way to ask Rails' question, and the read is the guard, not a send of
- * its own. See the call site in collectCalls.
+ * spellings of each.
+ *
+ * Rails guards an optional collaborator with `respond_to?`
+ * (`logger.respond_to?(:push_tags)`, railties/lib/rails/rack/logger.rb:23) and
+ * TS has no such operator, so reading the method itself is the only spelling of
+ * the question. Ruby records `respond_to?` at that position, not `push_tags`;
+ * letting the read claim it puts the name ahead of the arguments Rails
+ * evaluates first (`compute_tags`) and reports an inversion in a body whose
+ * order matches Rails. So the ORDER stream withholds the position — the call
+ * itself still takes its own, and the call SET is untouched. Same rule as
+ * compare.ts#ambiguousTsNames: a position is attributable to exactly one call.
  */
 function isGuardConditionRead(access: ts.PropertyAccessExpression): boolean {
   let node: ts.Node = access;

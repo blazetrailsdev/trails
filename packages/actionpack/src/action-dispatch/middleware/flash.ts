@@ -23,7 +23,7 @@ export const KEY = "action_dispatch.request.flash_hash";
  */
 export interface FlashRequestHost {
   env: RackEnv;
-  // `@env[name]` (rack/lib/rack/request.rb:100-102) is untyped in Ruby.
+  /** Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby. */
   getHeader(name: string): any;
   session: {
     isEnabled?(): boolean;

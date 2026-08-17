@@ -344,9 +344,11 @@ export class Request {
     return this.contentType;
   }
 
+  /**
+   * Rails: `content_length` (request.rb:292-295). A chunked body carries no
+   * `CONTENT_LENGTH`, so the drained body is measured instead.
+   */
   get contentLength(): number | undefined {
-    // request.rb:292-295 — a chunked body has no CONTENT_LENGTH, so Rails
-    // measures the drained body instead.
     if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
     const cl = this.getHeader("CONTENT_LENGTH") as string | undefined;
     if (!cl) return undefined;
@@ -464,8 +466,8 @@ export class Request {
 
   // --- Body ---
 
+  /** Rails: `body` (request.rb:357-364) — a cached `RAW_POST_DATA` wins over the live stream. */
   get body(): string {
-    // request.rb:357-364 — a cached RAW_POST_DATA wins over the live stream.
     const rawPost = this.getHeader("RAW_POST_DATA");
     if (rawPost != null) return String(rawPost);
     const input = this.bodyStream;
@@ -485,10 +487,12 @@ export class Request {
     return "";
   }
 
+  /**
+   * Rails: `raw_post` (request.rb:348-353). The body is cached under
+   * `RAW_POST_DATA` so repeated reads of a stream-backed `rack.input` don't
+   * yield "" after the first drain.
+   */
   get rawPost(): string {
-    // Rails caches raw_post under RAW_POST_DATA so repeated reads of a
-    // stream-backed rack.input don't yield "" after the first drain
-    // (request.rb:348-353).
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.body);
     }
@@ -609,10 +613,10 @@ export class Request {
    * — to mirror `ActionDispatch::Http::Headers#[]`. Keys that don't match the
    * pattern (e.g. `"action_dispatch.parameter_filter"`) pass through to the
    * env unchanged, mirroring `Request#get_header`.
+   *
+   * Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby: an
+   * env slot holds a String as often as a routes set, a logger or a RemoteIp.
    */
-  // `@env[name]` (rack/lib/rack/request.rb:100-102) is untyped in Ruby, and
-  // every header reader in this file goes through it: an env slot holds a
-  // String as often as a routes set, a logger, or a RemoteIp.
   getHeader(name: string): any {
     return this.env[envName(name)];
   }
