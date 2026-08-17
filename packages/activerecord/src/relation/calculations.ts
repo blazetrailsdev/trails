@@ -11,6 +11,7 @@
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
+import { isEmpty } from "../ruby-empty.js";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
@@ -1200,7 +1201,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
     ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
     ...Object.keys(model._attributeAliases ?? {}),
   ]);
-  return columnNames.map(String).every((c) => known.has(c));
+  return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
 }
 
 /**
@@ -1566,7 +1567,7 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 /** @internal */
 export async function selectForCount(rel: CalculationRelation): Promise<string> {
   // "*" is the JS analogue of Rails' `:all` symbol (calculations.rb:646-654).
-  if (rel.selectValues.length === 0) return "*";
+  if (isEmpty(rel.selectValues)) return "*";
   return rel.withConnection((conn) =>
     (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
       .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))

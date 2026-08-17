@@ -27,7 +27,10 @@
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
  * what makes a sibling PR's deleted method surface as a STALE row on a branch
  * that never touched it. CI opts out — it runs the extraction step separately
- * and must not pay for it twice.
+ * and must not pay for it twice. The regeneration is FORCED (RFC 0106) — a
+ * cached one is a PARTIAL one, and a partly-cached artifact both invents rows
+ * and hides real ones — and when it is opted out of, the gate REFUSES to run
+ * against an artifact older than the compared sources.
  *
  * Usage: no flag gates (CI); `--write` reseeds; `--report` groups read-only;
  * `--no-regen` gates the artifact already on disk.
@@ -56,7 +59,13 @@ import {
   rowsOfKind,
 } from "./call-mismatch-baseline.js";
 import { listJsonFiles, reportNonCanonicalBaselines } from "./baseline-json.js";
-import { NO_REGEN_FLAG, regenerateArtifact, shouldRegenerate } from "./gate-regen.js";
+import {
+  NO_REGEN_FLAG,
+  artifactIsStale,
+  regenerateArtifact,
+  shouldRegenerate,
+  staleArtifactMessage,
+} from "./gate-regen.js";
 import {
   BASELINE_DIR,
   loadBaseline as loadCallSetRows,
@@ -210,6 +219,9 @@ async function runAsScript(): Promise<void> {
       );
       process.exit(2);
     }
+  } else if (await artifactIsStale(ARTIFACT_PATH)) {
+    console.error(staleArtifactMessage("call-args ratchet", ARTIFACT_PATH));
+    process.exit(2);
   }
   process.exit(await main(argv.includes("--write")));
 }

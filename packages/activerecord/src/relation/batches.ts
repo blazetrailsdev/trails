@@ -5,6 +5,7 @@
  */
 import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray } from "@blazetrails/activesupport";
+import { isEmpty } from "../ruby-empty.js";
 import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
 import { stripThenable } from "./thenable.js";
@@ -315,7 +316,10 @@ export async function ensureValidOptionsForBatchingBang(
       columns: string[];
     }>;
     const uniqueIndex = indexes.find(
-      (index) => index.unique && !index.where && index.columns.every((c) => cursor.includes(c)),
+      (index) =>
+        index.unique &&
+        !index.where &&
+        isEmpty(kernelArray(index.columns).filter((c) => !cursor.includes(c))),
     );
     if (!uniqueIndex) {
       throw new Error(":cursor must include a primary key or other unique column(s)");

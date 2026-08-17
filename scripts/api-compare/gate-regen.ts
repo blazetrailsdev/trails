@@ -18,7 +18,9 @@
  */
 
 import { spawn } from "child_process";
-import { ROOT_DIR } from "./config.js";
+import * as path from "path";
+import { ROOT_DIR, apiComparePackageRoots } from "./config.js";
+import { manifestIsStale } from "./build-freshness.js";
 
 export const NO_REGEN_FLAG = "--no-regen";
 
@@ -39,20 +41,79 @@ export function shouldRegenerate(argv: string[], env: Record<string, string | un
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
 }
 
-// `extraArgs` is the compare scope. It defaults to the artifact's, the
-// only one compare.ts writes: a plain `pnpm parity:api` computes no call sets
-// at all, so passing [] would regenerate nothing the gate can read.
+/**
+ * The env the regeneration child runs with: the caller's, plus the force
+ * marker. Separate from the spawn so the contract is testable without a real
+ * `pnpm` on PATH.
+ */
+export function regenEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return { ...env, API_COMPARE_FORCE: "1" };
+}
+
+/**
+ * Run `pnpm parity:api <extraArgs>` to rewrite the artifact the gates read.
+ *
+ * `extraArgs` is the compare scope. It defaults to the artifact's, the only one
+ * compare.ts writes: a plain `pnpm parity:api` computes no call sets at all, so
+ * passing [] would regenerate nothing the gate can read.
+ *
+ * The regeneration is FORCED (RFC 0106). A cached regeneration is a PARTIAL
+ * one: `extract-ts-api.ts` serves any package whose own fingerprint and
+ * recorded read-set still validate, so the artifact the gate then reads mixes
+ * freshly-extracted packages with entries an earlier tree produced. Measured on
+ * PR #6647: a plain gate reported nine NEW mismatches in files the branch never
+ * touched — each in a package a sibling PR had just moved on `main` — while
+ * HIDING the one real row the branch introduced (`errors.ts copy! deep_dup`),
+ * which only surfaced in CI. Forced, the same tree reported exactly that row
+ * and none of the nine. Rows off a partly-cached artifact are unfalsifiable, so
+ * the gate pays the full extraction rather than print them; two of those
+ * phantoms became filed-and-closed stories before the artifact was suspected.
+ */
 export function regenerateArtifact(
   env: Record<string, string | undefined>,
   extraArgs: string[] = ["--calls"],
 ): Promise<void> {
   const args = ["parity:api", ...extraArgs];
   return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", args, { cwd: ROOT_DIR, env, stdio: "inherit" });
+    const child = spawn("pnpm", args, {
+      cwd: ROOT_DIR,
+      env: regenEnv(env),
+      stdio: "inherit",
+    });
     child.on("error", reject);
     child.on("close", (code, signal) => {
       if (code === 0) resolve();
       else reject(new Error(`\`pnpm ${args.join(" ")}\` exited with ${signal ?? code}`));
     });
   });
+}
+
+/**
+ * Whether `artifactPath` predates the sources it describes.
+ *
+ * The companion to the forced regeneration above, for the runs that skip it —
+ * `--no-regen`, API_COMPARE_SKIP_REGEN=1, or CI. Those gate whatever is on
+ * disk, and an artifact older than a compared source describes a tree that no
+ * longer exists: its rows are neither reproducible nor falsifiable. mtimes are
+ * the right oracle here for the same reason they are for the extraction
+ * manifests — the artifact is only ever written by a local run that just read
+ * those sources, never restored from an archive (see `manifestIsStale`).
+ */
+export function artifactIsStale(artifactPath: string): Promise<boolean> {
+  return manifestIsStale(artifactPath, apiComparePackageRoots());
+}
+
+/** The operator-facing refusal text for a stale artifact. */
+export function staleArtifactMessage(gate: string, artifactPath: string): string {
+  return (
+    `\n${gate}: REFUSING to gate — ${path.relative(ROOT_DIR, artifactPath)} predates ` +
+    "the sources it describes.\n" +
+    "Its rows would describe a tree that no longer exists: mismatches converged " +
+    "since it was written still flag, and ones introduced since do not. Regenerate " +
+    "and re-run:\n" +
+    "  API_COMPARE_FORCE=1 pnpm parity:api --calls\n" +
+    `Or drop ${NO_REGEN_FLAG}/${REGEN_SKIP_ENV} and let the gate regenerate it itself.\n`
+  );
 }

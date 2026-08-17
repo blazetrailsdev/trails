@@ -34,6 +34,13 @@ export class BigIntegerType extends IntegerType {
    * is a number" contract better-sqlite3/mysql2 already honor, so a default
    * `bigint` PK, `pluck`, collection `ids`, and an `integer` FK holding the
    * same value all compare `===`.
+   *
+   * `BigInteger < Integer` (big_integer.rb:8) inherits `cast_value`
+   * (integer.rb:89-91) unchanged, so the string arm is `String#to_i`: a leading
+   * digit run converts (`"12abc".to_i == 12`) and its absence answers 0
+   * (`"bad".to_i == 0`), exactly as `IntegerType#castValue` does. The run is
+   * parsed as a `BigInt` so a bignum past float64's safe range stays exact;
+   * `BigInt()` rejects a leading "+", which is stripped first.
    */
   protected override castValue(value: unknown): number | null {
     if (typeof value === "bigint") return this.narrowBigInt(value);
@@ -42,20 +49,10 @@ export class BigIntegerType extends IntegerType {
       return this.narrowBigInt(BigInt(Math.trunc(value)));
     }
     if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed === "") return null;
-      // Extract a leading signed-digit run (e.g. "123abc" → 123n), matching Rails to_i behavior
-      // for strings that start with digits. Unlike Ruby to_i, non-numeric strings return null
-      // rather than 0 — consistent with IntegerType's parseInt/NaN → null path.
-      // BigInt() rejects a leading "+"; strip it first.
-      const lead = trimmed.match(/^([+-]?\d+)/)?.[1];
-      if (!lead) return null;
+      const lead = value.trim().match(/^([+-]?\d+)/)?.[1];
+      if (!lead) return 0;
       return this.narrowBigInt(BigInt(lead.startsWith("+") ? lead.slice(1) : lead));
     }
     return super.castValue(value);
-  }
-
-  override serialize(value: unknown): unknown {
-    return this.cast(value);
   }
 }

@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "relation/batches.ts",
     "rubyName": "ensure_valid_options_for_batching!",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `(Array(index.columns) - cursor).empty?` (batches.rb:316) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/batches.ts",
-    "rubyName": "ensure_valid_options_for_batching!",
     "call": "size",
     "reason": "Per-entry verified (RFC 0072 batching cluster): Rails batches.rb:306-312 compares `Array(start).size != cursor.size`; trails relation/batches.ts spells the same arity check with `Array.isArray(...) ? ... : [...]` and `.length`, JS's spelling of `Array()`/`#size`. Equivalent, not an omission."
   },

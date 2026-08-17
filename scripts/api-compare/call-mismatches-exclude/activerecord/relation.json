@@ -83,20 +83,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "scope_for_create",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `create_with_value.empty?` (relation.rb:1233) — `empty?` on a Ruby Hash, whose faithful JS spelling is `Object.keys(h).length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "structurally_compatible?",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `structurally_incompatible_values_for(other).empty?` (query_methods.rb:1122) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "to_sql",
     "call": "apply_join_dependency",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
