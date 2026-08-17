@@ -1,3 +1,4 @@
+import { groupBy } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
@@ -19,16 +20,10 @@ export class Batch {
     // Empty preloaders are rejected in `call()` — `isEmpty()` is async because
     // it may materialize a Relation, mirroring Rails' `records.length`.
     this._preloaders = preloaders;
-    this._availableRecords = new Map();
-    for (const record of availableRecords.flat()) {
-      const klass = (record.constructor as typeof Base).baseClass;
-      const existing = this._availableRecords.get(klass);
-      if (existing) {
-        existing.push(record);
-      } else {
-        this._availableRecords.set(klass, [record]);
-      }
-    }
+    this._availableRecords = groupBy(
+      availableRecords.flat(),
+      (r) => (r.constructor as typeof Base).baseClass,
+    );
   }
 
   async call(): Promise<void> {

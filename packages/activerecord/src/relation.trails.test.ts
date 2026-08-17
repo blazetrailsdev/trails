@@ -999,3 +999,40 @@ describe("relation.rb:68 mixin ancestry", () => {
     expect(collisions.map(({ name, key }) => `${name}#${key}`)).toEqual([]);
   });
 });
+
+describe("Relation Enumerable surface (trails)", () => {
+  fixtures(["authors", "posts"]);
+
+  beforeAll(() => {
+    registerModel(CanonAuthor);
+    registerModel(CanonPost);
+  });
+
+  it("groups, indexes and compacts the loaded records the way Enumerable does", async () => {
+    const posts = CanonPost.where({ type: "Post" }).order("id");
+
+    const grouped = await posts.groupBy((post: any) => post.authorId);
+    expect([...grouped.keys()].sort()).toEqual(
+      [...new Set((await posts).map((post: any) => post.authorId))].sort(),
+    );
+    expect([...grouped.values()].flat().length).toBe(await posts.count());
+
+    const indexed = await posts.indexBy((post: any) => post.id as number);
+    const first = (await posts)[0] as any;
+    expect((indexed[first.id] as any).id).toBe(first.id);
+
+    // `reject(&:blank?)` over records (enumerable.rb:184-186): no persisted
+    // record is blank, so the identity of the survivors is what this pins —
+    // the same instances, in load order, not merely the same count.
+    const loaded = await posts;
+    expect(await posts.compactBlank()).toEqual(loaded);
+    expect((await CanonPost.where({ id: -1 }).compactBlank()).length).toBe(0);
+  });
+
+  it("presence returns the relation when records exist and null when none do", async () => {
+    expect(await CanonPost.where({ id: -1 }).presence()).toBeNull();
+    const present = await CanonPost.all().presence();
+    expect(present).not.toBeNull();
+    expect((await present!.toArray()).length).toBe(await CanonPost.all().count());
+  });
+});

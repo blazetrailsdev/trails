@@ -737,6 +737,71 @@ function keptSymbolColon(rubyKey: string, tsKey: string): boolean {
   return rubyKey.startsWith("str:") && tsKey === `str::${rubyKey.slice("str:".length)}`;
 }
 
+/** The Ruby `Regexp.new` receiver, in `CallSite.recv` spelling. `Regexp.new`
+ *  is the ONLY call whose flag argument the two languages spell differently,
+ *  so the equivalence below is scoped to it. */
+const REGEXP_RECEIVER = "const:Regexp";
+
+/** Ruby's Regexp option constants, and the JS flag letter each one means.
+ *  Ruby `MULTILINE` is dot-matches-newline, which JS spells `s` — JS `m` is
+ *  Ruby's default anchor behaviour and has no Ruby constant. `EXTENDED` has no
+ *  JS equivalent at all and is deliberately absent, so a site passing it keeps
+ *  reporting rather than comparing equal to some other flag string. */
+const RUBY_REGEXP_OPTIONS: Record<string, string> = {
+  "Regexp::IGNORECASE": "i",
+  "Regexp::MULTILINE": "s",
+};
+
+/**
+ * The canonical flag descriptor for one `Regexp.new` / `new RegExp` flag
+ * argument, or undefined when the argument is not a flag spelling either
+ * language sanctions.
+ *
+ * Ruby's second `Regexp.new` argument is the option argument, and any truthy
+ * value means IGNORECASE — `Regexp.new(strings.join("|"), true)`
+ * (activesupport/lib/active_support/parameter_filter.rb:121-122) is exactly
+ * `Regexp::IGNORECASE`. JS spells the same argument as a flag string, so the
+ * faithful port passes `"i"`. Same argument, same meaning, one letter of
+ * language punctuation between them.
+ *
+ * An OR of two option constants is out of reach here, and structurally rather
+ * than by omission: extract-ruby-api.rb:2580 describes any `|` expression as
+ * the bare operator (`binop:|`) with its operands discarded, and `binop:` is an
+ * OPAQUE descriptor, so such a site is SKIPPED as uncomparable long before this
+ * function sees it. Recovering it would mean widening the extractor's
+ * descriptor grammar for every consumer; no vendored Rails call site spells the
+ * flag that way.
+ */
+function regexpFlagKey(key: string): string | undefined {
+  if (key === "bool:true") return "reflags:i";
+  if (key === "bool:false" || key === "nil") return "reflags:";
+  if (key.startsWith("const:")) {
+    const flag = RUBY_REGEXP_OPTIONS[key.slice("const:".length)];
+    return flag === undefined ? undefined : `reflags:${flag}`;
+  }
+  if (key.startsWith("str:")) {
+    const flags = key.slice("str:".length);
+    return /^[dgimsuvy]*$/.test(flags) ? `reflags:${[...flags].sort().join("")}` : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * An argument list with a Regexp construction's flag argument rewritten to its
+ * canonical descriptor, so Ruby's flag boolean and JS's flag string compare
+ * equal (RFC 0106).
+ *
+ * Scoped to `Regexp.new` — the equivalence is a property of that constructor's
+ * second argument, not of `true` and `"i"`, and a global one would mask a
+ * genuine changed-literal defect anywhere else. A flag spelling neither side
+ * sanctions is left alone and still reports.
+ */
+function withRegexpFlagKeys(ruby: CallSite, args: string[]): string[] {
+  if (ruby.name !== "new" || ruby.recv !== REGEXP_RECEIVER || args.length < 2) return args;
+  const flag = regexpFlagKey(args[1]);
+  return flag === undefined ? args : [args[0], flag, ...args.slice(2)];
+}
+
 function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
   return (
     rubyArgs.length === tsArgs.length && rubyArgs.every((arg, i) => argKeysEqual(arg, tsArgs[i]))
@@ -1113,8 +1178,9 @@ export function compareCallArgs(
   }
   const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
 
-  const compared = resolveCalleeRefs(rubyArgs, enclosingRubyName);
-  if (argsEqual(compared, tsArgs)) {
+  const compared = withRegexpFlagKeys(ruby, resolveCalleeRefs(rubyArgs, enclosingRubyName));
+  const comparedTs = withRegexpFlagKeys(ruby, tsArgs);
+  if (argsEqual(compared, comparedTs)) {
     const alignedRuby = aligned.rubyArgs === ruby.args ? aligned.rubyArgs : undefined;
     if (
       alignedRuby === undefined ||
@@ -1124,5 +1190,5 @@ export function compareCallArgs(
     }
     return { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };
   }
-  return { verdict: "mismatch", class: classify(compared, tsArgs), rubyArgs, tsArgs };
+  return { verdict: "mismatch", class: classify(compared, comparedTs), rubyArgs, tsArgs };
 }

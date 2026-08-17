@@ -80,4 +80,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
   "with_indifferent_access",
+  // Ruby core `Enumerable#group_by` — `records.group_by { … }`. JS has no
+  // `Array.prototype` analogue (`Object.groupBy` keys by string coercion, which
+  // Ruby's Hash does not), so @blazetrails/activesupport exports it as
+  // `groupBy(collection, block)` and the receiver is TS argument 1.
+  "group_by",
 ]);
