@@ -60,6 +60,10 @@ const NEGATION: Partial<Record<CanonicalKind, CanonicalKind>> = {
   notSame: "same",
   predicate: "notPredicate",
   notPredicate: "predicate",
+  // `expect(() => …).not.toThrow()` is the port of `assert_nothing_raised`,
+  // which minitest spells as its own assertion rather than as `refute_raises`.
+  raises: "nothingRaised",
+  nothingRaised: "raises",
 };
 
 // Rails minitest assertion method name → canonical kind. `refute_*` is minitest's
