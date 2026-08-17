@@ -354,14 +354,17 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Transform keys — returns new HWIA with transformed keys.
+   * Mirrors `transform_keys` (hash_with_indifferent_access.rb:338-341) —
+   * `dup.tap { |h| h.transform_keys!(hash, &block) }`, so the mapping hash and
+   * the block arms are the ones `transform_keys!` documents below.
    */
-  transformKeys(fn: (key: string) => string): HashWithIndifferentAccess<V> {
-    const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this.data) {
-      result.set(fn(k), v);
-    }
-    return result;
+  transformKeys(
+    hash: AnyObject | null | ((key: string) => string) = NOT_GIVEN,
+    block?: (key: string) => string,
+  ): HashWithIndifferentAccess<V> {
+    const dup = new HashWithIndifferentAccess<V>(this);
+    dup.transformKeysBang(hash, block);
+    return dup;
   }
 
   /**

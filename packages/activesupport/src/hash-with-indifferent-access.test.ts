@@ -103,6 +103,22 @@ describe("HashWithIndifferentAccessTest", () => {
     const transformed = h.transformKeys((k) => k.repeat(2));
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
     expect(transformed.toHash()).toEqual({ aa: 1, bb: 2 });
+
+    let hash = new HashWithIndifferentAccess({ a: 1, b: 2 }).transformKeys({ a: "x", y: "z" });
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("x")).toBe(1);
+    expect(hash.get("b")).toBe(2);
+    expect(hash.get("z")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["x", "b"]);
+
+    hash = new HashWithIndifferentAccess({ a: 1, b: 2 }).transformKeys({ a: "A", q: "Q" }, (k) =>
+      k.repeat(3),
+    );
+    expect(hash.get("A")).toBe(1);
+    expect(hash.get("bbb")).toBe(2);
+    expect([...hash.keys()]).toEqual(["A", "bbb"]);
+
+    expect(() => hash.transformKeys(null)).toThrow(/no implicit conversion of nil/);
   });
 
   it("indifferent transform_values — returns new HWIA", () => {
