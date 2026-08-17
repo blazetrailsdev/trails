@@ -2547,13 +2547,13 @@ function secFraction(f: string): Rational {
 }
 
 /**
- * @internal `date_parse.c` `iso8601_ext_datetime_cb` (`date_parse.c:2329-2390`):
+ * @internal `date_parse.c` `iso8601_ext_datetime_cb` (`date_parse.c:2328-2392`):
  * the extended ISO 8601 date-time, whose leading alternation is one of four
  * shapes — calendar, ordinal, week, and the yearless week day — read out of the
  * groups the one that matched left behind.
  */
 function iso8601ExtDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
   let y: number | bigint;
 
   if (s[1] !== undefined) {
@@ -2602,7 +2602,7 @@ function iso8601ExtDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `iso8601_ext_datetime` (`date_parse.c:2392-2408`). */
+/** @internal `date_parse.c` `iso8601_ext_datetime` (`date_parse.c:2394-2409`). */
 function iso8601ExtDatetime(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*(?:([-+]?\\d{2,}|-)-(\\d{2})?(?:-(\\d{2}))?|` +
@@ -2616,12 +2616,12 @@ function iso8601ExtDatetime(str: string, hash: DateParts): number {
 }
 
 /**
- * @internal `date_parse.c` `iso8601_bas_datetime_cb` (`date_parse.c:2413-2478`):
+ * @internal `date_parse.c` `iso8601_bas_datetime_cb` (`date_parse.c:2414-2481`):
  * the basic — separatorless — spelling, whose alternation has two more arms than
  * the extended one: the yearless ordinal date and the yearless week date.
  */
 function iso8601BasDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
   let y: number | bigint;
 
   if (s[3] !== undefined) {
@@ -2671,7 +2671,7 @@ function iso8601BasDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `iso8601_bas_datetime` (`date_parse.c:2480-2499`). */
+/** @internal `date_parse.c` `iso8601_bas_datetime` (`date_parse.c:2483-2500`). */
 function iso8601BasDatetime(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*(?:([-+]?(?:\\d{4}|\\d{2})|--)(\\d{2}|-)(\\d{2})|` +
@@ -2686,9 +2686,9 @@ function iso8601BasDatetime(str: string, hash: DateParts): number {
   return match(str, new RegExp(patSource, "i"), hash, iso8601BasDatetimeCb);
 }
 
-/** @internal `date_parse.c` `iso8601_ext_time_cb` (`date_parse.c:2504-2527`). */
+/** @internal `date_parse.c` `iso8601_ext_time_cb` (`date_parse.c:2505-2529`). */
 function iso8601ExtTimeCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   hash.hour = Number(s[1]);
   hash.min = Number(s[2]);
@@ -2702,17 +2702,17 @@ function iso8601ExtTimeCb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `iso8601_bas_time_cb` (`date_parse.c:2529`), a `#define` onto the extended one. */
+/** @internal `date_parse.c` `iso8601_bas_time_cb` (`date_parse.c:2531`), a `#define` onto the extended one. */
 const iso8601BasTimeCb = iso8601ExtTimeCb;
 
-/** @internal `date_parse.c` `iso8601_ext_time` (`date_parse.c:2531-2541`). */
+/** @internal `date_parse.c` `iso8601_ext_time` (`date_parse.c:2533-2543`). */
 function iso8601ExtTime(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*(\\d{2}):(\\d{2})(?::(\\d{2})(?:[,.](\\d+))?` + `(z|[-+]\\d{2}(:?\\d{2})?)?)?\\s*$`;
   return match(str, new RegExp(patSource, "i"), hash, iso8601ExtTimeCb);
 }
 
-/** @internal `date_parse.c` `iso8601_bas_time` (`date_parse.c:2543-2553`). */
+/** @internal `date_parse.c` `iso8601_bas_time` (`date_parse.c:2545-2555`). */
 function iso8601BasTime(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*(\\d{2})(\\d{2})(?:(\\d{2})(?:[,.](\\d+))?` + `(z|[-+]\\d{2}(\\d{2})?)?)?\\s*$`;
@@ -2720,7 +2720,7 @@ function iso8601BasTime(str: string, hash: DateParts): number {
 }
 
 /**
- * @internal `date_parse.c` `date__iso8601` (`date_parse.c:2555-2578`): the four
+ * @internal `date_parse.c` `date__iso8601` (`date_parse.c:2557-2580`): the four
  * ISO 8601 spellings in order, the first that matches winning.
  */
 function dateIso8601(str: string): DateParts {
@@ -2735,12 +2735,12 @@ function dateIso8601(str: string): DateParts {
 }
 
 /**
- * @internal `date_parse.c` `rfc3339_cb` (`date_parse.c:2586-2609`): RFC 3339's
+ * @internal `date_parse.c` `rfc3339_cb` (`date_parse.c:2585-2609`): RFC 3339's
  * profile of ISO 8601, whose zone group is mandatory — so `:zone` and `:offset`
  * are set unconditionally, and before the optional `:sec_fraction`.
  */
 function rfc3339Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   hash.year = cstr2num(s[1] as string);
   hash.mon = Number(s[2]);
@@ -2755,7 +2755,7 @@ function rfc3339Cb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `rfc3339` (`date_parse.c:2611-2625`). */
+/** @internal `date_parse.c` `rfc3339` (`date_parse.c:2611-2623`). */
 function rfc3339(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*(-?\\d{4})-(\\d{2})-(\\d{2})` +
@@ -2765,7 +2765,7 @@ function rfc3339(str: string, hash: DateParts): number {
   return match(str, new RegExp(patSource, "i"), hash, rfc3339Cb);
 }
 
-/** @internal `date_parse.c` `date__rfc3339` (`date_parse.c:2627-2641`). */
+/** @internal `date_parse.c` `date__rfc3339` (`date_parse.c:2625-2637`). */
 function dateRfc3339(str: string): DateParts {
   const hash: DateParts = {};
   rfc3339(str, hash);
@@ -2773,12 +2773,12 @@ function dateRfc3339(str: string): DateParts {
 }
 
 /**
- * @internal `date_parse.c` `xmlschema_datetime_cb` (`date_parse.c:2646-2673`):
+ * @internal `date_parse.c` `xmlschema_datetime_cb` (`date_parse.c:2642-2673`):
  * XML Schema's `dateTime`, `date` and `gYearMonth`/`gYear` all at once — every
  * group but the year is optional.
  */
 function xmlschemaDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   hash.year = cstr2num(s[1] as string);
   if (s[2] !== undefined) hash.mon = Number(s[2]);
@@ -2805,9 +2805,9 @@ function xmlschemaDatetime(str: string, hash: DateParts): number {
   return match(str, new RegExp(patSource, "i"), hash, xmlschemaDatetimeCb);
 }
 
-/** @internal `date_parse.c` `xmlschema_time_cb` (`date_parse.c:2692-2715`): XML Schema's `time`. */
+/** @internal `date_parse.c` `xmlschema_time_cb` (`date_parse.c:2692-2716`): XML Schema's `time`. */
 function xmlschemaTimeCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   hash.hour = Number(s[1]);
   hash.min = Number(s[2]);
@@ -2821,19 +2821,19 @@ function xmlschemaTimeCb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `xmlschema_time` (`date_parse.c:2717-2727`). */
+/** @internal `date_parse.c` `xmlschema_time` (`date_parse.c:2718-2728`). */
 function xmlschemaTime(str: string, hash: DateParts): number {
   const patSource = `^\\s*(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?` + `(z|[-+]\\d{2}:\\d{2})?\\s*$`;
   return match(str, new RegExp(patSource, "i"), hash, xmlschemaTimeCb);
 }
 
 /**
- * @internal `date_parse.c` `xmlschema_trunc_cb` (`date_parse.c:2732-2754`): the
+ * @internal `date_parse.c` `xmlschema_trunc_cb` (`date_parse.c:2733-2757`): the
  * truncated `gMonth`, `gMonthDay` and `gDay`. `s[2]` and `s[3]` both write
  * `:mday`, because only one of the two arms can have matched.
  */
 function xmlschemaTruncCb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   if (s[1] !== undefined) hash.mon = Number(s[1]);
   if (s[2] !== undefined) hash.mday = Number(s[2]);
@@ -2846,13 +2846,13 @@ function xmlschemaTruncCb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `xmlschema_trunc` (`date_parse.c:2756-2767`). */
+/** @internal `date_parse.c` `xmlschema_trunc` (`date_parse.c:2759-2769`). */
 function xmlschemaTrunc(str: string, hash: DateParts): number {
   const patSource = `^\\s*(?:--(\\d{2})(?:-(\\d{2}))?|---(\\d{2}))` + `(z|[-+]\\d{2}:\\d{2})?\\s*$`;
   return match(str, new RegExp(patSource, "i"), hash, xmlschemaTruncCb);
 }
 
-/** @internal `date_parse.c` `date__xmlschema` (`date_parse.c:2769-2792`). */
+/** @internal `date_parse.c` `date__xmlschema` (`date_parse.c:2771-2792`). */
 function dateXmlschema(str: string): DateParts {
   const hash: DateParts = {};
 
@@ -3029,15 +3029,15 @@ function dateHttpdate(str: string): DateParts {
 const JISX0301_DEFAULT_ERA = "H";
 
 /**
- * @internal `date_parse.c` `jisx0301_cb` (`date_parse.c:3017-3050`): the era
+ * @internal `date_parse.c` `jisx0301_cb` (`date_parse.c:3016-3048`): the era
  * initial names the year {@link gengo} counts from, and the two-digit year in
  * the string is added to it.
  */
 function jisx0301Cb(m: RegExpExecArray, hash: DateParts): number {
-  const s = m as (string | undefined)[];
+  const s: (string | undefined)[] = m;
 
   const ep = gengo(s[1] === undefined ? JISX0301_DEFAULT_ERA : s[1][0]);
-  hash.year = Number(s[2]) + ep;
+  hash.year = fAdd(cstr2num(s[2] as string), ep);
   hash.mon = Number(s[3]);
   hash.mday = Number(s[4]);
   if (s[5] !== undefined) {
@@ -3054,7 +3054,7 @@ function jisx0301Cb(m: RegExpExecArray, hash: DateParts): number {
   return 1;
 }
 
-/** @internal `date_parse.c` `jisx0301` (`date_parse.c:3052-3065`). */
+/** @internal `date_parse.c` `jisx0301` (`date_parse.c:3050-3062`). */
 function jisx0301(str: string, hash: DateParts): number {
   const patSource =
     `^\\s*([${JISX0301_ERA_INITIALS}])?(\\d{2})\\.(\\d{2})\\.(\\d{2})` +
@@ -3065,7 +3065,7 @@ function jisx0301(str: string, hash: DateParts): number {
 }
 
 /**
- * @internal `date_parse.c` `date__jisx0301` (`date_parse.c:3067-3081`): a string
+ * @internal `date_parse.c` `date__jisx0301` (`date_parse.c:3064-3080`): a string
  * the JIS pattern does not take is answered by {@link dateIso8601} instead,
  * hash and all.
  */
@@ -6742,7 +6742,7 @@ export class Date {
 
   /**
    * Ruby `Date.iso8601(string = '-4712-01-01', start = Date::ITALY, limit:
-   * 128)` (ruby/date, `date_core.c` `date_s_iso8601`, `date_core.c:4647-4670`).
+   * 128)` (ruby/date, `date_core.c` `date_s_iso8601`, `date_core.c:4647-4669`).
    */
   static iso8601(str = JULIAN_EPOCH_DATE, start = DEFAULT_SG, opt?: ParseOpt): Temporal.PlainDate {
     return dNewByFrags(Date._iso8601(str, opt), val2sg(start)).toDate();
@@ -6760,7 +6760,7 @@ export class Date {
   /**
    * Ruby `Date.rfc3339(string = '-4712-01-01T00:00:00+00:00', start =
    * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `date_s_rfc3339`,
-   * `date_core.c:4717-4740`).
+   * `date_core.c:4717-4739`).
    */
   static rfc3339(
     str = JULIAN_EPOCH_DATETIME,
@@ -6782,7 +6782,7 @@ export class Date {
   /**
    * Ruby `Date.xmlschema(string = '-4712-01-01', start = Date::ITALY, limit:
    * 128)` (ruby/date, `date_core.c` `date_s_xmlschema`,
-   * `date_core.c:4785-4808`).
+   * `date_core.c:4785-4807`).
    */
   static xmlschema(
     str = JULIAN_EPOCH_DATE,
@@ -6873,7 +6873,7 @@ export class Date {
   /**
    * Ruby `Date.jisx0301(string = '-4712-01-01', start = Date::ITALY, limit:
    * 128)` (ruby/date, `date_core.c` `date_s_jisx0301`,
-   * `date_core.c:4995-5018`).
+   * `date_core.c:4995-5017`).
    */
   static jisx0301(str = JULIAN_EPOCH_DATE, start = DEFAULT_SG, opt?: ParseOpt): Temporal.PlainDate {
     return dNewByFrags(Date._jisx0301(str, opt), val2sg(start)).toDate();
