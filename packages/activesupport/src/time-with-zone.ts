@@ -13,6 +13,7 @@ import { Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Rational, cCivilToJd, strftime } from "@blazetrails/date";
 import { Encoding } from "./json/encoding.js";
+import { DATE_FORMATS, toFs } from "./time-ext.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
@@ -493,41 +494,33 @@ export class TimeWithZone {
     );
   }
 
-  /** Named format strings, matching Rails to_fs / to_formatted_s */
+  /**
+   * Returns a string of the object's date and time.
+   *
+   * Mirrors: `TimeWithZone#to_fs` (`time_with_zone.rb:212-220`). Every key in
+   * `Time::DATE_FORMATS` works here, including one an app registers at boot —
+   * the registry is read at call time, so a late registration is reachable.
+   *
+   * `DATE_FORMATS` comes from `time-ext.ts`, which imports this file back. The
+   * edge is not a TDZ hazard: neither side reads the other at module-eval time
+   * (this read is inside the method, and `time-ext`'s `TimeWithZone` uses are
+   * inside function bodies) and neither declares a `class ... extends` across
+   * it.
+   */
   toFs(format: string = "default"): string {
-    switch (format) {
-      case "db": {
-        const u = this._utc;
-        return (
-          `${u.year}-${pad2(u.month)}-${pad2(u.day)} ` +
-          `${pad2(u.hour)}:${pad2(u.minute)}:${pad2(u.second)}`
-        );
-      }
-      case "long":
-        return this.strftime("%B %d, %Y %H:%M");
-      case "short":
-        return this.strftime("%d %b %H:%M");
-      case "rfc822":
-      case "rfc2822":
-        return this.rfc2822();
-      case "iso8601":
-      case "xmlschema":
-        return this.xmlschema();
-      case "inspect": {
-        const li = this._local();
-        const nsi = String(li.nsec).padStart(9, "0");
-        return (
-          `${li.year}-${pad2(li.month)}-${pad2(li.day)} ` +
-          `${pad2(li.hour)}:${pad2(li.minute)}:${pad2(li.second)}.${nsi} ` +
-          `${this.formattedOffset(false)}`
-        );
-      }
-      default:
+    if (format === "db") {
+      return toFs(this.utc(), format);
+    } else {
+      const formatter = DATE_FORMATS[format];
+      if (formatter != null) {
+        return typeof formatter === "function" ? String(formatter(this)) : this.strftime(formatter);
+      } else {
         return this.toString();
+      }
     }
   }
 
-  /** Alias for toFs */
+  /** `alias_method :to_formatted_s, :to_fs` (time_with_zone.rb:221). */
   toFormattedS(format?: string): string {
     return this.toFs(format);
   }

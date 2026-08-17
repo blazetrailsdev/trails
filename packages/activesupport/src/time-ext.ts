@@ -666,12 +666,17 @@ export function secFraction(
 export { secFraction as subsec };
 
 /**
- * The receivers `Time::DATE_FORMATS`' lambdas duck-type: a ruby/date `Time` and
- * the `PlainDateTime | ZonedDateTime` seat a Ruby `DateTime` stands on. Both
- * answer `day`, `strftime`, `formatted_offset`, `rfc2822` and `iso8601`, which
- * is every member those lambdas call.
+ * The receivers `Time::DATE_FORMATS`' lambdas duck-type: a ruby/date `Time`,
+ * the `PlainDateTime | ZonedDateTime` seat a Ruby `DateTime` stands on, and a
+ * `TimeWithZone` — `time_with_zone.rb:212-220` resolves the same hash and
+ * passes `self`. All three answer `day`, `strftime`, `formatted_offset`,
+ * `rfc2822` and `iso8601`, which is every member those lambdas call.
  */
-type DateFormatsReceiver = RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DateFormatsReceiver =
+  | RubyTime
+  | TimeWithZone
+  | Temporal.PlainDateTime
+  | Temporal.ZonedDateTime;
 
 /**
  * The named formats `to_fs` resolves, either a `strftime` string or a callable
@@ -713,21 +718,31 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
   long: "%B %d, %Y %H:%M",
   long_ordinal: (time) => {
     const dayFormat = ordinalize(time.day);
-    return (time instanceof RubyTime ? time : new RubyDateTime(time)).strftime(
-      `%B ${dayFormat}, %Y %H:%M`,
-    );
+    return (
+      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
+    ).strftime(`%B ${dayFormat}, %Y %H:%M`);
   },
   rfc822: (time) => {
     const offsetFormat =
       time instanceof RubyTime
         ? formattedOffset(time, false)
-        : dateTimeFormattedOffset(time, false);
-    return (time instanceof RubyTime ? time : new RubyDateTime(time)).strftime(
-      `%a, %d %b %Y %H:%M:%S ${offsetFormat}`,
-    );
+        : time instanceof TimeWithZone
+          ? time.formattedOffset(false)
+          : dateTimeFormattedOffset(time, false);
+    return (
+      time instanceof RubyTime || time instanceof TimeWithZone ? time : new RubyDateTime(time)
+    ).strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
   },
-  rfc2822: (time) => (time instanceof RubyTime ? time : new RubyDateTime(time)).rfc2822(),
-  iso8601: (time) => (time instanceof RubyTime ? time : new RubyDateTime(time)).iso8601(),
+  rfc2822: (time) =>
+    (time instanceof RubyTime || time instanceof TimeWithZone
+      ? time
+      : new RubyDateTime(time)
+    ).rfc2822(),
+  iso8601: (time) =>
+    (time instanceof RubyTime || time instanceof TimeWithZone
+      ? time
+      : new RubyDateTime(time)
+    ).iso8601(),
 };
 
 /**

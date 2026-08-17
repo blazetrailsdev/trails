@@ -44,17 +44,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
-    "rubyName": "method",
-    "call": "get_header",
-    "kind": "args",
-    "rubyArgs": [
-      "str:rack.methodoverride.original_method"
-    ],
-    "reason": "request.rb:212-221 makes `method` the PRE-override HTTP method, read from `rack.methodoverride.original_method` before `REQUEST_METHOD`; trails inverts the pair — `method` applies an override it reads from `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline, and `requestMethod` is the raw value. Converging needs both readers and the override site moved, tracked as story converge-request-method-onto-methodoverride-original-method."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
     "rubyName": "request_parameters_list",
     "call": "get_header",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

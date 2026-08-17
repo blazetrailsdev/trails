@@ -31,14 +31,6 @@ export class TestRequest extends Request {
     return new TestRequest(merged);
   }
 
-  get requestMethod(): string {
-    return ((this.env["REQUEST_METHOD"] as string) || "GET").toUpperCase();
-  }
-
-  set requestMethod(method: string) {
-    this.setHeader("REQUEST_METHOD", method.toUpperCase());
-  }
-
   get host(): string {
     return super.host;
   }

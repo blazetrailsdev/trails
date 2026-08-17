@@ -5,8 +5,10 @@
  * mirroring the Rails Request API.
  */
 
+import { toSentence } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { parseNestedQuery, Request as RackRequest } from "@blazetrails/rack";
+import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { Session } from "../request/session.js";
 import {
   etagMatches as _etagMatches,
@@ -148,6 +150,11 @@ function envName(key: string): string {
 export class Request {
   readonly env: RackEnv;
 
+  /** Rails' `@method` memo (request.rb:214). */
+  #method?: string;
+  /** Rails' `@request_method` memo (request.rb:151). */
+  #requestMethod?: string;
+
   constructor(env: RackEnv = {}) {
     this.env = { ...env };
     // Set defaults
@@ -162,49 +169,59 @@ export class Request {
 
   // --- HTTP method ---
 
-  private _requestMethod?: string;
-
+  /**
+   * Returns the original value of the environment's REQUEST_METHOD, even if it
+   * was overridden by middleware. See {@link requestMethod}. Mirrors
+   * `Request#method` (request.rb:212-221); the `*args` arm delegating to
+   * `Object#method` has no spelling on a TS getter.
+   */
   get method(): string {
-    // Check for method override via _method parameter or X-Http-Method-Override header
-    if (this.requestMethod === "POST") {
-      const override =
-        (this.getHeader("HTTP_X_HTTP_METHOD_OVERRIDE") as string) ?? this.params?.["_method"];
-      if (override) {
-        const upper = String(override).toUpperCase();
-        if (["GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(upper)) {
-          return upper;
-        }
-      }
-    }
-    return this.requestMethod;
+    this.#method ??= this.checkMethod(
+      this.getHeader("rack.methodoverride.original_method") ?? this.getHeader("REQUEST_METHOD"),
+    );
+    return this.#method as string;
   }
 
+  /**
+   * Returns the HTTP method that the application should see — the overridden
+   * value where a middleware rewrote it. Mirrors `Request#request_method`
+   * (request.rb:145-152).
+   */
   get requestMethod(): string {
-    return (this._requestMethod ??= this.checkMethod(this.getHeader("REQUEST_METHOD"))!);
+    this.#requestMethod ??= this.checkMethod(this.rawRequestMethod);
+    return this.#requestMethod as string;
   }
 
-  /** Mirrors: `alias raw_request_method request_method` (request.rb:145). */
+  /** @internal Mirrors `Request#request_method=` (request.rb:184-188). */
+  set requestMethod(requestMethod: string) {
+    if (this.checkMethod(requestMethod)) {
+      this.#requestMethod = this.setHeader("REQUEST_METHOD", requestMethod) as string;
+    }
+  }
+
+  /** Mirrors: `alias raw_request_method request_method` (request.rb:145) — the
+   * unchecked `Rack::Request::Helpers#request_method`. */
   get rawRequestMethod(): string {
-    return this.requestMethod;
+    return this.getHeader("REQUEST_METHOD") as string;
   }
 
   get isGet(): boolean {
-    return this.method === "GET";
+    return this.requestMethod === "GET";
   }
   get isHead(): boolean {
-    return this.method === "HEAD";
+    return this.requestMethod === "HEAD";
   }
   get isPost(): boolean {
-    return this.method === "POST";
+    return this.requestMethod === "POST";
   }
   get isPut(): boolean {
-    return this.method === "PUT";
+    return this.requestMethod === "PUT";
   }
   get isPatch(): boolean {
-    return this.method === "PATCH";
+    return this.requestMethod === "PATCH";
   }
   get isDelete(): boolean {
-    return this.method === "DELETE";
+    return this.requestMethod === "DELETE";
   }
 
   // --- URL components ---
@@ -737,12 +754,16 @@ export class Request {
     return HTTP_METHOD_LOOKUP[this.requestMethod];
   }
 
-  /** @internal Validates `name` against the RFC methods list. */
+  /** @internal Mirrors `Request#check_method` (request.rb:497-503). */
   protected checkMethod(name: string | undefined): string | undefined {
-    if (!name) return name;
-    if (!Object.hasOwn(HTTP_METHOD_LOOKUP, name)) {
-      throw new Error(`${name}, accepted HTTP methods are ${RFC_METHODS.join(", ")}`);
+    if (name != null) {
+      if (!Object.hasOwn(HTTP_METHOD_LOOKUP, name)) {
+        throw new UnknownHttpMethod(
+          `${name}, accepted HTTP methods are ${toSentence([...RFC_METHODS], { locale: false })}`,
+        );
+      }
     }
+
     return name;
   }
 
