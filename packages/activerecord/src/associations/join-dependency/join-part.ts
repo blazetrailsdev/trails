@@ -108,6 +108,34 @@ export abstract class JoinPart {
     }
   }
 
+  /**
+   * Mirrors `include Enumerable` (join_part.rb:13) over `each`
+   * (join_part.rb:31-34): Ruby derives every Enumerable method — `drop`, `map!`,
+   * … — from `each`, and JS derives them from `Symbol.iterator` the same way, so
+   * `[...node]` is the depth-first, self-first node list `join_root.drop(1)`
+   * reads.
+   *
+   * @noRailsEquivalent PERMANENT — JS has no module to `include`, so the
+   * Enumerable contract Ruby gets from `each` (join_part.rb:13, 31-34) is
+   * spelled `Symbol.iterator`. No port can remove the spelling difference.
+   */
+  *[Symbol.iterator](): IterableIterator<JoinPart> {
+    yield this;
+    for (const child of this.children) {
+      yield* child;
+    }
+  }
+
+  /**
+   * `Enumerable#drop` (join_part.rb:13 `include Enumerable`), the walk
+   * `JoinDependency#reflections` reads. JS has no Enumerable module to mix in,
+   * so the one method Rails actually calls on a JoinPart-as-Enumerable is
+   * spelled out over the same `each`/iterator.
+   */
+  drop(n: number): JoinPart[] {
+    return [...this].slice(n);
+  }
+
   eachChildren(fn: (parent: JoinPart, child: JoinPart) => void): void {
     for (const child of this.children) {
       fn(this, child);

@@ -10,6 +10,8 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
+import type { AssociationProxy } from "./collection-proxy.js";
+import { _CollectionProxyCtor } from "./collection-proxy-slot.js";
 import { foreignKeyPresentFor, ownerForeignKeyColumns } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
@@ -56,6 +58,8 @@ export class CollectionAssociation extends Association {
   // 1:1 ordering with the assigned attributes collection (Rails
   // nested_attributes.rb:487-547).
   nestedAttributesTarget: (Base | null)[] | null = null;
+  /** Mirrors `@proxy` (collection_association.rb:41). */
+  protected _proxy?: AssociationProxy;
   protected _associationIds: unknown[] | null = null;
   // Whether the most recent `removeRecords` was halted by a `before_remove`
   // abort. Rails leaves `@target` untouched on abort (remove_records exits
@@ -983,19 +987,39 @@ export class CollectionAssociation extends Association {
     proxy._wireInverseTarget(record);
   }
 
-  override get reader(): Base[] {
+  /**
+   * Mirrors: CollectionAssociation#reader (collection_association.rb:33-42).
+   *
+   * The reload arm issues the load query, so the body after `ensure_klass_exists!`
+   * is a promise — Rails' four lines in Rails' order, awaited by the caller.
+   * Rails' return value is `@proxy` itself; trails' CollectionProxy is thenable
+   * (it resolves to its records), so awaiting this promise hands back the
+   * records the proxy holds rather than the proxy object. Callers that need the
+   * proxy object take it from `record.<name>` (the generated accessor), which is
+   * the same cached instance this returns. `reset_scope` is likewise called for
+   * effect: it returns the raw proxy, not the JS Proxy wrapper callers hold.
+   *
+   * It is called here, not left to `association()`: that factory resets only on
+   * its own cache-hit path (the trails generated accessor's reader, RFC 0022),
+   * so without this line a second `reader` would skip Rails' fourth line. The
+   * cost is one redundant reset on the read that first builds the proxy;
+   * `reset_scope` is idempotent.
+   */
+  override get reader(): Promise<Base[]> {
     this.ensureKlassExists();
-    return this.target;
-  }
 
-  async asyncReader(): Promise<Base[]> {
-    this.ensureKlassExists();
+    return (async () => {
+      if (this.isStaleTarget()) {
+        await this.reload();
+      }
 
-    if (this.isStaleTarget()) {
-      await this.reload();
-    }
-
-    return this.target;
+      const CollectionProxy = _CollectionProxyCtor as unknown as {
+        create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
+      };
+      this._proxy ??= CollectionProxy.create(this.klass, this);
+      this._proxy.resetScope();
+      return this._proxy;
+    })();
   }
 
   private ensureKlassExists(): void {

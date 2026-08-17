@@ -62,6 +62,27 @@ describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
   });
 });
 
+describe("CheckConstraintDefinition#validate?", () => {
+  it("returns the stored value when :validate is present, including nil", () => {
+    expect(new CheckConstraintDefinition("t", "e", {}).validate).toBe(true);
+    expect(new CheckConstraintDefinition("t", "e", { validate: false }).validate).toBe(false);
+    expect(new CheckConstraintDefinition("t", "e", { validate: null }).validate).toBe(null);
+  });
+
+  it("ignores a validate lookup when the definition stores no :validate", () => {
+    const definition = new CheckConstraintDefinition("t", "e", { name: "chk" });
+
+    expect(definition.isDefinedFor({ name: "chk", validate: false })).toBe(true);
+    expect(definition.isDefinedFor({ name: "chk", validate: true })).toBe(true);
+    expect(
+      new CheckConstraintDefinition("t", "e", { name: "chk", validate: false }).isDefinedFor({
+        name: "chk",
+        validate: true,
+      }),
+    ).toBe(false);
+  });
+});
+
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition("astronauts", { adapter: conn });

@@ -189,7 +189,7 @@ export interface AddForeignKeyOptions {
   onDelete?: ReferentialAction;
   onUpdate?: ReferentialAction;
   deferrable?: "immediate" | "deferred" | false;
-  validate?: boolean;
+  validate?: boolean | null;
   ifNotExists?: boolean;
 }
 
@@ -235,7 +235,7 @@ export interface ForeignKeyLookupOptions {
   toTable?: string;
   column?: string | string[];
   name?: string;
-  validate?: boolean;
+  validate?: boolean | null;
   primaryKey?: string | string[];
   onDelete?: ReferentialAction;
   onUpdate?: ReferentialAction;
@@ -284,7 +284,7 @@ export class ForeignKeyDefinition {
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
   readonly deferrable?: "immediate" | "deferred" | false;
-  readonly validate: boolean;
+  readonly validate: boolean | null;
   /**
    * Whether `:validate` was stored on the options hash (Rails introspection
    * sets it only on PostgreSQL; mysql/sqlite leave it absent). Mirrors the
@@ -313,7 +313,7 @@ export class ForeignKeyDefinition {
     onDelete?: ReferentialAction,
     onUpdate?: ReferentialAction,
     deferrable?: "immediate" | "deferred" | false,
-    validate?: boolean,
+    validate?: boolean | null,
     storedOptionKeys?: Iterable<ForeignKeyStoredOptionKey>,
   ) {
     this.fromTable = fromTable;
@@ -324,12 +324,13 @@ export class ForeignKeyDefinition {
     this.onDelete = onDelete;
     this.onUpdate = onUpdate;
     this.deferrable = deferrable;
-    // Rails reads `validate?` off `options.fetch(:validate, true)`, so the value
-    // defaults to true; storesValidate records whether `:validate` was actually
+    // Rails reads `validate?` off `options.fetch(:validate, true)`, so a stored
+    // value — nil included — survives and the `true` default applies only when
+    // the key is absent; storesValidate records whether `:validate` was actually
     // on the options hash (PG introspection sets it; mysql/sqlite/DSL-without-it
     // leave it absent), driving the fetch-fallback in isDefinedFor.
     this.storesValidate = validate !== undefined;
-    this.validate = validate ?? true;
+    this.validate = this.storesValidate ? (validate as boolean | null) : true;
     // Default: every generic key is stored, matching the DB-introspection paths
     // (pg/mysql/sqlite `foreignKeys`) whose options hash always carries
     // column/name/primaryKey/onDelete/onUpdate/deferrable — present even when
@@ -353,12 +354,12 @@ export class ForeignKeyDefinition {
     return "id";
   }
 
-  get isValidate(): boolean {
+  get isValidate(): boolean | null {
     return this.validate;
   }
 
   /** Alias of isValidate (Rails: `alias validated? validate?`). */
-  get isValidated(): boolean {
+  get isValidated(): boolean | null {
     return this.isValidate;
   }
 
@@ -389,9 +390,7 @@ export class ForeignKeyDefinition {
       // when `:validate` was not stored on the definition (mysql/sqlite
       // introspection, or an add/DSL path that didn't pass it), the fetch falls
       // back to the lookup value, so the comparison is trivially true.
-      (options.validate === undefined ||
-        !this.storesValidate ||
-        options.validate === this.validate) &&
+      (options.validate == null || !this.storesValidate || options.validate === this.validate) &&
       // Generic key compare, mirroring defined_for?'s `options.all?` over the
       // remaining stored option keys (column, name, primary_key, on_delete, …).
       (options.column === undefined ||
@@ -428,12 +427,12 @@ export class PrimaryKeyDefinition {
 export class CheckConstraintDefinition {
   readonly tableName: string;
   readonly expression: string;
-  readonly options: { name?: string; validate?: boolean };
+  readonly options: { name?: string; validate?: boolean | null };
 
   constructor(
     tableName: string,
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    options: { name?: string; validate?: boolean | null } = {},
   ) {
     this.tableName = tableName;
     this.expression = expression;
@@ -444,12 +443,15 @@ export class CheckConstraintDefinition {
     return this.options.name as string;
   }
 
-  /** Mirrors: `validate?` (schema_definitions.rb:180-183). */
-  get validate(): boolean {
-    return this.options.validate ?? true;
+  /**
+   * Mirrors: `validate?` (schema_definitions.rb:180-183). `options.fetch` returns
+   * a stored nil as nil; the `true` default applies only when the key is absent.
+   */
+  get validate(): boolean | null {
+    return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
 
-  get isValidate(): boolean {
+  get isValidate(): boolean | null {
     return this.validate;
   }
 
@@ -460,16 +462,22 @@ export class CheckConstraintDefinition {
   isDefinedFor(options: {
     name: string | null | undefined;
     expression?: string;
-    validate?: boolean;
+    validate?: boolean | null;
   }): boolean {
     // Mirrors Rails CheckConstraintDefinition#defined_for?(name:, expression: nil,
     // ...): it matches on name (and validate) only — the expression is accepted
     // but never compared (it is used upstream to derive the name). A raw-string
     // expression compare would spuriously fail against the adapter's normalized
-    // form (e.g. PostgreSQL's `pg_get_constraintdef`).
+    // form (e.g. PostgreSQL's `pg_get_constraintdef`). The validate arm mirrors
+    // `validate.nil? || validate == self.options.fetch(:validate, validate)`
+    // (schema_definitions.rb:193): with `:validate` unstored the fetch falls back
+    // to the lookup value, so the comparison is trivially true — the getter's
+    // `true` default must not stand in for it.
     return (
       this.name === (options.name == null ? "" : options.name.toString()) &&
-      (options.validate === undefined || options.validate === this.validate)
+      (options.validate == null ||
+        !("validate" in this.options) ||
+        options.validate === this.validate)
     );
   }
 }

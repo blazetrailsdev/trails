@@ -26,7 +26,7 @@ export interface DatabaseConfigOptions {
   schemaDump?: string | false | null;
   databaseTasks?: boolean;
   useMetadataTable?: boolean;
-  seeds?: boolean;
+  seeds?: boolean | null;
   url?: string;
   replicaOf?: string;
   replica?: boolean;
@@ -172,7 +172,7 @@ export class DatabaseConfig {
    *
    * Abstract on DatabaseConfig — HashConfig overrides with real logic.
    */
-  get seeds(): boolean {
+  get seeds(): boolean | null {
     return false;
   }
 
