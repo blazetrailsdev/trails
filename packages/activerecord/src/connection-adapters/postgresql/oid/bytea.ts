@@ -21,7 +21,7 @@ export class Bytea extends BinaryType {
    * formats. We delegate to our shared `unescapeBytea` helper (the same
    * one used by quoting.ts) so octal escapes aren't silently lost.
    */
-  override deserialize(value: unknown): Uint8Array | null {
+  override deserialize(value: unknown): unknown {
     if (value == null) return null;
     if (value instanceof BinaryData) return value.bytes;
     // Buffer in Node is already a Uint8Array — return it directly instead

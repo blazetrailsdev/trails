@@ -38,9 +38,12 @@ describe("ValueType<T> type parameter flows into concrete subclasses", () => {
     expectTypeOf(t.cast(0)).toEqualTypeOf<number | null>();
   });
 
-  it("BinaryType#cast narrows to Uint8Array | null", () => {
+  // BinaryType is the one deliberate `unknown`: `Binary#cast` (binary.rb:18-26)
+  // coerces only a ::String, so a non-string value comes back out unchanged and
+  // there is no narrower type to promise. `serialize` still narrows to `Data`.
+  it("BinaryType#cast stays unknown because Binary#cast passes non-strings through", () => {
     const t = new BinaryType();
-    expectTypeOf(t.cast(0)).toEqualTypeOf<Uint8Array | null>();
+    expectTypeOf(t.cast(0)).toEqualTypeOf<unknown>();
   });
 
   it("ImmutableStringType and StringType narrow to string | null", () => {

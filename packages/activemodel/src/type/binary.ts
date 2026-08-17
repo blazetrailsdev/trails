@@ -3,7 +3,7 @@ import { ValueType } from "./value.js";
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-export class BinaryType extends ValueType<Uint8Array> {
+export class BinaryType extends ValueType<unknown> {
   readonly name = "binary";
 
   type(): string {
@@ -14,11 +14,32 @@ export class BinaryType extends ValueType<Uint8Array> {
     return true;
   }
 
-  cast(value: unknown): Uint8Array | null {
-    if (value === null || value === undefined) return null;
-    if (value instanceof Data) return value.bytes;
-    if (value instanceof Uint8Array) return value;
-    return textEncoder.encode(String(value));
+  /**
+   * Mirrors: ActiveModel::Type::Binary#cast (binary.rb:18-26)
+   *
+   *   if value.is_a?(Data)
+   *     value.to_s
+   *   else
+   *     value = super
+   *     value = value.b if ::String === value && value.encoding != Encoding::BINARY
+   *     value
+   *   end
+   *
+   * `super` is Value#cast, whose `cast_value` is identity — so only a `::String`
+   * is coerced and everything else (an Integer, say) comes back out unchanged.
+   * A `Uint8Array` is trails' stand-in for a BINARY-encoded Ruby String, so
+   * `Data#to_s` is `bytes` (JS `toString()` would UTF-8-decode and lose bytes)
+   * and `String#b` is `textEncoder.encode`; a value that is already a
+   * `Uint8Array` passes through, as a BINARY String does in Ruby.
+   */
+  cast(value: unknown): unknown {
+    if (value instanceof Data) {
+      return value.bytes;
+    } else {
+      value = super.cast(value);
+      if (typeof value === "string") value = textEncoder.encode(value);
+      return value;
+    }
   }
 
   /**
@@ -45,21 +66,22 @@ export class BinaryType extends ValueType<Uint8Array> {
    *   old_value != value
    *
    * Rails does not coerce `value`; it relies on Ruby's `!=`. JS cannot compare
-   * byte arrays with `!=`, so the bytes are walked, and `cast` supplies the
-   * `Uint8Array` that walk needs. It is identity in practice: the only callers
-   * (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`) pass
-   * `this.value`, which is already cast.
+   * byte arrays with `!=`, so the bytes are walked when both sides are bytes and
+   * `!==` carries the rest, as Ruby's `!=` does. `cast` is identity in practice:
+   * the only callers (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`)
+   * pass `this.value`, which is already cast.
    */
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const old = this.deserialize(rawOldValue);
     const cur = this.cast(newValue);
-    if (old === null && cur === null) return false;
-    if (old === null || cur === null) return true;
-    if (old.length !== cur.length) return true;
-    for (let i = 0; i < old.length; i++) {
-      if (old[i] !== cur[i]) return true;
+    if (old instanceof Uint8Array && cur instanceof Uint8Array) {
+      if (old.length !== cur.length) return true;
+      for (let i = 0; i < old.length; i++) {
+        if (old[i] !== cur[i]) return true;
+      }
+      return false;
     }
-    return false;
+    return old !== cur;
   }
 }
 

@@ -2702,11 +2702,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // `applyJoinDependency` clones internally, so the caller's relation
     // is not mutated.
     let resolved: any = opts;
-    if (
-      typeof opts._eagerLoadingForSql === "function" &&
-      opts._eagerLoadingForSql() &&
-      typeof opts.applyJoinDependency === "function"
-    ) {
+    if (opts.isEagerLoading === true && typeof opts.applyJoinDependency === "function") {
       // `apply_join_dependency` is async in trails (its
       // `distinct_relation_for_primary_key` branch executes a query) while
       // `build_from` (query_methods.rb:1789) is sync. Everything before that

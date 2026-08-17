@@ -333,7 +333,7 @@ interface FinderRelation {
   /** @internal */
   constructRelationForExists(conditions: unknown): any;
   /** @internal Relation#eager_loading? (relation.ts). */
-  _eagerLoadingForSql(): boolean;
+  readonly isEagerLoading: boolean;
   /** @internal Rails raises EagerLoadPolymorphicError from apply_join_dependency. */
   _checkEagerLoadable(): void;
   /** @internal Relation#apply_join_dependency, block form (relation.ts). */
@@ -735,7 +735,7 @@ export async function exists(
   // EagerLoadPolymorphicError it raises for a polymorphic spec has to be
   // surfaced here rather than only where the joins are actually built.
   this._checkEagerLoadable();
-  if (this._eagerLoadingForSql()) {
+  if (this.isEagerLoading) {
     return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
       relation.exists(conditions),
     );
