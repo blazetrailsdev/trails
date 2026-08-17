@@ -729,6 +729,7 @@ export function extractFromProgram(
         // mixin uses (see activesupport/src/include.ts).
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
+          if (isConstantCaseName(decl.name.text)) continue;
           if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue;
           const methods = harvestObjectLiteralMethods(decl.initializer, checker, relPath);
           if (methods.length === 0) continue;
@@ -1817,6 +1818,20 @@ export function factoryClassMembers(
   return out;
 }
 
+/**
+ * True for a SCREAMING_SNAKE binding — a Ruby *constant* holding data rather
+ * than a `module`. Ruby module names are CamelCase, so constant case is the
+ * discriminator between a mixin object literal and a method table such as
+ * `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS` (deprecation/behaviors.rb:13-63),
+ * whose keys are Symbols no Ruby caller invokes as methods. Counting those keys
+ * as ported members makes `isPortedWithArgs("raise")` true package-wide and
+ * turns every Rails `raise` in the package into a call-mismatch row (RFC 0108).
+ * An acronym module name (`TSE`) is also all-caps, so the underscore is required.
+ */
+export function isConstantCaseName(name: string): boolean {
+  return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
+}
+
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -2116,7 +2131,10 @@ export function extractClass(
         ...(skeleton !== undefined ? { skeleton } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
+      const calls = extractCalls(member.body);
+      const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
+      const skeleton = extractSkeleton(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -2126,7 +2144,10 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -2135,7 +2156,10 @@ export function extractClass(
       }
     } else if (ts.isSetAccessorDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
+      const calls = extractCalls(member.body);
+      const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
+      const skeleton = extractSkeleton(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -2146,7 +2170,10 @@ export function extractClass(
         writer: true,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
       };
       if (isStatic) {
         classMethods.push(method);

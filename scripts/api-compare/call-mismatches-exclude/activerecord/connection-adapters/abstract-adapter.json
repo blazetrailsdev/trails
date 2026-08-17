@@ -40,5 +40,12 @@
     "rubyName": "log",
     "call": "instrument",
     "reason": "RFC 0106: the receiver now converges to `this.instrumenter`; the method is `instrumentAsync` because Rails' sync `Instrumenter#instrument` cannot await the query block (abstract_adapter.rb:1134-1146)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "type_map",
+    "call": "compute_if_absent",
+    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
   }
 ]

@@ -2,6 +2,13 @@
   {
     "package": "activesupport",
     "tsFile": "xml-mini/nokogirisax.ts",
+    "rubyName": "current_hash",
+    "call": "last",
+    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "xml-mini/nokogirisax.ts",
     "rubyName": "end_element",
     "call": "delete",
     "reason": "Per-entry verified: Rails nokogirisax.rb:57-59 calls `current_hash.delete(HASH_SIZE_KEY)` / `.delete(CONTENT_KEY)`; TS spells both with the `delete` operator on the plain object, which is not a call node."

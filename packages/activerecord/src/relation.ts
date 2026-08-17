@@ -1156,6 +1156,7 @@ export class Relation<T extends Base> {
     this._offsets = undefined;
     this._take = undefined;
     this._records = [];
+    this._shouldEagerLoad = undefined;
     this._cacheKeys = undefined;
     this._cacheVersions = undefined;
     // Bump the load token and drop any in-flight loadAsync() promise —
@@ -3173,16 +3174,14 @@ export class Relation<T extends Base> {
    *     eager_load_values.any? ||
    *     includes_values.any? && (joined_includes_values.any? || references_eager_loaded_tables?)
    *
-   * Not memoized: Rails' `||=` only sticks on a truthy result and `reset` clears
-   * it, while trails' eager paths mutate limit/offset on the relation in place,
-   * so recomputing is both cheaper to keep correct and observably the same.
+   * `||=` recomputes on a falsy memo, so a `false` result is not sticky; `reset`
+   * clears it alongside the other memos (relation.rb:1195-1204).
    */
   get isEagerLoading(): boolean {
-    return (
+    return (this._shouldEagerLoad ||=
       this.eagerLoadValues.length > 0 ||
       (this.includesValues.length > 0 &&
-        (this.joinedIncludesValues.length > 0 || this.referencesEagerLoadedTables()))
-    );
+        (this.joinedIncludesValues.length > 0 || this.referencesEagerLoadedTables())));
   }
 
   /**
@@ -3355,6 +3354,9 @@ export class Relation<T extends Base> {
   }
 
   // Memoized per timestamp column, matching Rails' @cache_keys / @cache_versions.
+  /** Rails: `@should_eager_load` (relation.rb:1237-1242), cleared in `reset`. */
+  private _shouldEagerLoad: boolean | undefined;
+
   private _cacheKeys: Map<string, Promise<string>> | undefined;
   private _cacheVersions: Map<string, Promise<string | null>> | undefined;
 
