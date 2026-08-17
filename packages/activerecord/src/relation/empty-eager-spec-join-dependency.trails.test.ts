@@ -8,7 +8,7 @@
  * Rails does not special-case that: `apply_join_dependency`
  * (finder_methods.rb:457) builds the JoinDependency, joins it (contributing no
  * JOINs), and runs the ordinary query. trails carried three
- * `jd.nodes.length === 0` degrade branches — in `_executeEagerLoad`, the
+ * `jd.nodes.length === 0` degrade branches — in `exec_main_query`, the
  * `pluck` eager path and the `cacheVersion` eager path — which were load-bearing
  * only while the preload-fallback lane existed (deleted in #5968). This file
  * covers the shape that reaches those sites, so the ordinary Rails-shaped flow

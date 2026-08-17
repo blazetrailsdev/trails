@@ -336,8 +336,11 @@ interface FinderRelation {
   _eagerLoadingForSql(): boolean;
   /** @internal Rails raises EagerLoadPolymorphicError from apply_join_dependency. */
   _checkEagerLoadable(): void;
-  /** @internal Relation#apply_join_dependency (relation.ts). */
-  applyJoinDependency(options?: { eagerLoading?: boolean }): any;
+  /** @internal Relation#apply_join_dependency, block form (relation.ts). */
+  applyJoinDependency<R>(
+    options: { eagerLoading?: boolean },
+    block: (relation: any) => R | Promise<R>,
+  ): Promise<R>;
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
   toArel(): { ast: unknown };
@@ -733,7 +736,9 @@ export async function exists(
   // surfaced here rather than only where the joins are actually built.
   this._checkEagerLoadable();
   if (this._eagerLoadingForSql()) {
-    return this.applyJoinDependency({ eagerLoading: false }).exists(conditions);
+    return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
+      relation.exists(conditions),
+    );
   }
   const relation = this.constructRelationForExists(conditions);
   // Resolve any deferred distinct-PK subquery markers to a literal id list

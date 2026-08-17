@@ -15,12 +15,10 @@
  * now JOINs both segments (`joinConstraints` keys
  * `target.association_primary_key = source.foreign_key` per column).
  *
- * One residual, separately-tracked trails deviation remains (hence the
- * `*.trails.test.ts` suffix):
- *   - A limit/offset over the joined collection needs the composite-PK
- *     `distinct_relation_for_primary_key` materialization, which trails can't do
- *     yet — it surfaces an explicit NotImplementedError
- *     (0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization).
+ * A limit/offset over the joined collection is converged too: `apply_join_dependency`
+ * routes it through the adapter's `distinct_relation_for_primary_key`
+ * (schema_statements.rb:1429), whose `Array(primary_key).zip(limited_ids.transpose)`
+ * rewrite is per-column, so a composite PK materializes as one `IN` per key column.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
@@ -123,19 +121,17 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
   });
 
-  it("pluck over eagerLoad('chapters') with a limit surfaces the composite-PK materialization gap", async () => {
+  it("pluck over eagerLoad('chapters') with a limit materializes the composite primary keys", async () => {
     await seedBooks();
     // Rails materializes the limited DISTINCT primary keys
-    // (distinct_relation_for_primary_key) before joining; trails has no
-    // composite-PK materialization yet, so it surfaces the explicit error
-    // rather than emitting a wrong single-column predicate. Tracked by
-    // 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
-    await expect(
-      CpkBook.eagerLoad("chapters")
-        .order("cpk_books.author_id", "cpk_books.id")
-        .limit(2)
-        .pluck("title"),
-    ).rejects.toThrow(/limit\/offset over a collection association/);
+    // (distinct_relation_for_primary_key, schema_statements.rb:1429) and
+    // re-queries with one `IN` per key column, so the LIMIT bounds PARENTS —
+    // not the fanned-out joined rows.
+    const titles = await CpkBook.eagerLoad("chapters")
+      .order("cpk_books.author_id", "cpk_books.id")
+      .limit(2)
+      .pluck("title");
+    expect(titles).toEqual(["Alpha", "Beta"]);
   });
 
   it("pluck of a nested-hash spec's inner composite-FK belongsTo joins both segments", async () => {
@@ -172,15 +168,16 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     });
   });
 
-  it("cache_version over eagerLoad('chapters') with a limit surfaces the composite-PK materialization gap", async () => {
+  it("cache_version over eagerLoad('chapters') with a limit materializes the composite primary keys", async () => {
     await withCollectionCacheVersioning(async () => {
       await seedBooks();
-      await expect(
-        CpkBook.eagerLoad("chapters")
-          .order("cpk_books.author_id", "cpk_books.id")
-          .limit(2)
-          .cacheVersion("revision"),
-      ).rejects.toThrow(/limit\/offset over a collection association/);
+      // The limited DISTINCT composite keys are materialized, so the size the
+      // cache version reports is the two limited PARENTS.
+      const version = await CpkBook.eagerLoad("chapters")
+        .order("cpk_books.author_id", "cpk_books.id")
+        .limit(2)
+        .cacheVersion("revision");
+      expect(version).toMatch(/^2-/);
     });
   });
 });

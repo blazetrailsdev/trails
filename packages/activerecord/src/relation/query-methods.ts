@@ -18,6 +18,7 @@ import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 import {
   ActiveRecordError,
   IrreversibleOrderError,
+  NotImplementedError,
   PreparedStatementInvalid,
   UnmodifiableRelation,
 } from "../errors.js";
@@ -2706,7 +2707,28 @@ export function buildFrom(this: QueryMethodsHost): unknown {
       opts._eagerLoadingForSql() &&
       typeof opts.applyJoinDependency === "function"
     ) {
-      resolved = opts.applyJoinDependency();
+      // `apply_join_dependency` is async in trails (its
+      // `distinct_relation_for_primary_key` branch executes a query) while
+      // `build_from` (query_methods.rb:1789) is sync. Everything before that
+      // query is synchronous, so the block delivers the relation during the
+      // call; `resolved` still being `opts` means the query branch WAS entered
+      // and a synchronous `from(...)` cannot await it. Raise rather than build
+      // the subquery from an un-joined relation.
+      const pending = opts.applyJoinDependency({}, (relation: any) => {
+        resolved = relation;
+      });
+      if (resolved === opts) {
+        pending.catch(() => {});
+        // @nie disposition=TODO
+        throw new NotImplementedError(
+          "Using an eager-loaded relation with a limit/offset over a collection " +
+            "association as a `from` subquery is not supported: Rails resolves this " +
+            "by executing a query to materialize the limited primary keys " +
+            "(distinct_relation_for_primary_key), which the synchronous `from` " +
+            "cannot do. Materialize the ids first, e.g. " +
+            "where(id: await rel.pluck(primaryKey)).",
+        );
+      }
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the

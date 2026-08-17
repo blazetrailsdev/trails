@@ -1,6 +1,8 @@
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
+import { NotImplementedError } from "../../errors.js";
+
 import { rubyInspectArray } from "../ruby-inspect.js";
 import { DeferredDistinctPkIn } from "./deferred-distinct-pk-in.js";
 
@@ -53,7 +55,35 @@ export class RelationHandler {
   // distinct_relation_for_primary_key materialization branch
   // (finder_methods.rb:463). Matches relation.ts's own call site (~L3542).
   private applyJoinDependency(value: any): any {
-    return typeof value?.applyJoinDependency === "function" ? value.applyJoinDependency() : value;
+    if (typeof value?.applyJoinDependency !== "function") return value;
+    // relation_handler.rb:7 — `if value.eager_loading?`. Without it a plain
+    // `includes(...)` subquery (no `references`, so not eager-loading) would be
+    // join-converted here where Rails leaves it alone.
+    if (value._eagerLoadingForSql?.() !== true) return value;
+    // finder_methods.rb:457-481 is synchronous in Ruby; trails' is async because
+    // `distinct_relation_for_primary_key` executes a query. Everything before
+    // that query is synchronous, so the block runs during the call and this
+    // synchronous handler gets its relation — unless the query branch WAS
+    // entered, which `deferDistinctPkMaterialization` above is supposed to have
+    // claimed first. `resolved` still being unset is that invariant breaking:
+    // fail loudly rather than emit an un-materialized `IN (subquery)`.
+    let resolved: any;
+    const pending = value.applyJoinDependency({}, (relation: any) => {
+      resolved = relation;
+    });
+    if (resolved === undefined) {
+      pending.catch(() => {});
+      // @nie disposition=TODO
+      throw new NotImplementedError(
+        "Using an eager-loaded relation with a limit/offset over a collection " +
+          "association as a subquery value is not supported: Rails resolves this by " +
+          "executing a query to materialize the limited primary keys " +
+          "(distinct_relation_for_primary_key), which the synchronous predicate " +
+          "builder cannot do. Materialize the ids first, e.g. " +
+          "where(id: await rel.pluck(primaryKey)).",
+      );
+    }
+    return resolved;
   }
 
   // Mirrors Rails: inject the table-qualified primary key select only when the
