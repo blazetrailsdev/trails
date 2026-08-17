@@ -6,7 +6,6 @@ import { threadedConnectionFor } from "./connection-handling.js";
 import {
   ActiveRecordError,
   ConnectionNotEstablished,
-  NotImplementedError,
   RecordNotSaved,
   RecordNotUnique,
   UnknownPrimaryKey,
@@ -581,7 +580,7 @@ export class Relation<T extends Base> {
    */
   private _joinDependency: JoinDependency | null = null;
   /**
-   * The eager associations `_executeEagerLoad` degraded to a preload, handed to
+   * The eager associations `exec_main_query` degraded to a preload, handed to
    * `exec_queries`' preload step. No Rails counterpart: Rails' eager arm always
    * builds the JOIN.
    */
@@ -1616,7 +1615,23 @@ export class Relation<T extends Base> {
     const promotedIncludes = this._promotedIncludes();
     if (this.eagerLoadValues.length > 0 || promotedIncludes.length > 0) {
       const allEager = [...new Set([...this.eagerLoadValues, ...promotedIncludes])];
-      return this.skipQueryCacheIfNecessary(() => this._executeEagerLoad(allEager, { async }));
+      return this.skipQueryCacheIfNecessary(async () => {
+        // trails' remaining capability gap: a composite-PK/CTE/FROM-override
+        // eager load can't emit the aliased JOIN, so it degrades to a preload
+        // (`_eagerLoadBypassesJoinDependency`). Rails always JOINs.
+        if (this._eagerLoadBypassesJoinDependency()) {
+          const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
+          this._eagerBypassPreloads = allEager;
+          return result;
+        }
+        // Mirrors: relation.rb:1432-1443.
+        return this.applyJoinDependency({}, async (relation, joinDependency) => {
+          if (relation.isNullRelation()) return Result.empty();
+          joinDependency.applyColumnAliases(relation);
+          this._joinDependency = joinDependency;
+          return this._conn().selectAll(relation.toArel(), "SQL", [], { async });
+        });
+      });
     }
 
     // Awaiting the FutureResult here is trails' `future.result` in
@@ -1767,52 +1782,6 @@ export class Relation<T extends Base> {
     return new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
   }
 
-  private async _executeEagerLoad(
-    eagerAssocs?: AssociationSpec[],
-    // `exec_main_query`'s `async:` (relation.rb:1423), which its eager arm
-    // hands to `select_all` (relation.rb:1436).
-    { async = false }: { async?: boolean } = {},
-  ): Promise<Result> {
-    const eagerAssociations = eagerAssocs ?? this.eagerLoadValues;
-    const basePk = (this._model as any).primaryKey ?? "id";
-    if (this._eagerLoadBypassesJoinDependency()) {
-      const result = await this._conn().selectAll(this.toArel(), "Eager Load", [], { async });
-      this._eagerBypassPreloads = eagerAssociations;
-      return result;
-    }
-
-    const jd = this._buildEagerJoinDependency(eagerAssociations);
-
-    // For collection (non-limitable) eager loads with a LIMIT/OFFSET, Rails
-    // (distinct_relation_for_primary_key) runs a separate DISTINCT-pk query to
-    // materialize the limited parent IDs, then re-queries with `pk IN (ids)`.
-    // This avoids `IN (SELECT ... LIMIT n)`, which MariaDB does not support.
-    let limitedIds: unknown[] | undefined;
-    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
-      limitedIds = await this._materializeLimitedIds(jd, basePk);
-      if (limitedIds.length === 0) {
-        // Rails' `relation.null_relation? ? [].freeze` (relation.rb:1438-1440).
-        return Result.empty();
-      }
-    }
-
-    // Rails' `apply_join_dependency { |relation, jd| … relation.to_sql }`
-    // (relation.rb:1211-1214): build arel from the yielded relation, so CTEs and
-    // annotate() comments fold in through the ordinary path.
-    const eagerRelation = this._applyEagerJoinDependency(jd, basePk, limitedIds);
-    jd.applyColumnAliases(eagerRelation);
-    const manager = eagerRelation.toArel();
-
-    // Read through selectAll (not execute) so the adapter-reported result
-    // column_types are available to type-cast extra/computed `select` columns
-    // hydrated onto the base record — mirroring Rails' JoinDependency#instantiate,
-    // which slices `result_set.column_types`.
-    const result = await this._conn().selectAll(manager, "SQL", [], { async });
-    // Rails' `@_join_dependency = join_dependency` (relation.rb:1435).
-    this._joinDependency = jd;
-    return result;
-  }
-
   /**
    * Async iterator support — allows `for await (const record of relation)`.
    *
@@ -1875,7 +1844,7 @@ export class Relation<T extends Base> {
    * building a JoinDependency. trails can't emit the aliased eager JOIN under a
    * composite PK, CTEs, or a FROM override, so eager specs are
    * preloaded in those cases (a capability gap — Rails always JOINs). Kept in
-   * one place so the `toArray` builder (`_executeEagerLoad`), the `toSql`
+   * one place so the `toArray` builder (`exec_main_query`), the `toSql`
    * builder (`toSql`), and the calculation/exists raise-check
    * (`_checkEagerLoadable`) agree on exactly when a JoinDependency is built.
    * @internal
@@ -1920,7 +1889,7 @@ export class Relation<T extends Base> {
    * not raise either.
    *
    * Only the calculation/exists entry points call this — the `toArray` eager
-   * path builds its real JoinDependency in `_executeEagerLoad`/`toSql`,
+   * path builds its real JoinDependency in `exec_main_query`/`toSql`,
    * which raises there, so re-checking from the shared `buildJoins`
    * chokepoint would just rebuild a throwaway JoinDependency on every eager load.
    *
@@ -1971,7 +1940,7 @@ export class Relation<T extends Base> {
 
     // Mirrors `relation.rb:606-616`.
     const arel = this._eagerLoadingForSql()
-      ? this.applyJoinDependency().arel()
+      ? await this.applyJoinDependency({}, (relation) => relation.arel())
       : this.buildArel(this._conn());
     arel.source.left = table;
     const groupValuesArelColumns = this.arelColumns(
@@ -2044,7 +2013,7 @@ export class Relation<T extends Base> {
     // implicitly here (the no-arg default, finder_methods.rb:457), so a
     // grouped delete skips the limit/offset materialization guard.
     const arel = this._eagerLoadingForSql()
-      ? this.applyJoinDependency().arel()
+      ? await this.applyJoinDependency({}, (relation) => relation.arel())
       : this.buildArel(this._conn());
     // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
     // target back to the bare table before `compile_delete`. For the common
@@ -2341,94 +2310,64 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Mirror Rails `apply_join_dependency` (finder_methods.rb:457-461): build a
-   * JoinDependency over `eager_load_values | includes_values` with an OuterJoin
-   * join type and push it into `joins_values` via `joins!`, on a relation that
-   * has dropped `:includes`, `:eager_load` and `:preload`. A no-op when the
-   * relation is not eager-loading.
+   * Mirrors: ActiveRecord::FinderMethods#apply_join_dependency
+   * (finder_methods.rb:457-481).
    *
-   * `eagerLoading` mirrors Rails `apply_join_dependency(eager_loading:
-   * group_values.empty?)` (finder_methods.rb:457): when `false` (a grouped
-   * relation), the limit/offset materialization guard below is skipped, because
-   * Rails only rewrites the relation via `distinct_relation_for_primary_key`
-   * when `eager_loading` is truthy.
-   *
-   * The two-clause `using_limitable_reflections?` test Rails spells inline here
-   * (finder_methods.rb:463-470) lives in `_eagerJoinDependencyIsLimitable`, its
-   * single home.
+   * Only the block form Rails also offers is provided: `distinct_relation_for_primary_key`
+   * EXECUTES a query, so this method is async, and a trails `Relation` is
+   * thenable — returning one out of a `Promise` would run it and resolve to its
+   * records. Callers that want Rails' `relation = apply_join_dependency` shape
+   * capture the yielded relation from the block.
    * @internal
    */
-  applyJoinDependency({
-    eagerLoading = this.groupValues.length === 0,
-  }: { eagerLoading?: boolean } = {}): Relation<T> {
-    if (!this._eagerLoadingForSql()) return this;
-    const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
+  async applyJoinDependency<R>(
+    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
+    block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
+  ): Promise<R> {
     const joinDependency = QueryMethodBangs.constructJoinDependency.call(
       this as any,
-      eagerSpecs as any,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
-    );
-    const rel = this.except("includes", "eagerLoad", "preload");
-    QueryMethodBangs.joinsBang.call(rel as any, joinDependency as any);
+    ) as unknown as JoinDependency;
+    const relation = this.except("includes", "eagerLoad", "preload");
+    QueryMethodBangs.joinsBang.call(relation as any, joinDependency as any);
 
-    // Rails `apply_join_dependency`, for a limit/offset over non-limitable
-    // (collection) reflections, replaces the relation with
-    // `distinct_relation_for_primary_key` (finder_methods.rb:463): it EXECUTES a
-    // query (`select_rows`, schema_statements.rb:1434) to materialize the
-    // limited DISTINCT primary keys (honoring `columns_for_distinct(...,
-    // order_values)`), rewrites the relation as `WHERE pk IN (ids)`, and clears
-    // limit_value/offset_value. This avoids `IN (SELECT … LIMIT n)`, which
-    // limits joined rows rather than parents and is unportable (MySQL rejects
-    // it). A synchronous predicate builder cannot execute that query, and any
-    // pure-SQL approximation (DISTINCT+LIMIT subquery) diverges from Rails'
-    // materialized-ID shape and ordered-distinct handling — so rather than
-    // claim parity we reject this combination explicitly. Tracked by the
-    // `converge-relation-subquery-distinct-pk-materialization` continuation story.
     if (
       eagerLoading &&
       this.hasLimitOrOffset &&
-      !this._eagerJoinDependencyIsLimitable(joinDependency)
+      !(
+        this.usingLimitableReflections(joinDependency.reflections as never) &&
+        this.usingLimitableReflections(
+          (
+            QueryMethodBangs.constructJoinDependency.call(
+              this as any,
+              _qm.selectAssociationList
+                .call(this as any, this.joinsValues, null)
+                .concat(
+                  _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
+                ) as AssociationSpec[],
+              null,
+            ) as unknown as JoinDependency
+          ).reflections as never,
+        )
+      )
     ) {
-      // @nie disposition=TODO
-      throw new NotImplementedError(
-        "Using an eager-loaded relation with a limit/offset over a collection " +
-          "association as a subquery value is not supported: Rails resolves this by " +
-          "executing a query to materialize the limited primary keys " +
-          "(distinct_relation_for_primary_key), which the synchronous predicate " +
-          "builder cannot do. Materialize the ids first, e.g. " +
-          "where(id: await rel.pluck(primaryKey)).",
+      // Rails reassigns `relation` from the return value; every rewrite
+      // `distinct_relation_for_primary_key` performs is an in-place mutation of
+      // the relation it is handed, and a thenable `Relation` cannot be returned
+      // through a `Promise`, so it mutates `relation` and returns nothing here.
+      await this.skipQueryCacheIfNecessary(() =>
+        this.model.withConnection((c: DatabaseAdapter) =>
+          (
+            c as unknown as {
+              distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
+            }
+          ).distinctRelationForPrimaryKey(relation),
+        ),
       );
     }
 
-    return rel;
-  }
-
-  /**
-   * Rails `apply_join_dependency { |relation| ... }` (finder_methods.rb:456-488)
-   * for callers that can await: it EXECUTES `distinct_relation_for_primary_key`
-   * when a limit/offset rides a collection reflection. The synchronous
-   * {@link applyJoinDependency} above cannot run that query and rejects the
-   * combination instead, so `calculate` — which is async all the way down —
-   * routes here and gets Rails' materialized-ids rewrite. Only the block form
-   * is offered: a `Relation` is thenable, so it cannot be carried out of a
-   * promise without the await loading it.
-   * @internal
-   */
-  async _applyJoinDependencyAsync<R>(
-    run: (relation: Relation<T>) => Promise<R>,
-    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
-  ): Promise<R> {
-    const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-    if (eagerSpecs.length === 0) return run(this);
-    const jd = this._buildEagerJoinDependency(eagerSpecs);
-    const basePk = (this._model as any).primaryKey ?? "id";
-    if (eagerLoading && this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
-      const limitedIds = await this._materializeLimitedIds(jd, basePk);
-      return run(this._applyEagerJoinDependency(jd, basePk, limitedIds));
-    }
-    const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethodBangs.joinsBang.call(relation as any, jd as any);
-    return run(relation);
+    return block(relation, joinDependency);
   }
 
   /** Eager-load specs that `apply_join_dependency` would join (eager_load ∪ includes). */
@@ -2652,13 +2591,12 @@ export class Relation<T extends Base> {
    * forces the distinct-parent-id rewrite even when every eager reflection is
    * singular.
    *
-   * Rails spells this guard inline in `apply_join_dependency` because that one
-   * block-form method is its only entry point; trails still has several
-   * (`applyJoinDependency`, `_applyJoinDependencyAsync`,
-   * `_applyEagerJoinDependency`, `_executeEagerLoad`,
-   * `_isDeferredDistinctPkSubquery`) pending the sync/async collapse tracked by
-   * `converge-relation-subquery-distinct-pk-materialization`, so the guard has
-   * exactly ONE home here and every entry point calls it — never a second copy.
+   * Rails spells this guard inline in `apply_join_dependency`, and so does
+   * {@link applyJoinDependency}. This copy serves only the SYNCHRONOUS eager
+   * paths that cannot route through it — `toSql`, the deferred distinct-PK
+   * predicate cluster, and `_eagerLoadBypassesJoinDependency` — pending the
+   * sync/async collapse tracked by
+   * `converge-relation-subquery-distinct-pk-materialization`.
    */
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
     return (
@@ -2733,7 +2671,7 @@ export class Relation<T extends Base> {
    * standalone `SELECT DISTINCT pk … LIMIT n` and returns the literal IDs, so
    * the caller can rewrite the relation as `WHERE pk IN (ids)` instead of
    * nesting `IN (SELECT … LIMIT n)` (which MariaDB rejects). Shared by the
-   * toArray execution path (`_executeEagerLoad`) and pluck's apply-join-dependency
+   * toArray execution path (`exec_main_query`) and pluck's apply-join-dependency
    * branch; the connection is proven live at both call sites (the subquery
    * executes immediately).
    *
@@ -2763,7 +2701,7 @@ export class Relation<T extends Base> {
    * Precompute the DISTINCT-pk subquery's SELECT list via the adapter's
    * `columns_for_distinct` (Rails' `limited_ids_for`). Order columns are
    * appended after the pk so PostgreSQL accepts `SELECT DISTINCT ... ORDER BY
-   * <ordered col>`. Called from `_executeEagerLoad`, where the connection is
+   * <ordered col>`. Called from the deferred distinct-PK cluster, where the connection is
    * established (the subquery executes immediately after), so the adapter is
    * always resolvable here.
    *
@@ -3585,44 +3523,14 @@ export class Relation<T extends Base> {
       // below keys off the RESOLVED relation's limit/offset (Rails'
       // `collection.has_limit_or_offset?`), not the original's.
       //
-      // Inlined rather than delegated because `Relation` is thenable: returning
-      // or awaiting a bare relation through an async helper would execute it and
-      // resolve to its records. Here only `_materializeLimitedIds` (an id array)
-      // is awaited; the relation is built with synchronous assignments.
+      // The yielded relation is captured out of the block rather than assigned
+      // from the return value (Rails' `collection = apply_join_dependency`)
+      // because a `Relation` is thenable and cannot cross a `Promise` boundary.
       let collection: Relation<T> = this;
       if (this._eagerLoadingForSql()) {
-        const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-        const rel = this.clone();
-        rel.eagerLoadValues = [];
-        rel.includesValues = [];
-        const pk = (this._model as { primaryKey?: string | string[] }).primaryKey ?? "id";
-        const jd = this._buildEagerJoinDependency(eagerSpecs);
-        if (
-          this.hasLimitOrOffset &&
-          !this._eagerJoinDependencyIsLimitable(jd) &&
-          !Array.isArray(pk)
-        ) {
-          // Rails' distinct_relation_for_primary_key (finder_methods.rb:463):
-          // materialize the limited DISTINCT primary keys, rewrite as
-          // `WHERE pk IN (ids)`, and clear limit/offset. Single-column PK only —
-          // `_materializeLimitedIds` (shared with the pluck eager-limit path) has
-          // no composite-PK support (Rails' zip/transpose over
-          // `Array(primary_key)`), so a composite PK falls through to the
-          // synchronous applyJoinDependency below, which surfaces the
-          // unsupported combination as an explicit NotImplementedError rather
-          // than emitting a wrong single-column `"col1,col2"` predicate.
-          const limitedIds = await this._materializeLimitedIds(jd, pk);
-          collection = rel.leftOuterJoins(eagerSpecs).where({ [pk]: limitedIds });
-          collection.limitValue = null;
-          collection.offsetValue = null;
-        } else if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
-          // Composite-PK, non-limitable eager limit/offset: unsupported here —
-          // surfaces NotImplementedError rather than a wrong predicate. Tracked
-          // by 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization.
-          collection = this.applyJoinDependency();
-        } else {
-          collection = rel.leftOuterJoins(eagerSpecs);
-        }
+        await this.applyJoinDependency({}, (relation) => {
+          collection = relation;
+        });
       }
       const tsColumn = this.table.get(timestampColumn);
       // Build COUNT(*) and MAX(col) projections via Arel nodes.

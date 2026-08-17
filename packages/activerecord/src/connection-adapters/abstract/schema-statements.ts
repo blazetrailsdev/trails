@@ -1726,6 +1726,17 @@ export class SchemaStatements {
     return columns;
   }
 
+  /**
+   * Mirrors: ConnectionAdapters::SchemaStatements#distinct_relation_for_primary_key
+   * (schema_statements.rb:1429-1452).
+   *
+   * Rails returns the rewritten `relation`; every rewrite it performs (`none!`,
+   * `where!`, `limit_value=`/`offset_value=`) is an in-place mutation of the
+   * argument, so the caller holds the same object either way. TypeScript cannot
+   * return it: a trails `Relation` is thenable, so resolving it out of this
+   * `Promise` would run the relation and hand back its records instead. The
+   * caller therefore reuses the relation it passed in.
+   */
   async distinctRelationForPrimaryKey(relation: {
     primaryKey?: string | string[];
     table?: { [key: string]: unknown };
@@ -1734,13 +1745,12 @@ export class SchemaStatements {
     distinctBang?: () => unknown;
     noneBang?: () => void;
     whereBang?: (conditions: Record<string, unknown>) => unknown;
-    where?: (conditions: Record<string, unknown>) => unknown;
     limitValue?: number | null;
     offsetValue?: number | null;
     arel?: () => unknown;
-  }): Promise<unknown> {
+  }): Promise<void> {
     const pk = relation.primaryKey;
-    if (!pk) return relation;
+    if (!pk) return;
 
     const pkNames = Array.isArray(pk) ? pk : [pk];
     // Rails: primary_key_columns = Array(primary_key).map { |c| visitor.compile(relation.table[c]) }
@@ -1790,24 +1800,12 @@ export class SchemaStatements {
       for (let i = 0; i < pkNames.length; i++) {
         conditions[pkNames[i]] = transposed[i];
       }
-      if (typeof (relation as any).whereBang === "function") {
-        (relation as any).whereBang(conditions);
-      } else if (typeof (relation as any).where === "function") {
-        relation = (relation as any).where(conditions);
-      }
+      relation.whereBang?.(conditions);
     }
 
-    if (typeof (relation as any).limitBang === "function") {
-      (relation as any).limitBang(null);
-    } else {
-      (relation as any).limitValue = null;
-    }
-    if (typeof (relation as any).offsetBang === "function") {
-      (relation as any).offsetBang(null);
-    } else {
-      (relation as any).offsetValue = null;
-    }
-    return relation;
+    // Rails: relation.limit_value = relation.offset_value = nil
+    relation.limitValue = null;
+    relation.offsetValue = null;
   }
 
   updateTableDefinition(tableName: string, base?: unknown): Table {

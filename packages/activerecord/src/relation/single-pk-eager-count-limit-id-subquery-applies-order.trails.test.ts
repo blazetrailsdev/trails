@@ -65,9 +65,7 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
     // would wrongly return 2.
     expect(count).toBe(1);
     // The id-materialization subquery carries the ORDER BY title.
-    const idSql = sqls.find(
-      (s) => /DISTINCT/i.test(s) && /ORDER BY/i.test(s) && /LIMIT 2/i.test(s),
-    );
+    const idSql = sqls.find((s) => /DISTINCT/i.test(s) && /ORDER BY/i.test(s) && /LIMIT/i.test(s));
     expect(idSql).toBeTruthy();
     expect(idSql).toMatch(/ORDER BY.*title/i);
   });

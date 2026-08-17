@@ -683,14 +683,13 @@ describe("distinctRelationForPrimaryKey", () => {
     const ss = makeStatements({ quoteColumnName: (n: string) => `"${n}"`, selectRows });
     const rel = makeRelation();
 
-    const result = await ss.distinctRelationForPrimaryKey(rel);
+    await ss.distinctRelationForPrimaryKey(rel);
 
     expect(rel._calls.reselect).toEqual(['"posts"."id"']);
     expect(selectRows).toHaveBeenCalledWith(arelNode, "SQL");
     expect(rel._calls.where).toEqual([{ id: [10, 20] }]);
     expect(rel.limitValue).toBeNull();
     expect(rel.offsetValue).toBeNull();
-    expect(result).toBe(rel);
   });
 
   it("keeps only the trailing pk value when columns_for_distinct prepends order columns", async () => {

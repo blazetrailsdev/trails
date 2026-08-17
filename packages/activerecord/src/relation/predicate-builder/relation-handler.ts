@@ -53,7 +53,17 @@ export class RelationHandler {
   // distinct_relation_for_primary_key materialization branch
   // (finder_methods.rb:463). Matches relation.ts's own call site (~L3542).
   private applyJoinDependency(value: any): any {
-    return typeof value?.applyJoinDependency === "function" ? value.applyJoinDependency() : value;
+    if (typeof value?.applyJoinDependency !== "function") return value;
+    // finder_methods.rb:457-481 is synchronous in Ruby; trails' is async because
+    // `distinct_relation_for_primary_key` executes a query. That branch is
+    // unreachable from here — `deferDistinctPkMaterialization` above claims
+    // exactly the relations that would take it — so the block runs before the
+    // method's first `await` and this synchronous handler gets its relation.
+    let resolved: any = value;
+    void value.applyJoinDependency({}, (relation: any) => {
+      resolved = relation;
+    });
+    return resolved;
   }
 
   // Mirrors Rails: inject the table-qualified primary key select only when the

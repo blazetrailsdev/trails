@@ -166,10 +166,11 @@ interface CalculationRelation {
   /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
   selectValues: (string | symbol | Nodes.Node)[];
   withValues: Array<Record<string, unknown>>;
-  /** @internal Rails `apply_join_dependency`; see Relation. */
-  applyJoinDependency(options?: { eagerLoading?: boolean }): CalculationRelation;
-  /** @internal Awaitable `apply_join_dependency`; see Relation. */
-  _applyJoinDependencyAsync<R>(run: (relation: CalculationRelation) => Promise<R>): Promise<R>;
+  /** @internal Rails `apply_join_dependency` (block form); see Relation. */
+  applyJoinDependency<R>(
+    options: { eagerLoading?: boolean },
+    block: (relation: CalculationRelation, joinDependency: JoinDependency) => R | Promise<R>,
+  ): Promise<R>;
   /** Mirrors `Relation#calculate`; `calculate` recurses through it. */
   calculate(operation: string, columnName?: string | Nodes.Node | number | null): Promise<unknown>;
   _checkEagerLoadable(): void;
@@ -222,14 +223,16 @@ interface CalculationRelation {
   includesValues: unknown[];
   /** @internal trails: `spawn` without the scoping re-application; see Relation. */
   clone(): CalculationRelation;
-  /** @internal trails: builds the JoinDependency `apply_join_dependency` would. */
-  _buildEagerJoinDependency(specs: unknown[]): JoinDependency;
   /** Mirrors `Relation#limit_or_offset?`. */
   hasLimitOrOffset: boolean;
-  /** @internal trails: `using_limitable_reflections?` (finder_methods.rb:475). */
-  _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean;
-  /** @internal trails: `distinct_relation_for_primary_key`'s executed half. */
-  _materializeLimitedIds(jd: JoinDependency, primaryKey: string | string[]): Promise<unknown[]>;
+  /** @internal Relation#eager_loading? (relation.ts). */
+  _eagerLoadingForSql(): boolean;
+  /** Mirrors `Relation#except`. */
+  except(...values: string[]): CalculationRelation;
+  /** Mirrors `Relation#group`. */
+  group(...args: unknown[]): CalculationRelation;
+  /** Mirrors `Relation#ids`. */
+  ids(): Promise<unknown[]>;
   /** @internal Rails `build_arel` (query_methods.rb:1750). */
   toArel(aliases?: unknown): SelectManager;
 }
@@ -349,26 +352,6 @@ function isBigintColumn(
 }
 
 /**
- * Rails `calculate` obtains the eager-joined relation from
- * `apply_join_dependency` (calculations.rb:217-238) — the single place that
- * builds the eager JoinDependency out of `eager_load_values | includes_values`
- * and pushes it into `joins_values` (finder_methods.rb:457-461). Route every
- * eager calculation arm through it instead of constructing a JoinDependency
- * locally, so the `except(:includes, :eager_load, :preload)` clear and the
- * `using_limitable_reflections?` branch live in one place.
- *
- * `eagerLoading` mirrors Rails' `apply_join_dependency(eager_loading:
- * group_values.empty?)`: `false` on a grouped relation, and also on the
- * count arms that materialize the limited primary keys themselves below —
- * those implement `distinct_relation_for_primary_key` inline, so the
- * relation-level guard for that same case must not fire.
- * @internal
- */
-function eagerJoinedRelation(rel: CalculationRelation, eagerLoading: boolean): CalculationRelation {
-  return rel.applyJoinDependency({ eagerLoading });
-}
-
-/**
  * Mirrors: ActiveRecord::Calculations#execute_grouped_calculation
  * (calculations.rb:514-593)
  * @internal
@@ -410,9 +393,18 @@ export async function executeGroupedCalculation(
   // eager JoinDependency already folded into joins_values by
   // `apply_join_dependency` (calculations.rb:232) — `eager_loading: false`,
   // since this arm only ever runs grouped.
-  const relation = eagerJoinedRelation(rel, false)
-    .except("group")
-    .distinctBang(false) as CalculationRelation;
+  // calculations.rb:524 takes `except(:group).distinct!(false)` on a relation
+  // `apply_join_dependency` (calculations.rb:232) has already folded the eager
+  // JoinDependency into. trails re-derives it here, capturing the yielded
+  // relation out of the block because a `Relation` is thenable; `eager_loading:
+  // false`, since this arm only ever runs grouped.
+  let joined = rel;
+  if (rel._eagerLoadingForSql()) {
+    await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
+      joined = r;
+    });
+  }
+  const relation = joined.except("group").distinctBang(false) as CalculationRelation;
   const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
   const columnAliasTracker = new ColumnAliasTracker(rel._conn());
   const aliases = groupNodes.map((field) =>
@@ -767,7 +759,7 @@ export async function calculate(
     // Rails takes `relation = apply_join_dependency`; a trails `Relation` is
     // thenable, so the joined relation is delivered to a block instead (the
     // block form `apply_join_dependency` also has).
-    return this._applyJoinDependencyAsync(async (relation) => {
+    return this.applyJoinDependency({}, async (relation) => {
       if (operation === "count") {
         if (
           !this.distinctValue &&
@@ -845,39 +837,12 @@ export async function pluck(
           ? columnNames[0]
           : "\0arel";
     if (hasInclude(this as any, firstColumnName)) {
-      // hasInclude is true only when eagerLoadValues or
-      // includesValues is non-empty, so the union is always non-empty here.
-      const eagerSpecs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-      const rel = this.clone();
-      rel.eagerLoadValues = [];
-      rel.includesValues = [];
-
-      const basePk = (this._model as any).primaryKey ?? "id";
-      const jd = this._buildEagerJoinDependency(eagerSpecs);
-
-      if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
-        // A composite base PK can't be materialized here — `_materializeLimitedIds`
-        // (Rails' zip/transpose over `Array(primary_key)`) has no composite
-        // support, so it would emit a wrong single-column `"col1,col2"` predicate.
-        // Surface the same explicit NotImplementedError the cache_version path
-        // raises for this shape (tracked by
-        // 0023-surfaced-deviations/converge-composite-pk-distinct-relation-materialization).
-        if (Array.isArray(basePk)) this.applyJoinDependency();
-        // Rails apply_join_dependency, for a limit/offset over a collection
-        // reflection, replaces the relation via distinct_relation_for_primary_key
-        // (finder_methods.rb:463): execute a query to materialize the limited
-        // DISTINCT primary keys, rewrite as `WHERE pk IN (ids)`, and clear
-        // limit/offset. Limiting the joined rows directly would be wrong under
-        // fan-out (it limits associated rows, not parents).
-        const limitedIds = await this._materializeLimitedIds(jd, basePk);
-        const limited = rel.leftOuterJoins(eagerSpecs).where({
-          [basePk]: limitedIds,
-        });
-        limited.limitValue = null;
-        limited.offsetValue = null;
-        return limited.pluck(...columnNames);
-      }
-      return rel.leftOuterJoins(eagerSpecs).pluck(...columnNames);
+      // Rails: `relation = apply_join_dependency; relation.pluck(*column_names)`
+      // (calculations.rb:310-311). The relation is taken from the block because
+      // a trails `Relation` is thenable and cannot cross a `Promise` boundary.
+      // The yielded relation has `:includes`/`:eager_load` cleared, so the
+      // recursive `pluck` takes the plain branch below — no infinite loop.
+      return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
     }
 
     // Reflect the schema before casting results so the model's attribute
@@ -1023,46 +988,12 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
   }
 
   if (hasInclude(this as any, primaryKey as string)) {
-    // DIVERGENCE (finder_methods.rb:457-463): trails' `applyJoinDependency`
-    // no-ops unless the relation already eager-loads for SQL, so the plain
-    // `apply_join_dependency` call would not terminate this recursion. Spell
-    // it as `pluck` does — clear the eager values, LEFT OUTER JOIN
-    // `eager_load_values | includes_values`, and materialize the limited
-    // DISTINCT primary keys (`distinct_relation_for_primary_key`, :463) that
-    // a synchronous applyJoinDependency cannot execute.
-    // Deduped without a `Set`: the `new` Rails records for `ids` is
-    // `Promise::Complete.new` in the `loaded?` arm (calculations.rb:382),
-    // which trails models with the native async surface, so a `new Set` here
-    // would be the body's first constructor and land after `hasInclude`.
-    // Measured, not assumed: spelling it `[...new Set([...])]` adds a
-    // `relation.ts ids order:hasInclude,constructor` row to
-    // `pnpm parity:api:calls`. `pluck`'s arm keeps its `Set` because its body
-    // is compared through the `_pluckInner` helper union, not directly.
-    const eagerSpecs = [...this.eagerLoadValues, ...this.includesValues].filter(
-      (spec, i, all) => all.indexOf(spec) === i,
-    );
-    const rel = this.clone();
-    rel.eagerLoadValues = [];
-    rel.includesValues = [];
-
-    const jd = this._buildEagerJoinDependency(eagerSpecs);
-    if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
-      // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
-      // `eagerLoadValues` alone, so `primaryKey` can still be null here (a
-      // view), and `_materializeLimitedIds` — Rails' zip/transpose over
-      // `Array(primary_key)` (schema_statements.rb:1448) — has neither a null
-      // nor a composite arm, so the composite case surfaces
-      // applyJoinDependency's explicit NotImplementedError instead.
-      const basePk = primaryKey ?? "id";
-      if (Array.isArray(basePk)) this.applyJoinDependency();
-      const limitedIds = await this._materializeLimitedIds(jd, basePk);
-      const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });
-      limited.limitValue = null;
-      limited.offsetValue = null;
-      return limited.group(...primaryKeyArray).ids();
-    }
-    const relation = rel.leftOuterJoins(eagerSpecs).group(...primaryKeyArray);
-    return relation.ids();
+    // Rails: `relation = apply_join_dependency.group(*primary_key_array); relation.ids`
+    // (calculations.rb:386-387). The relation comes out of the block because a
+    // trails `Relation` is thenable and cannot cross a `Promise` boundary; the
+    // yielded relation has `:includes`/`:eager_load` cleared, so the recursive
+    // `ids` takes the plain branch below.
+    return this.applyJoinDependency({}, (relation) => relation.group(...primaryKeyArray).ids());
   }
 
   const columns = this.arelColumns(primaryKeyArray);
@@ -1421,7 +1352,12 @@ export async function executeSimpleCalculation(
     // Rails routes aggregates through apply_join_dependency when eager loading,
     // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
     rel._checkEagerLoadable();
-    const joined = eagerJoinedRelation(rel, rel.groupValues.length === 0);
+    let joined = rel;
+    if (rel._eagerLoadingForSql()) {
+      await rel.applyJoinDependency({ eagerLoading: rel.groupValues.length === 0 }, (r) => {
+        joined = r;
+      });
+    }
     // PostgreSQL doesn't like ORDER BY when there are no GROUP BY
     // (calculations.rb:477-478).
     const relation = joined.unscope("order").distinctBang(false) as CalculationRelation;

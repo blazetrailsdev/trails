@@ -10,13 +10,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "calculate",
-    "call": "apply_join_dependency",
-    "reason": "Per-entry verified: Rails calculations.rb:232 `relation = apply_join_dependency`. Rails' apply_join_dependency EXECUTES `distinct_relation_for_primary_key` for a limited collection join, which a synchronous TS method cannot do, so `calculate` calls the awaitable block-form sibling `Relation#_applyJoinDependencyAsync` (finder_methods.rb:456-488, block arm) instead; the leading underscore keeps it off the compare population."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "calculate",
     "call": "new",
     "kind": "args",
     "rubyArgs": [

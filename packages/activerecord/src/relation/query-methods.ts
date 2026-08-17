@@ -2706,7 +2706,14 @@ export function buildFrom(this: QueryMethodsHost): unknown {
       opts._eagerLoadingForSql() &&
       typeof opts.applyJoinDependency === "function"
     ) {
-      resolved = opts.applyJoinDependency();
+      // `apply_join_dependency` is async in trails (its
+      // `distinct_relation_for_primary_key` branch executes a query) while
+      // `build_from` is sync. Everything up to the yield is synchronous, so the
+      // block delivers the relation for every subquery that does not take that
+      // branch; one that does keeps the un-joined `opts`, as it did before.
+      void opts.applyJoinDependency({}, (relation: any) => {
+        resolved = relation;
+      });
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
