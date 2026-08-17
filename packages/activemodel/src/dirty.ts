@@ -131,21 +131,18 @@ export class DirtyTracker {
 
   /**
    * An independent tracker carrying this one's state, with `_attrs` repointed at
-   * `attrs` (the duplicate's own AttributeSet).
+   * the duplicate's own AttributeSet.
    *
    * @noRailsEquivalent CONVERGEABLE — story
-   * `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`,
-   * whose root cause is this same eager/lazy split; making `DirtyTracker` derive
-   * from the AttributeSet retires this method with it. Rails' `initialize_dup` only
-   * nils `@mutations_from_database` and lets it rebuild lazily from the
-   * already-deep-dup'd `@attributes`, which still carry each attribute's
-   * original-vs-current pair, so the rebuilt tracker reports the same `changes` as
-   * the source while being a distinct object. `DirtyTracker` instead holds an eager
-   * snapshot and derives `changes` from recorded writes, so it cannot reconstruct
-   * itself that way — copying the state is how the same two properties (equal
-   * state, distinct identity) are reached. Verified against MRI: `dup.changes` and
-   * `dup.previous_changes` both equal the source's, and writes to the copy do not
-   * leak back.
+   * `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`
+   * shares this root cause; making `DirtyTracker` derive from the AttributeSet
+   * retires this method with it. Rails' `initialize_dup` just nils
+   * `@mutations_from_database` and lets it rebuild from the already-deep-dup'd
+   * `@attributes`, so the copy reports the source's `changes` yet is a distinct
+   * object. This tracker snapshots eagerly and derives changes from recorded
+   * writes, so it cannot rebuild that way; copying reaches the same two properties.
+   * MRI-verified: `dup.changes` and `dup.previous_changes` equal the source's, and
+   * writes to the copy do not leak back.
    */
   deepDup(attrs: AttributeSet): DirtyTracker {
     const copy = new DirtyTracker();
