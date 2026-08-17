@@ -150,9 +150,7 @@ function envName(key: string): string {
 export class Request {
   readonly env: RackEnv;
 
-  /** Rails' `@method` memo (request.rb:214). */
   #method?: string;
-  /** Rails' `@request_method` memo (request.rb:151). */
   #requestMethod?: string;
 
   constructor(env: RackEnv = {}) {

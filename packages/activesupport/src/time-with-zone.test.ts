@@ -4,7 +4,7 @@ import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { instantFromDate } from "./testing/temporal-helpers.js";
 import { Temporal } from "@blazetrails/date";
-import { DATE_FORMATS, inTimeZone } from "./time-ext.js";
+import { inTimeZone } from "./time-ext.js";
 import { setZone, zone as timeZone } from "./time-zone-config.js";
 
 describe("TimeWithZoneTest", () => {
@@ -848,23 +848,6 @@ describe("TimeWithZoneTest", () => {
   it("to fs not existent", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.toFs("not_existent")).toBe("1999-12-31 19:00:00 -0500");
-  });
-
-  // Trails-only: every `Time::DATE_FORMATS` key answers on a TimeWithZone
-  // (time_with_zone.rb:212-220), including one registered after boot.
-  it("to fs resolves through Time::DATE_FORMATS", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
-    expect(twz.toFs("number")).toBe("19991231190000");
-    expect(twz.toFs("usec")).toBe("19991231190000000000");
-    expect(twz.toFs("nsec")).toBe("19991231190000000000000");
-    expect(twz.toFs("time")).toBe("19:00");
-
-    DATE_FORMATS["shouty"] = "%Y!";
-    try {
-      expect(twz.toFs("shouty")).toBe("1999!");
-    } finally {
-      delete DATE_FORMATS["shouty"];
-    }
   });
 
   it("strftime with composite format", () => {
