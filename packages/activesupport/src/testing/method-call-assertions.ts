@@ -10,16 +10,18 @@
 import { Assertion } from "./assertions.js";
 
 /**
- * Mirrors `Minitest::MockExpectationError` (minitest/mock.rb) — what a
- * `Minitest::Mock` raises when a call does not match what was expected, and so
- * what `assert_called_with` raises through `assert_mock`.
+ * Mirrors `MockExpectationError` (minitest/mock.rb) — what a `Minitest::Mock`
+ * raises when a call does not match what was expected, and so what
+ * `assert_called_with` raises through `assert_mock`. It is a top-level
+ * `StandardError`, a sibling of `Minitest::Assertion` rather than a subclass of
+ * it, so it extends `Error` the way {@link Assertion} does.
  *
  * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
  * through `Minitest::Mock` (method_call_assertions.rb:20-27) but the class is
  * defined in the minitest gem, which has no vendored Rails file for the
  * comparator to map onto.
  */
-export class MockExpectationError extends Assertion {
+export class MockExpectationError extends Error {
   override name = "MockExpectationError";
 }
 
