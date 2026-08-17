@@ -129,6 +129,12 @@ export class OrderedOptions {
     return undefined;
   }
 
+  /** `Hash#clear`. */
+  clear(): this {
+    this.data.clear();
+    return this;
+  }
+
   /** `Hash#keys`. */
   keys(): string[] {
     return [...this.data.keys()];
@@ -251,9 +257,14 @@ export class InheritableOptions extends OrderedOptions {
     return !!(this.parent && this.parentIsKey(key) && this.ownKey(String(key)));
   }
 
-  /** Mirrors `inheritable_copy` (ordered_options.rb:134-136). */
+  /**
+   * Mirrors `inheritable_copy` (ordered_options.rb:134-136) — `self.class.new`,
+   * so a `Configurable::Configuration` copy stays a Configuration, reading
+   * through the same anonymous class the compiled readers live on
+   * (configurable.rb:33).
+   */
   inheritableCopy(): InheritableOptions {
-    return new InheritableOptions(this);
+    return new (this.constructor as new (parent: OrderedOptions) => InheritableOptions)(this);
   }
 
   /** Mirrors `to_a` (ordered_options.rb:138-140). */

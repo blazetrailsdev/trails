@@ -1,115 +1,148 @@
+import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
-const VALID_NAME = /^[_A-Za-z]\w*$/;
-
+/**
+ * Mirrors: ActiveSupport::Configurable::Configuration (configurable.rb:14-26).
+ */
 export class Configuration extends InheritableOptions {
-  compileMethods(): void {
-    // In TypeScript, Proxy-based access already handles dynamic keys,
-    // so this is a no-op (Rails uses this to compile method_missing into real methods).
+  /** Mirrors `compile_methods!` (configurable.rb:15-17). */
+  compileMethodsBang(): void {
+    // `this.constructor` goes through the Proxy that stands in for Ruby's
+    // `method_missing` (ordered_options.rb:49-58), which hands back a *bound*
+    // function — and a bound function carries no `prototype` to define the
+    // compiled readers on. The prototype's `constructor` is the same class
+    // Ruby's `self.class` answers.
+    const klass = Object.getPrototypeOf(this).constructor as typeof Configuration;
+    klass.compileMethodsBang(this.keys());
+  }
+
+  /**
+   * Mirrors `self.compile_methods!` (configurable.rb:20-25) — compiles reader
+   * methods so we don't have to go through method_missing.
+   *
+   * Ruby's `def #{key}; _get(...); end` is a no-argument reader, which JavaScript
+   * spells as a getter: a plain value property would answer the function itself
+   * where `config.bar` has to answer the value.
+   */
+  static compileMethodsBang(keys: string[]): void {
+    for (const key of keys.filter((m) => !(m in this.prototype))) {
+      Object.defineProperty(this.prototype, key, {
+        get(this: Configuration): unknown {
+          return this._get(key);
+        },
+        configurable: true,
+      });
+    }
   }
 }
 
+/**
+ * Mirrors: ActiveSupport::Configurable (configurable.rb:11-155).
+ *
+ * Ruby's `include ActiveSupport::Configurable` mixes `ClassMethods` onto the
+ * singleton and `#config` onto instances; the trails idiom for that is the
+ * `this`-typed functions below, assigned onto the including class (CLAUDE.md,
+ * "Module mixins").
+ */
 export namespace Configurable {
   export interface ConfigAccessorOptions {
     instanceReader?: boolean;
     instanceWriter?: boolean;
     instanceAccessor?: boolean;
+    /**
+     * `default:` (configurable.rb:110). A function value stands in for Ruby's
+     * `config_accessor :hair_colors do … end` block, as `mattr_accessor`'s
+     * does (module-ext.ts).
+     */
     default?: unknown;
   }
 
-  export function getConfig(target: any): Configuration {
-    if (!Object.prototype.hasOwnProperty.call(target, "_config") || !target._config) {
-      const parent = Object.getPrototypeOf(target);
-      if (parent && parent._config) {
-        target._config = new Configuration(parent._config);
-      } else {
-        target._config = new Configuration();
-      }
-    }
-    return target._config;
-  }
-
-  export function configure(target: any, fn: (config: Configuration) => void): void {
-    fn(getConfig(target));
-  }
-
-  export function configAccessor(
-    klass: any,
-    ...namesAndOptions: (string | ConfigAccessorOptions)[]
-  ): void {
-    const lastArg = namesAndOptions[namesAndOptions.length - 1];
-    const hasOptions = typeof lastArg === "object" && lastArg !== null;
-    const options: ConfigAccessorOptions = hasOptions
-      ? (namesAndOptions.pop() as ConfigAccessorOptions)
-      : {};
-
-    const names = namesAndOptions as string[];
-    const addInstanceReader =
-      options.instanceAccessor !== false && options.instanceReader !== false;
-    const addInstanceWriter =
-      options.instanceAccessor !== false && options.instanceWriter !== false;
-
-    for (const name of names) {
-      if (!VALID_NAME.test(name)) {
-        throw new Error(
-          `invalid config attribute name: "${name}". Expected name to match ${VALID_NAME.toString()}`,
-        );
-      }
-
-      Object.defineProperty(klass, name, {
-        get() {
-          return Configurable.getConfig(this).get(name);
-        },
-        set(value: unknown) {
-          Configurable.getConfig(this).set(name, value);
-        },
-        configurable: true,
-        enumerable: false,
-      });
-
-      if (klass.prototype) {
-        if (addInstanceReader && addInstanceWriter) {
-          Object.defineProperty(klass.prototype, name, {
-            get() {
-              return Configurable.getInstanceConfig(this).get(name);
-            },
-            set(value: unknown) {
-              Configurable.getInstanceConfig(this).set(name, value);
-            },
-            configurable: true,
-            enumerable: false,
-          });
-        } else if (addInstanceReader) {
-          Object.defineProperty(klass.prototype, name, {
-            get() {
-              return Configurable.getInstanceConfig(this).get(name);
-            },
-            configurable: true,
-            enumerable: false,
-          });
-        } else if (addInstanceWriter) {
-          Object.defineProperty(klass.prototype, `${name}=`, {
-            value(this: any, value: unknown) {
-              Configurable.getInstanceConfig(this).set(name, value);
-            },
-            configurable: true,
-            enumerable: false,
-          });
+  /** Mirrors `Configurable::ClassMethods` (configurable.rb:28-133). */
+  export namespace ClassMethods {
+    /** Mirrors `config` (configurable.rb:29-36). */
+    export function config(this: any): Configuration {
+      // Ruby's `@_config ||=` reads a per-class ivar, which a subclass does not
+      // inherit; JavaScript statics ARE inherited, so the own-property test is
+      // what keeps a subclass off its parent's config — the same job Rails'
+      // private `inherited` hook (configurable.rb:135-141) does.
+      if (!Object.prototype.hasOwnProperty.call(this, "_config")) {
+        const superclass = Object.getPrototypeOf(this);
+        if (superclass != null && typeof superclass.config === "function") {
+          this._config = superclass.config().inheritableCopy();
+        } else {
+          // create a new "anonymous" class that will host the compiled reader methods
+          this._config = new (class extends Configuration {})();
         }
       }
+      return this._config;
+    }
 
-      if ("default" in options) {
-        const defaultValue =
-          typeof options.default === "function" ? options.default() : options.default;
-        klass[name] = defaultValue;
+    /** Mirrors `configure` (configurable.rb:38-40). */
+    export function configure(this: any, block: (config: Configuration) => void): void {
+      block(config.call(this));
+    }
+
+    /**
+     * Mirrors `config_accessor` (configurable.rb:107-127). Ruby's `*names`
+     * followed by kwargs is spelled as a trailing options object, the shape
+     * `mattr_accessor` already uses in trails.
+     */
+    export function configAccessor(
+      this: any,
+      ...namesAndOptions: (string | ConfigAccessorOptions)[]
+    ): void {
+      const last = namesAndOptions[namesAndOptions.length - 1];
+      const options: ConfigAccessorOptions =
+        typeof last === "object" && last !== null
+          ? (namesAndOptions.pop() as ConfigAccessorOptions)
+          : {};
+      const names = namesAndOptions as string[];
+      const instanceReader = options.instanceReader !== false;
+      const instanceWriter = options.instanceWriter !== false;
+      const instanceAccessor = options.instanceAccessor !== false;
+
+      for (const name of names) {
+        if (!/^[_A-Za-z]\w*$/.test(name)) throw new NameError("invalid config attribute name");
+
+        const reader = function (this: any): unknown {
+          return this.config().get(name);
+        };
+        const writer = function (this: any, value: unknown): void {
+          this.config().set(name, value);
+        };
+
+        Object.defineProperty(this, name, { get: reader, set: writer, configurable: true });
+
+        if (instanceAccessor) {
+          // Rails' two `class_eval`s define two independent methods; JavaScript
+          // holds both halves on one property, so each half is merged onto
+          // whatever the other already defined.
+          if (instanceReader) {
+            Object.defineProperty(this.prototype, name, {
+              ...Object.getOwnPropertyDescriptor(this.prototype, name),
+              get: reader,
+              configurable: true,
+            });
+          }
+          if (instanceWriter) {
+            Object.defineProperty(this.prototype, name, {
+              ...Object.getOwnPropertyDescriptor(this.prototype, name),
+              set: writer,
+              configurable: true,
+            });
+          }
+        }
+
+        this[name] = typeof options.default === "function" ? options.default() : options.default;
       }
     }
   }
 
-  export function getInstanceConfig(instance: any): Configuration {
-    if (!Object.prototype.hasOwnProperty.call(instance, "_instanceConfig")) {
-      instance._instanceConfig = new Configuration(getConfig(instance.constructor));
+  /** Mirrors `Configurable#config` (configurable.rb:150-152). */
+  export function config(this: any): Configuration {
+    if (!Object.prototype.hasOwnProperty.call(this, "_config")) {
+      this._config = this.constructor.config().inheritableCopy();
     }
-    return instance._instanceConfig;
+    return this._config;
   }
 }
