@@ -1435,8 +1435,17 @@ export class Migration {
 
   // --- Class methods (Rails: Migration.copy, .proper_table_name, etc.) ---
 
+  /**
+   * `MigrationFilenameRegexp` (`migration.rb:637`). Rails' migrations end in
+   * `.rb`; trails' end in `.ts`/`.js`.
+   */
+  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/;
+
   static isValidVersionFormat(version: string): boolean {
-    return /^\d{3,}$/.test(version);
+    return [
+      Migration.MigrationFilenameRegexp,
+      /^\d(_?\d)*$/, // integer with optional underscores
+    ].some((pattern) => pattern.test(version));
   }
 
   static nextMigrationNumber(number?: number | bigint | string): string {

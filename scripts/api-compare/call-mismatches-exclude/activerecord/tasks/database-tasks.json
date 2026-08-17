@@ -2,128 +2,44 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "check_target_version",
-    "call": "valid_version_format?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "class_for_adapter",
     "call": "detect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "configs_for",
-    "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "db_configs_with_versions",
-    "call": "with_temporary_pool_for_each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `@tasks.reverse_each.detect` (`database_tasks.rb:575`) is `resolveTask`, the same newest-first walk over the same registrations, extracted because `registerTask` stores the handler rather than its name so `task.is_a?(String) ? task.constantize : task` has no analogue; inlining it back is filed as its own story."
   },
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "dump_schema",
     "call": "open",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "dump_schema",
-    "call": "order:structureDump,dump",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
+    "reason": "Verified per-site (RFC 0106): `File.open(filename, \"w:utf-8\") { |file| ... }` (`database_tasks.rb:439`) — the fs port models no open-file handle, so the dumper writes into a line buffer that `writeFileSync` flushes; there is no TS call spelling for the block form."
   },
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "for_each",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `ActiveRecord::DatabaseConfigurations.new(databases)` (`database_tasks.rb:144`) — the TS signature takes the already-built `DatabaseConfigurations`, because the Rails caller is the railtie hash and trails has no `Rails` constant to branch on at `:142`."
   },
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "load_schema",
     "call": "load",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "load_schema_current",
-    "call": "with_temporary_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "local_database?",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migrate_all",
-    "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migrate_status",
-    "call": "table_exists?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "prepare_all",
-    "call": "each_current_configuration",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "prepare_all",
-    "call": "order:eachCurrentEnvironment,initializeDatabase",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "resolve_configuration",
-    "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): Ruby's `load(file)` (`database_tasks.rb:386`) evaluates a Ruby schema file; a TS/JS schema file is an ES module, so the port awaits a dynamic `import()` of its file URL. `load` has no TS call spelling."
   },
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "schema_sha1",
     "call": "read",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "schema_up_to_date?",
-    "call": "resolve_configuration",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `File.read(file)` (`database_tasks.rb:616`) — the fs port spells a whole-file read `getFs().readFileSync(file)`, which is not a `read` call the comparator can credit."
   },
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
     "rubyName": "schema_up_to_date?",
     "call": "with_temporary_pool",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `with_temporary_pool(db_config)` (`database_tasks.rb:403`) — the port reads internal_metadata off the already-established migration pool instead. Converging it re-establishes and restores a connection inside the `reconstruct_from_schema` fast path, so it is filed as its own story rather than folded in here."
   },
   {
     "package": "activerecord",

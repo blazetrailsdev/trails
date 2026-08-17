@@ -11,7 +11,7 @@ import {
   configurationsStore,
   setConfigurationsStore,
 } from "../database-configurations.js";
-import { ProtectedEnvironmentError } from "../migration.js";
+import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import {
   getFs,
@@ -19,6 +19,7 @@ import {
   getCryptoAsync,
   getOs,
   getEnv,
+  isBlank,
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
@@ -65,6 +66,9 @@ export class DatabaseNotSupported extends Error {
 export type SchemaFormat = "ts" | "js" | "sql";
 
 export class DatabaseTasks {
+  /** `LOCAL_HOSTS` (`tasks/database_tasks.rb:63`). */
+  static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
+
   static get env(): string {
     return DatabaseConfigurations.defaultEnv;
   }
@@ -635,7 +639,9 @@ export class DatabaseTasks {
     const v = version ?? getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
     if (v === undefined || v === null || String(v).trim() === "") return;
     const str = String(v).trim();
-    if (!/^\d+$/.test(str)) {
+    // `Migration.valid_version_format?(ENV["VERSION"])` (`database_tasks.rb:318`)
+    // — the format itself lives on Migration, not here.
+    if (!Migration.isValidVersionFormat(str)) {
       // Mirror Rails' message shape:
       // `raise "Invalid format of target version: \`VERSION=#{ENV['VERSION']}\`"`.
       throw new Error(`Invalid format of target version: \`VERSION=${str}\``);
@@ -694,7 +700,7 @@ export class DatabaseTasks {
     options: { envName?: string; name?: string; includeHidden?: boolean } = {},
   ): DatabaseConfig[] {
     // database_tasks.rb:551-553 — `Base.configurations.configs_for(**options)`.
-    return configurationsStore().configsFor(options);
+    return baseClass().configurations().configsFor(options);
   }
 
   /**
@@ -702,7 +708,7 @@ export class DatabaseTasks {
    * (`tasks/database_tasks.rb:555-557`).
    */
   private static resolveConfiguration(configuration: unknown): DatabaseConfig {
-    return configurationsStore().resolve(configuration);
+    return baseClass().configurations().resolve(configuration);
   }
 
   /**
@@ -743,13 +749,10 @@ export class DatabaseTasks {
     return result;
   }
 
-  // Mirrors Rails: LOCAL_HOSTS = ["127.0.0.1", "localhost"] + host.blank?
-  // (blank? treats whitespace-only strings as blank, so we trim before
-  // comparing.)
   /** @internal Mirrors: `local_database?` (`tasks/database_tasks.rb:610-613`). */
   private static isLocalDatabase(dbConfig: DatabaseConfig): boolean {
-    const host = dbConfig.host?.trim();
-    return !host || host === "localhost" || host === "127.0.0.1";
+    const host = dbConfig.host;
+    return isBlank(host) || this.LOCAL_HOSTS.includes(host as string);
   }
 
   static cacheDumpFilename(
@@ -1007,10 +1010,31 @@ export class DatabaseTasks {
     // Resolve relative paths against `root` so the dump lands in the app's
     // db/ dir regardless of process cwd — mirrors loadSchema's resolution.
     const filename = this._resolveSchemaPath(rawFilename);
-    if (format === "sql") {
-      const fs = getFs();
-      const path = getPath();
-      fs.mkdirSync(path.dirname(filename), { recursive: true });
+    const fs = getFs();
+    const path = getPath();
+    // `FileUtils.mkdir_p(db_dir)` (`database_tasks.rb:437`).
+    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    // Rails' `case format` runs the `:ruby` arm before the `:sql` one
+    // (`database_tasks.rb:438-453`); keep that branch order.
+    if (format !== "sql") {
+      const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+      // Rails' dumper only ever emits Ruby, so its `dump` has no language slot;
+      // ours reads the class default, scoped to this dump the way `load_schema`
+      // scopes `Migration.verbose` (`database_tasks.rb:380,394`).
+      const languageWas = SchemaDumper.language;
+      SchemaDumper.language = format === "js" ? "js" : "ts";
+      try {
+        const migrationConnectionPool = this.migrationConnectionPool();
+        // Rails: `File.open(filename, "w:utf-8") { |file| SchemaDumper.dump(pool, file) }`
+        // (`database_tasks.rb:439-442`). `file` is the dump stream — ours collects
+        // the lines, then writes them, because the fs port has no open-file handle.
+        const file: string[] = [];
+        await SchemaDumper.dump(migrationConnectionPool, file);
+        fs.writeFileSync(filename, file.join("\n"));
+      } finally {
+        SchemaDumper.language = languageWas;
+      }
+    } else {
       await this.structureDump(dbConfig, filename);
       // Rails' dump_schema appends `dump_schema_information` after a
       // structure_dump so schema_migrations' version rows round-trip
@@ -1019,28 +1043,6 @@ export class DatabaseTasks {
       // migration would replay. Gated on the schema_migrations table
       // existing — on a never-migrated DB there's nothing to stamp.
       await this._appendSchemaInformation(filename);
-      return;
-    }
-    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    const fs = getFs();
-    const path = getPath();
-    const dir = path.dirname(filename);
-    fs.mkdirSync(dir, { recursive: true });
-    // Rails' dumper only ever emits Ruby, so its `dump` has no language slot;
-    // ours reads the class default, scoped to this dump the way `load_schema`
-    // scopes `Migration.verbose` (`database_tasks.rb:380,394`).
-    const languageWas = SchemaDumper.language;
-    SchemaDumper.language = format === "js" ? "js" : "ts";
-    try {
-      const migrationConnectionPool = this.migrationConnectionPool();
-      // Rails: `File.open(filename, "w:utf-8") { |file| SchemaDumper.dump(pool, file) }`
-      // (`database_tasks.rb:439-442`). `file` is the dump stream — ours collects
-      // the lines, then writes them, because the fs port has no open-file handle.
-      const file: string[] = [];
-      await SchemaDumper.dump(migrationConnectionPool, file);
-      fs.writeFileSync(filename, file.join("\n"));
-    } finally {
-      SchemaDumper.language = languageWas;
     }
   }
 
@@ -1130,7 +1132,11 @@ export class DatabaseTasks {
     environment?: string,
   ): Promise<void> {
     for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
-      await this.loadSchema(dbConfig, format, file);
+      // `with_temporary_connection(db_config) { load_schema(...) }`
+      // (`database_tasks.rb:476-478`).
+      await this.withTemporaryConnection(dbConfig, async () => {
+        await this.loadSchema(dbConfig, format, file);
+      });
     }
   }
 
@@ -1148,8 +1154,9 @@ export class DatabaseTasks {
     const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const migrator = await this._migratorFor(adapter, pool.dbConfig);
-    // Mirrors database_tasks.rb:302-305: abort unless schema_migrations exists.
-    if (!(await migrator.schemaMigrationTableExists())) {
+    // `migration_connection_pool.schema_migration.table_exists?`
+    // (`database_tasks.rb:303`).
+    if (!(await pool.schemaMigration.tableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
     }
     const rows = await migrator.migrationsStatus();
@@ -1184,7 +1191,10 @@ export class DatabaseTasks {
   }
 
   static async migrateAll(): Promise<void> {
-    const configs = this.configsFor({ envName: this._normalizeEnv() });
+    // `ActiveRecord::Base.configurations.configs_for(env_name: ...)`
+    // (`database_tasks.rb:244`) — `migrate_all` reads the registry directly
+    // rather than through the private `configs_for` helper.
+    const configs = baseClass().configurations().configsFor({ envName: this._normalizeEnv() });
 
     // Rails: initialize_database for every config before the single-primary fast path or version loop.
     for (const dbConfig of configs) {
@@ -1220,12 +1230,11 @@ export class DatabaseTasks {
     let seed = false;
     const dumpDbConfigs: DatabaseConfig[] = [];
 
-    // Rails: each_current_configuration { |db_config| initialize_database(db_config) }
-    for (const environment of eachCurrentEnvironment(env)) {
-      for (const dbConfig of this.configsFor({ envName: environment })) {
-        const databaseInitialized = await initializeDatabase(dbConfig);
-        if (databaseInitialized && dbConfig.seeds) seed = true;
-      }
+    // `each_current_configuration(env) { |db_config| ... }`
+    // (`database_tasks.rb:180-184`).
+    for (const dbConfig of this.eachCurrentConfiguration(env)) {
+      const databaseInitialized = await initializeDatabase(dbConfig);
+      if (databaseInitialized && dbConfig.seeds) seed = true;
     }
 
     // Rails: db_configs_with_versions per environment, sort, migrate each.
@@ -1260,20 +1269,22 @@ export class DatabaseTasks {
     environment?: string,
   ): Promise<Map<string | number, DatabaseConfig[]>> {
     const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
-    const env = this._normalizeEnv(environment);
-    const targetVersion = this.targetVersion();
-    for (const dbConfig of this.configsFor({ envName: env })) {
-      await this.withTemporaryPool(dbConfig, async (pool) => {
-        const context = await this._migrationContextFor(await pool.leaseConnection(), dbConfig);
-        const versionsToRun = await context.pendingMigrationVersions();
-        for (const version of versionsToRun) {
-          if (targetVersion !== null && targetVersion !== Number(version)) continue;
-          const list = dbConfigsWithVersions.get(version) ?? [];
-          list.push(dbConfig);
-          dbConfigsWithVersions.set(version, list);
-        }
-      });
-    }
+    // `environment = env` is Ruby's parameter default (`database_tasks.rb:285`).
+    environment = this._normalizeEnv(environment);
+    // `with_temporary_pool_for_each(env: environment) do |pool| ... end`
+    // (`database_tasks.rb:288`) — the db_config comes off the yielded pool.
+    await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
+      const dbConfig = pool.dbConfig;
+      const context = await this._migrationContextFor(await pool.leaseConnection(), dbConfig);
+      const versionsToRun = await context.pendingMigrationVersions();
+      const targetVersion = this.targetVersion();
+      for (const version of versionsToRun) {
+        if (targetVersion !== null && targetVersion !== Number(version)) continue;
+        const list = dbConfigsWithVersions.get(version) ?? [];
+        list.push(dbConfig);
+        dbConfigsWithVersions.set(version, list);
+      }
+    });
     return dbConfigsWithVersions;
   }
 
@@ -1410,11 +1421,13 @@ export class DatabaseTasks {
   }
 
   static async schemaUpToDate(
-    dbConfig: DatabaseConfig,
+    configuration: unknown,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<boolean> {
     void format;
+    // `db_config = resolve_configuration(configuration)` (`database_tasks.rb:398`).
+    const dbConfig = this.resolveConfiguration(configuration);
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
     if (!file) return true;
     const fs = getFs();
