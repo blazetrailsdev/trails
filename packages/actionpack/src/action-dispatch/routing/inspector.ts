@@ -131,10 +131,14 @@ export class RouteWrapper {
     return this.route.verb;
   }
   get controller(): string {
-    return this.route.controller;
+    return this.route.pathParamNames.includes("controller")
+      ? ":controller"
+      : (this.requirements.controller as string);
   }
   get action(): string {
-    return this.route.action;
+    return this.route.pathParamNames.includes("action")
+      ? ":action"
+      : (this.requirements.action as string);
   }
 
   get reqs(): string {

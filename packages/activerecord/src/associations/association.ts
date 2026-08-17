@@ -497,9 +497,30 @@ export class Association {
   }
 
   get extensions(): any[] {
-    const ext = this.reflection.options.extend;
-    if (!ext) return [];
-    return Array.isArray(ext) ? ext : [ext];
+    // `reflection` here is Rails' rich `MacroReflection`, resolved off the
+    // owner's class exactly as `klass` above does: the definition an
+    // `Association` is constructed with is the lightweight macro record, which
+    // carries neither `extensions` nor `scope_for`.
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => AssociationDefinition | null;
+    };
+    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
+      this.reflection) as AssociationDefinition;
+
+    let extensions = [
+      ...new Set([...this.klass.defaultExtensions(), ...(reflection.extensions?.() ?? [])]),
+    ];
+
+    if (reflection.scope) {
+      extensions = [
+        ...new Set([
+          ...extensions,
+          ...reflection.scopeFor!(this.klass.unscoped(), this.owner).extensions,
+        ]),
+      ];
+    }
+
+    return extensions;
   }
 
   /**

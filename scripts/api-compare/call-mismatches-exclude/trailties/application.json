@@ -4,14 +4,14 @@
     "tsFile": "application.ts",
     "rubyName": "config",
     "call": "called_from",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `self.class.called_from` (engine.rb:553) is only read to feed `find_root`, which the synchronous getter cannot await (async fs only); `calledFrom()` is read where the root is resolved instead."
   },
   {
     "package": "trailties",
     "tsFile": "application.ts",
     "rubyName": "config",
     "call": "find_root",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `Engine::Configuration.new(self.class.find_root(self.class.called_from))` (engine.rb:553) — `findRoot` walks the filesystem and is async under the hard rule (async fs only), so the synchronous `config` getter cannot await it; the root is applied through the resolved-root path instead."
   },
   {
     "package": "trailties",

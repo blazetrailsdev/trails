@@ -364,7 +364,7 @@ export class ForeignKeyDefinition {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
-    return !statelessTest(SchemaDumper.fkIgnorePattern, this.name);
+    return this.name != null ? !statelessTest(SchemaDumper.fkIgnorePattern, this.name) : false;
   }
 
   isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
@@ -454,7 +454,7 @@ export class CheckConstraintDefinition {
   }
 
   get isExportNameOnSchemaDump(): boolean {
-    return this.name ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
+    return this.name != null ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
   isDefinedFor(options: {
