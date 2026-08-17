@@ -2330,7 +2330,7 @@ export class PostgreSQLAdapter
     const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(sql, binds);
     const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
     const printer = new ExplainPrettyPrinter();
-    return printer.pp(result.toArray());
+    return printer.pp(result);
   }
 
   /**

@@ -161,6 +161,9 @@ export const JS_RESERVED_WORDS = new Set(
  * keyed by the RUBY name and valued by every TS spelling that counts as it.
  */
 export const NO_JS_EQUIVALENT: Record<string, string[]> = {
+  // Ruby `Kernel#Array` — `Array(x)` in JS builds an array OF LENGTH x, so the
+  // repo spells it `kernelArray` (activesupport/src/array-utils.ts).
+  Array: ["kernelArray"],
   class: ["constructor"],
   compact: ["filter"],
   first: ["at"],

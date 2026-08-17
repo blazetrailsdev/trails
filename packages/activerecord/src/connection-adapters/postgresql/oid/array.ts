@@ -23,6 +23,108 @@ function encodeArrayElement(text: string | null, delimiter: string): string {
   return text;
 }
 
+/**
+ * The pg gem's `PG::TextEncoder::Array`, which Rails' OID::Array holds as
+ * `@pg_encoder` and hands to `Data` (`oid/array.rb:20`, `:51`).
+ *
+ * @noRailsEquivalent PERMANENT — the pg gem ships this class in C, so there is
+ * no Ruby file in any Rails gem for the port to mirror, and node-postgres
+ * offers no equivalent encoder/decoder pair.
+ */
+export class PgTextEncoderArray {
+  readonly name: string;
+  readonly delimiter: string;
+
+  constructor({ name, delimiter }: { name: string; delimiter: string }) {
+    this.name = name;
+    this.delimiter = delimiter;
+  }
+
+  encode(values: readonly unknown[]): string {
+    const items = values.map((value) => {
+      if (value == null) return encodeArrayElement(null, this.delimiter);
+      if (globalThis.Array.isArray(value)) return this.encode(value);
+      return encodeArrayElement(String(value), this.delimiter);
+    });
+    return `{${items.join(this.delimiter)}}`;
+  }
+}
+
+/**
+ * The pg gem's `PG::TextDecoder::Array`, which Rails' OID::Array holds as
+ * `@pg_decoder` (`oid/array.rb:21`) and calls from `deserialize` and `cast`.
+ * It only splits the literal: the element casting is `type_cast_array`'s job.
+ *
+ * @noRailsEquivalent PERMANENT — the pg gem ships this class in C, so there is
+ * no Ruby file in any Rails gem for the port to mirror, and node-postgres
+ * offers no equivalent encoder/decoder pair.
+ */
+export class PgTextDecoderArray {
+  readonly name: string;
+  readonly delimiter: string;
+
+  constructor({ name, delimiter }: { name: string; delimiter: string }) {
+    this.name = name;
+    this.delimiter = delimiter;
+  }
+
+  decode(str: string): unknown[] {
+    const trimmed = str.trim();
+    // A malformed array string decodes to `[]` rather than raising, which is
+    // the behaviour `cast`'s TypeError rescue documents (oid/array.rb:39-42).
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [];
+    const inner = trimmed.slice(1, -1);
+    if (inner === "") return [];
+
+    const elements: unknown[] = [];
+    let i = 0;
+
+    while (i < inner.length) {
+      if (inner[i] === '"') {
+        i++;
+        let val = "";
+        while (i < inner.length && inner[i] !== '"') {
+          if (inner[i] === "\\" && i + 1 < inner.length) {
+            i++;
+            val += inner[i];
+          } else {
+            val += inner[i];
+          }
+          i++;
+        }
+        i++; // closing quote
+        elements.push(val);
+      } else if (
+        inner.substring(i, i + 4).toUpperCase() === "NULL" &&
+        (i + 4 >= inner.length || inner[i + 4] === this.delimiter || inner[i + 4] === "}")
+      ) {
+        elements.push(null);
+        i += 4;
+      } else if (inner[i] === "{") {
+        let depth = 1;
+        const start = i;
+        i++;
+        while (i < inner.length && depth > 0) {
+          if (inner[i] === "{") depth++;
+          if (inner[i] === "}") depth--;
+          i++;
+        }
+        elements.push(this.decode(inner.substring(start, i)));
+      } else {
+        let val = "";
+        while (i < inner.length && inner[i] !== this.delimiter) {
+          val += inner[i];
+          i++;
+        }
+        elements.push(val);
+      }
+      if (i < inner.length && inner[i] === this.delimiter) i++;
+    }
+
+    return elements;
+  }
+}
+
 function stableStringify(value: unknown): string {
   try {
     return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? `${v}n` : v)) ?? String(value);
@@ -48,11 +150,16 @@ export class Array extends ValueType<unknown> {
   readonly name: string = "array";
   readonly subtype: ArraySubtype;
   readonly delimiter: string;
+  private readonly pgEncoder: PgTextEncoderArray;
+  private readonly pgDecoder: PgTextDecoderArray;
 
   constructor(subtype: ArraySubtype, delimiter: string = ",") {
     super();
     this.subtype = subtype;
     this.delimiter = delimiter;
+
+    this.pgEncoder = new PgTextEncoderArray({ name: `${this.type()}[]`, delimiter: delimiter });
+    this.pgDecoder = new PgTextDecoderArray({ name: `${this.type()}[]`, delimiter: delimiter });
   }
 
   /** Rails: `delegate :limit, :precision, :scale, to: :subtype` — live read-through. */
@@ -95,96 +202,32 @@ export class Array extends ValueType<unknown> {
 
   cast(value: unknown): unknown {
     if (value == null) return null;
-    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "cast");
-    if (typeof value === "string") return this.parseArray(value);
+    if (typeof value === "string") {
+      value = this.pgDecoder.decode(value);
+    }
     return this.typeCastArray(value, "cast");
   }
 
   override serialize(value: unknown): unknown {
     if (value == null) return null;
-    if (!globalThis.Array.isArray(value)) return value;
-    return new Data(this, this.typeCastArray(value, "serialize") as unknown[]);
+    if (globalThis.Array.isArray(value)) {
+      const castedValues = this.typeCastArray(value, "serialize") as unknown[];
+      return new Data(this.pgEncoder, castedValues);
+    }
+    return value;
   }
 
   override deserialize(value: unknown): unknown {
     if (value == null) return null;
-    if (value instanceof Data) return this.typeCastArray(value.values, "deserialize") as unknown[];
-    if (typeof value === "string") return this.parseArray(value, "deserialize");
-    // Divergence: Rails' deserialize only sees strings (PG::TextDecoder is run
-    // upstream). node-pg can return already-decoded JS arrays, so route them
-    // through the subtype here the same way cast() does.
-    if (globalThis.Array.isArray(value))
-      return this.typeCastArray(value, "deserialize") as unknown[];
-    return value;
-  }
-
-  private parseArray(str: string, method: "cast" | "deserialize" = "cast"): unknown[] {
-    const trimmed = str.trim();
-    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return [];
-    const inner = trimmed.slice(1, -1);
-    if (inner === "") return [];
-
-    const elements: unknown[] = [];
-    let i = 0;
-
-    while (i < inner.length) {
-      if (inner[i] === '"') {
-        i++;
-        let val = "";
-        while (i < inner.length && inner[i] !== '"') {
-          if (inner[i] === "\\" && i + 1 < inner.length) {
-            i++;
-            val += inner[i];
-          } else {
-            val += inner[i];
-          }
-          i++;
-        }
-        i++; // closing quote
-        elements.push(this.castElement(val, method));
-      } else if (
-        inner.substring(i, i + 4).toUpperCase() === "NULL" &&
-        (i + 4 >= inner.length || inner[i + 4] === this.delimiter || inner[i + 4] === "}")
-      ) {
-        elements.push(null);
-        i += 4;
-      } else if (inner[i] === "{") {
-        let depth = 1;
-        const start = i;
-        i++;
-        while (i < inner.length && depth > 0) {
-          if (inner[i] === "{") depth++;
-          if (inner[i] === "}") depth--;
-          i++;
-        }
-        elements.push(this.parseArray(inner.substring(start, i), method));
-      } else {
-        let val = "";
-        while (i < inner.length && inner[i] !== this.delimiter) {
-          val += inner[i];
-          i++;
-        }
-        elements.push(this.castElement(val, method));
-      }
-      if (i < inner.length && inner[i] === this.delimiter) i++;
+    if (typeof value === "string") {
+      return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
-
-    return elements;
-  }
-
-  private castElement(value: unknown, method: "cast" | "deserialize"): unknown {
-    if (method === "deserialize")
-      return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
-    return this.subtype.cast(value);
-  }
-
-  encode(values: readonly unknown[]): string {
-    const items = values.map((value) => {
-      if (value == null) return encodeArrayElement(null, this.delimiter);
-      if (globalThis.Array.isArray(value)) return this.encode(value);
-      return encodeArrayElement(String(value), this.delimiter);
-    });
-    return `{${items.join(this.delimiter)}}`;
+    if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
+    // Divergence: Rails' deserialize only sees strings and Data. node-pg can
+    // return an already-decoded JS array, so route it through the subtype here
+    // the same way cast() does.
+    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
+    return value;
   }
 
   private formatValueForSchema(value: unknown): string {
@@ -229,11 +272,12 @@ export class Array extends ValueType<unknown> {
   }
 }
 
+/** Rails: `Data = Struct.new(:encoder, :values)` (oid/array.rb:11). */
 export class Data {
-  readonly encoder: Array;
+  readonly encoder: PgTextEncoderArray;
   readonly values: unknown[];
 
-  constructor(encoder: Array, values: unknown[]) {
+  constructor(encoder: PgTextEncoderArray, values: unknown[]) {
     this.encoder = encoder;
     this.values = values;
   }

@@ -3,6 +3,7 @@
  *
  * Mirrors: ActiveRecord::Batches
  */
+import { kernelArray } from "@blazetrails/activesupport";
 import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
 import { stripThenable } from "./thenable.js";
@@ -55,14 +56,8 @@ export class Batches {
     // Rails' `enum_for(:find_each, ...) { ... }` size block (batches.rb:90-95);
     // see findInBatches below for why it lives on the iterator.
     enumerator.size = async (): Promise<number> => {
-      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
-      return applyLimits(
-        relation,
-        cursorArr,
-        start,
-        finish,
-        buildBatchOrders(cursorArr, order),
-      ).size();
+      cursor = kernelArray(cursor);
+      return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
     };
     return enumerator;
   }
@@ -96,13 +91,13 @@ export class Batches {
     // block hangs off the returned iterator under the same name; `size` is
     // async here only because the count reaches the database.
     const size = async (): Promise<number> => {
-      const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
+      cursor = kernelArray(cursor);
       const total = await applyLimits(
         relation,
-        cursorArr,
+        cursor,
         start,
         finish,
-        buildBatchOrders(cursorArr, order),
+        buildBatchOrders(cursor, order),
       ).size();
       return Math.floor((total - 1) / batchSize) + 1;
     };
@@ -156,10 +151,7 @@ export class Batches {
     block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
   ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
     const self = this;
-    const effectiveCursor = cursorOption ?? this.primaryKey;
-    const cursor = (Array.isArray(effectiveCursor) ? effectiveCursor : [effectiveCursor]).map(
-      String,
-    );
+    const cursor = kernelArray(cursorOption ?? this.primaryKey).map(String);
     // `ensure_valid_options_for_batching!` reaches the schema cache, which is
     // async here, so the validation runs when the batches are first pulled
     // rather than at `in_batches` call time.
@@ -292,21 +284,18 @@ export class Batches {
 /** @internal */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
-  cursor: string | string[],
+  cursor: string[],
   start: unknown,
   finish: unknown,
   order: "asc" | "desc" | ("asc" | "desc")[],
 ): Promise<void> {
-  const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
   if (start !== undefined && start !== null) {
-    const startArr = Array.isArray(start) ? start : [start];
-    if (startArr.length !== cursorArr.length) {
+    if (kernelArray(start).length !== cursor.length) {
       throw new Error(":start must contain one value per cursor column");
     }
   }
   if (finish !== undefined && finish !== null) {
-    const finishArr = Array.isArray(finish) ? finish : [finish];
-    if (finishArr.length !== cursorArr.length) {
+    if (kernelArray(finish).length !== cursor.length) {
       throw new Error(":finish must contain one value per cursor column");
     }
   }
@@ -315,16 +304,9 @@ export async function ensureValidOptionsForBatchingBang(
   // batch order is only stable if some other full, non-partial unique index
   // covers the cursor. `schema_cache.indexes` is async here, which is why the
   // whole check (and so this method) is a promise.
-  const primaryKey = relation.primaryKey;
   // Ruby `Array(nil)` is `[]`, so a model with no primary key subtracts to an
   // empty set and skips the check entirely (batches.rb:314).
-  const pkArr =
-    primaryKey == null
-      ? []
-      : Array.isArray(primaryKey)
-        ? primaryKey.filter((k) => k != null)
-        : [primaryKey];
-  if (pkArr.some((key) => !cursorArr.includes(key))) {
+  if (kernelArray<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
     const model = relation.model;
     const indexes = (await model.schemaCache().indexes(relation.tableName)) as Array<{
       unique: boolean;
@@ -332,7 +314,7 @@ export async function ensureValidOptionsForBatchingBang(
       columns: string[];
     }>;
     const uniqueIndex = indexes.find(
-      (index) => index.unique && !index.where && index.columns.every((c) => cursorArr.includes(c)),
+      (index) => index.unique && !index.where && index.columns.every((c) => cursor.includes(c)),
     );
     if (!uniqueIndex) {
       throw new Error(":cursor must include a primary key or other unique column(s)");
@@ -350,7 +332,7 @@ export async function ensureValidOptionsForBatchingBang(
 /** @internal */
 export function applyLimits(
   relation: any,
-  cursor: string | string[],
+  cursor: string[],
   start: unknown,
   finish: unknown,
   batchOrders: [string, "asc" | "desc"][],
@@ -367,7 +349,7 @@ export function applyLimits(
 /** @internal */
 export function applyStartLimit(
   relation: any,
-  cursor: string | string[],
+  cursor: string[],
   start: unknown,
   batchOrders: [string, "asc" | "desc"][],
 ): any {
@@ -378,7 +360,7 @@ export function applyStartLimit(
 /** @internal */
 export function applyFinishLimit(
   relation: any,
-  cursor: string | string[],
+  cursor: string[],
   finish: unknown,
   batchOrders: [string, "asc" | "desc"][],
 ): any {
@@ -389,24 +371,24 @@ export function applyFinishLimit(
 /** @internal */
 export function batchCondition(
   relation: any,
-  cursor: string | string[],
+  cursor: string[],
   values: unknown,
   operators: string[],
 ): any {
-  const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
-  const valArr = Array.isArray(values) ? values : [values];
   const table = relation._model.arelTable;
 
   // Build lexicographic WHERE matching Rails' cursor_positions.reverse_each logic:
   // Single column: col OP val
   // Multi-column: (col1 STRICT_OP val1) OR (col1 = val1 AND <rest>)
   // where STRICT_OP is the strict variant of OP (lteq→lt, gteq→gt).
-  const positions = cursorArr.map((col, i) => [col, valArr[i], operators[i]] as const);
-  const [firstCol, firstVal, firstOp] = positions[positions.length - 1];
+  const cursorPositions = cursor.map(
+    (column, i) => [column, kernelArray(values)[i], operators[i]] as const,
+  );
+  const [firstCol, firstVal, firstOp] = cursorPositions[cursorPositions.length - 1];
   let whereClause: any = table.get(firstCol)[firstOp](firstVal);
 
-  for (let i = positions.length - 2; i >= 0; i--) {
-    const [col, val, op] = positions[i];
+  for (let i = cursorPositions.length - 2; i >= 0; i--) {
+    const [col, val, op] = cursorPositions[i];
     const attr = table.get(col);
     const strictOp = op === "lteq" ? "lt" : op === "gteq" ? "gt" : op;
     whereClause = attr[strictOp](val).or(attr.eq(val).and(whereClause));
@@ -417,12 +399,10 @@ export function batchCondition(
 
 /** @internal */
 export function buildBatchOrders(
-  cursor: string | string[],
+  cursor: string[],
   order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
 ): [string, "asc" | "desc"][] {
-  const cursorArr = Array.isArray(cursor) ? cursor : [cursor];
-  const orderArr = Array.isArray(order) ? order : Array(cursorArr.length).fill(order ?? "asc");
-  return cursorArr.map((col, i) => [col, orderArr[i] ?? "asc"]);
+  return cursor.map((column, i) => [column, kernelArray(order)[i] ?? "asc"]);
 }
 
 /** @internal */
@@ -430,26 +410,23 @@ export function batchOnLoadedRelation(opts: {
   relation: any;
   start: unknown;
   finish: unknown;
-  cursor: string | string[];
+  cursor: string[];
   order: "asc" | "desc" | ("asc" | "desc")[];
   batchLimit: number;
 }): any[] {
   const { relation, cursor, batchLimit } = opts;
   // relation.records() is async in this codebase; loaded records live on _records.
   let records: any[] = Array.isArray(relation._records) ? relation._records : [];
-  const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  const order = batchOrders.map(([, dir]) => dir);
+  const order = buildBatchOrders(cursor, opts.order as any).map(([, second]) => second);
 
   if (opts.start != null || opts.finish != null) {
-    const startArr =
-      opts.start != null ? (Array.isArray(opts.start) ? opts.start : [opts.start]) : null;
-    const finishArr =
-      opts.finish != null ? (Array.isArray(opts.finish) ? opts.finish : [opts.finish]) : null;
     records = records.filter((record) => {
       const values = recordCursorValues(record, cursor);
-      if (startArr != null && compareValuesForOrder(values, startArr, order) < 0) return false;
-      if (finishArr != null && compareValuesForOrder(values, finishArr, order) > 0) return false;
-      return true;
+      return (
+        (opts.start == null ||
+          compareValuesForOrder(values, kernelArray(opts.start), order) >= 0) &&
+        (opts.finish == null || compareValuesForOrder(values, kernelArray(opts.finish), order) <= 0)
+      );
     });
   }
 
@@ -466,9 +443,8 @@ export function batchOnLoadedRelation(opts: {
 }
 
 /** @internal */
-export function recordCursorValues(record: any, cursor: string | string[]): unknown[] {
-  const cols = Array.isArray(cursor) ? cursor : [cursor];
-  return cols.map((column) => record.readAttribute?.(column) ?? record[column]);
+export function recordCursorValues(record: any, cursor: string[]): unknown[] {
+  return cursor.map((column) => record.readAttribute?.(column) ?? record[column]);
 }
 
 /** @internal */

@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Array as OidArray, Data as ArrayData } from "./array.js";
-import { StringType } from "@blazetrails/activemodel";
+import { PgTextEncoderArray, Data as ArrayData } from "./array.js";
 
 describe("PostgreSQL array literal encoding", () => {
-  const encoder = new OidArray(new StringType());
+  const encoder = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
   const encode = (values: unknown[]): string => new ArrayData(encoder, values).toString();
 
   it("emits unambiguous elements bare", () => {
