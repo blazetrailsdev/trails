@@ -22,9 +22,9 @@ import {
   isPlainObject as _isPlainObject,
   wrap,
   any,
-  compactBlank as _compactBlank,
-  groupBy as _groupBy,
-  indexBy as _indexBy,
+  compactBlank,
+  groupBy,
+  indexBy,
 } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
@@ -419,6 +419,52 @@ export interface ExplainProxy<T extends Base> {
   finally(onfinally?: (() => void) | null): Promise<string>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+/**
+ * Ruby core `Enumerable`'s methods — `relation.rb:67`'s `include Enumerable`,
+ * which works over `each` → `records` — as pure sync functions on an
+ * already-loaded `records` array. This is the Enumerable half of what
+ * `RECORD_DELEGATES` is for `delegate ... to: :records` (delegation.rb:101):
+ * Ruby's core Enumerable has no `def` in any vendored gem, so there is no
+ * per-method Rails body to mirror and the `include` itself is the only thing
+ * to port — one table, not a bespoke body per method.
+ *
+ * `Relation` applies these to `toArray()`; `CollectionProxy` applies the same
+ * functions to `loadTarget()` (collection_proxy.rb:1024 — `records` →
+ * `load_target`), which is the whole of the difference Rails has between the
+ * two.
+ */
+const ENUMERABLE_DELEGATES = {
+  /** `Enumerable#detect` / `#find` — the first record the block is truthy for. */
+  detect: <T>(records: T[], fn: (record: T, index: number, all: T[]) => unknown): T | undefined =>
+    records.find(fn),
+
+  /** `Enumerable#reject` — the records the block is falsy for. */
+  reject: <T>(records: T[], fn: (record: T) => boolean): T[] => records.filter((r) => !fn(r)),
+
+  /**
+   * `Enumerable#sort_by` — ascending by the block's key, stable (equal keys
+   * keep their relative order) and non-mutating (`sort_by`, not `sort_by!`).
+   */
+  sortBy: <T>(records: T[], key: (record: T) => any): T[] =>
+    records
+      .map((record, index) => ({ record, index, sortKey: key(record) }))
+      .sort((a, b) => {
+        if (a.sortKey < b.sortKey) return -1;
+        if (a.sortKey > b.sortKey) return 1;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.record),
+
+  /** `Enumerable#group_by`. */
+  groupBy,
+
+  /** `Enumerable#index_by` (core_ext/enumerable.rb:52-60) — last wins. */
+  indexBy,
+
+  /** `Enumerable#compact_blank` (core_ext/enumerable.rb:184-186). */
+  compactBlank,
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
@@ -1402,7 +1448,8 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return the number of loaded records (alias for toArray().length).
+   * Return the number of loaded records — `delegate :length, to: :records`
+   * (delegation.rb:101), not an Enumerable member.
    *
    * Mirrors: ActiveRecord::Relation#length
    */
@@ -1411,68 +1458,36 @@ export class Relation<T extends Base> {
     return records.length;
   }
 
-  /**
-   * Filter loaded records, removing those that match the predicate.
-   *
-   * Mirrors: ActiveRecord::Relation#reject (Ruby Enumerable)
-   */
-  async reject(fn: (record: T) => boolean): Promise<T[]> {
-    const records = await this.toArray();
-    return records.filter((r) => !fn(r));
-  }
+  // ---- include Enumerable (relation.rb:67) — see ENUMERABLE_DELEGATES ----
 
-  /**
-   * Return the first loaded record for which the block is truthy, else
-   * undefined. Named `detect` (Ruby's Enumerable#detect) rather than `find`
-   * because `find` on a Relation is the AR PK finder, not a block search.
-   *
-   * Mirrors: Enumerable#detect / #find (via Relation#include Enumerable)
-   *
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
-   *   `detect` has no `def` in any vendored gem because Ruby's core Enumerable
-   *   supplies it over `each`).
-   */
+  /** `Enumerable#detect` / `#find` — `find` on a Relation is the AR PK finder. */
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
-    const records = await this.toArray();
-    return records.find(fn);
+    return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
   }
 
-  /**
-   * Return a new array of the records sorted ascending by the block's return
-   * key. The sort is stable (equal keys keep their original relative order)
-   * and non-mutating (Ruby's `sort_by`, not `sort_by!`). Loads first — JS has
-   * no blocking IO, so where Rails reaches `records`/`load_target` lazily we
-   * evaluate the relation up front via `toArray()`.
-   *
-   * Mirrors: Enumerable#sort_by (via Relation#include Enumerable)
-   *
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
-   *   `sort_by` has no `def` in any vendored gem because Ruby's core Enumerable
-   *   supplies it over `each`).
-   */
+  /** `Enumerable#reject`. */
+  async reject(fn: (record: T) => boolean): Promise<T[]> {
+    return ENUMERABLE_DELEGATES.reject(await this.toArray(), fn);
+  }
+
+  /** `Enumerable#sort_by`. */
   async sortBy(key: (record: T) => any): Promise<T[]> {
-    const records = await this.toArray();
-    return records
-      .map((record, index) => ({ record, index, sortKey: key(record) }))
-      .sort((a, b) => {
-        if (a.sortKey < b.sortKey) return -1;
-        if (a.sortKey > b.sortKey) return 1;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.record);
+    return ENUMERABLE_DELEGATES.sortBy(await this.toArray(), key);
   }
 
-  /**
-   * Return the loaded records with the blank ones rejected. Loads first, for
-   * the same reason {@link sortBy} does.
-   *
-   * Mirrors: Enumerable#compact_blank (core_ext/enumerable.rb:184-186, via
-   * Relation#include Enumerable)
-   */
+  /** `Enumerable#group_by`. */
+  async groupBy<K>(fn: (record: T) => K): Promise<Map<K, T[]>> {
+    return ENUMERABLE_DELEGATES.groupBy(await this.toArray(), fn);
+  }
+
+  /** `Enumerable#index_by`. */
+  async indexBy<K extends string | number>(fn: (record: T) => K): Promise<Record<K, T>> {
+    return ENUMERABLE_DELEGATES.indexBy(await this.toArray(), fn);
+  }
+
+  /** `Enumerable#compact_blank`. */
   async compactBlank(): Promise<T[]> {
-    return _compactBlank(await this.toArray());
+    return ENUMERABLE_DELEGATES.compactBlank(await this.toArray());
   }
 
   // -- Terminal methods --
@@ -2237,33 +2252,6 @@ export class Relation<T extends Base> {
    */
   whereValuesHash(relationTableName: string = this.model.tableName): Record<string, unknown> {
     return this.whereClause.toH(relationTableName);
-  }
-
-  // -- Collection convenience methods --
-
-  /**
-   * Load records and group them by the block's return value.
-   *
-   * Mirrors: Enumerable#group_by (via Relation#include Enumerable)
-   *
-   * @noRailsEquivalent PERMANENT
-   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
-   *   `group_by` has no `def` in any vendored gem because Ruby's core Enumerable
-   *   supplies it over `each`).
-   */
-  async groupBy<K>(fn: (record: T) => K): Promise<Map<K, T[]>> {
-    return _groupBy(await this.toArray(), fn);
-  }
-
-  /**
-   * Load records and index them by the block's return value (last wins on
-   * collision).
-   *
-   * Mirrors: Enumerable#index_by (core_ext/enumerable.rb:52-60, via
-   * Relation#include Enumerable)
-   */
-  async indexBy<K extends string | number>(fn: (record: T) => K): Promise<Record<K, T>> {
-    return _indexBy(await this.toArray(), fn);
   }
 
   /** @internal */

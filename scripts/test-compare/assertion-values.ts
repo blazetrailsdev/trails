@@ -97,9 +97,22 @@ function collectSide(
     }
     entry.total++;
     const value = values?.[i];
-    if (value != null) entry.captured.push(value);
+    if (value != null) entry.captured.push(foldSymbolToken(value));
   }
   return map;
+}
+
+/**
+ * Fold a string token's leading `:` — trails spells a Ruby Symbol VALUE as the
+ * colon-prefixed string (`:short` is `":short"`, CLAUDE.md "A Ruby Symbol is a
+ * JS string, never a JS `Symbol`"), while the Ruby extractor renders `:short`
+ * as the bare `s:short`. Applied to BOTH sides so every spelling of the pair —
+ * Ruby symbol, Ruby string, trails colon-string, trails bare string — folds
+ * onto one token, which is the same "symbol-vs-string is not a fidelity
+ * divergence" rule the encoding comment already states.
+ */
+function foldSymbolToken(token: string): string {
+  return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
 }
 
 /**

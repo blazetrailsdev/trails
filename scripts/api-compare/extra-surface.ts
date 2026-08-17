@@ -185,6 +185,94 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     Keyed on one host class since `allowed` is
  *     unioned per-file across every entity in errors.rb.
  */
+/**
+ * Ruby CORE modules a Rails class `include`s, with the method names the core
+ * module supplies. These have no `def` in any vendored gem — they are the
+ * interpreter's — so the include contributes nothing to the allow-set and every
+ * faithful port of one reads as novel TS surface (`ActiveRecord::Relation`
+ * `include Enumerable`, relation.rb:67, is the whole population today: `detect`,
+ * `sort_by`, `group_by` and the rest of the Enumerable surface a Relation
+ * answers over `each` → `records`).
+ *
+ * That is a false read: the port IS the include, and the alternative was one
+ * near-identical `@noRailsEquivalent PERMANENT` tag per method, all citing the
+ * same `include` line. So a core module's methods enter `allowed` exactly like
+ * a vendored mixin's, keeping the allowance scoped to the files whose Ruby
+ * counterpart actually writes the `include` — a `detect` on a class that does
+ * not include Enumerable stays flagged.
+ *
+ * Values are `Enumerable.instance_methods(false)` (Ruby 3.4). An
+ * ActiveSupport core_ext reopening of the same module (`index_by`,
+ * `compact_blank` in `core_ext/enumerable.rb`) is a real `def` in a vendored
+ * gem and already resolves through the normal module walk — this table adds
+ * only what the interpreter supplies.
+ */
+const CORE_MIXIN_METHODS: Record<string, string[]> = {
+  Enumerable: [
+    "all?",
+    "any?",
+    "chain",
+    "chunk",
+    "chunk_while",
+    "collect",
+    "collect_concat",
+    "compact",
+    "count",
+    "cycle",
+    "detect",
+    "drop",
+    "drop_while",
+    "each_cons",
+    "each_entry",
+    "each_slice",
+    "each_with_index",
+    "each_with_object",
+    "entries",
+    "filter",
+    "filter_map",
+    "find",
+    "find_all",
+    "find_index",
+    "first",
+    "flat_map",
+    "grep",
+    "grep_v",
+    "group_by",
+    "include?",
+    "inject",
+    "lazy",
+    "map",
+    "max",
+    "max_by",
+    "member?",
+    "min",
+    "min_by",
+    "minmax",
+    "minmax_by",
+    "none?",
+    "one?",
+    "partition",
+    "reduce",
+    "reject",
+    "reverse_each",
+    "select",
+    "slice_after",
+    "slice_before",
+    "slice_when",
+    "sort",
+    "sort_by",
+    "sum",
+    "take",
+    "take_while",
+    "tally",
+    "to_a",
+    "to_h",
+    "to_set",
+    "uniq",
+    "zip",
+  ],
+};
+
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
   "ActiveRecord::Railtie": ["process_action", "cleanup_view_runtime", "append_info_to_payload"],
   "ActiveRecord::AssociationNotFoundError": ["detailed_message"],
@@ -1072,6 +1160,11 @@ function collectAllowedNames(
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (visited.has(fqn)) return;
     visited.add(fqn);
+    // A Ruby core module (`include Enumerable`) supplies methods no vendored
+    // gem `def`s — see CORE_MIXIN_METHODS. Added before the module lookup
+    // because the same name can ALSO be a vendored core_ext reopening, which
+    // contributes its own `def`s through the walk below.
+    for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.

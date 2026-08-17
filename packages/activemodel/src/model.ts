@@ -22,6 +22,7 @@ import {
   resetCallbacks as asResetCallbacks,
   withOptions,
   include,
+  runLoadHooks,
   wrap,
   ToJsonWithActiveSupportEncoder,
   type Included,
@@ -2664,3 +2665,6 @@ function _rejectOnOption(conditions?: CallbackConditions): void {
 }
 
 include(Model, ToJsonWithActiveSupportEncoder);
+
+// model.rb:77 — `ActiveSupport.run_load_hooks(:active_model, Model)`.
+runLoadHooks("active_model", Model);

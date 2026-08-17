@@ -419,34 +419,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target.some(fn, thisArg);
   }
 
-  // Mirrors Ruby's Enumerable#detect / #find: returns the first record for
-  // which the block is truthy, else undefined. Named `detect` (not `find`)
-  // because `find` is the AR PK finder on both CollectionProxy and Relation.
-  // Rails reaches detect via Enumerable#detect → Relation#records →
-  // CollectionProxy#load_target (collection_proxy.rb:1024), so an unloaded
-  // proxy loads first — hence async + loadTarget() here (as select/records do).
-  async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
-    const records = await this.loadTarget();
-    return records.find(fn);
-  }
-
-  // Mirrors Ruby's Enumerable#sort_by: a new array sorted ascending by the
-  // block's return key (stable, non-mutating). Like detect above, Rails reaches
-  // sort_by via Enumerable → Relation#records → CollectionProxy#load_target
-  // (collection_proxy.rb:1024), so override Relation#sortBy to load through
-  // loadTarget() — hydrating the target and its loaded-state side effects —
-  // rather than the inherited toArray() path.
-  async sortBy(key: (record: T) => any): Promise<T[]> {
-    const records = await this.loadTarget();
-    return records
-      .map((record, index) => ({ record, index, sortKey: key(record) }))
-      .sort((a, b) => {
-        if (a.sortKey < b.sortKey) return -1;
-        if (a.sortKey > b.sortKey) return 1;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.record);
-  }
+  // Enumerable#detect / #sort_by are inherited, not overridden: `toArray()`
+  // below is this proxy's `records` → `load_target` (collection_proxy.rb:1024).
 
   // every has the standard type-predicate overload from Array<T>.
   every<S extends T>(
