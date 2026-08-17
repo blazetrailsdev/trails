@@ -2,6 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { Notifications } from "../../notifications.js";
 import type { Event } from "../../notifications/instrumenter.js";
 import type { Store, StoreOptions } from "../store.js";
+import { assertSame } from "../../testing/assertions.js";
 
 // Mirrors Rails `CacheInstrumentationBehavior`
 // (activesupport/test/cache/behaviors/cache_instrumentation_behavior.rb).
@@ -131,7 +132,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
 
     expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
     expect(events[0].payload.key).toBe(normalizedKey(key));
-    expect(events[0].payload.hit).toBe(true);
+    assertSame(true, events[0].payload.hit);
     expect(events[0].payload.store).toBe(host.storeName);
   });
 

@@ -1,5 +1,6 @@
-import { expect, it } from "vitest";
+import { it } from "vitest";
 import type { Store, StoreOptions } from "../store.js";
+import { assert, assertNot } from "../../testing/assertions.js";
 
 // Mirrors Rails `CacheDeleteMatchedBehavior`
 // (activesupport/test/cache/behaviors/cache_delete_matched_behavior.rb).
@@ -21,9 +22,9 @@ export function cacheDeleteMatchedBehavior(host: CacheDeleteMatchedBehaviorHost)
     cache.write("foo/bar", "baz");
     cache.write("fu/baz", "bar");
     cache.deleteMatched(/oo/);
-    expect(cache.exist("foo")).toBe(false);
-    expect(cache.exist("fu")).toBe(true);
-    expect(cache.exist("foo/bar")).toBe(false);
-    expect(cache.exist("fu/baz")).toBe(true);
+    assertNot(cache.exist("foo"));
+    assert(cache.exist("fu"));
+    assertNot(cache.exist("foo/bar"));
+    assert(cache.exist("fu/baz"));
   });
 }
