@@ -1,6 +1,6 @@
 /**
  * trails-specific regression guard (no Rails counterpart): `Relation#where` /
- * `whereNot` / `whereAny` / `having` hand hash values RAW to PredicateBuilder,
+ * `whereNot` / `or` / `having` hand hash values RAW to PredicateBuilder,
  * like Rails' build_where_clause (query_methods.rb) — the QueryAttribute bind
  * owns casting/serialization at compile time (predicate_builder.rb:57-69 →
  * build_bind_attribute → value_for_database). An earlier trails invention
@@ -31,8 +31,8 @@ describe("where value defer-to-bind casting", () => {
     expect(await rel).toHaveLength(0);
   });
 
-  it("whereAny with an un-castable string binds it instead of IS NULL", async () => {
-    const rel = Topic.all().whereAny({ parent_id: "not-a-number" }, { written_on: "" });
+  it("or with an un-castable string binds it instead of IS NULL", async () => {
+    const rel = Topic.where({ parent_id: "not-a-number" }).or(Topic.where({ written_on: "" }));
     expect(rel.toSql()).not.toMatch(/IS NULL/i);
     expect(await rel).toHaveLength(0);
   });
