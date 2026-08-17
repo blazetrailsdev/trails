@@ -996,7 +996,8 @@ export class CollectionAssociation extends Association {
    * (it resolves to its records), so awaiting this promise hands back the
    * records the proxy holds rather than the proxy object. Callers that need the
    * proxy object take it from `record.<name>` (the generated accessor), which is
-   * the same cached instance this returns.
+   * the same cached instance this returns. `reset_scope` is likewise called for
+   * effect: it returns the raw proxy, not the JS Proxy wrapper callers hold.
    */
   override get reader(): Promise<Base[]> {
     this.ensureKlassExists();
@@ -1010,9 +1011,6 @@ export class CollectionAssociation extends Association {
         create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
       };
       this._proxy ??= CollectionProxy.create(this.klass, this);
-      // `@proxy.reset_scope` returns the proxy itself; here it is called for
-      // effect because `this` inside it is the raw proxy, not the JS Proxy
-      // wrapper every caller must keep holding.
       this._proxy.resetScope();
       return this._proxy;
     })();

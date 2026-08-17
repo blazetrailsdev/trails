@@ -271,8 +271,6 @@ describe("DatabaseConfigurations", () => {
       vi.spyOn(config, "isPrimary").mockReturnValue(false);
       expect(config.seeds).toBe(true);
 
-      // `configuration_hash.fetch(:seeds, primary?)` returns the STORED value
-      // whenever the key is present — a stored nil is not the default.
       config = new HashConfig("default_env", "primary", { adapter: "abstract", seeds: null });
       expect(config.seeds).toBe(null);
     });

@@ -38,13 +38,12 @@ export class HashConfig extends DatabaseConfig {
   /**
    * Mirrors: HashConfig#seeds?
    *
-   * If the `seeds` key is present, returns its value. Otherwise returns
-   * true for the primary database and false for others.
+   * `Hash#fetch` returns the stored value whenever the key is present — a stored
+   * nil included — so this reads by key presence: if `seeds` is present it
+   * returns its value, otherwise true for the primary database and false for
+   * others.
    */
   get seeds(): boolean | null {
-    // `Hash#fetch` returns the STORED value whenever the key is present —
-    // including a stored nil — and substitutes the default only when the key is
-    // absent, so this reads by key presence rather than `??`.
     return "seeds" in this.configuration
       ? (this.configuration.seeds as boolean | null)
       : this.isPrimary();

@@ -533,10 +533,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * RFC 0022 makes the wrapped proxy the canonical has_many store, keyed on the
    * owner by association name, so the create-or-fetch of that store is the
    * `association()` factory: it routes through the same `collectionProxyClassFor`
-   * carrier `_create` uses and then hydrates and wraps the instance.
+   * carrier `_create` uses and then hydrates and wraps the instance — resolving
+   * `model` from the association itself, so the argument is accepted and unused.
    */
   static create<T extends Base = Base>(
-    _klass: typeof Base,
+    _model: typeof Base,
     association: { owner: Base; reflection: { name: string } },
   ): AssociationProxy<T> {
     return associationProxy<T>(association.owner, association.reflection.name);

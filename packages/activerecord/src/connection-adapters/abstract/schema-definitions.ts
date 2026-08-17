@@ -324,13 +324,12 @@ export class ForeignKeyDefinition {
     this.onDelete = onDelete;
     this.onUpdate = onUpdate;
     this.deferrable = deferrable;
-    // Rails reads `validate?` off `options.fetch(:validate, true)`, so the value
-    // defaults to true; storesValidate records whether `:validate` was actually
+    // Rails reads `validate?` off `options.fetch(:validate, true)`, so a stored
+    // value — nil included — survives and the `true` default applies only when
+    // the key is absent; storesValidate records whether `:validate` was actually
     // on the options hash (PG introspection sets it; mysql/sqlite/DSL-without-it
     // leave it absent), driving the fetch-fallback in isDefinedFor.
     this.storesValidate = validate !== undefined;
-    // `options.fetch(:validate, true)`: a stored nil survives as nil; the
-    // default applies only when `:validate` was never stored.
     this.validate = this.storesValidate ? (validate as boolean | null) : true;
     // Default: every generic key is stored, matching the DB-introspection paths
     // (pg/mysql/sqlite `foreignKeys`) whose options hash always carries
@@ -444,10 +443,11 @@ export class CheckConstraintDefinition {
     return this.options.name as string;
   }
 
-  /** Mirrors: `validate?` (schema_definitions.rb:180-183). */
+  /**
+   * Mirrors: `validate?` (schema_definitions.rb:180-183). `options.fetch` returns
+   * a stored nil as nil; the `true` default applies only when the key is absent.
+   */
   get validate(): boolean | null {
-    // `options.fetch(:validate, true)` returns a stored nil as nil; the default
-    // applies only when the key is absent.
     return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
 
