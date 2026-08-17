@@ -4,6 +4,7 @@
  * Mirrors: ActiveRecord::Encryption::KeyProvider
  */
 
+import { groupBy } from "@blazetrails/activesupport";
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
 import { Configurable } from "./configurable-slot.js";
@@ -40,14 +41,6 @@ export class KeyProvider {
 
   /** @internal */
   private keysGroupedById(): Map<string, Key[]> {
-    if (!this._keysGroupedById) {
-      this._keysGroupedById = new Map();
-      for (const key of this._keys) {
-        const group = this._keysGroupedById.get(key.id) ?? [];
-        group.push(key);
-        this._keysGroupedById.set(key.id, group);
-      }
-    }
-    return this._keysGroupedById;
+    return (this._keysGroupedById ??= groupBy(this._keys, (key) => key.id));
   }
 }

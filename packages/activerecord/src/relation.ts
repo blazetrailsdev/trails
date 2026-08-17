@@ -29,6 +29,9 @@ import {
   isPlainObject as _isPlainObject,
   wrap,
   any,
+  compactBlank as _compactBlank,
+  groupBy as _groupBy,
+  indexBy as _indexBy,
 } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
@@ -2218,10 +2221,11 @@ export class Relation<T extends Base> {
   /**
    * Return self if any records exist, null otherwise.
    *
-   * Mirrors: ActiveRecord::Relation#presence
+   * Mirrors: Object#presence (core_ext/object/blank.rb:45-47) — `present? ?
+   * self : nil`, reached on a Relation through `Relation#blank?`.
    */
   async presence(): Promise<LoadedRelation<Relation<T>> | null> {
-    return (await this.isAny()) ? stripThenable(this as Relation<T>) : null;
+    return (await this.isPresent()) ? stripThenable(this as Relation<T>) : null;
   }
 
   /**
@@ -2260,6 +2264,11 @@ export class Relation<T extends Base> {
    * because `find` on a Relation is the AR PK finder, not a block search.
    *
    * Mirrors: Enumerable#detect / #find (via Relation#include Enumerable)
+   *
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
+   *   `detect` has no `def` in any vendored gem because Ruby's core Enumerable
+   *   supplies it over `each`).
    */
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
     const records = await this.toArray();
@@ -2274,6 +2283,11 @@ export class Relation<T extends Base> {
    * evaluate the relation up front via `toArray()`.
    *
    * Mirrors: Enumerable#sort_by (via Relation#include Enumerable)
+   *
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
+   *   `sort_by` has no `def` in any vendored gem because Ruby's core Enumerable
+   *   supplies it over `each`).
    */
   async sortBy(key: (record: T) => any): Promise<T[]> {
     const records = await this.toArray();
@@ -2288,16 +2302,14 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Filter to only records where the given column is not null/undefined.
+   * Return the loaded records with the blank ones rejected. Loads first, for
+   * the same reason {@link sortBy} does.
    *
-   * Mirrors: Rails where.not(column: nil) pattern
+   * Mirrors: Enumerable#compact_blank (core_ext/enumerable.rb:184-186, via
+   * Relation#include Enumerable)
    */
-  compactBlank(...columns: string[]): Relation<T> {
-    let rel: Relation<T> = this;
-    for (const col of columns) {
-      rel = rel.whereNot({ [col]: null });
-    }
-    return rel;
+  async compactBlank(): Promise<T[]> {
+    return _compactBlank(await this.toArray());
   }
 
   // -- Terminal methods --
@@ -3149,40 +3161,28 @@ export class Relation<T extends Base> {
   // -- Collection convenience methods --
 
   /**
-   * Load records and group them by the value of a column or function.
+   * Load records and group them by the block's return value.
    *
-   * Mirrors: Enumerable#group_by (used on ActiveRecord::Relation)
+   * Mirrors: Enumerable#group_by (via Relation#include Enumerable)
+   *
+   * @noRailsEquivalent PERMANENT
+   *   (`vendor/rails/activerecord/lib/active_record/relation.rb:67` — `include Enumerable`;
+   *   `group_by` has no `def` in any vendored gem because Ruby's core Enumerable
+   *   supplies it over `each`).
    */
-  async groupByColumn(keyOrFn: string | ((record: T) => unknown)): Promise<Record<string, T[]>> {
-    const records = await this.toArray();
-    const result: Record<string, T[]> = {};
-    for (const record of records) {
-      const key =
-        typeof keyOrFn === "string"
-          ? String(record.readAttribute(keyOrFn))
-          : String(keyOrFn(record));
-      if (!result[key]) result[key] = [];
-      result[key].push(record);
-    }
-    return result;
+  async groupBy<K>(fn: (record: T) => K): Promise<Map<K, T[]>> {
+    return _groupBy(await this.toArray(), fn);
   }
 
   /**
-   * Load records and index them by a column value (last wins on collision).
+   * Load records and index them by the block's return value (last wins on
+   * collision).
    *
-   * Mirrors: Enumerable#index_by (used on ActiveRecord::Relation)
+   * Mirrors: Enumerable#index_by (core_ext/enumerable.rb:52-60, via
+   * Relation#include Enumerable)
    */
-  async indexBy(keyOrFn: string | ((record: T) => unknown)): Promise<Record<string, T>> {
-    const records = await this.toArray();
-    const result: Record<string, T> = {};
-    for (const record of records) {
-      const key =
-        typeof keyOrFn === "string"
-          ? String(record.readAttribute(keyOrFn))
-          : String(keyOrFn(record));
-      result[key] = record;
-    }
-    return result;
+  async indexBy<K extends string | number>(fn: (record: T) => K): Promise<Record<K, T>> {
+    return _indexBy(await this.toArray(), fn);
   }
 
   /** @internal */

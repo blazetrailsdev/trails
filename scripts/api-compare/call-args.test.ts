@@ -264,6 +264,79 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
   });
 });
 
+describe("compareCallArgs Regexp flag argument", () => {
+  // parameter_filter.rb:121 `Regexp.new(strings.join("|"), true)`, ported as
+  // `new RegExp(strings.join("|"), "i")`.
+  const regexpNew = (args: string[]): CallSite => ({
+    ...site("new", args),
+    recv: "const:Regexp",
+  });
+
+  it("reads Ruby's ignore-case boolean as the JS i flag", () => {
+    expect(
+      compareCallArgs(
+        regexpNew(["call:join", "bool:true"]),
+        site("constructor", ["call:join", "str:i"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("reads Regexp::IGNORECASE the same way", () => {
+    expect(
+      compareCallArgs(
+        regexpNew(["id:source", "const:Regexp::IGNORECASE"]),
+        site("constructor", ["id:source", "str:i"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("reads Regexp::MULTILINE as the JS s flag", () => {
+    expect(
+      compareCallArgs(
+        regexpNew(["id:source", "const:Regexp::MULTILINE"]),
+        site("constructor", ["id:source", "str:s"]),
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        regexpNew(["id:source", "const:Regexp::MULTILINE"]),
+        site("constructor", ["id:source", "str:m"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("compares flag strings letter-set-wise", () => {
+    expect(
+      compareCallArgs(
+        regexpNew(["id:source", "str:im"]),
+        site("constructor", ["id:source", "str:mi"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a dropped flag argument", () => {
+    expect(
+      compareCallArgs(regexpNew(["call:join", "bool:true"]), site("constructor", ["call:join"]))
+        .verdict,
+    ).toBe("mismatch");
+  });
+
+  it("scopes the equivalence to Regexp construction", () => {
+    const result = compareCallArgs(
+      site("match_filter", ["id:source", "bool:true"]),
+      site("matchFilter", ["id:source", "str:i"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.class).toBe("shape");
+  });
+
+  it("scopes the equivalence to the flag position", () => {
+    expect(compareCallArgs(regexpNew(["bool:true"]), site("constructor", ["str:i"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
 describe("compareCallArgs ported-private receiver argument", () => {
   const required = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
 

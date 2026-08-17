@@ -32,33 +32,38 @@ describe("ParameterFilter (trails)", () => {
     expect(seen).toEqual(["secret", "other"]);
   });
 
-  it("keeps a case-insensitive pattern the flag expansion cannot rewrite as its own Regexp", () => {
+  it("folds a case-insensitive pattern the flag expansion must rewrite into the one group Regexp", () => {
     // Ruby folds every pattern of a group into ONE Regexp with an inline
     // `(?i:...)` group (parameter_filter.rb:58-65). JS has no inline flag
-    // group, so the port expands each cased character to `[aA]` — which is
-    // unsafe for a source carrying a character class, a Unicode property
-    // escape or a named group. Those keep their own `i`-flagged Regexp
-    // instead of being folded in, which is the one case where a group ends
-    // up with more than one Regexp.
-    const unexpandable = [/[xy]z/i, /\p{L}q/iu, /(?<tail>vw)/i];
-    for (const pattern of unexpandable) {
+    // group, so the port expands each cased character to `[aA]` — inside a
+    // character class in place, and widening `\p{Lu}` / `\p{Ll}` to `\p{L}`,
+    // since `(?i:)` scopes the flag to any sub-pattern.
+    for (const pattern of [/[xy]z/i, /\p{Lu}q/iu, /(?<tail>vw)/i, /[a-c]z/i]) {
       const precompiled = ParameterFilter.precompileFilters([/plain/, pattern]);
-      expect(precompiled).toContain(pattern);
-      expect(precompiled.length).toBe(2);
-      expect((precompiled[0] as RegExp).source).toBe("plain");
+      expect(precompiled.length).toBe(1);
+      expect(precompiled[0]).not.toBe(pattern);
     }
 
-    // Riding along as its own Regexp keeps the `i` flag, so `new
-    // ParameterFilter(precompiled)` still matches case-insensitively.
-    const filter = new ParameterFilter(ParameterFilter.precompileFilters([/[xy]z/i, "ccC"]));
+    const filter = new ParameterFilter(
+      ParameterFilter.precompileFilters([/[xy]z/i, /(?<tail>vw)/i, /[a-c]q/i, "ccC"]),
+    );
     expect(filter.filterParam("XZ", "v")).toBe("[FILTERED]");
+    expect(filter.filterParam("VW", "v")).toBe("[FILTERED]");
+    expect(filter.filterParam("BQ", "v")).toBe("[FILTERED]");
     expect(filter.filterParam("cCc", "v")).toBe("[FILTERED]");
     expect(filter.filterParam("zzz", "v")).toBe("v");
+    expect(filter.filterParam("dq", "v")).toBe("v");
+
+    // The property escape only means a property under `u`, so the joined
+    // Regexp carries the flag its members were written with.
+    const unicode = new ParameterFilter(ParameterFilter.precompileFilters([/\p{Lu}q/iu]));
+    expect(unicode.filterParam("aQ", "v")).toBe("[FILTERED]");
+    expect(unicode.filterParam("1q", "v")).toBe("v");
   });
 
-  it("keeps a deep case-insensitive pattern the flag expansion cannot rewrite as its own Regexp", () => {
+  it("folds a deep case-insensitive pattern the flag expansion must rewrite into the one group Regexp", () => {
     const precompiled = ParameterFilter.precompileFilters([/a\.a/, /[xy]\.z/i]);
-    expect(precompiled.length).toBe(2);
+    expect(precompiled.length).toBe(1);
     const filter = new ParameterFilter(precompiled);
     expect(filter.filter({ X: { Z: "v" } }).X).toEqual({ Z: "[FILTERED]" });
     expect(filter.filter({ a: { a: "v" } }).a).toEqual({ a: "[FILTERED]" });

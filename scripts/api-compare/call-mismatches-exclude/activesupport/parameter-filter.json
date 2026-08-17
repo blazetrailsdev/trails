@@ -2,13 +2,12 @@
   {
     "package": "activesupport",
     "tsFile": "parameter-filter.ts",
-    "rubyName": "compile_filters!",
+    "rubyName": "precompile_filters",
     "call": "new",
     "kind": "args",
     "rubyArgs": [
-      "ref:join",
-      "bool:true"
+      "ref:join"
     ],
-    "reason": "`Regexp.new(strings.join(\"|\"), true)` (parameter_filter.rb:121-122) — Ruby's second Regexp argument is the ignore-case boolean; the JS constructor's second argument is a flag string, so `\"i\"` is the same argument spelled the way the language spells it. Irreducible language shortcoming, demonstrated under burn-down-parameter-filter-regexp-and-block-deviations (RFC 0098): the flag is whole-pattern in both languages here, so there is no closer spelling."
+    "reason": "`Regexp.new(patterns.join(\"|\"))` (parameter_filter.rb:64-65) — a Ruby Regexp is Unicode-aware with no flag to say so, while a JS Regexp only reads `\\p{...}` as a property escape under an explicit `u`/`v` flag. The port's second argument spells the property Ruby's constructor has implicitly, so the joined group Regexp keeps the semantics of the members it folds in; there is no one-argument JS spelling of it."
   }
 ]
