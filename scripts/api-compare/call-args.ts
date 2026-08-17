@@ -763,6 +763,14 @@ const RUBY_REGEXP_OPTIONS: Record<string, string> = {
  * `Regexp::IGNORECASE`. JS spells the same argument as a flag string, so the
  * faithful port passes `"i"`. Same argument, same meaning, one letter of
  * language punctuation between them.
+ *
+ * An OR of two option constants is out of reach here, and structurally rather
+ * than by omission: extract-ruby-api.rb:2580 describes any `|` expression as
+ * the bare operator (`binop:|`) with its operands discarded, and `binop:` is an
+ * OPAQUE descriptor, so such a site is SKIPPED as uncomparable long before this
+ * function sees it. Recovering it would mean widening the extractor's
+ * descriptor grammar for every consumer; no vendored Rails call site spells the
+ * flag that way.
  */
 function regexpFlagKey(key: string): string | undefined {
   if (key === "bool:true") return "reflags:i";

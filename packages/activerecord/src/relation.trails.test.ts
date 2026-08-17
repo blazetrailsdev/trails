@@ -1021,7 +1021,12 @@ describe("Relation Enumerable surface (trails)", () => {
     const first = (await posts)[0] as any;
     expect((indexed[first.id] as any).id).toBe(first.id);
 
-    expect((await posts.compactBlank()).length).toBe(await posts.count());
+    // `reject(&:blank?)` over records (enumerable.rb:184-186): no persisted
+    // record is blank, so the identity of the survivors is what this pins —
+    // the same instances, in load order, not merely the same count.
+    const loaded = await posts;
+    expect(await posts.compactBlank()).toEqual(loaded);
+    expect((await CanonPost.where({ id: -1 }).compactBlank()).length).toBe(0);
   });
 
   it("presence returns the relation when records exist and null when none do", async () => {

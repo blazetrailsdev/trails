@@ -330,6 +330,18 @@ describe("compareCallArgs Regexp flag argument", () => {
     expect(result.class).toBe("shape");
   });
 
+  it("skips a site whose flag argument is an OR of option constants", () => {
+    // extract-ruby-api.rb:2580 describes `Regexp::IGNORECASE | Regexp::MULTILINE`
+    // as the bare `binop:|`, an OPAQUE descriptor — the operands are gone, so
+    // the site is uncomparable rather than a mismatch.
+    const result = compareCallArgs(
+      regexpNew(["id:source", "binop:|"]),
+      site("constructor", ["id:source", "str:is"]),
+    );
+    expect(result.verdict).toBe("skip");
+    expect(result.reason).toBe("opaqueRubyArg");
+  });
+
   it("scopes the equivalence to the flag position", () => {
     expect(compareCallArgs(regexpNew(["bool:true"]), site("constructor", ["str:i"])).verdict).toBe(
       "mismatch",
