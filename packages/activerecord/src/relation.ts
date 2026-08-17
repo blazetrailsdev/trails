@@ -1448,13 +1448,7 @@ export class Relation<T extends Base> {
     return this.structurallyIncompatibleValuesFor(other as never).length === 0;
   }
 
-  // ---- include Enumerable (relation.rb:67) ----
-  // Ruby's core Enumerable works over `each` → `records`; there is no per-method
-  // Rails body to mirror, so each of these applies the shared
-  // `ENUMERABLE_DELEGATES` function to the loaded records — the same table
-  // CollectionProxy applies to `load_target` (collection_proxy.rb:1024). They
-  // load first (`toArray()`) because JS has no blocking IO where Rails reads
-  // `records` inline.
+  // ---- include Enumerable (relation.rb:67) — see ENUMERABLE_DELEGATES ----
 
   /** `Enumerable#detect` / `#find` — `find` on a Relation is the AR PK finder. */
   async length(): Promise<number> {

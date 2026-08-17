@@ -419,10 +419,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target.some(fn, thisArg);
   }
 
-  // Enumerable#detect / #sort_by are NOT overridden here: Rails reaches them
-  // through Relation#records → CollectionProxy#load_target
-  // (collection_proxy.rb:1024), and `toArray()` above IS that path, so the
-  // inherited Relation implementations already load through the target.
+  // Enumerable#detect / #sort_by are inherited, not overridden: `toArray()`
+  // below is this proxy's `records` → `load_target` (collection_proxy.rb:1024).
 
   // every has the standard type-predicate overload from Array<T>.
   every<S extends T>(
