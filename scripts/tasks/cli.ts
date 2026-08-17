@@ -1,4 +1,12 @@
 #!/usr/bin/env tsx
+// SUPERSEDED — the live CLI is `scripts/cli.ts` in the tasks repo, entered
+// through its `bin/tasks`. `pnpm tasks` here runs `scripts/tasks/tasks.sh`,
+// which delegates there; nothing invokes this file. It is kept only until the
+// tasks-repo copy has some mileage, then deleted along with its test file, the
+// `scripts/tasks/*.test.ts` entry in vitest.config.ts, and the `scripts/tasks`
+// argument in ci.yml's unit-tests `pnpm vitest run`. Do not fix bugs here —
+// fix them in the tasks repo, or the two silently diverge.
+//
 // trails-side CLI for the sibling blazetrailsdev/tasks repo.
 //
 // All state lives in $TASKS_DIR (default ~/github/blazetrailsdev/tasks).

@@ -166,6 +166,13 @@ tasks repo enumerates these as convergence classes.
   CI's `Docs ActiveRecord Freeze` job fails any PR that adds or modifies a
   file there (allowlist: `docs/activerecord/parity-verification.md`). Other
   `docs/` trees are not policed and stay live until their own cutover.
+- **The `tasks` CLI itself lives in the tasks repo** (`scripts/cli.ts`, entered
+  through its `bin/tasks`). trails' `pnpm tasks` is a shim,
+  `scripts/tasks/tasks.sh`, that finds a tasks checkout and hands off; it does
+  not set `$TASKS_DIR`, so the CLI still resolves the working tree it acts on
+  from your cwd — your worktree's own `tasks/` symlink. `tasks` is also on the
+  `PATH` (installed by `start-worktree.sh`) and works from any cwd. Fix CLI
+  bugs in the tasks repo, not here.
 - Do NOT add "Co-Authored-By" lines to commits or "Generated with Claude
   Code" lines to PR descriptions.
 - After opening a PR, run the `/link` skill with the PR number so webhook

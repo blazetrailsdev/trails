@@ -256,6 +256,15 @@ TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
   ln -s "$TASKS_WT" "$TARGET/tasks"
   echo "    linked tasks -> $TASKS_WT"
 ) || echo "    warning: tasks worktree provisioning failed — falling back to canonical $TASKS_CANONICAL" >&2
+
+# Put `tasks` on the PATH. The installer lives in the tasks repo and points
+# ~/.local/bin/tasks at the CANONICAL checkout's bin/tasks — never a
+# worktree's, which would dangle once the worktree is removed. bin/tasks
+# resolves the checkout to run from the caller's cwd, so the canonical target
+# still runs this worktree's tasks/ CLI when invoked from here.
+if [[ -x "$TASKS_CANONICAL/scripts/install-bin.sh" ]]; then
+  "$TASKS_CANONICAL/scripts/install-bin.sh" || true
+fi
 # Cleanup note: removing this trails worktree does not automatically remove
 # the tasks worktree at $TASKS_WT. Remove it manually with:
 #   git -C "$TASKS_CANONICAL" worktree remove "$TASKS_WT"
