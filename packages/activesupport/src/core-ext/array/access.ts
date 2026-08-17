@@ -71,7 +71,7 @@ export class Array {
    */
   static excluding<T>(self: T[], ...elements: (T | T[])[]): T[] {
     const removed = elements.flat(1) as T[];
-    return self.filter((element) => !removed.includes(element));
+    return self.filter((element) => !removed.some((other) => eql(element, other)));
   }
 
   /** Alias of {@link Array.excluding}. */
@@ -155,4 +155,15 @@ export class Array {
     }
     return self;
   }
+}
+
+/**
+ * The comparison Ruby's `Array#-` makes — `eql?`/`hash`, which is element-wise
+ * on a nested array. `Array#includes` is identity-only and would keep a nested
+ * array that `self - elements` removes.
+ */
+function eql(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (!globalThis.Array.isArray(a) || !globalThis.Array.isArray(b)) return false;
+  return a.length === b.length && a.every((element, i) => eql(element, b[i]));
 }

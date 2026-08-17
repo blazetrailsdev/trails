@@ -1,38 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { Integer } from "./integer/multiple.js";
 import { ordinal, ordinalize } from "../inflector.js";
 
 describe("IntegerExtTest", () => {
+  const PRIME = 22953686867719691230002707821868552601124472329079n;
+
   it("multiple of", () => {
-    expect(4 % 4).toBe(0); // 4 is multiple of 4
-    expect(3 % 4).not.toBe(0); // 3 is not multiple of 4
-    expect(12 % 3).toBe(0); // 12 is multiple of 3
-    expect(13 % 3).not.toBe(0); // 13 is not multiple of 3
+    expect([-7, 0, 7, 14].every((i) => Integer.isMultipleOf(i, 7))).toBeTruthy();
+    expect([-7, 7, 14].some((i) => Integer.isMultipleOf(i, 6))).toBeFalsy();
+
+    // test the 0 edge case
+    expect(Integer.isMultipleOf(0, 0)).toBeTruthy();
+    expect(Integer.isMultipleOf(5, 0)).toBeFalsy();
+
+    // test with a prime
+    expect([2, 3, 5, 7].some((i) => Integer.isMultipleOf(PRIME, i))).toBeFalsy();
   });
 
   it("ordinalize", () => {
+    // These tests are mostly just to ensure that the ordinalize method exists.
+    // Its results are tested comprehensively in the inflector test cases.
     expect(ordinalize(1)).toBe("1st");
-    expect(ordinalize(2)).toBe("2nd");
-    expect(ordinalize(3)).toBe("3rd");
-    expect(ordinalize(4)).toBe("4th");
-    expect(ordinalize(11)).toBe("11th");
-    expect(ordinalize(12)).toBe("12th");
-    expect(ordinalize(13)).toBe("13th");
-    expect(ordinalize(21)).toBe("21st");
-    expect(ordinalize(1002)).toBe("1002nd");
-    expect(ordinalize(1003)).toBe("1003rd");
-    expect(ordinalize(-11)).toBe("-11th");
-    expect(ordinalize(-1)).toBe("-1st");
+    expect(ordinalize(8)).toBe("8th");
   });
 
   it("ordinal", () => {
     expect(ordinal(1)).toBe("st");
-    expect(ordinal(2)).toBe("nd");
-    expect(ordinal(3)).toBe("rd");
-    expect(ordinal(4)).toBe("th");
-    expect(ordinal(11)).toBe("th");
-    expect(ordinal(12)).toBe("th");
-    expect(ordinal(13)).toBe("th");
-    expect(ordinal(21)).toBe("st");
-    expect(ordinal(-1)).toBe("st");
+    expect(ordinal(8)).toBe("th");
   });
 });

@@ -3,10 +3,16 @@ import { extractBang } from "../../index.js";
 
 describe("ExtractTest", () => {
   it("extract", () => {
-    const numbers = [1, 2, 3, 4, 5];
-    const odds = extractBang(numbers, (n) => n % 2 !== 0);
-    expect(odds).toEqual([1, 3, 5]);
-    expect(numbers).toEqual([2, 4]);
+    const numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    // Ruby's `object_id`, held to assert `extract!` mutated the receiver in
+    // place rather than returning a new array.
+    const arrayId = numbers;
+
+    const oddNumbers = extractBang(numbers, (n) => n % 2 !== 0);
+
+    expect(oddNumbers).toEqual([1, 3, 5, 7, 9]);
+    expect(numbers).toEqual([0, 2, 4, 6, 8]);
+    expect(numbers).toBe(arrayId);
   });
 
   it("extract without block", () => {
@@ -17,9 +23,13 @@ describe("ExtractTest", () => {
   });
 
   it("extract on empty array", () => {
-    const arr: number[] = [];
-    const extracted = extractBang(arr, (n) => n > 0);
-    expect(extracted).toEqual([]);
-    expect(arr).toEqual([]);
+    const emptyArray: number[] = [];
+    const arrayId = emptyArray;
+
+    const newEmptyArray = extractBang(emptyArray, () => false);
+
+    expect(newEmptyArray).toEqual([]);
+    expect(emptyArray).toEqual([]);
+    expect(emptyArray).toBe(arrayId);
   });
 });

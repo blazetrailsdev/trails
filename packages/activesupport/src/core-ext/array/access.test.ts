@@ -30,7 +30,8 @@ describe("AccessTest", () => {
   });
 
   it("including", () => {
-    expect(ArrayExt.including([1, 2, 3], 4, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(ArrayExt.including([1, 2, 4], 3, 5).sort()).toEqual([1, 2, 3, 4, 5]);
+    expect(ArrayExt.including([1, 2, 4], [3, 5]).sort()).toEqual([1, 2, 3, 4, 5]);
     expect(ArrayExt.including([[0, 1]], [[1, 0]])).toEqual([
       [0, 1],
       [1, 0],
@@ -38,7 +39,17 @@ describe("AccessTest", () => {
   });
 
   it("excluding", () => {
-    expect(ArrayExt.excluding([1, 2, 3, 4, 5], 2, 4)).toEqual([1, 3, 5]);
+    expect(ArrayExt.excluding([1, 2, 3, 4, 5], 3, 5)).toEqual([1, 2, 4]);
+    expect(ArrayExt.excluding([1, 2, 3, 4, 5], [3, 5])).toEqual([1, 2, 4]);
+    expect(
+      ArrayExt.excluding(
+        [
+          [0, 1],
+          [1, 0],
+        ],
+        [[1, 0]],
+      ),
+    ).toEqual([[0, 1]]);
   });
 
   it("without", () => {

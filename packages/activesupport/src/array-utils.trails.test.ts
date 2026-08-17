@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kernelArray, toFs } from "./array-utils.js";
+import { inGroupsOf, kernelArray, toFs } from "./array-utils.js";
 
 describe("KernelArrayTest (trails)", () => {
   it("returns an empty array for nil", () => {
@@ -51,5 +51,28 @@ describe("ToFsTest (trails)", () => {
 
   it("default format is the empty brackets for an empty array", () => {
     expect(toFs([])).toBe("[]");
+  });
+});
+
+describe("GroupingTest (trails)", () => {
+  // `grouping_test.rb` only guards 0, -1 and nil. Ruby reaches the same verdict
+  // for a fractional group size through `number.to_i`, which truncates — and
+  // reports it unrounded, because the message interpolates `number.inspect`.
+  // Verified against the vendored `grouping.rb` under MRI.
+  it("truncates a fractional group size the way Integer#to_i does", () => {
+    expect(() => inGroupsOf([1, 2, 3, 4, 5], 0.7)).toThrow(
+      "Group size must be a positive integer, was 0.7",
+    );
+    expect(inGroupsOf([1, 2, 3, 4, 5], 2.7)).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it("does not mutate the receiver when padding", () => {
+    const array = [1, 2, 3, 4, 5];
+    expect(inGroupsOf(array, 2)).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, null],
+    ]);
+    expect(array).toEqual([1, 2, 3, 4, 5]);
   });
 });
