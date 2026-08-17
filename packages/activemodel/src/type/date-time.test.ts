@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
+import { TimeZone, setZoneDefault, toS } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 
 describe("DateTimeTest", () => {
@@ -120,7 +120,7 @@ describe("DateTimeTest", () => {
       }
     }).toThrow(expect.objectContaining({ name: "ArgumentError" }));
     expect((error as Error).message).toBe(
-      `Provided hash ${JSON.stringify({ a: 1 })} doesn't contain necessary keys: [1, 2, 3]`,
+      `Provided hash ${toS({ a: 1 })} doesn't contain necessary keys: [1, 2, 3]`,
     );
   });
 

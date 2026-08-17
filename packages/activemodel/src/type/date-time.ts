@@ -9,6 +9,7 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
+import { toS } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { isUtc } from "./helpers/timezone.js";
@@ -152,6 +153,12 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    *     super
    *   end
    *
+   * Both `#{}` interpolations are Ruby `to_s`, which for a Hash and an Array
+   * alike is `inspect` — `{:a=>1}` and `[1, 2, 3]`, not JSON. `toS` from
+   * ActiveSupport is that function; the one residual is that a Ruby Symbol key
+   * is a plain JS string in trails, so `{ a: 1 }` renders `{"a"=>1}` where MRI
+   * 3.3 gives `{:a=>1}` — the key's Symbol-ness is not recoverable at runtime.
+   *
    * Validates that year/mon/mday (multiparameter keys 1, 2, 3) are
    * present, then defers to the multiparameter wrapper. Trails routes
    * the actual reconstruction through `AcceptsMultiparameterTime`
@@ -167,7 +174,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     const missing = [1, 2, 3].filter((k) => !Object.hasOwn(values, k));
     if (missing.length > 0) {
       throw new ArgumentError(
-        `Provided hash ${JSON.stringify(values)} doesn't contain necessary keys: [${missing.join(", ")}]`,
+        `Provided hash ${toS(values)} doesn't contain necessary keys: ${toS(missing)}`,
       );
     }
     return new AcceptsMultiparameterTime(this, { "4": 0, "5": 0 }).cast(
