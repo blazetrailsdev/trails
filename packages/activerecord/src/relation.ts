@@ -1078,10 +1078,10 @@ export class Relation<T extends Base> {
    * Check if this relation carries a lock clause.
    *
    * Mirrors: ActiveRecord::Relation#locked? (relation.rb:75,
-   * `alias :locked? :lock_value`) — the lock clause itself, so `lock("FOR
-   * UPDATE")` answers the string rather than a boolean.
+   * `alias :locked? :lock_value`) — the stored `lock_value` itself, so `lock`
+   * answers `true` and `lock("FOR UPDATE")` answers the string.
    */
-  get isLocked(): string | null {
+  get isLocked(): string | boolean | null {
     return this.lockValue;
   }
 
@@ -1988,49 +1988,53 @@ export class Relation<T extends Base> {
   /**
    * Try to create first; if uniqueness violation, find the existing record.
    *
-   * Mirrors: ActiveRecord::Relation#create_or_find_by
+   * Mirrors: ActiveRecord::Relation#create_or_find_by (relation.rb:273-283) —
+   * the whole body runs inside `with_connection do |connection|`, and the
+   * rescue's `transaction_open?` branch asks that yielded connection.
    */
   async createOrFindBy(
     attributes: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
-    // Rails:
-    //   transaction(requires_new: true) { create(attributes, &block) }
-    //   rescue ActiveRecord::RecordNotUnique
-    //     where(attributes).lock.find_by!(attributes)
-    // Nested transaction so the failed INSERT rolls back cleanly
-    // before the retry; `.lock` + `find_by!` so the concurrent winner
-    // is materialized + row-locked inside the caller's txn.
-    try {
-      const result = await this._model.transaction(
-        () =>
-          this._model.create({
-            ...this.scopeForCreate(),
-            ...attributes,
-            ...extra,
-          }) as Promise<T>,
-        { requiresNew: true },
-      );
-      // transaction() returns undefined when the block raises Rollback.
-      // Don't silently yield undefined — raise so callers see the abort.
-      if (result === undefined) {
-        // `RecordNotSaved.record` is conventionally the model instance that
-        // failed to persist — which doesn't exist here, since the inner
-        // create rolled back. Leave record undefined rather than passing
-        // the Relation.
-        throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
+    return this.withConnection(async (connection) => {
+      // Rails:
+      //   transaction(requires_new: true) { create(attributes, &block) }
+      //   rescue ActiveRecord::RecordNotUnique
+      //     where(attributes).lock.find_by!(attributes)
+      // Nested transaction so the failed INSERT rolls back cleanly
+      // before the retry; `.lock` + `find_by!` so the concurrent winner
+      // is materialized + row-locked inside the caller's txn.
+      try {
+        const result = await this._model.transaction(
+          () =>
+            this._model.create({
+              ...this.scopeForCreate(),
+              ...attributes,
+              ...extra,
+            }) as Promise<T>,
+          { requiresNew: true },
+        );
+        // transaction() returns undefined when the block raises Rollback.
+        // Don't silently yield undefined — raise so callers see the abort.
+        if (result === undefined) {
+          // `RecordNotSaved.record` is conventionally the model instance that
+          // failed to persist — which doesn't exist here, since the inner
+          // create rolled back. Leave record undefined rather than passing
+          // the Relation.
+          throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
+        }
+        return result;
+      } catch (e) {
+        if (!(e instanceof RecordNotUnique)) throw e;
+        // Rails (relation.rb:277-281): with a transaction still open the winner
+        // is materialized + row-locked inside it; otherwise plain find_by!, no
+        // lock.
+        if (connection.isTransactionOpen()) {
+          return this.where(attributes).lock().findByBang(attributes);
+        }
+        return this.findByBang(attributes);
       }
-      return result;
-    } catch (e) {
-      if (!(e instanceof RecordNotUnique)) throw e;
-      // Rails (relation.rb:277-281): with a transaction still open the winner
-      // is materialized + row-locked inside it; otherwise plain find_by!, no
-      // lock.
-      if (this._conn().isTransactionOpen()) {
-        return this.where(attributes).lock().findByBang(attributes);
-      }
-      return this.findByBang(attributes);
-    }
+    });
   }
 
   /**
@@ -2361,6 +2365,15 @@ export class Relation<T extends Base> {
    * — `_buildEagerOperandManager` is that block, and its manager is rendered
    * through the same connection path (a null manager, e.g. an unresolvable
    * association, falls through to the plain arel).
+   *
+   * @missingRailsCall with_connection — Rails' non-eager arm is
+   * `model.with_connection { |conn| conn.unprepared_statement { conn.to_sql(arel) } }`
+   * (relation.rb:1217-1219). `withConnection` is a `Promise`-returning checkout
+   * in TypeScript, and `to_sql` renders a string with no `await` in it, so
+   * taking one would make `toSql` async — 412 test and 16 source call sites
+   * treat it as synchronous. The checkout is instead the caller's, read through
+   * `_conn()`, and `unprepared_statement` is applied by hand around the render.
+   * Convergence tracked by RFC 0107 (`converge-sync-eager-builders-async-to-sql`).
    */
   toSql(): string {
     // `unprepared_statement` applied synchronously: `to_sql` is sync here, so
@@ -3739,7 +3752,7 @@ export interface Relation<T extends Base> {
   /** Mirrors: ActiveRecord::Relation#offset_value */
   offsetValue: number | null;
   /** Mirrors: ActiveRecord::Relation#lock_value */
-  lockValue: string | null;
+  lockValue: string | boolean | null;
   /** Mirrors: ActiveRecord::Relation#readonly_value */
   readonlyValue: boolean | null;
   /** Mirrors: ActiveRecord::Relation#reordering_value */
@@ -3822,7 +3835,7 @@ export interface Relation<T extends Base>
   // whose mixin signatures return `any` — declared here with the relation's own
   // element type.
   unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;
-  lock(locks?: string | boolean): Relation<T>;
+  lock(locks?: string | boolean | null): Relation<T>;
   none(): Relation<T>;
   readonly(value?: boolean): Relation<T>;
   strictLoading(value?: boolean): Relation<T>;
@@ -4076,7 +4089,6 @@ function excludingWithCallee(callee: "excluding" | "without") {
       if (relation.isLoaded) combined.push(...(relation as any)._records);
       else combined.push(relation);
     }
-    if (combined.length === 0) return this;
     return this.spawn().excludingBang(combined);
   };
 }

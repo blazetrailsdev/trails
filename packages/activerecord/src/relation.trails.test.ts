@@ -1087,3 +1087,30 @@ describe("Relation#empty_scope? STI type_condition (trails)", () => {
     expect((CanonCompany.all() as any).isEmptyScope).toBe(true);
   });
 });
+
+// `lock!` (query_methods.rb:1242-1249) stores the ARGUMENT — `locks || true`
+// for String/true/nil, `false` otherwise. The `FOR UPDATE` default belongs to
+// Arel's `SelectManager#lock` (select_manager.rb:52-59), so the stored value
+// and the emitted SQL are two different things. Rails' relation_mutation_test
+// only pins the String arm.
+describe("lock_value stores the argument", () => {
+  fixtures([]);
+
+  it("stores true for a bare lock and false for lock(false)", () => {
+    expect(CanonPost.all().lock().lockValue).toBe(true);
+    expect(CanonPost.all().lock(null).lockValue).toBe(true);
+    expect(CanonPost.all().lock(false).lockValue).toBe(false);
+    expect(CanonPost.all().lock("FOR SHARE").lockValue).toBe("FOR SHARE");
+  });
+
+  // The SQLite visitor drops the LOCK node entirely (arel/visitors/sqlite.rb),
+  // so assert against the AST rather than the rendered SQL.
+  it("builds the Arel default clause for a bare lock", () => {
+    expect((CanonPost.all().toArel() as any).ast.lock).toBe(null);
+    expect(String((CanonPost.all().lock().toArel() as any).ast.lock.expr)).toBe("FOR UPDATE");
+    expect((CanonPost.all().lock(false).toArel() as any).ast.lock).toBe(null);
+    expect(String((CanonPost.all().lock("FOR SHARE").toArel() as any).ast.lock.expr)).toBe(
+      "FOR SHARE",
+    );
+  });
+});

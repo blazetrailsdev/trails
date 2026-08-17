@@ -28,4 +28,16 @@ describe("excluding deferred arm (trails)", () => {
     expect(attribute.relation).toBeInstanceOf(Nodes.TableAlias);
     expect((attribute.relation as Nodes.TableAlias).name).toBe("p");
   });
+
+  // `spawn.excluding!(...)` (query_methods.rb:1580) has no empty-argument
+  // short circuit: the result is always a distinct relation carrying the
+  // (vacuously true) inverted predicate.
+  it("spawns and appends the inverted predicate with no arguments", () => {
+    const all = Post.all();
+    const excluded = all.excluding();
+
+    expect(excluded).not.toBe(all);
+    expect(excluded.whereClause.predicates.length).toBe(all.whereClause.predicates.length + 1);
+    expect(excluded.toSql()).not.toBe(all.toSql());
+  });
 });

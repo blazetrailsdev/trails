@@ -257,7 +257,7 @@ interface QueryMethodsHost {
   _withIsRecursive: boolean;
   limitValue: number | string | null;
   offsetValue: number | string | null;
-  lockValue: string | null;
+  lockValue: string | boolean | null;
   readonlyValue: boolean | null;
   reorderingValue: boolean | null;
   strictLoadingValue: boolean | null;
@@ -1478,15 +1478,23 @@ function offsetBang(this: QueryMethodsHost, value: number | string | null): any 
  *
  * Mirrors: ActiveRecord::QueryMethods#lock (query_methods.rb:1238-1240)
  */
-function lock(this: QueryMethodsHost, locks: string | boolean = true): any {
+function lock(this: QueryMethodsHost, locks: string | boolean | null = true): any {
   return lockBang.call(this.spawn(), locks);
 }
 
-function lockBang(this: QueryMethodsHost, locks: string | boolean = true): any {
-  if (typeof locks === "string") {
-    this.lockValue = locks;
+/**
+ * Mirrors: ActiveRecord::QueryMethods#lock! (query_methods.rb:1242-1249) — the
+ * argument itself is stored, so a bare `lock` leaves `lockValue === true` and
+ * `lock(false)` leaves it `false`. The `FOR UPDATE` default is Arel's, applied
+ * by `SelectManager#lock` (select_manager.rb:52-59), not by this writer.
+ */
+function lockBang(this: QueryMethodsHost, locks: string | boolean | null = true): any {
+  if (typeof locks === "string" || locks === true || locks == null) {
+    // Ruby `locks || true`: only `nil` falls through to `true` here, since
+    // `false` never reaches this arm.
+    this.lockValue = locks ?? true;
   } else {
-    this.lockValue = locks ? "FOR UPDATE" : null;
+    this.lockValue = false;
   }
   return this;
 }
@@ -2924,7 +2932,7 @@ export function buildArel(
 
   if (!this.fromClause.isEmpty()) arel.from(buildFrom.call(this) as any);
 
-  if (this.lockValue) arel.lock(this.lockValue);
+  if (this.lockValue != null && this.lockValue !== false) arel.lock(this.lockValue);
 
   if (this.annotateValues.length > 0) {
     const annotates =
