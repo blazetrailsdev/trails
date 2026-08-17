@@ -1882,3 +1882,102 @@ describe("Ruby extractor attr_reader flag", () => {
     expect(byName.get("add_to")?.reader).toBeUndefined();
   });
 });
+
+describe("Ruby extractor attr_reader read suppression", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> [callArgs site names, calls].
+  function rubyStreams(
+    fixtures: Record<string, string>,
+  ): Record<string, { sites: string[]; calls: string[] }> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attr-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = {
+              sites: (m[:callArgs] || []).map { |s| s[:name] },
+              calls: m[:calls] || [],
+            }
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("drops a bare read of an attr_reader, which the port spells as a getter", () => {
+    const c = rubyStreams({
+      "scope.rb": `
+        class Scope
+          private
+            attr_reader :value_transformation
+
+            def transform_value(value)
+              value_transformation.call(value)
+            end
+
+            def transform_self(value)
+              self.value_transformation.call(value)
+            end
+        end
+      `,
+    });
+    // The reader read itself is gone, and the Proc invocation Ruby spells
+    // `.call` on it lands under the reader's name — what `this.valueTransformation(value)`
+    // records on the TS side.
+    expect(c["Scope#transform_value"].sites).toEqual(["value_transformation"]);
+    expect(c["Scope#transform_self"].sites).toEqual(["value_transformation"]);
+    expect(c["Scope#transform_value"].calls).toEqual(["value_transformation"]);
+  });
+
+  it("keeps a site that passes arguments to an attr_reader name", () => {
+    const c = rubyStreams({
+      "branch.rb": `
+        class Branch
+          attr_reader :association
+
+          def preloaders_for_reflection(record)
+            record.class._reflect_on_association(association)
+            record.association(association)
+          end
+        end
+      `,
+    });
+    expect(c["Branch#preloaders_for_reflection"].sites).toEqual(["class", "association"]);
+  });
+
+  it("keeps a bare call whose name is an attr_reader on a NESTED class only", () => {
+    const c = rubyStreams({
+      "outer.rb": `
+        class Outer
+          def read
+            association
+          end
+
+          class Inner
+            attr_reader :association
+          end
+        end
+      `,
+    });
+    expect(c["Outer#read"].sites).toEqual(["association"]);
+  });
+});

@@ -196,7 +196,7 @@ describe("body call capture", () => {
     // sorted + de-duped (runCallbacks appears twice, recorded once). The
     // intermediate read `obj.nested` in `obj.nested.touch()` is credited as
     // `nested` — a non-callee property read mirrors a Ruby method send.
-    expect(save.calls).toEqual(["helper", "nested", "runCallbacks", "touch"]);
+    expect(save.calls).toEqual([".nested", "helper", "nested", "runCallbacks", "touch"]);
   });
 
   it("records the call-set of a get accessor body, as it does for a method", () => {
@@ -458,6 +458,22 @@ describe("body call capture", () => {
     expect(check.calls).toEqual(["!has", "!includes", "!loaded", "has", "includes", "loaded"]);
   });
 
+  it("marks a read off another object with the foreign-read prefix", () => {
+    // `details.locale` names a member of `details`, not the same-file method
+    // `locale` — the closure must not walk into that one (RFC 0108).
+    const cls = extractFromSource(
+      `class Foo {
+        detailArgsForAny(details: { locale: string; formats: string[] }) {
+          return [details.locale, details.formats, this.formats, Registry.defaults];
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "detailArgsForAny")!;
+    // `formats` is read off `this` too, so it is the body's own; `defaults` is
+    // read off a class reference, which the same file may well declare.
+    expect(m.calls).toEqual([".locale", "defaults", "formats", "locale"]);
+  });
+
   it("does not mark a call the ! does not actually negate", () => {
     // `!a &&` binds the negation to `a`; `!!` is a truthiness cast, not a
     // negation — crediting either would be the same false positive the marker
@@ -643,6 +659,7 @@ describe("body call capture", () => {
        class Foo { buildJoins(arel) { _qm.emitJoinPlan.call(this, arel); } }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
+      ".emitJoinPlan",
       "call",
       "emitJoinPlan",
     ]);
@@ -732,6 +749,7 @@ describe("body call capture", () => {
       `class Foo { buildJoins(arel) { unbound.buildJoins.call(this, arel); } }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
+      ".buildJoins",
       "buildJoins",
       "call",
     ]);
@@ -769,7 +787,7 @@ describe("body call capture", () => {
     );
     const unpin = cls.instanceMethods.find((m) => m.name === "unpin")!;
     expect(unpin.callSeq).toEqual(["connection", "lock", "synchronize"]);
-    expect(unpin.calls).toEqual(["checkin", "connection", "lock", "synchronize"]);
+    expect(unpin.calls).toEqual([".lock", "checkin", "connection", "lock", "synchronize"]);
   });
 
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
@@ -868,7 +886,7 @@ describe("body call capture", () => {
     // make the call set depend on body shape. The RHS read `x.dup` still counts.
     const cls = extractFromSource(`class Foo { reset(x) { this.joinsValues = x.dup; } }`);
     const m = cls.instanceMethods.find((m) => m.name === "reset")!;
-    expect(m.calls).toEqual(["dup"]);
+    expect(m.calls).toEqual([".dup", "dup"]);
   });
 
   it("does not credit a destructuring-assignment target as a value read", () => {

@@ -148,7 +148,7 @@ export function includeGraphEntities(
 
 /**
  * The call-sets of `tsName` bodies on `entities` (the output of
- * `includeGraphEntities`), partitioned into plain and negated calls.
+ * `includeGraphEntities`), partitioned into plain, negated and foreign-read calls.
  *
  * Resolution is per-ENTITY, not per-file: a barrel (`cache/index.ts`) holds a
  * re-exported entry for every store in the package, so unioning a reached
@@ -163,7 +163,7 @@ export function includeGraphCallSets(
   entities: readonly GraphEntity[],
   tsName: string,
   graph: IncludeGraph,
-): { calls: Set<string>; negated: Set<string> } {
+): { calls: Set<string>; negated: Set<string>; foreignReads: Set<string> } {
   const raw: string[] = [];
   const seenFileFunctionFiles = new Set<string>();
   for (const entity of entities) {

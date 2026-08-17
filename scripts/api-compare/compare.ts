@@ -532,21 +532,6 @@ export const ORDER_PREFIX = "order:";
  * position for either ({@link ambiguousTsNames}), so it is skipped here; the
  * membership check still sees it.
  *
- * ONE class of order flag is a known extractor artifact and is NOT handled
- * here, recorded once rather than re-derived per file (RFC 0084
- * `extractor-predicate-and-closure-order-artifacts`): a call nested in ANOTHER
- * call's ARGUMENTS. Both extractors emit lexical order — receiver, then the
- * call, then its arguments (extract-ruby-api.rb#walk_for_calls,
- * extract-ts-api.ts#collectCalls, whose comments pin the two to each other) —
- * so Rails' `add_to_target(build_record(attributes, &block), replace: true)`
- * (collection_association.rb:121) records `add_to_target` BEFORE `build_record`
- * even though `build_record` is what runs first. A port that hoists the nested
- * call into a local — which an `await` forces — then reads as an inversion.
- * Ruby EVALUATION order (arguments before the enclosing call) is the sequence
- * both sides should record; changing it is a matched change to two extractors
- * with its own whole-artifact re-measure, so it is its own story rather than a
- * special case here.
- *
  * `bodyRubyCalls` is the body's call list BEFORE `dropWeakCalls` — the
  * disambiguation above is about what the Ruby body NAMES, and a call the weak
  * filter drops (an inert receiver, `reflection.validate?`) still names a TS
@@ -698,17 +683,16 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
  * to reach `detailsKey` (RFC 0025
  * `extractor-missing-set-perturbed-by-unrelated-edits`).
  *
- * `length` is the same shape from the other end: it is a JS PROPERTY, never a
- * callable, so every `length` the TS extractor records came off an `xs.length`
- * read — never off a call to a same-file member spelled `length`. Resolving it
- * bridged 29 relation.ts bodies into `Relation#length` and, three hops on, into
- * `toArray`'s `withConnection`: `to_sql` and `create_or_find_by` were credited
- * with a `with_connection` neither body makes, and the credit evaporated the
- * moment `length` moved to its faithful home in `DelegationMethods`
- * (`relation/delegation.rb:101`) — RFC 0107's
- * `converge-relation-length-onto-records-delegation`.
+ * `length` used to be listed here for the same reason from the other end — an
+ * `xs.length` read bridged 29 relation.ts bodies into `Relation#length` and, three
+ * hops on, into `toArray`'s `withConnection` (`relation/delegation.rb:101`; RFC
+ * 0107). It is gone because the FOREIGN_READ_PREFIX marker now covers it and
+ * every other read off a non-`this` receiver, by receiver rather than by name:
+ * removing the entry moves no row in the whole artifact, and keeping it would
+ * silence a genuine call to a same-file helper that happens to be spelled
+ * `length`.
  */
-const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor", "length"]);
+const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
 
 /**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.
@@ -719,26 +703,47 @@ const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor", "lengt
  * which an unrelated same-named method can satisfy). `tsName` seeds the visited
  * set, so self-recursion and longer cycles terminate. Names in
  * SYNTHETIC_CALL_NAMES are never resolved or expanded.
+ *
+ * Neither are the names a body recorded ONLY as a property read off another
+ * object (FOREIGN_READ_PREFIX): `details.locale` names a member of `details`,
+ * not the same-file method `locale`, so resolving it would union an unrelated
+ * method's call-set — and everything it reaches — into a body that read a plain
+ * property, making this body's `missing` set move when that method is edited
+ * (RFC 0108; the constructor half of the same receiver-blindness is
+ * SYNTHETIC_CALL_NAMES). `foreignReads` answers that population per OWNER —
+ * the body itself is `tsName` — because a name foreign to this body may well
+ * be a genuine `this.` call in the helper one hop out.
  */
 export function reachedSameFileMethods(
   tsName: string,
   tsCalls: Iterable<string>,
   sameFileCalls: (name: string) => Iterable<string> | undefined,
   depth = SAME_FILE_CLOSURE_DEPTH,
+  foreignReads: (owner: string) => Iterable<string> | undefined = () => undefined,
 ): Set<string> {
   const reached = new Set<string>();
   const visited = new Set<string>([tsName]);
-  let frontier = [...tsCalls];
+  const foreignOf = new Map<string, Set<string>>();
+  const foreign = (owner: string): Set<string> => {
+    let set = foreignOf.get(owner);
+    if (set === undefined) {
+      set = new Set(foreignReads(owner) ?? []);
+      foreignOf.set(owner, set);
+    }
+    return set;
+  };
+  let frontier: Array<[name: string, owner: string]> = [...tsCalls].map((n) => [n, tsName]);
   for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
-    const next: string[] = [];
-    for (const name of frontier) {
+    const next: Array<[string, string]> = [];
+    for (const [name, owner] of frontier) {
       if (SYNTHETIC_CALL_NAMES.has(name)) continue;
+      if (foreign(owner).has(name)) continue;
       if (visited.has(name)) continue;
       visited.add(name);
       const calls = sameFileCalls(name);
       if (calls === undefined) continue; // not defined in this file
       reached.add(name);
-      next.push(...calls);
+      for (const c of calls) next.push([c, name]);
     }
     frontier = next;
   }
@@ -2815,7 +2820,13 @@ export function main() {
         const own = partitionNegatedCalls(tsCandidateSets.flat());
         const sameFile = sameFilePartition(tsFile);
         const sameFileCalls = (n: string) => sameFile.get(n)?.calls;
-        const reached = reachedSameFileMethods(tsName, own.calls, sameFileCalls);
+        const reached = reachedSameFileMethods(
+          tsName,
+          own.calls,
+          sameFileCalls,
+          SAME_FILE_CLOSURE_DEPTH,
+          (n) => (n === tsName ? own.foreignReads : sameFile.get(n)?.foreignReads),
+        );
         const effective = effectiveTsCalls(
           tsName,
           own.calls,
