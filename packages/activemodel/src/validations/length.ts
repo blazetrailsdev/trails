@@ -97,9 +97,9 @@ export class LengthValidator extends EachValidator {
           options["maximum"] = r.excludeEnd ? r.end - 1 : r.end;
         }
       } else {
-        throw new ArgumentError(
-          ":in and :within must be a [min, max] tuple or { begin, end, excludeEnd? } object",
-        );
+        // Mirrors length.rb:17. A Ruby Range spells as a `[min, max]` tuple or
+        // a `{ begin, end, excludeEnd? }` object in TS.
+        throw new ArgumentError(":in and :within must be a Range");
       }
     }
 
@@ -175,17 +175,18 @@ export class LengthValidator extends EachValidator {
     for (const key of ["minimum", "maximum", "is"] as const) {
       const value = this.options[key];
       if (value === undefined) continue;
+      // Mirrors length.rb:39-42. A Ruby Symbol reaches us as a colon-prefixed
+      // string, which is what separates `:five` (a method name) from `"a"`.
       if (
         (Number.isInteger(value as number) && (value as number) >= 0) ||
         value === Infinity ||
-        typeof value === "function" ||
-        typeof value === "string"
+        value === -Infinity ||
+        (typeof value === "string" && value.startsWith(":")) ||
+        typeof value === "function"
       ) {
         continue;
       }
-      throw new ArgumentError(
-        `:${key} must be a non-negative Integer, Infinity, string (method name), or Proc`,
-      );
+      throw new ArgumentError(`:${key} must be a non-negative Integer, Infinity, Symbol, or Proc`);
     }
   }
 }

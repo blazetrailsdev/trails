@@ -1,657 +1,535 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { assertPredicate, assertNothingRaised } from "@blazetrails/activesupport";
+import { ArgumentError } from "../attribute-assignment.js";
 import { Model } from "../index.js";
+import type { LengthRange } from "./length.js";
+
+// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
+class Topic extends Model {
+  static {
+    this.attribute("title", "string");
+    this.attribute("authorName", "string");
+    this.attribute("content", "string");
+    this.attribute("approved", "integer");
+  }
+
+  private five(): number {
+    return 5;
+  }
+}
+
+// Mirrors: activemodel/test/models/person.rb — the subset this file exercises.
+class Person extends Model {
+  static {
+    this.attribute("karma", "string");
+  }
+}
 
 describe("LengthValidationTest", () => {
-  it("optionally validates length of using within", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { in: [3, 10] } });
-      }
-    }
-    const p = new Person({ name: "ab" });
-    expect(await p.isValid()).toBe(false);
-    const p2 = new Person({ name: "abc" });
-    expect(await p2.isValid()).toBe(true);
-  });
-
-  it("optionally validates length of using is", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { is: 5 } });
-      }
-    }
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(await new Person({ name: "bob" }).isValid()).toBe(false);
-  });
-
-  it("validates length of using minimum utf8", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { minimum: 3 } });
-      }
-    }
-    const p = new Person({ name: "\u{1F600}\u{1F600}\u{1F600}" });
-    // Emoji are 2 code units each in JS, so length >= 3
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using maximum utf8", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { maximum: 5 } });
-      }
-    }
-    const p = new Person({ name: "ab" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using within utf8", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { in: [1, 5] } });
-      }
-    }
-    expect(await new Person({ name: "abc" }).isValid()).toBe(true);
-  });
-
-  it("validates length of for infinite maxima", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { minimum: 1, maximum: Infinity } });
-      }
-    }
-    expect(await new Person({ name: "a" }).isValid()).toBe(true);
-    expect(await new Person({ name: "a".repeat(1000) }).isValid()).toBe(true);
-  });
-
-  it("validates length of using maximum should not allow nil when nil not allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, length: { maximum: 5 } });
-      }
-    }
-    const p = new Person();
-    expect(await p.isValid()).toBe(false);
-  });
-
-  it("validates length of using both minimum and maximum should not allow nil", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, length: { minimum: 1, maximum: 5 } });
-      }
-    }
-    const p = new Person();
-    expect(await p.isValid()).toBe(false);
-  });
-
-  it("validates length of using proc as maximum with model method", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { maximum: () => 5 } });
-      }
-    }
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(await new Person({ name: "aliceb" }).isValid()).toBe(false);
-  });
-
-  it("validates length of using lambda as maximum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { maximum: () => 10 } });
-      }
-    }
-    expect(await new Person({ name: "short" }).isValid()).toBe(true);
-    expect(await new Person({ name: "a".repeat(11) }).isValid()).toBe(false);
-  });
-
-  it("validates length of using bignum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 1000000 } });
-      }
-    }
-    const p = new Person({ title: "short" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of nasty params", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 1 } });
-      }
-    }
-    const p = new Person({ title: "" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("optionally validates length of using within utf8", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { in: [3, 5] } });
-      }
-    }
-    const p = new Person({ title: "abc" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using is utf8", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 5 } });
-      }
-    }
-    const p = new Person({ title: "abcde" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of for ruby class", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 2 } });
-      }
-    }
-    const p = new Person({ title: "ok" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using maximum should not allow nil and empty string when blank not allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, length: { maximum: 5 } });
-      }
-    }
-    const p = new Person({ title: "" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates length of using minimum 0 should not allow nil", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, length: { minimum: 0 } });
-      }
-    }
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates length of using is 0 should not allow nil", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 0 } });
-      }
-    }
-    const p = new Person({});
-    expect(await p.isInvalid()).toBe(true);
-
-    p.title = "";
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates with diff in option", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 2, maximum: 10 } });
-      }
-    }
-    const p = new Person({ title: "ok" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using symbol as maximum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 10 } });
-      }
-    }
-    const p = new Person({ title: "short" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates length of using minimum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 5 } });
-      }
-    }
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcd" }).isValid()).toBe(false);
-  });
-
-  it("validates length of using maximum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 5 } });
-      }
-    }
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
-  });
-
-  it("validates length of using maximum should allow nil", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 5 } });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
-
-  it("validates length of using within", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { in: [3, 5] } });
-      }
-    }
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
-  });
-
-  it("validates length of using is", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 4 } });
-      }
-    }
-    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
-  });
-
-  it("validates length of custom errors for minimum with too short", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 5, tooShort: "is way too short" } });
-      }
-    }
-    const p = new Person({ title: "ab" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("is way too short");
-  });
-
-  it("validates length of custom errors for maximum with too long", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 5, tooLong: "is way too long" } });
-      }
-    }
-    const p = new Person({ title: "abcdefgh" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("is way too long");
-  });
-
-  it("validates length of custom errors for both too short and too long", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", {
-          length: { minimum: 3, maximum: 5, tooShort: "short!", tooLong: "long!" },
-        });
-      }
-    }
-    const short = new Person({ title: "ab" });
-    await short.isValid();
-    expect(short.errors.get("title")).toContain("short!");
-
-    const long = new Person({ title: "abcdef" });
-    await long.isValid();
-    expect(long.errors.get("title")).toContain("long!");
-  });
-
-  it("validates length of custom errors for is with wrong length", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 4, wrongLength: "wrong size!" } });
-      }
-    }
-    const p = new Person({ title: "abc" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("wrong size!");
-  });
-
-  it("validates length of using proc as maximum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { length: { maximum: () => 5 } });
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    expect(await p.isValid()).toBe(true);
-    const p2 = new Person({ name: "Alicia" });
-    expect(await p2.isValid()).toBe(false);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("validates length of with allow nil", async () => {
-    class Topic extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validatesLengthOf("title", { is: 5, allowNil: true });
-      }
-    }
-    expect(await new Topic({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Topic({ title: "" }).isValid()).toBe(false);
-    expect(await new Topic({ title: null }).isValid()).toBe(true);
-    expect(await new Topic({ title: "abcde" }).isValid()).toBe(true);
+    Topic.validatesLengthOf("title", { is: 5, allowNil: true });
+
+    assertPredicate(await new Topic({ title: "ab" }).isInvalid(), (invalid) => invalid);
+    assertPredicate(await new Topic({ title: "" }).isInvalid(), (invalid) => invalid);
+    assertPredicate(await new Topic({ title: null }).isValid(), (valid) => valid);
+    assertPredicate(await new Topic({ title: "abcde" }).isValid(), (valid) => valid);
   });
 
   it("validates length of with allow blank", async () => {
-    class Topic extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validatesLengthOf("title", { is: 5, allowBlank: true });
-      }
-    }
-    expect(await new Topic({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Topic({ title: "" }).isValid()).toBe(true);
-    expect(await new Topic({ title: null }).isValid()).toBe(true);
-    expect(await new Topic({ title: "abcde" }).isValid()).toBe(true);
+    Topic.validatesLengthOf("title", { is: 5, allowBlank: true });
+
+    assertPredicate(await new Topic({ title: "ab" }).isInvalid(), (invalid) => invalid);
+    assertPredicate(await new Topic({ title: "" }).isValid(), (valid) => valid);
+    assertPredicate(await new Topic({ title: null }).isValid(), (valid) => valid);
+    assertPredicate(await new Topic({ title: "abcde" }).isValid(), (valid) => valid);
+  });
+
+  it("validates length of using minimum", async () => {
+    Topic.validatesLengthOf("title", { minimum: 5 });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "not";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+
+    t.title = null;
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+  });
+
+  it("validates length of using maximum should allow nil", async () => {
+    Topic.validatesLengthOf("title", { maximum: 10 });
+    const t = new Topic();
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("optionally validates length of using minimum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 2 } });
-      }
-    }
-    expect(await new Person({ title: "ab" }).isValid()).toBe(true);
-    expect(await new Person({ title: "a" }).isValid()).toBe(false);
+    Topic.validatesLengthOf("title", { minimum: 5, allowNil: true });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = null;
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of using maximum", async () => {
+    Topic.validatesLengthOf("title", { maximum: 5 });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("optionally validates length of using maximum", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 5 } });
-      }
-    }
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
+    Topic.validatesLengthOf("title", { maximum: 5, allowNil: true });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = null;
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of using within", async () => {
+    Topic.validatesLengthOf("title", "content", { within: { begin: 3, end: 5 } });
+
+    const t = new Topic({ title: "a!", content: "I'm ooooooooh so very long" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.get("content")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = null;
+    t.content = null;
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.get("content")).toEqual(["is too short (minimum is 3 characters)"]);
+
+    t.title = "abe";
+    t.content = "mad";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("validates length of using within with exclusive range", async () => {
-    // TS doesn't have Ruby's exclusive range syntax, but we can simulate
-    // by using minimum/maximum with appropriate bounds
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        // Exclusive range (3...5) means 3 <= length < 5, so max is 4
-        this.validates("title", { length: { minimum: 3, maximum: 4 } });
-      }
-    }
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+    Topic.validatesLengthOf("title", { within: { begin: 4, end: 10, excludeEnd: true } });
+
+    const t = new Topic({ title: "9 chars!!" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "Now I'm 10";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 9 characters)"]);
+
+    t.title = "Four";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("validates length of using within with infinite ranges", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 0, maximum: Infinity } });
+    const cases: Array<[LengthRange, number | null]> = [
+      [{ begin: -Infinity, end: 10 }, 11],
+      [{ begin: -Infinity, end: 11, excludeEnd: true }, 11],
+      [{ begin: -Infinity }, null],
+      [{ begin: 10, end: Infinity }, 9],
+      [{ begin: 10, end: Infinity, excludeEnd: true }, 9],
+      [{ begin: 10 }, 9],
+      [{ end: 10 }, 11],
+      [{ end: 11, excludeEnd: true }, 11],
+      [{ begin: -Infinity, end: Infinity }, null],
+    ];
+    for (const [range, invalidLength] of cases) {
+      Topic.clearValidatorsBang();
+      Topic.validatesLengthOf("title", { within: range });
+
+      const t = new Topic({ title: "a".repeat(10) });
+      assertPredicate(await t.isValid(), (valid) => valid);
+
+      if (invalidLength != null) {
+        t.title = "a".repeat(invalidLength);
+        assertPredicate(await t.isInvalid(), (invalid) => invalid);
       }
     }
-    expect(await new Person({ title: "" }).isValid()).toBe(true);
-    expect(await new Person({ title: "a".repeat(10000) }).isValid()).toBe(true);
+  });
+
+  it("optionally validates length of using within", async () => {
+    Topic.validatesLengthOf("title", "content", {
+      within: { begin: 3, end: 5 },
+      allowNil: true,
+    });
+
+    const t = new Topic({ title: "abc", content: "abcd" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = null;
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of using is", async () => {
+    Topic.validatesLengthOf("title", { is: 5 });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is the wrong length (should be 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.title = null;
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+  });
+
+  it("optionally validates length of using is", async () => {
+    Topic.validatesLengthOf("title", { is: 5, allowNil: true });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = null;
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of using bignum", async () => {
+    const bigmin = 2 ** 30;
+    const bigmax = 2 ** 32;
+    const bigrange: LengthRange = { begin: bigmin, end: bigmax, excludeEnd: true };
+    await assertNothingRaised(() => {
+      Topic.validatesLengthOf("title", { is: bigmin + 5 });
+      Topic.validatesLengthOf("title", { within: bigrange });
+      Topic.validatesLengthOf("title", { in: bigrange });
+      Topic.validatesLengthOf("title", { minimum: bigmin });
+      Topic.validatesLengthOf("title", { maximum: bigmax });
+    });
+  });
+
+  it("validates length of nasty params", () => {
+    expect(() => Topic.validatesLengthOf("title", { is: -6 })).toThrow(ArgumentError);
+    expect(() => Topic.validatesLengthOf("title", { within: 6 })).toThrow(ArgumentError);
+    expect(() => Topic.validatesLengthOf("title", { minimum: "a" })).toThrow(ArgumentError);
+    expect(() => Topic.validatesLengthOf("title", { maximum: "a" })).toThrow(ArgumentError);
+    expect(() => Topic.validatesLengthOf("title", { within: "a" })).toThrow(ArgumentError);
+    expect(() => Topic.validatesLengthOf("title", { is: "a" })).toThrow(ArgumentError);
   });
 
   it("validates length of custom errors for minimum with message", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: 5, message: "is too short!" } });
-      }
-    }
-    const p = new Person({ title: "ab" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("is too short!");
+    Topic.validatesLengthOf("title", { minimum: 5, message: "boo %{count}" });
+    const t = new Topic({ title: "uhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["boo 5"]);
+  });
+
+  it("validates length of custom errors for minimum with too short", async () => {
+    Topic.validatesLengthOf("title", { minimum: 5, tooShort: "hoo %{count}" });
+    const t = new Topic({ title: "uhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
   });
 
   it("validates length of custom errors for maximum with message", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 3, message: "is too long!" } });
-      }
-    }
-    const p = new Person({ title: "abcde" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("is too long!");
+    Topic.validatesLengthOf("title", { maximum: 5, message: "boo %{count}" });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["boo 5"]);
   });
 
   it("validates length of custom errors for in", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { in: [3, 5], tooShort: "short!", tooLong: "long!" } });
-      }
-    }
-    const short = new Person({ title: "ab" });
-    await short.isValid();
-    expect(short.errors.get("title")).toContain("short!");
-    const long = new Person({ title: "abcdef" });
-    await long.isValid();
-    expect(long.errors.get("title")).toContain("long!");
+    Topic.validatesLengthOf("title", { in: { begin: 10, end: 20 }, message: "hoo %{count}" });
+    let t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 10"]);
+
+    t = new Topic({ title: "uhohuhohuhohuhohuhohuhohuhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 20"]);
+  });
+
+  it("validates length of custom errors for maximum with too long", async () => {
+    Topic.validatesLengthOf("title", { maximum: 5, tooLong: "hoo %{count}" });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("validates length of custom errors for both too short and too long", async () => {
+    Topic.validatesLengthOf("title", {
+      minimum: 3,
+      maximum: 5,
+      tooShort: "too short",
+      tooLong: "too long",
+    });
+
+    let t = new Topic({ title: "a" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["too short"]);
+
+    t = new Topic({ title: "aaaaaa" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["too long"]);
   });
 
   it("validates length of custom errors for is with message", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 5, message: "wrong length!" } });
-      }
-    }
-    const p = new Person({ title: "abc" });
-    await p.isValid();
-    expect(p.errors.get("title")).toContain("wrong length!");
+    Topic.validatesLengthOf("title", { is: 5, message: "boo %{count}" });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["boo 5"]);
+  });
+
+  it("validates length of custom errors for is with wrong length", async () => {
+    Topic.validatesLengthOf("title", { is: 5, wrongLength: "hoo %{count}" });
+    const t = new Topic({ title: "uhohuhoh", content: "whatever" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["hoo 5"]);
+  });
+
+  it("validates length of using minimum utf8", async () => {
+    Topic.validatesLengthOf("title", { minimum: 5 });
+
+    const t = new Topic({ title: "一二三四五", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "一二三四";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 5 characters)"]);
+  });
+
+  it("validates length of using maximum utf8", async () => {
+    Topic.validatesLengthOf("title", { maximum: 5 });
+
+    const t = new Topic({ title: "一二三四五", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "一二34五六";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+  });
+
+  it("validates length of using within utf8", async () => {
+    Topic.validatesLengthOf("title", "content", { within: { begin: 3, end: 5 } });
+
+    const t = new Topic({ title: "一二", content: "12三四五六七" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual(["is too short (minimum is 3 characters)"]);
+    expect(t.errors.get("content")).toEqual(["is too long (maximum is 5 characters)"]);
+    t.title = "一二三";
+    t.content = "12三";
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("optionally validates length of using within utf8", async () => {
+    Topic.validatesLengthOf("title", { within: { begin: 3, end: 5 }, allowNil: true });
+
+    let t = new Topic({ title: "一二三四五" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t = new Topic({ title: "一二三" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = null;
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of using is utf8", async () => {
+    Topic.validatesLengthOf("title", { is: 5 });
+
+    const t = new Topic({ title: "一二345", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "一二345六";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is the wrong length (should be 5 characters)"]);
   });
 
   it("validates length of for integer", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 5 } });
-      }
+    Topic.validatesLengthOf("approved", { is: 4 });
+
+    let t = new Topic({ title: "uhohuhoh", content: "whatever", approved: 1 });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("approved"), (errors) => errors.length > 0);
+
+    t = new Topic({ title: "uhohuhoh", content: "whatever", approved: 1234 });
+    assertPredicate(await t.isValid(), (valid) => valid);
+  });
+
+  it("validates length of for ruby class", async () => {
+    try {
+      Person.validatesLengthOf("karma", { minimum: 5 });
+
+      const p = new Person();
+      p.karma = "Pix";
+      assertPredicate(await p.isInvalid(), (invalid) => invalid);
+
+      expect(p.errors.get("karma")).toEqual(["is too short (minimum is 5 characters)"]);
+
+      p.karma = "The Smiths";
+      assertPredicate(await p.isValid(), (valid) => valid);
+    } finally {
+      Person.clearValidatorsBang();
     }
-    // Length is checked as string length
-    expect(await new Person({ title: "12345" }).isValid()).toBe(true);
-    expect(await new Person({ title: "1234" }).isValid()).toBe(false);
   });
 
-  it("validates length of with proc", async () => {
-    // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`.
-    // A Proc receives the record and returns the limit per-instance.
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.attribute("limit", "integer");
-        this.validates("title", {
-          length: { maximum: (r: Person) => r.readAttribute("limit") as number },
-        });
-      }
-    }
-    expect(await new Person({ title: "abc", limit: 5 }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdef", limit: 5 }).isValid()).toBe(false);
+  it("validates length of for infinite maxima", async () => {
+    Topic.validatesLengthOf("title", { within: { begin: 5, end: Infinity } });
+
+    const t = new Topic({ title: "1234" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+
+    t.title = "12345";
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    Topic.validatesLengthOf("authorName", { maximum: Infinity });
+
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.authorName = "A very long author name that should still be valid.".repeat(100);
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("accepts :in as a range object { begin, end }", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { in: { begin: 3, end: 10 } } });
-      }
-    }
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
+  it("validates length of using maximum should not allow nil when nil not allowed", async () => {
+    Topic.validatesLengthOf("title", { maximum: 10, allowNil: false });
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
   });
 
-  it("accepts :within as a range object { begin, end }", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { within: { begin: 3, end: 10 } } });
-      }
-    }
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
+  it("validates length of using maximum should not allow nil and empty string when blank not allowed", async () => {
+    Topic.validatesLengthOf("title", { maximum: 10, allowBlank: false });
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.title = "";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
   });
 
-  it("accepts :in as a range object with excludeEnd", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        // { begin: 3, end: 5, excludeEnd: true } → minimum: 3, maximum: 4
-        this.validates("title", { length: { in: { begin: 3, end: 5, excludeEnd: true } } });
-      }
-    }
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
+  it("validates length of using both minimum and maximum should not allow nil", async () => {
+    Topic.validatesLengthOf("title", { minimum: 5, maximum: 10 });
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
   });
 
-  it("does not leak reserved keys into errors.add options (minimum/maximum path)", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { in: [3, 5] } });
-      }
-    }
-    const p = new Person({ title: "ab" });
-    await p.isValid();
-    const err = p.errors.objects[0];
-    expect(err).toBeDefined();
-    expect(err.options).not.toHaveProperty("minimum");
-    expect(err.options).not.toHaveProperty("maximum");
-    expect(err.options).not.toHaveProperty("tooShort");
-    expect(err.options).not.toHaveProperty("tooLong");
-    expect(err.options).not.toHaveProperty("within");
-    expect(err.options).not.toHaveProperty("is");
-    expect(err.options).toHaveProperty("count");
+  it("validates length of using minimum 0 should not allow nil", async () => {
+    Topic.validatesLengthOf("title", { minimum: 0 });
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("does not leak reserved keys into errors.add options (is path)", async () => {
-    // Rails RESERVED_OPTIONS omits :wrong_length intentionally, so wrongLength
-    // does appear in error options — matching length.rb:13 behaviour.
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { is: 5, wrongLength: "bad length!" } });
-      }
-    }
-    const p = new Person({ title: "abc" });
-    await p.isValid();
-    const err = p.errors.objects[0];
-    expect(err).toBeDefined();
-    expect(err.options).not.toHaveProperty("minimum");
-    expect(err.options).not.toHaveProperty("maximum");
-    expect(err.options).not.toHaveProperty("tooShort");
-    expect(err.options).not.toHaveProperty("tooLong");
-    expect(err.options).not.toHaveProperty("within");
-    expect(err.options).not.toHaveProperty("is");
-    expect(err.options).toHaveProperty("count");
+  it("validates length of using is 0 should not allow nil", async () => {
+    Topic.validatesLengthOf("title", { is: 0 });
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("allowBlank: false with only maximum forces minimum of 1", async () => {
-    // Mirrors length.rb:22-24: if allow_blank == false && minimum.nil? && is.nil? → minimum = 1
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { maximum: 10, allowBlank: false } });
-      }
-    }
-    expect(await new Person({ title: "" }).isValid()).toBe(false);
-    expect(await new Person({ title: "a" }).isValid()).toBe(true);
+  it("validates with diff in option", async () => {
+    Topic.validatesLengthOf("title", { is: 5 });
+    Topic.validatesLengthOf("title", { is: 5, if: () => false });
+
+    assertPredicate(await new Topic({ title: "david" }).isValid(), (valid) => valid);
+    assertPredicate(await new Topic({ title: "david2" }).isInvalid(), (invalid) => invalid);
   });
 
-  it("throws at definition time when :in is not a tuple or range object", () => {
-    expect(() => {
-      class Person extends Model {
-        static {
-          this.attribute("title", "string");
-          this.validates("title", { length: { in: "3..10" as unknown as [number, number] } });
-        }
-      }
-      return Person;
-    }).toThrow(/must be a \[min, max\] tuple/);
+  it("validates length of using symbol as maximum", async () => {
+    Topic.validatesLengthOf("title", { maximum: ":five" });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("throws at definition time when constraint is a non-integer", () => {
-    expect(() => {
-      class Person extends Model {
-        static {
-          this.attribute("title", "string");
-          this.validates("title", { length: { minimum: 2.5 } });
-        }
-      }
-      // reference to suppress unused-class lint
-      return Person;
-    }).toThrow(/minimum must be a non-negative Integer/);
+  it("validates length of using proc as maximum", async () => {
+    Topic.validatesLengthOf("title", { maximum: (_model: Topic) => 5 });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("throws at definition time when constraint is negative", () => {
-    expect(() => {
-      class Person extends Model {
-        static {
-          this.attribute("title", "string");
-          this.validates("title", { length: { minimum: -1 } });
-        }
-      }
-      return Person;
-    }).toThrow(/minimum must be a non-negative Integer/);
+  it("validates length of using proc as maximum with model method", async () => {
+    // Rails writes `Topic.define_method(:max_title_length) { 5 }`; JS has no
+    // define_method, so the method goes onto the prototype directly.
+    (Topic.prototype as unknown as Record<string, unknown>)["maxTitleLength"] = () => 5;
+    Topic.validatesLengthOf("title", {
+      maximum: (model: Topic) =>
+        (model as unknown as { maxTitleLength(): number }).maxTitleLength(),
+    });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("validates length of with symbol method name", async () => {
-    // Rails: a Symbol resolves via record.send(:method_name). In TS a
-    // string option that names a method on the record is resolved the
-    // same way (resolve-value.ts).
-    class Person extends Model {
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { length: { minimum: "minLength" } });
-      }
-      minLength(): number {
-        return 3;
-      }
-    }
-    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+  it("validates length of using lambda as maximum", async () => {
+    Topic.validatesLengthOf("title", { maximum: () => 5 });
+
+    const t = new Topic({ title: "valid", content: "whatever" });
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.title = "notvalid";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (errors) => errors.length > 0);
+    expect(t.errors.get("title")).toEqual(["is too long (maximum is 5 characters)"]);
+
+    t.title = "";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 });
