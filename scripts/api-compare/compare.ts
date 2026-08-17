@@ -141,6 +141,7 @@ import {
   buildIncludeGraph,
   includeGraphCallSets,
   includeGraphEntities,
+  includeGraphHosts,
   type GraphEntity,
 } from "./include-graph.js";
 import {
@@ -704,11 +705,12 @@ const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
  * set, so self-recursion and longer cycles terminate. Names in
  * SYNTHETIC_CALL_NAMES are never resolved or expanded.
  *
- * Neither are the names a body recorded ONLY as a property read off another
- * object (FOREIGN_READ_PREFIX): `details.locale` names a member of `details`,
- * not the same-file method `locale`, so resolving it would union an unrelated
- * method's call-set — and everything it reaches — into a body that read a plain
- * property, making this body's `missing` set move when that method is edited
+ * Neither are the names a body recorded ONLY off another object
+ * (FOREIGN_READ_PREFIX) — read or invoked: `details.locale` and
+ * `details.digest(x)` name members of `details`, not the same-file methods
+ * `locale` / `digest`, so resolving one would union an unrelated
+ * method's call-set — and everything it reaches — into a body that never
+ * called it, making this body's `missing` set move when that method is edited
  * (RFC 0108; the constructor half of the same receiver-blindness is
  * SYNTHETIC_CALL_NAMES). `foreignReads` answers that population per OWNER —
  * the body itself is `tsName` — because a name foreign to this body may well
@@ -934,20 +936,107 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
   return `${tsFile}\u0000${tsClass}\u0000${tsName}`;
 }
 
-/** The TS class that owns `tsName` in the file a pair matched, given every
- *  class in that file declaring the name and the Ruby entity the pair came
- *  from. One declaration needs no disambiguation; several are resolved by the
- *  Ruby class's own short name (`ActiveRecord::ConnectionAdapters::NullPool` →
- *  `NullPool`), which the naming rules make the TS class name too. Unresolved
- *  (`undefined`) keeps the whole-file behaviour it replaced. */
+/**
+ * The TS class that owns `tsName` in the file a pair matched, given every
+ * class in that file declaring the name and the Ruby entity the pair came
+ * from. One declaration needs no disambiguation; several are resolved in three
+ * steps, each of which must name exactly ONE owner or fall through — an
+ * unresolved (`undefined`) result records nothing rather than pairing wrongly
+ * (see ambiguousTsOwner):
+ *
+ *  1. the Ruby class's own short name
+ *     (`ActiveRecord::ConnectionAdapters::NullPool` → `NullPool`), which the
+ *     naming rules make the TS class name too;
+ *  2. the include graph: Ruby flattens a mixin's methods onto the INCLUDING
+ *     class, so the Ruby module never names the TS owner — `FinderMethods#first`
+ *     lands in relation.ts, whose `Relation` records `extends: ["FinderMethods"]`
+ *     and whose sibling `ExplainProxy` does not (`hosts`, see includeGraphHosts);
+ *  3. the SEAT (`OwnerSeat`), for the file that ports both halves of one name:
+ *     persistence.ts spells `Persistence::ClassMethods#_update_record`
+ *     (persistence.rb:687-692) as the free export and the instance half
+ *     (`:900-916`) as `InstanceMethods`, so the class seat is the one owner
+ *     that is not the instance seat.
+ *
+ * Step 3 runs only where the RUBY file poses a seat question — the same name on
+ * both the singleton and the instance half. Where every Ruby owner sits on one
+ * seat the several TS declarations are not the two halves of anything, and
+ * picking one by seat is the mispairing this resolution exists to avoid:
+ * time-ext.ts's single `toTime` body answers `Time#to_time`, `Date#to_time` and
+ * `DateTime#to_time` alike (RFC 0108).
+ */
 export function resolveTsOwner(
   owners: ReadonlySet<string> | undefined,
   rubyModule: string,
+  { hosts, seatOf, rubySeat, rubySeats = new Set() }: TsOwnerResolution = {},
 ): string | undefined {
   if (!owners || owners.size === 0) return undefined;
   if (owners.size === 1) return [...owners][0];
   const short = rubyModule.split("::").at(-1) ?? rubyModule;
-  return owners.has(short) ? short : undefined;
+  if (owners.has(short)) return short;
+  if (hosts) {
+    const via = [...owners].filter((o) => hosts.has(o));
+    if (via.length === 1) return via[0];
+  }
+  if (seatOf && rubySeats.size > 1) {
+    const exact = [...owners].filter((o) => seatOf(o) === rubySeat);
+    if (exact.length === 1) return exact[0];
+    const compatible = [...owners].filter((o) => (seatOf(o) ?? rubySeat) === rubySeat);
+    if (compatible.length === 1) return compatible[0];
+  }
+  return undefined;
+}
+
+/**
+ * Which half of its host a member sits on: Ruby's singleton/instance split,
+ * which TS spells as `static` vs prototype and Rails spells as an `X::ClassMethods`
+ * module beside the bare `X` (`persistence.rb:687-692` vs `:900-916`).
+ */
+export type OwnerSeat = "class" | "instance";
+
+/** What `resolveTsOwner` needs to pick one of a file's several declarations of
+ *  a name: the include-graph hosts of the Ruby module (see includeGraphHosts),
+ *  the seat each TS owner declares the name on, and the seat the Ruby method
+ *  itself sits on. All optional — absent, the resolution is name-only, as it
+ *  was before RFC 0108. */
+export interface TsOwnerResolution {
+  hosts?: ReadonlySet<string>;
+  seatOf?: (tsOwner: string) => OwnerSeat | undefined;
+  rubySeat?: OwnerSeat;
+  /** The seats of EVERY Ruby owner declaring the name in this Ruby file. The
+   *  seat arm runs only when they differ — see resolveTsOwner. */
+  rubySeats?: ReadonlySet<OwnerSeat>;
+}
+
+/** The seat a Ruby owner FQN states, if any: `ActiveRecord::Persistence::ClassMethods`
+ *  is the singleton half of `ActiveRecord::Persistence`. A method the extractor
+ *  bucketed as a class method (`def self.foo`) is the class seat wherever it
+ *  lives, which is what `klass` carries. */
+export function rubyOwnerSeat(rubyModule: string, klass: boolean): OwnerSeat {
+  if (klass) return "class";
+  return (rubyModule.split("::").at(-1) ?? rubyModule) === "ClassMethods" ? "class" : "instance";
+}
+
+/**
+ * The seat a TS owner declares `tsName` on. The trails grouping names come
+ * first: an object literal named `ClassMethods` / `InstanceMethods` holds the
+ * halves that could not both be free exports (persistence.ts), and its members
+ * are prototype members of the grouping either way, so `isStatic` would read
+ * every one of them as the instance seat.
+ *
+ * `undefined` for a top-level function (`""`), which is neither — the port
+ * spells both a `ClassMethods` body and an instance mixin body that way.
+ */
+export function tsOwnerSeat(
+  tsOwner: string,
+  staticOwners: ReadonlySet<string> | undefined,
+  instanceOwners: ReadonlySet<string> | undefined,
+): OwnerSeat | undefined {
+  if (tsOwner === "ClassMethods") return "class";
+  if (tsOwner === "InstanceMethods") return "instance";
+  const isStatic = staticOwners?.has(tsOwner) ?? false;
+  const isInstance = instanceOwners?.has(tsOwner) ?? false;
+  if (isStatic === isInstance) return undefined;
+  return isStatic ? "class" : "instance";
 }
 
 /** True when a file declares `tsName` on several owners and the one this pair
@@ -998,12 +1087,32 @@ export function ambiguousTsOwner(
  * call `attributesForUpdate` exactly as `persistence.rb:901` does could not
  * retire the row. Bidirectional too: a genuine omission in either body is
  * masked by the other.
+ *
+ * Resolved, and so NOT ambiguous, when exactly one of the Ruby owners sits on
+ * the seat the single TS member is declared on (`RubyOwnerResolution`): it is
+ * then that member's counterpart, and every other owner's counterpart is
+ * elsewhere or nowhere, so this arm compares and the others record nothing.
+ * Several owners sharing that seat says no more than the bare count did —
+ * routing/mapper.rb declares `add_route` on `Base`, `Resources` and `Scoping`,
+ * all instance (RFC 0108).
  */
 export function ambiguousRubyOwner(
   rubyOwners: ReadonlySet<string> | undefined,
   tsOwners: ReadonlySet<string> | undefined,
+  { rubySeat, tsSeat, rubyOwnersOnTsSeat }: RubyOwnerResolution = {},
 ): boolean {
-  return (rubyOwners?.size ?? 0) > 1 && (tsOwners?.size ?? 0) <= 1;
+  if ((rubyOwners?.size ?? 0) <= 1 || (tsOwners?.size ?? 0) > 1) return false;
+  if (tsSeat !== undefined && rubyOwnersOnTsSeat === 1) return rubySeat !== tsSeat;
+  return true;
+}
+
+/** The seat data `ambiguousRubyOwner` resolves a many-to-one pairing with: the
+ *  seat of the Ruby method under comparison, the seat the single TS member is
+ *  declared on, and how many of the file's Ruby owners of that name sit on it. */
+export interface RubyOwnerResolution {
+  rubySeat?: OwnerSeat;
+  tsSeat?: OwnerSeat;
+  rubyOwnersOnTsSeat?: number;
 }
 
 /**
@@ -2249,6 +2358,12 @@ export function main() {
     const tsMissingCallTagsByFileName = new Map<string, Map<string, Map<string, Set<string>>>>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // The same population split by the SEAT each owner declares the name on
+    // (file → name → owners), so `resolveTsOwner` can pair a Ruby
+    // `X::ClassMethods` owner with the static declaration and the bare `X`
+    // owner with the prototype one (RFC 0108).
+    const tsStaticOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsInstanceOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -2293,6 +2408,20 @@ export function main() {
       }
       return includeGraphCallSets(entities, tsName, includeGraph);
     };
+    // (file → Ruby module short name → the file's owners that mix it in),
+    // memoized: `resolveTsOwner` asks once per matched pair.
+    const graphHosts = new Map<string, Map<string, Set<string>>>();
+    const includeHosts = (tsFile: string, rubyModule: string): ReadonlySet<string> => {
+      const short = rubyModule.split("::").at(-1) ?? rubyModule;
+      const byModule = graphHosts.get(tsFile) ?? new Map<string, Set<string>>();
+      let hosts = byModule.get(short);
+      if (!hosts) {
+        hosts = includeGraphHosts(tsFile, short, includeGraph);
+        byModule.set(short, hosts);
+        graphHosts.set(tsFile, byModule);
+      }
+      return hosts;
+    };
     const recordTsParams = (
       m: MethodInfo,
       file = m.file ?? "",
@@ -2303,6 +2432,14 @@ export function main() {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsOwnersByFileName.set(file, owners);
+        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
+        if (owner !== "") {
+          const bySeat =
+            m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
+          const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
+          seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
+          bySeat.set(file, seatOwners);
+        }
       }
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
@@ -2704,10 +2841,15 @@ export function main() {
       const rubyCallsByOwnerName = new Map<string, { calls: string[]; weak: string[] }>();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
       const rubyReaderNames = new Set<string>();
+      // (owner, name) pairs the extractor bucketed as CLASS methods — the
+      // singleton seat wherever the owner FQN does not already say so (see
+      // rubyOwnerSeat).
+      const rubyKlassOwnerNames = new Set<string>();
       const ownerKey = (owner: string, name: string) => `${owner}\u0000${name}`;
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
+        const klassNames = new Set(f.klass.map((rm) => rm.name));
         for (const rm of rubyMethods) {
           // Collected ahead of the mode filter: a Rails `attr_reader` is
           // usually private while the bodies reading it are public, so a
@@ -2726,6 +2868,7 @@ export function main() {
             rm.name,
             (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
           );
+          if (klassNames.has(rm.name)) rubyKlassOwnerNames.add(ownerKey(item.fqn, rm.name));
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
@@ -2789,6 +2932,46 @@ export function main() {
         }
       };
 
+      // The one TS member a matched pair is held to (see resolveTsOwner), and
+      // whether the pairing stayed ambiguous — in which case the gates record
+      // nothing rather than compare against a member this Ruby body did not
+      // port to.
+      const resolveOwner = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+      ): { tsClass: string | undefined; ambiguous: boolean } => {
+        const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
+        const rubySeatOf = (rubyOwner: string) =>
+          rubyOwnerSeat(rubyOwner, rubyKlassOwnerNames.has(ownerKey(rubyOwner, rubyName)));
+        const rubySeat = rubySeatOf(rubyModule);
+        const seatOf = (tsOwner: string) =>
+          tsOwnerSeat(
+            tsOwner,
+            tsStaticOwnersByFileName.get(tsFile)?.get(tsName),
+            tsInstanceOwnersByFileName.get(tsFile)?.get(tsName),
+          );
+        const rubyOwners = rubyOwnersByName.get(rubyName);
+        const rubySeats = new Set([...(rubyOwners ?? [])].map(rubySeatOf));
+        const tsClass = resolveTsOwner(tsOwners, rubyModule, {
+          hosts: includeHosts(tsFile, rubyModule),
+          seatOf,
+          rubySeat,
+          rubySeats,
+        });
+        const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
+        const ambiguous =
+          ambiguousTsOwner(tsOwners, tsClass) ||
+          ambiguousRubyOwner(rubyOwners, tsOwners, {
+            rubySeat,
+            tsSeat,
+            rubyOwnersOnTsSeat: [...(rubyOwners ?? [])].filter((o) => rubySeatOf(o) === tsSeat)
+              .length,
+          });
+        return { tsClass, ambiguous };
+      };
+
       // Advisory calls-parity check: for a name-matched pair, flag Ruby body
       // calls that (a) map by naming convention to a method we ported and
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
@@ -2808,9 +2991,8 @@ export function main() {
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
         if (rubyCalls.length === 0) return;
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
-        const tsClass = resolveTsOwner(tsOwners, rubyModule);
-        if (ambiguousTsOwner(tsOwners, tsClass)) return;
-        if (ambiguousRubyOwner(rubyOwnersByName.get(rubyName), tsOwners)) return;
+        const { tsClass, ambiguous } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        if (ambiguous) return;
         if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
@@ -2947,9 +3129,8 @@ export function main() {
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
-        const tsClass = resolveTsOwner(tsOwners, rubyModule);
-        if (ambiguousTsOwner(tsOwners, tsClass)) return;
-        if (ambiguousRubyOwner(rubyOwnersByName.get(rubyName), tsOwners)) return;
+        const { tsClass, ambiguous } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        if (ambiguous) return;
         if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
           return;
         }

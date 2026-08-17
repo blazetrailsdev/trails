@@ -101,16 +101,17 @@ export const NEGATED_ALIASES = new Map<string, Set<string>>([
 export const NEGATED_CALL_PREFIX = "!";
 
 /**
- * Prefix the TS extractor uses to mark a name it only ever saw as a property
- * READ off a receiver that is not `this`/`super` (`details.locale` → `.locale`).
+ * Prefix the TS extractor uses to mark a name it only ever saw as a member of a
+ * receiver that is not `this`/`super` — a property READ (`details.locale` →
+ * `.locale`) or an INVOCATION (`details.digest(x)` → `.digest`).
  * Ruby has no field access, so such a read still counts as a call — the plain
  * name is recorded exactly as before — but it names a member of ANOTHER object,
  * so the same-file closure must not resolve it against a same-file method that
  * happens to carry the name (RFC 0108; see reachedSameFileMethods).
  *
  * Marked IN ADDITION to the plain name, and only when EVERY occurrence in the
- * body was such a read: one `this.locale()` in the same body makes the name the
- * body's own again.
+ * body was off such a receiver: one `this.locale()` in the same body makes the
+ * name the body's own again.
  */
 export const FOREIGN_READ_PREFIX = ".";
 
@@ -122,7 +123,7 @@ export function requiresNegatedAlias(rubyCall: string, tsCall: string): boolean 
 /**
  * Split a raw TS call-set into the plain call names, the names the extractor
  * saw in a NEGATED position (`!includes` → `includes`) and the ones it only saw
- * as a foreign property read (`.locale` → `locale`). Both marked populations are
+ * as a foreign member — read or call (`.locale` → `locale`). Both marked populations are
  * kept OUT of the plain set: they are a second record of a call already in it,
  * so leaving them in would double-count against DELEGATION_MAX_CALLS in
  * `isDelegatingWrapper` (compare.ts) and make wrapper detection body-shape dependent.

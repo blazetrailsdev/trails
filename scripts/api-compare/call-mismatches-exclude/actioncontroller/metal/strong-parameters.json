@@ -154,6 +154,13 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
+    "rubyName": "hash_filter",
+    "call": "slice",
+    "reason": "Rails slices the params down to the filter's keys first (strong_parameters.rb:1353); the port walks the filter's own entries and guards each with `k in this._data` (strong-parameters.ts:704-705), covering the same key set without a `slice` call."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/strong-parameters.ts",
     "rubyName": "merge",
     "call": "new_instance_with_inherited_permitted_status",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

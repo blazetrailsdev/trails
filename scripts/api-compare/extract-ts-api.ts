@@ -3055,6 +3055,11 @@ function collectCalls(
         const prop = callee.name.text;
         called.push(prop);
         negated.push(prop);
+        // An invocation off another object gets the same foreign tally as a read
+        // off one (see FOREIGN_READ_PREFIX). The `X.call(...)` identifier
+        // credited below is deliberately NOT tallied: that dispatch really does
+        // run a same-file body — the `this`-typed mixin convention (CLAUDE.md).
+        if (isForeignReadReceiver(callee.expression)) tally(foreignReadOccurrences, prop);
         // `X.call(...)` / `X.apply(...)` also dispatch the function bound to
         // `X` (the project's `this`-typed mixin convention, plus Ruby's
         // `meth.call`/`send` indirection). Additionally credit the dispatched

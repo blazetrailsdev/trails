@@ -147,6 +147,39 @@ export function includeGraphEntities(
 }
 
 /**
+ * The entities declared in `tsFile` whose own recorded `includes` / `extends`
+ * closure reaches an entity named `moduleName` — i.e. the TS hosts a Ruby
+ * module of that name was flattened onto.
+ *
+ * Per-ENTITY, unlike `includeGraphEntities`: `resolveTsOwner` asks which of a
+ * file's several declarations of one member name ported a given Ruby module, so
+ * a file-wide closure would answer "all of them". The edge rules are the same —
+ * recorded names only, and an edge naming more than one entity is dropped.
+ */
+export function includeGraphHosts(
+  tsFile: string,
+  moduleName: string,
+  graph: IncludeGraph,
+): Set<string> {
+  const hosts = new Set<string>();
+  for (const entity of graph.entitiesByFile.get(tsFile) ?? []) {
+    const seenEdges = new Set<string>();
+    const queue = [entity];
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      for (const name of [...current.includes, ...current.extends]) {
+        if (name === moduleName) hosts.add(entity.name);
+        if (seenEdges.has(name)) continue;
+        seenEdges.add(name);
+        const targets = graph.entitiesByName.get(name) ?? [];
+        if (targets.length === 1) queue.push(targets[0]);
+      }
+    }
+  }
+  return hosts;
+}
+
+/**
  * The call-sets of `tsName` bodies on `entities` (the output of
  * `includeGraphEntities`), partitioned into plain, negated and foreign-read calls.
  *

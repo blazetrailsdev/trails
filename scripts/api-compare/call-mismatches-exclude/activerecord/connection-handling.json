@@ -3,6 +3,13 @@
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
     "rubyName": "establish_connection",
+    "call": "call",
+    "reason": "Rails defaults the argument through `DEFAULT_ENV.call` (connection_handling.rb:51); the port's `configOrEnv === undefined` arm routes to `autoConnect` (connection-handling.ts:770), which resolves the environment itself."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "establish_connection",
     "call": "connection_handler",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

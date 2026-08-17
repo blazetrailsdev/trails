@@ -10,6 +10,13 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "compute_cache_version",
+    "call": "empty?",
+    "reason": "`collection.select_values.empty?` (relation.rb:489) is spelled `collection.selectValues.length === 0` (relation.ts:3472) — the property form of an Array emptiness test, which the gate deliberately does not credit as a call (JS_ENUMERABLE_ALIASES, RFC 0092)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "compute_cache_version",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

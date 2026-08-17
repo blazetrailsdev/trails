@@ -16,6 +16,13 @@
   {
     "package": "rack",
     "tsFile": "builder.ts",
+    "rubyName": "new_from_string",
+    "call": "call",
+    "reason": "Rails evaluates the script through `BUILDER_TOPLEVEL_BINDING.call(builder)` (builder.rb:107); the port compiles it with `new Function` and invokes the result directly (builder.ts:59-65), so no `call` dispatch exists."
+  },
+  {
+    "package": "rack",
+    "tsFile": "builder.ts",
     "rubyName": "parse_file",
     "call": "load_file",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

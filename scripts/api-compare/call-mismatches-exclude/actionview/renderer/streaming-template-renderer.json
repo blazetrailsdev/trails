@@ -3,6 +3,13 @@
     "package": "actionview",
     "tsFile": "renderer/streaming-template-renderer.ts",
     "rubyName": "delayed_render",
+    "call": "new",
+    "reason": "Rails instantiates `StreamingBuffer` and `Fiber` (streaming_template_renderer.rb:61,71); the port splits the layout at a sentinel inside an async generator (streaming-template-renderer.ts:87-110) and constructs neither."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
     "call": "set",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

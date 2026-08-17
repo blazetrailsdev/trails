@@ -87,6 +87,38 @@ export async function findNonCanonicalBaselines(files: string[]): Promise<string
   return out;
 }
 
+/**
+ * Baseline files that hold no rows at all (`[]`). The split writers never emit
+ * one — `writeSplitBaseline` DELETES a shard whose entries all converged — so a
+ * committed empty shard makes the mandatory reseed-drift check report a diff
+ * that has nothing to do with the caller's change, and CI's
+ * `Ratchet baseline drift` step fails on it (RFC 0108;
+ * `call-mismatches-exclude/activerecord/explain.json` was the instance).
+ */
+export async function findEmptyBaselines(files: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const f of files) {
+    const value = JSON.parse(await fs.readFile(f, "utf-8")) as unknown;
+    if (Array.isArray(value) && value.length === 0) out.push(f);
+  }
+  return out;
+}
+
+// Shared gate arm: fails when any baseline file holds no rows. Returns whether
+// the caller should fail.
+export async function reportEmptyBaselines(files: string[], label: string): Promise<boolean> {
+  const empty = await findEmptyBaselines(files);
+  if (empty.length === 0) return false;
+  console.error(
+    `\n${label}: ${empty.length} baseline file(s) hold no rows. The reseed ` +
+      "deletes such a file, so a clean-tree `--write` reports a diff the " +
+      "author did not cause — and the drift check is the one tool that says " +
+      "whether a new row landed in the right shard. Delete them:\n",
+  );
+  for (const f of [...empty].sort()) console.error(`  ! ${path.relative(ROOT_DIR, f)}`);
+  return true;
+}
+
 // Shared gate arm: fails when any baseline file is non-canonical, so escaped
 // non-ASCII (or stray indentation) cannot re-enter and re-arm the churn trap.
 // Returns whether the caller should fail.

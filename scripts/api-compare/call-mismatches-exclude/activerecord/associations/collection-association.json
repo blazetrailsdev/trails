@@ -23,6 +23,13 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
+    "rubyName": "replace",
+    "call": "transaction",
+    "reason": "Rails wraps `replace_records` in `transaction` (collection_association.rb:251); the synchronous writer path returns a ReplacePlan and opens the transaction in `persistReplacePlan` (collection-association.ts:775-791)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
     "call": "count_records",
     "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."

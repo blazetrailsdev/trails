@@ -38,6 +38,13 @@
     "package": "activerecord",
     "tsFile": "inheritance.ts",
     "rubyName": "find_sti_class",
+    "call": "inheritance_column",
+    "reason": "Rails casts through `base_class.type_for_attribute(inheritance_column)` (inheritance.rb:312); the port delegates the whole resolution to `stiClassFor` (inheritance.ts:533), same divergence as the `cast` / `type_for_attribute` rows beside it."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "inheritance.ts",
+    "rubyName": "find_sti_class",
     "call": "type_for_attribute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
