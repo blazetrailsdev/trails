@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
+import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { transliterate } from "./transliterate.js";
 
@@ -55,12 +56,20 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate handles nil", () => {
-    expect(transliterate(null)).toBe("");
-    expect(transliterate(undefined)).toBe("");
+    expect(() => transliterate(null as unknown as string)).toThrow(ArgumentError);
+    expect(() => transliterate(null as unknown as string)).toThrow(
+      "Can only transliterate strings. Received NilClass",
+    );
+    expect(() => transliterate(undefined as unknown as string)).toThrow(
+      "Can only transliterate strings. Received NilClass",
+    );
   });
 
   it("transliterate handles unknown object", () => {
-    expect(transliterate(42 as unknown as string)).toBe("42");
+    expect(() => transliterate({} as unknown as string)).toThrow(ArgumentError);
+    expect(() => transliterate({} as unknown as string)).toThrow(
+      "Can only transliterate strings. Received Object",
+    );
   });
 
   it("transliterate handles strings with valid utf8 encodings", () => {

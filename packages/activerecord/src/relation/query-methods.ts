@@ -288,6 +288,10 @@ interface QueryMethodsHost {
   _isNamedJoinValue(v: unknown): boolean;
   /** Rails' `clone` behind `spawn` (spawn_methods.rb:9-11). */
   clone(): any;
+  /** Mirrors: ActiveRecord::SpawnMethods#spawn (spawn_methods.rb:9-11). */
+  spawn(): any;
+  /** Rails `Relation#to_arel` — the built SelectManager (`arel`'s callee). */
+  toArel(aliases?: AliasTracker): any;
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue: boolean;
   _model: typeof import("../base.js").Base;
@@ -319,9 +323,36 @@ function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
   return union;
 }
 
+/**
+ * Specify associations to be eager loaded (preload strategy).
+ *
+ * Mirrors: ActiveRecord::QueryMethods#includes (query_methods.rb:250-253)
+ */
+function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":includes", args);
+  return includesBang.apply(this.clone(), args);
+}
+
 function includesBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
   this.includesValues = unionAppend(this.includesValues, associations);
   return this;
+}
+
+/**
+ * Mirrors: ActiveRecord::QueryMethods#all (query_methods.rb:260-262)
+ */
+function all(this: QueryMethodsHost): any {
+  return this.spawn();
+}
+
+/**
+ * Specify associations to be eager loaded using a LEFT OUTER JOIN.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#eager_load (query_methods.rb:290-293)
+ */
+function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":eager_load", args);
+  return eagerLoadBang.apply(this.clone(), args);
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
@@ -329,9 +360,40 @@ function eagerLoadBang(this: QueryMethodsHost, ...associations: AssociationSpec[
   return this;
 }
 
+/**
+ * Specify associations to be eager loaded using separate queries.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#preload (query_methods.rb:322-325)
+ */
+function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":preload", args);
+  return preloadBang.apply(this.clone(), args);
+}
+
 function preloadBang(this: QueryMethodsHost, ...associations: AssociationSpec[]): any {
   this.preloadValues = unionAppend(this.preloadValues, associations);
   return this;
+}
+
+/**
+ * Extracts a named `association` from the relation.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#extract_associated (query_methods.rb:341-343)
+ */
+async function extractAssociated(this: QueryMethodsHost, association: string): Promise<any[]> {
+  const records = await preload.call(this, association);
+  return Promise.all(records.map((record: any) => record[association]()));
+}
+
+/**
+ * Indicate that the given `tableNames` are referenced by an SQL string, and
+ * should therefore be JOINed rather than loaded separately.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#references (query_methods.rb:355-358)
+ */
+function references(this: QueryMethodsHost, ...tableNames: Array<string | Nodes.SqlLiteral>): any {
+  checkIfMethodHasArgumentsBang.call(this, ":references", tableNames);
+  return referencesBang.apply(this.clone(), tableNames);
 }
 
 function referencesBang(
@@ -386,10 +448,39 @@ export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[
   return PredicateBuilder.references(conditions);
 }
 
+/**
+ * Add a Common Table Expression (WITH clause).
+ *
+ * Mirrors: ActiveRecord::QueryMethods#with (query_methods.rb:493-497). The
+ * function is spelled `withCte` only because `with` is a reserved word in a TS
+ * function declaration; it is mixed in — and called — as `with`.
+ */
+function withCte(this: QueryMethodsHost, ...args: any[]): any {
+  // Rails' `raise ArgumentError ... if block_given?` (query_methods.rb:494). A
+  // trailing function argument is the TS equivalent of a Ruby block — `with`
+  // takes CTE definition hashes, never a callback.
+  if (args.some((cte) => typeof cte === "function")) {
+    throw argumentError("ActiveRecord::Relation#with does not accept a block");
+  }
+  checkIfMethodHasArgumentsBang.call(this, ":with", args);
+  return withBang.apply(this.clone(), args);
+}
+
 function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
   const processed = processWithArgs.call(this, args);
   this.withValues = unionAppend(this.withValues, processed);
   return this;
+}
+
+/**
+ * Add a recursive Common Table Expression (WITH RECURSIVE clause).
+ *
+ * Mirrors: ActiveRecord::QueryMethods#with_recursive (query_methods.rb:518-521)
+ * — unlike `with`, it has no `block_given?` guard.
+ */
+function withRecursive(this: QueryMethodsHost, ...args: any[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":with_recursive", args);
+  return withRecursiveBang.apply(this.clone(), args);
 }
 
 function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
@@ -751,6 +842,21 @@ function unscopeBang(
   return this;
 }
 
+/**
+ * Add one or more INNER JOINs. Accepts an association name (resolved through
+ * reflection), a raw SQL join string, Arel `Nodes.Join` instances, or a nested
+ * association hash — any mix of the above as variadic args. For an explicit
+ * JOIN/ON pair, pass the full raw SQL fragment as a single string (Rails'
+ * verbatim-fragment path): trails collapses Ruby Symbols to strings, so there
+ * is no type-based way to tell a `(table, on)` pair from `joins(:a, :b)`.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#joins (query_methods.rb:868-871)
+ */
+function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":joins", args as unknown[]);
+  return joinsBang.apply(this.clone(), args as (string | Nodes.Join)[]);
+}
+
 function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
   // Rails joins! uses |= (array union), deduplicating by Ruby eql?/hash —
   // structural for Hash specs, strings, and even Arel nodes (Arel::Nodes::Binary
@@ -762,6 +868,31 @@ function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): an
       this.joinsValues = [...this.joinsValues, arg];
   }
   return this;
+}
+
+/**
+ * Perform LEFT OUTER JOINs on `args`.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#left_outer_joins
+ * (query_methods.rb:883-887). Rails' `alias :left_joins :left_outer_joins`
+ * shares this body and reads the called name back out of `__callee__`, which
+ * TS has no equivalent for — so `leftJoins` below carries the same two lines
+ * with its own name rather than routing through an invented shared helper.
+ */
+function leftOuterJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":left_outer_joins", args);
+  // `left_outer_joins!` stores args verbatim and only raises for a
+  // non-Hash/Symbol/Array arg lazily at SQL-build time, in `build_join_buckets`
+  // (query_methods.rb:1828-1834) — not eagerly here.
+  return leftOuterJoinsBang.apply(this.clone(), args);
+}
+
+/**
+ * Mirrors: `alias :left_joins :left_outer_joins` (query_methods.rb:888).
+ */
+function leftJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":left_joins", args);
+  return leftOuterJoinsBang.apply(this.clone(), args);
 }
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
@@ -1516,6 +1647,18 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
 }
 
 /**
+ * Returns the Arel object associated with the relation. `aliases` threads an
+ * existing AliasTracker so a join scope built via `arel` re-aliases tables
+ * already claimed by the caller.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#arel (query_methods.rb:1594-1596)
+ * @internal
+ */
+export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
+  return this.toArel(aliases);
+}
+
+/**
  * Mirrors: ActiveRecord::QueryMethods#construct_join_dependency
  * (query_methods.rb:1598).
  * @internal
@@ -2036,6 +2179,22 @@ export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]):
 // Module export — all bang variants as a single object for `include()`.
 // ---------------------------------------------------------------------------
 export const QueryMethodBangs = {
+  includes,
+  all,
+  eagerLoad,
+  preload,
+  extractAssociated,
+  references,
+  with: withCte,
+  withRecursive,
+  joins,
+  leftOuterJoins,
+  leftJoins,
+  arel,
+  assertModifiableBang,
+  checkIfMethodHasArgumentsBang,
+  arelColumns,
+  arelColumnsFromHash,
   includesBang,
   eagerLoadBang,
   preloadBang,
