@@ -56,13 +56,15 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options continues lookup in parent", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent);
     expect((child as any).foo).toBe("bar");
   });
 
   it("inheritable options can override parent", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.foo = "baz";
     expect(child.foo).toBe("baz");
@@ -70,7 +72,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options inheritable copy", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent);
     const grandchild = child.inheritableCopy() as any;
     expect(grandchild.foo).toBe("bar");
@@ -91,7 +94,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options with bang", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     expect(child["foo!"]()).toBe("bar");
     expect(() => child["missing!"]()).toThrow(":missing is blank");
@@ -108,7 +112,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable option inspect", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     const str = child.inspect();
@@ -123,7 +128,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options to h", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     expect(child.toH()).toEqual({ foo: "bar", baz: "qux" });
@@ -139,7 +145,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options dup", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     const copy = child.dup();
@@ -158,14 +165,16 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options key", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     expect(child.key("qux")).toBe("baz");
   });
 
   it("inheritable options overridden", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     expect(child.foo).toBe("bar");
     child.foo = "baz";
@@ -173,14 +182,16 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options overridden with nil", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.foo = null;
     expect(child.foo).toBeNull();
   });
 
   it("inheritable options each", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     const collected: [string, unknown][] = [];
@@ -203,7 +214,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options count", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     child.another = "one";
@@ -219,7 +231,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options to s", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     const str = child.toString();
@@ -236,7 +249,8 @@ describe("OrderedOptionsTest", () => {
   });
 
   it("inheritable options pp", () => {
-    const parent = new OrderedOptions({ foo: "bar" });
+    const parent = new OrderedOptions();
+    parent.set("foo", "bar");
     const child = new InheritableOptions(parent) as any;
     child.baz = "qux";
     const str = child.inspect();
