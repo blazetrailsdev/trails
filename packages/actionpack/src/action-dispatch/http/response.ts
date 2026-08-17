@@ -323,10 +323,11 @@ export class Response {
   /**
    * Mirrors `Response#cookies` (response.rb:418-430). Ruby's `"k=".split("=")`
    * drops the trailing empty field so a deleted cookie reads back as `nil`;
-   * JS keeps it, so the same pair reads back as `""`.
+   * JS keeps it, so the same pair reads back as `""`. A pair with no `=` at
+   * all yields `nil` in Ruby and `undefined` here, hence the value type.
    */
-  get cookies(): Record<string, string> {
-    const cookies: Record<string, string> = {};
+  get cookies(): Record<string, string | undefined> {
+    const cookies: Record<string, string | undefined> = {};
     let header = this.getHeader(SET_COOKIE) as string | string[] | undefined;
     if (header != null) {
       if (typeof header === "string") header = header.split("\n");
@@ -334,7 +335,7 @@ export class Response {
         const pair = cookie.split(";")[0];
         if (pair) {
           const [key, value] = pair.split("=").map((v) => unescape(v));
-          cookies[key] = value ?? "";
+          cookies[key] = value;
         }
       }
     }
