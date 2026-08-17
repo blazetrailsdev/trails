@@ -3173,9 +3173,11 @@ export class Relation<T extends Base> {
    *   @should_eager_load ||=
    *     eager_load_values.any? ||
    *     includes_values.any? && (joined_includes_values.any? || references_eager_loaded_tables?)
+   *
+   * `||=` recomputes on a falsy memo, so a `false` result is not sticky; `reset`
+   * clears it alongside the other memos (relation.rb:1195-1204).
    */
   get isEagerLoading(): boolean {
-    // Ruby's `||=` recomputes on a falsy memo, so `false` is not sticky.
     return (this._shouldEagerLoad ||=
       this.eagerLoadValues.length > 0 ||
       (this.includesValues.length > 0 &&

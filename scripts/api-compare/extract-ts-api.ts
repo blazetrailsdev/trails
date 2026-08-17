@@ -727,14 +727,6 @@ export function extractFromProgram(
         // Capture `export const X = { method() {...}, foo, bar: ... }`
         // as a module. This is the shape every `include(Host, Mod)`
         // mixin uses (see activesupport/src/include.ts).
-        //
-        // SCREAMING_SNAKE names are skipped: a Ruby module is always
-        // CamelCase, so a constant-cased binding is a Ruby *constant* holding
-        // a Hash (`ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`,
-        // deprecation/behaviors.rb:13-63), whose keys are Symbols no Ruby
-        // caller invokes as methods. Counting them as ported members makes
-        // `isPortedWithArgs("raise")` true package-wide and turns every Rails
-        // `raise` into a call-mismatch row (RFC 0108).
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
@@ -1827,10 +1819,14 @@ export function factoryClassMembers(
 }
 
 /**
- * `DEFAULT_BEHAVIORS` — a Ruby constant holding data, not a `module`. Ruby
- * module names are CamelCase, so constant case is the discriminator between a
- * mixin object literal and a method table. An acronym module name (`TSE`) is
- * also all-caps, so the underscore is required.
+ * True for a SCREAMING_SNAKE binding — a Ruby *constant* holding data rather
+ * than a `module`. Ruby module names are CamelCase, so constant case is the
+ * discriminator between a mixin object literal and a method table such as
+ * `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS` (deprecation/behaviors.rb:13-63),
+ * whose keys are Symbols no Ruby caller invokes as methods. Counting those keys
+ * as ported members makes `isPortedWithArgs("raise")` true package-wide and
+ * turns every Rails `raise` in the package into a call-mismatch row (RFC 0108).
+ * An acronym module name (`TSE`) is also all-caps, so the underscore is required.
  */
 export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
@@ -2135,8 +2131,6 @@ export function extractClass(
         ...(skeleton !== undefined ? { skeleton } : {}),
       });
     } else if (ts.isGetAccessorDeclaration(member) && memberName) {
-      // A getter is a ported Rails method body like any other — record its
-      // call set so the call gate can see a dropped call in it.
       const calls = extractCalls(member.body);
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);

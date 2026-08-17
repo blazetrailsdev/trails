@@ -48,7 +48,7 @@ export class DeprecationException extends Error {
  */
 export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, DeprecationBehaviorCallable>> =
   {
-    raise: (message, callstack) => {
+    raise: (message, callstack, deprecator) => {
       const e = new DeprecationException(message);
       e.stack = callstack.map((l) => String(l)).join("\n");
       throw e;
@@ -77,9 +77,9 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, Deprecation
       );
     },
 
-    silence: () => {},
+    silence: (message, callstack, deprecator) => {},
 
-    report: (message, callstack) => {
+    report: (message, callstack, deprecator) => {
       const error = new DeprecationException(message);
       error.stack = callstack.map((l) => String(l)).join("\n");
       currentErrorReporter.report(error);
