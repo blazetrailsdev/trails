@@ -50,9 +50,11 @@ export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
  * Splits or iterates over the array in groups of size +number+, padding any
  * remaining slots with +fill_with+ unless it is +false+.
  *
- * Mirrors: `Array#in_groups_of` (`core_ext/array/grouping.rb:21-49`). The guard
- * is Ruby's `number.to_i <= 0`, whose `to_i` answers 0 for nil and for anything
- * non-numeric.
+ * Mirrors: `Array#in_groups_of` (`core_ext/array/grouping.rb:21-49`). Ruby's
+ * `to_i` and `Array.new` both TRUNCATE, and `each_slice` truncates through
+ * `to_int`, so a fractional +number+ is floored at three separate points while
+ * the error message reports it unrounded via `inspect` — `in_groups_of(0.7)`
+ * raises where `0.7 > 0` would have passed.
  */
 export function inGroupsOf<T>(
   array: T[],
@@ -60,19 +62,24 @@ export function inGroupsOf<T>(
   fillWith: T | null | false = null,
   block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
-  const numberToI = Number(number) || 0;
+  const numberToI = Math.trunc(Number(number)) || 0;
   if (numberToI <= 0) {
     throw new ArgumentError(`Group size must be a positive integer, was ${inspect(number)}`);
   }
+
+  let collection: (T | null | false)[];
+  if (fillWith === false) {
+    collection = array;
+  } else {
+    const padding = Math.trunc((number - (array.length % number)) % number) || 0;
+    collection = (array as (T | null | false)[]).concat(
+      globalThis.Array<T | null | false>(padding).fill(fillWith),
+    );
+  }
+
   const result: (T | null | false)[][] = [];
-  for (let i = 0; i < array.length; i += number) {
-    const group: (T | null | false)[] = array.slice(i, i + number);
-    if (fillWith !== false) {
-      while (group.length < number) {
-        group.push(fillWith);
-      }
-    }
-    result.push(group);
+  for (let i = 0; i < collection.length; i += numberToI) {
+    result.push(collection.slice(i, i + numberToI));
   }
   if (block) result.forEach(block);
   return result;
