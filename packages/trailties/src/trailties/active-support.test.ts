@@ -69,8 +69,8 @@ describe("RailtieTest", () => {
       Trailtie.runInitializers();
       for (const d of [deprecator, other]) {
         expect(d.silenced).toBe(true);
-        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.get("silence")]);
-        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.get("silence")]);
+        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.silence]);
+        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.silence]);
       }
     } finally {
       deprecator.behavior = savedBehavior;
@@ -93,8 +93,8 @@ describe("RailtieTest", () => {
     try {
       Trailtie.runInitializers();
       for (const d of [deprecator, other]) {
-        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.get("raise")]);
-        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.get("raise")]);
+        expect(d.behavior).toEqual([DEFAULT_BEHAVIORS.raise]);
+        expect(d.disallowedBehavior).toEqual([DEFAULT_BEHAVIORS.raise]);
         expect(d.disallowedWarnings).toEqual(["bad"]);
       }
     } finally {

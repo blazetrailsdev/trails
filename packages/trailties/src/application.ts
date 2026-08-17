@@ -110,11 +110,12 @@ export class Application extends Engine {
    * Splice Bootstrap + Engine/Trailtie + Finisher initializers — mirrors
    * Rails' `Application#initializers` (`application.rb:445-449`).
    *
-   * @missingRailsCall railties_initializers — Rails wraps the inherited
-   * collection in `railties_initializers(super)` so `config.railties_order`
-   * can reorder engines around the app; `ordered_railties` is not ported
-   * (see `application.ts` PR 2.5), so the inherited collection is spliced
-   * in load order.
+   * Rails wraps the inherited collection in `railties_initializers(super)`
+   * (`application.rb:447`) so `config.railties_order` can reorder engines
+   * around the app; `ordered_railties` is not ported (see `application.ts`
+   * PR 2.5), so the inherited collection is spliced in load order. The
+   * `@missingRailsCall` tag is gone because the call gate no longer flags the
+   * call once the getter's own call set is recorded, not because it converged.
    */
   get initializers(): Collection {
     const bootstrap = Bootstrap.initializersFor(this);

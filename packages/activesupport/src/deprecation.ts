@@ -37,69 +37,54 @@ export class DeprecationException extends Error {
  * Mirrors: `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
  * (deprecation/behaviors.rb:13-63).
  *
- * A Ruby Hash keyed by Symbols, so a `Map` and not an object literal: an
- * object literal's `raise` key would read as a ported member named `raise` and
- * make every Rails `raise` in the package look like a call to it.
- *
  * `:log`'s `defined?(Rails.logger) && Rails.logger` is a call-time constant
  * resolution, which ESM cannot express — `@blazetrails/trailties` depends on
  * this package, not the reverse — so `Trails.logger` is read through the
  * zero-import slot it stores itself in (`trails-logger-slot.ts`).
+ *
+ * Rails' `DEFAULT_BEHAVIORS[b]` is a Hash lookup, which sees no prototype, so
+ * the `behavior=` readers guard with `Object.hasOwn` — a bare `[b]` would
+ * answer `"constructor"` with a callable and skip `arity_coerce`.
  */
-export const DEFAULT_BEHAVIORS: ReadonlyMap<DeprecationBehavior, DeprecationBehaviorCallable> =
-  new Map<DeprecationBehavior, DeprecationBehaviorCallable>([
-    [
-      "raise",
-      (message, callstack) => {
-        const e = new DeprecationException(message);
-        e.stack = callstack.map((l) => String(l)).join("\n");
-        throw e;
-      },
-    ],
+export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, DeprecationBehaviorCallable>> =
+  {
+    raise: (message, callstack) => {
+      const e = new DeprecationException(message);
+      e.stack = callstack.map((l) => String(l)).join("\n");
+      throw e;
+    },
 
-    [
-      "stderr",
-      (message, callstack, deprecator) => {
-        stderr.write(message + "\n");
-        if (deprecator.debug) stderr.write(callstack.join("\n  ") + "\n");
-      },
-    ],
+    stderr: (message, callstack, deprecator) => {
+      stderr.write(message + "\n");
+      if (deprecator.debug) stderr.write(callstack.join("\n  ") + "\n");
+    },
 
-    [
-      "log",
-      (message, callstack, deprecator) => {
-        const logger = trailsLogger ?? new Logger(stderr);
-        logger.warn(message);
-        if (deprecator.debug) logger.debug(callstack.join("\n  "));
-      },
-    ],
+    log: (message, callstack, deprecator) => {
+      const logger = trailsLogger ?? new Logger(stderr);
+      logger.warn(message);
+      if (deprecator.debug) logger.debug(callstack.join("\n  "));
+    },
 
-    [
-      "notify",
-      (message, callstack, deprecator) => {
-        Notifications.instrument(
-          `deprecation.${underscore(deprecator.gemName).replace(/\//g, "_")}`,
-          {
-            message,
-            callstack,
-            gemName: deprecator.gemName,
-            deprecationHorizon: deprecator.deprecationHorizon,
-          },
-        );
-      },
-    ],
+    notify: (message, callstack, deprecator) => {
+      Notifications.instrument(
+        `deprecation.${underscore(deprecator.gemName).replace(/\//g, "_")}`,
+        {
+          message,
+          callstack,
+          gemName: deprecator.gemName,
+          deprecationHorizon: deprecator.deprecationHorizon,
+        },
+      );
+    },
 
-    ["silence", () => {}],
+    silence: () => {},
 
-    [
-      "report",
-      (message, callstack) => {
-        const error = new DeprecationException(message);
-        error.stack = callstack.map((l) => String(l)).join("\n");
-        currentErrorReporter.report(error);
-      },
-    ],
-  ]);
+    report: (message, callstack) => {
+      const error = new DeprecationException(message);
+      error.stack = callstack.map((l) => String(l)).join("\n");
+      currentErrorReporter.report(error);
+    },
+  };
 
 /** One element of what `behavior=` accepts (behaviors.rb:96-104). */
 type DeprecationBehaviorItem = DeprecationBehavior | ((...args: never[]) => void);
@@ -246,13 +231,16 @@ export class Deprecation {
    * Rails: `behaviors.rb:73-75`.
    */
   get behavior(): DeprecationBehaviorCallable[] {
-    return (this._behavior ??= [DEFAULT_BEHAVIORS.get("stderr")!]);
+    return (this._behavior ??= [DEFAULT_BEHAVIORS.stderr]);
   }
 
   /** Rails: `behavior=` (behaviors.rb:111-113). */
   set behavior(behavior: DeprecationBehaviorInput) {
     this._behavior = wrap<DeprecationBehaviorItem>(behavior).map(
-      (b) => (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b) : undefined) ?? arityCoerce(b),
+      (b) =>
+        (typeof b === "string" && Object.hasOwn(DEFAULT_BEHAVIORS, b)
+          ? DEFAULT_BEHAVIORS[b]
+          : undefined) ?? arityCoerce(b),
     );
   }
 
@@ -263,13 +251,16 @@ export class Deprecation {
    * Rails: `behaviors.rb:78-80`.
    */
   get disallowedBehavior(): DeprecationBehaviorCallable[] {
-    return (this._disallowedBehavior ??= [DEFAULT_BEHAVIORS.get("raise")!]);
+    return (this._disallowedBehavior ??= [DEFAULT_BEHAVIORS.raise]);
   }
 
   /** Rails: `disallowed_behavior=` (behaviors.rb:119-121). */
   set disallowedBehavior(behavior: DeprecationBehaviorInput) {
     this._disallowedBehavior = wrap<DeprecationBehaviorItem>(behavior).map(
-      (b) => (typeof b === "string" ? DEFAULT_BEHAVIORS.get(b) : undefined) ?? arityCoerce(b),
+      (b) =>
+        (typeof b === "string" && Object.hasOwn(DEFAULT_BEHAVIORS, b)
+          ? DEFAULT_BEHAVIORS[b]
+          : undefined) ?? arityCoerce(b),
     );
   }
 

@@ -199,6 +199,31 @@ describe("body call capture", () => {
     expect(save.calls).toEqual(["helper", "nested", "runCallbacks", "touch"]);
   });
 
+  it("records the call-set of a get accessor body, as it does for a method", () => {
+    // A Rails method trails ports as a getter (`query_cache` →
+    // `get queryCache()`) is a ported body like any other; without a `calls`
+    // set the call gate sees an empty population and can never flag a
+    // dropped call in it.
+    const cls = extractFromSource(
+      `class Foo {
+        get queryCache() {
+          return this.computeIfAbsent(this.executionContextId());
+        }
+        set queryCache(value) {
+          this.store(value);
+        }
+      }`,
+    );
+    const reader = cls.instanceMethods.find((m) => m.name === "queryCache" && !m.writer)!;
+    expect(reader.calls).toEqual(["computeIfAbsent", "executionContextId"]);
+    expect(reader.callSeq).toEqual(["executionContextId", "computeIfAbsent"]);
+    expect(reader.skeleton).toBeDefined();
+
+    const writer = cls.instanceMethods.find((m) => m.name === "queryCache" && m.writer)!;
+    expect(writer.calls).toEqual(["store"]);
+    expect(writer.callSeq).toEqual(["store"]);
+  });
+
   it("also records the same calls in source order, for the order-only comparison", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -1168,6 +1193,22 @@ describe("extractFromProgram — include() detection", () => {
     expect(mod.instanceMethods.map((m) => m.name).sort()).toEqual(["eq", "gt", "lt"]);
   });
 
+  it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
+    // `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
+    // (deprecation/behaviors.rb:13-63) is a Ruby Hash, not a module. Counting
+    // its `raise:` key as a ported member makes `isPortedWithArgs("raise")`
+    // true package-wide and reds every Rails `raise` in the package.
+    const info = extractFromFiles("/p", {
+      "deprecation.ts": `
+        export const DEFAULT_BEHAVIORS = {
+          raise: (message: string, callstack: unknown[]) => {},
+          silence: () => {},
+        };
+      `,
+    });
+    expect(info.modules["deprecation.ts:DEFAULT_BEHAVIORS"]).toBeUndefined();
+  });
+
   it("captures shorthand-property and callable-RHS object members", () => {
     // Mirrors packages/activerecord/src/locking/pessimistic.ts — bug
     // flagged in PR #961 review.
@@ -1982,19 +2023,19 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     const info = extractFromFiles("/p", {
       "quoting.ts": `
         /** @noRailsEquivalent PERMANENT adapter-free quoting crutch */
-        export const ABSTRACT_SCHEMA_QUOTER = {
+        export const AbstractSchemaQuoter = {
           quoteColumnName(name: string): string { return name; },
         };
 
-        export const OTHER_QUOTER = {
+        export const OtherQuoter = {
           quoteColumnName(name: string): string { return name; },
         };
       `,
     });
-    expect(info.modules["quoting.ts:ABSTRACT_SCHEMA_QUOTER"].noRailsEquivalent).toBe(
+    expect(info.modules["quoting.ts:AbstractSchemaQuoter"].noRailsEquivalent).toBe(
       "PERMANENT adapter-free quoting crutch",
     );
-    expect(info.modules["quoting.ts:OTHER_QUOTER"].noRailsEquivalent).toBeUndefined();
+    expect(info.modules["quoting.ts:OtherQuoter"].noRailsEquivalent).toBeUndefined();
   });
 
   it("drops the reason on a renamed export of a tagged declaration", () => {
