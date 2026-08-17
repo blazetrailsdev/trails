@@ -555,25 +555,6 @@ export function assertNotPredicate<T>(
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_not_predicate` /
- * `refute_predicate` (minitest/assertions.rb), the negated twin of
- * {@link assertPredicate}. Same rationale: Rails inherits it from Minitest, and
- * the predicate is a function applied to `actual` because JS has no method
- * Symbol to send.
- */
-export function assertNotPredicate<T>(
-  actual: T,
-  predicate: (value: T) => unknown,
-  message?: string,
-): void {
-  const result = predicate(actual);
-  assert(
-    result == null || result === false,
-    message ?? `Expected ${inspect(actual)} to not satisfy the predicate`,
-  );
-}
-
-/**
  * @noRailsEquivalent PERMANENT — Minitest's `assert_empty` (minitest/assertions.rb),
  * which sends `empty?` to the collection. Rails inherits it from Minitest, so
  * there is no Ruby counterpart in a mapped file. JS has no `empty?` protocol, so
