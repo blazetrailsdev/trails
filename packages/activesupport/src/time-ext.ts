@@ -18,6 +18,7 @@ import { TimeZone } from "./values/time-zone.js";
 import { toTime as stringToTime } from "./core-ext/string/conversions.js";
 import { preserveTimezone as compatibilityPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import { currentTime } from "./time-travel.js";
+import { secondsSinceMidnight as dateTimeSecondsSinceMidnight } from "./core-ext/date-time/calculations.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -62,8 +63,9 @@ export function endOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 23, min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
-// Rails' `alias`es on the day boundaries — time/calculations.rb:241-243, 250-254,
-// 264 and the identical set on DateTime (date_time/calculations.rb:126-137).
+// Rails' `alias`es on the day boundaries — time/calculations.rb:241-243,
+// 250-254, 264. DateTime's identical set is on its own receiver
+// (core-ext/date-time/calculations.ts).
 export { beginningOfDay as midnight };
 export { beginningOfDay as atMidnight };
 export { beginningOfDay as atBeginningOfDay };
@@ -86,7 +88,7 @@ export function endOfHour(date: Date): Temporal.Instant {
   return change(date, { min: 59, sec: 59, usec: 999999999 / 1000 });
 }
 
-// time/calculations.rb:270, 281; date_time/calculations.rb:148, 155.
+// time/calculations.rb:270, 281.
 export { beginningOfHour as atBeginningOfHour };
 export { endOfHour as atEndOfHour };
 
@@ -102,7 +104,7 @@ export function endOfMinute(date: Date): Temporal.Instant {
   return change(date, { sec: 59, usec: 999999999 / 1000 });
 }
 
-// time/calculations.rb:286, 295; date_time/calculations.rb:162, 168.
+// time/calculations.rb:286, 295.
 export { beginningOfMinute as atBeginningOfMinute };
 export { endOfMinute as atEndOfMinute };
 
@@ -329,22 +331,13 @@ export function advance(
 // ---------------------------------------------------------------------------
 
 /**
- * `DateTime#seconds_since_midnight` (`core_ext/date_time/calculations.rb:20-22`)
+ * `Time#seconds_since_midnight` (`core_ext/time/calculations.rb:64-66`). The
+ * `DateTime` arm of the same name (`core_ext/date_time/calculations.rb:20-22`)
  * is `sec + (min * 60) + (hour * 3600)` — a whole-second count, with none of
- * the sub-second arithmetic `Time#seconds_since_midnight`
- * (`core_ext/time/calculations.rb:64-66`) does.
+ * this sub-second arithmetic — and lives on its own receiver in
+ * `core-ext/date-time/calculations.ts`.
  */
-export function secondsSinceMidnight(
-  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): number;
-export function secondsSinceMidnight(date: Date): number;
-export function secondsSinceMidnight(
-  receiver: Date | Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): number {
-  if (!(receiver instanceof Date)) {
-    return receiver.second + receiver.minute * 60 + receiver.hour * 3600;
-  }
-  const date = receiver;
+export function secondsSinceMidnight(date: Date): number {
   return (
     Math.floor(date.getTime() / 1000) -
     Math.floor(change(date, { hour: 0 }).epochMilliseconds / 1000) +
@@ -844,7 +837,9 @@ export function secondsSinceUnixEpoch(
   datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
 ): number {
   const jd = cCivilToJd(datetime.year, datetime.month, datetime.day);
-  return (jd - 2440588) * 86400 - offsetInSeconds(datetime) + secondsSinceMidnight(datetime);
+  return (
+    (jd - 2440588) * 86400 - offsetInSeconds(datetime) + dateTimeSecondsSinceMidnight(datetime)
+  );
 }
 
 /**
