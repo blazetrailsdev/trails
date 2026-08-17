@@ -21,8 +21,8 @@
       "value": 0
     },
     "activemodel": {
-      "assertionCount": 393,
-      "kind": 592,
+      "assertionCount": 365,
+      "kind": 551,
       "value": 63
     },
     "activerecord": {
