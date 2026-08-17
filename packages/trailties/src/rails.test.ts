@@ -79,7 +79,7 @@ describe("Trails", () => {
 
   it("Trails.env= accepts a string and wraps it in EnvironmentInquirer", () => {
     Trails.env = "test";
-    expect(Trails.env.is("test")).toBe(true);
+    expect((Trails.env as any)["test?"]()).toBe(true);
     expect(Trails.env.toString()).toBe("test");
   });
 

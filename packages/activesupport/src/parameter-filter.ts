@@ -1,3 +1,5 @@
+import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+
 /**
  * = Active Support Parameter Filter
  *
@@ -132,7 +134,14 @@ export class ParameterFilter {
 
   /** Mask value of `params` if key matches one of filters. */
   filter(params: Record<string, unknown>): Record<string, unknown> {
-    return this.noFilters ? { ...params } : this.call(params);
+    if (!this.noFilters) return this.call(params);
+    // `params.dup` (parameter_filter.rb:85) — a shallow copy of the SAME class,
+    // so a HashWithIndifferentAccess in stays one on the way out. An object
+    // spread would flatten it to a plain object, whose keys are not indifferent.
+    if (params instanceof HashWithIndifferentAccess) {
+      return params.dup() as unknown as Record<string, unknown>;
+    }
+    return { ...params };
   }
 
   /**
@@ -181,9 +190,21 @@ export class ParameterFilter {
     fullParentKey: string | null = null,
     originalParams: Record<string, unknown> | null = params,
   ): Record<string, unknown> {
-    // `params.class.new` (parameter_filter.rb:126). A null-prototype hash has
-    // no constructor — no class, in Ruby's terms — so it allocates a plain
-    // Object, the nearest thing JS has to its class.
+    // `params.class.new` (parameter_filter.rb:126), then `params.each` and
+    // `filtered_params[key] = …`. A HashWithIndifferentAccess keeps its keys in
+    // a private Map, so `Object.entries` sees nothing on it and index
+    // assignment writes past it — its own iteration and writer are the `each`
+    // and `[]=` Ruby dispatches to.
+    if (params instanceof HashWithIndifferentAccess) {
+      const filteredParams = new HashWithIndifferentAccess<unknown>();
+      (params as HashWithIndifferentAccess<unknown>).forEach((value, key) => {
+        filteredParams.set(key, this.valueForKey(key, value, fullParentKey, originalParams));
+      });
+      return filteredParams as unknown as Record<string, unknown>;
+    }
+
+    // A null-prototype hash has no constructor — no class, in Ruby's terms —
+    // so it allocates a plain Object, the nearest thing JS has to its class.
     const filteredParams = new ((params.constructor ?? Object) as ObjectConstructor)() as Record<
       string,
       unknown
@@ -241,8 +262,13 @@ function escapeRegexp(source: string): string {
   return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Ruby's `value.is_a?(Hash)` — a plain object, not a class instance. */
+/**
+ * Ruby's `value.is_a?(Hash)` — a plain object, not a class instance. A
+ * HashWithIndifferentAccess is a `Hash` in Ruby (`class HashWithIndifferentAccess
+ * < Hash`), so a nested one recurses like any other hash.
+ */
 function isHash(value: unknown): value is Record<string, unknown> {
+  if (value instanceof HashWithIndifferentAccess) return true;
   if (value === null || typeof value !== "object") return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;

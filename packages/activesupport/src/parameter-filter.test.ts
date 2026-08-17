@@ -1,148 +1,198 @@
 import { describe, it, expect } from "vitest";
-import { ParameterFilter } from "./parameter-filter.js";
+import { ParameterFilter, type Filter } from "./parameter-filter.js";
+import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 
 /** Ruby's `String#swapcase`, which JS has no built-in for. */
 function swapcase(str: string): string {
   return str.replace(/\p{L}/gu, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()));
 }
 
+type Params = Record<string, unknown>;
+
 describe("ParameterFilterTest", () => {
   it("process parameter filter", () => {
-    const f = new ParameterFilter(["password", "credit_card"]);
-    const result = f.filter({
-      username: "alice",
-      password: "secret",
-      credit_card: "4111111111111111",
-    });
-    expect(result.username).toBe("alice");
-    expect(result.password).toBe("[FILTERED]");
-    expect(result.credit_card).toBe("[FILTERED]");
+    const testHashes: [Params, Params, Filter[]][] = [
+      [{ foo: "bar" }, { foo: "bar" }, ["food"]],
+      [{ foo: "bar" }, { foo: "[FILTERED]" }, ["foo"]],
+      [{ foo: "bar", bar: "foo" }, { foo: "[FILTERED]", bar: "foo" }, ["foo", "baz"]],
+      [{ foo: "bar", baz: "foo" }, { foo: "[FILTERED]", baz: "[FILTERED]" }, ["foo", "baz"]],
+      [{ bar: { foo: "bar", bar: "foo" } }, { bar: { foo: "[FILTERED]", bar: "foo" } }, ["fo"]],
+      [{ foo: { foo: "bar", bar: "foo" } }, { foo: "[FILTERED]" }, ["f", "banana"]],
+      [
+        { deep: { cc: { code: "bar", bar: "foo" }, ss: { code: "bar" } } },
+        { deep: { cc: { code: "[FILTERED]", bar: "foo" }, ss: { code: "bar" } } },
+        ["deep.cc.code"],
+      ],
+      [{ baz: [{ foo: "baz" }, "1"] }, { baz: [{ foo: "[FILTERED]" }, "1"] }, [/foo/]],
+    ];
+
+    for (const [beforeFilter, afterFilter, filterWords] of testHashes) {
+      let parameterFilter = new ParameterFilter(filterWords);
+      expect(parameterFilter.filter(beforeFilter)).toEqual(afterFilter);
+
+      filterWords.push("blah");
+      filterWords.push((key, value) => {
+        if (/bargain/.test(key)) return [...String(value)].reverse().join("");
+      });
+      filterWords.push((key, value, originalParams) => {
+        if ((originalParams!["barg"] as Params)["blah"] === "bar" && key === "hello") {
+          return "world!";
+        }
+      });
+
+      filterWords.push((key, value) => {
+        if (key === "array_elements") return String(value).toUpperCase();
+      });
+
+      parameterFilter = new ParameterFilter(filterWords);
+      beforeFilter["barg"] = {
+        bargain: "gain",
+        blah: "bar",
+        bar: { bargain: { blah: "foo", hello: "world" } },
+      };
+      afterFilter["barg"] = {
+        bargain: "niag",
+        blah: "[FILTERED]",
+        bar: { bargain: { blah: "[FILTERED]", hello: "world!" } },
+      };
+
+      beforeFilter["array_elements"] = ["element1", "element2"];
+      afterFilter["array_elements"] = ["ELEMENT1", "ELEMENT2"];
+
+      expect(parameterFilter.filter(beforeFilter)).toEqual(afterFilter);
+    }
   });
 
   it("filter should return mask option when value is filtered", () => {
-    const f = new ParameterFilter(["secret"], { mask: "[REDACTED]" });
-    const result = f.filter({ secret: "mySecret", name: "bob" });
-    expect(result.secret).toBe("[REDACTED]");
-    expect(result.name).toBe("bob");
+    const mask = Object.freeze({});
+    const testHashes: [Params, Params, Filter[]][] = [
+      [{ foo: "bar" }, { foo: "bar" }, ["food"]],
+      [{ foo: "bar" }, { foo: mask }, ["foo"]],
+      [{ foo: "bar", bar: "foo" }, { foo: mask, bar: "foo" }, ["foo", "baz"]],
+      [{ foo: "bar", baz: "foo" }, { foo: mask, baz: mask }, ["foo", "baz"]],
+      [{ bar: { foo: "bar", bar: "foo" } }, { bar: { foo: mask, bar: "foo" } }, ["fo"]],
+      [{ foo: { foo: "bar", bar: "foo" } }, { foo: mask }, ["f", "banana"]],
+      [
+        { deep: { cc: { code: "bar", bar: "foo" }, ss: { code: "bar" } } },
+        { deep: { cc: { code: mask, bar: "foo" }, ss: { code: "bar" } } },
+        ["deep.cc.code"],
+      ],
+      [{ baz: [{ foo: "baz" }, "1"] }, { baz: [{ foo: mask }, "1"] }, [/foo/]],
+    ];
+
+    for (const [beforeFilter, afterFilter, filterWords] of testHashes) {
+      let parameterFilter = new ParameterFilter(filterWords, { mask });
+      expect(parameterFilter.filter(beforeFilter)).toEqual(afterFilter);
+
+      filterWords.push("blah");
+      filterWords.push((key, value) => {
+        if (/bargain/.test(key)) return [...String(value)].reverse().join("");
+      });
+      filterWords.push((key, value, originalParams) => {
+        if ((originalParams!["barg"] as Params)["blah"] === "bar" && key === "hello") {
+          return "world!";
+        }
+      });
+
+      parameterFilter = new ParameterFilter(filterWords, { mask });
+      beforeFilter["barg"] = {
+        bargain: "gain",
+        blah: "bar",
+        bar: { bargain: { blah: "foo", hello: "world" } },
+      };
+      afterFilter["barg"] = {
+        bargain: "niag",
+        blah: mask,
+        bar: { bargain: { blah: mask, hello: "world!" } },
+      };
+
+      expect(parameterFilter.filter(beforeFilter)).toEqual(afterFilter);
+    }
   });
 
   it("filter_param", () => {
-    const f = new ParameterFilter(["password"]);
-    expect(f.filterParam("password", "hunter2")).toBe("[FILTERED]");
-    expect(f.filterParam("username", "alice")).toBe("alice");
+    const parameterFilter = new ParameterFilter(["foo", /bar/]);
+    expect(parameterFilter.filterParam("food", "secret value")).toBe("[FILTERED]");
+    expect(parameterFilter.filterParam("baz.foo", "secret value")).toBe("[FILTERED]");
+    expect(parameterFilter.filterParam("barbar", "secret value")).toBe("[FILTERED]");
+    expect(parameterFilter.filterParam("baz", "non secret value")).toBe("non secret value");
   });
 
   it("filter_param can work with empty filters", () => {
-    const f = new ParameterFilter([]);
-    expect(f.filterParam("password", "hunter2")).toBe("hunter2");
-    expect(f.filterParam("anything", "value")).toBe("value");
+    const parameterFilter = new ParameterFilter();
+    expect(parameterFilter.filterParam("foo", "bar")).toBe("bar");
   });
 
   it("parameter filter should maintain hash with indifferent access", () => {
-    const f = new ParameterFilter(["token"]);
-    const result = f.filter({ token: "abc123", data: "visible" });
-    expect(result["token"]).toBe("[FILTERED]");
-    expect(result["data"]).toBe("visible");
+    const testHashes: [HashWithIndifferentAccess<unknown>, Filter[]][] = [
+      [withIndifferentAccess({ foo: "bar" }), ["blah"]],
+      [withIndifferentAccess({ foo: "bar" }), []],
+    ];
+
+    for (const [beforeFilter, filterWords] of testHashes) {
+      const parameterFilter = new ParameterFilter(filterWords);
+      expect(parameterFilter.filter(beforeFilter as unknown as Params)).toBeInstanceOf(
+        HashWithIndifferentAccess,
+      );
+    }
   });
 
   it("filter_param should return mask option when value is filtered", () => {
-    const f = new ParameterFilter(["key"], { mask: "[HIDDEN]" });
-    expect(f.filterParam("key", "value")).toBe("[HIDDEN]");
+    const mask = Object.freeze({});
+    const parameterFilter = new ParameterFilter(["foo", /bar/], { mask });
+    expect(parameterFilter.filterParam("food", "secret value")).toEqual(mask);
+    expect(parameterFilter.filterParam("baz.foo", "secret value")).toEqual(mask);
+    expect(parameterFilter.filterParam("barbar", "secret value")).toEqual(mask);
+    expect(parameterFilter.filterParam("baz", "non secret value")).toEqual("non secret value");
   });
 
   it("process parameter filter with hash having integer keys", () => {
-    const f = new ParameterFilter(["secret"]);
-    const params: Record<string, unknown> = { "0": "public", secret: "hidden" };
-    const result = f.filter(params);
-    expect(result["0"]).toBe("public");
-    expect(result["secret"]).toBe("[FILTERED]");
+    const testHashes: [Params, Params, Filter[]][] = [
+      [{ 13: "bar" }, { 13: "[FILTERED]" }, ["13"]],
+      [{ 20: "bar" }, { 20: "bar" }, ["13"]],
+    ];
+
+    for (const [beforeFilter, afterFilter, filterWords] of testHashes) {
+      const parameterFilter = new ParameterFilter(filterWords);
+      expect(parameterFilter.filter(beforeFilter)).toEqual(afterFilter);
+    }
   });
 
   it("precompile_filters", () => {
-    const patterns = [/A.a/, /b.B/i, "ccC", "ddD"];
+    const patterns: (RegExp | string)[] = [/A.a/, /b.B/i, "ccC", "ddD"];
     const keys = ["Aaa", "Bbb", "Ccc", "Ddd"];
-    const deepPatterns = [/A\.a/, /b\.B/i, "c.C", "d.D"];
+    const deepPatterns: (RegExp | string)[] = [/A\.a/, /b\.B/i, "c.C", "d.D"];
     const deepKeys = ["A.a", "B.b", "C.c", "D.d"];
     const procs = [() => {}, () => {}];
 
     const precompiled = ParameterFilter.precompileFilters([...patterns, ...deepPatterns, ...procs]);
 
-    const regexps = precompiled.filter((f): f is RegExp => f instanceof RegExp);
-    expect(regexps.length).toBe(2);
+    expect(precompiled.filter((filter) => filter instanceof RegExp).length).toBe(2);
     expect(precompiled.length).toBe(2 + procs.length);
 
-    const regexp = regexps.find((r) => r.source.includes((patterns[0] as RegExp).source))!;
-    for (const key of keys) expect(regexp.test(key)).toBe(true);
-    expect(regexp.test(swapcase(keys[0]))).toBe(false);
+    // Ruby matches on `filter.to_s`, whose embeddable form (`(?-mix:A.a)`) is what
+    // the joined Regexp carries; JS joins `source`, so `source` is the analogue.
+    const regexp = precompiled.find(
+      (filter) =>
+        filter instanceof RegExp && filter.source.includes((patterns[0] as RegExp).source),
+    ) as RegExp;
+    for (const key of keys) expect(key).toMatch(regexp);
+    expect(swapcase(keys[0])).not.toMatch(regexp);
 
-    const deepRegexp = regexps.find((r) => r.source.includes((deepPatterns[0] as RegExp).source))!;
-    for (const deepKey of deepKeys) expect(deepRegexp.test(deepKey)).toBe(true);
-    expect(deepRegexp.test(swapcase(deepKeys[0]))).toBe(false);
+    const deepRegexp = precompiled.find(
+      (filter) =>
+        filter instanceof RegExp && filter.source.includes((deepPatterns[0] as RegExp).source),
+    ) as RegExp;
+    for (const deepKey of deepKeys) expect(deepKey).toMatch(deepRegexp);
+    expect(swapcase(deepKeys[0])).not.toMatch(deepRegexp);
 
     expect(regexp).not.toEqual(deepRegexp);
-    expect(precompiled.filter((f) => procs.includes(f as () => void))).toEqual(procs);
-
-    const filter = new ParameterFilter(precompiled);
-    for (const key of keys) expect(filter.filterParam(key, "x")).toBe("[FILTERED]");
-    for (const deepKey of deepKeys) {
-      expect(filter.filter({ [deepKey]: "x" })[deepKey]).toBe("[FILTERED]");
-    }
-    expect(filter.filterParam("zzz", "x")).toBe("x");
+    expect(precompiled.filter((filter) => procs.includes(filter as () => void))).toEqual(procs);
   });
 });
 
-describe("ParameterFilterTest", () => {
-  it("process parameter filter", () => {
-    const filter = new ParameterFilter(["password"]);
-    const result = filter.filter({ user: "alice", password: "secret" });
-    expect(result.user).toBe("alice");
-    expect(result.password).toBe("[FILTERED]");
-  });
-
-  it("filter should return mask option when value is filtered", () => {
-    const filter = new ParameterFilter(["token"], { mask: "REDACTED" });
-    const result = filter.filter({ token: "abc123" });
-    expect(result.token).toBe("REDACTED");
-  });
-
-  it("filter_param", () => {
-    const filter = new ParameterFilter(["secret"]);
-    expect(filter.filterParam("secret", "my_secret")).toBe("[FILTERED]");
-    expect(filter.filterParam("name", "alice")).toBe("alice");
-  });
-
-  it("filter_param can work with empty filters", () => {
-    const filter = new ParameterFilter([]);
-    expect(filter.filterParam("password", "value")).toBe("value");
-  });
-
-  it("parameter filter should maintain hash with indifferent access", () => {
-    const filter = new ParameterFilter(["password"]);
-    const result = filter.filter({ password: "secret", username: "admin" });
-    expect(result.password).toBe("[FILTERED]");
-    expect(result.username).toBe("admin");
-  });
-
-  it("filter_param should return mask option when value is filtered", () => {
-    const filter = new ParameterFilter(["key"], { mask: "***" });
-    expect(filter.filterParam("key", "value")).toBe("***");
-  });
-
-  it("process parameter filter with hash having integer keys", () => {
-    const filter = new ParameterFilter(["password"]);
-    const result = filter.filter({ 1: "one", password: "secret" } as Record<string, unknown>);
-    expect(result.password).toBe("[FILTERED]");
-    expect(result["1"]).toBe("one");
-  });
-
-  it("precompile_filters", () => {
-    // Verify filter works with regex patterns
-    const filter = new ParameterFilter([/password/i]);
-    const result = filter.filter({ Password: "secret", name: "alice" });
-    expect(result.Password).toBe("[FILTERED]");
-    expect(result.name).toBe("alice");
-  });
-
+describe("ParameterFilter", () => {
   it("recurses into nested plain objects", () => {
     const filter = new ParameterFilter(["secret"]);
     const result = filter.filter({ outer: { secret: "hidden", public: "visible" } });
@@ -179,5 +229,14 @@ describe("ParameterFilterTest", () => {
     const result = filter.filter(params as Record<string, unknown>);
     expect(result.secret).toBe("[FILTERED]");
     expect(result.name).toBe("alice");
+  });
+
+  it("filters a nested HashWithIndifferentAccess in place", () => {
+    const filter = new ParameterFilter(["secret"]);
+    const params = withIndifferentAccess({ outer: withIndifferentAccess({ secret: "hidden" }) });
+    const result = filter.filter(params as unknown as Record<string, unknown>);
+    expect((result as unknown as HashWithIndifferentAccess<any>).get("outer").get("secret")).toBe(
+      "[FILTERED]",
+    );
   });
 });
