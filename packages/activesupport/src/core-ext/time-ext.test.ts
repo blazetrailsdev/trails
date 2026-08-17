@@ -14,6 +14,7 @@ import {
   ceil,
   change,
   toFs,
+  DATE_FORMATS,
   xmlschema,
   lastWeek,
   toDate,
@@ -479,15 +480,31 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    const t = d(2005, 2, 21, 17, 44, 30);
-    const result = toFs(t, "db");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    // boundary: a JS `Date` is Rails' `Time.utc` receiver here, and carries
+    // milliseconds where Ruby's `30.12345678901` carries nanoseconds.
+    const time = utc(2005, 2, 21, 17, 44, 30, 123);
+    expect(toFs(time, "doesnt_exist")).toBe("2005-02-21 17:44:30 UTC");
+    expect(toFs(time, "db")).toBe("2005-02-21 17:44:30");
+    expect(toFs(time, "short")).toBe("21 Feb 17:44");
+    expect(toFs(time, "time")).toBe("17:44");
+    expect(toFs(time, "number")).toBe("20050221174430");
+    expect(toFs(time, "nsec")).toBe("20050221174430123000000");
+    expect(toFs(time, "usec")).toBe("20050221174430123000");
+    expect(toFs(time, "long")).toBe("February 21, 2005 17:44");
+    expect(toFs(time, "long_ordinal")).toBe("February 21st, 2005 17:44");
+    expect(toFs(time, "rfc822")).toBe("Mon, 21 Feb 2005 17:44:30 +0000");
+    expect(toFs(time, "rfc2822")).toBe("Mon, 21 Feb 2005 17:44:30 -0000");
+    expect(toFs(time, "inspect")).toBe("2005-02-21 17:44:30.123000000 +0000");
+    expect(toFs(time, "iso8601")).toBe("2005-02-21T17:44:30Z");
   });
 
   it("to fs custom date format", () => {
-    const t = d(2005, 2, 21, 14, 30, 0);
-    const result = toFs(t, "db");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    DATE_FORMATS.custom = "%Y%m%d%H%M%S";
+    try {
+      expect(toFs(utc(2005, 2, 21, 14, 30, 0), "custom")).toBe("20050221143000");
+    } finally {
+      delete DATE_FORMATS.custom;
+    }
   });
 
   it("rfc3339 with fractional seconds", () => {

@@ -663,6 +663,14 @@ export function secFraction(
 export { secFraction as subsec };
 
 /**
+ * The receivers `Time::DATE_FORMATS`' lambdas duck-type: a ruby/date `Time` and
+ * the `PlainDateTime | ZonedDateTime` seat a Ruby `DateTime` stands on. Both
+ * answer `day`, `strftime`, `formatted_offset`, `rfc2822` and `iso8601`, which
+ * is every member those lambdas call.
+ */
+type DateFormatsReceiver = RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime;
+
+/**
  * The named formats `to_fs` resolves, either a `strftime` string or a callable
  * taking the receiver.
  *
@@ -670,15 +678,16 @@ export { secFraction as subsec };
  * Ruby keys are Symbols and the four lambdas duck-type their argument — a
  * `Time`, a `Date` or a `DateTime` all answer `day`, `strftime`,
  * `formatted_offset`, `rfc2822` and `iso8601` — so the hash is shared by every
- * `to_fs` in ActiveSupport. Its only caller in trails today is
- * `core-ext/date-time/conversions.ts`'s `toFs`, so the callables are typed over
- * that receiver; `time-ext.ts`'s own `toFs` below still answers a JS `Date`
- * through a hand-rolled `switch` and is converged separately.
+ * `to_fs` in ActiveSupport. TS has no open classes, so the duck typing is the
+ * `DateFormatsReceiver` union below and an explicit dispatch inside each
+ * lambda: a ruby/date `Time` — the receiver `toFs` bridges a JS `Date` onto —
+ * answers `strftime`/`rfc2822`/`iso8601` itself, and the `DateTime` seat
+ * reaches the same names through `RubyDateTime`.
  *
- * `rfc822`'s `time.formatted_offset(false)` is imported as
- * `dateTimeFormattedOffset` because this file declares its own
- * `formattedOffset` over a JS `Date` — `core_ext/time/conversions.rb`'s arm of
- * the same Rails name — and a `DateTime` receiver reaches the other one.
+ * `rfc822`'s `time.formatted_offset(false)` is the `Time` arm this file
+ * declares for a `Time` receiver and `dateTimeFormattedOffset`
+ * (`core_ext/date_time/conversions.rb`'s arm of the same Rails name) for the
+ * `DateTime` one.
  *
  * That import closes a cycle with `core-ext/date-time/conversions.ts`, which
  * reads `DATE_FORMATS` back for its `to_fs`. Neither side touches the other at
@@ -690,10 +699,7 @@ export { secFraction as subsec };
  * call-time-constant section; a vitest run enters through a funnel module and
  * would mask it.
  */
-export const DATE_FORMATS: Record<
-  string,
-  string | ((time: Temporal.PlainDateTime | Temporal.ZonedDateTime) => string)
-> = {
+export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) => string)> = {
   db: "%Y-%m-%d %H:%M:%S",
   inspect: "%Y-%m-%d %H:%M:%S.%9N %z",
   number: "%Y%m%d%H%M%S",
@@ -704,53 +710,55 @@ export const DATE_FORMATS: Record<
   long: "%B %d, %Y %H:%M",
   long_ordinal: (time) => {
     const dayFormat = ordinalize(time.day);
-    return new RubyDateTime(time).strftime(`%B ${dayFormat}, %Y %H:%M`);
+    return (time instanceof RubyTime ? time : new RubyDateTime(time)).strftime(
+      `%B ${dayFormat}, %Y %H:%M`,
+    );
   },
   rfc822: (time) => {
-    const offsetFormat = dateTimeFormattedOffset(time, false);
-    return new RubyDateTime(time).strftime(`%a, %d %b %Y %H:%M:%S ${offsetFormat}`);
+    const offsetFormat =
+      time instanceof RubyTime
+        ? formattedOffset(time, false)
+        : dateTimeFormattedOffset(time, false);
+    return (time instanceof RubyTime ? time : new RubyDateTime(time)).strftime(
+      `%a, %d %b %Y %H:%M:%S ${offsetFormat}`,
+    );
   },
-  rfc2822: (time) => new RubyDateTime(time).rfc2822(),
-  iso8601: (time) => new RubyDateTime(time).iso8601(),
+  rfc2822: (time) => (time instanceof RubyTime ? time : new RubyDateTime(time)).rfc2822(),
+  iso8601: (time) => (time instanceof RubyTime ? time : new RubyDateTime(time)).iso8601(),
 };
 
 /**
- * toFs — formats a Date as a string using various named formats.
+ * Converts to a formatted string. See {@link DATE_FORMATS} for built-in
+ * formats.
+ *
+ *     toFs(time, "time")   // => "06:10"
+ *     toFs(time, "db")     // => "2007-01-18 06:10:17"
+ *     toFs(time, "short")  // => "18 Jan 06:10"
+ *
+ * Mirrors: `Time#to_fs` (`core_ext/time/conversions.rb:55-61`) —
+ * `formatter.respond_to?(:call) ? formatter.call(self).to_s : strftime(formatter)`,
+ * else `to_s`, which for a `Time` is ruby/time.c's `time_to_s`.
+ *
+ * A JS `Date` is an instant with no zone of its own, so it is bridged onto the
+ * ruby/date `Time` the Rails body formats as a `Time.utc` — the reading
+ * `Date#toISOString` answers, and the receiver Rails' own tests of this
+ * method's callers build (`range_ext_test.rb`'s `Time.utc` endpoints).
  */
 export function toFs(date: Date, format: string = "default"): string {
-  switch (format) {
-    case "db":
-      return date
-        .toISOString()
-        .replace("T", " ")
-        .replace(/\.\d+Z$/, "");
-    case "long":
-      return (
-        date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
-        " " +
-        date.toTimeString().slice(0, 8)
-      );
-    case "short":
-      return (
-        date.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-        " " +
-        date.toTimeString().slice(0, 5)
-      );
-    case "rfc822":
-    case "rfc2822":
-      return date.toUTCString();
-    case "iso8601":
-    case "xmlschema":
-      return date.toISOString();
-    case "inspect":
-      return date.toISOString();
-    default:
-      return (
-        date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) +
-        " " +
-        date.toTimeString().slice(0, 8)
-      );
+  const time = new RubyTime(
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds() + date.getUTCMilliseconds() / 1000,
+    "UTC",
+  );
+  const formatter = DATE_FORMATS[format];
+  if (formatter != null) {
+    return typeof formatter === "function" ? String(formatter(time)) : time.strftime(formatter);
   }
+  return time.toS();
 }
 
 /**
@@ -909,16 +917,19 @@ export function instantToS(instant: Temporal.Instant): string {
  * Mirrors: `Time#formatted_offset` (`core_ext/time/conversions.rb:69-71`) —
  * `utc? && alternate_utc_string || ActiveSupport::TimeZone.seconds_to_utc_offset(utc_offset, colon)`.
  * A `Date` is an instant read in the system zone, so `utc?` is that zone's
- * offset being zero and `utc_offset` is the offset itself, in seconds.
+ * offset being zero and `utc_offset` is the offset itself, in seconds; a
+ * ruby/date `Time` — the receiver `Time::DATE_FORMATS`' `rfc822` lambda hands
+ * over — answers both readers itself.
  * Ruby's `alternate_utc_string` is any non-nil String — `""` included — so the
  * arm is chosen on presence rather than on truthiness.
  */
 export function formattedOffset(
-  date: Date,
+  date: Date | RubyTime,
   colon = true,
   alternateUtcString: string | null = null,
 ): string {
-  const utcOffset = -date.getTimezoneOffset() * 60;
-  if (utcOffset === 0 && alternateUtcString != null) return alternateUtcString;
+  const isUtc = date instanceof RubyTime ? date.isUtc() : -date.getTimezoneOffset() * 60 === 0;
+  if (isUtc && alternateUtcString != null) return alternateUtcString;
+  const utcOffset = date instanceof RubyTime ? date.utcOffset : -date.getTimezoneOffset() * 60;
   return TimeZone.secondsToUtcOffset(utcOffset, colon);
 }
