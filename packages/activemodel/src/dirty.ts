@@ -81,6 +81,22 @@ export function attributePreviousChange(
 }
 
 /**
+ * Mirrors: ActiveModel::Dirty#attribute_will_change!
+ *
+ * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
+ * an attribute as changed for in-place mutations (e.g. array push) where
+ * the object reference stays the same but the content has changed.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
+  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
+  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
+  // Record-shaped reader over it, not the tracker itself.
+  return this._dirty.forceChange(attrName);
+}
+
+/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
@@ -580,22 +596,6 @@ export class DirtyTracker {
 }
 
 /**
- * Mirrors: ActiveModel::Dirty#attribute_will_change!
- *
- * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
- * an attribute as changed for in-place mutations (e.g. array push) where
- * the object reference stays the same but the content has changed.
- *
- * @internal Rails-private helper.
- */
-export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
-  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
-  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
-  // Record-shaped reader over it, not the tracker itself.
-  return this._dirty.forceChange(attrName);
-}
-
-/**
  * Mirrors: ActiveModel::Dirty#restore_attribute!
  *
  * Dispatch target for `restore_*!` per-attribute methods. Restores the
@@ -605,6 +605,25 @@ export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: strin
  */
 export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string): void {
   this._dirty.restoreAttribute(this._attributes, attrName);
+}
+
+/**
+ * Mirrors Rails
+ *
+ *   def initialize_dup(other)
+ *     super
+ *     @mutations_from_database = nil
+ *   end
+ *
+ * (activemodel/lib/active_model/dirty.rb:248-251). Without it the copy shares the
+ * source's tracker, so writing to one marks the other dirty. As with
+ * {@link initInternals}, a fresh `DirtyTracker` is the reset — trails consolidates
+ * Rails' two mutation trackers into one.
+ *
+ * @internal Rails-private helper.
+ */
+export function initializeDup(this: DirtyInternalsHost, _other: unknown): void {
+  this._dirty = new DirtyTracker();
 }
 
 function resolveValue(value: unknown): unknown {

@@ -42,7 +42,11 @@ import {
 } from "./type/normalized-value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
-import { DirtyTracker, initInternals as dirtyInitInternals } from "./dirty.js";
+import {
+  DirtyTracker,
+  initInternals as dirtyInitInternals,
+  initializeDup as dirtyInitializeDup,
+} from "./dirty.js";
 import {
   CallbackFn,
   AroundCallbackFn,
@@ -2133,9 +2137,17 @@ export class Model {
     return duped;
   }
 
-  /** Mirrors: ActiveModel::Validations#initialize_dup (validations.rb:310). */
+  /**
+   * Ruby chains one `initialize_dup` per included module through `super`. TS has
+   * no `super` across mixins, so this is the chain: `Validations` replaces
+   * `@errors` (validations.rb:310-313) and `Dirty` resets the mutation tracker
+   * (dirty.rb:248-251) — without the latter the copy shares the source's tracker
+   * and writing to one marks the other dirty.
+   */
   initializeDup(other: unknown): void {
     validationsInitializeDup.call(this, other);
+    dirtyInitializeDup.call(this, other);
+    this._dirty.initAttributes(this._attributes);
   }
 
   // -- Dirty tracking --

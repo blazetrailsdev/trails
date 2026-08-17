@@ -267,7 +267,6 @@ const _predicatesForValidationContexts = new Map<
  */
 export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
   this.errors = new Errors(this as unknown as TBase);
-  this._validationContext = null;
   this._contextForValidation = undefined;
 }
 
