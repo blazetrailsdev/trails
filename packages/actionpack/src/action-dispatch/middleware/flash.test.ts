@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
 import {
-  FLASH_KEY,
+  KEY,
   FlashHash,
   type FlashRequestHost,
   commitFlash,
@@ -39,7 +39,7 @@ function makeHost(initial: Record<string, unknown> = {}): FlashRequestHost & {
   session: ReturnType<typeof makeSession>;
 } {
   const env: RackEnv = {};
-  return { env, session: makeSession(initial) };
+  return { env, getHeader: (k: string) => env[k], session: makeSession(initial) };
 }
 
 describe("Flash::RequestMethods", () => {
@@ -47,7 +47,7 @@ describe("Flash::RequestMethods", () => {
     const host = makeHost({ flash: { flashes: { notice: "hi" }, discard: [] } });
     const f = flash.call(host)!;
     expect(f.get("notice")).toBe("hi");
-    expect(host.env[FLASH_KEY]).toBe(f);
+    expect(host.env[KEY]).toBe(f);
   });
 
   it("flash setter stores the value and a subsequent get returns it (no session rebuild)", () => {
@@ -103,6 +103,6 @@ describe("Flash::RequestMethods", () => {
     const host = makeHost();
     flash.call(host, new FlashHash({ notice: "hi" }));
     resetSession.call(host);
-    expect(host.env[FLASH_KEY]).toBeNull();
+    expect(host.env[KEY]).toBeNull();
   });
 });

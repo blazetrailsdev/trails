@@ -307,7 +307,14 @@ export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: un
 function makeSerializedHost(
   request: RequestCookieMethodsHost | undefined,
 ): SerializedCookieJarsHost {
-  return { request: request ?? { env: {}, cookies: {} } };
+  return {
+    request: request ?? {
+      env: {},
+      getHeader: () => undefined,
+      hasHeader: () => false,
+      cookies: {},
+    },
+  };
 }
 
 /** @internal */
@@ -552,6 +559,9 @@ export class Cookies {
  */
 export interface RequestCookieMethodsHost {
   env: RackEnv;
+  // `@env[name]` (rack/lib/rack/request.rb:100-102) is untyped in Ruby.
+  getHeader(name: string): any;
+  hasHeader(name: string): boolean;
   cookiesAppOptions?: CookieJarOptions;
   cookies: Record<string, string>;
 }
@@ -573,7 +583,7 @@ export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): Cook
 
 /** True iff a cookie jar has already been built for this request. */
 export function isHaveCookieJar(this: RequestCookieMethodsHost): boolean {
-  return this.env[COOKIE_JAR_ENV] !== undefined;
+  return this.hasHeader("action_dispatch.cookies");
 }
 
 const requestEnvAccessor = <T>(key: string) =>

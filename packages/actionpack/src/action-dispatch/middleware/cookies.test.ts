@@ -132,7 +132,16 @@ describe("Cookies middleware", () => {
 
 function chainedHost(env: Record<string, unknown>): ChainedCookieJarsHost {
   const jar = new CookieJar({ secret: "secret-key-base-for-tests" });
-  return { request: { env, cookies: {} }, signed: jar.signed, encrypted: jar.encrypted };
+  return {
+    request: {
+      env,
+      getHeader: (k: string) => env[k],
+      hasHeader: (k: string) => Object.hasOwn(env, k),
+      cookies: {},
+    },
+    signed: jar.signed,
+    encrypted: jar.encrypted,
+  };
 }
 
 describe("ChainedCookieJars predicates", () => {
@@ -200,7 +209,14 @@ describe("ChainedCookieJars predicates", () => {
 });
 
 function serializedHost(env: Record<string, unknown> = {}): SerializedCookieJarsHost {
-  return { request: { env, cookies: {} } };
+  return {
+    request: {
+      env,
+      getHeader: (k: string) => env[k],
+      hasHeader: (k: string) => Object.hasOwn(env, k),
+      cookies: {},
+    },
+  };
 }
 
 describe("SerializedCookieJars", () => {

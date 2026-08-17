@@ -65,6 +65,7 @@ export class NullType {
 export interface MimeNegotiationHost {
   getHeader(key: string): unknown;
   setHeader(key: string, value: unknown): unknown;
+  fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   parameters: Record<string, unknown>;
   /** Equivalent to `request.accept`: the raw `HTTP_ACCEPT` value (or ""). */
   accept: string;
@@ -205,28 +206,28 @@ export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType
 }
 
 export function formats(this: MimeNegotiationHost): MimeType[] {
-  const cached = this.getHeader(FORMATS_KEY);
-  if (cached !== undefined) return cached as MimeType[];
-  let v: MimeType[];
-  let extType: MimeType | undefined;
-  if (paramsReadable.call(this)) {
-    const f = this.parameters["format"];
-    const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
-    v = found ? [found] : [];
-  } else if (useAcceptHeader.call(this) && validAcceptHeader.call(this)) {
-    v = [...accepts.call(this)];
-  } else if ((extType = formatFromPathExtension.call(this))) {
-    v = [extType];
-  } else if (this.xhr) {
-    const js = MimeType.lookupByExtension("js");
-    v = js ? [js] : [];
-  } else {
-    const html = MimeType.lookupByExtension("html");
-    v = html ? [html] : [];
-  }
-  v = v.filter((f) => f.symbol || f.ref() === "*/*");
-  this.setHeader(FORMATS_KEY, v);
-  return v;
+  return this.fetchHeader(FORMATS_KEY, (k) => {
+    let v: MimeType[];
+    let extType: MimeType | undefined;
+    if (paramsReadable.call(this)) {
+      const f = this.parameters["format"];
+      const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
+      v = found ? [found] : [];
+    } else if (useAcceptHeader.call(this) && validAcceptHeader.call(this)) {
+      v = [...accepts.call(this)];
+    } else if ((extType = formatFromPathExtension.call(this))) {
+      v = [extType];
+    } else if (this.xhr) {
+      const js = MimeType.lookupByExtension("js");
+      v = js ? [js] : [];
+    } else {
+      const html = MimeType.lookupByExtension("html");
+      v = html ? [html] : [];
+    }
+    v = v.filter((f) => f.symbol || f.ref() === "*/*");
+    this.setHeader(k, v);
+    return v;
+  }) as MimeType[];
 }
 
 export function variant(

@@ -318,6 +318,56 @@ describe("body call capture", () => {
     expect(m.callSeq).toEqual(["scope", "constructor"]);
   });
 
+  it("does not give a respond_to?-guard read the guarded call's position", () => {
+    // railties/lib/rails/rack/logger.rb:23-24 —
+    //   `if logger.respond_to?(:push_tags)` / `logger.push_tags(*compute_tags(request)).size`
+    // Ruby records `respond_to?` then `compute_tags` then `push_tags`; the port
+    // spells the guard as a read of `pushTags`, which must not claim its
+    // position. The call SET still carries the name.
+    const cls = extractFromSource(
+      `class Foo {
+        call(env) {
+          const request = new Request(env);
+          return this.logger.pushTags
+            ? this.logger.pushTags(...this.computeTags(request)).length
+            : 0;
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "call")!;
+    expect(m.callSeq).toEqual(["constructor", "logger", "computeTags", "pushTags", "length"]);
+    expect(m.calls).toContain("pushTags");
+  });
+
+  it("keeps a guard read's position when the body never calls that name", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        call() {
+          if (this.logger.pushTags) return this.fallback();
+          return 0;
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "call")!;
+    expect(m.callSeq).toEqual(["logger", "pushTags", "fallback"]);
+  });
+
+  it("keeps a guard read's position when the guarded call has another receiver", () => {
+    // schema_definitions.rb:238-240 — `if index` guards `table.index(...)`, and
+    // Ruby records the `index` READER at the guard, ahead of `index_options`.
+    const cls = extractFromSource(
+      `class Foo {
+        addTo(table) {
+          if (this.index) {
+            table.index(this.columnNames(), this.indexOptions(table.name));
+          }
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "addTo")!;
+    expect(m.callSeq).toEqual(["index", "columnNames", "name", "indexOptions"]);
+  });
+
   it("records a callback argument after the call it is passed to, as Ruby records a block", () => {
     const cls = extractFromSource(
       `class Foo {

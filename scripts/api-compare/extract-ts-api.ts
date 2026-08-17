@@ -3007,6 +3007,7 @@ function collectCalls(
   // is no less ambiguous, since Ruby's single counterpart may correspond to
   // either position.
   const hoisted = skipHoistedClosures ? hoistedClosureCalls(node) : undefined;
+  const invoked = skipHoistedClosures ? invokedCallKeys(node) : undefined;
   const addNegated = (expr: ts.Node, ...called: string[]): void => {
     if (!isNegatedOperand(expr)) return;
     for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
@@ -3116,6 +3117,20 @@ function collectCalls(
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
       visit(n.expression);
       if (n.name.text === "constructor") return;
+      //   - in the ORDER stream only, the read that GUARDS a call of the same
+      //     name (`this.logger.pushTags ? this.logger.pushTags(…) : 0`): that
+      //     is the port's spelling of Ruby's `logger.respond_to?(:push_tags)`
+      //     (railties/lib/rails/rack/logger.rb:23), which Ruby records as
+      //     `respond_to?` at that position, not as `push_tags`. Letting the
+      //     read claim the guard's position puts the name ahead of the
+      //     arguments Rails evaluates first (`compute_tags`) and reports an
+      //     inversion in a body whose order matches Rails. The call itself
+      //     still takes its own position, and the SET is untouched — this is
+      //     the same "a position must be attributable to exactly one call"
+      //     rule as compare.ts#ambiguousTsNames.
+      if (invoked?.has(propertyAccessKey(n)) === true && isGuardConditionRead(n)) {
+        return;
+      }
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         tally(occurrences, n.name.text);
@@ -3156,6 +3171,66 @@ function isForeignReadReceiver(receiver: ts.Node): boolean {
   }
   if (ts.isIdentifier(receiver)) return !/^[A-Z]/.test(receiver.text);
   return true;
+}
+
+/**
+ * Whether a property read sits in the CONDITION of a guard — `if (x.foo)`,
+ * `x.foo ? … : …`, `x.foo && …`, `x.foo ?? …`, and the negated/parenthesized
+ * spellings of each. TS has no `respond_to?`, so reading the method itself is
+ * the only way to ask Rails' question, and the read is the guard, not a send of
+ * its own. See the call site in collectCalls.
+ */
+function isGuardConditionRead(access: ts.PropertyAccessExpression): boolean {
+  let node: ts.Node = access;
+  let parent = node.parent as ts.Node | undefined;
+  while (
+    parent !== undefined &&
+    (ts.isParenthesizedExpression(parent) ||
+      ts.isNonNullExpression(parent) ||
+      (ts.isPrefixUnaryExpression(parent) && parent.operator === ts.SyntaxKind.ExclamationToken))
+  ) {
+    node = parent;
+    parent = node.parent;
+  }
+  if (parent === undefined) return false;
+  if (ts.isIfStatement(parent) || ts.isWhileStatement(parent) || ts.isDoStatement(parent)) {
+    return parent.expression === node;
+  }
+  if (ts.isConditionalExpression(parent)) return parent.condition === node;
+  if (ts.isBinaryExpression(parent)) {
+    return (
+      parent.left === node &&
+      (parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+        parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+        parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+    );
+  }
+  return false;
+}
+
+/**
+ * `receiver.name` for every property-access call the body makes — the key
+ * `isGuardConditionRead`'s call site matches a guard read against. The RECEIVER
+ * is part of the key on purpose: `if (this.index) table.index(…)`
+ * (schema_definitions.rb:238-240) guards one object's reader around a call on
+ * ANOTHER object, and Ruby records that reader — `index` — at the guard's
+ * position, so the read must keep it. Only `x.foo ? x.foo(…)`, the same
+ * receiver and the same name, is the `respond_to?` spelling.
+ */
+function invokedCallKeys(node: ts.Node): Set<string> {
+  const found = new Set<string>();
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
+      found.add(propertyAccessKey(n.expression));
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return found;
+}
+
+function propertyAccessKey(access: ts.PropertyAccessExpression): string {
+  return `${access.expression.getText()}.${access.name.text}`;
 }
 
 /** `const block = () => { … }` / `= function () { … }` — see collectCalls. */
