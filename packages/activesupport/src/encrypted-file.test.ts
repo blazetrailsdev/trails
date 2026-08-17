@@ -3,6 +3,13 @@ import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "./encrypt
 import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { getOsAsync } from "./os-adapter.js";
 import { setEnv } from "./process-adapter.js";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+} from "./testing/assertions.js";
 
 describe("EncryptedFileTest", () => {
   const CONTENT = "One little fox jumped over the hedge";
@@ -82,9 +89,13 @@ describe("EncryptedFileTest", () => {
     await ef.write(CONTENT);
     const fs = await getFsAsync();
     const stat = await fs.stat!(contentPath);
-    // Mode includes file type bits; mask to permission bits.
-    const mode = (stat as unknown as { mode: number }).mode & 0o777;
-    expect(mode).toBe(0o600);
+    // Ruby's `File::Stat#owned?` is `uid == Process.uid`. `FsStatResult.uid` is
+    // the only uid the adapters carry — neither ProcessAdapter nor OsAdapter
+    // exposes the running process's — so the tmpdir this test just created
+    // stands in for it, the same workaround core-ext/file/atomic.ts:57 uses.
+    const tmpdirStat = await fs.stat!(tmpdir);
+    assertPredicate(stat, (s) => s.uid === tmpdirStat.uid);
+    expect(stat.mode!.toString(8)).toBe("100600");
   });
 
   it("raise MissingKeyError when key is missing", async () => {
@@ -94,7 +105,7 @@ describe("EncryptedFileTest", () => {
       envKey: "",
       raiseIfMissingKey: true,
     });
-    await expect(ef.read()).rejects.toBeInstanceOf(MissingKeyError);
+    await assertRaise([MissingKeyError], {}, () => ef.read());
   });
 
   it("raise MissingKeyError when env key is blank", async () => {
@@ -102,52 +113,58 @@ describe("EncryptedFileTest", () => {
     await fs.unlink!(keyPath);
     setEnv("CONTENT_KEY", "");
     const ef = make();
-    await expect(
-      (async () => {
-        await ef.write(CONTENT);
-        await ef.read();
-      })(),
-    ).rejects.toThrow(/Missing encryption key to decrypt file/);
+    const raised = await assertRaise([MissingKeyError], {}, async () => {
+      await ef.write(CONTENT);
+      await ef.read();
+    });
+
+    expect(raised.message).toMatch(/Missing encryption key to decrypt file/);
   });
 
   it("key can be added after MissingKeyError raised", async () => {
     const fs = await getFsAsync();
     await fs.unlink!(keyPath);
     const ef = make();
-    await expect(ef.key()).rejects.toBeInstanceOf(MissingKeyError);
+    await assertRaise([MissingKeyError], {}, () => ef.key());
+
     await fs.writeFile!(keyPath, key);
-    // Fresh instance — Rails caches key-file contents per instance too, so
-    // re-add-after-miss requires a new EncryptedFile (Rails uses ||=).
-    expect(await make().key()).toBe(key);
+
+    await assertNothingRaised(async () => {
+      // Fresh instance — Rails caches key-file contents per instance too, so
+      // re-add-after-miss requires a new EncryptedFile (Rails uses ||=).
+      expect(await make().key()).toBe(key);
+    });
   });
 
   it("key? is true when key file exists", async () => {
-    expect(await make().isKey()).toBe(true);
+    assertPredicate(await make().isKey(), (k) => k);
   });
 
   it("key? is true when env key is present", async () => {
     const fs = await getFsAsync();
     await fs.unlink!(keyPath);
     setEnv("CONTENT_KEY", key);
-    expect(await make().isKey()).toBe(true);
+    assertPredicate(await make().isKey(), (k) => k);
   });
 
   it("key? is false and does not raise when the key is missing", async () => {
     const fs = await getFsAsync();
     await fs.unlink!(keyPath);
-    expect(await make().isKey()).toBe(false);
+    await assertNothingRaised(async () => {
+      assertNot(await make().isKey());
+    });
   });
 
   it("raise InvalidKeyLengthError when key is too short", async () => {
     const fs = await getFsAsync();
     await fs.writeFile!(keyPath, EncryptedFile.generateKey().slice(0, -1));
-    await expect(make().write(CONTENT)).rejects.toBeInstanceOf(InvalidKeyLengthError);
+    await assertRaise([InvalidKeyLengthError], {}, () => make().write(CONTENT));
   });
 
   it("raise InvalidKeyLengthError when key is too long", async () => {
     const fs = await getFsAsync();
     await fs.writeFile!(keyPath, EncryptedFile.generateKey() + "0");
-    await expect(make().write(CONTENT)).rejects.toBeInstanceOf(InvalidKeyLengthError);
+    await assertRaise([InvalidKeyLengthError], {}, () => make().write(CONTENT));
   });
 
   // Bug-for-bug port of the Rails tests: the upstream `encrypted_file`
@@ -168,7 +185,7 @@ describe("EncryptedFileTest", () => {
 
     await ef.write(CONTENT);
 
-    expect((await fs.lstat!(symlinkPath)).isSymbolicLink?.()).toBe(true);
+    assert((await fs.lstat!(symlinkPath)).isSymbolicLink!());
     expect(await ef.read()).toBe(CONTENT);
   });
 
@@ -181,7 +198,7 @@ describe("EncryptedFileTest", () => {
     await ef.write(CONTENT);
 
     const fs = await getFsAsync();
-    expect(await fs.exists(contentPath)).toBe(true);
+    assert(await fs.exists(contentPath));
     expect(await ef.read()).toBe(CONTENT);
   });
 

@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { Entry } from "../entry.js";
 import { coder } from "../coder.js";
 import type { Store, StoreOptions } from "../store.js";
+import { assertSame } from "../../testing/assertions.js";
 
 // Mirrors Rails `CacheStoreCoderBehavior`
 // (activesupport/test/cache/behaviors/cache_store_coder_behavior.rb).
@@ -110,7 +111,7 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
   it("nil coder bypasses serialization", () => {
     const store = host.lookupStore({ coder: null });
     const entry = new Entry("value");
-    expect(serializeEntry(store, entry)).toBe(entry);
+    assertSame(entry, serializeEntry(store, entry));
   });
 
   it("coder is used during handle expired entry when expired", async () => {

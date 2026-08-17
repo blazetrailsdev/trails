@@ -1,220 +1,120 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { KeyGenerator, CachingKeyGenerator } from "./key-generator.js";
-import { BacktraceCleaner } from "./backtrace-cleaner.js";
+import { getCrypto } from "./crypto-adapter.js";
+import { ArgumentError } from "./hash-utils.js";
+import { assertRaises } from "./testing/assertions.js";
 
 describe("KeyGeneratorTest", () => {
+  // Rails' `class InvalidDigest; end` — anything that is not an OpenSSL digest.
+  const InvalidDigest = "InvalidDigest";
+
+  let secret: string;
+  let generator: KeyGenerator;
+
+  beforeEach(() => {
+    secret = getCrypto().randomBytes(64).toString("hex");
+    generator = new KeyGenerator(secret, { iterations: 2 });
+  });
+
   it("Generating a key of the default length", () => {
-    const gen = new KeyGenerator("secret");
-    const key = gen.generateKey("salt");
-    expect(key).toBeInstanceOf(Buffer);
-    expect(key.length).toBe(64);
+    const derivedKey = generator.generateKey("some_salt");
+    expect(derivedKey).toBeInstanceOf(Buffer);
+    expect(derivedKey.length).toBe(64);
   });
 
   it("Generating a key of an alternative length", () => {
-    const gen = new KeyGenerator("secret");
-    const key = gen.generateKey("salt", 32);
-    expect(key.length).toBe(32);
+    const derivedKey = generator.generateKey("some_salt", 32);
+    expect(derivedKey).toBeInstanceOf(Buffer);
+    expect(derivedKey.length).toBe(32);
   });
 
   it("Expected results", () => {
-    // Verify PBKDF2 produces consistent output
-    const gen = new KeyGenerator("secret", { iterations: 1 });
-    const key1 = gen.generateKey("salt", 16);
-    const key2 = gen.generateKey("salt", 16);
-    expect(key1.toString("hex")).toBe(key2.toString("hex"));
+    // For any given set of inputs, this method must continue to return
+    // the same output: if it changes, any existing values relying on a
+    // key would break.
+
+    let expected =
+      "b129376f68f1ecae788d7433310249d65ceec090ecacd4c872a3a9e9ec78e055739be5cc6956345d5ae38e7e1daa66f1de587dc8da2bf9e8b965af4b3918a122";
+    expect(new KeyGenerator("0".repeat(64)).generateKey("some_salt").toString("hex")).toBe(
+      expected,
+    );
+
+    expected = "b129376f68f1ecae788d7433310249d65ceec090ecacd4c872a3a9e9ec78e055";
+    expect(new KeyGenerator("0".repeat(64)).generateKey("some_salt", 32).toString("hex")).toBe(
+      expected,
+    );
+
+    expected =
+      "cbea7f7f47df705967dc508f4e446fd99e7797b1d70011c6899cd39bbe62907b8508337d678505a7dc8184e037f1003ba3d19fc5d829454668e91d2518692eae";
+    expect(
+      new KeyGenerator("0".repeat(64), { iterations: 2 }).generateKey("some_salt").toString("hex"),
+    ).toBe(expected);
   });
 
   it("With custom hash digest class", () => {
-    // Default uses sha1; verify it produces a non-empty key
-    const gen = new KeyGenerator("my_secret");
-    const key = gen.generateKey("my_salt", 32);
-    expect(key.length).toBe(32);
-    expect(key.toString("hex")).not.toBe("");
+    const originalHashDigestClass = KeyGenerator.hashDigestClass;
+
+    KeyGenerator.hashDigestClass = "sha256";
+
+    const expected =
+      "c92322ad55ee691520e8e0f279b53e7a5cc9c1f8efca98295ae252b04cc6e2274c3aaf75ef53b260a6dc548f3e5fbb8af0edf10e7663cf7054c35bcc12835fc0";
+    try {
+      expect(new KeyGenerator("0".repeat(64)).generateKey("some_salt").toString("hex")).toBe(
+        expected,
+      );
+    } finally {
+      KeyGenerator.hashDigestClass = originalHashDigestClass;
+    }
   });
 
-  it("Raises if given a non digest instance", () => {
-    // KeyGenerator always uses sha1 in our impl; this validates it works
-    const gen = new KeyGenerator("secret");
-    expect(() => gen.generateKey("salt")).not.toThrow();
+  it("Raises if given a non digest instance", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      KeyGenerator.hashDigestClass = InvalidDigest;
+    });
+    await assertRaises([ArgumentError], {}, () => {
+      KeyGenerator.hashDigestClass = new (class {})() as unknown as string;
+    });
   });
 
   it("inspect does not show secrets", () => {
-    const gen = new KeyGenerator("my_secret");
-    expect(gen.inspect()).not.toContain("my_secret");
-    expect(gen.inspect()).toContain("[FILTERED]");
+    expect(generator.inspect()).toMatch(/^#<KeyGenerator:0x[0-9a-f]+>$/);
   });
 });
 
 describe("CachingKeyGeneratorTest", () => {
+  let cachingGenerator: CachingKeyGenerator;
+
+  beforeEach(() => {
+    const secret = getCrypto().randomBytes(64).toString("hex");
+    cachingGenerator = new CachingKeyGenerator(new KeyGenerator(secret, { iterations: 2 }));
+  });
+
   it("Generating a cached key for same salt and key size", () => {
-    const gen = new KeyGenerator("secret");
-    const cache = new CachingKeyGenerator(gen);
-    const key1 = cache.generateKey("salt", 32);
-    const key2 = cache.generateKey("salt", 32);
-    expect(key1).toBe(key2); // same Buffer reference (cached)
+    const derivedKey = cachingGenerator.generateKey("some_salt", 32);
+    const cachedKey = cachingGenerator.generateKey("some_salt", 32);
+
+    expect(cachedKey).toEqual(derivedKey);
+    expect(cachedKey).toBe(derivedKey);
   });
 
   it("Does not cache key for different salt", () => {
-    const gen = new KeyGenerator("secret");
-    const cache = new CachingKeyGenerator(gen);
-    const key1 = cache.generateKey("salt1", 32);
-    const key2 = cache.generateKey("salt2", 32);
-    expect(key1.toString("hex")).not.toBe(key2.toString("hex"));
+    const derivedKey = cachingGenerator.generateKey("some_salt", 32);
+    const differentSaltKey = cachingGenerator.generateKey("other_salt", 32);
+
+    expect(differentSaltKey).not.toEqual(derivedKey);
   });
 
   it("Does not cache key for different length", () => {
-    const gen = new KeyGenerator("secret");
-    const cache = new CachingKeyGenerator(gen);
-    const key1 = cache.generateKey("salt", 16);
-    const key2 = cache.generateKey("salt", 32);
-    expect(key1.length).toBe(16);
-    expect(key2.length).toBe(32);
+    const derivedKey = cachingGenerator.generateKey("some_salt", 32);
+    const differentLengthKey = cachingGenerator.generateKey("some_salt", 64);
+
+    expect(differentLengthKey).not.toEqual(derivedKey);
   });
 
   it("Does not cache key for different salts and lengths that are different but are equal when concatenated", () => {
-    const gen = new KeyGenerator("secret");
-    const cache = new CachingKeyGenerator(gen);
-    // "abc|32" and "ab|c32" would be different cache keys with proper separation
-    const key1 = cache.generateKey("abc", 32);
-    const key2 = cache.generateKey("ab", 32);
-    expect(key1.toString("hex")).not.toBe(key2.toString("hex"));
-  });
-});
-describe("BacktraceCleanerFilterTest", () => {
-  it("backtrace should filter all lines in a backtrace, removing prefixes", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/Users/app/", ""));
-    const cleaned = cleaner.clean([
-      "/Users/app/models/user.rb:42",
-      "/Users/app/controllers/users_controller.rb:10",
-    ]);
-    expect(cleaned[0]).toBe("models/user.rb:42");
-    expect(cleaned[1]).toBe("controllers/users_controller.rb:10");
-  });
+    const derivedKey = cachingGenerator.generateKey("13", 37);
+    const differentLengthKey = cachingGenerator.generateKey("1", 337);
 
-  it("backtrace cleaner should allow removing filters", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/prefix/", ""));
-    cleaner.removeFilters();
-    const cleaned = cleaner.clean(["/prefix/file.rb"]);
-    expect(cleaned[0]).toBe("/prefix/file.rb");
-  });
-
-  it("backtrace should contain unaltered lines if they don't match a filter", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/app/", ""));
-    const cleaned = cleaner.clean(["/other/file.rb", "/app/model.rb"]);
-    expect(cleaned[0]).toBe("/other/file.rb");
-    expect(cleaned[1]).toBe("model.rb");
-  });
-
-  it("#dup also copy filters", () => {
-    const original = new BacktraceCleaner();
-    original.addFilter((line) => line.replace("foo", "bar"));
-    const copy = original.dup();
-    const cleaned = copy.clean(["foofile.rb"]);
-    expect(cleaned[0]).toBe("barfile.rb");
-  });
-});
-
-describe("BacktraceCleanerSilencerTest", () => {
-  it("backtrace should not contain lines that match the silencer", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("gems/"));
-    const cleaned = cleaner.clean(["/app/models/user.rb", "/gems/activesupport/lib/foo.rb"]);
-    expect(cleaned).toHaveLength(1);
-    expect(cleaned[0]).toBe("/app/models/user.rb");
-  });
-
-  it("backtrace cleaner should allow removing silencer", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("gems/"));
-    cleaner.removeSilencers();
-    const cleaned = cleaner.clean(["/gems/activesupport/lib/foo.rb"]);
-    expect(cleaned).toHaveLength(1);
-  });
-
-  it("#dup also copy silencers", () => {
-    const original = new BacktraceCleaner();
-    original.addSilencer((line) => line.includes("noise"));
-    const copy = original.dup();
-    const cleaned = copy.clean(["noise.rb", "signal.rb"]);
-    expect(cleaned).toEqual(["signal.rb"]);
-  });
-});
-
-describe("BacktraceCleanerMultipleSilencersTest", () => {
-  it("backtrace should not contain lines that match the silencers", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("gems/"));
-    cleaner.addSilencer((line) => line.includes("stdlib/"));
-    const cleaned = cleaner.clean([
-      "/app/models/user.rb",
-      "/gems/active/foo.rb",
-      "/stdlib/net/http.rb",
-    ]);
-    expect(cleaned).toEqual(["/app/models/user.rb"]);
-  });
-
-  it("backtrace should only contain lines that match the silencers", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addSilencer((line) => !line.includes("/app/"));
-    const cleaned = cleaner.clean(["/app/models/user.rb", "/gems/active/foo.rb"]);
-    expect(cleaned).toEqual(["/app/models/user.rb"]);
-  });
-});
-
-describe("BacktraceCleanerFilterAndSilencerTest", () => {
-  it("backtrace should filter and then silence", () => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/usr/local/", ""));
-    cleaner.addSilencer((line) => line.startsWith("gems/"));
-    const cleaned = cleaner.clean([
-      "/usr/local/gems/activesupport/foo.rb",
-      "/usr/local/app/models/user.rb",
-    ]);
-    // After filter: "gems/activesupport/foo.rb" (silenced), "app/models/user.rb" (kept)
-    expect(cleaned).toEqual(["app/models/user.rb"]);
-  });
-});
-
-describe("KeyGeneratorTest", () => {
-  it.skip("Generating a key of the default length");
-  it.skip("Generating a key of an alternative length");
-  it.skip("Expected results");
-  it.skip("With custom hash digest class");
-  it.skip("Raises if given a non digest instance");
-  it.skip("inspect does not show secrets");
-});
-describe("CachingKeyGeneratorTest", () => {
-  it("Generating a cached key for same salt and key size", () => {
-    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
-    const k1 = gen.generateKey("salt", 16);
-    const k2 = gen.generateKey("salt", 16);
-    expect(k1).toBe(k2); // same reference from cache
-  });
-
-  it("Does not cache key for different salt", () => {
-    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
-    const k1 = gen.generateKey("salt1", 16);
-    const k2 = gen.generateKey("salt2", 16);
-    expect(k1.equals(k2)).toBe(false);
-  });
-
-  it("Does not cache key for different length", () => {
-    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
-    const k1 = gen.generateKey("salt", 16);
-    const k2 = gen.generateKey("salt", 32);
-    expect(k1.length).toBe(16);
-    expect(k2.length).toBe(32);
-    expect(k1).not.toBe(k2);
-  });
-
-  it("Does not cache key for different salts and lengths that are different but are equal when concatenated", () => {
-    const gen = new CachingKeyGenerator(new KeyGenerator("secret", { iterations: 1 }));
-    // Different salts with same length must produce different keys
-    const k1 = gen.generateKey("salt", 16);
-    const k2 = gen.generateKey("sal", 16);
-    expect(k1.equals(k2)).toBe(false);
+    expect(differentLengthKey).not.toEqual(derivedKey);
   });
 });
