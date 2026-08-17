@@ -103,6 +103,11 @@ export interface DirtyInternalsHost {
   _dirty: DirtyTracker;
 }
 
+/** Host shape consumed by `initializeDup` — the duplicate, mid-`dup()`. */
+export interface DirtyDupHost extends DirtyInternalsHost {
+  _attributes: AttributeSet;
+}
+
 /**
  * Dirty tracking mixin — tracks attribute changes on a model.
  *
@@ -122,6 +127,35 @@ export class DirtyTracker {
     attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
   ): void {
     this.snapshot(attributes);
+  }
+
+  /**
+   * An independent tracker carrying this one's state, with `_attrs` repointed at
+   * `attrs` (the duplicate's own AttributeSet).
+   *
+   * @noRailsEquivalent CONVERGEABLE — story
+   * `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`,
+   * whose root cause is this same eager/lazy split; making `DirtyTracker` derive
+   * from the AttributeSet retires this method with it. Rails' `initialize_dup` only
+   * nils `@mutations_from_database` and lets it rebuild lazily from the
+   * already-deep-dup'd `@attributes`, which still carry each attribute's
+   * original-vs-current pair, so the rebuilt tracker reports the same `changes` as
+   * the source while being a distinct object. `DirtyTracker` instead holds an eager
+   * snapshot and derives `changes` from recorded writes, so it cannot reconstruct
+   * itself that way — copying the state is how the same two properties (equal
+   * state, distinct identity) are reached. Verified against MRI: `dup.changes` and
+   * `dup.previous_changes` both equal the source's, and writes to the copy do not
+   * leak back.
+   */
+  deepDup(attrs: AttributeSet): DirtyTracker {
+    const copy = new DirtyTracker();
+    copy._originalAttributes = new Map(this._originalAttributes);
+    copy._originalHas = new Set(this._originalHas);
+    copy._changedAttributes = new Map(this._changedAttributes);
+    copy._previousChanges = new Map(this._previousChanges);
+    copy._forcedNames = new Set(this._forcedNames);
+    copy._attrs = attrs;
+    return copy;
   }
 
   // Rails `Dirty#as_json` (dirty.rb:264-268) exists only to hide the
@@ -609,14 +643,16 @@ export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string):
 
 /**
  * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
- * (activemodel/lib/active_model/dirty.rb:248-251); without it the copy shares the
- * source's tracker, so writing to one marks the other dirty. As with
- * {@link initInternals}, a fresh `DirtyTracker` is the reset.
+ * (activemodel/lib/active_model/dirty.rb:248-251): give the copy its own tracker,
+ * so writing to one no longer marks the other dirty. Rails nils the ivar and lets
+ * it rebuild from the deep-dup'd `@attributes`, which reproduces the source's
+ * `changes` on the copy; {@link DirtyTracker.deepDup} is that rebuild, since a
+ * fresh empty tracker would instead wipe pending changes.
  *
  * @internal Rails-private helper.
  */
-export function initializeDup(this: DirtyInternalsHost, _other: unknown): void {
-  this._dirty = new DirtyTracker();
+export function initializeDup(this: DirtyDupHost, _other: unknown): void {
+  this._dirty = this._dirty.deepDup(this._attributes);
 }
 
 function resolveValue(value: unknown): unknown {

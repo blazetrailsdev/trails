@@ -2142,18 +2142,13 @@ export class Model {
    * no `super` across mixins, so this is the chain: `Validations` replaces
    * `@errors` (validations.rb:310-313) and `Dirty` resets the mutation tracker
    * (dirty.rb:248-251) — without the latter the copy shares the source's tracker,
-   * so writing to one marks the other dirty.
-   *
-   * The `initAttributes` call has no counterpart in Rails because it needs none:
-   * Ruby's tracker derives its baseline lazily from the duped `Attribute` objects,
-   * which carry their own `original_value`. `DirtyTracker` holds an eager snapshot
-   * instead, so the fresh one has to be seeded from the duped attributes or
-   * `attributeWas` on the copy reads `undefined`.
+   * so writing to one marks the other dirty. Both hooks run after `dup()` has
+   * deep-dup'd `_attributes`, matching the point in Rails' chain where
+   * `Attributes#initialize_dup` has already replaced `@attributes`.
    */
   initializeDup(other: unknown): void {
     validationsInitializeDup.call(this, other);
     dirtyInitializeDup.call(this, other);
-    this._dirty.initAttributes(this._attributes);
   }
 
   // -- Dirty tracking --
