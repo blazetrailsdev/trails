@@ -1515,7 +1515,6 @@ export function areStructurallyCompatible(self: unknown, other: unknown): boolea
  * (query_methods.rb:1121-1123)
  */
 function structurallyCompatible(this: QueryMethodsHost, other: any): boolean {
-  if (this._model !== other._model) return false;
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
 
@@ -1547,7 +1546,10 @@ function andBang(this: QueryMethodsHost, other: any): any {
  * Mirrors: ActiveRecord::QueryMethods#or (query_methods.rb:1167-1177)
  */
 function or(this: QueryMethodsHost, other: any): any {
-  if (this._isNone) return other.clone();
+  // query_methods.rb:1168 — the `other.is_a?(Relation)` guard wraps BOTH arms,
+  // so `none.or(garbage)` raises rather than reaching `other.spawn`.
+  assertRelationForCombining(other, "or");
+  if (this._isNone) return other.spawn();
   return orBang.call(this.spawn(), other);
 }
 
