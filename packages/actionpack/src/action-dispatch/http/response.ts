@@ -5,6 +5,7 @@
  */
 
 import { getFs } from "@blazetrails/activesupport";
+import { deleteSetCookieHeaderBang, setCookieHeader, unescape } from "@blazetrails/rack";
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
@@ -36,6 +37,7 @@ import {
 // Lowercase to match the rest of this file's header conventions; setHeader
 // is case-insensitive but call sites read `headers["content-type"]` directly.
 const CONTENT_TYPE = "content-type";
+const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
   /^(?<mime_type>[^;\s]+\s*(?:;\s*(?!charset)[^;\s]+)*)?(?:;\s*charset="?(?<charset>[^;\s"]+)"?)?/;
@@ -103,7 +105,6 @@ export class Response {
   private _body: string[];
   private _committed = false;
   private _charset: string | undefined;
-  private _cookies: Map<string, CookieValue> = new Map();
   private _sending = false;
   private _sent = false;
   stream: unknown = null;
@@ -289,30 +290,41 @@ export class Response {
 
   // --- Cookies ---
 
-  /** @internal */
+  /** @internal Mirrors `Rack::Response::Helpers#set_cookie` (rack/response.rb:270-272). */
   setCookie(name: string, value: string | CookieOptions): void {
-    if (typeof value === "string") {
-      this._cookies.set(name, { value });
-    } else {
-      this._cookies.set(name, value);
-    }
+    const header = this.getHeader(SET_COOKIE);
+    const cookie = setCookieHeader(name, rackCookieValue(value));
+    // Rack joins multiple Set-Cookie values with a newline on the way out
+    // (`Rack::Response#add_header` keeps an Array; our header hash is
+    // string-valued, and `cookies` below splits on "\n" to read it back).
+    this.setHeader(SET_COOKIE, header === undefined ? cookie : `${header}\n${cookie}`);
   }
 
+  /** Mirrors `Rack::Response::Helpers#delete_cookie` (rack/response.rb:274-280). */
   deleteCookie(name: string, options: Partial<CookieOptions> = {}): void {
-    this._cookies.set(name, {
-      value: "",
-      // boundary: epoch-zero Date is the standard delete-cookie sentinel.
-      expires: new Date(0),
-      ...options,
-    });
+    const header = deleteSetCookieHeaderBang(
+      this.getHeader(SET_COOKIE) ?? null,
+      name,
+      rackCookieValue({ value: "", ...options }),
+    );
+    this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
+  /** Mirrors `Response#cookies` (response.rb:418-430). */
   get cookies(): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const [name, opts] of this._cookies) {
-      result[name] = opts.value;
+    const cookies: Record<string, string> = {};
+    let header = this.getHeader(SET_COOKIE) as string | string[] | undefined;
+    if (header != null) {
+      if (typeof header === "string") header = header.split("\n");
+      for (const cookie of header) {
+        const pair = cookie.split(";")[0];
+        if (pair) {
+          const [key, value] = pair.split("=").map((v) => unescape(v));
+          cookies[key] = value ?? "";
+        }
+      }
     }
-    return result;
+    return cookies;
   }
 
   // --- Cache-Control (raw string accessor; Rails aliases this as `_cache_control`) ---
@@ -718,7 +730,28 @@ export interface CookieOptions {
   sameSite?: "strict" | "lax" | "none";
 }
 
-type CookieValue = CookieOptions;
+/**
+ * Rails hands `Rack::Utils.set_cookie_header` the cookie option hash
+ * untouched; our options are camelCased, so translate the keys back to the
+ * Rack spellings at the boundary.
+ */
+function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {
+  const opts = typeof value === "string" ? { value } : value;
+  return {
+    value: opts.value ?? "",
+    path: opts.path,
+    domain: opts.domain,
+    // boundary: `Rack::Utils.set_cookie_header` formats `expires` through
+    // `Date#toUTCString`, so a Temporal.Instant is narrowed to a JS Date here.
+    expires:
+      opts.expires === undefined || opts.expires instanceof Date
+        ? opts.expires
+        : new Date(opts.expires.epochMilliseconds),
+    secure: opts.secure,
+    httponly: opts.httpOnly,
+    same_site: opts.sameSite,
+  };
+}
 
 const STATUS_MESSAGES: Record<number, string> = {
   100: "Continue",

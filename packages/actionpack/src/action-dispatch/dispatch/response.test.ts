@@ -91,22 +91,35 @@ describe("ResponseTest", () => {
 
   it("cookies", () => {
     const res = new Response();
-    res.setCookie("foo", "bar");
-    expect(res.cookies).toEqual({ foo: "bar" });
+    res.setCookie("user_name", { value: "david", path: "/" });
+    expect(res.headers["set-cookie"]).toBe("user_name=david; path=/");
+    expect(res.cookies).toEqual({ user_name: "david" });
   });
 
   it("multiple cookies", () => {
     const res = new Response();
-    res.setCookie("foo", "bar");
-    res.setCookie("baz", "qux");
-    expect(res.cookies).toEqual({ foo: "bar", baz: "qux" });
+    res.setCookie("user_name", { value: "david", path: "/" });
+    res.setCookie("login", {
+      value: "foo&bar",
+      path: "/",
+      expires: new Date(Date.UTC(2005, 9, 10, 5)),
+    });
+    expect(res.headers["set-cookie"]).toBe(
+      "user_name=david; path=/\nlogin=foo%26bar; path=/; expires=Mon, 10 Oct 2005 05:00:00 GMT",
+    );
+    expect(res.cookies).toEqual({ login: "foo&bar", user_name: "david" });
   });
 
   it("delete cookies", () => {
     const res = new Response();
-    res.setCookie("foo", "bar");
-    res.deleteCookie("foo");
-    expect(res.cookies.foo).toBe("");
+    res.setCookie("user_name", { value: "david", path: "/" });
+    res.setCookie("login", {
+      value: "foo&bar",
+      path: "/",
+      expires: new Date(Date.UTC(2005, 9, 10, 5)),
+    });
+    res.deleteCookie("login");
+    expect(res.cookies).toEqual({ user_name: "david", login: "" });
   });
 
   it("read ETag and Cache-Control", () => {

@@ -2,13 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/response.ts",
-    "rubyName": "cookies",
-    "call": "get_header",
-    "reason": "Structural divergence, not a header-accessor spelling: response.rb:418-430 parses the response's OWN `Set-Cookie` header back into a name=>value hash, while response.ts:310-316 iterates the private `_cookies` map the writers populate. Every other row of this cluster converged onto getHeader/setHeader/hasHeader/fetchHeader; this one needs the reader rewritten, tracked as story converge-response-cookies-onto-set-cookie-header."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/response.ts",
     "rubyName": "delete_header",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
