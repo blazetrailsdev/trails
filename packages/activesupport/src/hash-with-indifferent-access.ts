@@ -358,12 +358,17 @@ export class HashWithIndifferentAccess<V = unknown> {
    * `dup.tap { |h| h.transform_keys!(hash, &block) }`, so the mapping hash and
    * the block arms are the ones `transform_keys!` documents below.
    */
+  transformKeys(block: (key: string) => string): HashWithIndifferentAccess<V>;
   transformKeys(
-    hash: AnyObject | null | ((key: string) => string) = NOT_GIVEN,
+    hash: AnyObject | null,
+    block?: (key: string) => string,
+  ): HashWithIndifferentAccess<V>;
+  transformKeys(
+    hash: AnyObject | null | ((key: string) => string),
     block?: (key: string) => string,
   ): HashWithIndifferentAccess<V> {
     const dup = new HashWithIndifferentAccess<V>(this);
-    dup.transformKeysBang(hash, block);
+    dup.transformKeysBang(hash as AnyObject | null, block);
     return dup;
   }
 
@@ -372,9 +377,17 @@ export class HashWithIndifferentAccess<V = unknown> {
    * block is syntactically separate from the optional `hash`; JS has no such
    * separation, so a function passed in the `hash` slot is read as the block —
    * the same reading `fetch` above gives a trailing function.
+   *
+   * Ruby's no-argument arm (`return to_enum(:transform_keys!) if
+   * NOT_GIVEN.equal?(hash) && !block_given?`, :346) has no JS analogue — there
+   * is no Enumerator to return — so, as at `Deprecators#each`
+   * (deprecators.rb:41), the overloads require either the block or the hash and
+   * a bare call is a compile-time error rather than an enumerator.
    */
+  transformKeysBang(block: (key: string) => string): this;
+  transformKeysBang(hash: AnyObject | null, block?: (key: string) => string): this;
   transformKeysBang(
-    hash: AnyObject | null | ((key: string) => string) = NOT_GIVEN,
+    hash: AnyObject | null | ((key: string) => string),
     block?: (key: string) => string,
   ): this {
     if (typeof hash === "function") {
