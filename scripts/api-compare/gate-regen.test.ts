@@ -11,7 +11,6 @@ import {
   shouldRegenerate,
   staleArtifactMessage,
 } from "./gate-regen.js";
-import { apiComparePackageRoots } from "./config.js";
 
 describe("shouldRegenerate", () => {
   it("regenerates on a plain local gating run", () => {
@@ -73,19 +72,15 @@ describe("artifactIsStale", () => {
     expect(await artifactIsStale(artifact)).toBe(false);
   });
 
-  it("is true once a compared source is written after the artifact", async () => {
+  it("is true once the artifact predates a compared source", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gate-regen-"));
     const artifact = path.join(dir, "call-mismatches.json");
     await fs.writeFile(artifact, "{}");
-    const src = path.join(apiComparePackageRoots()[0].srcDir, "index.ts");
-    const now = new Date(Date.now() + 60_000);
-    await fs.utimes(src, now, now);
-    try {
-      expect(await artifactIsStale(artifact)).toBe(true);
-    } finally {
-      const back = new Date();
-      await fs.utimes(src, back, back);
-    }
+    // Backdate the artifact rather than touching a real source file: the roots
+    // are the live repo, and moving one file's mtime would race sibling tests.
+    const long_ago = new Date(Date.now() - 86_400_000);
+    await fs.utimes(artifact, long_ago, long_ago);
+    expect(await artifactIsStale(artifact)).toBe(true);
   });
 
   it("is false when the artifact does not exist — the caller has a better error", async () => {
