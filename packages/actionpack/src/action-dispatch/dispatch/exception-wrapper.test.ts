@@ -119,10 +119,24 @@ describe("ExceptionWrapperTest", () => {
   });
 
   it("#traces returns every trace by category enumerated with an index", () => {
-    const wrapper = new ExceptionWrapper(new Error("test"));
-    expect(wrapper.traces.length).toBeGreaterThan(0);
-    for (const line of wrapper.traces) {
-      expect(typeof line).toBe("string");
+    const exception = new Error("test");
+    const wrapper = new ExceptionWrapper(exception);
+    const traces = wrapper.traces;
+
+    expect(Object.keys(traces)).toEqual(["Application Trace", "Framework Trace", "Full Trace"]);
+    expect(traces["Full Trace"].length).toBe(wrapper.fullTrace.length);
+    expect(traces["Application Trace"].length + traces["Framework Trace"].length).toBe(
+      traces["Full Trace"].length,
+    );
+    expect(traces["Full Trace"].map((frame) => frame.id)).toEqual(
+      wrapper.fullTrace.map((_trace, idx) => idx),
+    );
+    expect(traces["Full Trace"].map((frame) => frame.trace)).toEqual(wrapper.fullTrace);
+    for (const frame of traces["Full Trace"]) {
+      expect(frame.exceptionObjectId).toBe(wrapper.exceptionId());
+    }
+    for (const frame of traces["Application Trace"]) {
+      expect(wrapper.applicationTrace).toContain(frame.trace);
     }
   });
 

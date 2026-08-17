@@ -91,6 +91,7 @@ function _idFor(err: object): number {
 }
 
 export type TraceEntry = { file: string; line: number };
+export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
 export type SourceExtract = TraceEntry & { code?: Record<number, string> };
 
 export class ExceptionWrapper {
@@ -191,14 +192,32 @@ export class ExceptionWrapper {
     return RESCUE_TEMPLATES[this.exceptionClassName] ?? "diagnostics";
   }
 
-  get traces(): string[] {
-    const stack = this.exception.stack;
-    if (!stack) return [];
-    return stack
-      .split("\n")
-      .slice(1)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+  get traces(): Record<string, TraceWithId[]> {
+    const applicationTraceWithIds: TraceWithId[] = [];
+    const frameworkTraceWithIds: TraceWithId[] = [];
+    const fullTraceWithIds: TraceWithId[] = [];
+
+    this.fullTrace.forEach((trace, idx) => {
+      const traceWithId: TraceWithId = {
+        exceptionObjectId: _idFor(this.exception),
+        id: idx,
+        trace,
+      };
+
+      if (this.applicationTrace.includes(trace)) {
+        applicationTraceWithIds.push(traceWithId);
+      } else {
+        frameworkTraceWithIds.push(traceWithId);
+      }
+
+      fullTraceWithIds.push(traceWithId);
+    });
+
+    return {
+      "Application Trace": applicationTraceWithIds,
+      "Framework Trace": frameworkTraceWithIds,
+      "Full Trace": fullTraceWithIds,
+    };
   }
 
   get applicationTrace(): string[] {
@@ -222,18 +241,21 @@ export class ExceptionWrapper {
   }
 
   traceToShow(): "Application Trace" | "Full Trace" {
-    if (this.applicationTrace.length === 0 && this.rescueTemplate() !== "routing_error") {
+    if (
+      this.traces["Application Trace"].length === 0 &&
+      this.rescueTemplate() !== "routing_error"
+    ) {
       return "Full Trace";
     }
     return "Application Trace";
   }
 
-  sourceToShowId(): number {
-    return 0;
+  sourceToShowId(): number | undefined {
+    return this.traces[this.traceToShow()][0]?.id;
   }
 
   get sourceLocation(): TraceEntry | null {
-    const firstTrace = this.traces[0];
+    const firstTrace = this.backtrace()[0];
     if (!firstTrace) return null;
     return this.extractFileAndLineNumber(firstTrace);
   }
@@ -295,7 +317,13 @@ export class ExceptionWrapper {
   // handle it.
   /** @internal */
   buildBacktrace(): string[] {
-    return this.traces;
+    const stack = this.exception.stack;
+    if (!stack) return [];
+    return stack
+      .split("\n")
+      .slice(1)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
   }
 
   /** @internal */

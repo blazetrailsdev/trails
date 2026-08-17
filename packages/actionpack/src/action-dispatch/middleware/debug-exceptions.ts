@@ -111,10 +111,7 @@ export class DebugExceptions {
       status: wrapper.statusCode,
       error: wrapper.statusText,
       exception: wrapper.exceptionName,
-      traces: {
-        "Application Trace": wrapper.applicationTrace,
-        "Framework Trace": wrapper.frameworkTrace,
-      },
+      traces: wrapper.traces,
     });
     return this.render(wrapper.statusCode, body, "application/json");
   }
