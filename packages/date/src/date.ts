@@ -2539,6 +2539,331 @@ function match(
 }
 
 /**
+ * @internal `date_parse.c` `sec_fraction` (`date_parse.c:2318-2324`): the digits
+ * after the decimal comma over ten to their own count, so `"07"` is `7/100`.
+ */
+function secFraction(f: string): Rational {
+  return new Rational(cstr2num(f), 10n ** BigInt(f.length));
+}
+
+/**
+ * @internal `date_parse.c` `iso8601_ext_datetime_cb` (`date_parse.c:2328-2392`):
+ * the extended ISO 8601 date-time, whose leading alternation is one of four
+ * shapes — calendar, ordinal, week, and the yearless week day — read out of the
+ * groups the one that matched left behind.
+ */
+function iso8601ExtDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+  let y: number | bigint;
+
+  if (s[1] !== undefined) {
+    if (s[3] !== undefined) hash.mday = Number(s[3]);
+    if (s[1] !== "-") {
+      y = cstr2num(s[1]);
+      if (s[1].length < 4) y = compYear69(Number(y));
+      hash.year = y;
+    }
+    if (s[2] === undefined) {
+      if (s[1] !== "-") return 0;
+    } else {
+      hash.mon = Number(s[2]);
+    }
+  } else if (s[5] !== undefined) {
+    hash.yday = Number(s[5]);
+    if (s[4] !== undefined) {
+      y = cstr2num(s[4]);
+      if (s[4].length < 4) y = compYear69(Number(y));
+      hash.year = y;
+    }
+  } else if (s[8] !== undefined) {
+    hash.cweek = Number(s[7]);
+    hash.cwday = Number(s[8]);
+    if (s[6] !== undefined) {
+      y = cstr2num(s[6]);
+      if (s[6].length < 4) y = compYear69(Number(y));
+      hash.cwyear = y;
+    }
+  } else if (s[9] !== undefined) {
+    hash.cwday = Number(s[9]);
+  }
+  if (s[10] !== undefined) {
+    hash.hour = Number(s[10]);
+    hash.min = Number(s[11]);
+    if (s[12] !== undefined) hash.sec = Number(s[12]);
+  }
+  if (s[13] !== undefined) {
+    hash.secFraction = secFraction(s[13]);
+  }
+  if (s[14] !== undefined) {
+    hash.zone = s[14];
+    hash.offset = dateZoneToDiff(s[14]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `iso8601_ext_datetime` (`date_parse.c:2394-2409`). */
+function iso8601ExtDatetime(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(?:([-+]?\\d{2,}|-)-(\\d{2})?(?:-(\\d{2}))?|` +
+    `([-+]?\\d{2,})?-(\\d{3})|` +
+    `(\\d{4}|\\d{2})?-w(\\d{2})-(\\d)|` +
+    `-w-(\\d))` +
+    `(?:t` +
+    `(\\d{2}):(\\d{2})(?::(\\d{2})(?:[,.](\\d+))?)?` +
+    `(z|[-+]\\d{2}(?::?\\d{2})?)?)?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, iso8601ExtDatetimeCb);
+}
+
+/**
+ * @internal `date_parse.c` `iso8601_bas_datetime_cb` (`date_parse.c:2414-2481`):
+ * the basic — separatorless — spelling, whose alternation has two more arms than
+ * the extended one: the yearless ordinal date and the yearless week date.
+ */
+function iso8601BasDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+  let y: number | bigint;
+
+  if (s[3] !== undefined) {
+    hash.mday = Number(s[3]);
+    if (s[1] !== "--") {
+      y = cstr2num(s[1] as string);
+      if ((s[1] as string).length < 4) y = compYear69(Number(y));
+      hash.year = y;
+    }
+    if ((s[2] as string)[0] === "-") {
+      if (s[1] !== "--") return 0;
+    } else {
+      hash.mon = Number(s[2]);
+    }
+  } else if (s[5] !== undefined) {
+    hash.yday = Number(s[5]);
+    y = cstr2num(s[4] as string);
+    if ((s[4] as string).length < 4) y = compYear69(Number(y));
+    hash.year = y;
+  } else if (s[6] !== undefined) {
+    hash.yday = Number(s[6]);
+  } else if (s[9] !== undefined) {
+    hash.cweek = Number(s[8]);
+    hash.cwday = Number(s[9]);
+    y = cstr2num(s[7] as string);
+    if ((s[7] as string).length < 4) y = compYear69(Number(y));
+    hash.cwyear = y;
+  } else if (s[11] !== undefined) {
+    hash.cweek = Number(s[10]);
+    hash.cwday = Number(s[11]);
+  } else if (s[12] !== undefined) {
+    hash.cwday = Number(s[12]);
+  }
+  if (s[13] !== undefined) {
+    hash.hour = Number(s[13]);
+    hash.min = Number(s[14]);
+    if (s[15] !== undefined) hash.sec = Number(s[15]);
+  }
+  if (s[16] !== undefined) {
+    hash.secFraction = secFraction(s[16]);
+  }
+  if (s[17] !== undefined) {
+    hash.zone = s[17];
+    hash.offset = dateZoneToDiff(s[17]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `iso8601_bas_datetime` (`date_parse.c:2483-2500`). */
+function iso8601BasDatetime(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(?:([-+]?(?:\\d{4}|\\d{2})|--)(\\d{2}|-)(\\d{2})|` +
+    `([-+]?(?:\\d{4}|\\d{2}))(\\d{3})|` +
+    `-(\\d{3})|` +
+    `(\\d{4}|\\d{2})w(\\d{2})(\\d)|` +
+    `-w(\\d{2})(\\d)|` +
+    `-w-(\\d))` +
+    `(?:t?` +
+    `(\\d{2})(\\d{2})(?:(\\d{2})(?:[,.](\\d+))?)?` +
+    `(z|[-+]\\d{2}(?:\\d{2})?)?)?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, iso8601BasDatetimeCb);
+}
+
+/** @internal `date_parse.c` `iso8601_ext_time_cb` (`date_parse.c:2505-2529`). */
+function iso8601ExtTimeCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  hash.hour = Number(s[1]);
+  hash.min = Number(s[2]);
+  if (s[3] !== undefined) hash.sec = Number(s[3]);
+  if (s[4] !== undefined) hash.secFraction = secFraction(s[4]);
+  if (s[5] !== undefined) {
+    hash.zone = s[5];
+    hash.offset = dateZoneToDiff(s[5]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `iso8601_bas_time_cb` (`date_parse.c:2531`), a `#define` onto the extended one. */
+const iso8601BasTimeCb = iso8601ExtTimeCb;
+
+/** @internal `date_parse.c` `iso8601_ext_time` (`date_parse.c:2533-2543`). */
+function iso8601ExtTime(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(\\d{2}):(\\d{2})(?::(\\d{2})(?:[,.](\\d+))?` + `(z|[-+]\\d{2}(:?\\d{2})?)?)?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, iso8601ExtTimeCb);
+}
+
+/** @internal `date_parse.c` `iso8601_bas_time` (`date_parse.c:2545-2555`). */
+function iso8601BasTime(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(\\d{2})(\\d{2})(?:(\\d{2})(?:[,.](\\d+))?` + `(z|[-+]\\d{2}(\\d{2})?)?)?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, iso8601BasTimeCb);
+}
+
+/**
+ * @internal `date_parse.c` `date__iso8601` (`date_parse.c:2557-2580`): the four
+ * ISO 8601 spellings in order, the first that matches winning.
+ */
+function dateIso8601(str: string): DateParts {
+  const hash: DateParts = {};
+
+  if (iso8601ExtDatetime(str, hash)) return hash;
+  if (iso8601BasDatetime(str, hash)) return hash;
+  if (iso8601ExtTime(str, hash)) return hash;
+  iso8601BasTime(str, hash);
+
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `rfc3339_cb` (`date_parse.c:2585-2609`): RFC 3339's
+ * profile of ISO 8601, whose zone group is mandatory — so `:zone` and `:offset`
+ * are set unconditionally, and before the optional `:sec_fraction`.
+ */
+function rfc3339Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  hash.year = cstr2num(s[1] as string);
+  hash.mon = Number(s[2]);
+  hash.mday = Number(s[3]);
+  hash.hour = Number(s[4]);
+  hash.min = Number(s[5]);
+  hash.sec = Number(s[6]);
+  hash.zone = s[8];
+  hash.offset = dateZoneToDiff(s[8] as string);
+  if (s[7] !== undefined) hash.secFraction = secFraction(s[7]);
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `rfc3339` (`date_parse.c:2611-2623`). */
+function rfc3339(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(-?\\d{4})-(\\d{2})-(\\d{2})` +
+    `(?:t|\\s)` +
+    `(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?` +
+    `(z|[-+]\\d{2}:\\d{2})\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, rfc3339Cb);
+}
+
+/** @internal `date_parse.c` `date__rfc3339` (`date_parse.c:2625-2637`). */
+function dateRfc3339(str: string): DateParts {
+  const hash: DateParts = {};
+  rfc3339(str, hash);
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `xmlschema_datetime_cb` (`date_parse.c:2642-2673`):
+ * XML Schema's `dateTime`, `date` and `gYearMonth`/`gYear` all at once — every
+ * group but the year is optional.
+ */
+function xmlschemaDatetimeCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  hash.year = cstr2num(s[1] as string);
+  if (s[2] !== undefined) hash.mon = Number(s[2]);
+  if (s[3] !== undefined) hash.mday = Number(s[3]);
+  if (s[4] !== undefined) hash.hour = Number(s[4]);
+  if (s[5] !== undefined) hash.min = Number(s[5]);
+  if (s[6] !== undefined) hash.sec = Number(s[6]);
+  if (s[7] !== undefined) hash.secFraction = secFraction(s[7]);
+  if (s[8] !== undefined) {
+    hash.zone = s[8];
+    hash.offset = dateZoneToDiff(s[8]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `xmlschema_datetime` (`date_parse.c:2675-2687`). */
+function xmlschemaDatetime(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*(-?\\d{4,})(?:-(\\d{2})(?:-(\\d{2}))?)?` +
+    `(?:t` +
+    `(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?)?` +
+    `(z|[-+]\\d{2}:\\d{2})?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, xmlschemaDatetimeCb);
+}
+
+/** @internal `date_parse.c` `xmlschema_time_cb` (`date_parse.c:2692-2716`): XML Schema's `time`. */
+function xmlschemaTimeCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  hash.hour = Number(s[1]);
+  hash.min = Number(s[2]);
+  if (s[3] !== undefined) hash.sec = Number(s[3]);
+  if (s[4] !== undefined) hash.secFraction = secFraction(s[4]);
+  if (s[5] !== undefined) {
+    hash.zone = s[5];
+    hash.offset = dateZoneToDiff(s[5]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `xmlschema_time` (`date_parse.c:2718-2728`). */
+function xmlschemaTime(str: string, hash: DateParts): number {
+  const patSource = `^\\s*(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?` + `(z|[-+]\\d{2}:\\d{2})?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, xmlschemaTimeCb);
+}
+
+/**
+ * @internal `date_parse.c` `xmlschema_trunc_cb` (`date_parse.c:2733-2757`): the
+ * truncated `gMonth`, `gMonthDay` and `gDay`. `s[2]` and `s[3]` both write
+ * `:mday`, because only one of the two arms can have matched.
+ */
+function xmlschemaTruncCb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  if (s[1] !== undefined) hash.mon = Number(s[1]);
+  if (s[2] !== undefined) hash.mday = Number(s[2]);
+  if (s[3] !== undefined) hash.mday = Number(s[3]);
+  if (s[4] !== undefined) {
+    hash.zone = s[4];
+    hash.offset = dateZoneToDiff(s[4]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `xmlschema_trunc` (`date_parse.c:2759-2769`). */
+function xmlschemaTrunc(str: string, hash: DateParts): number {
+  const patSource = `^\\s*(?:--(\\d{2})(?:-(\\d{2}))?|---(\\d{2}))` + `(z|[-+]\\d{2}:\\d{2})?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, xmlschemaTruncCb);
+}
+
+/** @internal `date_parse.c` `date__xmlschema` (`date_parse.c:2771-2792`). */
+function dateXmlschema(str: string): DateParts {
+  const hash: DateParts = {};
+
+  if (xmlschemaDatetime(str, hash)) return hash;
+  if (xmlschemaTime(str, hash)) return hash;
+  xmlschemaTrunc(str, hash);
+
+  return hash;
+}
+
+/**
  * @internal `date_parse.c` `rfc2822_cb` (`date_parse.c:2797-2826`): a two- or
  * three-digit year is completed by `comp_year50` rather than `comp_year69`, so
  * `50` is 1950 and `100` is 2000. The seconds group is optional; the zone is
@@ -2693,6 +3018,61 @@ function dateHttpdate(str: string): DateParts {
   if (httpdateType1(str, hash)) return hash;
   if (httpdateType2(str, hash)) return hash;
   httpdateType3(str, hash);
+
+  return hash;
+}
+
+/**
+ * @internal `date_parse.c` `JISX0301_DEFAULT_ERA` (`date_parse.c:1291`): the era
+ * an undecorated JIS X 0301 date counts from, Heisei — obsolete, and kept.
+ */
+const JISX0301_DEFAULT_ERA = "H";
+
+/**
+ * @internal `date_parse.c` `jisx0301_cb` (`date_parse.c:3016-3048`): the era
+ * initial names the year {@link gengo} counts from, and the two-digit year in
+ * the string is added to it.
+ */
+function jisx0301Cb(m: RegExpExecArray, hash: DateParts): number {
+  const s: (string | undefined)[] = m;
+
+  const ep = gengo(s[1] === undefined ? JISX0301_DEFAULT_ERA : s[1][0]);
+  hash.year = fAdd(cstr2num(s[2] as string), ep);
+  hash.mon = Number(s[3]);
+  hash.mday = Number(s[4]);
+  if (s[5] !== undefined) {
+    hash.hour = Number(s[5]);
+    if (s[6] !== undefined) hash.min = Number(s[6]);
+    if (s[7] !== undefined) hash.sec = Number(s[7]);
+  }
+  if (s[8] !== undefined) hash.secFraction = secFraction(s[8]);
+  if (s[9] !== undefined) {
+    hash.zone = s[9];
+    hash.offset = dateZoneToDiff(s[9]);
+  }
+
+  return 1;
+}
+
+/** @internal `date_parse.c` `jisx0301` (`date_parse.c:3050-3062`). */
+function jisx0301(str: string, hash: DateParts): number {
+  const patSource =
+    `^\\s*([${JISX0301_ERA_INITIALS}])?(\\d{2})\\.(\\d{2})\\.(\\d{2})` +
+    `(?:t` +
+    `(?:(\\d{2}):(\\d{2})(?::(\\d{2})(?:[,.](\\d*))?)?` +
+    `(z|[-+]\\d{2}(?::?\\d{2})?)?)?)?\\s*$`;
+  return match(str, new RegExp(patSource, "i"), hash, jisx0301Cb);
+}
+
+/**
+ * @internal `date_parse.c` `date__jisx0301` (`date_parse.c:3064-3080`): a string
+ * the JIS pattern does not take is answered by {@link dateIso8601} instead,
+ * hash and all.
+ */
+function dateJisx0301(str: string): DateParts {
+  let hash: DateParts = {};
+  if (jisx0301(str, hash)) return hash;
+  hash = dateIso8601(str);
 
   return hash;
 }
@@ -6350,6 +6730,69 @@ export class Date {
   }
 
   /**
+   * Ruby `Date._iso8601(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__iso8601`, `date_core.c:4617-4626` → `date__iso8601` in
+   * `date_parse.c`): the frags of one ISO 8601 date, date-time or time, and an
+   * empty hash for a string that is none of them.
+   */
+  static _iso8601(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
+    return dateIso8601(str);
+  }
+
+  /**
+   * Ruby `Date.iso8601(string = '-4712-01-01', start = Date::ITALY, limit:
+   * 128)` (ruby/date, `date_core.c` `date_s_iso8601`, `date_core.c:4647-4669`).
+   */
+  static iso8601(str = JULIAN_EPOCH_DATE, start = DEFAULT_SG, opt?: ParseOpt): Temporal.PlainDate {
+    return dNewByFrags(Date._iso8601(str, opt), val2sg(start)).toDate();
+  }
+
+  /**
+   * Ruby `Date._rfc3339(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__rfc3339`, `date_core.c:4687-4696` → `date__rfc3339`).
+   */
+  static _rfc3339(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
+    return dateRfc3339(str);
+  }
+
+  /**
+   * Ruby `Date.rfc3339(string = '-4712-01-01T00:00:00+00:00', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `date_s_rfc3339`,
+   * `date_core.c:4717-4739`).
+   */
+  static rfc3339(
+    str = JULIAN_EPOCH_DATETIME,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return dNewByFrags(Date._rfc3339(str, opt), val2sg(start)).toDate();
+  }
+
+  /**
+   * Ruby `Date._xmlschema(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__xmlschema`, `date_core.c:4756-4765` → `date__xmlschema`).
+   */
+  static _xmlschema(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
+    return dateXmlschema(str);
+  }
+
+  /**
+   * Ruby `Date.xmlschema(string = '-4712-01-01', start = Date::ITALY, limit:
+   * 128)` (ruby/date, `date_core.c` `date_s_xmlschema`,
+   * `date_core.c:4785-4807`).
+   */
+  static xmlschema(
+    str = JULIAN_EPOCH_DATE,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDate {
+    return dNewByFrags(Date._xmlschema(str, opt), val2sg(start)).toDate();
+  }
+
+  /**
    * Ruby `Date._rfc2822(string, limit: 128)` (ruby/date, `date_core.c`
    * `date_s__rfc2822`, `date_core.c:4825-4834` → `date__rfc2822` in
    * `date_parse.c`): the frags of one RFC 2822 date-time, and an empty hash
@@ -6415,6 +6858,25 @@ export class Date {
     opt?: ParseOpt,
   ): Temporal.PlainDate {
     return dNewByFrags(Date._httpdate(str, opt), val2sg(start)).toDate();
+  }
+
+  /**
+   * Ruby `Date._jisx0301(string, limit: 128)` (ruby/date, `date_core.c`
+   * `date_s__jisx0301`, `date_core.c:4962-4971` → `date__jisx0301`), which
+   * falls back to `date__iso8601` for a string the JIS pattern does not take.
+   */
+  static _jisx0301(str: string, opt?: ParseOpt): DateParts {
+    checkLimit(str, opt);
+    return dateJisx0301(str);
+  }
+
+  /**
+   * Ruby `Date.jisx0301(string = '-4712-01-01', start = Date::ITALY, limit:
+   * 128)` (ruby/date, `date_core.c` `date_s_jisx0301`,
+   * `date_core.c:4995-5017`).
+   */
+  static jisx0301(str = JULIAN_EPOCH_DATE, start = DEFAULT_SG, opt?: ParseOpt): Temporal.PlainDate {
+    return dNewByFrags(Date._jisx0301(str, opt), val2sg(start)).toDate();
   }
 
   /**
@@ -7689,6 +8151,10 @@ const DateWithoutParseStatics: (new (
     | "rfc2822"
     | "rfc822"
     | "httpdate"
+    | "iso8601"
+    | "rfc3339"
+    | "xmlschema"
+    | "jisx0301"
   > = Date;
 
 /**
@@ -8481,6 +8947,46 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
+   * Ruby `DateTime.iso8601(string = '-4712-01-01T00:00:00+00:00', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_iso8601`,
+   * `date_core.c:8466-8489`), which is `Date._iso8601` followed by the
+   * DateTime-shaped build.
+   */
+  static iso8601(
+    str = JULIAN_EPOCH_DATETIME,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._iso8601(str, opt), val2sg(start)).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.rfc3339(string = '-4712-01-01T00:00:00+00:00', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_rfc3339`,
+   * `date_core.c:8505-8528`).
+   */
+  static rfc3339(
+    str = JULIAN_EPOCH_DATETIME,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._rfc3339(str, opt), val2sg(start)).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.xmlschema(string = '-4712-01-01T00:00:00+00:00', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_xmlschema`,
+   * `date_core.c:8544-8567`).
+   */
+  static xmlschema(
+    str = JULIAN_EPOCH_DATETIME,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._xmlschema(str, opt), val2sg(start)).toDatetime();
+  }
+
+  /**
    * Ruby `DateTime.rfc2822(string = 'Mon, 1 Jan -4712 00:00:00 +0000', start =
    * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_rfc2822`,
    * `date_core.c:8584-8607`), which is `Date._rfc2822` followed by the
@@ -8514,6 +9020,19 @@ export class DateTime extends DateWithoutParseStatics {
     opt?: ParseOpt,
   ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
     return dtNewByFrags(Date._httpdate(str, opt), val2sg(start)).toDatetime();
+  }
+
+  /**
+   * Ruby `DateTime.jisx0301(string = '-4712-01-01T00:00:00+00:00', start =
+   * Date::ITALY, limit: 128)` (ruby/date, `date_core.c` `datetime_s_jisx0301`,
+   * `date_core.c:8667-8690`).
+   */
+  static jisx0301(
+    str = JULIAN_EPOCH_DATETIME,
+    start = DEFAULT_SG,
+    opt?: ParseOpt,
+  ): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+    return dtNewByFrags(Date._jisx0301(str, opt), val2sg(start)).toDatetime();
   }
 
   /**

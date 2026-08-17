@@ -328,6 +328,24 @@ describe("TestDateParse", () => {
     expect(rescueArgumentError(() => DateTime.parse("")) instanceof Date.Error).toBeTruthy();
   });
 
+  it(" rfc3339", () => {
+    let h = Date._rfc3339("2001-02-03T04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._rfc3339("2001-02-03 04:05:06Z");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
+    h = Date._rfc3339("2001-02-03T04:05:06.07+01:00");
+    expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 3600]);
+
+    h = Date._rfc3339("");
+    expect(h).toEqual({});
+
+    h = Date._rfc3339(null as unknown as string);
+    expect(h).toEqual({});
+
+    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
+    expect(() => Date._rfc3339(1 as unknown as string)).toThrow(TypeError);
+  });
+
   it(" rfc2822", () => {
     let h = Date._rfc2822("Sat, 3 Feb 2001 04:05:06 UT");
     expect(ymdhms(h)).toEqual([2001, 2, 3, 4, 5, 6, 0]);
@@ -384,6 +402,19 @@ describe("TestDateParse", () => {
     expect(() => Date._httpdate(1 as unknown as string)).toThrow(TypeError);
   });
 
+  it("rfc3339", () => {
+    expect(Date.rfc3339()).toBeInstanceOf(Temporal.PlainDate);
+    expect(DateTime.rfc3339()).toBeInstanceOf(Temporal.PlainDateTime);
+
+    const d = Date.rfc3339("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
+    expect(d.equals(Date.civil(2001, 2, 3))).toBe(true);
+    expect(startOf(Date._rfc3339("2001-02-03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+
+    const dt = DateTime.rfc3339("2001-02-03T04:05:06+07:00", Date.ITALY + 10);
+    expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._rfc3339("2001-02-03T04:05:06+07:00"))).toBe(Date.ITALY + 10);
+  });
+
   it("rfc2822", () => {
     expect(Date.rfc2822()).toBeInstanceOf(Temporal.PlainDate);
     expect(DateTime.rfc2822()).toBeInstanceOf(Temporal.PlainDateTime);
@@ -419,25 +450,33 @@ describe("TestDateParse", () => {
   });
 
   /**
-   * Ruby asserts the same raise for every `_`-parser and its builder. The
-   * `_iso8601`, `_rfc3339`, `_xmlschema` and `_jisx0301` families are not
-   * ported yet (RFC 0088), so their arms are absent rather than renamed.
+   * Ruby's list has no `httpdate` arm at all; the four this port carried were
+   * an over-port, and go here.
    */
   it("length limit", () => {
     expect(() => Date._parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._iso8601("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._rfc822("1".repeat(1000))).toThrow(ArgumentError);
-    expect(() => Date._httpdate("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => Date.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.iso8601("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date.rfc822("1".repeat(1000))).toThrow(ArgumentError);
-    expect(() => Date.httpdate("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => DateTime.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.iso8601("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => DateTime.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => DateTime.rfc822("1".repeat(1000))).toThrow(ArgumentError);
-    expect(() => DateTime.httpdate("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => Date._parse("Jan " + "9".repeat(1000000))).toThrow(ArgumentError);
   });
