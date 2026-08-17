@@ -19,6 +19,7 @@ import {
 } from "./date-time/calculations.js";
 import { setFrozenTime } from "../time-travel.js";
 import { setZone } from "../time-zone-config.js";
+import { ArgumentError } from "../hash-utils.js";
 import {
   advance as timeAdvance,
   civilFromFormat,
@@ -179,6 +180,17 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(change(dt(2005, 2, 22, 15, 15, 10.7), { day: 1 }).toString()).toBe(
       dt(2005, 2, 1, 15, 15, 10.7).toString(),
     );
+    expect(change(dt(2005, 1, 2, 11, 22, 33), { usec: 8 }).toString()).toBe(
+      dt(2005, 1, 2, 11, 22, new Rational(33000008, 1000000)).toString(),
+    );
+    expect(change(dt(2005, 1, 2, 11, 22, 33), { nsec: 8000 }).toString()).toBe(
+      dt(2005, 1, 2, 11, 22, new Rational(33000008, 1000000)).toString(),
+    );
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 1, nsec: 1 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 1000000 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { nsec: 1000000000 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 999999 })).not.toThrow();
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { nsec: 999999999 })).not.toThrow();
   });
 
   it("advance partial days", () => {
@@ -562,5 +574,22 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(advance(receiver(), { seconds: 9 }).toString()).toBe(
       dt(2005, 2, 28, 15, 15, 19).toString(),
     );
+    expect(advance(receiver(), { hours: 5, minutes: 7, seconds: 9 }).toString()).toBe(
+      dt(2005, 2, 28, 20, 22, 19).toString(),
+    );
+    expect(advance(receiver(), { hours: -5, minutes: -7, seconds: -9 }).toString()).toBe(
+      dt(2005, 2, 28, 10, 8, 1).toString(),
+    );
+    expect(
+      advance(receiver(), {
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+        hours: 5,
+        minutes: 7,
+        seconds: 9,
+      }).toString(),
+    ).toBe(dt(2013, 10, 17, 20, 22, 19).toString());
   });
 });
