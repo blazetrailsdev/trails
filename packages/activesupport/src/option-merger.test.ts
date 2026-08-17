@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { withOptions } from "./core-ext/object/with-options.js";
 import { OptionMerger } from "./option-merger.js";
+import { assertNotSame } from "./testing/assertions.js";
 
 /**
  * Port of activesupport/test/option_merger_test.rb.
@@ -18,6 +19,12 @@ describe("OptionMergerTest", () => {
       return args;
     },
     methodWithOptions(options: Record<string, unknown> = {}): Record<string, unknown> {
+      return options;
+    },
+    methodWithKwargs(options: Record<string, unknown> = {}): Record<string, unknown> {
+      return options;
+    },
+    methodWithKwargsOnly(options: Record<string, unknown> = {}): Record<string, unknown> {
       return options;
     },
   };
@@ -43,6 +50,8 @@ describe("OptionMergerTest", () => {
     withOptions(context, options, (o) => {
       expect(context.methodWithOptions(localOptions)).toEqual(localOptions);
       expect(o.methodWithOptions(localOptions)).toEqual({ ...options, ...localOptions });
+      expect(o.methodWithKwargs(localOptions)).toEqual({ ...options, ...localOptions });
+      expect(o.methodWithKwargsOnly(localOptions)).toEqual({ ...options, ...localOptions });
     });
   });
 
@@ -50,12 +59,14 @@ describe("OptionMergerTest", () => {
     withOptions(context, options, (o) => {
       expect(context.methodWithOptions()).toEqual({});
       expect(o.methodWithOptions()).toEqual(options);
+      expect(o.methodWithKwargs()).toEqual(options);
+      expect(o.methodWithKwargsOnly()).toEqual(options);
     });
   });
 
   it("method with options copies options when options are missing", () => {
     withOptions(context, options, (o) => {
-      expect(o.methodWithOptions()).not.toBe(options);
+      assertNotSame(options, o.methodWithOptions());
     });
   });
 
@@ -135,7 +146,7 @@ describe("OptionMergerTest", () => {
   });
 
   it("option merger class method", () => {
-    expect(new OptionMerger({}, {})).toBeInstanceOf(OptionMerger);
+    expect(Object.getPrototypeOf(new OptionMerger({}, {}))).toBe(OptionMerger.prototype);
   });
 
   it("with options hash like", () => {

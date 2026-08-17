@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { EnvironmentInquirer } from "./environment-inquirer.js";
+import { assertNot, assertPredicate } from "./testing/assertions.js";
 
 describe("EnvironmentInquirerTest", () => {
   it("local predicate", () => {
-    expect(new EnvironmentInquirer("development").isLocal()).toBe(true);
-    expect(new EnvironmentInquirer("test").isLocal()).toBe(true);
-    expect(new EnvironmentInquirer("production").isLocal()).toBe(false);
+    assertPredicate(new EnvironmentInquirer("development"), (env) => env.isLocal());
+    assertPredicate(new EnvironmentInquirer("test"), (env) => env.isLocal());
+    assertNot(new EnvironmentInquirer("production").isLocal());
   });
 
   it("prevent local from being used as an actual environment name", () => {

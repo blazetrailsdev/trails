@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SecureCompareRotator, InvalidMatch } from "./secure-compare-rotator.js";
+import { assertChanges } from "./testing/assertions.js";
 
 describe("SecureCompareRotatorTest", () => {
   it("#secure_compare! works correctly after rotation", () => {
@@ -25,7 +26,7 @@ describe("SecureCompareRotatorTest", () => {
     expect(() => wrapper.secureCompareBang("different_secret")).toThrow(InvalidMatch);
   });
 
-  it("#secure_compare! calls the on_rotation proc", () => {
+  it("#secure_compare! calls the on_rotation proc", async () => {
     const wrapper = new SecureCompareRotator("old_secret");
     wrapper.rotate("new_secret");
     wrapper.rotate("another_secret");
@@ -33,18 +34,23 @@ describe("SecureCompareRotatorTest", () => {
 
     let witness: boolean | null = null;
 
-    expect(witness).toBeNull();
-    expect(
-      wrapper.secureCompareBang("and_another_one", {
-        onRotation: () => {
-          witness = true;
-        },
-      }),
-    ).toEqual(true);
-    expect(witness).toEqual(true);
+    await assertChanges(
+      () => witness,
+      null,
+      { from: null, to: true },
+      () => {
+        expect(
+          wrapper.secureCompareBang("and_another_one", {
+            onRotation: () => {
+              witness = true;
+            },
+          }),
+        ).toEqual(true);
+      },
+    );
   });
 
-  it("#secure_compare! calls the on_rotation proc that given in constructor", () => {
+  it("#secure_compare! calls the on_rotation proc that given in constructor", async () => {
     let witness: boolean | null = null;
 
     const wrapper = new SecureCompareRotator("old_secret", {
@@ -56,8 +62,13 @@ describe("SecureCompareRotatorTest", () => {
     wrapper.rotate("another_secret");
     wrapper.rotate("and_another_one");
 
-    expect(witness).toBeNull();
-    expect(wrapper.secureCompareBang("and_another_one")).toEqual(true);
-    expect(witness).toEqual(true);
+    await assertChanges(
+      () => witness,
+      null,
+      { from: null, to: true },
+      () => {
+        expect(wrapper.secureCompareBang("and_another_one")).toEqual(true);
+      },
+    );
   });
 });

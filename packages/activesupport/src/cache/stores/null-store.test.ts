@@ -4,15 +4,14 @@ import { NullStore } from "../null-store.js";
 describe("NullStoreTest", () => {
   it("cleanup", () => {
     const store = new NullStore();
-    // cleanup is a no-op for NullStore; just verify no errors
-    expect(() => store.clear()).not.toThrow();
+    store.write("name", "value");
+    store.cleanup();
+    expect(store.read("name")).toBeNull();
   });
 
   it("write", () => {
     const store = new NullStore();
-    store.write("key", "value");
-    // NullStore doesn't persist
-    expect(store.read("key")).toBeNull();
+    expect(store.write("name", "value")).toEqual(true);
   });
 
   it("read", () => {
@@ -22,9 +21,8 @@ describe("NullStoreTest", () => {
 
   it("delete", () => {
     const store = new NullStore();
-    store.write("key", "value");
-    store.delete("key");
-    expect(store.read("key")).toBeNull();
+    store.write("name", "value");
+    expect(store.delete("name")).toEqual(false);
   });
 
   it("increment", () => {
@@ -50,8 +48,9 @@ describe("NullStoreTest", () => {
 
   it("delete matched", () => {
     const store = new NullStore();
-    // deleteMatched is a no-op for NullStore
-    expect(() => store.deleteMatched(/key/)).not.toThrow();
+    store.write("name", "value");
+    store.deleteMatched(/name/);
+    expect(store.read("name")).toBeNull();
   });
 
   it("local store strategy", () => {

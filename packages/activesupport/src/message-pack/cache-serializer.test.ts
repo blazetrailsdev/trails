@@ -40,21 +40,27 @@ describe("MessagePackCacheSerializerTest", () => {
   const dump = (object: unknown) => MessagePackCacheSerializer.dump(object);
   const load = (dumped: Buffer) => MessagePackCacheSerializer.load(dumped);
 
+  /** `assert_roundtrip` (message_pack/shared_serializer_tests.rb:169-176). */
+  const assertRoundtrip = (object: HasValue) => {
+    const serialized = dump(object);
+    expect(serialized).toBeInstanceOf(Buffer);
+
+    const deserialized = load(serialized);
+    expect(deserialized).toBeInstanceOf(object.constructor);
+    expect(deserialized).toEqual(object);
+  };
+
   beforeAll(() => {
     registerObjectClass(DefinesJsonCreate);
     registerObjectClass(DefinesFromMsgpackExt);
   });
 
   it("uses #to_msgpack_ext and ::from_msgpack_ext to roundtrip unregistered objects", () => {
-    const deserialized = load(dump(new DefinesFromMsgpackExt("foo")));
-    expect(deserialized).toBeInstanceOf(DefinesFromMsgpackExt);
-    expect((deserialized as DefinesFromMsgpackExt).value).toBe("foo");
+    assertRoundtrip(new DefinesFromMsgpackExt("foo"));
   });
 
   it("uses #as_json and ::json_create to roundtrip unregistered objects", () => {
-    const deserialized = load(dump(new DefinesJsonCreate("foo")));
-    expect(deserialized).toBeInstanceOf(DefinesJsonCreate);
-    expect((deserialized as DefinesJsonCreate).value).toBe("foo");
+    assertRoundtrip(new DefinesJsonCreate("foo"));
   });
 
   it("raises error when unable to serialize an unregistered object", () => {
