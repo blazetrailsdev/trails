@@ -608,17 +608,10 @@ export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string):
 }
 
 /**
- * Mirrors Rails
- *
- *   def initialize_dup(other)
- *     super
- *     @mutations_from_database = nil
- *   end
- *
- * (activemodel/lib/active_model/dirty.rb:248-251). Without it the copy shares the
+ * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
+ * (activemodel/lib/active_model/dirty.rb:248-251); without it the copy shares the
  * source's tracker, so writing to one marks the other dirty. As with
- * {@link initInternals}, a fresh `DirtyTracker` is the reset — trails consolidates
- * Rails' two mutation trackers into one.
+ * {@link initInternals}, a fresh `DirtyTracker` is the reset.
  *
  * @internal Rails-private helper.
  */
