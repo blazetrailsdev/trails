@@ -4,8 +4,8 @@ import { ActiveSupportJSON } from "../json.js";
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-import { Encoding } from "./encoding.js";
-import { asJson } from "../core-ext/object/json.js";
+import { Encoding, type EncodeOptions } from "./encoding.js";
+import { asJson, ToJsonWithActiveSupportEncoder } from "../core-ext/object/json.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { Range } from "../range-ext.js";
 
@@ -36,6 +36,38 @@ class People {
   [Symbol.iterator](): IterableIterator<unknown> {
     return this.each();
   }
+}
+
+/** Rails' `JSONTest::InfiniteNumber` (encoding_test.rb:462-466). */
+class InfiniteNumber {
+  asJson(_options?: EncodeOptions | null): unknown {
+    return { number: Infinity };
+  }
+
+  toJSON = ToJsonWithActiveSupportEncoder.toJSON;
+}
+
+/** Rails' `JSONTest::NaNNumber` (encoding_test.rb:472-476). */
+class NaNNumber {
+  asJson(_options?: EncodeOptions | null): unknown {
+    return { number: NaN };
+  }
+
+  toJSON = ToJsonWithActiveSupportEncoder.toJSON;
+}
+
+/** Mirrors `sorted_json` (encoding_test.rb:14-20). */
+function sortedJson(json: string): string {
+  if (json.startsWith("{") && json.endsWith("}")) {
+    return "{" + json.slice(1, -1).split(",").sort().join(",") + "}";
+  } else {
+    return json;
+  }
+}
+
+/** Mirrors `object_keys` (encoding_test.rb:487-489). */
+function objectKeys(jsonObject: string): string[] {
+  return [...jsonObject.slice(1, -1).matchAll(/([^{}:,\s]+):/g)].map((match) => match[1]).sort();
 }
 
 function withStandardJsonTimeFormat(value: boolean, block: () => void): void {
@@ -93,9 +125,12 @@ describe("TestJSONEncoding", () => {
   });
 
   it("hash encoding", () => {
-    const h = { a: 1, b: "hello" };
-    const json = JSON.stringify(h);
-    expect(json).toBe('{"a":1,"b":"hello"}');
+    expect(ActiveSupportJSON.encode({ a: "b" })).toBe('{"a":"b"}');
+    expect(ActiveSupportJSON.encode({ a: 1 })).toBe('{"a":1}');
+    expect(ActiveSupportJSON.encode({ a: [1, 2] })).toBe('{"a":[1,2]}');
+    expect(ActiveSupportJSON.encode({ 1: 2 })).toBe('{"1":2}');
+
+    expect(sortedJson(ActiveSupportJSON.encode({ a: "b", c: "d" }))).toBe('{"a":"b","c":"d"}');
   });
 
   it("hash keys encoding", () => {
@@ -125,10 +160,14 @@ describe("TestJSONEncoding", () => {
   });
 
   it("utf8 string encoded properly", () => {
-    const s = "こんにちは";
-    const json = JSON.stringify(s);
-    const parsed = JSON.parse(json);
-    expect(parsed).toBe(s);
+    // Rails follows each `assert_equal` with `assert_equal(Encoding::UTF_8,
+    // result.encoding)`; a JS string has no encoding to name, so the two
+    // encoding assertions have no counterpart.
+    let result = ActiveSupportJSON.encode("€2.99");
+    expect(result).toBe('"€2.99"');
+
+    result = ActiveSupportJSON.encode("✎☺");
+    expect(result).toBe('"✎☺"');
   });
 
   it.skip("non utf8 string transcodes");
@@ -144,10 +183,10 @@ describe("TestJSONEncoding", () => {
   });
 
   it("hash key identifiers are always quoted", () => {
-    const h = { "my key": 1, normal: 2 };
-    const json = JSON.stringify(h);
-    expect(json).toContain('"my key"');
-    expect(json).toContain('"normal"');
+    const values = { 0: 0, 1: 1, _: "_", $: "$", a: "a", A: "A", A0: "A0", A0B: "A0B" };
+    expect(objectKeys(ActiveSupportJSON.encode(values))).toEqual(
+      ['"$"', '"A"', '"A0"', '"A0B"', '"_"', '"a"', '"0"', '"1"'].sort(),
+    );
   });
 
   it("hash should allow key filtering with only", () => {
@@ -167,16 +206,23 @@ describe("TestJSONEncoding", () => {
   });
 
   it("hash with time to json", () => {
-    const h = { at: new Date("2023-01-01T00:00:00Z") };
-    const json = JSON.stringify(h);
-    expect(json).toContain("2023");
+    withStandardJsonTimeFormat(false, () => {
+      expect(
+        ActiveSupportJSON.encode({ time: Temporal.Instant.from("2009-01-01T00:00:00Z") }),
+      ).toBe('{"time":"2009/01/01 00:00:00 +0000"}');
+    });
   });
 
   it("nested hash with float", () => {
-    const h = { x: 1.5, nested: { y: 2.75 } };
-    const parsed = JSON.parse(JSON.stringify(h));
-    expect(parsed.x).toBeCloseTo(1.5);
-    expect(parsed.nested.y).toBeCloseTo(2.75);
+    expect(() => {
+      const hash = {
+        CHI: {
+          display_name: "chicago",
+          latitude: 123.234,
+        },
+      };
+      ActiveSupportJSON.encode(hash);
+    }).not.toThrow();
   });
 
   it("hash like with options", () => {
@@ -269,9 +315,9 @@ describe("TestJSONEncoding", () => {
   it.skip("data encoding");
 
   it("nil true and false represented as themselves", () => {
-    expect(JSON.stringify(null)).toBe("null");
-    expect(JSON.stringify(true)).toBe("true");
-    expect(JSON.stringify(false)).toBe("false");
+    expect(asJson(null)).toBeNull();
+    expect(asJson(true)).toBe(true);
+    expect(asJson(false)).toBe(false);
   });
 
   it.skip("json gem dump by passing active support encoder");
@@ -324,18 +370,16 @@ describe("TestJSONEncoding", () => {
   it.skip("twz to json when wrapping a date time");
 
   it("exception to json", () => {
-    const err = new Error("boom");
-    const json = JSON.stringify({ message: err.message });
-    expect(JSON.parse(json).message).toBe("boom");
+    const exception = new Error("foo");
+    expect(ActiveSupportJSON.encode(exception)).toBe('"foo"');
   });
 
   it("to json works when as json returns infinite number", () => {
-    // JS JSON.stringify converts Infinity to null
-    expect(JSON.stringify(Infinity)).toBe("null");
+    expect(new InfiniteNumber().toJSON()).toBe('{"number":null}');
   });
 
   it("to json works when as json returns NaN number", () => {
-    expect(JSON.stringify(NaN)).toBe("null");
+    expect(new NaNNumber().toJSON()).toBe('{"number":null}');
   });
 
   it.skip("to json works on io objects");
