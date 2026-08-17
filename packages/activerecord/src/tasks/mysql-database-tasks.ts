@@ -145,10 +145,8 @@ export class MySQLDatabaseTasks {
   }
 
   private creationOptions(): { charset?: string; collation?: string } {
-    // `Hash#include?` is key presence, not a defined value
-    // (`mysql_database_tasks.rb:85-86`), so a key stored with an explicit nil
-    // still emits its option — go through `Object.keys(...).includes(...)`
-    // rather than an `!== undefined` value test.
+    // `Hash#include?` is key presence, not a defined value, so a key stored
+    // with an explicit nil still emits its option.
     const options: { charset?: string; collation?: string } = {};
     if (Object.keys(this.configurationHash).includes("encoding")) {
       options.charset = this.configurationHash.encoding as string;

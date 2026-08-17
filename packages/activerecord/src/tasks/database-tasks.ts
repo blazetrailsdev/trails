@@ -637,13 +637,9 @@ export class DatabaseTasks {
 
   static checkTargetVersion(version?: number | string): void {
     const v = version ?? getEnv("TRAILS_MIGRATION_VERSION") ?? getEnv("VERSION");
-    if (v === undefined || v === null || String(v).trim() === "") return;
-    const str = String(v).trim();
-    // `Migration.valid_version_format?(ENV["VERSION"])` (`database_tasks.rb:318`)
-    // — the format itself lives on Migration, not here.
+    if (v === undefined || v === null || String(v) === "") return;
+    const str = String(v);
     if (!Migration.isValidVersionFormat(str)) {
-      // Mirror Rails' message shape:
-      // `raise "Invalid format of target version: \`VERSION=#{ENV['VERSION']}\`"`.
       throw new Error(`Invalid format of target version: \`VERSION=${str}\``);
     }
   }
@@ -1012,10 +1008,7 @@ export class DatabaseTasks {
     const filename = this._resolveSchemaPath(rawFilename);
     const fs = getFs();
     const path = getPath();
-    // `FileUtils.mkdir_p(db_dir)` (`database_tasks.rb:437`).
     fs.mkdirSync(path.dirname(filename), { recursive: true });
-    // Rails' `case format` runs the `:ruby` arm before the `:sql` one
-    // (`database_tasks.rb:438-453`); keep that branch order.
     if (format !== "sql") {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       // Rails' dumper only ever emits Ruby, so its `dump` has no language slot;
@@ -1132,8 +1125,6 @@ export class DatabaseTasks {
     environment?: string,
   ): Promise<void> {
     for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
-      // `with_temporary_connection(db_config) { load_schema(...) }`
-      // (`database_tasks.rb:476-478`).
       await this.withTemporaryConnection(dbConfig, async () => {
         await this.loadSchema(dbConfig, format, file);
       });
@@ -1154,8 +1145,6 @@ export class DatabaseTasks {
     const pool = this.migrationConnectionPool();
     const adapter = await pool.leaseConnection();
     const migrator = await this._migratorFor(adapter, pool.dbConfig);
-    // `migration_connection_pool.schema_migration.table_exists?`
-    // (`database_tasks.rb:303`).
     if (!(await pool.schemaMigration.tableExists())) {
       throw new Error("Schema migrations table does not exist yet.");
     }
@@ -1191,9 +1180,6 @@ export class DatabaseTasks {
   }
 
   static async migrateAll(): Promise<void> {
-    // `ActiveRecord::Base.configurations.configs_for(env_name: ...)`
-    // (`database_tasks.rb:244`) — `migrate_all` reads the registry directly
-    // rather than through the private `configs_for` helper.
     const configs = baseClass().configurations().configsFor({ envName: this._normalizeEnv() });
 
     // Rails: initialize_database for every config before the single-primary fast path or version loop.
@@ -1230,8 +1216,6 @@ export class DatabaseTasks {
     let seed = false;
     const dumpDbConfigs: DatabaseConfig[] = [];
 
-    // `each_current_configuration(env) { |db_config| ... }`
-    // (`database_tasks.rb:180-184`).
     for (const dbConfig of this.eachCurrentConfiguration(env)) {
       const databaseInitialized = await initializeDatabase(dbConfig);
       if (databaseInitialized && dbConfig.seeds) seed = true;
@@ -1269,10 +1253,7 @@ export class DatabaseTasks {
     environment?: string,
   ): Promise<Map<string | number, DatabaseConfig[]>> {
     const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
-    // `environment = env` is Ruby's parameter default (`database_tasks.rb:285`).
     environment = this._normalizeEnv(environment);
-    // `with_temporary_pool_for_each(env: environment) do |pool| ... end`
-    // (`database_tasks.rb:288`) — the db_config comes off the yielded pool.
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
       const dbConfig = pool.dbConfig;
       const context = await this._migrationContextFor(await pool.leaseConnection(), dbConfig);
@@ -1426,7 +1407,6 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<boolean> {
     void format;
-    // `db_config = resolve_configuration(configuration)` (`database_tasks.rb:398`).
     const dbConfig = this.resolveConfiguration(configuration);
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
     if (!file) return true;

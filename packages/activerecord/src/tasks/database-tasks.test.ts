@@ -1482,11 +1482,18 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
   });
 
   it("check target version raises error on invalid version format", () => {
-    expect(() => DatabaseTasks.checkTargetVersion("abc")).toThrow(/Invalid format/);
+    for (const version of ["unknown", "0.1.11", "1.1.11", "0 ", "1.", "1_", "1_name"]) {
+      expect(() => DatabaseTasks.checkTargetVersion(version)).toThrow(
+        /Invalid format of target version/,
+      );
+    }
   });
 
   it("check target version does not raise error on valid version format", () => {
-    expect(() => DatabaseTasks.checkTargetVersion("20230101120000")).not.toThrow();
+    // Rails' last case is `001_name.rb`; trails' migrations are `.ts`/`.js`.
+    for (const version of ["0", "1", "001", "1_001", "001_name.ts", "20230101120000"]) {
+      expect(() => DatabaseTasks.checkTargetVersion(version)).not.toThrow();
+    }
   });
 });
 

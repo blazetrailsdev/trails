@@ -194,7 +194,6 @@ export class PostgreSQLDatabaseTasks {
       if (result.signal) details.push(`Signal: ${result.signal}`);
       if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
       if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      // `fail run_cmd_error(cmd, args, action)` (`postgresql_database_tasks.rb:120`).
       // Rails leaves the child's own output on the terminal because
       // `Kernel.system` does; `spawnSync` captures it, so the captured streams
       // follow the ported message rather than replacing it.
@@ -275,6 +274,6 @@ export function normalizeSchemaSearchPath(raw: string): string[] {
 export function runCmdError(cmd: string, args: string[], _action: string): string {
   return (
     `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
