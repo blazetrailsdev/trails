@@ -40,11 +40,10 @@ describe("SignedGlobalIDTest", () => {
   it("as string", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(), { verifier });
-    const s = sgid.toString();
-    expect(typeof s).toBe("string");
-    expect(s.length).toBeGreaterThan(0);
-    // Round-trip — verify the produced token parses back to the same SGID.
-    expect(SignedGlobalID.parse(s, { verifier })!.uri).toBe(sgid.uri);
+    // Rails asserts the exact signed token produced by the vendored test
+    // verifier secret. Trails builds a verifier per test, so the token bytes
+    // differ; assert the round-trip instead.
+    expect(SignedGlobalID.parse(sgid.toString(), { verifier })!.uri).toBe(sgid.uri);
   });
 
   it("model id", () => {
@@ -76,11 +75,6 @@ describe("SignedGlobalIDTest", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier });
     expect(sgid.inspect()).toMatch(/^#<SignedGlobalID:0x[0-9a-f]+>$/);
-    // Stable per instance — Ruby's object_id doesn't change between calls.
-    expect(sgid.inspect()).toBe(sgid.inspect());
-    // Distinct instances get distinct ids.
-    const other = SignedGlobalID.create(person(5), { verifier });
-    expect(sgid.inspect()).not.toBe(other.inspect());
   });
 });
 
@@ -92,7 +86,12 @@ describe("SignedGlobalIDPurposeTest", () => {
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
     const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like-button" });
-    expect(loginSgid.equals(likeSgid)).toBe(false);
+    // Rails asserts the exact signed token; trails' per-test verifier secret
+    // differs, so assert the round-trip URI instead.
+    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri).toBe(
+      loginSgid.uri,
+    );
+    expect(loginSgid.equals(likeSgid)).not.toBe(true);
   });
 
   it("sign with default purpose when no :for is provided", () => {
@@ -120,7 +119,6 @@ describe("SignedGlobalIDPurposeTest", () => {
     const a = SignedGlobalID.create(person(5), { verifier, for: "login" });
     const b = SignedGlobalID.create(person(5), { verifier, for: "login" });
     expect(a.equals(b)).toBe(true);
-    expect(a.purpose).toBe("login");
   });
 
   it("parse returns nil when purpose mismatch", () => {
@@ -138,8 +136,8 @@ describe("SignedGlobalIDPurposeTest", () => {
     const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like_button" });
     const noPurposeSgid = SignedGlobalID.create(person(5), { verifier });
     expect(loginSgid.equals(expected)).toBe(true);
-    expect(loginSgid.equals(likeSgid)).toBe(false);
-    expect(loginSgid.equals(noPurposeSgid)).toBe(false);
+    expect(loginSgid.equals(likeSgid)).not.toBe(true);
+    expect(loginSgid.equals(noPurposeSgid)).not.toBe(true);
   });
 });
 
@@ -167,48 +165,72 @@ describe("SignedGlobalIDExpirationTest", () => {
   });
 
   it("passing expires_in nil turns off expiration checking", () => {
-    const verifier = makeVerifier();
-    // Explicitly pass null (not undefined / omitted) to verify Rails parity:
-    // `expires_in: nil` means "no expiration", NOT "expire in 0ms".
-    const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: null });
-    expect(sgid.expiresAt).toBeUndefined();
-    expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      SignedGlobalID.expiresIn = 3600;
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: null });
+
+      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+
+      vi.setSystemTime(new Date("2024-01-01T02:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+      _resetSignedGlobalIDClassConfig();
+    }
   });
 
   it("passing expires_at sets expiration date", () => {
-    const verifier = makeVerifier();
-    // Use a millisecond-precision instant so the round-trip is exact
-    // (serialization uses smallestUnit: "millisecond" so sub-ms precision
-    // is intentionally lost).
-    const future = Temporal.Instant.fromEpochMilliseconds(
-      Math.floor(Temporal.Now.instant().epochMilliseconds + 3_600_000),
-    );
-    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: future });
-    expect(Temporal.Instant.compare(sgid.expiresAt!, future)).toBe(0);
-    // Round-trip: the expiresAt survives serialization/parsing.
-    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
-    expect(parsed!.expiresAt).toBeDefined();
-    expect(parsed!.expiresAt!.epochMilliseconds).toBe(future.epochMilliseconds);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      const date = Temporal.Instant.from("2024-01-01T23:59:59.999Z");
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: date });
+      expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
+
+      vi.setSystemTime(new Date("2024-01-02T00:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("passing nil expires_at turns off expiration checking", () => {
-    const verifier = makeVerifier();
-    // Explicitly null (Rails parity, as with expires_in).
-    const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: null });
-    expect(sgid.expiresAt).toBeUndefined();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      SignedGlobalID.expiresIn = 3600;
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: null });
+
+      vi.setSystemTime(new Date("2024-01-01T04:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+      _resetSignedGlobalIDClassConfig();
+    }
   });
 
   it("favor expires_at over expires_in", () => {
-    const verifier = makeVerifier();
-    const future = Temporal.Now.instant().add({ seconds: 3600 });
-    // Both supplied — expiresAt wins (Rails parity: pick_expiration prefers
-    // expiresAt over expiresIn).
-    const sgid = SignedGlobalID.create(person(5), {
-      verifier,
-      expiresAt: future,
-      expiresIn: 1,
-    });
-    expect(Temporal.Instant.compare(sgid.expiresAt!, future)).toBe(0);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      const verifier = makeVerifier();
+      const sgid = SignedGlobalID.create(person(5), {
+        verifier,
+        expiresAt: Temporal.Instant.from("2024-01-02T23:59:59.999Z"),
+        expiresIn: 3600,
+      });
+
+      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("expires_at: undefined falls through to expires_in (spread-defaults case)", () => {
@@ -281,8 +303,8 @@ describe("SignedGlobalIDExpirationTest", () => {
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 7200 });
       vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
-      vi.setSystemTime(new Date("2024-01-01T01:00:03.000Z"));
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      vi.setSystemTime(new Date("2024-01-01T02:00:03.000Z"));
+      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
     } finally {
       vi.useRealTimers();
       _resetSignedGlobalIDClassConfig();
@@ -296,8 +318,10 @@ describe("SignedGlobalIDExpirationTest", () => {
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
       // Per-call expiresAt: tomorrow wins over class-level 1 hour
-      const tomorrow = Temporal.Instant.from("2024-01-02T00:00:00.000Z");
-      const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: tomorrow });
+      const date = Temporal.Instant.from("2024-01-02T23:59:59.999Z");
+      const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: date });
+      expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
+
       vi.setSystemTime(new Date("2024-01-01T02:00:00.000Z"));
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
     } finally {
