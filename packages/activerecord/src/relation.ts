@@ -3473,8 +3473,14 @@ export class Relation<T extends Base> {
     }
 
     if (timestamp != null) {
-      // `timestamp` is already the UTC instant Rails' `timestamp.utc` answers.
-      return `${size}-${toFs(timestamp as Temporal.Instant, this.model.cacheTimestampFormat)}`;
+      // Ruby resolves `timestamp.utc.to_fs` on the receiver's class. A datetime
+      // column deserializes to the `Temporal.Instant` that is Rails' already-UTC
+      // `Time#utc`; a non-datetime cache-version column (an integer `revision`)
+      // has no `utc` at all and reaches `Numeric#to_fs`, which at the default
+      // format is `to_s`.
+      return timestamp instanceof Temporal.Instant
+        ? `${size}-${toFs(timestamp, this.model.cacheTimestampFormat)}`
+        : `${size}-${String(timestamp)}`;
     }
     return `${size}`;
   }
