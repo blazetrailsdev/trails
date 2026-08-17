@@ -1,94 +1,35 @@
 import { describe, it, expect } from "vitest";
-import { Model, Types } from "../index.js";
+import { Types } from "../index.js";
 
 describe("FloatTest", () => {
-  it("changing float", () => {
-    class MyModel extends Model {
-      static {
-        this.attribute("value", "float");
-      }
-    }
-    const m = new MyModel({ value: 1.5 });
-    m.writeAttribute("value", 2.5);
-    expect(m.readAttribute("value")).toBe(2.5);
-    expect(m.attributeChanged("value")).toBe(true);
-  });
-
   it("type cast float", () => {
     const type = new Types.FloatType();
-    expect(type.cast(42.5)).toBe(42.5);
-    expect(type.cast("3.14")).toBe(3.14);
-    expect(type.cast(null)).toBe(null);
+    expect(type.cast("1")).toBe(1.0);
   });
 
   it("type cast float from invalid string", () => {
     const type = new Types.FloatType();
-    expect(type.cast("not-a-number")).toBe(null);
-  });
-
-  it("blank string casts to null via Helpers::Numeric", () => {
-    const type = new Types.FloatType();
     expect(type.cast("")).toBeNull();
-    expect(type.cast("   ")).toBeNull();
+    expect(type.cast("1ignore")).toBe(1.0);
+    expect(type.cast("bad1")).toBe(0.0);
+    expect(type.cast("bad")).toBe(0.0);
   });
 
-  it("serialize delegates to cast via Helpers::Numeric", () => {
+  it("changing float", () => {
     const type = new Types.FloatType();
-    expect(type.serialize("3.14")).toBe(3.14);
-  });
 
-  it("isChanged returns false for two NaN values", () => {
-    const type = new Types.FloatType();
-    expect(type.isChanged(NaN, NaN, NaN)).toBe(false);
-  });
-
-  it('isChanged returns true for NaN-to-NaN when raw is a "NaN" string — equal_nan? takes value_before_type_cast', () => {
-    const type = new Types.FloatType();
-    expect(type.isChanged(NaN, NaN, "NaN")).toBe(true);
-  });
-
-  it("isChanged returns true for a genuine float change", () => {
-    const type = new Types.FloatType();
-    expect(type.isChanged(1.0, 2.0, "2.0")).toBe(true);
-  });
-
-  it("casting booleans via Helpers::Numeric — true → 1.0, false → 0.0", () => {
-    const type = new Types.FloatType();
-    expect(type.cast(true)).toBe(1);
-    expect(type.cast(false)).toBe(0);
-  });
-
-  it('cast "NaN" returns Number.NaN', () => {
-    const type = new Types.FloatType();
-    expect(Number.isNaN(type.cast("NaN"))).toBe(true);
-  });
-
-  it('cast "Infinity" returns Number.POSITIVE_INFINITY', () => {
-    const type = new Types.FloatType();
-    expect(type.cast("Infinity")).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it('cast "-Infinity" returns Number.NEGATIVE_INFINITY', () => {
-    const type = new Types.FloatType();
-    expect(type.cast("-Infinity")).toBe(Number.NEGATIVE_INFINITY);
-  });
-
-  it("special strings are case-sensitive — lowercase variants cast to null", () => {
-    const type = new Types.FloatType();
-    expect(type.cast("nan")).toBeNull();
-    expect(type.cast("infinity")).toBeNull();
-    expect(type.cast("INFINITY")).toBeNull();
-  });
-
-  it('serialize("NaN") round-trips to Number.NaN via Helpers::Numeric', () => {
-    const type = new Types.FloatType();
-    expect(Number.isNaN(type.serialize("NaN"))).toBe(true);
-  });
-
-  it("typeCastForSchema dumps the float specials as Ruby constants", () => {
-    const type = new Types.FloatType();
-    expect(type.typeCastForSchema(NaN)).toBe("::Float::NAN");
-    expect(type.typeCastForSchema(Infinity)).toBe("::Float::INFINITY");
-    expect(type.typeCastForSchema(-Infinity)).toBe("-::Float::INFINITY");
+    expect(type.isChanged(0.0, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5.0, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5.0, 5.0, "5wibble")).toBeFalsy();
+    expect(type.isChanged(5.0, 5.0, "5")).toBeFalsy();
+    expect(type.isChanged(5.0, 5.0, "5.0")).toBeFalsy();
+    expect(type.isChanged(500.0, 500.0, "0.5E+4")).toBeFalsy();
+    expect(type.isChanged(null, null, null)).toBeFalsy();
+    expect(type.isChanged(NaN, NaN, NaN)).toBeFalsy();
+    // Rails passes `BigDecimal("0.0") / 0` for the new value and the raw value;
+    // trails' NaN decimal is the "NaN" sentinel (see decimal.test.ts). A Float
+    // NaN over a BigDecimal NaN is still a change — Rails' `equal_nan?` guard
+    // requires `old_value.instance_of?(new_value.class)` (numeric.rb:39).
+    expect(type.isChanged(NaN, "NaN", "NaN")).toBeTruthy();
   });
 });

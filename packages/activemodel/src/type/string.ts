@@ -28,11 +28,4 @@ export class StringType extends ImmutableStringType {
     if (typeof value === "boolean") return super.castValue(value);
     return String(value);
   }
-
-  // Return type stays `unknown` so subclass overrides (e.g. PG OID's
-  // Xml which wraps the cast result in a Data node) can widen the
-  // output type the way Rails' loosely-typed `serialize` does.
-  serialize(value: unknown): unknown {
-    return this.cast(value);
-  }
 }

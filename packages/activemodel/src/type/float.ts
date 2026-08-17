@@ -28,7 +28,11 @@ export class FloatType extends NumericValueType {
     if (value === "Infinity") return Number.POSITIVE_INFINITY;
     if (value === "-Infinity") return Number.NEGATIVE_INFINITY;
     if (value === "NaN") return Number.NaN;
+    // Mirrors float.rb:60's `else value.to_f`: Ruby's String#to_f reads the
+    // leading numeric prefix and answers 0.0 when there is none — "1ignore" is
+    // 1.0 and "bad" is 0.0, never nil (float_test.rb:14-19). A blank string
+    // never reaches here; Helpers::Numeric#cast has already turned it into nil.
     const parsed = parseFloat(String(value));
-    return isNaN(parsed) ? null : parsed;
+    return isNaN(parsed) ? 0 : parsed;
   }
 }

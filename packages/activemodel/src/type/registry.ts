@@ -55,7 +55,7 @@ export class TypeRegistry {
 
   lookup(name: string, options?: TypeOptions): Type {
     const factory = this.registrations.get(name);
-    if (!factory) throw new ArgumentError(`Unknown type: ${name}`);
+    if (!factory) throw new ArgumentError(`Unknown type :${name}`);
     return factory(name, options);
   }
 
