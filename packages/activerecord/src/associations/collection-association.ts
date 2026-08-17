@@ -680,19 +680,49 @@ export class CollectionAssociation extends Association {
     return this.deleteOrDestroy(records, "destroy");
   }
 
-  get size(): number {
+  /**
+   * Returns the size of the collection by executing a SELECT COUNT(*) query if
+   * the collection hasn't been loaded, and by counting `target` if it has.
+   *
+   * Mirrors: ActiveRecord::Associations::CollectionAssociation#size
+   * (collection_association.rb:209-222), all five arms in Rails' order. The two
+   * in-memory arms stay synchronous — Rails' first two issue no query either —
+   * while the grouped arm and the two counted arms return a promise, since a
+   * grouped COUNT(*) yields one row per group rather than a scalar and so has to
+   * load the target and count it in memory.
+   *
+   * Rails declares `count_records` only on the descendants
+   * (has_many_association.rb:80, has_many_through_association.rb:79) and calls it
+   * abstractly from here; every concrete collection association is a
+   * `HasManyAssociation`, so it is reached through the subclass rather than
+   * through a base declaration Rails does not have.
+   */
+  size(): Promise<number> | number {
     if (!this.findTargetNeeded() || this.isLoaded()) {
       return this.target.length;
-    }
-    if (this._associationIds) {
+    } else if (this._associationIds) {
       return this._associationIds.length;
+    } else if (
+      ((this.associationScope() as { groupValues?: unknown[] } | undefined)?.groupValues ?? [])
+        .length > 0
+    ) {
+      return Promise.resolve(this.loadTarget()).then((target) => target.length);
+    } else if (
+      !(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue &&
+      this.target.length > 0
+    ) {
+      const unsavedRecords = this.target.filter((record) => record.isNewRecord());
+      return (this as unknown as { countRecords(): Promise<number> })
+        .countRecords()
+        .then((count) => unsavedRecords.length + count);
+    } else {
+      return (this as unknown as { countRecords(): Promise<number> }).countRecords();
     }
-    return this.target.length;
   }
 
   async isEmpty(): Promise<boolean> {
     if (this.isLoaded() || this._associationIds || this.reflection.hasActiveCachedCounter?.()) {
-      return this.size === 0;
+      return (await this.size()) === 0;
     }
     return this.target.length === 0 && !(await this.scope().exists());
   }
