@@ -7,6 +7,7 @@
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable, relationName } from "@blazetrails/arel";
 import {
+  ArgumentError,
   Attribute,
   ValueType,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
@@ -21,6 +22,7 @@ import {
   UnmodifiableRelation,
 } from "../errors.js";
 import { FromClause } from "./from-clause.js";
+import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import { sanitizeLimit } from "../connection-adapters/abstract/database-statements.js";
 import { JoinDependency } from "../associations/join-dependency.js";
@@ -490,6 +492,47 @@ function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
   return this;
 }
 
+/**
+ * Select specific columns, or filter loaded records with a block.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#select (query_methods.rb:413-424)
+ *
+ * Examples:
+ *   select("name", "email")          // column projection
+ *   select("COUNT(*) as total")       // raw SQL expression
+ *   select(record => record.active)   // block form (returns array)
+ */
+function select(this: QueryMethodsHost, ...fields: any[]): any {
+  // Block form first — mirrors Rails' `if block_given?` guard before
+  // check_if_method_has_arguments!. A trailing function argument is the TS
+  // equivalent of a Ruby block.
+  if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
+    if (fields.length > 1) {
+      throw new ArgumentError("`select' with block doesn't take arguments.");
+    }
+    return (this as any).toArray().then((records: any[]) => records.filter(fields[0]));
+  }
+  checkIfMethodHasArgumentsBang.call(
+    this,
+    ":select",
+    fields,
+    "Call `select' with at least one field.",
+  );
+  fields = processSelectArgs.call(this, fields);
+  return _selectBang.apply(this.spawn(), fields);
+}
+
+/**
+ * Replace existing select columns.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#reselect (query_methods.rb:541-545)
+ */
+function reselect(this: QueryMethodsHost, ...args: any[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":reselect", args);
+  args = processSelectArgs.call(this, args);
+  return reselectBang.apply(this.spawn(), args);
+}
+
 function reselectBang(this: QueryMethodsHost, ...columns: any[]): any {
   this.selectValues = columns.map((c: any) => {
     if (c instanceof Nodes.Node) return c;
@@ -566,12 +609,32 @@ function _selectBang(this: QueryMethodsHost, ...columns: any[]): any {
   return this;
 }
 
+/**
+ * Add GROUP BY.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#group (query_methods.rb:573-576)
+ */
+function group(this: QueryMethodsHost, ...args: (string | Nodes.Node)[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":group", args as unknown[]);
+  return groupBang.apply(this.spawn(), args);
+}
+
 function groupBang(
   this: QueryMethodsHost,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
 ): any {
   this.groupValues = [...this.groupValues, ...(columns as string[])];
   return this;
+}
+
+/**
+ * Replace GROUP BY columns.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#regroup (query_methods.rb:593-596)
+ */
+function regroup(this: QueryMethodsHost, ...args: string[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":regroup", args);
+  return regroupBang.apply(this.spawn(), args);
 }
 
 function regroupBang(
@@ -582,6 +645,18 @@ function regroupBang(
   return this;
 }
 
+/**
+ * Add ORDER BY. Accepts column name or { column: "asc"|"desc" }.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#order (query_methods.rb:656-662)
+ */
+function order(this: QueryMethodsHost, ...args: OrderArg[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":order", args as unknown[], undefined, () => {
+    sanitizeOrderArguments.call(this, args as unknown[]);
+  });
+  return orderBang.apply(this.spawn(), args);
+}
+
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
   // Mirrors Rails' `self.order_values |= args`: union dedupes repeated terms.
@@ -590,6 +665,84 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     ...(args as unknown[]),
   ]) as typeof this.orderValues;
   return this;
+}
+
+/**
+ * Order by specific values of a column.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#in_order_of (query_methods.rb:717-741) —
+ * the permit matcher comes off `model.adapter_class`, a class-level lookup that
+ * leases no connection.
+ */
+function inOrderOf(
+  this: QueryMethodsHost,
+  column: string | Nodes.Node,
+  values: unknown[],
+  filter = true,
+): any {
+  (this.model as any).disallowRawSqlBang([column], {
+    permit: (
+      this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+    ).columnNameWithOrderMatcher(),
+  });
+  if (values.length === 0) return noneBang.call(this.spawn());
+
+  const references = columnReferences([column]);
+  if (references.length > 0) referencesBang.call(this, ...references);
+
+  // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
+  // Cast each value to its database form so the CASE/IN predicates match a typed
+  // column (e.g. enum integer mappings, date/time serialization) instead of the
+  // JS-native string/number form. An Arel node finds no attribute type and falls
+  // through to ValueType (no-op cast). `undefined` is normalized to `null` so
+  // `eq(null)` emits IS NULL rather than the invalid `= NULL`.
+  const typeCaster = new TypeCasterMap(this.model);
+  values = values.map((value) => {
+    if (value === undefined || value === null) return null;
+    return typeCaster.typeCastForDatabase(column, value);
+  });
+
+  // Mirrors Rails: `column.is_a?(Arel::Nodes::SqlLiteral) ? column : order_column(column.to_s)`.
+  // An Arel expression (e.g. `Arel.sql("id * 2")`) is used verbatim; a string/symbol
+  // resolves through orderColumn, which handles `"table.column"` for joined associations.
+  const arelColumn: any =
+    column instanceof Nodes.SqlLiteral ? column : orderColumn.call(this, String(column));
+
+  // The Arel CASE node is pushed as a node (not pre-rendered SQL) so its embedded
+  // bind values thread through the outer collector when the statement is compiled.
+  let scope = orderBang.call(
+    this.spawn(),
+    buildCaseForValuePosition.call(this, arelColumn, values, { filter }) as any,
+  );
+
+  // The values were already database-cast above via type_cast_for_database, and `in`
+  // wraps each in Casted, which casts again on value_for_database. That double-cast is
+  // faithful because Rails does the identical one (query_methods.rb:724 then :735,
+  // casted.rb:19-20) — not because the second cast is inert; a non-idempotent
+  // serialize would run twice here exactly as it does in Rails.
+  if (filter) {
+    // Mirrors Rails: `arel_column.in(values.compact).or(arel_column.eq(nil))`
+    // (query_methods.rb:732) — Arel's `or` wraps the pair in a Grouping itself.
+    const whereClause: Nodes.Node = values.includes(null)
+      ? (arelColumn.in(values.filter((v) => v !== null)) as Nodes.Node).or(arelColumn.eq(null))
+      : arelColumn.in(values);
+
+    scope = whereBang.call(scope, whereClause);
+  }
+
+  return scope;
+}
+
+/**
+ * Replace ordering.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#reorder (query_methods.rb:752-757)
+ */
+function reorder(this: QueryMethodsHost, ...args: OrderArg[]): any {
+  checkIfMethodHasArgumentsBang.call(this, ":reorder", args as unknown[], undefined, () => {
+    sanitizeOrderArguments.call(this, args as unknown[]);
+  });
+  return reorderBang.apply(this.spawn(), args);
 }
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
@@ -1259,6 +1412,20 @@ function orBang(this: QueryMethodsHost, other: any): any {
   return this;
 }
 
+/**
+ * Add HAVING clause. Accepts raw SQL string (with optional bind values),
+ * a hash of column/value pairs, or an Arel node.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#having (query_methods.rb:1197-1199)
+ */
+function having(
+  this: QueryMethodsHost,
+  condition: string | Record<string, unknown> | Nodes.Node,
+  ...binds: unknown[]
+): any {
+  return havingBang.call(this.spawn(), condition, ...binds);
+}
+
 function havingBang(
   this: QueryMethodsHost,
   opts: string | Record<string, unknown> | Nodes.Node,
@@ -1292,11 +1459,29 @@ function havingBang(
   return this;
 }
 
+/**
+ * Set LIMIT.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#limit (query_methods.rb:1211-1213)
+ */
+function limit(this: QueryMethodsHost, value: number | string | null): any {
+  return limitBang.call(this.spawn(), value);
+}
+
 function limitBang(this: QueryMethodsHost, value: number | string | null): any {
   // Mirrors `limit!` (query_methods.rb:1215-1218): the raw value is stored and
   // sanitized later, by `build_arel`'s `connection.sanitize_limit` (:1757).
   this.limitValue = value;
   return this;
+}
+
+/**
+ * Set OFFSET.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#offset (query_methods.rb:1227-1229)
+ */
+function offset(this: QueryMethodsHost, value: number | string | null): any {
+  return offsetBang.call(this.spawn(), value);
 }
 
 function offsetBang(this: QueryMethodsHost, value: number | string | null): any {
@@ -1419,6 +1604,15 @@ function fromBang(this: QueryMethodsHost, value: any, subqueryName?: string): an
   return this;
 }
 
+/**
+ * Make the query DISTINCT.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#distinct (query_methods.rb:1410-1412)
+ */
+function distinct(this: QueryMethodsHost, value = true): any {
+  return distinctBang.call(this.spawn(), value);
+}
+
 function distinctBang(this: QueryMethodsHost, value = true): any {
   this.distinctValue = value;
   return this;
@@ -1475,6 +1669,15 @@ function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
   // union, so a hint already present is not repeated.
   this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
   return this;
+}
+
+/**
+ * Reverse the existing order.
+ *
+ * Mirrors: ActiveRecord::QueryMethods#reverse_order (query_methods.rb:1498-1500)
+ */
+function reverseOrder(this: QueryMethodsHost): any {
+  return reverseOrderBang.call(this.spawn());
 }
 
 function reverseOrderBang(this: QueryMethodsHost): any {
@@ -2201,11 +2404,18 @@ export const QueryMethodBangs = {
   referencesBang,
   withBang,
   withRecursiveBang,
+  select,
+  reselect,
   reselectBang,
   _selectBang,
+  group,
   groupBang,
+  regroup,
   regroupBang,
+  order,
   orderBang,
+  inOrderOf,
+  reorder,
   reorderBang,
   unscope,
   unscopeBang,
@@ -2215,8 +2425,11 @@ export const QueryMethodBangs = {
   invertWhereBang,
   andBang,
   orBang,
+  having,
   havingBang,
+  limit,
   limitBang,
+  offset,
   offsetBang,
   lock,
   lockBang,
@@ -2231,11 +2444,13 @@ export const QueryMethodBangs = {
   createWithBang,
   from,
   fromBang,
+  distinct,
   distinctBang,
   extending,
   extendingBang,
   optimizerHints,
   optimizerHintsBang,
+  reverseOrder,
   reverseOrderBang,
   skipQueryCacheBang,
   skipPreloadingBang,

@@ -72,7 +72,6 @@ import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
 import { TableMetadata } from "./table-metadata.js";
-import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { WhereClause } from "./relation/where-clause.js";
 import type { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
@@ -1090,83 +1089,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Add ORDER BY. Accepts column name or { column: "asc"|"desc" }.
-   *
-   * Mirrors: ActiveRecord::Relation#order
-   */
-  order(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":order", args as unknown[], undefined, () => {
-      this.sanitizeOrderArguments(args as unknown[]);
-    });
-    return this.spawn().orderBang(...args);
-  }
-
-  /**
-   * Set LIMIT.
-   *
-   * Mirrors: ActiveRecord::Relation#limit
-   */
-  limit(value: number | string | null): Relation<T> {
-    return this.spawn().limitBang(value);
-  }
-
-  /**
-   * Set OFFSET.
-   *
-   * Mirrors: ActiveRecord::Relation#offset
-   */
-  offset(value: number | string | null): Relation<T> {
-    return this.spawn().offsetBang(value);
-  }
-
-  /**
-   * Select specific columns, or filter loaded records with a block.
-   *
-   * Mirrors: ActiveRecord::Relation#select
-   *
-   * Examples:
-   *   select("name", "email")          // column projection
-   *   select("COUNT(*) as total")       // raw SQL expression
-   *   select(record => record.active)   // block form (returns array)
-   */
-  select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
-  select(...fields: any[]): Relation<T> | Promise<T[]> {
-    // Block form first — mirrors Rails' `if block_given?` guard before
-    // check_if_method_has_arguments!. A trailing function argument is the TS
-    // equivalent of a Ruby block.
-    if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
-      if (fields.length > 1) {
-        throw new ArgumentError("`select' with block doesn't take arguments.");
-      }
-      return this.toArray().then((records) => records.filter(fields[0]));
-    }
-    this.checkIfMethodHasArgumentsBang(":select", fields, "Call `select' with at least one field.");
-    fields = this.processSelectArgs(fields);
-    return this.spawn()._selectBang(...fields);
-  }
-
-  /**
-   * Replace existing select columns.
-   *
-   * Mirrors: ActiveRecord::Relation#reselect
-   */
-  reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":reselect", args as unknown[]);
-    args = this.processSelectArgs(args as unknown[]) as typeof args;
-    return this.spawn().reselectBang(...args);
-  }
-
-  /**
-   * Make the query DISTINCT.
-   *
-   * Mirrors: ActiveRecord::Relation#distinct
-   */
-  distinct(value = true): Relation<T> {
-    return this.spawn().distinctBang(value);
-  }
-
-  /**
    * PostgreSQL DISTINCT ON — select distinct rows based on specific columns.
    *
    * Mirrors: ActiveRecord::Relation#distinct_on (PostgreSQL only)
@@ -1175,138 +1097,6 @@ export class Relation<T extends Base> {
     const rel = this.spawn();
     rel.distinctValue = true;
     rel._distinctOnColumns = columns;
-    return rel;
-  }
-
-  /**
-   * Add GROUP BY.
-   *
-   * Mirrors: ActiveRecord::Relation#group
-   */
-  group(...args: (string | import("@blazetrails/arel").Nodes.Node)[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":group", args as unknown[]);
-    return this.spawn().groupBang(...(args as string[]));
-  }
-
-  /**
-   * Add HAVING clause. Accepts raw SQL string (with optional bind values),
-   * a hash of column/value pairs, or an Arel node.
-   *
-   * Mirrors: ActiveRecord::Relation#having
-   */
-  having(condition: string, ...binds: unknown[]): Relation<T>;
-  having(condition: Record<string, unknown>): Relation<T>;
-  having(condition: Nodes.Node): Relation<T>;
-  having(
-    condition: string | Record<string, unknown> | Nodes.Node,
-    ...binds: unknown[]
-  ): Relation<T> {
-    return this.spawn().havingBang(condition, ...binds);
-  }
-
-  /**
-   * Replace GROUP BY columns.
-   *
-   * Mirrors: ActiveRecord::Relation#regroup
-   */
-  regroup(...args: string[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":regroup", args);
-    return this.spawn().regroupBang(...args);
-  }
-
-  /**
-   * Replace ordering.
-   *
-   * Mirrors: ActiveRecord::Relation#reorder
-   */
-  reorder(...args: OrderArg[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":reorder", args as unknown[], undefined, () => {
-      this.sanitizeOrderArguments(args as unknown[]);
-    });
-    return this.spawn().reorderBang(...args);
-  }
-
-  /**
-   * Reverse the existing order.
-   *
-   * Mirrors: ActiveRecord::Relation#reverse_order
-   */
-  reverseOrder(): Relation<T> {
-    return this.spawn().reverseOrderBang();
-  }
-
-  /**
-   * Order by specific values of a column.
-   *
-   * Mirrors: ActiveRecord::Relation#in_order_of (query_methods.rb:718) — the
-   * permit matcher comes off `model.adapter_class`, a class-level lookup that
-   * leases no connection.
-   */
-  inOrderOf(column: string | Nodes.Node, values: unknown[], filter = true): Relation<T> {
-    this.model.disallowRawSqlBang([column], {
-      permit: (
-        this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
-      ).columnNameWithOrderMatcher(),
-    });
-
-    if (values.length === 0) return this.none();
-
-    const rel = this.spawn();
-
-    // Mirrors Rails: `references = column_references([column]);
-    // self.references_values |= references unless references.empty?`
-    // (query_methods.rb:721-722) — recorded on the spawn, which trails clones
-    // up-front rather than at Rails' `spawn.order!`.
-    const references = _qm.columnReferences([column]);
-    if (references.length > 0) rel.referencesBang(...references);
-
-    // Mirrors Rails: `values.map { |v| model.type_caster.type_cast_for_database(column, v) }`.
-    // Cast each value to its database form so the CASE/IN predicates match a typed
-    // column (e.g. enum integer mappings, date/time serialization) instead of the
-    // JS-native string/number form. An Arel node finds no attribute type and falls
-    // through to ValueType (no-op cast).
-    const typeCaster = new TypeCasterMap(this.model);
-    // Normalize undefined → null so eq(null) emits IS NULL (not the invalid = NULL).
-    const normalized = values.map((value) => {
-      if (value === undefined || value === null) return null;
-      return typeCaster.typeCastForDatabase(column, value);
-    });
-
-    // Mirrors Rails: `column.is_a?(Arel::Nodes::SqlLiteral) ? column : order_column(column.to_s)`.
-    // An Arel expression (e.g. `Arel.sql("id * 2")`) is used verbatim; a string/symbol
-    // resolves through orderColumn, which handles `"table.column"` for joined associations
-    // (and records the reference on the cloned relation).
-    const arelCol =
-      column instanceof Nodes.SqlLiteral
-        ? column
-        : (_qm.orderColumn.call(rel as any, String(column)) as any);
-
-    // Mirrors Rails: `scope = spawn.order!(build_case_for_value_position(arel_column,
-    // values, filter: filter))` (query_methods.rb:727). The Arel CASE node is
-    // pushed as a node (not pre-rendered SQL) so its embedded bind values thread
-    // through the outer collector when the statement is compiled.
-    const caseNode = _qm.buildCaseForValuePosition.call(rel as any, arelCol, normalized, {
-      filter,
-    });
-    QueryMethodBangs.orderBang.call(rel as any, caseNode as any);
-
-    // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
-    // The values were already database-cast above via type_cast_for_database, and `in`
-    // wraps each in Casted, which casts again on value_for_database. That double-cast is
-    // faithful because Rails does the identical one (query_methods.rb:724 then :735,
-    // casted.rb:19-20) — not because the second cast is inert; a non-idempotent
-    // serialize would run twice here exactly as it does in Rails.
-    if (filter) {
-      const hasNull = normalized.includes(null);
-      const nonNull = normalized.filter((v) => v !== null);
-      // Mirrors Rails: `arel_column.in(values.compact).or(arel_column.eq(nil))`
-      // (query_methods.rb:732) — Arel's `or` wraps the pair in a Grouping itself.
-      const whereNode: Nodes.Node = hasNull
-        ? (arelCol.in(nonNull) as Nodes.Node).or(arelCol.eq(null))
-        : arelCol.in(nonNull);
-      rel.whereClause = rel.whereClause.plus(new WhereClause([whereNode]));
-    }
-
     return rel;
   }
 
@@ -4948,6 +4738,28 @@ export interface Relation<T extends Base>
   arelColumns(columns: ReadonlyArray<unknown>): unknown[];
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
+  // QueryMethods' ordering and projection families (query-methods.ts), whose
+  // mixin signatures return `any` — declared here with the relation's own
+  // element type, in query_methods.rb source order.
+  select(fn: (record: T) => boolean): Promise<T[]>;
+  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  reselect(...args: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  group(...args: (string | Nodes.Node)[]): Relation<T>;
+  regroup(...args: string[]): Relation<T>;
+  order(...args: OrderArg[]): Relation<T>;
+  inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T>;
+  reorder(...args: OrderArg[]): Relation<T>;
+  having(condition: string, ...binds: unknown[]): Relation<T>;
+  having(condition: Record<string, unknown>): Relation<T>;
+  having(condition: Nodes.Node): Relation<T>;
+  having(
+    condition: string | Record<string, unknown> | Nodes.Node,
+    ...binds: unknown[]
+  ): Relation<T>;
+  limit(value: number | string | null): Relation<T>;
+  offset(value: number | string | null): Relation<T>;
+  distinct(value?: boolean): Relation<T>;
+  reverseOrder(): Relation<T>;
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;

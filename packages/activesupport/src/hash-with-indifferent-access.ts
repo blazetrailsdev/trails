@@ -115,8 +115,16 @@ export class HashWithIndifferentAccess<V = unknown> {
     return this;
   }
 
-  delete(key: string): boolean {
-    return this.data.delete(this.convertKey(key));
+  /**
+   * Mirrors `delete` (hash_with_indifferent_access.rb:303-305) — `Hash#delete`
+   * through `convert_key`, so the removed value comes back (`undefined` when
+   * the key was absent), not `Map#delete`'s boolean.
+   */
+  delete(key: string): V | undefined {
+    const convertedKey = this.convertKey(key);
+    const value = this.data.get(convertedKey);
+    this.data.delete(convertedKey);
+    return value;
   }
 
   /**
@@ -400,23 +408,13 @@ export class HashWithIndifferentAccess<V = unknown> {
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError("no implicit conversion of nil into Hash");
     } else if (NOT_GIVEN === hash) {
-      for (const key of [...this.keys()]) {
-        const value = this.get(key)!;
-        this.delete(key);
-        this.set(block!(key), value);
-      }
+      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key)!);
     } else if (block) {
       for (const key of [...this.keys()]) {
-        const value = this.get(key)!;
-        this.delete(key);
-        this.set((hash[key] as string) || block(key), value);
+        this.set((hash[key] as string) || block(key), this.delete(key)!);
       }
     } else {
-      for (const key of [...this.keys()]) {
-        const value = this.get(key)!;
-        this.delete(key);
-        this.set((hash[key] as string) || key, value);
-      }
+      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key)!);
     }
 
     return this;
