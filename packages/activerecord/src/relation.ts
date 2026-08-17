@@ -1948,14 +1948,14 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
    */
   private referencesEagerLoadedTables(): boolean {
-    // relation.rb:1241 short-circuits on `includes_values.any?` before ever
-    // reaching here; trails split `eager_loading?` across two promoters, so the
-    // guard rides the callee.
+    // relation.rb:1241 gates this behind `includes_values.any?` inside
+    // `eager_loading?`; trails split that reader across two promoters, so the
+    // guard rides here.
     if (this.includesValues.length === 0) return false;
 
-    // relation.rb:1475 — `build_joins([])`. Rails hands `build_joins` the joins
-    // array it appends to and reads it back; trails' `build_joins` appends onto
-    // an Arel `SelectManager`, so the throwaway manager IS the `[]`.
+    // relation.rb:1475 `build_joins([])`. Rails' `build_joins` appends to the
+    // joins array it is handed and the caller reads it back; trails' appends to
+    // an Arel `SelectManager`, so the throwaway manager is the `[]`.
     const arel = new SelectManager(this.table);
     this.buildJoins(arel);
     const joinedTables = arel
@@ -1963,9 +1963,8 @@ export class Relation<T extends Base> {
       .flatMap((join: Nodes.Join) =>
         join instanceof Nodes.StringJoin
           ? this.tablesInString(join.left)
-          : [(join.left as unknown as { name?: string })?.name],
-      )
-      .filter((name): name is string => typeof name === "string");
+          : [(join.left as unknown as { name: string }).name],
+      );
 
     joinedTables.push(this.table.name);
 
