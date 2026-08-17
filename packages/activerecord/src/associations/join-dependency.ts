@@ -396,14 +396,17 @@ export class JoinDependency {
     return this._baseModel;
   }
 
+  // Mirrors: `join_root.drop(1).map!(&:reflection)` (join_dependency.rb:81-83) —
+  // the Enumerable walk of the join tree, root dropped, reading the reflection
+  // each node already carries.
   get reflections(): any[] {
-    const result: any[] = [];
-    this._joinRoot.eachChildren((parent, child) => {
-      if (child.tableIndex < 0) return;
-      const reflection = _reflectOnAssociation(parent.baseKlass as any, child.immediateAssocName);
-      if (reflection) result.push(reflection);
-    });
-    return result;
+    // `_through_` hops are trails-only tree nodes (`JoinLeaf`): Rails keeps a
+    // through association's whole chain inside the one JoinAssociation, so the
+    // hops carry no reflection of their own and Rails never lists one here.
+    return this.joinRoot
+      .drop(1)
+      .map((node) => (node as any).reflection)
+      .filter((reflection) => reflection != null);
   }
 
   /**

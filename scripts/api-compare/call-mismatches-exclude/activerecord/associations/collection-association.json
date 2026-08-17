@@ -9,20 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
-    "rubyName": "reader",
-    "call": "create",
-    "reason": "Verified per-site (RFC 0106): `@proxy ||= CollectionProxy.create(klass, self)` (collection_association.rb:41) — RFC 0022 makes the `CollectionProxy` the canonical has_many store, created and cached by `associationProxy(owner, name)` rather than constructed inside `reader`; `reader` returns the shared target it already owns."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "reader",
-    "call": "reload",
-    "reason": "Verified per-site (RFC 0106): `reload` on a stale target (collection_association.rb:37-39) issues the load query, so it is `await`-only in trails while `reader` is a synchronous property read; the stale-reload arm lives in `asyncReader`, which every awaited call site uses."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
     "rubyName": "replace",
     "call": "transaction",
     "reason": "Rails wraps `replace_records` in `transaction` (collection_association.rb:251); the synchronous writer path returns a ReplacePlan and opens the transaction in `persistReplacePlan` (collection-association.ts:775-791)."

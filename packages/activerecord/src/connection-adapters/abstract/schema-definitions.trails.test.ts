@@ -62,6 +62,17 @@ describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
   });
 });
 
+describe("CheckConstraintDefinition#validate?", () => {
+  it("returns the stored value when :validate is present, including nil", () => {
+    // `options.fetch(:validate, true)` (schema_definitions.rb:180-183) returns
+    // the STORED value whenever the key is present, so a stored nil is not
+    // replaced by the `true` default.
+    expect(new CheckConstraintDefinition("t", "e", {}).validate).toBe(true);
+    expect(new CheckConstraintDefinition("t", "e", { validate: false }).validate).toBe(false);
+    expect(new CheckConstraintDefinition("t", "e", { validate: null }).validate).toBe(null);
+  });
+});
+
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition("astronauts", { adapter: conn });

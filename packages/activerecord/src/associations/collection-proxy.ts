@@ -57,6 +57,7 @@ import {
   autoloadModel,
   resolveAssocClass,
   _routeThroughViaAssociationScope,
+  association as associationProxy,
 } from "../associations.js";
 import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
 import { multisetDifference, multisetIntersection } from "./has-many-through-association.js";
@@ -521,6 +522,24 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (richKlass) return richKlass;
     autoloadModel(className);
     return constantize(className) as typeof Base;
+  }
+
+  /**
+   * Mirrors: ActiveRecord::Delegation::ClassMethods#create
+   * (relation/delegation.rb:138-140) — `relation_class_for(model).new(model, ...)`
+   * — as reached by `CollectionProxy.create(klass, self)`
+   * (collection_association.rb:41).
+   *
+   * RFC 0022 makes the wrapped proxy the canonical has_many store, keyed on the
+   * owner by association name, so the create-or-fetch of that store is the
+   * `association()` factory: it routes through the same `collectionProxyClassFor`
+   * carrier `_create` uses and then hydrates and wraps the instance.
+   */
+  static create<T extends Base = Base>(
+    _klass: typeof Base,
+    association: { owner: Base; reflection: { name: string } },
+  ): AssociationProxy<T> {
+    return associationProxy<T>(association.owner, association.reflection.name);
   }
 
   /**
