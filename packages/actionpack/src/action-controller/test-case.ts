@@ -153,7 +153,7 @@ export class TestCase {
   }
 
   /** Cookies jar from the response. */
-  get cookies(): Record<string, string> {
+  get cookies(): Record<string, string | undefined> {
     return this.response?.cookies ?? {};
   }
 

@@ -57,6 +57,9 @@ export {
   setMultipartFileLimit,
   getMultipartTotalPartLimit,
   setMultipartTotalPartLimit,
+  setCookieHeader,
+  deleteSetCookieHeaderBang,
+  unescape,
 } from "./utils.js";
 export { BodyProxy } from "./body-proxy.js";
 export { Request } from "./request.js";
