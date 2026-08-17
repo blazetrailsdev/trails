@@ -32,6 +32,8 @@ import {
   quotedBinary as pgQuotedBinary,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
+  lookupCastTypeFromColumn as pgLookupCastTypeFromColumn,
+  type CastableColumn,
 } from "./postgresql/quoting.js";
 import { TypeMapInitializer, type PgTypeRow } from "./postgresql/oid/type-map-initializer.js";
 import { Money } from "./postgresql/oid/money.js";
@@ -1022,32 +1024,12 @@ export class PostgreSQLAdapter
   }
 
   /**
-   * Mirrors: PostgreSQLAdapter#lookup_cast_type_from_column(column).
-   * Synchronous — only consults the already-populated type_map. Rails'
-   * get_oid_type auto-loads on miss because Ruby can block; TS callers
-   * of this method (e.g. the type-caster that runs during attribute
-   * reads) are sync, so missing OIDs resolve to a ValueType here and
-   * callers that need miss-loading should call `loadAdditionalTypes`
-   * first (as `execQuery` does).
+   * Mirrors: `include PostgreSQL::Quoting` — the module's
+   * `lookup_cast_type_from_column` (postgresql/quoting.rb:189-192), reached
+   * through the same one-line seam as `quotedDate` / `quotedBinary`.
    */
-  lookupCastTypeFromColumn(column: {
-    oid?: number | null;
-    fmod?: number | null;
-    sqlType?: string | null;
-    name?: string;
-  }): Type {
-    const oid = column.oid;
-    if (oid == null) return new ValueType();
-    // Rails' lookup_cast_type_from_column only *looks up* — it never
-    // mutates the type_map on miss. Registering a fallback here would
-    // poison the map: subsequent getOidType calls would see
-    // typeMap.has(oid)=true, skip loadAdditionalTypes, and never
-    // resolve the real type. Return a fresh ValueType on miss and
-    // leave miss-loading to getOidType / loadAdditionalTypes.
-    // columns() batch-loads missing OIDs via loadAdditionalTypes before
-    // building Column objects, so OIDs are registered by the time this is
-    // called for type-casting during attribute reads.
-    return this.typeMap.fetch(oid, column.fmod ?? -1, column.sqlType ?? "", () => new ValueType());
+  override lookupCastTypeFromColumn(column: CastableColumn): Type {
+    return pgLookupCastTypeFromColumn.call(this, column) as Type;
   }
 
   /**

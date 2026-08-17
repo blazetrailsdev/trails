@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, isBlank, Notifications } from "@blazetrails/activesupport";
+import { except, hexdigest, isBlank, Notifications, toFs } from "@blazetrails/activesupport";
 import { isEmpty } from "./ruby-empty.js";
 import { Table, SelectManager, Nodes, sql } from "@blazetrails/arel";
 import type { Base } from "./base.js";
@@ -16,7 +16,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 
-import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
@@ -113,31 +112,6 @@ export type InBatchesOptions = {
 export type EnumerablePattern<T extends Base> =
   | ((record: T) => boolean)
   | (new (...args: never[]) => Base);
-
-/**
- * Enforce Rails' `extract_options!` shape on variadic `explain(...)`
- * inputs: at most one hash option, and if present it must be the last
- * positional argument. This keeps adapters (especially MySQL, whose
- * `EXPLAIN FORMAT=X ANALYZE` is invalid) from receiving orderings they
- * can't render.
- */
-function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | string): string {
-  const dt = ts.toZonedDateTimeISO("UTC");
-  const y = dt.year.toString().padStart(4, "0");
-  const mo = dt.month.toString().padStart(2, "0");
-  const d = dt.day.toString().padStart(2, "0");
-  const h = dt.hour.toString().padStart(2, "0");
-  const mi = dt.minute.toString().padStart(2, "0");
-  const s = dt.second.toString().padStart(2, "0");
-  if (format === "number") return `${y}${mo}${d}${h}${mi}${s}`;
-  if (format !== "usec") {
-    throw new Error(
-      `Unknown cacheTimestampFormat: ${JSON.stringify(format)}. Supported values: "usec", "number".`,
-    );
-  }
-  const us = (dt.millisecond * 1000 + dt.microsecond).toString().padStart(6, "0");
-  return `${y}${mo}${d}${h}${mi}${s}${us}`;
-}
 
 /**
  * Ruby's `Hash#==` — the comparison `empty_scope?` (relation.rb:1299) makes
@@ -3407,34 +3381,36 @@ export class Relation<T extends Base> {
     return this._cacheVersions.get(timestampColumn)!;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall first — Ruby's `Array#first` on the `select_rows` result; JS
+   *   arrays have no such method and `[0]` is the whole of it.
+   */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
-    let size = 0;
+    timestampColumn = String(timestampColumn);
+
+    let size: unknown = 0;
     let timestamp: unknown = null;
 
     if (this._loaded) {
       size = this._records.length;
-      if (size > 0) {
-        const toInstant = (v: unknown): Temporal.Instant | null => {
-          if (v instanceof Temporal.Instant) return v;
-          // boundary: cache-key timestamp may be JS Date or epoch number
-          // from custom-typed columns; bridge into a Temporal.Instant.
-          if (v instanceof Date && !Number.isNaN(v.getTime()))
-            return Temporal.Instant.fromEpochMilliseconds(v.getTime());
-          if (typeof v === "number" && Number.isFinite(v))
-            return Temporal.Instant.fromEpochMilliseconds(v);
-          return null;
-        };
+      if ((size as number) > 0) {
+        // Ruby's `Array#max`, which orders through `<=>`; a cast datetime
+        // attribute sits on a `Temporal.Instant`, which has no relational
+        // operators of its own.
         timestamp = this._records
-          .map((r) => (r as any).readAttribute(timestampColumn))
-          .reduce((max: unknown, val: unknown) => {
-            if (max == null) return val;
-            if (val == null) return max;
-            // Coerce Date/number to Instant for the dual-typed window (pre-PR 5a).
-            const valI = toInstant(val);
-            const maxI = toInstant(max);
-            if (valI && maxI) return Temporal.Instant.compare(valI, maxI) > 0 ? valI : maxI;
-            return max;
+          .map((record) =>
+            (record as unknown as { readAttribute(name: string): unknown }).readAttribute(
+              timestampColumn,
+            ),
+          )
+          .reduce((max: unknown, value: unknown) => {
+            if (max == null) return value;
+            if (value == null) return max;
+            if (max instanceof Temporal.Instant && value instanceof Temporal.Instant) {
+              return Temporal.Instant.compare(value, max) > 0 ? value : max;
+            }
+            return (value as number) > (max as number) ? value : max;
           }, null);
       }
     } else {
@@ -3444,10 +3420,6 @@ export class Relation<T extends Base> {
       // projection below replaces the relation's columns instead of being mixed
       // with the eager-load's `comments.*` projection — which Postgres rejects
       // ("column must appear in the GROUP BY clause") and SQLite silently allows.
-      // A limit/offset over a collection reflection is materialized to a
-      // `WHERE pk IN (ids)` relation with limit/offset cleared, so the branch
-      // below keys off the RESOLVED relation's limit/offset (Rails'
-      // `collection.has_limit_or_offset?`), not the original's.
       //
       // The yielded relation is captured out of the block rather than assigned
       // from the return value (Rails' `collection = apply_join_dependency`)
@@ -3458,98 +3430,51 @@ export class Relation<T extends Base> {
           collection = relation;
         });
       }
-      const tsColumn = this.table.get(timestampColumn);
-      // Build COUNT(*) and MAX(col) projections via Arel nodes.
-      const countStar = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-      const maxNode = tsColumn.maximum();
 
+      const c = this._conn();
+      const column = c.visitor.compile(this.table.get(timestampColumn));
+      const selectValues = `COUNT(*) AS ${(
+        this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
+      ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
+
+      let arel: unknown;
+      // A limit/offset over a collection reflection is materialized to a
+      // `WHERE pk IN (ids)` relation with limit/offset cleared, so this branch
+      // keys off the RESOLVED relation's limit/offset (Rails'
+      // `collection.has_limit_or_offset?`), not the original's.
       if (collection.hasLimitOrOffset) {
-        // Has LIMIT/OFFSET — wrap in a subquery (mirrors Rails' build_subquery).
-        const subqueryAlias = "subquery_for_cache_key";
-        const inner = collection.clone();
-        // Rails appends `select("<col> AS collection_cache_key_timestamp")` to
-        // whatever the collection already selects — a custom `select(...)` must
-        // survive so its aliases (e.g. an `ORDER BY` on a `name AS dev_name`
-        // select) still resolve in the subquery. Replacing the select list here
-        // dropped those aliases and broke ordering.
-        inner.selectValues = [...inner.selectValues, tsColumn.as("collection_cache_key_timestamp")];
-        if (collection.distinctValue && collection.selectValues.length === 0) {
+        const query = collection.select(sql(`${column} AS collection_cache_key_timestamp`));
+        if (this.distinctValue && isEmpty(collection.selectValues)) {
           // `Table#star` is a getter; a table ALIAS (Nodes.TableAlias) has none,
           // so `get("*")` yields the equivalent `<alias>.*` Attribute — mirrors
           // Rails' `table[Arel.star]` over `Arel::Nodes::TableAlias#[]`.
           const star = (this.table as { star?: Nodes.Node }).star ?? this.table.get("*");
-          inner.selectValues = [star, ...inner.selectValues];
+          query.selectValues = [...query.selectValues, star];
         }
-        // Build a proper Arel SelectManager for the outer COUNT/MAX query so
-        // quoting and adapter differences are handled by the AST visitor.
-        // Grouping(SqlLiteral) renders as "(inner sql)" and TableAlias appends
-        // the bare alias name (same pattern SelectManager#as uses in Rails).
-        const innerSql = inner.toSql();
-        const subAlias = new Nodes.TableAlias(
-          new Nodes.Grouping(new Nodes.SqlLiteral(innerSql)),
-          new Nodes.SqlLiteral(subqueryAlias, { retryable: true }),
-        );
-        const subTable = new Table(subqueryAlias);
-        const subColumn = subTable.get("collection_cache_key_timestamp");
-        const outerManager = new SelectManager();
-        outerManager.from(subAlias);
-        outerManager.project(
-          new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]).as("size"),
-          subColumn.maximum().as("timestamp"),
-        );
-        const outerResult = await this._conn().selectAll(outerManager, "SQL");
-        const rows = outerResult.toArray();
-        size = Number(rows[0]?.size ?? 0);
-        timestamp = rows[0]?.timestamp;
+        const subqueryAlias = "subquery_for_cache_key";
+        const subqueryColumn = `${subqueryAlias}.collection_cache_key_timestamp`;
+        arel = query.buildSubquery(subqueryAlias, sql(selectValues.replace("%s", subqueryColumn)));
       } else {
-        const query = collection.clone();
-        query.orderValues = [];
-        query._rawOrderClauses = [];
-        query.selectValues = [countStar.as("size"), maxNode.as("timestamp")];
-        const queryResult = await this._conn().selectAll(query.toArel(), "SQL");
-        const rows = queryResult.toArray();
-        size = Number(rows[0]?.size ?? 0);
-        timestamp = rows[0]?.timestamp;
+        const query = collection.unscope("order");
+        query.selectValues = [sql(selectValues.replace("%s", column))];
+        arel = query.toArel();
+      }
+
+      [size, timestamp] = (await c.selectRows(arel, null))[0] ?? [];
+
+      if (size != null) {
+        const columnType = this.model.typeForAttribute(timestampColumn);
+        timestamp = (columnType as unknown as { deserialize(value: unknown): unknown }).deserialize(
+          timestamp,
+        );
+      } else {
+        size = 0;
       }
     }
 
     if (timestamp != null) {
-      let ts: Temporal.Instant | null = null;
-      if (timestamp instanceof Temporal.Instant) {
-        ts = timestamp;
-      } else if (
-        // boundary: aggregate cache-key timestamp from a custom-typed column.
-        timestamp instanceof Date &&
-        !Number.isNaN(timestamp.getTime())
-      ) {
-        ts = Temporal.Instant.fromEpochMilliseconds(timestamp.getTime());
-      } else if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
-        ts = Temporal.Instant.fromEpochMilliseconds(timestamp);
-      } else if (typeof timestamp === "string") {
-        try {
-          // Normalize: space → T, short offset ±HH → ±HH:MM (Postgres wire quirk).
-          // Naive strings interpreted in defaultSqlTimezone() — UTC by default,
-          // host-system local when ActiveRecord.default_timezone === "local".
-          const normalized = timestamp
-            .trim()
-            .replace(" ", "T")
-            .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
-          const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(normalized);
-          ts = hasOffset
-            ? Temporal.Instant.from(normalized)
-            : Temporal.PlainDateTime.from(normalized)
-                .toZonedDateTime(defaultSqlTimezone())
-                .toInstant();
-        } catch {
-          ts = null;
-        }
-      }
-      if (ts != null) {
-        const fmt = this.model.cacheTimestampFormat;
-        const formatted = formatCacheTimestamp(ts, fmt);
-        return `${size}-${formatted}`;
-      }
-      return `${size}-${String(timestamp)}`;
+      // `timestamp` is already the UTC instant Rails' `timestamp.utc` answers.
+      return `${size}-${toFs(timestamp as Temporal.Instant, this.model.cacheTimestampFormat)}`;
     }
     return `${size}`;
   }
