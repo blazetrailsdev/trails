@@ -11,6 +11,8 @@ type AnyObject = Record<string, unknown>;
  * `replace(hash)` (slice.rb:15) is the own-key clear plus `Object.assign` —
  * JS objects carry no `replace`.
  *
+ * @missingRailsCall default — `hash.default = default` (slice.rb:13) reads a
+ * seat a plain JS object does not have.
  * @missingRailsCall replace — Ruby's `Hash#replace` (slice.rb:15) has no JS
  * analogue; the own-key delete loop plus `Object.assign` IS that call.
  */

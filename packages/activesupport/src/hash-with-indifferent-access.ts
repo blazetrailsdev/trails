@@ -53,17 +53,51 @@ type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
  */
 type DefaultBlock<V> = (key: string) => V;
 
+/**
+ * A `Hash#default_proc` (hash_with_indifferent_access.rb:77): yielded the hash
+ * itself and the missing key.
+ */
+type DefaultProc<V> = (hash: HashWithIndifferentAccess<V>, key: string) => V;
+
 export class HashWithIndifferentAccess<V = unknown> {
   private data: Map<string, V>;
 
-  constructor(constructor?: AnyObject | HashWithIndifferentAccess<V>) {
+  /** `Hash#default` / `Hash#default_proc` storage — Rails inherits both. */
+  private _default?: V;
+  private _defaultProc?: DefaultProc<V>;
+
+  /**
+   * Mirrors `initialize` (hash_with_indifferent_access.rb:70-83). The
+   * `respond_to?(:to_hash)` arm goes through `update`, so every key gets
+   * `convert_key` and every value `convert_value`, then carries the source
+   * hash's `default` / `default_proc` over — both under Ruby truthiness, so a
+   * stored `false` default is left behind exactly as `if hash.default` does;
+   * the `else` arm is `Hash.new(obj)`, which sets the default value.
+   *
+   * `Hash.new { |hash, key| ... }` takes its default_proc as a block. A block
+   * is a single trailing function argument here, the same spelling `fetch`
+   * uses (:195).
+   */
+  constructor(
+    constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<V> | NoInfer<V>,
+  ) {
     this.data = new Map();
-    // Mirrors `initialize` (hash_with_indifferent_access.rb:70-83): the
-    // populated arm goes through `update`, so every key gets `convert_key` and
-    // every value `convert_value`. Rails' `else super(constructor)` arm sets a
-    // Hash default value, which this class does not model.
-    if (constructor != null) {
+    if (constructor instanceof HashWithIndifferentAccess || isPlainObject(constructor)) {
       this.update(constructor);
+
+      const hash = constructor;
+      if (hash instanceof HashWithIndifferentAccess) {
+        if (hash.default() != null && (hash.default() as unknown) !== false) {
+          this.setDefault(hash.default());
+        }
+        if (hash.defaultProc()) this.setDefaultProc(hash.defaultProc());
+      }
+    } else if (constructor == null) {
+      // super()
+    } else if (typeof constructor === "function") {
+      this.setDefaultProc(constructor as DefaultProc<V>);
+    } else {
+      this.setDefault(constructor as V);
     }
   }
 
@@ -77,10 +111,61 @@ export class HashWithIndifferentAccess<V = unknown> {
 
   /**
    * Mirrors `[]` (hash_with_indifferent_access.rb:166-168) — the reader that
-   * takes either spelling of the key.
+   * takes either spelling of the key. On a miss `Hash#[]` yields to the
+   * default_proc, else returns the default.
    */
   get(key: string): V | undefined {
-    return this.data.get(this.convertKey(key));
+    const convertedKey = this.convertKey(key);
+    if (this.data.has(convertedKey)) return this.data.get(convertedKey);
+    return this.default(convertedKey);
+  }
+
+  /**
+   * Mirrors `default` (hash_with_indifferent_access.rb:223-229) — with no
+   * argument it is `Hash#default`, the plain default value; with one it is
+   * `Hash#default(key)` over the converted key, which runs the default_proc.
+   */
+  default(...args: string[]): V | undefined {
+    if (args.length === 0) {
+      return this._default;
+    } else {
+      const key = this.convertKey(args[0]);
+      return this._defaultProc ? this._defaultProc(this, key) : this._default;
+    }
+  }
+
+  /**
+   * `Hash#default=`, which `initialize` (:76) and `set_defaults` (:420) write
+   * through. A TS `set` accessor cannot share a name with the `default()`
+   * reader, so it takes the conventions' `setX()` spelling. MRI clears
+   * default_proc on this write, and `test_dup_with_default_proc_sets_proc`
+   * (hash_with_indifferent_access_test.rb:837-838) depends on it.
+   */
+  setDefault(value: V | undefined): void {
+    this._default = value;
+    this._defaultProc = undefined;
+  }
+
+  /**
+   * `Hash#default_proc`, read by `set_defaults` (:417-418).
+   *
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
+   * subclasses; core Ruby has no file in the mapped Rails source to match against
+   */
+  defaultProc(): DefaultProc<V> | undefined {
+    return this._defaultProc;
+  }
+
+  /**
+   * `Hash#default_proc=`, which `initialize` (:77) and `set_defaults` (:418)
+   * write through. MRI clears the default value on this write.
+   *
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
+   * subclasses; core Ruby has no file in the mapped Rails source to match against
+   */
+  setDefaultProc(proc: DefaultProc<V> | undefined): void {
+    this._defaultProc = proc;
+    this._default = undefined;
   }
 
   /**
@@ -211,7 +296,7 @@ export class HashWithIndifferentAccess<V = unknown> {
   merge(
     ...hashes: (AnyObject | HashWithIndifferentAccess<V> | BlockFn<V>)[]
   ): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this).update(...hashes);
+    return this.dup().update(...hashes);
   }
 
   /**
@@ -258,6 +343,43 @@ export class HashWithIndifferentAccess<V = unknown> {
         this.regularWriter(this.convertKey(key), this.convertValue(v));
       }
     }
+  }
+
+  /**
+   * Mirrors `dup` (hash_with_indifferent_access.rb:264-268) — a shallow copy
+   * that carries the receiver's defaults over.
+   */
+  dup(): HashWithIndifferentAccess<V> {
+    const newHash = new HashWithIndifferentAccess<V>(this);
+    this.setDefaults(newHash);
+    return newHash;
+  }
+
+  /**
+   * Mirrors `reverse_merge` (hash_with_indifferent_access.rb:283-285) — like
+   * `merge` but the other way around: merges the receiver into the argument
+   * and returns a new hash with indifferent access as result.
+   */
+  reverseMerge(otherHash: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
+    return new HashWithIndifferentAccess<V>(otherHash).merge(this);
+  }
+
+  /** `alias_method :with_defaults, :reverse_merge` (hash_with_indifferent_access.rb:286). */
+  withDefaults(otherHash: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
+    return this.reverseMerge(otherHash);
+  }
+
+  /**
+   * Mirrors `reverse_merge!` (hash_with_indifferent_access.rb:288-290) — same
+   * semantics as `reverseMerge` but modifies the receiver in-place.
+   */
+  reverseMergeBang(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
+    return this.replace(this.reverseMerge(new HashWithIndifferentAccess<V>(otherHash)));
+  }
+
+  /** `alias_method :with_defaults!, :reverse_merge!` (hash_with_indifferent_access.rb:291). */
+  withDefaultsBang(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
+    return this.reverseMergeBang(otherHash);
   }
 
   /**
@@ -583,7 +705,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * withIndifferentAccess — returns a dup of self (already HWIA).
    */
   withIndifferentAccess(): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this);
+    return this.dup();
   }
 
   /**
@@ -684,6 +806,22 @@ export class HashWithIndifferentAccess<V = unknown> {
       return array as V;
     } else {
       return value;
+    }
+  }
+
+  /**
+   * Mirrors `set_defaults` (hash_with_indifferent_access.rb:416-422) — copies
+   * the receiver's default_proc, else its default value, onto `target`.
+   *
+   * Rails' other caller is `to_hash`, whose target is a plain `Hash`; a TS
+   * object has nowhere to keep a default, so only the hash-valued targets
+   * (`dup`) reach it.
+   */
+  private setDefaults(target: HashWithIndifferentAccess<V>): void {
+    if (this.defaultProc()) {
+      target.setDefaultProc(this.defaultProc());
+    } else {
+      target.setDefault(this.default());
     }
   }
 
