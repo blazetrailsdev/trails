@@ -79,12 +79,17 @@ describe("FileStoreTest", () => {
   // remain valid
   it("filename max size", () => {
     const key = "A".repeat(FILENAME_MAX_SIZE);
-    const path = pathFor(store, key);
-    // Ruby wraps the assertion in `Dir::Tmpname.create(basename, …)`
-    // (file_store_test.rb:80), which appends the timestamp/pid/random suffix
-    // `atomic_write`'s Tempfile would; trails' atomicWrite spells that suffix
-    // itself, so the budget is measured against the same worst case.
-    const tmpname = `${basename(path)}.20260817-123456-abcdef`;
+    // Ruby reads the name Tempfile would pick out of `Dir::Tmpname.create`
+    // (file_store_test.rb:80); trails' atomicWrite picks its own, so the name
+    // under test is the one the real write hands to writeFileSync.
+    const writeFileSync = vi.spyOn(getFs(), "writeFileSync");
+    let tmpname: string;
+    try {
+      store.write(key, "v");
+      tmpname = basename(String(writeFileSync.mock.calls[0][0]));
+    } finally {
+      writeFileSync.mockRestore();
+    }
     assert(
       basename(`${tmpname}.lock`).length <= 255,
       `Temp filename too long: ${basename(`${tmpname}.lock`).length}`,
