@@ -971,7 +971,12 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
  *     `TimeExt` for one body. Where every owner declaring the name records the
  *     SAME call-set the comparison is identical whichever is picked, so pick
  *     one (`callSetOf`; the sorted first, which is the free export). Owners
- *     whose call-sets differ are two bodies and stay unresolved.
+ *     whose call-sets differ are two bodies and stay unresolved. Equality of
+ *     the recorded sets is the whole test, so two genuinely different bodies
+ *     recording the same set (both empty, say) also resolve — harmless while
+ *     the resolved owner only gates `ambiguousTsOwner` / `ownerRecordsNothing`
+ *     and the comparison itself unions the file's declarations (checkCalls),
+ *     but a reader that consumed the owner's OWN set would need more here.
  */
 export function resolveTsOwner(
   owners: ReadonlySet<string> | undefined,
