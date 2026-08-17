@@ -89,8 +89,10 @@ describe("EncryptedFileTest", () => {
     await ef.write(CONTENT);
     const fs = await getFsAsync();
     const stat = await fs.stat!(contentPath);
-    // Ruby's `File::Stat#owned?` is `uid == Process.uid`; no adapter exposes the
-    // current uid, so the tmpdir this test just created stands in for it.
+    // Ruby's `File::Stat#owned?` is `uid == Process.uid`. `FsStatResult.uid` is
+    // the only uid the adapters carry — neither ProcessAdapter nor OsAdapter
+    // exposes the running process's — so the tmpdir this test just created
+    // stands in for it, the same workaround core-ext/file/atomic.ts:57 uses.
     const tmpdirStat = await fs.stat!(tmpdir);
     assertPredicate(stat, (s) => s.uid === tmpdirStat.uid);
     expect(stat.mode!.toString(8)).toBe("100600");

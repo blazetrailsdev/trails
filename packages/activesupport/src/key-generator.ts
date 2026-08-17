@@ -40,10 +40,13 @@ export class KeyGenerator {
     this.secret = secret;
     // The default iterations are higher than required for our key derivation uses
     // on the off chance someone uses this for password storage
-    this.iterations = options.iterations || 2 ** 16;
+    //
+    // `??`, not `||`: Ruby's `||` (key_generator.rb:32,35) falls through only for
+    // nil/false, so `iterations: 0` is honoured there; JS `||` would swallow it.
+    this.iterations = options.iterations ?? 2 ** 16;
     // Also allow configuration here so people can use this to build a rotation
     // scheme when switching the digest class.
-    this.hashDigestClass = options.hashDigestClass || KeyGenerator.hashDigestClass;
+    this.hashDigestClass = options.hashDigestClass ?? KeyGenerator.hashDigestClass;
   }
 
   /**
