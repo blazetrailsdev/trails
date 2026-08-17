@@ -230,6 +230,11 @@ export class Array extends ValueType<unknown> {
       return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
+    // Rails' `super` arm is unreachable: `PG::TextDecoder::Array` always hands
+    // `deserialize` a String. node-pg parses array OIDs itself, so this arm IS
+    // reachable here, and routing it through `super` would run the subtype's
+    // `cast` per element where `deserialize` is owed (oid/array.rb:24-31).
+    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
     return super.deserialize(value);
   }
 
