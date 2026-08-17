@@ -5,7 +5,7 @@
  * Mirrors the Rails API: https://api.rubyonrails.org/classes/ActiveSupport/TimeWithZone.html
  */
 
-import { TimeZone } from "./values/time-zone.js";
+import { TimeZone, TimezonePeriod } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
@@ -93,6 +93,8 @@ export class TimeWithZone {
   private readonly _zoned: Temporal.ZonedDateTime;
   /** The timezone */
   private readonly _timeZone: TimeZone;
+  /** `@period` — memoized by {@link period}. */
+  private _period?: TimezonePeriod;
 
   constructor(instant: Temporal.Instant, timeZone: TimeZone) {
     this._zoned = instant.toZonedDateTimeISO(timeZone.tzinfo);
@@ -113,6 +115,17 @@ export class TimeWithZone {
   // Core accessors
   // ---------------------------------------------------------------------------
 
+  /**
+   * The underlying `TZInfo::TimezonePeriod`, memoized on first read.
+   *
+   * Mirrors: ActiveSupport::TimeWithZone#period
+   * (time_with_zone.rb:72-74) — `@period ||= time_zone.period_for_utc(@utc)`.
+   */
+  get period(): TimezonePeriod {
+    const utc = this._zoned.toInstant();
+    return (this._period ??= this._timeZone.periodForUtc(utc));
+  }
+
   /** The TimeZone instance */
   get timeZone(): TimeZone {
     return this._timeZone;
@@ -123,14 +136,14 @@ export class TimeWithZone {
     return this._zoned.toPlainDateTime();
   }
 
-  /** Timezone abbreviation (e.g., "EST", "EDT") */
+  /** Timezone abbreviation (e.g., "EST", "EDT") — time_with_zone.rb:133-135. */
   get zone(): string {
-    return this._timeZone.abbreviation(this._zoned.toInstant());
+    return this.period.abbreviation;
   }
 
-  /** UTC offset in seconds */
+  /** UTC offset in seconds — time_with_zone.rb:111-113. */
   get utcOffset(): number {
-    return this._timeZone.utcOffsetAt(this._zoned.toInstant());
+    return this.period.observedUtcOffset;
   }
 
   /** Alias for utcOffset */
@@ -143,9 +156,9 @@ export class TimeWithZone {
     return this.utcOffset;
   }
 
-  /** Whether DST is in effect */
+  /** Whether DST is in effect — time_with_zone.rb:94-96. */
   dst(): boolean {
-    return this._timeZone.isDst(this._zoned.toInstant());
+    return this.period.isDst();
   }
 
   /** Alias for dst() */

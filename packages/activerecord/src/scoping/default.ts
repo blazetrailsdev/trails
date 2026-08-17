@@ -73,14 +73,14 @@ export class Default {
     if (scopes.length === 0) return undefined;
 
     return evaluateDefaultScope.call(this, () => {
-      let rel = relation;
+      let combinedScope = relation;
       for (const scopeObj of scopes) {
         if (isExecuteScope(allQueries, scopeObj)) {
-          const result = scopeObj.scope(rel);
-          if (result != null) rel = result;
+          const result = scopeObj.scope(combinedScope);
+          if (result != null) combinedScope = result;
         }
       }
-      return rel;
+      return combinedScope;
     });
   }
 

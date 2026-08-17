@@ -478,7 +478,7 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio", NaN);
+    m._dirty.forceChange("ratio");
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.clearAttributeChanges(["ratio"]);
@@ -755,7 +755,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio", NaN);
+    m._dirty.forceChange("ratio");
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.restoreAttributes();
@@ -775,7 +775,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio", NaN);
+    m._dirty.forceChange("ratio");
     expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.changesApplied();
@@ -797,7 +797,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
 
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
-    m._dirty.forceChange("ratio", NaN); // mirrors attribute_will_change!
+    m._dirty.forceChange("ratio"); // mirrors attribute_will_change!
     m.writeAttribute("ratio", NaN); // type-equal write
     expect(m.changedAttributeNamesToSave).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,

@@ -800,7 +800,7 @@ export async function calculate(
  */
 export async function pluck(
   this: CalculationRelation,
-  ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
 ): Promise<unknown[]> {
   // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
   if (this.isNullRelation()) return [];
@@ -808,12 +808,12 @@ export async function pluck(
   // calculations.rb:300 — a loaded relation whose plucked columns are all
   // attributes reads the materialized records instead of issuing SQL, the same
   // arm `pick` carries (:353).
-  if (this.loaded && isAllAttributes(this, columns as unknown as string[])) {
+  if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
     const records = await this.records();
     return records.map((record) =>
-      columns.length > 1
-        ? columns.map((column) => record.get(String(column)))
-        : record.get(String(columns[0])),
+      columnNames.length > 1
+        ? columnNames.map((column) => record.get(String(column)))
+        : record.get(String(columnNames[0])),
     );
   }
 
@@ -827,7 +827,7 @@ export async function pluck(
     // Checked after materialization so a deferred distinct-PK
     // predicate that resolves to an empty id set also short-circuits.
     if (this.whereClause.isContradiction()) {
-      return typeCastPluckValues(Result.empty(), columns, this as any);
+      return typeCastPluckValues(Result.empty(), columnNames, this as any);
     }
     // Mirrors Calculations#pluck: when has_include? is true, apply_join_dependency
     // converts the includes/eager_load associations to LEFT OUTER JOINs (clearing
@@ -839,7 +839,11 @@ export async function pluck(
     // reflection we also materialize the limited DISTINCT primary keys
     // (distinct_relation_for_primary_key) before recursing.
     const firstColumnName =
-      columns.length === 0 ? null : typeof columns[0] === "string" ? columns[0] : "\0arel";
+      columnNames.length === 0
+        ? null
+        : typeof columnNames[0] === "string"
+          ? columnNames[0]
+          : "\0arel";
     if (hasInclude(this as any, firstColumnName)) {
       // hasInclude is true only when eagerLoadValues or
       // includesValues is non-empty, so the union is always non-empty here.
@@ -871,9 +875,9 @@ export async function pluck(
         });
         limited.limitValue = null;
         limited.offsetValue = null;
-        return limited.pluck(...columns);
+        return limited.pluck(...columnNames);
       }
-      return rel.leftOuterJoins(eagerSpecs).pluck(...columns);
+      return rel.leftOuterJoins(eagerSpecs).pluck(...columnNames);
     }
 
     // Reflect the schema before casting results so the model's attribute
@@ -882,13 +886,15 @@ export async function pluck(
     // raw query (no toArray()), so it must trigger the load itself.
     await this._model.ensureSchemaLoaded();
 
-    this._model.disallowRawSqlBang(this.flattenedArgs(columns) as (string | symbol | Nodes.Node)[]);
+    this._model.disallowRawSqlBang(
+      this.flattenedArgs(columnNames) as (string | symbol | Nodes.Node)[],
+    );
 
     const table = this.table;
     // Rails columns_hash.key? — qualify a bare known column to the base table.
     const knownColumns = new Set(this._model.attributeNames());
     const isKnownColumn = (name: string): boolean => knownColumns.has(name);
-    const projections = columns.map((c) => {
+    const columns = columnNames.map((c) => {
       if (c instanceof Nodes.SqlLiteral) {
         // Rails' Arel::Nodes::SqlLiteral subclasses String, so arel_columns routes
         // it through arel_column: a bare known-column literal is qualified to the
@@ -936,7 +942,7 @@ export async function pluck(
     // Going through `select_values` (rather than overwriting `manager.projections`)
     // is what makes a zero-column `pluck` project `table[Arel.star]` via
     // `build_select`'s else arm instead of emitting a projection-less `SELECT FROM`.
-    rel.selectValues = projections as any;
+    rel.selectValues = columns as any;
     const manager = rel.toArel();
 
     // Rails: `select_all(relation.arel, "#{model.name} Pluck")` (calculations.rb:317).
@@ -956,9 +962,9 @@ export async function pluck(
  */
 export function asyncPluck(
   this: CalculationRelation,
-  ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
 ): Promise<unknown[]> {
-  return this.pluck(...columns);
+  return this.pluck(...columnNames);
 }
 
 /**
@@ -999,8 +1005,12 @@ export function asyncPick(
  * Mirrors: ActiveRecord::Calculations#ids (calculations.rb:371).
  */
 export async function ids(this: CalculationRelation): Promise<unknown[]> {
-  const pk = this.model.primaryKey as string | string[] | null;
-  const primaryKeyArray = Array.isArray(pk) ? pk : pk == null ? [] : [pk];
+  const primaryKey = this.model.primaryKey as string | string[] | null;
+  const primaryKeyArray = Array.isArray(primaryKey)
+    ? primaryKey
+    : primaryKey == null
+      ? []
+      : [primaryKey];
 
   if (this.loaded) {
     const result = this._records.map((record) => {
@@ -1012,7 +1022,7 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     return result;
   }
 
-  if (hasInclude(this as any, pk as string)) {
+  if (hasInclude(this as any, primaryKey as string)) {
     // DIVERGENCE (finder_methods.rb:457-463): trails' `applyJoinDependency`
     // no-ops unless the relation already eager-loads for SQL, so the plain
     // `apply_join_dependency` call would not terminate this recursion. Spell
@@ -1038,12 +1048,12 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
     const jd = this._buildEagerJoinDependency(eagerSpecs);
     if (this.hasLimitOrOffset && !this._eagerJoinDependencyIsLimitable(jd)) {
       // Same two guards `pluck`'s arm carries: `hasInclude` returns true off
-      // `eagerLoadValues` alone, so `pk` can still be null here (a
+      // `eagerLoadValues` alone, so `primaryKey` can still be null here (a
       // view), and `_materializeLimitedIds` — Rails' zip/transpose over
       // `Array(primary_key)` (schema_statements.rb:1448) — has neither a null
       // nor a composite arm, so the composite case surfaces
       // applyJoinDependency's explicit NotImplementedError instead.
-      const basePk = pk ?? "id";
+      const basePk = primaryKey ?? "id";
       if (Array.isArray(basePk)) this.applyJoinDependency();
       const limitedIds = await this._materializeLimitedIds(jd, basePk);
       const limited = rel.leftOuterJoins(eagerSpecs).where({ [basePk as string]: limitedIds });

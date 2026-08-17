@@ -519,6 +519,39 @@ export function getLocalComponents(
   };
 }
 
+/**
+ * The slice of `TZInfo::TimezonePeriod` Rails reads through
+ * `ActiveSupport::TimeWithZone#period` — `dst?` (time_with_zone.rb:95),
+ * `observed_utc_offset` (:112) and `abbreviation` (:134). TZInfo is a gem, not
+ * Rails, so only the three members the Rails source names are modelled; each
+ * one is resolved off {@link TimeZone} at the instant the period covers, which
+ * is what `time_zone.period_for_utc(@utc)` hands back.
+ *
+ * @noRailsEquivalent PERMANENT — TZInfo is a gem, not Rails, so
+ *   `TimezonePeriod` and its `observed_utc_offset` reader have no counterpart
+ *   under vendor/rails and no amount of further porting produces one. Rails
+ *   names the object (`TimeWithZone#period`, time_with_zone.rb:72-74) and reads
+ *   exactly three members off it — `dst?` (:95), `observed_utc_offset` (:112),
+ *   `abbreviation` (:134) — so the port needs a stand-in for it, the same
+ *   position `InvalidTimezoneIdentifier` above is in.
+ */
+export class TimezonePeriod {
+  readonly abbreviation: string;
+  readonly observedUtcOffset: number;
+  private readonly _dst: boolean;
+
+  constructor(abbreviation: string, observedUtcOffset: number, dst: boolean) {
+    this.abbreviation = abbreviation;
+    this.observedUtcOffset = observedUtcOffset;
+    this._dst = dst;
+  }
+
+  /** Mirrors `TZInfo::TimezonePeriod#dst?`. */
+  isDst(): boolean {
+    return this._dst;
+  }
+}
+
 export class TimeZone {
   readonly name: string;
   readonly tzinfo: string; // IANA name
@@ -1007,6 +1040,15 @@ export class TimeZone {
     const currentOffset = getZoneInfo(this.tzinfo, d).utcOffsetSeconds;
     const standardOffset = Math.min(janOffset, julOffset);
     return currentOffset !== standardOffset;
+  }
+
+  /**
+   * The `TZInfo::TimezonePeriod` covering the given UTC instant, which
+   * `TimeWithZone#period` memoizes (time_with_zone.rb:72-74) and reads
+   * `dst?` / `observed_utc_offset` / `abbreviation` off.
+   */
+  periodForUtc(date: Date | Temporal.Instant): TimezonePeriod {
+    return new TimezonePeriod(this.abbreviation(date), this.utcOffsetAt(date), this.isDst(date));
   }
 
   /**

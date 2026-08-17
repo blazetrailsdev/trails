@@ -176,7 +176,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   forceChange(attrName: string): void {
-    if (this.forcedChanges.has(attrName)) return;
+    if (this.attributeChanged(attrName)) return;
     const value = this.fetchValue(attrName);
     this.forcedChanges.set(attrName, cloneValue(value));
   }

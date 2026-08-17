@@ -26,6 +26,7 @@ export type NamingClass =
   | "module-mixin-call"
   | "block-idiom"
   | "ivar-reflection"
+  | "implicit-to-s"
   | "burndown";
 
 export interface NamingClassInfo {
@@ -79,7 +80,10 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
     reason:
       "Ruby `owner.instance_exec(&block)` (belongs_to_association.rb:47) is trails' " +
       "`block(this.owner)` — the block is a plain function and the receiver its argument, so " +
-      "the recorder sees `instance_exec` against `block`.",
+      "the recorder sees `instance_exec` against `block`. Same for a Ruby block passed as a " +
+      "trailing `{ }` (`model_class.unscoped { yield }`, locator.rb:223) where trails passes " +
+      "the callback as an argument. Scoped to the cited Ruby call sites " +
+      "(BLOCK_IDIOM_RUBY_REFS), never to the TS spelling alone.",
   },
   {
     name: "ivar-reflection",
@@ -89,6 +93,18 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "(persistence.rb:491). TS has no counterpart and needs none: the field is read or written " +
       "directly (`becoming._attributes`), which is the only shape the language offers, so the " +
       "recorder sees the ivar's own name where Ruby names the reflection accessor.",
+  },
+  {
+    name: "implicit-to-s",
+    permanent: true,
+    reason:
+      "Ruby leans on implicit `to_s` — `quote_table_name(name)` (to_sql.rb:874) with a " +
+      "composite-PK Array, `quote_table_name(index_to_remove)` with a PostgreSQL::Name " +
+      "(postgresql_adapter.rb's remove_index). A TS signature takes a string, so the call " +
+      "site spells the conversion (`toS(name)`, `indexToRemove.toString()`); the value and " +
+      "the rendering are the same, only Ruby's is invisible. The mirror image counts too: " +
+      "Ruby coercing an already-`string` TS value (`force_change(attr_name.to_s)`, " +
+      "dirty.rb:410, against a `attrName: string` parameter) has nothing to spell.",
   },
   {
     name: "module-mixin-receiver",
@@ -118,6 +134,19 @@ export const IVAR_REFLECTION_ACCESSORS = new Set([
   "instanceVariableSet",
 ]);
 
+/**
+ * Ruby identifiers whose call site passes a block that trails spells as a
+ * plain callback argument named `block`. Kept as an explicit, cited list
+ * rather than keying on the TS spelling alone: a Ruby parameter that merely
+ * happens to be named `block` is ordinary burndown, and the safe direction for
+ * a permanent class is to under-match.
+ *
+ *   - `instance_exec` — `owner.instance_exec(&block)`, belongs_to_association.rb:47
+ *   - `modelClass`    — `model_class.unscoped { yield }`, locator.rb:223, whose
+ *                       receiver the recorder records as the argument
+ */
+export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "modelClass"]);
+
 /** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
 export const JS_RESERVED_WORDS = new Set(
   (
@@ -133,14 +162,18 @@ export const JS_RESERVED_WORDS = new Set(
  */
 export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   class: ["constructor"],
+  compact: ["filter"],
   first: ["at"],
+  gsub: ["replaceAll", "replace"],
   httpdate: ["toUTCString"],
   inject: ["reduce"],
-  inspect: ["toString"],
+  inspect: ["toString", "inspectError"],
   last: ["at", "pop"],
   length: ["size"],
   object_id: ["this"],
+  read: ["readFile"],
   size: ["length"],
+  strip: ["trim"],
   to_f: ["parseFloat", "Number"],
   to_i: ["parseInt", "Number"],
   to_s: ["toString", "String"],
@@ -195,8 +228,13 @@ function isThisTypedFunction(rubyRef: string, thisTypedFunctions?: ReadonlySet<s
  *   which the conventions table would camelCase without the underscore. A row
  *   that DID keep its `@` is the conventions table's own rename, so it falls
  *   through to that arm.
- * - `block` is a TS-side artifact of the block idiom, so that arm keys on the
- *   TS spelling; `call` is one too, but a bare `ref:call` proves nothing on its
+ * - `toS`/`toString` on the TS side alone is Ruby's implicit `to_s` made
+ *   explicit, so that arm runs right after {@link NO_JS_EQUIVALENT} — which
+ *   already answers `inspect` → `toString` for the stronger reason.
+ * - `block` is a TS-side artifact of the block idiom, so that arm reads the TS
+ *   spelling — but only against {@link BLOCK_IDIOM_RUBY_REFS}, the cited Ruby
+ *   call sites that actually pass a block, so a Ruby parameter that merely
+ *   happens to be named `block` stays burndown; `call` is one too, but a bare `ref:call` proves nothing on its
  *   own, so that arm additionally requires the Ruby name to BE a `this`-typed
  *   function — `thisTypedFunctions`, which the caller reads off the TS API
  *   manifest. Without that set the arm never fires and the row stays burndown,
@@ -217,13 +255,14 @@ export function classifyPair(
     ? NO_JS_EQUIVALENT[rubyRef]
     : NO_JS_EQUIVALENT_BY_CAMEL.get(rubyRef);
   if (noJsEquivalent?.includes(tsRef)) return "no-js-equivalent";
+  if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
+    return "implicit-to-s";
+  }
   if (!rubyRef.startsWith("@") && tsRef === `_${snakeToCamel(rubyRef)}`) return "ivar-underscore";
   if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
     return "module-mixin-call";
   }
-  if ((rubyRef === "instance_exec" || rubyRef === "instanceExec") && tsRef === "block") {
-    return "block-idiom";
-  }
+  if (tsRef === "block" && BLOCK_IDIOM_RUBY_REFS.has(rubyRef)) return "block-idiom";
   const ivar = rubyRef.startsWith("@");
   const bare = ivar ? rubyRef.slice(1) : rubyRef;
   const converted = rubyMethodToTsIgnoringSkip(bare);
