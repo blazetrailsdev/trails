@@ -104,7 +104,6 @@ export namespace Configurable {
       for (const name of names) {
         if (!/^[_A-Za-z]\w*$/.test(name)) throw new NameError("invalid config attribute name");
 
-        // `def #{name}; config.#{name}; end` / `def #{name}=(value); config.#{name} = value; end`
         const reader = function (this: any): unknown {
           return this.config().get(name);
         };
