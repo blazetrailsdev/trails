@@ -11,6 +11,6 @@
     "tsFile": "array-utils.ts",
     "rubyName": "in_groups",
     "call": "div",
-    "reason": "Ruby core Integer#div (core_ext/array/grouping.rb:66), not a ported trails method — the gate matched Date#div/Duration#div; the port uses Math.floor."
+    "reason": "Ruby core Integer#div (core_ext/array/grouping.rb:66), not a ported trails method — the port uses Math.floor."
   }
 ]

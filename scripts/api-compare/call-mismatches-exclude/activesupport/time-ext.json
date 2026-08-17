@@ -11,7 +11,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "change",
     "call": "utc?",
-    "reason": "Ruby core Time#utc? read off the receiver (core_ext/time/calculations.rb:123-155), not a ported trails method — the gate matched DateTime#isUtc."
+    "reason": "Ruby core Time#utc? read off the receiver (core_ext/time/calculations.rb:123-155), not a ported trails method — Temporal carries the zone on the value."
   },
   {
     "package": "activesupport",
@@ -25,7 +25,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "sec_fraction",
     "call": "subsec",
-    "reason": "Ruby core Time#subsec on the receiver (core_ext/time/calculations.rb:107-109), not a ported trails method — the gate matched DateTime#subsec."
+    "reason": "Ruby core Time#subsec on the receiver (core_ext/time/calculations.rb:107-109), not a ported trails method — the port reads Temporal's sub-second fields."
   },
   {
     "package": "activesupport",
@@ -46,21 +46,21 @@
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
     "call": "day",
-    "reason": "Ruby core Date#day read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method — the gate matched Duration.day."
+    "reason": "Ruby core Date#day read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
     "call": "getlocal",
-    "reason": "Ruby core Time#getlocal on the receiver (core_ext/time/compatibility.rb:13-15), not a ported trails method — the gate matched TimeWithZone#getlocal."
+    "reason": "Ruby core Time#getlocal on the receiver (core_ext/time/compatibility.rb:13-15), not a ported trails method — the port reads the zone off the Temporal value."
   },
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
     "call": "month",
-    "reason": "Ruby core Date#month read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method — the gate matched Duration.month."
+    "reason": "Ruby core Date#month read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
   },
   {
     "package": "activesupport",
@@ -74,7 +74,7 @@
     "tsFile": "time-ext.ts",
     "rubyName": "to_time",
     "call": "year",
-    "reason": "Ruby core Date#year read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method — the gate matched Duration.year."
+    "reason": "Ruby core Date#year read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
   },
   {
     "package": "activesupport",

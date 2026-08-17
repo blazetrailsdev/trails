@@ -11,6 +11,6 @@
     "tsFile": "core-ext/digest/uuid.ts",
     "rubyName": "uuid_from_hash",
     "call": "unpack",
-    "reason": "Ruby core String#unpack of the digest bytes (core_ext/digest/uuid.rb:19-38), not a ported trails method — the gate matched Cache::Entry.unpack."
+    "reason": "Ruby core String#unpack of the digest bytes (core_ext/digest/uuid.rb:19-38), not a ported trails method."
   }
 ]

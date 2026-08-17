@@ -4,41 +4,41 @@
     "tsFile": "enumerable-utils.ts",
     "rubyName": "in_order_of",
     "call": "compact",
-    "reason": "Ruby core Array#compact on the receiver (core_ext/enumerable.rb:197-207), not a ported trails method — the gate matched Relation#compact."
+    "reason": "Ruby core Array#compact on the receiver (core_ext/enumerable.rb:197-207), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
     "rubyName": "many?",
     "call": "any?",
-    "reason": "Ruby core Enumerable#any? on the receiver (core_ext/enumerable.rb:93-99), not a ported trails method — the gate matched Querying.isAny."
+    "reason": "Ruby core Enumerable#any? on the receiver (core_ext/enumerable.rb:93-99), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
     "rubyName": "sole",
     "call": "count",
-    "reason": "Ruby core Enumerable#count on the receiver (core_ext/enumerable.rb:211-217), not a ported trails method — the gate matched Querying.count."
+    "reason": "Ruby core Enumerable#count on the receiver (core_ext/enumerable.rb:211-217), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
     "rubyName": "sole",
     "call": "first",
-    "reason": "Ruby core Enumerable#first on the receiver (core_ext/enumerable.rb:211-217), not a ported trails method — the gate matched Relation#first."
+    "reason": "Ruby core Enumerable#first on the receiver (core_ext/enumerable.rb:211-217), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
     "rubyName": "sum",
     "call": "first",
-    "reason": "Ruby core Enumerable#first on the receiver (core_ext/enumerable.rb:241-247), not a ported trails method — the gate matched Relation#first."
+    "reason": "Ruby core Enumerable#first on the receiver (core_ext/enumerable.rb:241-247), not a ported trails method."
   },
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
     "rubyName": "sum",
     "call": "last",
-    "reason": "Ruby core Enumerable#last on the receiver (core_ext/enumerable.rb:241-247), not a ported trails method — the gate matched Querying.last."
+    "reason": "Ruby core Enumerable#last on the receiver (core_ext/enumerable.rb:241-247), not a ported trails method."
   }
 ]
