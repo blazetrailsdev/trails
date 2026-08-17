@@ -17,15 +17,9 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 import { sanitizeForMassAssignment as sanitizeForbiddenAttributes } from "@blazetrails/activemodel";
 
 import { defaultSqlTimezone } from "./connection-adapters/abstract/sql-formatting.js";
-import { habtmTargetFk, joinHabtmTableNames, modelRegistry } from "./associations.js";
 import { applyThenable, stripThenable } from "./relation/thenable.js";
-import { isStiSubclass } from "./inheritance.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
-  underscore as _toUnderscore,
-  camelize as _camelize,
-  singularize as _singularize,
-  pluralize as _pluralize,
   isPlainObject as _isPlainObject,
   wrap,
   any,
@@ -93,7 +87,6 @@ import {
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
-import { invokeScopeLambda } from "./associations/association-scope.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 
 /**
@@ -806,76 +799,6 @@ export class Relation<T extends Base> {
     return reflection;
   }
 
-  private _resolveHasManySubquery(
-    modelClass: any,
-    assocDef: any,
-    assocName: string,
-  ): {
-    targetTable: string;
-    foreignKey: string;
-    typeNodes: InstanceType<typeof Nodes.Node>[];
-  } {
-    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
-    const targetModel = modelRegistry.get(targetClassName);
-    if (!targetModel) {
-      throw new Error(
-        `Model '${targetClassName}' not found in registry for association '${assocName}'`,
-      );
-    }
-    const targetTable = targetModel.tableName;
-    const tgtTable = new Table(targetTable);
-    const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
-    const typeNodes: InstanceType<typeof Nodes.Node>[] = [];
-    if (assocDef.options.as) {
-      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-      typeNodes.push(tgtTable.get(typeCol).eq(modelClass.name));
-    }
-    const inheritanceCol = targetModel.inheritanceColumn;
-    if (inheritanceCol && isStiSubclass(targetModel)) {
-      const stiNames = [
-        targetModel.name,
-        ...(targetModel.descendants ?? []).map((d: any) => d.name),
-      ];
-      typeNodes.push(tgtTable.get(inheritanceCol).in(stiNames));
-    }
-    return { targetTable, foreignKey, typeNodes };
-  }
-
-  private _resolveHasManyJoin(
-    modelClass: any,
-    assocDef: any,
-    assocName: string,
-  ): { targetTable: string; foreignKey: string; onClause: string } {
-    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocName));
-    const targetModel = modelRegistry.get(targetClassName);
-    if (!targetModel) {
-      throw new Error(
-        `Model '${targetClassName}' not found in registry for association '${assocName}'`,
-      );
-    }
-    const targetTable = targetModel.tableName;
-    const sourceTable = modelClass.tableName;
-    const pk = (assocDef.options.primaryKey ?? modelClass.primaryKey) as string;
-    const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
-    let onClause: string;
-    if (assocDef.options.as) {
-      const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-      onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}" AND "${targetTable}"."${typeCol}" = '${modelClass.name}'`;
-    } else {
-      onClause = `"${targetTable}"."${foreignKey}" = "${sourceTable}"."${pk}"`;
-    }
-    const inheritanceCol = targetModel.inheritanceColumn;
-    if (inheritanceCol && isStiSubclass(targetModel)) {
-      const stiNames = [
-        targetModel.name,
-        ...(targetModel.descendants ?? []).map((d: any) => d.name),
-      ];
-      const inList = stiNames.map((n: string) => `'${n}'`).join(", ");
-      onClause += ` AND "${targetTable}"."${inheritanceCol}" IN (${inList})`;
-    }
-    return { targetTable, foreignKey, onClause };
-  }
-
   /**
    * Add NOT WHERE conditions. Accepts a hash of column/value pairs,
    * or the composite-key positional form (mirrors `where(cols, tuples)`).
@@ -1408,102 +1331,6 @@ export class Relation<T extends Base> {
   // merge and spawn are mixed in from spawn-methods.ts
 
   /**
-   * Append a macro-time association `scope:` lambda to a JOIN's ON
-   * predicates, mirroring JoinDependency's scope handling
-   * (associations/join-dependency.ts:272-282) and Rails' `joins(:assoc)`,
-   * which folds the reflection scope into the join constraint. Routing the
-   * scope's conditions through the target model's `where()` casts enum FK
-   * values (e.g. `where(last_read: :reading)` → `last_read = 2`), so
-   * `where.associated`/`where.missing` see the integer mapping that the
-   * raw column-to-column ON would otherwise skip.
-   *
-   * Invoked via `invokeScopeLambda` so 0-arity `this`-bound scopes
-   * (`function () { return this.where(...) }`) and arrow scopes
-   * (`(rel) => rel.where(...)`, `(rel, owner) => ...`) are all evaluated, with
-   * the Rails `instance_exec(owner) || relation` falsy-fallback. A bare join
-   * has no owner instance, so the scope runs with `owner === undefined`.
-   *
-   * The scope is invoked unconditionally via `invokeScopeLambda`, mirroring
-   * JoinDependency (join-dependency.ts:272-282), which neither pre-skips by
-   * arity nor rescues scope-evaluation errors. A bare join has no owner, so
-   * the scope runs with `owner === undefined` (Rails passes nil in join
-   * contexts); owner-parameter scopes that tolerate a nil owner still fold in,
-   * and a scope that genuinely requires the owner throws — the same outcome
-   * JoinDependency produces. `invokeScopeLambda` (not a raw `scope(rel)` call)
-   * is used so 0-arity `this`-bound scopes bind `this` to the relation.
-   *
-   * @internal
-   */
-  private _appendAssociationScope(predicates: Nodes.Node[], assocDef: any, targetModel: any): void {
-    const scope = assocDef.scope;
-    if (typeof scope !== "function") return;
-    const baseRel = targetModel._allForPreload();
-    const scopeRel = invokeScopeLambda(scope, baseRel, undefined as unknown as Base) || baseRel;
-    if (scopeRel?.whereClause && !scopeRel.whereClause.isEmpty()) {
-      predicates.push(scopeRel.whereClause.ast);
-    }
-  }
-
-  /**
-   * Derive an association's foreign key, mirroring Rails'
-   * `Reflection#derive_foreign_key` (reflection.rb):
-   *
-   * - `belongsTo` → `#{name}_id` (the association name)
-   * - polymorphic `as` → `#{as}_id`
-   * - otherwise → `#{owner.model_name}_id` (the owning model)
-   *
-   * - `inverse_of` (when `inferFromInverseOf`) → the inverse reflection's own
-   *   foreign key, recursively (reflection.rb:558-566:
-   *   `inverse_of.foreign_key(infer_from_inverse_of: false)`)
-   *
-   * An explicit `foreignKey` option always wins (and may be a composite
-   * `string[]`). `ownerName` is the owning model's class name — for a `:through`
-   * source association the owner is the through model, not the base model, so
-   * callers pass the appropriate name.
-   *
-   * `inferFromInverseOf` mirrors Rails' `infer_from_inverse_of:` guard: the
-   * recursive call into the inverse passes `false` so the inverse's OWN
-   * `inverse_of` is not chased (prevents two mutually-inverse associations from
-   * bouncing forever).
-   *
-   * @internal
-   */
-  private _deriveForeignKey(
-    reflection: any,
-    name: string,
-    ownerName: string,
-    inferFromInverseOf = true,
-  ): string | string[] {
-    if (reflection.options.foreignKey != null) return reflection.options.foreignKey;
-    if (reflection.type === "belongsTo") return `${_toUnderscore(name)}_id`;
-    if (reflection.options.as) return `${_toUnderscore(reflection.options.as)}_id`;
-    // When `inverse_of:` is set, defer to the inverse reflection's foreign key so
-    // a self-referential `has_many :children, inverse_of: :parent` uses the
-    // parent belongs_to's `parent_id` rather than the owner-name default
-    // `comment_id`. Recurse through the full derivation (option / composite array
-    // / belongsTo / polymorphic `as`) rather than re-deriving inline, so a
-    // polymorphic or explicitly-keyed inverse resolves correctly too.
-    if (reflection.options.inverseOf != null && inferFromInverseOf) {
-      // Mirror Rails' `derive_class_name` (reflection.rb:812-816): only a
-      // collection association singularizes before camelizing; belongsTo/hasOne
-      // camelize the name as-is. Matches the `isPlural` branching at the fallback
-      // resolver above rather than singularizing unconditionally.
-      const isPlural =
-        reflection.type === "hasMany" ||
-        reflection.type === "hasAndBelongsToMany" ||
-        (reflection.type as string) === "hasManyThrough";
-      const targetClassName =
-        reflection.options.className ?? _camelize(isPlural ? _singularize(name) : name);
-      const targetModel: any = modelRegistry.get(targetClassName);
-      const inverse = (targetModel?._associations ?? []).find(
-        (a: any) => a.name === reflection.options.inverseOf,
-      );
-      if (inverse) return this._deriveForeignKey(inverse, inverse.name, targetClassName, false);
-    }
-    return `${_toUnderscore(ownerName)}_id`;
-  }
-
-  /**
    * True when `name` is a declared association on this relation's model. A
    * named `joins(:assoc)` routes through JoinDependency (mirroring Rails'
    * joins_values → build_join_dependencies); anything else is a raw SQL join
@@ -1514,314 +1341,6 @@ export class Relation<T extends Base> {
   private _isAssociationName(name: string): boolean {
     const modelClass = this._model as any;
     return (modelClass._associations ?? []).some((a: any) => a.name === name);
-  }
-
-  /**
-   * Resolve an association name to one or more JOIN table/ON pairs.
-   * Returns null if the name is not a recognized association.
-   *
-   * Through and HABTM associations produce multiple joins (the intermediate
-   * table(s) plus the final target).
-   */
-  private _resolveAssociationJoin(name: string): JoinClauseSpec | JoinClauseSpec[] | null {
-    const modelClass = this._model as any;
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === name);
-    if (!assocDef) return null;
-
-    const sourceTable = modelClass.tableName;
-    const sourcePk = modelClass.primaryKey ?? "id";
-
-    if (assocDef.type === "belongsTo") {
-      const foreignKey = this._deriveForeignKey(assocDef, name, modelClass.name);
-      const className = assocDef.options.className ?? _camelize(name);
-      const targetModel = modelRegistry.get(className);
-      if (!targetModel) return null;
-      const targetTable = targetModel.tableName;
-      const rawTargetPk = assocDef.options.primaryKey ?? targetModel.primaryKey ?? "id";
-      const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-      const pkArr = Array.isArray(rawTargetPk) ? rawTargetPk : [rawTargetPk];
-      if (fkArr.length !== pkArr.length) return null;
-      const tgt = new Table(targetTable);
-      const src = new Table(sourceTable);
-      const predicates: Nodes.Node[] = pkArr.map((pk, i) => tgt.get(pk).eq(src.get(fkArr[i])));
-
-      // STI type condition on target
-      const inheritanceCol = targetModel.inheritanceColumn;
-      if (inheritanceCol && isStiSubclass(targetModel)) {
-        const stiNames = [
-          targetModel.name,
-          ...(targetModel.descendants ?? []).map((d: any) => d.name),
-        ];
-        predicates.push(tgt.get(inheritanceCol).in(stiNames));
-      }
-
-      this._appendAssociationScope(predicates, assocDef, targetModel);
-      return {
-        table: targetTable,
-        on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
-        klass: targetModel,
-      };
-    }
-
-    if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
-      // Through association: join through the intermediate model, then the target
-      if (assocDef.options.through) {
-        return this._resolveThroughJoin(modelClass, assocDef);
-      }
-
-      const className =
-        assocDef.options.className ??
-        _camelize(assocDef.type === "hasMany" ? _singularize(name) : name);
-      const targetModel = modelRegistry.get(className);
-      if (!targetModel) return null;
-      const targetTable = targetModel.tableName;
-      const rawPk = assocDef.options.primaryKey ?? sourcePk;
-      const foreignKey = this._deriveForeignKey(assocDef, name, modelClass.name);
-      const pkArr = Array.isArray(rawPk) ? rawPk : [rawPk];
-      const fkArr = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-      if (pkArr.length !== fkArr.length) return null;
-      const tgt = new Table(targetTable);
-      const src = new Table(sourceTable);
-      const predicates: Nodes.Node[] = pkArr.map((pk, i) => tgt.get(fkArr[i]).eq(src.get(pk)));
-
-      // Polymorphic type condition
-      if (assocDef.options.as) {
-        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        predicates.push(tgt.get(typeCol).eq(modelClass.name));
-      }
-
-      // STI type condition on target
-      const inheritanceCol = targetModel.inheritanceColumn;
-      if (inheritanceCol && isStiSubclass(targetModel)) {
-        const stiNames = [
-          targetModel.name,
-          ...(targetModel.descendants ?? []).map((d: any) => d.name),
-        ];
-        predicates.push(tgt.get(inheritanceCol).in(stiNames));
-      }
-
-      this._appendAssociationScope(predicates, assocDef, targetModel);
-      return {
-        table: targetTable,
-        on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
-        klass: targetModel,
-      };
-    }
-
-    // hasManyThrough (test-data style where type is literally "hasManyThrough")
-    if (
-      (assocDef.type as string) === "hasManyThrough" ||
-      (assocDef.type as string) === "hasOneThrough"
-    ) {
-      return this._resolveThroughJoin(modelClass, assocDef);
-    }
-
-    // HABTM: join through the join table, then the target
-    if (assocDef.type === "hasAndBelongsToMany") {
-      return this._resolveHabtmJoin(modelClass, assocDef);
-    }
-
-    return null;
-  }
-
-  /**
-   * Resolve a has_many/has_one :through association into multiple JOIN clauses.
-   */
-  private _resolveThroughJoin(modelClass: any, assocDef: any): JoinClauseSpec[] | null {
-    const sourceTable = modelClass.tableName;
-    const sourcePk = modelClass.primaryKey ?? "id";
-    const associations: any[] = modelClass._associations ?? [];
-
-    const throughName = assocDef.options.through;
-    const throughAssocDef = associations.find((a: any) => a.name === throughName);
-    if (!throughAssocDef) return null;
-
-    // Resolve the through (intermediate) model
-    const throughClassName =
-      throughAssocDef.options.className ??
-      _camelize(throughAssocDef.type === "hasMany" ? _singularize(throughName) : throughName);
-    const throughModel = modelRegistry.get(throughClassName);
-    if (!throughModel) return null;
-    const throughTable = (throughModel as any).tableName;
-
-    // Build the first JOIN(s): source -> through. When the through association
-    // is itself a :through or HABTM (a nested-through chain, e.g. Post
-    // `has_many :essays, through: :categories` where `categories` is HABTM),
-    // delegate to the recursive resolver so the full intermediate join chain
-    // (join table + categories + essays) is emitted rather than a bogus direct
-    // FK against the through target. Mirrors Rails' ThroughReflection chain.
-    const srcTable = new Table(sourceTable);
-    const thrTable = new Table(throughTable);
-    const throughIsNested =
-      throughAssocDef.options.through != null ||
-      throughAssocDef.type === "hasAndBelongsToMany" ||
-      (throughAssocDef.type as string) === "hasManyThrough" ||
-      (throughAssocDef.type as string) === "hasOneThrough";
-
-    let throughJoins: JoinClauseSpec[];
-    if (throughIsNested) {
-      const resolved = this._resolveAssociationJoin(throughName);
-      if (!resolved) return null;
-      throughJoins = Array.isArray(resolved) ? resolved : [resolved];
-    } else {
-      const throughPredicates: Nodes.Node[] = [];
-      if (throughAssocDef.type === "belongsTo") {
-        const throughFk = this._deriveForeignKey(
-          throughAssocDef,
-          throughName,
-          modelClass.name,
-        ) as string;
-        const throughTargetPk =
-          throughAssocDef.options.primaryKey ?? throughModel.primaryKey ?? "id";
-        throughPredicates.push(thrTable.get(throughTargetPk).eq(srcTable.get(throughFk)));
-      } else {
-        const throughPk = throughAssocDef.options.primaryKey ?? sourcePk;
-        const throughAsName = throughAssocDef.options.as;
-        const throughFk = this._deriveForeignKey(
-          throughAssocDef,
-          throughName,
-          modelClass.name,
-        ) as string;
-        throughPredicates.push(thrTable.get(throughFk).eq(srcTable.get(throughPk)));
-        if (throughAsName) {
-          throughPredicates.push(
-            thrTable.get(`${_toUnderscore(throughAsName)}_type`).eq(modelClass.name),
-          );
-        }
-      }
-      throughJoins = [
-        {
-          table: throughTable,
-          on:
-            throughPredicates.length === 1
-              ? throughPredicates[0]
-              : new Nodes.And(throughPredicates),
-          klass: throughModel,
-        },
-      ];
-    }
-
-    // Resolve the source association on the through model to build the second JOIN
-    const sourceName = assocDef.options.source ?? _singularize(assocDef.name);
-    const throughModelAssocs: any[] = (throughModel as any)._associations ?? [];
-    const sourceAssocDef =
-      throughModelAssocs.find((a: any) => a.name === sourceName) ??
-      throughModelAssocs.find((a: any) => a.name === _pluralize(sourceName));
-
-    // Polymorphic source: when the source belongs_to on the through model is
-    // polymorphic, `source_type:` on the outer through declares which concrete
-    // class to join against (Rails HasManyThroughAssociation, reflection.rb).
-    const isPolySource =
-      sourceAssocDef?.type === "belongsTo" && sourceAssocDef.options?.polymorphic === true;
-    const targetClassName =
-      (isPolySource ? assocDef.options.sourceType : undefined) ??
-      assocDef.options.className ??
-      _camelize(_singularize(assocDef.name));
-    if (isPolySource && !assocDef.options.sourceType) return null;
-    const targetModel = modelRegistry.get(targetClassName);
-    if (!targetModel) return null;
-    const targetTable = (targetModel as any).tableName;
-    const tgtTable = new Table(targetTable);
-
-    const sourceType = sourceAssocDef?.type ?? "belongsTo";
-    const targetPredicates: Nodes.Node[] = [];
-
-    if (sourceType === "belongsTo") {
-      const targetFk = sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceName)}_id`;
-      const targetPk = sourceAssocDef?.options?.primaryKey ?? targetModel.primaryKey ?? "id";
-      targetPredicates.push(tgtTable.get(targetPk).eq(thrTable.get(targetFk)));
-      if (isPolySource) {
-        // Mirrors Rails BelongsToReflection: type column is `foreign_type`
-        // (options[:foreign_type] || "#{name}_type").
-        const typeCol = sourceAssocDef!.options?.foreignType ?? `${_toUnderscore(sourceName)}_type`;
-        targetPredicates.push(thrTable.get(typeCol).eq(assocDef.options.sourceType));
-      }
-    } else {
-      const sourceAsName = sourceAssocDef?.options?.as;
-      const sourceFk = sourceAsName
-        ? (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(sourceAsName)}_id`)
-        : (sourceAssocDef?.options?.foreignKey ?? `${_toUnderscore(throughClassName)}_id`);
-      const rawThroughPk = sourceAssocDef?.options?.primaryKey ?? throughModel.primaryKey ?? "id";
-      let throughPkCol: string;
-      if (Array.isArray(rawThroughPk)) {
-        if (rawThroughPk.includes("id")) {
-          throughPkCol = "id";
-        } else if (rawThroughPk.length === 1) {
-          throughPkCol = rawThroughPk[0];
-        } else {
-          return null;
-        }
-      } else {
-        throughPkCol = rawThroughPk;
-      }
-      targetPredicates.push(tgtTable.get(sourceFk).eq(thrTable.get(throughPkCol)));
-      if (sourceAsName) {
-        targetPredicates.push(
-          tgtTable.get(`${_toUnderscore(sourceAsName)}_type`).eq(throughClassName),
-        );
-      }
-    }
-
-    // Fold the outer through-association's own `scope:` lambda (e.g.
-    // `-> { where(name: "Bob") }`) into the final target join's ON predicates,
-    // mirroring JoinDependency's reflection-scope handling.
-    this._appendAssociationScope(targetPredicates, assocDef, targetModel);
-
-    return [
-      ...throughJoins,
-      {
-        table: targetTable,
-        on: targetPredicates.length === 1 ? targetPredicates[0] : new Nodes.And(targetPredicates),
-        klass: targetModel,
-      },
-    ];
-  }
-
-  /**
-   * Resolve a HABTM association into JOIN clauses through the join table.
-   */
-  private _resolveHabtmJoin(modelClass: any, assocDef: any): JoinClauseSpec[] | null {
-    // Rails' HABTM macro does not forward `:primary_key` to the generated
-    // through-`has_many` (Builder::HasAndBelongsToMany#middle_options); the
-    // owner-side join always resolves to the model's primary key.
-    const sourcePkOption = modelClass.primaryKey ?? "id";
-    if (Array.isArray(sourcePkOption)) return null;
-    const sourcePk: string = sourcePkOption;
-    const sourceTable = modelClass.tableName;
-
-    const fkOption = assocDef.options.foreignKey;
-    if (Array.isArray(fkOption)) return null;
-
-    const targetClassName = assocDef.options.className ?? _camelize(_singularize(assocDef.name));
-    const targetModel = modelRegistry.get(targetClassName);
-    if (!targetModel) return null;
-    const targetTable = (targetModel as any).tableName;
-    const targetPk = targetModel.primaryKey ?? "id";
-    if (Array.isArray(targetPk)) return null;
-
-    // Match Rails Builder::HasAndBelongsToMany#table_name: sort both side
-    // tableNames and collapse a shared `[._]`-terminated prefix.
-    const defaultJoinTable = joinHabtmTableNames(sourceTable, targetTable);
-    const joinTable = assocDef.options.joinTable ?? defaultJoinTable;
-
-    const ownerFk = this._deriveForeignKey(assocDef, assocDef.name, modelClass.name) as string;
-    const targetFk = habtmTargetFk(assocDef.name, assocDef.options);
-
-    const srcT = new Table(sourceTable);
-    const joinT = new Table(joinTable);
-    const tgtT = new Table(targetTable);
-    return [
-      {
-        table: joinTable,
-        on: joinT.get(ownerFk).eq(srcT.get(sourcePk)),
-      },
-      {
-        table: targetTable,
-        on: tgtT.get(targetPk).eq(joinT.get(targetFk)),
-        klass: targetModel,
-      },
-    ];
   }
 
   // -- Relation state --
@@ -2423,73 +1942,37 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Resolve association-name join specs to their lowercased table names. An
-   * unresolved spec falls back to its own lowercased name (matching the inline
-   * resolution in `referencesEagerLoadedTables`).
-   */
-  private _resolveAssocTables(values: AssociationSpec[]): string[] {
-    return values
-      .filter((v): v is string => typeof v === "string")
-      .flatMap((v) => {
-        const resolved = this._resolveAssociationJoin(v);
-        if (!resolved) return [v.toLowerCase()];
-        const entries = Array.isArray(resolved) ? resolved : [resolved];
-        return entries.map((e) => e.table.toLowerCase());
-      });
-  }
-
-  /**
    * Returns true when any references_values entry points to a table that is
    * not already joined — triggers promoting includes to eager_load.
    *
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
    */
   private referencesEagerLoadedTables(): boolean {
+    // relation.rb:1241 short-circuits on `includes_values.any?` before ever
+    // reaching here; trails split `eager_loading?` across two promoters, so the
+    // guard rides the callee.
     if (this.includesValues.length === 0) return false;
-    if (this.referencesValues.length === 0) return false;
 
-    // Mirrors Rails references_eager_loaded_tables? (relation.rb:1474-1488): calls
-    // build_joins([]) and extracts table names from the returned join nodes
-    // (StringJoin → tables_in_string(join.left), other → join.left.name), then checks
-    // whether any references_values are NOT in that joined-tables set. Only
-    // references_values are consulted; Rails does not scan WHERE predicates.
-    // leftOuterJoinsValues holds association names (not table names). Rails
-    // build_joins([]) processes left_outer_joins_values and extracts table names
-    // from the resulting join nodes. We resolve via _resolveAssocTables to
-    // get the actual table name (handles camelCase → snake_case mappings).
-    const leftOuterTables = this._resolveAssocTables(this.leftOuterJoinsValues);
-    // joins_values holds association names too (joins(:assoc) routed through
-    // JoinDependency with InnerJoin). Run them through `select_association_list`
-    // — the same partition build_joins applies — and resolve the surviving specs
-    // to table names so references to those tables don't spuriously promote
-    // includes to eager_load. The raw SQL strings it drops are handled by the
-    // `tablesInString` arm below, exactly as Rails' StringJoin branch does.
-    const rawJoinValues: (string | Nodes.Join)[] = [];
-    const namedInnerTables = this._resolveAssocTables(
-      this.selectAssociationList(this.joinsValues, null, (join) =>
-        rawJoinValues.push(join as string | Nodes.Join),
-      ) as AssociationSpec[],
-    );
-    const joinedTables = new Set<string>([
-      ...this._joinClauses.map((j) => j.table.toLowerCase()),
-      ...leftOuterTables,
-      ...namedInnerTables,
-      ...rawJoinValues.flatMap((v) => {
-        if (typeof v === "string") {
-          const join = new Nodes.StringJoin(new Nodes.SqlLiteral(v));
-          return this.tablesInString(join.left);
-        }
-        if (v instanceof Nodes.StringJoin) {
-          return this.tablesInString(v.left);
-        }
-        const leftName = (v.left as any)?.name;
-        if (typeof leftName === "string") return [leftName.toLowerCase()];
-        return this.tablesInString(v.toSql());
-      }),
-      String((this._model as unknown as { tableName?: string }).tableName ?? "").toLowerCase(),
-    ]);
+    // relation.rb:1475 — `build_joins([])`. Rails hands `build_joins` the joins
+    // array it appends to and reads it back; trails' `build_joins` appends onto
+    // an Arel `SelectManager`, so the throwaway manager IS the `[]`.
+    const arel = new SelectManager(this.table);
+    this.buildJoins(arel);
+    const joinedTables = arel
+      .joinSources()
+      .flatMap((join: Nodes.Join) =>
+        join instanceof Nodes.StringJoin
+          ? this.tablesInString(join.left)
+          : [(join.left as unknown as { name?: string })?.name],
+      )
+      .filter((name): name is string => typeof name === "string");
 
-    return this.referencesValues.some((ref) => !joinedTables.has(String(ref).toLowerCase()));
+    joinedTables.push(this.table.name);
+
+    // always convert table names to downcase as in Oracle quoted table names are in uppercase
+    const downcased = joinedTables.map((name) => name.toLowerCase());
+
+    return this.referencesValues.some((ref) => !downcased.includes(String(ref)));
   }
 
   /**

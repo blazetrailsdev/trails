@@ -1,8 +1,8 @@
 /**
  * trails-internal coverage (not a Rails test port) for the `inverse_of`
- * foreign-key derivation branches in `Relation#_deriveForeignKey`
- * (`relation.ts`), a port of Rails' `Reflection#foreign_key` /
- * `#derive_foreign_key` (reflection.rb:551-566, 812-816). When a has_one /
+ * foreign-key derivation branches reached by `joins(:assoc)` through
+ * `JoinDependency`, Rails' `Reflection#foreign_key` / `#derive_foreign_key`
+ * (reflection.rb:551-566, 812-816). When a has_one /
  * has_many sets `inverse_of:` (and carries neither an explicit `foreignKey`
  * nor a polymorphic `as`), derivation recurses into the inverse reflection so
  * the join uses the inverse's own foreign key rather than the owner-name
