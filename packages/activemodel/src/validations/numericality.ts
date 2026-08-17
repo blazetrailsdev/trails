@@ -1,10 +1,10 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank, underscore, RoundingHelper, BigDecimal } from "@blazetrails/activesupport";
+import { underscore, RoundingHelper, BigDecimal, Range } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
-import { ArgumentError, TypeError as RubyTypeError } from "../attribute-assignment.js";
+import { ArgumentError } from "../attribute-assignment.js";
 import { roundFloatToSignificantDigits } from "../type/decimal.js";
 
 type NumericValue = number | ((record: ValidatableRecord) => number) | string;
@@ -56,12 +56,6 @@ export class NumericalityValidator extends EachValidator {
     precision = 15,
     scale?: number,
   ): void {
-    // A cast/raw decimal is a BigDecimal (Numeric in Rails — Kernel.Float
-    // accepts it). Normalize to its fixed-form string so the string-based
-    // checks below (isNumber, Number(), isInteger) treat it as numeric.
-    if (value instanceof BigDecimal) value = value.toString("F");
-    if (this.options.allowBlank && isBlank(value)) return;
-
     if (!this.isNumber(value, precision, scale)) {
       record.errors.add(attribute, ":not_a_number", this.filteredOptions(value));
       return;
@@ -75,7 +69,10 @@ export class NumericalityValidator extends EachValidator {
       return;
     }
 
-    const num = parseAsNumber(Number(value), precision, scale) as number;
+    // Rails reassigns `value` (numericality.rb:47), so every filtered_options
+    // below interpolates the PARSED value, not the raw input.
+    const num = parseAsNumber(value, precision, scale) as number;
+    value = num;
 
     // Rails uses filtered_options(value).merge!(count: option_value)
     // for compare/range branches and filtered_options(value) (no count)
@@ -86,44 +83,56 @@ export class NumericalityValidator extends EachValidator {
       count,
     });
 
-    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+    // Ruby `Hash#slice(*keys)` yields the entries in the ARGUMENT order, not the
+    // receiver's, so `options.slice(*RESERVED_OPTIONS)` walks the options in
+    // RESERVED_OPTIONS order — COMPARE, then NUMBER, then RANGE (numericality.rb:16).
+    // Iterating the constant reproduces that, which is what fixes the order errors
+    // land in when one attribute fails several checks at once.
+    for (const option of RESERVED_OPTIONS) {
       let optionValue = this.options[option] as NumericValue | undefined;
       if (optionValue === undefined) continue;
-      optionValue = this.optionAsNumber(record, optionValue, precision, scale);
-      if (optionValue === undefined) continue;
-      if (!compareOperator(COMPARE_CHECKS[option], num, optionValue)) {
-        record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+      if (option in NUMBER_CHECKS) {
+        // Rails: value.to_i.public_send(NUMBER_CHECKS[option]) — TS has no
+        // public_send, so the check Symbol selects the parity test.
+        const odd = Math.trunc(num) % 2 !== 0;
+        if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
+          record.errors.add(attribute, `:${option}`, this.filteredOptions(value));
+        }
+      } else if (option in RANGE_CHECKS) {
+        // Rails: value.public_send(:in?, range) — Object#in? delegates to
+        // Range#include?, and :count interpolates the range's own to_s.
+        const range = optionValue as unknown as Range<number>;
+        if (!range.isInclude(num)) {
+          record.errors.add(attribute, `:${option}`, withCount(range.toS()));
+        }
+      } else if (option in COMPARE_CHECKS) {
+        optionValue = this.optionAsNumber(record, optionValue, precision, scale);
+        if (optionValue === undefined) continue;
+        if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
+          record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+        }
       }
-    }
-    if (this.options.in !== undefined) {
-      const [min, max] = this.options.in as [number, number];
-      if (num < min || num > max) {
-        record.errors.add(attribute, ":in", withCount(`${min}..${max}`));
-      }
-    }
-    if (this.options.odd && Math.trunc(num) % 2 === 0) {
-      record.errors.add(attribute, ":odd", this.filteredOptions(value));
-    }
-    if (this.options.even && Math.trunc(num) % 2 !== 0) {
-      record.errors.add(attribute, ":even", this.filteredOptions(value));
     }
   }
 
   override checkValidity(): void {
-    for (const key of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
-      const val = this.options[key];
-      if (
-        val !== undefined &&
-        typeof val !== "number" &&
-        typeof val !== "function" &&
-        typeof val !== "string" &&
-        !(val instanceof BigDecimal)
-      ) {
-        throw new ArgumentError(`:${key} must be a number, a symbol or a proc`);
+    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+      const value = this.options[option];
+      if (value === undefined) continue;
+      // Rails: unless value.is_a?(Numeric) || value.is_a?(Proc) || value.is_a?(Symbol).
+      // A trails Symbol is a colon-prefixed string, which is what separates
+      // `":maxApproved"` (send it) from `"foo"` (a String — Rails rejects it).
+      if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
+        throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
       }
     }
-    if (this.options.in !== undefined && !Array.isArray(this.options.in)) {
-      throw new ArgumentError(":in must be a range");
+
+    for (const option of Object.keys(RANGE_CHECKS)) {
+      const value = this.options[option];
+      if (value === undefined) continue;
+      if (!(value instanceof Range)) {
+        throw new ArgumentError(`:${option} must be a range`);
+      }
     }
   }
 
@@ -187,57 +196,11 @@ export function optionAsNumber(
   precision: number,
   scale?: number,
 ): number | undefined {
-  const resolved = this.resolveValue(record, optionValue);
-  if (resolved === undefined || resolved === null) return undefined;
-  // Rails parse_as_number's BigDecimal branch is `round(raw_value, scale)` —
-  // scale rounding ONLY, with no `to_d(precision)` / precision pass (unlike
-  // the Float branch). Mirror that exactly: round to scale and return, rather
-  // than falling through to `parseAsNumber` (which also applies precision and
-  // would clamp a BigDecimal option carrying more significant digits than the
-  // validator's precision to a different target than Rails compares against).
-  if (resolved instanceof BigDecimal) {
-    const n = Number(resolved.toString("F"));
-    return Number.isFinite(n) ? round(n, scale) : undefined;
-  }
-  // Rails option_as_number → parse_as_number → Kernel.Float would raise
-  // TypeError on non-Numeric/non-String input (Date, boolean, object).
-  // Throw the consistent validator error rather than silently accepting
-  // values that JS Number() happens to coerce (true → 1, Date → epoch).
-  if (typeof resolved !== "number" && typeof resolved !== "string") {
-    throw new RubyTypeError(`Resolved numericality option must be numeric: ${String(resolved)}`);
-  }
-  if (typeof resolved === "string") {
-    if (resolved.trim() === "") {
-      // Rails Kernel.Float raises ArgumentError on blank strings, so
-      // option_as_number propagates the error.
-      throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
-    }
-    // Rails parse_as_number's elsif chain only falls through for hex
-    // literals when the ANCHORED regex matches (HEXADECIMAL_REGEX uses
-    // \A so leading whitespace doesn't qualify). "  0x10" doesn't
-    // match, falls through to Kernel.Float, and raises — so we should
-    // raise too rather than silently skipping.
-    if (HEXADECIMAL_REGEX.test(resolved)) return undefined;
-    const trimmed = resolved.trimStart();
-    // Anything non-decimal that survives — leading-whitespace hex,
-    // 0b… / 0o… — is rejected by Rails Kernel.Float. JS Number() would
-    // silently coerce 0b/0o, so the explicit guard is load-bearing
-    // on the trails side.
-    if (HEXADECIMAL_REGEX.test(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) {
-      throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
-    }
-  }
-  const numeric = typeof resolved === "number" ? resolved : Number(resolved);
-  if (!Number.isFinite(numeric)) {
-    throw new ArgumentError(`Resolved numericality option must be numeric: ${String(resolved)}`);
-  }
-  return parseAsNumber(numeric, precision, scale);
+  return parseAsNumber(this.resolveValue(record, optionValue), precision, scale);
 }
 
 /**
- * Rails: parse_as_number → branches by Ruby type (Float / BigDecimal /
- * Numeric / integer-string / non-hex string). In TS we just narrow to
- * number and route through round + parseFloat per Rails:
+ * Mirrors: numericality.rb:72-84
  *
  *   def parse_as_number(raw_value, precision, scale)
  *     if raw_value.is_a?(Float)
@@ -252,13 +215,74 @@ export function optionAsNumber(
  *   end
  *
  * Returns undefined when raw_value isn't parseable (matching Rails'
- * implicit-nil from the `elsif` chain falling through).
+ * implicit-nil from the `elsif` chain falling through, and the
+ * `rescue ArgumentError, TypeError` around `Kernel.Float` in `is_number?`).
+ *
+ * Ruby's Float-vs-Integer split has no JS counterpart — both are `number` —
+ * so integrality stands in for it: a non-integral number takes the `Float`
+ * branch, an integral one the `Numeric` (pass-through) branch. That is what
+ * keeps a 17-digit integer out of the 15-significant-digit `parse_float`.
  *
  * @internal Rails-private helper.
  */
-export function parseAsNumber(num: number, precision: number, scale?: number): number | undefined {
-  if (!Number.isFinite(num)) return undefined;
-  return parseFloatRails(num, precision, scale);
+export function parseAsNumber(
+  rawValue: unknown,
+  precision: number,
+  scale?: number,
+): number | undefined {
+  if (typeof rawValue === "number") {
+    // Ruby `Float::NAN.to_d` raises, so the chain yields no number.
+    if (Number.isNaN(rawValue)) return undefined;
+    // `% 1 === 0` stands in for Ruby's Float-vs-Integer type test (see above);
+    // an integral value takes the `Numeric` pass-through branch.
+    return rawValue % 1 === 0 ? rawValue : parseFloatRails(rawValue, precision, scale);
+  }
+  if (rawValue instanceof BigDecimal) return round(Number(rawValue.toString("F")), scale);
+  if (isInteger(rawValue)) return Number.parseInt(String(rawValue), 10);
+  if (!isHexadecimalLiteral(rawValue)) {
+    const float = kernelFloat(rawValue);
+    if (float === undefined) return undefined;
+    return parseFloatRails(float, precision, scale);
+  }
+  return undefined;
+}
+
+/**
+ * Ruby's `Kernel.Float`, as `parse_as_number` (numericality.rb:82) calls it:
+ * a strict decimal parse that honors `to_f` on a non-Numeric object and raises
+ * `ArgumentError`/`TypeError` otherwise. `is_number?` rescues both, so the
+ * unparseable cases return undefined here rather than throwing.
+ *
+ * `Number()` is laxer than `Kernel.Float` in two directions trails has to close
+ * by hand: it reads `0b…`/`0o…`/`0x…` literals, and it coerces `""` and
+ * whitespace to `0`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel.Float`, not a Rails method,
+ * so `parity:api` has no Ruby name to credit it against.
+ */
+function kernelFloat(rawValue: unknown): number | undefined {
+  if (rawValue !== null && typeof rawValue === "object") {
+    const toF = (rawValue as { toF?: unknown }).toF;
+    return typeof toF === "function" ? (toF as () => number).call(rawValue) : undefined;
+  }
+  if (typeof rawValue !== "string") return undefined;
+  if (rawValue.trim() === "") return undefined;
+  // `is_hexadecimal_literal?` is anchored at \A, but Kernel.Float strips
+  // leading whitespace before parsing, so "  0x1" is still rejected there.
+  const trimmed = rawValue.trimStart();
+  if (isHexadecimalLiteral(trimmed) || NON_DECIMAL_LITERAL_REGEX.test(trimmed)) return undefined;
+  const coerced = Number(rawValue);
+  return Number.isNaN(coerced) ? undefined : coerced;
+}
+
+/** Ruby's `value.is_a?(Numeric)` over the two numeric types trails carries. */
+function isNumeric(value: unknown): boolean {
+  return typeof value === "number" || value instanceof BigDecimal;
+}
+
+/** Ruby's `value.is_a?(Symbol)` — a colon-prefixed string in trails. */
+function isSymbol(value: unknown): boolean {
+  return typeof value === "string" && value.startsWith(":");
 }
 
 /**
@@ -300,38 +324,16 @@ export function round(num: number, scale?: number): number {
  * @internal Rails-private helper.
  */
 export function isNumber(
-  this: { options: Record<string, unknown>; isHexadecimalLiteral(v: unknown): boolean },
+  this: { options: Record<string, unknown> },
   rawValue: unknown,
   precision: number,
   scale?: number,
 ): boolean {
-  if (this.options.onlyNumeric && typeof rawValue !== "number") return false;
-  if (rawValue === null || rawValue === undefined) return false;
-  if (typeof rawValue === "number") return Number.isFinite(rawValue);
-  // Rails Kernel.Float raises TypeError for non-String/non-Numeric input
-  // (Date, true/false, arbitrary objects), so is_number? returns false.
-  // Restrict the coercion path to strings; JS Number(true) === 1 etc.
-  // would otherwise silently pass.
-  if (typeof rawValue !== "string") return false;
-  // Rails `Kernel.Float` raises on blank strings — JS Number("") would
-  // coerce to 0 and falsely report true.
-  if (rawValue.trim() === "") return false;
-  // Rails `is_hexadecimal_literal?` is anchored at \A (no whitespace),
-  // but Kernel.Float strips leading whitespace before parsing, so a
-  // string like "  0x1" is still a hex literal that Rails rejects.
-  // Trails extends this to 0b… / 0o… because JS Number() coerces those
-  // too (Rails Kernel.Float would raise).
-  const trimmed = rawValue.trimStart();
-  if (this.isHexadecimalLiteral(trimmed)) return false;
-  if (NON_DECIMAL_LITERAL_REGEX.test(trimmed)) return false;
-  // Rails: rescue ArgumentError, TypeError; false; end (numericality.rb:99).
-  // The non-string/non-number paths return early above, and Number(string)
-  // doesn't throw in JS — so the rescue is structurally absent here.
-  // Kept the docstring reference to Rails' rescue for the call-shape
-  // mapping; no try/catch needed.
-  const coerced = Number(rawValue);
-  if (Number.isNaN(coerced)) return false;
-  return parseAsNumber(coerced, precision, scale) !== undefined;
+  if (this.options.onlyNumeric && !isNumeric(rawValue)) return false;
+
+  // Rails' `rescue ArgumentError, TypeError; false` is folded into
+  // `kernelFloat`, which returns undefined where Kernel.Float would raise.
+  return parseAsNumber(rawValue, precision, scale) !== undefined;
 }
 
 /**
@@ -527,6 +529,9 @@ export function isRecordAttributeChangedInPlace(
  * @internal Rails-private helper.
  */
 export function parseFloatRails(num: number, precision: number, scale?: number): number {
+  // Ruby `(1.0/0.0).to_d(15)` is BigDecimal Infinity, not an error, so an
+  // infinite Float survives the pipeline and reaches the comparisons.
+  if (!Number.isFinite(num)) return num;
   return Number(roundFloatToSignificantDigits(round(num, scale), precision));
 }
 
