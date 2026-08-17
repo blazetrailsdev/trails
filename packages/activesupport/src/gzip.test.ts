@@ -27,9 +27,9 @@ describe("GzipTest", () => {
   it("compress should return a binary string", () => {
     const compressed = Gzip.compress("");
 
-    // Rails asserts `compressed.encoding == Encoding.find("binary")`; a JS string
-    // has no encoding, so the latin1 round-trip a binary string is carried as is
-    // the closest observable.
+    // Rails asserts `compressed.encoding == Encoding.find("binary")`
+    // (gzip_test.rb:21); a JS string carries no encoding, so its being a string
+    // at all is the closest observable.
     expect(typeof compressed).toBe("string");
     assertNot(!compressed, "a compressed blank string should not be blank");
   });
@@ -38,8 +38,8 @@ describe("GzipTest", () => {
     const sourceString = "Hello World".repeat(100);
 
     const gzippedBySpeed = Gzip.compress(sourceString, constants.Z_BEST_SPEED);
-    // Rails reads the level back off Zlib::GzipReader; node's zlib exposes no
-    // per-member level, so the round-trip stands in for it.
+    // Rails reads the level back off Zlib::GzipReader (gzip_test.rb:29-33);
+    // node's zlib exposes no per-member level, so the round-trip stands in.
     expect(Gzip.decompress(gzippedBySpeed)).toBe(sourceString);
 
     const gzippedByBestCompression = Gzip.compress(sourceString, constants.Z_BEST_COMPRESSION);

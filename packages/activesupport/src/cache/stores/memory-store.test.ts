@@ -49,8 +49,9 @@ describe("MemoryStoreTest", () => {
   });
 
   it("increment preserves expiry", async () => {
-    // Rails stubs `Time.now` forward a minute; the port sleeps past a short
-    // `expires_in` instead, since the store reads the wall clock directly.
+    // Rails stubs `Time.now` forward a minute (memory_store_test.rb:31-47); the
+    // port sleeps past a short `expires_in` instead, since the store reads the
+    // wall clock directly and JS has no equivalent of Ruby's `Time.stub`.
     const cache = new MemoryStore();
     cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
     expect(cache.read("counter", { raw: true })).toEqual(1);
@@ -319,9 +320,9 @@ describe("MemoryStorePruningTest", () => {
   });
 
   it("cache different object ids string", () => {
-    // Rails compares `object_id`s; JS has none, so the deep-clone contract is
-    // spelled as reference inequality — which a string primitive cannot carry,
-    // so the stored value is the object a String stands in for here.
+    // Rails compares `object_id`s (memory_store_test.rb:210-216); JS has no
+    // object_id, so the deep-clone contract is spelled as reference inequality —
+    // which a string primitive cannot carry, hence the wrapper object.
     const item = { toS: "my_string" };
     store.write("test_key", item);
     expect(store.read("test_key")).not.toBe(item);
