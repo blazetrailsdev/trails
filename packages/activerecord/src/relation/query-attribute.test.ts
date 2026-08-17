@@ -185,6 +185,16 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
   });
 
+  it("isUnboundable casts the value exactly once", () => {
+    // `serializable?` computes `cast_value` once and yields it (integer.rb:75-79);
+    // Ruby's single local is one cast, so reading the sign must not cast again.
+    const int4 = new IntegerType({ limit: 4 });
+    const spy = vi.spyOn(int4, "cast");
+    expect(new QueryAttribute("id", "-1099511627776", int4).isUnboundable()).toBe(-1);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it("isUnboundable memoizes so the value is inspected exactly once", () => {
     // query_attribute.rb:45-51 guards with `unless defined?(@_unboundable)`, so
     // the check happens once however often the predicate is read — and both

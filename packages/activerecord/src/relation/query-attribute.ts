@@ -125,11 +125,16 @@ export class QueryAttribute extends Attribute {
    */
   isUnboundable(): 1 | -1 | false {
     if (this._unboundable === undefined) {
-      // Ruby's `value <=> 0` runs on the value `serializable?` yields, which is
-      // `cast_value` (integer.rb:75-79) — not the attribute's own `value`, which
-      // for a QueryAttribute is the raw one (query_attribute.rb:22-24). Reading
-      // the raw value would lose the sign of a string bound.
-      this._unboundable = this.isSerializable() ? false : compareToZero(this.type.cast(this.value));
+      // `serializable? { |value| @_unboundable = value <=> 0 } && @_unboundable = nil`
+      // — the yielded value is `cast_value` (integer.rb:75-79), not the attribute's
+      // own `value`, which for a QueryAttribute is the raw one
+      // (query_attribute.rb:22-24). Taking it from the block is what casts exactly
+      // once, as Ruby's single `cast_value` local does.
+      let unboundable: 1 | -1 | false = false;
+      const serializable = this.isSerializable((castValue) => {
+        unboundable = compareToZero(castValue);
+      });
+      this._unboundable = serializable ? false : unboundable;
     }
     return this._unboundable;
   }

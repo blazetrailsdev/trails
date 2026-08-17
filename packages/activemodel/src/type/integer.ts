@@ -53,7 +53,7 @@ export class IntegerType extends NumericValueType {
     return this.ensureInRange(value) as number | null;
   }
 
-  isSerializable(value: unknown): boolean {
+  isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
     // Mirrors integer.rb:74-80 — `cast_value = cast(value)` then
     // `in_range?(cast_value)`. The leading cast is load-bearing and must not be
     // re-derived via `Number(value)`: `cast` routes a BigInt through
@@ -65,7 +65,12 @@ export class IntegerType extends NumericValueType {
     // `!value` => true. Casting here rather than trusting the caller keeps this
     // predicate correct for a raw value, whether or not the caller pre-cast.
     const castValue = this.cast(value) as number | bigint | null;
-    return this.isInRange(castValue);
+    if (this.isInRange(castValue)) return true;
+    // `in_range?(cast_value) || begin; yield cast_value if block_given?; false; end`
+    // — the block receives the CAST value, which is the only place a caller can
+    // get it without casting a second time.
+    block?.(castValue);
+    return false;
   }
 
   /**
