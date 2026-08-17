@@ -3,6 +3,7 @@ import {
   ValidationContext,
   ValidationsContextHost,
   initInternals as validationsInitInternals,
+  initializeDup as validationsInitializeDup,
   contextForValidation as validationsContextForValidation,
   runValidationsBang as validationsRunValidationsBang,
   raiseValidationError as validationsRaiseValidationError,
@@ -10,6 +11,7 @@ import {
   _mergeAttributes as validationsMergeAttributes,
   _validatesDefaultKeys as validationsValidatesDefaultKeys,
   _parseValidatesOptions as validationsParseValidatesOptions,
+  VALID_OPTIONS_FOR_VALIDATE,
   readAttributeForValidation as validationsReadAttributeForValidation,
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
@@ -92,6 +94,7 @@ import {
   assertHashAttributes,
   isMassAssignmentEmpty,
   ArgumentError,
+  NoMethodError,
 } from "./attribute-assignment.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { AbsenceValidator } from "./validations/absence.js";
@@ -559,8 +562,28 @@ export class Model {
 
   // -- Validations (Phase 1100) --
 
-  static validates(attribute: string, rules: Record<string, unknown>): void {
+  static validates(...args: [...attributes: string[], rules: Record<string, unknown>]): void {
+    // Rails `validates(*attributes)` splits the trailing options hash off with
+    // `extract_options!` and stamps `defaults[:attributes] = attributes`
+    // (validates.rb:111-114), so every validator covers ALL the named attributes.
+    const rules = args[args.length - 1] as Record<string, unknown>;
+    const attributes = args.slice(0, -1) as string[];
+
+    // `defaults.slice!(*_validates_default_keys)` (validates.rb:112) splits the
+    // control keys out, leaving the validator keys. A falsy validator value still
+    // counts here — `next unless options` skips building it (validates.rb:127),
+    // which `test_validates_with_false_hash_value` pins.
+    const validations = Object.keys(rules).filter((k) => !this._validatesDefaultKeys().includes(k));
+
+    if (attributes.length === 0) {
+      throw new ArgumentError("You need to supply at least one attribute");
+    }
+    if (validations.length === 0) {
+      throw new ArgumentError("You need to supply at least one validation");
+    }
+
     const onContext = rules.on as string | undefined;
+    const exceptOnContext = rules.exceptOn as string | string[] | undefined;
     const ifCond = rules.if as ConditionFn | ConditionFn[] | undefined;
     const unlessCond = rules.unless as ConditionFn | ConditionFn[] | undefined;
     const isStrict = rules.strict as boolean | undefined;
@@ -569,6 +592,7 @@ export class Model {
 
     const shared: Record<string, unknown> = {};
     if (onContext !== undefined) shared.on = onContext;
+    if (exceptOnContext !== undefined) shared.exceptOn = exceptOnContext;
     if (ifCond !== undefined) shared.if = ifCond;
     if (unlessCond !== undefined) shared.unless = unlessCond;
     if (isStrict) shared.strict = true;
@@ -653,12 +677,14 @@ export class Model {
     }
 
     for (const { klass, opts } of validatorSpecs) {
-      this.validatesWith(klass, { ...opts, attributes: [attribute], ...shared });
+      this.validatesWith(klass, { ...opts, attributes, ...shared });
     }
   }
 
-  static validatesBang(attribute: string, rules: Record<string, unknown>): void {
-    this.validates(attribute, { ...rules, strict: true });
+  static validatesBang(...args: [...attributes: string[], rules: Record<string, unknown>]): void {
+    const rules = args[args.length - 1] as Record<string, unknown>;
+    const attributes = args.slice(0, -1) as string[];
+    this.validates(...attributes, { ...rules, strict: true });
   }
 
   static clearValidatorsBang(): void {
@@ -675,6 +701,18 @@ export class Model {
     methodOrFn: string | ((record: T) => unknown),
     options: ConditionalOptions = {},
   ): void {
+    // Rails validations.rb:163-169 runs the key check only when every positional
+    // arg is a method name — a block validator may carry validator-ish keys.
+    if (typeof methodOrFn === "string") {
+      for (const k of Object.keys(options)) {
+        if (!(VALID_OPTIONS_FOR_VALIDATE as readonly string[]).includes(k)) {
+          throw new ArgumentError(
+            `Unknown key: :${k}. Valid keys are: ${VALID_OPTIONS_FOR_VALIDATE.map((v) => `:${v}`).join(", ")}. Perhaps you meant to call \`validates\` instead of \`validate\`?`,
+          );
+        }
+      }
+    }
+
     const fn: CallbackFn = (record: object) => {
       // Return the underlying result so a Promise-returning validator flows
       // into the callback runner, which awaits it (RFC 0063 made the validation
@@ -691,6 +729,12 @@ export class Model {
       } else if (typeof r[methodOrFn] === "function") {
         return (r[methodOrFn] as () => void)();
       }
+      // Rails registers the Symbol as a callback filter and `send`s it when the
+      // chain runs, so an unknown name raises NoMethodError at validation time,
+      // not registration time (validations_test.rb:160-166).
+      throw new NoMethodError(
+        `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
+      );
     };
     _registerCallbackOnProto(
       this.prototype,
@@ -750,8 +794,20 @@ export class Model {
         ? {}
         : ((args.pop() as ConditionalOptions & { strict?: boolean; [key: string]: unknown }) ?? {});
 
-    const { if: ifOpt, unless: unlessOpt, on: onOpt, strict: isStrict, ...rest } = options;
-    const conditions = this._buildValidateConditions({ if: ifOpt, unless: unlessOpt, on: onOpt });
+    const {
+      if: ifOpt,
+      unless: unlessOpt,
+      on: onOpt,
+      exceptOn: exceptOnOpt,
+      strict: isStrict,
+      ...rest
+    } = options;
+    const conditions = this._buildValidateConditions({
+      if: ifOpt,
+      unless: unlessOpt,
+      on: onOpt,
+      exceptOn: exceptOnOpt,
+    });
 
     // Extract the explicit `attributes:` option so we can route the validator
     // into the right bucket even when the validator class doesn't expose
@@ -1469,6 +1525,18 @@ export class Model {
       );
     }
 
+    if (options.exceptOn !== undefined) {
+      // Rails validations.rb:175-182: `except_on` becomes an `unless:` intersecting
+      // `Array(except_on)` with `Array(o.validation_context)`, so a nil context
+      // never intersects and the validator still runs.
+      const exceptOn = Array.isArray(options.exceptOn) ? options.exceptOn : [options.exceptOn];
+      parts.push((record: object) => {
+        const mc = (record as unknown as ValidationsContextHost).validationContext;
+        const current = mc == null ? [] : Array.isArray(mc) ? mc : [mc];
+        return !exceptOn.some((c) => current.includes(c));
+      });
+    }
+
     if (options.unless !== undefined) {
       const conds = Array.isArray(options.unless) ? options.unless : [options.unless];
       parts.push(
@@ -1476,10 +1544,11 @@ export class Model {
       );
     }
 
-    if (parts.length === 0) return undefined;
+    if (parts.length === 0) return options.prepend ? { prepend: true } : undefined;
 
     return {
       if: (record: object) => parts.every((fn) => fn(record)),
+      ...(options.prepend ? { prepend: true } : {}),
     };
   }
 
@@ -1831,11 +1900,21 @@ export class Model {
   // Array<Symbol> (or nil). `valid?([:create, :publish])` round-trips
   // the array so `on: :create` / `on: [:create]` / `on: [:create, :other]`
   // validators all fire. See `validations.rb:361-368` and `:294-306`.
-  _validationContext: string | string[] | null = null;
+  // Rails has no `@validation_context` ivar: the context lives on the
+  // `ValidationContext` that `context_for_validation` memoizes (validations.rb:463-470).
+  // An accessor pair over it keeps every `record._validationContext` reader working
+  // while putting the *write* off the model, where `Object.freeze` can't block it.
+  get _validationContext(): string | string[] | null {
+    return this.contextForValidation().context;
+  }
+
+  set _validationContext(value: string | string[] | null) {
+    this.contextForValidation().context = value;
+  }
 
   /**
-   * Lazy-initialized live `ValidationContext` view. Populated on first
-   * call to `contextForValidation()` and cleared by `initInternals()`.
+   * Lazy-initialized `ValidationContext`, which owns the active context. Set on
+   * first `contextForValidation()` call and cleared by `initInternals()`.
    *
    * @internal
    */
@@ -1843,8 +1922,7 @@ export class Model {
 
   /**
    * Lazy accessor for the active `ValidationContext`. Mirrors Rails
-   * `context_for_validation` (validations.rb:463-465). The returned
-   * object's `.context` property is a live view of `_validationContext`.
+   * `context_for_validation` (validations.rb:463-465).
    *
    * @internal Rails-private helper.
    */
@@ -1892,8 +1970,10 @@ export class Model {
     } else {
       normalized = context;
     }
-    const prevContext = this._validationContext;
-    this._validationContext = normalized;
+    // Rails validations.rb:362-363: read the current context, write the new one
+    // through `context_for_validation`, restore in `ensure`.
+    const currentContext = this.validationContext;
+    this.contextForValidation().context = normalized;
 
     try {
       // Rails: `run_validations!` is the block, and its truthy return becomes
@@ -1905,7 +1985,7 @@ export class Model {
       if (!completed) return false;
       return this.errors.empty;
     } finally {
-      this._validationContext = prevContext;
+      this.contextForValidation().context = currentContext;
     }
   }
 
@@ -1976,6 +2056,27 @@ export class Model {
   }
 
   /**
+   * Mirrors: ActiveModel::Validations::HelperMethods#validates_presence_of
+   * (validations/presence.rb:34-36). Rails both `extend`s and `include`s
+   * `HelperMethods` (validations.rb:45-46), so the helpers exist on the instance
+   * too and run on the spot — which is what a `validate do ... end` block calls.
+   */
+  async validatesPresenceOf(...attrNames: unknown[]): Promise<void> {
+    await this.validatesWith(
+      PresenceValidator,
+      (this.constructor as typeof Model)._mergeAttributes([...attrNames]),
+    );
+  }
+
+  /** Mirrors: HelperMethods#validates_length_of (validations/length.rb:123-125). */
+  async validatesLengthOf(...attrNames: unknown[]): Promise<void> {
+    await this.validatesWith(
+      LengthValidator,
+      (this.constructor as typeof Model)._mergeAttributes([...attrNames]),
+    );
+  }
+
+  /**
    * Freeze this model instance. Mirrors Rails
    * `ActiveModel::Validations#freeze` (activemodel/lib/active_model/validations.rb:372-377):
    *
@@ -2004,6 +2105,26 @@ export class Model {
     void this.contextForValidation();
     Object.freeze(this);
     return this;
+  }
+
+  /**
+   * Mirrors Ruby's `Object#dup`: allocate an instance of the same class, copy the
+   * ivars, dispatch `initialize_dup`. `Object.create(getPrototypeOf(this))` is
+   * the JS equivalent and, like Ruby `dup`, does NOT re-enter the constructor.
+   * `Attributes#initialize_dup` deep-dups `@attributes` (attributes.rb:111-114);
+   * `Validations#initialize_dup` replaces `@errors` (validations.rb:310-313).
+   */
+  dup(): this {
+    const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
+    Object.assign(duped, this);
+    duped._attributes = this._attributes.deepDup();
+    duped.initializeDup(this);
+    return duped;
+  }
+
+  /** Mirrors: ActiveModel::Validations#initialize_dup (validations.rb:310). */
+  initializeDup(other: unknown): void {
+    validationsInitializeDup.call(this, other);
   }
 
   // -- Dirty tracking --

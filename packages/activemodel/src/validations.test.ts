@@ -1,6 +1,25 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assert, assertEmpty, assertPredicate } from "@blazetrails/activesupport";
-import { LengthValidator, Model, PresenceValidator, Validator } from "./index.js";
+import {
+  assert,
+  assertEmpty,
+  assertNot,
+  assertNotEmpty,
+  assertNothingRaised,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  LengthValidator,
+  Model,
+  NoMethodError,
+  PresenceValidator,
+  StrictValidationFailed,
+  ValidationError,
+  Validator,
+} from "./index.js";
+import type { ConditionalOptions } from "./validator.js";
 import { FormatValidator } from "./validations/format.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -618,43 +637,62 @@ describe("ValidationsTest", () => {
   });
 
   it("invalid should be the opposite of valid", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    expect(await new Person({}).isInvalid()).toBe(true);
-    expect(await new Person({ name: "Alice" }).isInvalid()).toBe(false);
+    Topic.validatesPresenceOf("title");
+
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    assertPredicate(t.errors.get("title"), (messages) => messages.length > 0);
+
+    t.title = "Things are going to change";
+    assertNotPredicate(await t.isInvalid(), (invalid) => invalid);
   });
 
   it("validation order", async () => {
-    const order: string[] = [];
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.validate((_record: any) => {
-          order.push("name_check");
-        });
-        this.validate((_record: any) => {
-          order.push("email_check");
-        });
-      }
-    }
-    await new Person({}).isValid();
-    expect(order).toEqual(["name_check", "email_check"]);
+    Topic.validatesPresenceOf("title");
+    Topic.validatesLengthOf("title", { minimum: 2 });
+
+    let t = new Topic({ title: "" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")[0]).toEqual("can't be blank");
+    Topic.validatesPresenceOf("title", "author_name");
+    Topic.validate(function (this: Topic) {
+      this.errors.add("author_email_address", "will never be valid");
+    });
+    Topic.validatesLengthOf("title", "content", { minimum: 2 });
+
+    t = new Topic({ title: "" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    let key: string;
+    expect((key = t.errors.attributeNames[0])).toEqual("title");
+    expect(t.errors.get(key)[0]).toEqual("can't be blank");
+    expect(t.errors.get(key)[1]).toEqual("is too short (minimum is 2 characters)");
+    expect((key = t.errors.attributeNames[1])).toEqual("author_name");
+    expect(t.errors.get(key)[0]).toEqual("can't be blank");
+    expect((key = t.errors.attributeNames[2])).toEqual("author_email_address");
+    expect(t.errors.get(key)[0]).toEqual("will never be valid");
+    expect((key = t.errors.attributeNames[3])).toEqual("content");
+    expect(t.errors.get(key)[0]).toEqual("is too short (minimum is 2 characters)");
   });
 
   it("validation with if and on", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create", if: () => true });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true); // no context
-    expect(await new Person({}).isValid("create")).toBe(false); // with context
+    Topic.validatesPresenceOf("title", {
+      if: (x: Topic) => {
+        x.author_name = "bad";
+        return true;
+      },
+      on: "update",
+    });
+
+    const t = new Topic({ title: "" });
+
+    // If block should not fire
+    assertPredicate(await t.isValid(), (valid) => valid);
+    assertPredicate(t.author_name, (authorName) => authorName == null);
+
+    // If block should fire
+    assert(await t.isInvalid("update"));
+    assert(t.author_name === "bad");
   });
 
   it("strict validation in validates", async () => {
@@ -668,13 +706,8 @@ describe("ValidationsTest", () => {
   });
 
   it("strict validation not fails", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, strict: true });
-      }
-    }
-    expect(await new Person({ name: "Alice" }).isValid()).toBe(true);
+    Topic.validates("title", { strict: true, presence: true });
+    assertPredicate(await new Topic({ title: "hello" }).isValid(), (valid) => valid);
   });
 
   it("list of validators for model", () => {
@@ -704,27 +737,24 @@ describe("ValidationsTest", () => {
   });
 
   it("validate with bang", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    await expect(new Person({}).validateBang()).rejects.toThrow();
-    expect(await new Person({ name: "Alice" }).validateBang()).toBe(true);
+    Topic.validates("title", { presence: true });
+
+    await assertRaises([ValidationError], {}, async () => {
+      await new Topic().validateBang();
+    });
   });
 
   it("errors to json", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p = new Person({});
-    await p.isValid();
-    const json = p.errors.asJson();
-    expect(json.name.length).toBeGreaterThan(0);
+    Topic.validatesPresenceOf(["title", "content"]);
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    const hash: Record<string, string[]> = {};
+    hash.title = ["can't be blank"];
+    hash.content = ["can't be blank"];
+    // Rails' `to_json` is the `Object#to_json` core_ext (`as_json.to_json` for
+    // Errors); trails has no port of it, so both sides serialize the JS way.
+    expect(JSON.stringify(t.errors.asJson())).toEqual(JSON.stringify(hash));
   });
 
   it("does not modify options argument", () => {
@@ -739,14 +769,8 @@ describe("ValidationsTest", () => {
   });
 
   it("validates with false hash value", async () => {
-    // When presence is false, no validation should be added
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Person.validates("name", { presence: false });
-    expect(await new Person({}).isValid()).toBe(true);
+    Topic.validates("title", { presence: false });
+    assertPredicate(await new Topic().isValid(), (valid) => valid);
   });
 
   it("validates with bang", async () => {
@@ -761,26 +785,23 @@ describe("ValidationsTest", () => {
   });
 
   it("validate with bang and context", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p = new Person();
-    await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
+    Topic.validates("title", { presence: true, on: "context" });
+
+    await assertRaises([ValidationError], {}, async () => {
+      await new Topic().validateBang("context");
+    });
+
+    const t = new Topic({ title: "Valid title" });
+    assert(await t.validateBang("context"));
   });
 
   it("strict validation error message", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p = new Person();
-    await p.isValid();
-    expect(p.errors.fullMessages.join(", ")).toContain("can't be blank");
+    Topic.validates("title", { strict: true, presence: true });
+
+    const exception = await assertRaises([StrictValidationFailed], {}, async () => {
+      await new Topic().isValid();
+    });
+    expect(exception.message).toEqual("Title can't be blank");
   });
 
   it("validation with message as proc that takes a record as a parameter", async () => {
@@ -794,29 +815,25 @@ describe("ValidationsTest", () => {
   });
 
   it("frozen models can be validated", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    // We can't truly freeze JS objects with Maps inside,
-    // but we can verify validation works after model creation
-    expect(await p.isValid()).toBe(true);
+    Person.validates("title", { presence: true });
+    const person = new Person().freeze();
+    assertPredicate(person, (p) => Object.isFrozen(p));
+    assertNot(await person.isValid());
   });
 
   it("dup validity is independent", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p1 = new Person({ name: "Alice" });
-    const p2 = new Person();
-    expect(await p1.isValid()).toBe(true);
-    expect(await p2.isValid()).toBe(false);
+    Topic.validatesPresenceOf("title");
+    const topic = new Topic({ title: "Literature" });
+    await topic.isValid();
+
+    const duped = topic.dup();
+    duped.title = null;
+    assertPredicate(await duped.isInvalid(), (invalid) => invalid);
+
+    topic.title = null;
+    duped.title = "Mathematics";
+    assertPredicate(await topic.isInvalid(), (invalid) => invalid);
+    assertPredicate(await duped.isValid(), (valid) => valid);
   });
 
   it("validates an undeclared getter via the send default", async () => {
@@ -882,35 +899,51 @@ describe("ValidationsTest", () => {
     assertEmpty(opts);
   });
 
-  it("invalid validator", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    // validates with empty rules should not throw
-    expect(() => Person.validates("name", {})).not.toThrow();
+  it("invalid validator", async () => {
+    Topic.validate("iDontExist");
+    await assertRaises([NoMethodError], {}, async () => {
+      const t = new Topic();
+      await t.isValid();
+    });
   });
 
-  it("invalid options to validate", () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    expect(() => Person.validates("name", {})).not.toThrow();
+  it("invalid options to validate", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
+      // A common mistake -- we meant to call 'validates'
+      Topic.validate("title", { presence: true } as unknown as ConditionalOptions);
+    });
+    const message =
+      "Unknown key: :presence. Valid keys are: :on, :if, :unless, :prepend, :exceptOn. Perhaps you meant to call `validates` instead of `validate`?";
+    expect(error.message).toEqual(message);
   });
 
   it("callback options to validate", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
+    class Klass extends Topic {
+      callSequence: string[] = [];
+
+      private validatorA(): void {
+        this.callSequence.push("a");
+      }
+
+      private validatorB(): void {
+        this.callSequence.push("b");
+      }
+
+      private validatorC(): void {
+        this.callSequence.push("c");
       }
     }
-    const p = new Person({});
-    expect(await p.isValid()).toBe(true);
-    expect(await p.isValid("create")).toBe(false);
+
+    await assertNothingRaised(() => {
+      Klass.validate("validatorA", { if: () => true });
+      Klass.validate("validatorB", { prepend: true });
+      Klass.validate("validatorC", { unless: () => true });
+    });
+
+    const t = new Klass();
+
+    assertPredicate(await t.isValid(), (valid) => valid);
+    expect(t.callSequence).toEqual(["b", "a"]);
   });
 
   it("accessing instance of validator on an attribute", () => {
@@ -930,33 +963,33 @@ describe("ValidationsTest", () => {
   });
 
   it("validation with message as proc that takes record and data as a parameters", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", {
-          presence: {
-            message: (record: any) => `${record.constructor.name} needs a name`,
-          },
-        });
-      }
-    }
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.get("name")[0]).toContain("needs a name");
+    Topic.validatesPresenceOf("title", {
+      message: (record: Topic, data: { attribute: string }) =>
+        `${data.attribute} is missing. You have failed me for the last time, ${record.author_name}.`,
+    });
+
+    const t = new Topic({ author_name: "Admiral" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual([
+      "Title is missing. You have failed me for the last time, Admiral.",
+    ]);
   });
 
   it("validations some with except", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.validates("name", { presence: true });
-        this.validates("age", { numericality: true, on: "create" });
-      }
-    }
-    const p = new Person({ age: "abc" });
-    // Without context, only name validation runs
-    expect(await p.isValid()).toBe(false);
+    Topic.validates("title", {
+      presence: { exceptOn: "custom_context" },
+      length: { maximum: 10 },
+    });
+
+    await assertRaises([ValidationError], {}, async () => {
+      await new Topic().validateBang();
+    });
+
+    await assertRaises([ValidationError], {}, async () => {
+      await new Topic({ title: "A".repeat(11) }).validateBang("custom_context");
+    });
+
+    assert(await new Topic().validateBang("custom_context"));
   });
 
   it("validates format of with multiline regexp should raise error", () => {
@@ -982,77 +1015,36 @@ describe("ValidationsTest", () => {
   });
 
   it("validations on the instance level", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validate(function (record: any) {
-          if (record.readAttribute("name") === "invalid") {
-            record.errors.add("name", ":invalid", { message: "is not allowed" });
-          }
-        });
-      }
-    }
-    const p = new Person({ name: "invalid" });
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["is not allowed"]);
+    Topic.validates("title", "author_name", { presence: true });
+    Topic.validates("content", { length: { minimum: 10 } });
+
+    const topic = new Topic();
+    assertPredicate(await topic.isInvalid(), (invalid) => invalid);
+    expect(topic.errors.size).toEqual(3);
+
+    topic.title = "Some Title";
+    topic.author_name = "Some Author";
+    topic.content = "Some Content Whose Length is more than 10.";
+    assertPredicate(await topic.isValid(), (valid) => valid);
   });
 
   it("validate with except on", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, on: "create" });
-      }
-    }
-    const p = new Person();
-    // Without context, "on: create" validations should not run
-    expect(await p.isValid()).toBe(true);
-    // With matching context, they should run
-    expect(await p.isValid("create")).toBe(false);
-  });
+    Topic.validates("title", { presence: true, exceptOn: "custom_context" });
 
-  it("frozen models can be validated", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p = new Person({ name: "Alice" });
-    // Object.freeze doesn't prevent our validation from reading
-    // (we can't truly freeze a Model, but we can test that validation works)
-    expect(await p.isValid()).toBe(true);
-  });
+    const topic = new Topic();
+    await topic.validate();
 
-  it("dup validity is independent", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    const p1 = new Person({ name: "Alice" });
-    const p2 = new Person();
-    expect(await p1.isValid()).toBe(true);
-    expect(await p2.isValid()).toBe(false);
-    // p1's validity should not be affected by p2
-    expect(p1.errors.empty).toBe(true);
+    expect(topic.errors.get("title")).toEqual(["can't be blank"]);
+
+    assert(await topic.validate("custom_context"));
   });
 
   it("validation with message as proc", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", {
-          presence: {
-            message: (_record: any) => `name is required for record`,
-          },
-        });
-      }
-    }
-    const p = new Person();
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("name")).toEqual(["name is required for record"]);
+    Topic.validatesPresenceOf("title", { message: () => "no blanks here".toUpperCase() });
+
+    const t = new Topic();
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+    expect(t.errors.get("title")).toEqual(["NO BLANKS HERE"]);
   });
 
   it("list of validators on multiple attributes", () => {
@@ -1067,19 +1059,16 @@ describe("ValidationsTest", () => {
   });
 
   it("validate", async () => {
-    class Topic extends Model {
-      static {
-        this.attribute("title", "string");
-        this.attribute("content", "string");
-      }
-    }
-    Topic.validate((t: any) => {
-      if (!t.readAttribute("title")) t.errors.add("title", ":blank");
+    Topic.validate(async function (this: Topic) {
+      await this.validatesPresenceOf("title", "author_name");
+      await this.validatesLengthOf("content", { minimum: 10 });
     });
-    const topic = new Topic({});
-    expect(topic.errors.empty).toBe(true);
+
+    const topic = new Topic();
+    assertEmpty(topic.errors);
+
     await topic.validate();
-    expect(topic.errors.get("title")).toContain("can't be blank");
+    assertNotEmpty(topic.errors);
   });
 
   it("strict validation particular validator", async () => {
