@@ -714,7 +714,11 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("argless default with existing nil key", () => {
-    const h = new HashWithIndifferentAccess<unknown>(":default").merge({ a: "defined" });
+    // Rails builds the source as `Hash.new(:default).merge(nil => "defined")`.
+    // A plain JS object has no default seat and no nil key — every key is a
+    // string — so the default comes from the HWIA constructor and the nil key
+    // is JS's own spelling of it.
+    const h = new HashWithIndifferentAccess<unknown>(":default").merge({ null: "defined" });
 
     expect(h.default()).toBe(":default");
   });
