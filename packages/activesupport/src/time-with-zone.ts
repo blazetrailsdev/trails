@@ -368,15 +368,10 @@ export class TimeWithZone {
 
   /** Formatted UTC offset like "+05:30" */
   formattedOffset(colon = true, alternateUtcString?: string): string {
-    if (alternateUtcString !== undefined && this.utcOffset === 0) {
+    if (this.isUtc() && alternateUtcString !== undefined) {
       return alternateUtcString;
     }
-    const offset = this.utcOffset;
-    const sign = offset >= 0 ? "+" : "-";
-    const abs = Math.abs(offset);
-    const h = String(Math.floor(abs / 3600)).padStart(2, "0");
-    const m = String(Math.floor((abs % 3600) / 60)).padStart(2, "0");
-    return colon ? `${sign}${h}:${m}` : `${sign}${h}${m}`;
+    return TimeZone.secondsToUtcOffset(this.utcOffset, colon);
   }
 
   toString(): string {

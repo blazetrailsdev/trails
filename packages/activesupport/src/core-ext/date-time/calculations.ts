@@ -23,8 +23,9 @@ import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
-import { nsec, secFraction, secondsSinceUnixEpoch } from "../../time-ext.js";
+import { secFraction } from "../../time-ext.js";
 import * as date from "../date/calculations.js";
+import { nsec, toI } from "./conversions.js";
 
 /**
  * The receiver of this file's instance members: the seat
@@ -76,10 +77,7 @@ export function secondsSinceMidnight(datetime: DateTime): number {
  * (`date_time/conversions.rb:84-86`).
  */
 export function secondsUntilEndOfDay(datetime: DateTime): number {
-  return (
-    Math.trunc(secondsSinceUnixEpoch(endOfDay(datetime))) -
-    Math.trunc(secondsSinceUnixEpoch(datetime))
-  );
+  return toI(endOfDay(datetime)) - toI(datetime);
 }
 
 /** Mirrors: `DateTime#subsec` (`date_time/calculations.rb:36-38`) — `sec_fraction`. */
@@ -217,17 +215,9 @@ export function ago(datetime: DateTime, seconds: number): DateTime {
 /**
  * Mirrors: `DateTime#since` (`date_time/calculations.rb:116-118`) —
  * `self + Rational(seconds, 86400)`.
- *
- * Ruby's `Rational()` takes a Float numerator; this constructor takes Integers
- * only, so a fractional `seconds` is carried as its nanosecond count over the
- * matching denominator — the same value, at the sub-second precision the
- * receiver's `sf` holds. An Integer `seconds` cancels back to
- * `Rational(seconds, 86400)` through the constructor's own gcd.
  */
 export function since(datetime: DateTime, seconds: number): DateTime {
-  return new RubyDateTime(datetime)
-    .plus(new Rational(Math.round(seconds * 1_000_000_000), 86_400_000_000_000))
-    .toDatetime();
+  return new RubyDateTime(datetime).plus(new Rational(seconds, 86400)).toDatetime();
 }
 
 /**
@@ -310,3 +300,21 @@ export function endOfMinute(datetime: DateTime): DateTime {
 
 /** Mirrors: `alias :at_end_of_minute :end_of_minute` (`date_time/calculations.rb:167`) */
 export const atEndOfMinute = endOfMinute;
+
+/**
+ * Mirrors: `DateTime#utc?` (`date_time/calculations.rb:196-198`) —
+ * `offset == 0`.
+ */
+export function isUtc(datetime: DateTime): boolean {
+  return new RubyDateTime(datetime).offset.isZero();
+}
+
+/**
+ * Returns the offset value in seconds.
+ *
+ * Mirrors: `DateTime#utc_offset` (`date_time/calculations.rb:201-203`) —
+ * `(offset * 86400).to_i`.
+ */
+export function utcOffset(datetime: DateTime): number {
+  return new RubyDateTime(datetime).offset.mul(86400).toI();
+}

@@ -660,6 +660,11 @@ export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // (`active_support/core_ext/date_time/calculations.rb:10-12`) is
 // `Time.current` plus `to_datetime`, so in Ruby the two never collide and in a
 // flat ESM namespace they would.
+// Its `conversions` sibling
+// (`@blazetrails/activesupport/core-ext/date-time/conversions`) is the same
+// case again: `DateTime#usec`/`#nsec`/`#to_i`
+// (`active_support/core_ext/date_time/conversions.rb:79-96`) read the
+// receiver's own offset where the `Time` arm reads an instant.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

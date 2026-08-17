@@ -2409,3 +2409,22 @@ describe("builder seats answer rb_obj_class(self)", () => {
     expect(dt.gregorian()).toBeInstanceOf(DateTimeSub);
   });
 });
+
+describe("Rational", () => {
+  it("takes a Float on either side, as nurat_s_convert does", () => {
+    // ruby 3.3.11:
+    //   Rational(0.5, 86400)  #=> (1/172800)
+    //   Rational(1.333, 1)    #=> (6003298303284871/4503599627370496)
+    //   Rational(1, 0.5)      #=> (2/1)
+    expect(new Rational(0.5, 86400)).toEqual(new Rational(1, 172800));
+    expect(new Rational(1.333, 1).numerator).toBe(6003298303284871n);
+    expect(new Rational(1.333, 1).denominator).toBe(4503599627370496n);
+    expect(new Rational(1, 0.5)).toEqual(new Rational(2, 1));
+  });
+
+  it("raises FloatDomainError for a non-finite Float, as float_decode_internal does", () => {
+    // ruby 3.3.11: Rational(Float::INFINITY, 1) #=> FloatDomainError: Infinity
+    expect(() => new Rational(Infinity, 1)).toThrow("Infinity");
+    expect(() => new Rational(NaN, 1)).toThrow("NaN");
+  });
+});

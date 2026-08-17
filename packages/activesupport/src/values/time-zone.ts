@@ -363,6 +363,11 @@ declare global {
   }
 }
 
+/** `UTC_OFFSET_WITH_COLON` (time_zone.rb:187), a `private_constant`. */
+const UTC_OFFSET_WITH_COLON = "%s%02d:%02d";
+/** `UTC_OFFSET_WITHOUT_COLON` (time_zone.rb:188), the same with the colon out. */
+const UTC_OFFSET_WITHOUT_COLON = UTC_OFFSET_WITH_COLON.replaceAll(":", "");
+
 const zoneCache = new Map<string, TimeZone>();
 /** `@zones` (time_zone.rb:224). */
 let zones: TimeZone[] | null = null;
@@ -542,6 +547,26 @@ export class TimeZone {
    * for Ruby's `arg.abs` / `arg.to_i` delegating to `@value` — trails' Duration
    * derives totals from `parts` and carries no `@value`.
    */
+  /**
+   * Assumes self represents an offset from UTC in seconds (as returned from
+   * `Time#utc_offset`) and turns this into an +HH:MM formatted string.
+   *
+   * Mirrors: `TimeZone.seconds_to_utc_offset` (time_zone.rb:199-205). Ruby's
+   * `format % [sign, hours, minutes]` is the substitution the three `replace`
+   * calls make; `String#%` has no TypeScript counterpart, and the format string
+   * is the private constant Rails reads it out of.
+   */
+  static secondsToUtcOffset(seconds: number, colon = true): string {
+    const format = colon ? UTC_OFFSET_WITH_COLON : UTC_OFFSET_WITHOUT_COLON;
+    const sign = seconds < 0 ? "-" : "+";
+    const hours = Math.trunc(Math.abs(seconds) / 3600);
+    const minutes = Math.trunc((Math.abs(seconds) % 3600) / 60);
+    return format
+      .replace("%s", sign)
+      .replace("%02d", String(hours).padStart(2, "0"))
+      .replace("%02d", String(minutes).padStart(2, "0"));
+  }
+
   static find(arg: unknown): TimeZone | null {
     if (arg instanceof TimeZone) return arg;
     if (typeof arg === "string") {
@@ -965,15 +990,16 @@ export class TimeZone {
   }
 
   /**
-   * Formatted UTC offset like "+05:30" or "-08:00".
+   * Returns a formatted string of the offset from UTC, or an alternative
+   * string if the time zone is already UTC.
+   *
+   * Mirrors: `TimeZone#formatted_offset` (time_zone.rb:326-328). Ruby's
+   * `alternate_utc_string` is any non-nil String — `""` included — so the arm
+   * is chosen on presence rather than on truthiness.
    */
-  formattedOffset(colon = true): string {
-    const offset = this.utcOffset;
-    const sign = offset >= 0 ? "+" : "-";
-    const abs = Math.abs(offset);
-    const h = String(Math.floor(abs / 3600)).padStart(2, "0");
-    const m = String(Math.floor((abs % 3600) / 60)).padStart(2, "0");
-    return colon ? `${sign}${h}:${m}` : `${sign}${h}${m}`;
+  formattedOffset(colon = true, alternateUtcString: string | null = null): string {
+    if (this.utcOffset === 0 && alternateUtcString != null) return alternateUtcString;
+    return TimeZone.secondsToUtcOffset(this.utcOffset, colon);
   }
 
   /**

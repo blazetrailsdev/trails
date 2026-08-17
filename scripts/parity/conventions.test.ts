@@ -390,6 +390,9 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(rubyFileToTs("core_ext/date_time/calculations.rb", "activesupport")).toBe(
       "core-ext/date-time/calculations.ts",
     );
+    expect(rubyFileToTs("core_ext/date_time/conversions.rb", "activesupport")).toBe(
+      "core-ext/date-time/conversions.ts",
+    );
   });
 
   it("gives core_ext/object/json.rb its own bucket", () => {
