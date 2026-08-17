@@ -17,7 +17,6 @@ interface SizeableAssociation {
   target: Post[];
   isLoaded(): boolean;
   loadedBang(): void;
-  reset(): void;
   addToTarget(record: Post): Post;
   size(): Promise<number> | number;
 }
@@ -77,8 +76,6 @@ describe("CollectionAssociation#size with a grouped association scope", () => {
   it("loads the target and counts it when the association scope groups", async () => {
     const firm = (await Firm.find(companies("first_firm").id)) as unknown as Author;
     const assoc = association(firm, "clientsGroupedByFirmId");
-    // A grouped COUNT(*) returns one row per group rather than a scalar, so the
-    // arm has to load the target and count it in memory.
     const size = await assoc.size();
 
     expect(assoc.isLoaded()).toBe(true);

@@ -580,9 +580,24 @@ describe("ActionDispatch::IntegrationTest", () => {
   });
 
   describe("_mock_session", () => {
-    it("_mock_session owns the session's cookie jar", () => {
-      expect(app._mockSession).toBe(app._mockSession);
-      expect(app.cookies).toBe(app._mockSession.cookieJar);
+    it("_mock_session owns the session's cookie jar", async () => {
+      const mockSession = app._mockSession;
+      expect(app.cookies).toBe(mockSession.cookieJar);
+
+      app.cookies.set("stored", "value");
+      await app.get("/posts");
+      expect(app._mockSession).toBe(mockSession);
+      expect(app.cookies.get("stored")).toBe("value");
+    });
+
+    it("reset! drops the mock session, and with it the cookies", () => {
+      app.cookies.set("stored", "value");
+      const mockSession = app._mockSession;
+
+      app.resetBang();
+
+      expect(app._mockSession).not.toBe(mockSession);
+      expect(app.cookies.get("stored")).toBeUndefined();
     });
   });
 

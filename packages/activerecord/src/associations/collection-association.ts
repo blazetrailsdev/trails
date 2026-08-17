@@ -681,11 +681,17 @@ export class CollectionAssociation extends Association {
    * the collection hasn't been loaded, and by counting `target` if it has.
    *
    * Mirrors: ActiveRecord::Associations::CollectionAssociation#size
-   * (collection_association.rb:209-222). Abstract in the sense that it relies
-   * on `count_records`, which descendants have to provide — so the two counted
-   * arms and the grouped `load_target` arm return a promise while the two
-   * in-memory arms stay synchronous, exactly as Rails' arms do (Rails' first
-   * two issue no query either).
+   * (collection_association.rb:209-222), all five arms in Rails' order. The two
+   * in-memory arms stay synchronous — Rails' first two issue no query either —
+   * while the grouped arm and the two counted arms return a promise, since a
+   * grouped COUNT(*) yields one row per group rather than a scalar and so has to
+   * load the target and count it in memory.
+   *
+   * Rails declares `count_records` only on the descendants
+   * (has_many_association.rb:80, has_many_through_association.rb:79) and calls it
+   * abstractly from here; every concrete collection association is a
+   * `HasManyAssociation`, so it is reached through the subclass rather than
+   * through a base declaration Rails does not have.
    */
   size(): Promise<number> | number {
     if (!this.findTargetNeeded() || this.isLoaded()) {
@@ -696,35 +702,18 @@ export class CollectionAssociation extends Association {
       ((this.associationScope() as { groupValues?: unknown[] } | undefined)?.groupValues ?? [])
         .length > 0
     ) {
-      // A GROUP BY makes COUNT(*) return per-group rows rather than a scalar,
-      // so Rails loads the whole target and counts it in memory.
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
     } else if (
       !(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue &&
       this.target.length > 0
     ) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
-      // Rails declares `count_records` only on the descendants
-      // (has_many_association.rb:80, has_many_through_association.rb:79) and
-      // calls it abstractly from here; every concrete collection association is
-      // a HasManyAssociation, so reach it through the subclass rather than
-      // adding a base declaration Rails does not have.
-      return this.asCountingAssociation()
+      return (this as unknown as { countRecords(): Promise<number> })
         .countRecords()
         .then((count) => unsavedRecords.length + count);
     } else {
-      return this.asCountingAssociation().countRecords();
+      return (this as unknown as { countRecords(): Promise<number> }).countRecords();
     }
-  }
-
-  /**
-   * `CollectionAssociation#size` calls `count_records` abstractly
-   * (collection_association.rb:207-208, :218, :220); only the descendants
-   * declare it (has_many_association.rb:80).
-   * @internal
-   */
-  private asCountingAssociation(): { countRecords(): Promise<number> } {
-    return this as unknown as { countRecords(): Promise<number> };
   }
 
   async isEmpty(): Promise<boolean> {

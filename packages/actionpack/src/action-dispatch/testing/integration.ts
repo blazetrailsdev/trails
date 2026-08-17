@@ -152,9 +152,6 @@ export class IntegrationTest {
    */
   resetBang(): void {
     this.session = {};
-    // Rails' `reset!` drops the memoized mock session (integration.rb:159), and
-    // with it the cookie jar — that IS how an integration session forgets its
-    // cookies.
     this._mockSessionMemo = undefined;
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
@@ -326,8 +323,8 @@ export class IntegrationTest {
     return this.status;
   }
 
-  /** Backing store for the memoized `_mockSession` (Rails' `@_mock_session`). */
-  _mockSessionMemo?: MockSession;
+  /** Backing store for the memoized {@link _mockSession} (Rails' `@_mock_session`). */
+  private _mockSessionMemo?: MockSession;
 
   /** The controller instance from the last request. */
   controller!: Metal;
@@ -416,7 +413,8 @@ export class IntegrationTest {
    * The underlying mock session used to dispatch requests, memoized as in
    * `Integration::Session#_mock_session` (integration.rb:318-320):
    * `@_mock_session ||= Rack::MockSession.new(@app, host)`. It owns the
-   * session's single cookie jar; `reset!` drops it.
+   * session's single cookie jar, which is why dropping it is how `reset!`
+   * (integration.rb:159) makes the session forget its cookies.
    *
    * @internal
    */
@@ -890,7 +888,7 @@ export class IntegrationTest {
         HTTP_ACCEPT: this.accept,
         ...(options.env ?? {}),
       };
-      const noRouteCookieHeader = this.cookieHeader();
+      const noRouteCookieHeader = this._mockSession.httpCookie();
       if (noRouteCookieHeader !== undefined) {
         noRouteEnv.HTTP_COOKIE = noRouteCookieHeader;
       }
@@ -958,9 +956,7 @@ export class IntegrationTest {
       (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
     env.REQUEST_URI = this.buildFullUri(finalPath, env);
 
-    // Cookies the mock session's jar will send with this request — Rack::Test
-    // builds `HTTP_COOKIE` from `cookie_jar.for(uri)`.
-    const cookieHeader = this.cookieHeader();
+    const cookieHeader = this._mockSession.httpCookie();
     if (cookieHeader !== undefined) {
       env.HTTP_COOKIE = cookieHeader;
     }
@@ -1033,8 +1029,6 @@ export class IntegrationTest {
     // (and the `flash` getter above) can find it.
     this.request.flash = (this.controller as any).flash ?? new FlashHash();
 
-    // Merge the response's Set-Cookies into the session's jar — Rack::Test's
-    // MockSession does this in `#request` via `cookie_jar.merge(last_response)`.
     const cookieJar = this._mockSession.cookieJar;
     const setCookies = this.response.getHeader("set-cookie");
     if (setCookies) {
@@ -1049,29 +1043,12 @@ export class IntegrationTest {
       }
     }
 
-    // The jar outlives the request, but its signed/encrypted sub-jars read their
-    // secrets off the request that built them, so re-point it at the request
-    // just dispatched.
     cookieJar._request = this.request as unknown as CookieJar["_request"];
 
-    // Reflect the up-to-date jar on the request so reads that go through
-    // `request.cookies` see Set-Cookies from the just-finished response, not
-    // just the cookies that were sent in.
-    const updatedCookieHeader = this.cookieHeader();
+    const updatedCookieHeader = this._mockSession.httpCookie();
     if (updatedCookieHeader !== undefined) {
       this.request.env.HTTP_COOKIE = updatedCookieHeader;
     }
-  }
-
-  /**
-   * `HTTP_COOKIE` for the next request, from the mock session's jar — Rack::Test
-   * spells this `Rack::Test::CookieJar#for(uri)`. `undefined` when the jar is
-   * empty, so the header is omitted rather than sent blank.
-   */
-  private cookieHeader(): string | undefined {
-    const entries = Object.entries(this._mockSession.cookieJar.toHash());
-    if (entries.length === 0) return undefined;
-    return entries.map(([k, v]) => `${k}=${v}`).join("; ");
   }
 }
 
@@ -1090,6 +1067,17 @@ class MockSession {
     readonly app: unknown,
     readonly host: string,
   ) {}
+
+  /**
+   * The `HTTP_COOKIE` the jar sends with the next request, which Rack::Test's
+   * mock session builds as `cookie_jar.for(uri)`. `undefined` for an empty jar,
+   * so the header is omitted rather than sent blank.
+   */
+  httpCookie(): string | undefined {
+    const entries = Object.entries(this.cookieJar.toHash());
+    if (entries.length === 0) return undefined;
+    return entries.map(([k, v]) => `${k}=${v}`).join("; ");
+  }
 }
 
 // --- Mixin attachments ---------------------------------------------------
