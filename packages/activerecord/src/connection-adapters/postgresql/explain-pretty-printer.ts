@@ -4,48 +4,44 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::ExplainPrettyPrinter
  */
 
+import type { Result } from "../../result.js";
+
 export class ExplainPrettyPrinter {
-  pp(result: Array<Record<string, unknown>>): string {
-    if (result.length === 0) return "";
+  /**
+   * Pretty prints the result of an EXPLAIN in a way that resembles the output of the
+   * PostgreSQL shell:
+   *
+   *                                     QUERY PLAN
+   *   ------------------------------------------------------------------------------
+   *    Nested Loop Left Join  (cost=0.00..37.24 rows=8 width=0)
+   *      Join Filter: (posts.user_id = users.id)
+   *      ->  Index Scan using users_pkey on users  (cost=0.00..8.27 rows=1 width=4)
+   *            Index Cond: (id = 1)
+   *      ->  Seq Scan on posts  (cost=0.00..28.88 rows=8 width=4)
+   *            Filter: (posts.user_id = 1)
+   *   (6 rows)
+   */
+  pp(result: Result): string {
+    const header = result.columns[0];
+    const lines = result.rows.map((row) => String(row[0]));
 
-    const lines = result.map((row) => {
-      const queryPlan = row["QUERY PLAN"] ?? row.query_plan ?? row.queryplan ?? "";
-      // `EXPLAIN (FORMAT JSON)` returns the plan as a json/jsonb column.
-      // The pg driver previously auto-parsed it to a JS object; with the
-      // per-connection OID override it now arrives as a raw string. Handle
-      // both: object (user-supplied parser) and string (our raw passthrough).
-      if (queryPlan !== null && typeof queryPlan === "object") {
-        return JSON.stringify(queryPlan, null, 2);
-      }
-      if (typeof queryPlan === "string") {
-        try {
-          return JSON.stringify(JSON.parse(queryPlan), null, 2);
-        } catch {
-          // not JSON — fall through to plain string (TEXT format plans)
-        }
-      }
-      return String(queryPlan);
-    });
+    // We add 2 because there's one char of padding at both sides, note
+    // the extra hyphens in the example above.
+    const width = Math.max(...[header, ...lines].map((line) => line.length)) + 2;
 
-    const header = "QUERY PLAN";
-    // Width: max of header and all plan sub-line lengths + 2 (one space each side). Mirrors Rails.
-    // Multi-line JSON values are split so each sub-line is measured independently.
-    const allWidths = lines.flatMap((l) => l.split("\n").map((s) => s.length));
-    const width = Math.max(header.length, ...allWidths) + 2;
-    const sep = "-".repeat(width);
+    const pp: string[] = [];
 
-    // Rails: header.center(width).rstrip
-    const leftPad = Math.floor((width - header.length) / 2);
-    const centeredHeader = " ".repeat(leftPad) + header;
+    // Ruby's `center` splits the padding floor-left / ceil-right and `rstrip`
+    // then drops the right half, so only the left padding survives.
+    pp.push(" ".repeat(Math.floor((width - header.length) / 2)) + header);
+    pp.push("-".repeat(width));
 
-    // Rails: lines.map { |line| " #{line}" } — one leading space per plan line.
-    // Multi-line JSON values: indent each sub-line individually.
-    const indentedLines = lines.flatMap((l) => l.split("\n").map((s) => ` ${s}`));
+    pp.push(...lines.map((line) => ` ${line}`));
 
-    // Rails: "(N rows)" footer (not a second separator), then a trailing newline.
-    const nrows = result.length;
-    const footer = `(${nrows} ${nrows === 1 ? "row" : "rows"})`;
+    const nrows = result.rows.length;
+    const rowsLabel = nrows === 1 ? "row" : "rows";
+    pp.push(`(${nrows} ${rowsLabel})`);
 
-    return [centeredHeader, sep, ...indentedLines, footer].join("\n") + "\n";
+    return pp.join("\n") + "\n";
   }
 }

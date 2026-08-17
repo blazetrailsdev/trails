@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Array as OidArray, Data } from "./array.js";
+import { Array as OidArray, Data, PgTextEncoderArray } from "./array.js";
 
 const stringSubtype = {
   type: "string",
@@ -27,7 +27,7 @@ describe("PostgreSQL::OID::Array", () => {
     const data = type.serialize(["a", "b"]) as Data;
 
     expect(data).toBeInstanceOf(Data);
-    expect(data.encoder).toBe(type);
+    expect(data.encoder).toBeInstanceOf(PgTextEncoderArray);
     expect(data.values).toEqual(["a", "b"]);
     expect(String(data)).toBe("{a,b}");
   });

@@ -7,8 +7,7 @@ import {
 } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
-import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
-import { DateTime as PgDateTime } from "./oid/date-time.js";
+import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
@@ -50,7 +49,11 @@ describe("PostgreSQL quoting", () => {
     expect(quote(false)).toBe("FALSE");
     expect(typeCast(true)).toBe(true);
     expect(typeCast(false)).toBe(false);
-    expect(quote(new ArrayData(new OidArray(stringSubtype), [true, false]))).toBe("'{true,false}'");
+    expect(
+      quote(
+        new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), [true, false]),
+      ),
+    ).toBe("'{true,false}'");
   });
 
   it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
@@ -65,7 +68,9 @@ describe("PostgreSQL quoting", () => {
   it("quotes PostgreSQL OID wrapper values before delegating other values", () => {
     expect(quote(new XmlData("<root />"))).toBe("xml '<root />'");
     expect(quote(new BitData("1010"))).toBe("B'1010'");
-    expect(quote(new ArrayData(new OidArray(stringSubtype), ["a", "b"]))).toBe("'{a,b}'");
+    expect(
+      quote(new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), ["a", "b"])),
+    ).toBe("'{a,b}'");
     expect(quote(new Range(1, 10, true))).toBe("'[1,10)'");
     expect(quote(Infinity)).toBe("'Infinity'");
   });
@@ -74,7 +79,7 @@ describe("PostgreSQL quoting", () => {
     // box[] uses a `;` element delimiter; routing quote/typeCast through
     // encodeArray (which calls the OID encoder) keeps it type-correct rather
     // than diverging on a hardcoded `,`.
-    const boxArray = new ArrayData(new OidArray(stringSubtype, ";"), [
+    const boxArray = new ArrayData(new PgTextEncoderArray({ name: "box[]", delimiter: ";" }), [
       "(1,1),(0,0)",
       "(2,2),(1,1)",
     ]);
@@ -87,7 +92,7 @@ describe("PostgreSQL quoting", () => {
     // element gets the same db literal a scalar does (fixed-6 μs, " BC" for
     // proleptic years), not ISO-8601. This is the Rails-shaped path an inline
     // datetime[] INSERT must route through.
-    const dtArray = new ArrayData(new OidArray(new PgDateTime()), [
+    const dtArray = new ArrayData(new PgTextEncoderArray({ name: "datetime[]", delimiter: "," }), [
       Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
       Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
     ]);
@@ -194,7 +199,7 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("serializes array defaults through the type map", async () => {
-    const arrayType = new OidArray(stringSubtype);
+    const arrayType = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
     const column = { sqlType: "text[]", array: true };
     const typeMap = {
       lookupCastTypeFromColumn() {
@@ -417,8 +422,3 @@ describe("PostgreSQL quoting", () => {
     expect(() => typeCast(new Date())).toThrow(/Temporal/);
   });
 });
-
-const stringSubtype = {
-  cast: (value: unknown) => value,
-  serialize: (value: unknown) => value,
-};
