@@ -36,6 +36,16 @@ describe("IntegerType", () => {
     expect(type.deserialize(true)).toBeNull();
   });
 
+  it("serialize truncates a fractional number toward zero", () => {
+    // `serialize` is `ensure_in_range(super)` (integer.rb:65-68) over
+    // `Numeric#serialize`'s `cast(value)`, whose `cast_value` is `value.to_i`
+    // (integer.rb:90) — `10.5.to_i` is 10 and `-10.5.to_i` is -10 in MRI.
+    // NOT covered by helpers/numeric.test.ts: its `ConcreteNumeric#castValue`
+    // returns a number unchanged, so truncation is Integer's own domain.
+    expect(type.serialize(10.5)).toBe(10);
+    expect(type.serialize(-10.5)).toBe(-10);
+  });
+
   it("serialize honors a custom 1-byte limit", () => {
     const tinyType = new Types.IntegerType({ limit: 1 });
     expect(tinyType.serialize(127)).toBe(127);
