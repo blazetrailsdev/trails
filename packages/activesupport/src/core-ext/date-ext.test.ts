@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import {
   endOfMonth,
   endOfYear,
@@ -22,7 +22,7 @@ import {
   isFuture,
   isToday,
 } from "../time-ext.js";
-import { toTime } from "./date/conversions.js";
+import { toFormattedS as dateToFormattedS, toFs as dateToFs, toTime } from "./date/conversions.js";
 import * as DateExt from "./date/calculations.js";
 import { setZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -75,15 +75,28 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    const date = d(2005, 2, 21);
-    const result = toFs(date, "db");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    const date = pd(2005, 2, 21);
+    expect(dateToFs(date, "short")).toBe("21 Feb");
+    expect(dateToFs(date, "long")).toBe("February 21, 2005");
+    expect(dateToFs(date, "long_ordinal")).toBe("February 21st, 2005");
+    expect(dateToFs(date, "db")).toBe("2005-02-21");
+    expect(dateToFs(date, "inspect")).toBe("2005-02-21");
+    expect(dateToFs(date, "rfc822")).toBe("21 Feb 2005");
+    expect(dateToFs(date, "rfc2822")).toBe("21 Feb 2005");
+    expect(dateToFs(date, "iso8601")).toBe("2005-02-21");
+    expect(dateToFs(date, "doesnt_exist")).toBe(new RubyDate(date).toS());
+    expect(dateToFormattedS(date, "short")).toBe("21 Feb");
   });
 
   it("to fs with single digit day", () => {
-    const date = d(2005, 2, 1);
-    const result = toFs(date, "db");
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    const date = pd(2005, 2, 1);
+    expect(dateToFs(date, "short")).toBe("01 Feb");
+    expect(dateToFs(date, "long")).toBe("February 01, 2005");
+    expect(dateToFs(date, "long_ordinal")).toBe("February 1st, 2005");
+    expect(dateToFs(date, "db")).toBe("2005-02-01");
+    expect(dateToFs(date, "inspect")).toBe("2005-02-01");
+    expect(dateToFs(date, "rfc822")).toBe("01 Feb 2005");
+    expect(dateToFs(date, "iso8601")).toBe("2005-02-01");
   });
 
   it("readable inspect", () => {

@@ -2,6 +2,7 @@ import { Temporal } from "@blazetrails/date";
 
 import { Range } from "../../range-ext.js";
 import { toFs as timeToFs } from "../../time-ext.js";
+import { toFs as dateToFs } from "../date/conversions.js";
 
 /**
  * `ActiveSupport::RangeWithFormat`
@@ -25,7 +26,7 @@ declare module "../../range-ext.js" {
  * for `Date`, `Date`/`Temporal.Instant` for `Time`, everything else `to_s`.
  */
 function toFsDb(value: unknown): string {
-  if (value instanceof Temporal.PlainDate) return value.toString();
+  if (value instanceof Temporal.PlainDate) return dateToFs(value, "db");
   // boundary: `time-ext.ts`'s `toFs` — the ported `Time#to_fs` — takes a JS Date.
   if (value instanceof Date) return timeToFs(value, "db");
   // boundary: as above, an Instant is bridged to the Date `toFs` accepts.

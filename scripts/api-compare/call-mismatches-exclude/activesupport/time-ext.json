@@ -76,20 +76,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "formatted_offset",
-    "call": "utc?",
-    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "formatted_offset",
-    "call": "utc_offset",
-    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "preserve_timezone",
     "call": "system_local_time?",
     "kind": "args",
@@ -116,13 +102,6 @@
     "rubyName": "since",
     "call": "warn",
     "reason": "Time#since's `warn` is reached only from its `rescue TypeError` arm, which deprecates passing a non-numeric (time/calculations.rb:126-133). time-ext.ts's `since` takes `seconds: number`, so the deprecated call shape is unrepresentable and the arm has nothing to warn about."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_fs",
-    "call": "strftime",
-    "reason": "`strftime` is Ruby's C-level time formatter. JS has no strftime; each named DATE_FORMATS entry is expanded with `Intl`/`toISOString` in `toFs`."
   },
   {
     "package": "activesupport",
