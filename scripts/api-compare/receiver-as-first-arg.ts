@@ -85,4 +85,12 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // Ruby's Hash does not), so @blazetrails/activesupport exports it as
   // `groupBy(collection, block)` and the receiver is TS argument 1.
   "group_by",
+  // active_support/core_ext/enumerable.rb:52-60 — `people.index_by { … }`,
+  // exported by @blazetrails/activesupport as `indexBy(collection, block)` for
+  // the same reason `group_by` is: the Hash is keyed by VALUE, not by string
+  // coercion, so no `Array.prototype` analogue exists.
+  "index_by",
+  // active_support/core_ext/enumerable.rb:184-186 — `values.compact_blank`,
+  // exported by @blazetrails/activesupport as `compactBlank(collection)`.
+  "compact_blank",
 ]);

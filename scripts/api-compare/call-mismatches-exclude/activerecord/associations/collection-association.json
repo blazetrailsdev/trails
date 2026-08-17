@@ -5,14 +5,5 @@
     "rubyName": "ids_reader",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `target.empty?` (collection_association.rb:54) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
-    "call": "index_by",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby calling convention, not a divergence: `records.index_by { … }` is a receiver call with a block (collection_association.rb:68-75), and ActiveSupport's TS `indexBy` is a free function, so the receiver and the block become its two arguments — same call, same key function, arity shifted by the language."
   }
 ]
