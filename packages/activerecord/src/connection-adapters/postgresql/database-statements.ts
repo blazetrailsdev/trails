@@ -227,7 +227,6 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
  */
 export async function castResult(this: CastResultHost, result: pg.QueryResult): Promise<Result> {
   const fields = result.fields ?? [];
-  // Rails: `if result.fields.empty?` (database_statements.rb:172).
   if (isEmpty(fields)) {
     return Result.empty();
   }

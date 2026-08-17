@@ -317,7 +317,6 @@ export async function ensureValidOptionsForBatchingBang(
     }>;
     const uniqueIndex = indexes.find(
       (index) =>
-        // Rails: `(Array(index.columns) - cursor).empty?` (batches.rb:316).
         index.unique &&
         !index.where &&
         isEmpty(kernelArray(index.columns).filter((c) => !cursor.includes(c))),

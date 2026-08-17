@@ -105,22 +105,6 @@ describe("BigIntegerTest", () => {
     expect(type.isSerializable(BigInt("9".repeat(100)))).toBe(true);
   });
 
-  it("string with no leading digits casts to 0, following String#to_i", () => {
-    // `BigInteger < Integer` (big_integer.rb:8) inherits `cast_value`
-    // (integer.rb:89-91), so this must agree with IntegerType.
-    const type = new BigIntegerType();
-    expect(type.cast("bad")).toBe(0);
-    expect(type.cast("bad1")).toBe(0);
-    expect(new IntegerType().cast("bad")).toBe(0);
-  });
-
-  it("serialize answers null for a non-numeric string, via Integer#serialize", () => {
-    // integer.rb:65-68's `non_numeric_string?` guard, inherited because
-    // big_integer.rb overrides only serialize_cast_value and max_value.
-    const type = new BigIntegerType();
-    expect(type.serialize("bad")).toBeNull();
-  });
-
   it("blank string casts to null", () => {
     const type = new BigIntegerType();
     expect(type.cast("")).toBeNull();

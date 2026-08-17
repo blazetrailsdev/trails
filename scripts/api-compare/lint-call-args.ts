@@ -220,8 +220,6 @@ async function runAsScript(): Promise<void> {
       process.exit(2);
     }
   } else if (await artifactIsStale(ARTIFACT_PATH)) {
-    // Regeneration was opted out of, so the artifact on disk is all there is.
-    // Refuse rather than print rows off a tree that has since moved.
     console.error(staleArtifactMessage("call-args ratchet", ARTIFACT_PATH));
     process.exit(2);
   }

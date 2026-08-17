@@ -130,7 +130,6 @@ export class InsertAll {
     // (insert_all.rb#initialize validates uniqueBy in the constructor before
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
-    // Rails: `return ActiveRecord::Result.empty if inserts.empty?` (insert_all.rb:49).
     if (isEmpty(this.inserts)) return Result.empty();
     // Mirrors Rails InsertAll#execute: build the log/instrumentation label
     // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all

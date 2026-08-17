@@ -41,21 +41,6 @@ export function shouldRegenerate(argv: string[], env: Record<string, string | un
   return !env.CI && env[REGEN_SKIP_ENV] !== "1";
 }
 
-// `extraArgs` is the compare scope. It defaults to the artifact's, the
-// only one compare.ts writes: a plain `pnpm parity:api` computes no call sets
-// at all, so passing [] would regenerate nothing the gate can read.
-//
-// The regeneration is FORCED (RFC 0106). A cached regeneration is a PARTIAL
-// one: `extract-ts-api.ts` serves any package whose own fingerprint and
-// recorded read-set still validate, so the artifact the gate then reads mixes
-// freshly-extracted packages with entries an earlier tree produced. Measured on
-// PR #6647: a plain gate reported nine NEW mismatches in files the branch never
-// touched — each in a package a sibling PR had just moved on `main` — while
-// HIDING the one real row the branch introduced (`errors.ts copy! deep_dup`),
-// which only surfaced in CI. Forced, the same tree reported exactly that row
-// and none of the nine. Rows off a partly-cached artifact are unfalsifiable, so
-// the gate pays the full extraction rather than print them; two of those
-// phantoms became filed-and-closed stories before the artifact was suspected.
 /**
  * The env the regeneration child runs with: the caller's, plus the force
  * marker. Separate from the spawn so the contract is testable without a real
@@ -67,6 +52,25 @@ export function regenEnv(
   return { ...env, API_COMPARE_FORCE: "1" };
 }
 
+/**
+ * Run `pnpm parity:api <extraArgs>` to rewrite the artifact the gates read.
+ *
+ * `extraArgs` is the compare scope. It defaults to the artifact's, the only one
+ * compare.ts writes: a plain `pnpm parity:api` computes no call sets at all, so
+ * passing [] would regenerate nothing the gate can read.
+ *
+ * The regeneration is FORCED (RFC 0106). A cached regeneration is a PARTIAL
+ * one: `extract-ts-api.ts` serves any package whose own fingerprint and
+ * recorded read-set still validate, so the artifact the gate then reads mixes
+ * freshly-extracted packages with entries an earlier tree produced. Measured on
+ * PR #6647: a plain gate reported nine NEW mismatches in files the branch never
+ * touched — each in a package a sibling PR had just moved on `main` — while
+ * HIDING the one real row the branch introduced (`errors.ts copy! deep_dup`),
+ * which only surfaced in CI. Forced, the same tree reported exactly that row
+ * and none of the nine. Rows off a partly-cached artifact are unfalsifiable, so
+ * the gate pays the full extraction rather than print them; two of those
+ * phantoms became filed-and-closed stories before the artifact was suspected.
+ */
 export function regenerateArtifact(
   env: Record<string, string | undefined>,
   extraArgs: string[] = ["--calls"],

@@ -1446,8 +1446,6 @@ export class Relation<T extends Base> {
    */
   structurallyCompatible(other: Relation<T>): boolean {
     if (this._model !== other._model) return false;
-    // Rails: `structurally_incompatible_values_for(other).empty?`
-    // (query_methods.rb:1121-1123).
     return isEmpty(this.structurallyIncompatibleValuesFor(other as never));
   }
 
@@ -2152,8 +2150,6 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#scope_for_create
    */
   scopeForCreate(): Record<string, unknown> {
-    // Rails: `create_with_value.each { |k, v| hash[k.to_s] = v } unless
-    // create_with_value.empty?` (relation.rb:1231-1235).
     const hash = this._scopeAttributes();
     if (!isEmpty(this.createWithValue)) {
       for (const [k, v] of Object.entries(this.createWithValue)) hash[k] = v;

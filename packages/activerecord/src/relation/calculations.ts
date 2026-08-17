@@ -1201,8 +1201,6 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
     ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
     ...Object.keys(model._attributeAliases ?? {}),
   ]);
-  // Rails: `(column_names.map(&:to_s) - model.attribute_names -
-  // model.attribute_aliases.keys).empty?` (calculations.rb:427).
   return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
 }
 

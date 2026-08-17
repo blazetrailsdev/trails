@@ -55,9 +55,6 @@ describe("regenerateArtifact", () => {
 
 describe("regenEnv", () => {
   it("forces the regeneration, so the artifact the gate reads is never a partial one", () => {
-    // A cached regeneration serves whichever packages still validate and
-    // re-extracts the rest, and the mixed artifact both invents rows and hides
-    // real ones (RFC 0106).
     expect(regenEnv({ PATH: "/usr/bin" })).toEqual({ PATH: "/usr/bin", API_COMPARE_FORCE: "1" });
   });
 
