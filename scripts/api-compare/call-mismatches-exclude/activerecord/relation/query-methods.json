@@ -2,6 +2,20 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
+    "rubyName": "arel",
+    "call": "build_arel",
+    "reason": "Surfaced by the relation.ts → relation/query-methods.ts split (RFC 0107): `arel` and `toArel` are now cross-file, so the call-set comparer can no longer see through the delegation to the `build_arel` call inside `toArel`. Folding the memo, connection acquisition and build_arel call back into `arel` itself is tracked by story converge-toarel-onto-with-connection-acquisition (RFC 0107)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "arel",
+    "call": "with_connection",
+    "reason": "Relation#arel's memo, connection acquisition and build_arel call all live in `toArel`, which this body delegates to verbatim; folding them back into `arel` is tracked by story converge-toarel-onto-with-connection-acquisition (RFC 0107). Row moved verbatim from relation.ts with the member (RFC 0107 fan-out)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
     "call": "include?",
     "reason": "Satisfied in `Relation#whereAssociated`, which is where Rails' `associations.each` body lives in this port: the already-joined guard (`query_methods.rb:91`) reads `joinsValues` / `leftOuterJoinsValues` and `includes` there, per-iteration, exactly as Rails does. Same split as the existing `joins!` / `not` entries for this method."

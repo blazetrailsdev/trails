@@ -37,10 +37,6 @@ import {
   WhereChain,
   QueryMethodBangs,
   argumentError,
-  assertModifiableBang as _assertModifiableBang,
-  checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
-  arelColumns as _arelColumns,
-  arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
   defineValueMethods,
   type UnscopeType,
@@ -1405,99 +1401,6 @@ export class Relation<T extends Base> {
   // merge and spawn are mixed in from spawn-methods.ts
 
   /**
-   * Add one or more INNER JOINs. Accepts:
-   * - An association name (resolved to a JOIN via reflection)
-   * - A raw SQL join string, e.g. `joins("INNER JOIN authors ON posts.author_id = authors.id")`
-   * - Arel `Nodes.Join` instances (e.g. from `SelectManager#joinSources`)
-   * - Any mix of the above as variadic args
-   *
-   * Mirrors: ActiveRecord::Relation#joins — Rails' `joins(*args)` is variadic
-   * and accepts strings, symbol association names, Arel join nodes, or a nested
-   * association hash like `joins({ post: "author" })` (mirrors Rails
-   * `joins(post: :author)`). For an explicit JOIN/ON pair, pass the full raw
-   * SQL fragment as a single string (Rails' verbatim-fragment path) rather than
-   * a `(table, on)` pair — trails collapses Ruby symbols to strings, so there is
-   * no type-based way to tell a `(table, on)` pair from `joins(:a, :b)`.
-   */
-  joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(specArray: JoinSpec[]): Relation<T>;
-  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
-  joins(...args: Array<JoinSpec>): Relation<T>;
-  joins(...args: Array<JoinSpec>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":joins", args as unknown[]);
-    // Rails `spawn.joins!(*args)` (query_methods.rb:868-871). `joins!` unions
-    // with `|=` — one array union over the whole set, deduplicating by
-    // eql?/hash (structural for Arel `Nodes.Binary`, plain strings, and Hash
-    // specs alike). A single unified store preserves insertion order across
-    // named and raw joins; the named-vs-raw partition the builders need is
-    // derived on read by `select_association_list`.
-    return QueryMethodBangs.joinsBang.call(
-      this.clone() as any,
-      ...(args as (string | Nodes.Join)[]),
-    ) as Relation<T>;
-  }
-
-  /**
-   * Add a LEFT OUTER JOIN. Variadic, mirroring Rails'
-   * `left_outer_joins(*args)` (query_methods.rb:883-887), whose `!` writer does
-   * `left_outer_joins_values |= args` (query_methods.rb:889-891). Accepts:
-   * - String association names: `leftJoins("posts")`,
-   *   `leftJoins("thinkingPosts", "welcomePosts")`
-   * - A hash spec for nested associations: `leftJoins({ posts: "comments" })`
-   * - Arrays of the above: `leftJoins(["posts", "comments"])`
-   *
-   * Args are stored in left_outer_joins_values and resolved via JoinDependency.
-   * Rails raises ArgumentError on a raw SQL string fragment ("only Hash, Symbol
-   * and Array are allowed"); a raw LEFT OUTER JOIN fragment goes through
-   * `joins("LEFT OUTER JOIN …")` instead.
-   *
-   * Mirrors: ActiveRecord::Relation#left_joins
-   */
-  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    return this._leftOuterJoins(":left_joins", args);
-  }
-
-  /**
-   * Alias for leftJoins.
-   *
-   * Mirrors: ActiveRecord::Relation#left_outer_joins (`left_joins` is Rails'
-   * alias of the same method).
-   */
-  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T> {
-    return this._leftOuterJoins(":left_outer_joins", args);
-  }
-
-  /**
-   * Shared body for `leftJoins` / `leftOuterJoins`, mirroring Rails'
-   * `left_outer_joins(*args)` (query_methods.rb:883-887) →
-   * `spawn.left_outer_joins!(*args)` (query_methods.rb:889-891). The `callee`
-   * name threads through to the
-   * ArgumentError so the message matches whichever alias was called
-   * (Rails' `__callee__`). Validation runs exactly once: re-delegating between
-   * the two public methods would re-run the no-argument guard after
-   * `checkIfMethodHasArgumentsBang` compacts a blank-only `args` (e.g.
-   * `leftOuterJoins({})`) down to `[]`, which Rails treats as a no-op, not a
-   * raise.
-   *
-   * @internal
-   */
-  private _leftOuterJoins(
-    callee: string,
-    args: Array<AssociationSpec | AssociationSpec[]>,
-  ): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(callee, args);
-    // Rails `spawn.left_outer_joins!(*args)` stores args verbatim
-    // (`left_outer_joins_values |= args`) and only raises for a
-    // non-Hash/Symbol/Array arg lazily at SQL-build time, in
-    // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
-    // `buildJoinBuckets` for the raise.
-    return QueryMethodBangs.leftOuterJoinsBang.call(
-      this.clone() as any,
-      ...(args as AssociationSpec[]),
-    ) as Relation<T>;
-  }
-
-  /**
    * Append a macro-time association `scope:` lambda to a JOIN's ON
    * predicates, mirroring JoinDependency's scope handling
    * (associations/join-dependency.ts:272-282) and Rails' `joins(:assoc)`,
@@ -1912,36 +1815,6 @@ export class Relation<T extends Base> {
         klass: targetModel,
       },
     ];
-  }
-
-  /**
-   * Specify associations to be eager loaded (preload strategy).
-   *
-   * Mirrors: ActiveRecord::Relation#includes
-   */
-  includes(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":includes", args);
-    return this.clone().includesBang(...args);
-  }
-
-  /**
-   * Specify associations to be preloaded with separate queries.
-   *
-   * Mirrors: ActiveRecord::Relation#preload
-   */
-  preload(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":preload", args);
-    return this.clone().preloadBang(...args);
-  }
-
-  /**
-   * Specify associations to be eager loaded.
-   *
-   * Mirrors: ActiveRecord::Relation#eager_load
-   */
-  eagerLoad(...args: AssociationSpec[]): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":eager_load", args);
-    return this.clone().eagerLoadBang(...args);
   }
 
   // -- Relation state --
@@ -3755,49 +3628,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Rails `Relation#assert_modifiable!`. Raises `UnmodifiableRelation`
-   * when the relation has already been loaded.
-   * @internal
-   */
-  assertModifiableBang(): void {
-    return _assertModifiableBang.call(this as any);
-  }
-
-  /**
-   * Rails `Relation#check_if_method_has_arguments!`. Delegates to the
-   * canonical implementation in `relation/query-methods.ts` so all call
-   * sites share one definition of "blank" / flatten semantics.
-   * @internal
-   */
-  checkIfMethodHasArgumentsBang(
-    methodName: string,
-    args: unknown[],
-    message?: string,
-    block?: (args: unknown[]) => void,
-  ): void {
-    return _checkIfMethodHasArgumentsBang.call(this as any, methodName, args, message, block);
-  }
-
-  /**
-   * Rails `Relation#arel_columns_from_hash`. Delegates to the canonical
-   * helper.
-   * @internal
-   */
-  arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[] {
-    return _arelColumnsFromHash.call(this as any, fields);
-  }
-
-  /**
-   * Rails `Relation#arel_columns`. Delegates to the canonical helper.
-   * Returns `unknown[]` because Rails' `else` branch passes non-Arel
-   * values through unchanged (numerics, raw SQL fragments, etc.).
-   * @internal
-   */
-  arelColumns(columns: ReadonlyArray<unknown>): unknown[] {
-    return _arelColumns.call(this as any, columns as unknown[]);
-  }
-
-  /**
    * Mirrors: ActiveRecord::Relation#preload_associations (relation.rb:1321)
    *
    * Rails derives the spec list itself (`preload_values`, plus `includes_values`
@@ -3841,67 +3671,7 @@ export class Relation<T extends Base> {
 
   // -- CTE support --
 
-  /**
-   * Add a Common Table Expression (WITH clause).
-   *
-   * Mirrors: ActiveRecord::Relation#with
-   */
-  with(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T> {
-    // Mirrors Rails `with` (query_methods.rb:493): `raise ArgumentError ... if
-    // block_given?`. A trailing function argument is the TS equivalent of a Ruby
-    // block — `with` takes CTE definition hashes, never a callback.
-    if (args.some((cte) => typeof cte === "function")) {
-      throw argumentError("ActiveRecord::Relation#with does not accept a block");
-    }
-    // Rails `with` follows the block guard with `check_if_method_has_arguments!`
-    // (query_methods.rb:494). The shared helper raises on empty varargs, then
-    // mirrors `args.flatten!` (arrays only — CTE definition hashes survive) and
-    // `compact_blank!` (a blank arg like `null`/`[]`/`{}` compacts away, so
-    // `with(null)` no-ops). It mutates `args` in place.
-    this.checkIfMethodHasArgumentsBang(":with", args);
-    return this.clone().withBang(...args);
-  }
-
-  /**
-   * Add a recursive Common Table Expression (WITH RECURSIVE clause).
-   *
-   * Mirrors: ActiveRecord::Relation#with_recursive
-   */
-  withRecursive(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T> {
-    // Rails `with_recursive` (query_methods.rb:518-521) calls only
-    // `check_if_method_has_arguments!(__callee__, args)` before `spawn.with_recursive!`
-    // — unlike `with`, it has no `block_given?` guard. The shared helper raises on
-    // empty varargs, then mirrors `args.flatten!` (arrays only) and `compact_blank!`
-    // (so `withRecursive(null)` no-ops). It mutates `args` in place.
-    this.checkIfMethodHasArgumentsBang(":with_recursive", args);
-    return this.clone().withRecursiveBang(...args);
-  }
-
   // -- Other query methods --
-
-  /**
-   * Add table references for eager loading.
-   *
-   * Mirrors: ActiveRecord::Relation#references
-   */
-  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T> {
-    this.checkIfMethodHasArgumentsBang(":references", tableNames);
-    return this.clone().referencesBang(...tableNames) as Relation<T>;
-  }
-
-  /**
-   * Extract an associated collection into a new relation.
-   *
-   * Mirrors: ActiveRecord::Relation#extract_associated
-   */
-  async extractAssociated(association: string): Promise<Base[]> {
-    const records = await this.preload(association);
-    return Promise.all(records.map((record) => (record as any)[association]()));
-  }
 
   /**
    * Alias for build.
@@ -4151,18 +3921,6 @@ export class Relation<T extends Base> {
   // -- Other --
 
   /**
-   * Return the Arel SelectManager. `aliases` threads an existing AliasTracker
-   * so a join scope built via `arel` re-aliases tables already claimed by the
-   * caller (Rails `def arel(aliases = nil); build_arel(c, aliases); end`,
-   * query_methods.rb:1594).
-   *
-   * Mirrors: ActiveRecord::Relation#arel (alias for toArel)
-   */
-  arel(aliases?: AliasTracker): SelectManager {
-    return this.toArel(aliases);
-  }
-
-  /**
    * Compares two relations for equality.
    *
    * Mirrors: ActiveRecord::Relation#== (relation.rb:1253-1262) — a
@@ -4286,12 +4044,25 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Return self — a no-op on a Relation.
+   * The single none-short-circuit chokepoint consulted by every query terminal
+   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and by the mutation
+   * terminals (`updateAll`/`deleteAll`) BEFORE returning an empty result.
+   * `touchAll`/`updateCounters` reach it by delegating to `updateAll`, as they
+   * do in Rails.
    *
-   * Mirrors: ActiveRecord::Relation#all
+   * On a plain relation this is just `_isNone`; the override in
+   * `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
+   * live association scope, so a relation SPAWNED off a new owner
+   * (`owner.things.where(...)`) resolves the persisted FK once the owner is
+   * saved — mirroring Rails' CollectionProxy delegating every query to
+   * `association.scope`, rather than each terminal carrying its own rebase hook.
+   * `CollectionProxy` needs no rebase at all: it is never `@none` itself, and
+   * its value readers are delegated to `scope` (collection_proxy.rb:1128-1137).
+   *
+   * @internal
    */
-  all(): Relation<T> {
-    return this;
+  _isEmptyRelation(): boolean {
+    return this._isNone;
   }
 
   // ---------------------------------------------------------------------------
@@ -5138,6 +4909,41 @@ export interface Relation<T extends Base>
   extending(): Relation<T>;
   optimizerHints(...args: string[]): Relation<T>;
   annotate(...args: string[]): Relation<T>;
+  // QueryMethods' joins / eager-load / CTE members and the shared Arel helpers
+  // (query-methods.ts), whose mixin signatures return `any` — declared here with
+  // the relation's own element type, in query_methods.rb source order.
+  includes(...args: AssociationSpec[]): Relation<T>;
+  all(): Relation<T>;
+  eagerLoad(...args: AssociationSpec[]): Relation<T>;
+  preload(...args: AssociationSpec[]): Relation<T>;
+  extractAssociated(association: string): Promise<Base[]>;
+  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T>;
+  with(
+    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+  ): Relation<T>;
+  withRecursive(
+    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
+  ): Relation<T>;
+  joins(...nodes: Nodes.Join[]): Relation<T>;
+  joins(specArray: JoinSpec[]): Relation<T>;
+  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
+  joins(...args: Array<JoinSpec>): Relation<T>;
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
+  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
+  arel(aliases?: AliasTracker): SelectManager;
+  /** @internal */
+  assertModifiableBang(): void;
+  /** @internal */
+  checkIfMethodHasArgumentsBang(
+    methodName: string,
+    args: unknown[],
+    message?: string,
+    block?: (args: unknown[]) => void,
+  ): void;
+  /** @internal */
+  arelColumns(columns: ReadonlyArray<unknown>): unknown[];
+  /** @internal */
+  arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
   mergeBang(other: any): Relation<T>;
