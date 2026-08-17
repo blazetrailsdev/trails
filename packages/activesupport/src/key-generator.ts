@@ -63,7 +63,7 @@ export class KeyGenerator {
 
   /** :nodoc: */
   inspect(): string {
-    return `#<KeyGenerator:0x${objectId(this).toString(16).padStart(16, "0")}>`;
+    return `#<${this.constructor.name}:0x${((objectId(this) << 1) >>> 0).toString(16).padStart(14, "0")}>`;
   }
 }
 
