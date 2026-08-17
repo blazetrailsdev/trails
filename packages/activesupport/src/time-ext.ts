@@ -375,8 +375,11 @@ export function allDay(date: Date): { start: Temporal.Instant; end: Temporal.Ins
   return { start: beginningOfDay(date), end: endOfDay(date) };
 }
 
-export function allWeek(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
-  return { start: beginningOfWeek(date), end: endOfWeek(date) };
+export function allWeek(
+  date: Date,
+  startDay = 1,
+): { start: Temporal.Instant; end: Temporal.Instant } {
+  return { start: beginningOfWeek(date, startDay), end: endOfWeek(date, startDay) };
 }
 
 export function allMonth(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {

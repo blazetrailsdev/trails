@@ -22,6 +22,13 @@ describe("TestDateNew", () => {
     d.day,
   ];
 
+  /**
+   * Ruby `DateTime#offset`, as the offset the `Temporal` carries: a
+   * `PlainDateTime` carries none, which is the `0` Ruby reads there.
+   */
+  const offset = (d: Temporal.PlainDateTime | Temporal.ZonedDateTime): string | number =>
+    d instanceof Temporal.ZonedDateTime ? d.offset : 0;
+
   /** Ruby subtracts two `Time`s to a number of seconds; this is that number. */
   const epochSeconds = (t: Time): number => t.toTime().epochMilliseconds / 1000;
 
@@ -40,10 +47,11 @@ describe("TestDateNew", () => {
     const d3 = Date.jd(0);
     expect(ymd(d3)).toEqual([-4712, 1, 1]);
     const d4 = DateTime.jd(0, 0, 0, 0, 0) as Temporal.PlainDateTime;
-    expect([...ymd(d4), d4.hour, d4.minute, d4.second]).toEqual([-4712, 1, 1, 0, 0, 0]);
-    expect(d4).toBeInstanceOf(Temporal.PlainDateTime);
+    expect([...ymd(d4), d4.hour, d4.minute, d4.second, offset(d4)]).toEqual([
+      -4712, 1, 1, 0, 0, 0, 0,
+    ]);
     const d5 = DateTime.jd(0, 0, 0, 0, "+0900") as Temporal.ZonedDateTime;
-    expect([...ymd(d5), d5.hour, d5.minute, d5.second, d5.offset]).toEqual([
+    expect([...ymd(d5), d5.hour, d5.minute, d5.second, offset(d5)]).toEqual([
       -4712,
       1,
       1,
@@ -129,10 +137,11 @@ describe("TestDateNew", () => {
     expect(ymd(d4)).toEqual([-4712, 1, 1]);
 
     const d5 = DateTime.ordinal(-4712, 1, 0, 0, 0, 0) as Temporal.PlainDateTime;
-    expect([...ymd(d5), d5.hour, d5.minute, d5.second]).toEqual([-4712, 1, 1, 0, 0, 0]);
-    expect(d5).toBeInstanceOf(Temporal.PlainDateTime);
+    expect([...ymd(d5), d5.hour, d5.minute, d5.second, offset(d5)]).toEqual([
+      -4712, 1, 1, 0, 0, 0, 0,
+    ]);
     const d6 = DateTime.ordinal(-4712, 1, 0, 0, 0, "+0900") as Temporal.ZonedDateTime;
-    expect([...ymd(d6), d6.hour, d6.minute, d6.second, d6.offset]).toEqual([
+    expect([...ymd(d6), d6.hour, d6.minute, d6.second, offset(d6)]).toEqual([
       -4712,
       1,
       1,
@@ -175,10 +184,11 @@ describe("TestDateNew", () => {
     expect(ymd(d4)).toEqual([-4712, 1, 1]);
 
     const d5 = DateTime.civil(-4712, 1, 1, 0, 0, 0, 0) as Temporal.PlainDateTime;
-    expect([...ymd(d5), d5.hour, d5.minute, d5.second]).toEqual([-4712, 1, 1, 0, 0, 0]);
-    expect(d5).toBeInstanceOf(Temporal.PlainDateTime);
+    expect([...ymd(d5), d5.hour, d5.minute, d5.second, offset(d5)]).toEqual([
+      -4712, 1, 1, 0, 0, 0, 0,
+    ]);
     const d6 = DateTime.civil(-4712, 1, 1, 0, 0, 0, "+0900") as Temporal.ZonedDateTime;
-    expect([...ymd(d6), d6.hour, d6.minute, d6.second, d6.offset]).toEqual([
+    expect([...ymd(d6), d6.hour, d6.minute, d6.second, offset(d6)]).toEqual([
       -4712,
       1,
       1,
@@ -269,10 +279,11 @@ describe("TestDateNew", () => {
     expect(ymd(d3)).toEqual([1582, 10, 15]);
 
     const d4 = DateTime.commercial(1582, 40, 5, 0, 0, 0, 0) as Temporal.PlainDateTime;
-    expect([...ymd(d4), d4.hour, d4.minute, d4.second]).toEqual([1582, 10, 15, 0, 0, 0]);
-    expect(d4).toBeInstanceOf(Temporal.PlainDateTime);
+    expect([...ymd(d4), d4.hour, d4.minute, d4.second, offset(d4)]).toEqual([
+      1582, 10, 15, 0, 0, 0, 0,
+    ]);
     const d5 = DateTime.commercial(1582, 40, 5, 0, 0, 0, "+0900") as Temporal.ZonedDateTime;
-    expect([...ymd(d5), d5.hour, d5.minute, d5.second, d5.offset]).toEqual([
+    expect([...ymd(d5), d5.hour, d5.minute, d5.second, offset(d5)]).toEqual([
       1582,
       10,
       15,
@@ -333,29 +344,33 @@ describe("TestDateNew", () => {
   });
 
   it("today", () => {
-    const z = Time.now();
     const d = Date.today();
     const t = Time.now();
     const t2 = Time.utc(t.year, t.mon, t.day);
     const t3 = Time.utc(d.year, d.month, d.day);
-    expect(Math.abs(epochSeconds(t2) - epochSeconds(t3))).toBeLessThanOrEqual(
-      epochSeconds(t) - epochSeconds(z) + 2,
-    );
+    // Ruby's delta is `t - z + 2` seconds; vitest spells a tolerance as a
+    // number of digits, and `-1` is the nearest one (5s) that still covers it.
+    expect(epochSeconds(t2)).toBeCloseTo(epochSeconds(t3), -1);
 
-    // @ts-expect-error `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985)
+    // `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985). TS
+    // undefines it at the type level — the `@ts-expect-error` is that check —
+    // while at runtime the static is only ever inherited from `Date`, never
+    // `DateTime`'s own.
+    // @ts-expect-error see above
     void DateTime.today;
+    expect(Object.hasOwn(DateTime, "today")).toEqual(false);
   });
 
   it("now", () => {
-    // @ts-expect-error `now` is a `DateTime` singleton method alone (date_core.c:9987)
+    // `now` is a `DateTime` singleton method alone (date_core.c:9987).
+    // @ts-expect-error see above
     void Date.now;
+    expect(Object.hasOwn(Date, "now")).toEqual(false);
 
-    const z = Time.now();
     const d = DateTime.now() as Temporal.ZonedDateTime;
     const t = Time.now();
     const t2 = Time.mktime(d.year, d.month, d.day, d.hour, d.minute, d.second);
-    expect(Math.abs(epochSeconds(t) - epochSeconds(t2))).toBeLessThanOrEqual(
-      epochSeconds(t) - epochSeconds(z) + 2,
-    );
+    // See `today` above for why the Ruby delta becomes a digit count here.
+    expect(epochSeconds(t)).toBeCloseTo(epochSeconds(t2), -1);
   });
 });

@@ -273,6 +273,11 @@ describe("TestDateArith", () => {
     p.step(q, o as never, (d) => {
       a.push(d);
     });
-    expect(a).toEqual([]);
+    assertEmpty(a);
   });
 });
+
+/** minitest `assert_empty`, which vitest has no matcher for. */
+function assertEmpty(collection: { length: number }): void {
+  expect(collection.length).toBe(0);
+}

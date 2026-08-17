@@ -18,12 +18,13 @@ import {
   toFs,
   xmlschema,
   toDate,
-  isPast,
-  isFuture,
   isToday,
 } from "../time-ext.js";
 import { toFormattedS as dateToFormattedS, toFs as dateToFs, toTime } from "./date/conversions.js";
 import * as DateExt from "./date/calculations.js";
+import { isFuture, isPast } from "./date-and-time/calculations.js";
+import { isBlank } from "./object/blank.js";
+import { assertNothingRaised, assertNotPredicate, assertPredicate } from "../testing/assertions.js";
 import { setZone } from "../time-zone-config.js";
 import { TimeZone } from "../values/time-zone.js";
 
@@ -39,27 +40,45 @@ function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
 }
 
+function instant(date: Date): Temporal.Instant {
+  return Temporal.Instant.fromEpochMilliseconds(date.getTime());
+}
+
+/** Ruby `Time#to_i`, the seconds an `assert_equal Time.local(...)` compares. */
+function seconds(date: Date): number {
+  return Math.floor(date.getTime() / 1000);
+}
+
+/** The calendar days a Rails `Date` range's two ends name. */
+function range(r: { start: Temporal.Instant; end: Temporal.Instant }): Temporal.PlainDate[] {
+  return [toDate(asDate(r.start)), toDate(asDate(r.end))];
+}
+
 describe("DateExtBehaviorTest", () => {
   it("date acts like date", () => {
-    const date = new Date();
-    expect(date instanceof Date).toBe(true);
+    // Rails sends `acts_like_date?`, the duck-type marker `Date` defines; the
+    // port has no such marker, so the predicate is the class check it stands for.
+    assertPredicate(new Date(), (date) => date instanceof Date);
   });
 
   it("blank?", () => {
-    const date = new Date();
-    expect(date instanceof Date).toBe(true);
+    assertNotPredicate(new Date(), isBlank);
   });
 
-  it("freeze doesnt clobber memoized instance methods", () => {
-    const date = new Date();
-    Object.freeze(date);
-    expect(typeof date.toISOString()).toBe("string");
+  it("freeze doesnt clobber memoized instance methods", async () => {
+    await assertNothingRaised(() => {
+      const date = new Date();
+      Object.freeze(date);
+      return date.toISOString();
+    });
   });
 
-  it("can freeze twice", () => {
-    const date = new Date();
-    Object.freeze(date);
-    expect(() => Object.freeze(date)).not.toThrow();
+  it("can freeze twice", async () => {
+    await assertNothingRaised(() => {
+      const date = new Date();
+      Object.freeze(date);
+      Object.freeze(date);
+    });
   });
 });
 
@@ -113,9 +132,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("compare to time", () => {
-    const ref = d(2023, 6, 15, 12, 0, 0);
-    const before = prevDay(ref);
-    expect(before.epochMilliseconds).toBeLessThan(ref.getTime());
+    expect(Temporal.PlainDate.compare(DateExt.yesterday(), toDate(new Date())) < 0).toBeTruthy();
   });
 
   it("to datetime", () => {
@@ -127,11 +144,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to date", () => {
-    const date = d(2005, 2, 21, 10, 30);
-    const result = toDate(date);
-    expect(result.year).toBe(2005);
-    expect(result.month).toBe(2);
-    expect(result.day).toBe(21);
+    expect(toDate(d(2005, 2, 21, 10, 30))).toEqual(pd(2005, 2, 21));
   });
 
   it("change", () => {
@@ -143,10 +156,10 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("sunday", () => {
-    const result = asDate(endOfWeek(d(2008, 2, 29)));
-    expect(result.getDay()).toBe(0); // Sunday
-    expect(result.getMonth()).toBe(2); // March
-    expect(result.getDate()).toBe(2);
+    // Rails `Date#sunday` is `end_of_week(:monday)`, which the port spells with
+    // the week-start day number rather than its Symbol.
+    expect(toDate(asDate(endOfWeek(d(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
+    expect(toDate(asDate(endOfWeek(d(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
   });
 
   it("last year in calendar reform", () => {
@@ -163,14 +176,25 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance in calendar reform", () => {
-    expect(asDate(advance(d(1582, 10, 4), { days: 1 })).getDate()).toBe(5);
-    expect(asDate(advance(d(1582, 10, 15), { days: -1 })).getDate()).toBe(14);
+    // The port's calendar is proleptic Gregorian throughout — it has no Julian
+    // reform seam — so the day either side of 1582-10-15 is its neighbour, not
+    // the reform's, and the expected dates below are that calendar's.
+    expect(toDate(asDate(advance(d(1582, 10, 4), { days: 1 })))).toEqual(pd(1582, 10, 5));
+    expect(toDate(asDate(advance(d(1582, 10, 15), { days: -1 })))).toEqual(pd(1582, 10, 14));
+    for (let day = 5; day <= 14; day++) {
+      expect(toDate(asDate(advance(d(1582, 9, day), { months: 1 })))).toEqual(pd(1582, 10, day));
+      expect(toDate(asDate(advance(d(1582, 11, day), { months: -1 })))).toEqual(pd(1582, 10, day));
+      expect(toDate(asDate(advance(d(1581, 10, day), { years: 1 })))).toEqual(pd(1582, 10, day));
+      expect(toDate(asDate(advance(d(1583, 10, day), { years: -1 })))).toEqual(pd(1582, 10, day));
+    }
   });
 
   it("last week", () => {
-    const result = asDate(lastWeek(d(2005, 5, 17), "monday"));
-    expect(result.getDate()).toBe(9);
-    expect(result.getMonth()).toBe(4); // May
+    expect(toDate(asDate(lastWeek(d(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
+    expect(toDate(asDate(lastWeek(d(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
+    expect(toDate(asDate(lastWeek(d(2010, 2, 19), "friday")))).toEqual(pd(2010, 2, 12));
+    expect(toDate(asDate(lastWeek(d(2010, 2, 19), "saturday")))).toEqual(pd(2010, 2, 13));
+    expect(toDate(asDate(lastWeek(d(2010, 3, 4), "saturday")))).toEqual(pd(2010, 2, 27));
   });
 
   it("last quarter on 31st", () => {
@@ -181,10 +205,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("yesterday constructor", () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const today = new Date();
-    expect(yesterday.getDate()).not.toBe(today.getDate());
+    expect(DateExt.yesterday()).toEqual(DateExt.current().subtract({ days: 1 }));
   });
 
   it("yesterday constructor when zone is not set", () => {
@@ -210,9 +231,7 @@ describe("DateExtCalculationsTest", () => {
   it.skip("tomorrow constructor when zone is set");
 
   it("since", () => {
-    const result = DateExt.since(pd(2005, 2, 21), 45);
-    expect(result.sec).toBe(45);
-    expect(result.day).toBe(21);
+    expect(DateExt.since(pd(2005, 2, 21), 45).toI()).toEqual(seconds(d(2005, 2, 21, 0, 0, 45)));
   });
 
   it("since when zone is set", () => {
@@ -229,11 +248,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("ago", () => {
-    const result = DateExt.ago(pd(2005, 2, 21), 45);
-    expect(result.day).toBe(20);
-    expect(result.hour).toBe(23);
-    expect(result.min).toBe(59);
-    expect(result.sec).toBe(15);
+    expect(DateExt.ago(pd(2005, 2, 21), 45).toI()).toEqual(seconds(d(2005, 2, 20, 23, 59, 15)));
   });
 
   it("ago when zone is set", () => {
@@ -250,9 +265,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("middle of day", () => {
-    const result = DateExt.middleOfDay(pd(2005, 2, 21));
-    expect(result.hour).toBe(12);
-    expect(result.min).toBe(0);
+    expect(DateExt.middleOfDay(pd(2005, 2, 21)).toI()).toEqual(seconds(d(2005, 2, 21, 12, 0, 0)));
   });
 
   it("beginning of day when zone is set", () => {
@@ -272,53 +285,43 @@ describe("DateExtCalculationsTest", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     setZone(zone);
     try {
-      const endOfDayInZone = DateExt.endOfDay(pd(2005, 2, 21));
-      expect(endOfDayInZone.hour).toBe(23);
-      expect(endOfDayInZone.min).toBe(59);
-      expect(endOfDayInZone.sec).toBe(59);
-      expect(endOfDayInZone.timeZone).toBe(zone);
+      expect(DateExt.endOfDay(pd(2005, 2, 21)).toI()).toEqual(
+        zone.local(2005, 2, 21, 23, 59, 59).toI(),
+      );
+      expect(DateExt.endOfDay(pd(2005, 2, 21)).timeZone).toBe(zone);
     } finally {
       setZone(null);
     }
   });
 
   it("all day", () => {
-    const { start, end } = allDay(d(2011, 6, 7));
-    expect(asDate(start).getHours()).toBe(0);
-    expect(asDate(end).getHours()).toBe(23);
-    expect(asDate(end).getMinutes()).toBe(59);
+    // Rails' range end carries `Rational(999999999, 1000)` of a second; the
+    // port's `Temporal.Instant` seat holds milliseconds, so it ends at `.999`.
+    const beginningOfDay = d(2011, 6, 7, 0, 0, 0);
+    const endOfDay = d(2011, 6, 7, 23, 59, 59, 999);
+    expect(allDay(d(2011, 6, 7))).toEqual({
+      start: instant(beginningOfDay),
+      end: instant(endOfDay),
+    });
   });
 
   it.skip("all day when zone is set");
 
   it("all week", () => {
-    const { start, end } = allWeek(d(2011, 6, 7));
-    expect(asDate(start).getDay()).toBe(1); // Monday
-    expect(asDate(start).getDate()).toBe(6);
-    expect(asDate(end).getDay()).toBe(0); // Sunday
-    expect(asDate(end).getDate()).toBe(12);
+    expect(range(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
+    expect(range(allWeek(d(2011, 6, 7), 0))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
   });
 
   it("all month", () => {
-    const { start, end } = allMonth(d(2011, 6, 7));
-    expect(asDate(start).getDate()).toBe(1);
-    expect(asDate(start).getMonth()).toBe(5); // June
-    expect(asDate(end).getDate()).toBe(30);
+    expect(range(allMonth(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
   });
 
   it("all quarter", () => {
-    const { start, end } = allQuarter(d(2011, 6, 7));
-    expect(asDate(start).getMonth()).toBe(3); // April
-    expect(asDate(end).getMonth()).toBe(5); // June
-    expect(asDate(end).getDate()).toBe(30);
+    expect(range(allQuarter(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
   });
 
   it("all year", () => {
-    const { start, end } = allYear(d(2011, 6, 7));
-    expect(asDate(start).getMonth()).toBe(0); // January
-    expect(asDate(start).getDate()).toBe(1);
-    expect(asDate(end).getMonth()).toBe(11); // December
-    expect(asDate(end).getDate()).toBe(31);
+    expect(range(allYear(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
   });
 
   it("xmlschema", () => {
@@ -329,14 +332,19 @@ describe("DateExtCalculationsTest", () => {
 
   it.skip("xmlschema when zone is set");
 
+  // Rails stubs `Date.current` to 2000-01-01 and reads the day before, the day
+  // itself and the day after. The port has no stub seam on `current`, so the
+  // three days are taken relative to the real one instead.
   it("past", () => {
-    expect(isPast(d(1999, 12, 31))).toBe(true);
-    expect(isPast(d(2099, 1, 1))).toBe(false);
+    expect(isPast(DateExt.current().subtract({ days: 1 }))).toBe(true);
+    expect(isPast(DateExt.current())).toBe(false);
+    expect(isPast(DateExt.current().add({ days: 1 }))).toBe(false);
   });
 
   it("future", () => {
-    expect(isFuture(d(2099, 1, 1))).toBe(true);
-    expect(isFuture(d(1999, 12, 31))).toBe(false);
+    expect(isFuture(DateExt.current().subtract({ days: 1 }))).toBe(false);
+    expect(isFuture(DateExt.current())).toBe(false);
+    expect(isFuture(DateExt.current().add({ days: 1 }))).toBe(true);
   });
 
   it("current returns date today when zone not set", () => {
@@ -353,15 +361,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("end of year", () => {
-    const result = asDate(endOfYear(d(2005, 6, 15)));
-    expect(result.getMonth()).toBe(11); // December
-    expect(result.getDate()).toBe(31);
+    expect(toDate(asDate(endOfYear(d(2008, 2, 22)))).toString()).toEqual(
+      pd(2008, 12, 31).toString(),
+    );
   });
 
   it("end of month", () => {
-    const result = asDate(endOfMonth(d(2005, 2, 5)));
-    expect(result.getDate()).toBe(28);
-    expect(result.getMonth()).toBe(1);
+    expect(toDate(asDate(endOfMonth(d(2005, 3, 20))))).toEqual(pd(2005, 3, 31));
+    expect(toDate(asDate(endOfMonth(d(2005, 2, 20))))).toEqual(pd(2005, 2, 28));
+    expect(toDate(asDate(endOfMonth(d(2005, 4, 20))))).toEqual(pd(2005, 4, 30));
   });
 
   it("last year in leap years", () => {
@@ -371,20 +379,29 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance", () => {
-    expect(asDate(advance(d(2005, 1, 31), { months: 1 }))).toEqual(d(2005, 2, 28));
+    expect(toDate(asDate(advance(d(2005, 2, 28), { years: 1 })))).toEqual(pd(2006, 2, 28));
+    expect(toDate(asDate(advance(d(2005, 2, 28), { months: 4 })))).toEqual(pd(2005, 6, 28));
+    expect(toDate(asDate(advance(d(2005, 2, 28), { weeks: 3 })))).toEqual(pd(2005, 3, 21));
+    expect(toDate(asDate(advance(d(2005, 2, 28), { days: 5 })))).toEqual(pd(2005, 3, 5));
+    expect(toDate(asDate(advance(d(2005, 2, 28), { years: 7, months: 7 })))).toEqual(
+      pd(2012, 9, 28),
+    );
+    expect(toDate(asDate(advance(d(2005, 2, 28), { years: 7, months: 19, days: 5 })))).toEqual(
+      pd(2013, 10, 3),
+    );
+    expect(
+      toDate(asDate(advance(d(2005, 2, 28), { years: 7, months: 19, weeks: 2, days: 5 }))),
+    ).toEqual(pd(2013, 10, 17));
+    expect(toDate(asDate(advance(d(2004, 2, 29), { years: 1 })))).toEqual(pd(2005, 2, 28));
   });
 
   it("beginning of day", () => {
-    const result = DateExt.beginningOfDay(pd(2005, 2, 21));
-    expect(result.hour).toBe(0);
-    expect(result.min).toBe(0);
-    expect(result.sec).toBe(0);
+    expect(DateExt.beginningOfDay(pd(2005, 2, 21)).toI()).toEqual(seconds(d(2005, 2, 21, 0, 0, 0)));
   });
 
   it("end of day", () => {
-    const result = DateExt.endOfDay(pd(2005, 2, 21));
-    expect(result.hour).toBe(23);
-    expect(result.min).toBe(59);
-    expect(result.sec).toBe(59);
+    // Rails' expected `Time` carries `Rational(999999999, 1000)` of a second;
+    // `TimeWithZone#toI` truncates to the second either way.
+    expect(DateExt.endOfDay(pd(2005, 2, 21)).toI()).toEqual(seconds(d(2005, 2, 21, 23, 59, 59)));
   });
 });

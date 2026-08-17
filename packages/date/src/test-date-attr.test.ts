@@ -120,7 +120,7 @@ describe("TestDateAttr", () => {
             ] as const
           )[i % 7]
         ],
-      ).toBe(true);
+      ).toBeTruthy();
     }
   });
 
