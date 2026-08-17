@@ -38,7 +38,7 @@ describe("BatchEnumerator (trails)", () => {
     await expect(
       Post.inBatches({ of: 1, order: "invalid" as "asc" }).eachRecord(() => {}),
     ).rejects.toThrow(
-      ':order must be :asc or :desc or an array consisting of :asc or :desc, got "invalid"',
+      ":order must be :asc or :desc or an array consisting of :asc or :desc, got :invalid",
     );
   });
 
@@ -48,7 +48,7 @@ describe("BatchEnumerator (trails)", () => {
         () => {},
       ),
     ).rejects.toThrow(
-      ':order must be :asc or :desc or an array consisting of :asc or :desc, got ["asc", "sideways"]',
+      ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
     );
   });
 });
