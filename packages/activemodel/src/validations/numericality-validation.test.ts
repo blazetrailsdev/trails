@@ -1,818 +1,552 @@
-import { describe, it, expect, vi } from "vitest";
-import { Model, Errors } from "../index.js";
-import { prepareValueForValidation } from "./numericality.js";
+import { describe, it, expect, afterEach } from "vitest";
+import {
+  assertPredicate,
+  assertNotPredicate,
+  BigDecimal,
+  NumberHelper,
+  Range,
+} from "@blazetrails/activesupport";
+import { Model } from "../index.js";
+import { ArgumentError } from "../attribute-assignment.js";
+
+// Mirrors: activemodel/test/models/topic.rb — the subset this file exercises.
+// Rails' Topic declares `attr_accessor :approved` with no type, which is the
+// untyped ValueType here (type/registry.ts:47). `price` is an `attr_writer`
+// plus a `number_to_currency` reader, NOT an attribute, so it is a plain field
+// whose raw value is reached through Rails' `attribute_before_type_cast`
+// override (topic.rb:56-58) — `readAttributeBeforeTypeCast` in trails.
+class Topic extends Model {
+  static {
+    this.attribute("title", "string");
+    this.attribute("content", "string");
+    this.attribute("approved", "value");
+  }
+
+  // Rails' `@price` ivar. Declared without an initializer because
+  // `_assignAttributes` runs inside Model's constructor, before a subclass
+  // field initializer would have run — an initialized `#price` is unwritable
+  // at that point.
+  declare _price: unknown;
+
+  set price(value: unknown) {
+    this._price = value;
+  }
+
+  get price(): string | null {
+    return NumberHelper.numberToCurrency(this._price as number);
+  }
+
+  get rawPrice(): unknown {
+    return this._price;
+  }
+
+  conditionIsFalse(): boolean {
+    return false;
+  }
+
+  override readAttributeBeforeTypeCast(attrName: string): unknown {
+    if (attrName === "price") return this._price;
+    return super.readAttributeBeforeTypeCast(attrName);
+  }
+}
+
+// Mirrors: activemodel/test/models/person.rb — `attr_accessor :karma`.
+class Person extends Model {
+  static {
+    this.attribute("karma", "value");
+  }
+}
+
+/**
+ * Mirrors `test_validates_numericality_with_object_acting_as_numeric`'s
+ * anonymous `Class.new { def to_f; 123.54; end }` — `Kernel.Float` honors
+ * `to_f` on a non-Numeric object, so numericality accepts it.
+ */
+class ActingAsNumeric {
+  toF(): number {
+    return 123.54;
+  }
+}
 
 describe("NumericalityValidationTest", () => {
-  it("validates numericality with greater than or equal using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { greaterThanOrEqualTo: 18 } });
-      }
-    }
-    expect(await new Person({ age: 18 }).isValid()).toBe(true);
-    expect(await new Person({ age: 17 }).isValid()).toBe(false);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
-  it("validates numericality with equal to using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("count", "integer");
-        this.validates("count", { numericality: { equalTo: 5 } });
-      }
-    }
-    expect(await new Person({ count: 5 }).isValid()).toBe(true);
-    expect(await new Person({ count: 6 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with less than or equal using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { lessThanOrEqualTo: 100 } });
-      }
-    }
-    expect(await new Person({ age: 100 }).isValid()).toBe(true);
-    expect(await new Person({ age: 101 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with lambda", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { numericality: { greaterThan: (_r: any) => 0 } });
-      }
-    }
-    expect(await new Person({ score: 1 }).isValid()).toBe(true);
-    expect(await new Person({ score: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with numeric message", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "string");
-        this.validates("age", { numericality: { message: "must be a number" } });
-      }
-    }
-    const p = new Person({ age: "abc" });
-    await p.isValid();
-    expect(p.errors.get("age")).toContain("must be a number");
-  });
-
-  it("validates numericality with exponent number", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: true });
-      }
-    }
-    const p = new Person({ score: 1e2 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality with less than using differing numeric types", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { lessThan: 100 } });
-      }
-    }
-    const p = new Person({ age: 50 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality with less than or equal to using differing numeric types", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { lessThanOrEqualTo: 100 } });
-      }
-    }
-    const p = new Person({ age: 100 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality of for ruby class", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: true });
-      }
-    }
-    const p = new Person({ age: 25 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality using value before type cast if possible", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: true });
-      }
-    }
-    const p = new Person({ age: "25" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality with object acting as numeric", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: true });
-      }
-    }
-    const p = new Person({ score: 3.14 });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates numericality with invalid args", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "string");
-        this.validates("age", { numericality: true });
-      }
-    }
-    const p = new Person({ age: "abc" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates numericality equality for float and big decimal", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: { equalTo: 1.5 } });
-      }
-    }
-    const p = new Person({ score: 1.5 });
-    expect(await p.isValid()).toBe(true);
-  });
+  const NIL = [null];
+  const BLANK = ["", " ", " \t \r \n"];
+  const BIGDECIMAL_STRINGS = ["12345678901234567890.1234567890"]; // 30 significant digits
+  const FLOAT_STRINGS = [
+    "0.0",
+    "+0.0",
+    "-0.0",
+    "10.0",
+    "10.5",
+    "-10.5",
+    "-0.0001",
+    "-090.1",
+    "90.1e1",
+    "-90.1e5",
+    "-90.1e-5",
+    "90e-5",
+  ];
+  const INTEGER_STRINGS = ["0", "+0", "-0", "10", "+10", "-10", "0090", "-090"];
+  // Rails' list is [0.0, 10.0, 10.5, -10.5, -0.0001]. JS has one numeric type,
+  // so `0.0 === 0` and `10.0 === 10` — a "Float that happens to be integral" is
+  // not expressible, and those two entries would be NUMERIC_INTEGERS members
+  // rather than the integer-only-rejecting Floats Rails means them to be. The
+  // distinction is still covered by FLOAT_STRINGS' "0.0" / "10.0".
+  const NUMERIC_FLOATS = [10.5, -10.5, -0.0001];
+  const NUMERIC_INTEGERS = [0, 10, -10];
+  const FLOATS = [...NUMERIC_FLOATS, ...FLOAT_STRINGS];
+  const INTEGERS = [...NUMERIC_INTEGERS, ...INTEGER_STRINGS];
+  const BIGDECIMAL = BIGDECIMAL_STRINGS.map((bd) => new BigDecimal(bd));
+  const JUNK = [
+    "not a number",
+    "42 not a number",
+    "0xdeadbeef",
+    "-0xdeadbeef",
+    "+0xdeadbeef",
+    "0xinvalidhex",
+    "0Xdeadbeef",
+    "00-1",
+    "--3",
+    "+-3",
+    "+3-1",
+    "-+019.0",
+    "12.12.13.12",
+    "123\nnot a number",
+  ];
+  const INFINITY = [1.0 / 0.0];
 
   it("default validates numericality of", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: true });
-      }
-    }
-    expect(await new Person({ value: "42" }).isValid()).toBe(true);
-    expect(await new Person({ value: "3.14" }).isValid()).toBe(true);
-    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved");
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK]);
+    await assertValidValues([...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with nil allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { allowNil: true } });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-  });
+    Topic.validatesNumericalityOf("approved", { allowNil: true });
 
-  it("validates numericality of with integer only", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { onlyInteger: true } });
-      }
-    }
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    const f = new Person({ value: "5.5" });
-    expect(await f.isValid()).toBe(false);
-    expect(f.errors.get("value")).toContain("must be an integer");
-  });
-
-  it("validates numericality with greater than", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { greaterThan: 0 } });
-      }
-    }
-    expect(await new Person({ value: 1 }).isValid()).toBe(true);
-    expect(await new Person({ value: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with greater than or equal", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { greaterThanOrEqualTo: 18 } });
-      }
-    }
-    expect(await new Person({ value: 18 }).isValid()).toBe(true);
-    expect(await new Person({ value: 17 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with equal to", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { equalTo: 42 } });
-      }
-    }
-    expect(await new Person({ value: 42 }).isValid()).toBe(true);
-    expect(await new Person({ value: 43 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with less than", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { lessThan: 10 } });
-      }
-    }
-    expect(await new Person({ value: 9 }).isValid()).toBe(true);
-    expect(await new Person({ value: 10 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with less than or equal to", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { lessThanOrEqualTo: 5 } });
-      }
-    }
-    expect(await new Person({ value: 5 }).isValid()).toBe(true);
-    expect(await new Person({ value: 6 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with odd", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { odd: true } });
-      }
-    }
-    expect(await new Person({ value: 3 }).isValid()).toBe(true);
-    expect(await new Person({ value: 4 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with even", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { even: true } });
-      }
-    }
-    expect(await new Person({ value: 4 }).isValid()).toBe(true);
-    expect(await new Person({ value: 3 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with other than", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { otherThan: 0 } });
-      }
-    }
-    expect(await new Person({ value: 1 }).isValid()).toBe(true);
-    expect(await new Person({ value: 0 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with greater than less than and even", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { greaterThan: 0, lessThan: 10, even: true } });
-      }
-    }
-    expect(await new Person({ value: 4 }).isValid()).toBe(true);
-    expect(await new Person({ value: 3 }).isValid()).toBe(false); // odd
-    expect(await new Person({ value: 0 }).isValid()).toBe(false); // not > 0
-    expect(await new Person({ value: 10 }).isValid()).toBe(false); // not < 10
-  });
-
-  it("validates numericality with in", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { in: [1, 10] } });
-      }
-    }
-    expect(await new Person({ value: 5 }).isValid()).toBe(true);
-    expect(await new Person({ value: 0 }).isValid()).toBe(false);
-    expect(await new Person({ value: 11 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with proc", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { greaterThan: (_r: any) => 0 } });
-      }
-    }
-    const p = new Person({ age: 1 });
-    expect(await p.isValid()).toBe(true);
-    const p2 = new Person({ age: 0 });
-    expect(await p2.isValid()).toBe(false);
-  });
-
-  it("validates numericality with symbol", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.attribute("min_age", "integer");
-        this.validates("age", { numericality: { greaterThan: "getMinAge" } });
-      }
-      getMinAge() {
-        return 18;
-      }
-    }
-    const p = new Person({ age: 25, min_age: 18 });
-    expect(await p.isValid()).toBe(true);
-    const p2 = new Person({ age: 10, min_age: 18 });
-    expect(await p2.isValid()).toBe(false);
+    await assertInvalidValues([...JUNK, ...BLANK]);
+    await assertValidValues([...NIL, ...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with blank allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { allowBlank: true } });
-      }
-    }
-    expect(await new Person({ value: "" }).isValid()).toBe(true);
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { allowBlank: true });
+
+    await assertInvalidValues(JUNK);
+    await assertValidValues([...NIL, ...BLANK, ...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
+  });
+
+  it("validates numericality of with integer only", async () => {
+    Topic.validatesNumericalityOf("approved", { onlyInteger: true });
+
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK, ...FLOATS, ...BIGDECIMAL, ...INFINITY]);
+    await assertValidValues(INTEGERS);
   });
 
   it("validates numericality of with integer only and nil allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { onlyInteger: true, allowNil: true } });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    expect(await new Person({ value: "5.5" }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { onlyInteger: true, allowNil: true });
+
+    await assertInvalidValues([...JUNK, ...BLANK, ...FLOATS, ...BIGDECIMAL, ...INFINITY]);
+    await assertValidValues([...NIL, ...INTEGERS]);
   });
 
   it("validates numericality of with integer only and symbol as value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.attribute("limit", "integer");
-        this.validates("value", { numericality: { greaterThan: "getLimit" } });
-      }
-      getLimit() {
-        return 10;
-      }
-    }
-    expect(await new Person({ value: 15 }).isValid()).toBe(true);
-    expect(await new Person({ value: 5 }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { onlyInteger: ":conditionIsFalse" });
+
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK]);
+    await assertValidValues([...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with integer only and proc as value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { greaterThan: (_r: any) => 10 } });
-      }
-    }
-    expect(await new Person({ value: 15 }).isValid()).toBe(true);
-    expect(await new Person({ value: 5 }).isValid()).toBe(false);
+    defineIsAllowOnlyIntegers();
+    Topic.validatesNumericalityOf("approved", {
+      onlyInteger: (topic: Topic) => (topic as unknown as AllowOnlyIntegers).isAllowOnlyIntegers(),
+    });
+
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK]);
+    await assertValidValues([...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with integer only and lambda as value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "integer");
-        this.validates("value", { numericality: { lessThanOrEqualTo: () => 100 } });
-      }
-    }
-    expect(await new Person({ value: 100 }).isValid()).toBe(true);
-    expect(await new Person({ value: 101 }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { onlyInteger: () => false });
+
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK]);
+    await assertValidValues([...FLOATS, ...INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with numeric only", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: true });
-      }
-    }
-    expect(await new Person({ value: "123" }).isValid()).toBe(true);
-    expect(await new Person({ value: "123.45" }).isValid()).toBe(true);
-    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { onlyNumeric: true });
+
+    await assertInvalidValues([...NIL, ...BLANK, ...JUNK, ...FLOAT_STRINGS, ...INTEGER_STRINGS]);
+    await assertValidValues([...NUMERIC_FLOATS, ...NUMERIC_INTEGERS, ...BIGDECIMAL, ...INFINITY]);
   });
 
   it("validates numericality of with numeric only and nil allowed", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { allowNil: true } });
-      }
-    }
-    expect(await new Person({}).isValid()).toBe(true);
-    expect(await new Person({ value: "42" }).isValid()).toBe(true);
+    Topic.validatesNumericalityOf("approved", { onlyNumeric: true, allowNil: true });
+
+    await assertInvalidValues([...JUNK, ...BLANK, ...FLOAT_STRINGS, ...INTEGER_STRINGS]);
+    await assertValidValues([
+      ...NIL,
+      ...NUMERIC_FLOATS,
+      ...NUMERIC_INTEGERS,
+      ...BIGDECIMAL,
+      ...INFINITY,
+    ]);
+  });
+
+  it("validates numericality with greater than", async () => {
+    Topic.validatesNumericalityOf("approved", { greaterThan: 10 });
+
+    await assertInvalidValues([-10, 10], "must be greater than 10");
+    await assertValidValues([11]);
   });
 
   it("validates numericality with greater than using differing numeric types", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "float");
-        this.validates("value", { numericality: { greaterThan: 5 } });
-      }
-    }
-    expect(await new Person({ value: 5.5 }).isValid()).toBe(true);
-    expect(await new Person({ value: 4.9 }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { greaterThan: new BigDecimal("97.18") });
+
+    await assertInvalidValues(
+      [-97.18, new BigDecimal("97.18"), new BigDecimal("-97.18")],
+      "must be greater than 97.18",
+    );
+    await assertValidValues([97.19, 98, new BigDecimal("98"), new BigDecimal("97.19")]);
   });
 
   it("validates numericality with greater than using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { greaterThan: 0 } });
-      }
-    }
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    expect(await new Person({ value: "0" }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { greaterThan: 10 });
+
+    await assertInvalidValues(["-10", "9", "9.9", "10"], "must be greater than 10");
+    await assertValidValues(["10.1", "11"]);
+  });
+
+  it("validates numericality with greater than or equal", async () => {
+    Topic.validatesNumericalityOf("approved", { greaterThanOrEqualTo: 10 });
+
+    await assertInvalidValues([-9, 9], "must be greater than or equal to 10");
+    await assertValidValues([10]);
   });
 
   it("validates numericality with greater than or equal using differing numeric types", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "float");
-        this.validates("value", { numericality: { greaterThanOrEqualTo: 5 } });
-      }
-    }
-    expect(await new Person({ value: 5.0 }).isValid()).toBe(true);
-    expect(await new Person({ value: 4.9 }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", {
+      greaterThanOrEqualTo: new BigDecimal("97.18"),
+    });
+
+    await assertInvalidValues(
+      [-97.18, 97.17, 97, new BigDecimal("97.17"), new BigDecimal("-97.18")],
+      "must be greater than or equal to 97.18",
+    );
+    await assertValidValues([97.18, 98, new BigDecimal("97.19")]);
   });
 
-  it("validates numericality with equal to using differing numeric types", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "float");
-        this.validates("value", { numericality: { equalTo: 5 } });
-      }
-    }
-    expect(await new Person({ value: 5.0 }).isValid()).toBe(true);
-    expect(await new Person({ value: 5.1 }).isValid()).toBe(false);
-  });
+  it("validates numericality with greater than or equal using string value", async () => {
+    Topic.validatesNumericalityOf("approved", { greaterThanOrEqualTo: 10 });
 
-  it("validates numericality with less than using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { lessThan: 10 } });
-      }
-    }
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    expect(await new Person({ value: "10" }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with other than using string value", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("value", "string");
-        this.validates("value", { numericality: { otherThan: 0 } });
-      }
-    }
-    expect(await new Person({ value: "5" }).isValid()).toBe(true);
-    expect(await new Person({ value: "0" }).isValid()).toBe(false);
-  });
-});
-describe("numericality comparison operators", () => {
-  it("validates numericality with greater than or equal", async () => {
-    class GTE extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { greaterThanOrEqualTo: 18 } });
-      }
-    }
-    expect(await new GTE({ age: 18 }).isValid()).toBe(true);
-    expect(await new GTE({ age: 17 }).isValid()).toBe(false);
-  });
-
-  it("validates numericality with less than or equal to", async () => {
-    class LTE extends Model {
-      static {
-        this.attribute("rating", "integer");
-        this.validates("rating", { numericality: { lessThanOrEqualTo: 5 } });
-      }
-    }
-    expect(await new LTE({ rating: 5 }).isValid()).toBe(true);
-    expect(await new LTE({ rating: 6 }).isValid()).toBe(false);
+    await assertInvalidValues(["-10", "9", "9.9"], "must be greater than or equal to 10");
+    await assertValidValues(["10", "10.1", "11"]);
   });
 
   it("validates numericality with equal to", async () => {
-    class EQ extends Model {
-      static {
-        this.attribute("answer", "integer");
-        this.validates("answer", { numericality: { equalTo: 42 } });
-      }
-    }
-    expect(await new EQ({ answer: 42 }).isValid()).toBe(true);
-    expect(await new EQ({ answer: 41 }).isValid()).toBe(false);
+    Topic.validatesNumericalityOf("approved", { equalTo: 10 });
+
+    await assertInvalidValues([-10, 11, ...INFINITY], "must be equal to 10");
+    await assertValidValues([10]);
+  });
+
+  it("validates numericality with equal to using differing numeric types", async () => {
+    Topic.validatesNumericalityOf("approved", { equalTo: new BigDecimal("97.18") });
+
+    await assertInvalidValues([-97.18], "must be equal to 97.18");
+    await assertValidValues([new BigDecimal("97.18")]);
+  });
+
+  it("validates numericality with equal to using string value", async () => {
+    Topic.validatesNumericalityOf("approved", { equalTo: 10 });
+
+    await assertInvalidValues(["-10", "9", "9.9", "10.1", "11"], "must be equal to 10");
+    await assertValidValues(["10"]);
+  });
+
+  it("validates numericality with less than", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThan: 10 });
+
+    await assertInvalidValues([10], "must be less than 10");
+    await assertValidValues([-9, 9]);
+  });
+
+  it("validates numericality with less than using differing numeric types", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThan: new BigDecimal("97.18") });
+
+    await assertInvalidValues([97.18, new BigDecimal("97.18")], "must be less than 97.18");
+    await assertValidValues([-97.0, 97.0, -97, 97, new BigDecimal("-97"), new BigDecimal("97")]);
+  });
+
+  it("validates numericality with less than using string value", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThan: 10 });
+
+    await assertInvalidValues(["10", "10.1", "11"], "must be less than 10");
+    await assertValidValues(["-10", "9", "9.9"]);
+  });
+
+  it("validates numericality with less than or equal to", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: 10 });
+
+    await assertInvalidValues([11], "must be less than or equal to 10");
+    await assertValidValues([-10, 10]);
+  });
+
+  it("validates numericality with less than or equal to using differing numeric types", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: new BigDecimal("97.18") });
+
+    await assertInvalidValues([97.19, 98], "must be less than or equal to 97.18");
+    await assertValidValues([-97.18, new BigDecimal("-97.18"), new BigDecimal("97.18")]);
+  });
+
+  it("validates numericality with less than or equal using string value", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: 10 });
+
+    await assertInvalidValues(["10.1", "11"], "must be less than or equal to 10");
+    await assertValidValues(["-10", "9", "9.9", "10"]);
+  });
+
+  it("validates numericality with odd", async () => {
+    Topic.validatesNumericalityOf("approved", { odd: true });
+
+    await assertInvalidValues([-2, 2], "must be odd");
+    await assertValidValues([-1, 1]);
+  });
+
+  it("validates numericality with even", async () => {
+    Topic.validatesNumericalityOf("approved", { even: true });
+
+    await assertInvalidValues([-1, 1], "must be even");
+    await assertValidValues([-2, 2]);
+  });
+
+  it("validates numericality with greater than less than and even", async () => {
+    Topic.validatesNumericalityOf("approved", { greaterThan: 1, lessThan: 4, even: true });
+
+    await assertInvalidValues([1, 3, 4]);
+    await assertValidValues([2]);
   });
 
   it("validates numericality with other than", async () => {
-    class OT extends Model {
-      static {
-        this.attribute("count", "integer");
-        this.validates("count", { numericality: { otherThan: 0 } });
-      }
-    }
-    expect(await new OT({ count: 1 }).isValid()).toBe(true);
-    expect(await new OT({ count: 0 }).isValid()).toBe(false);
-  });
-});
-describe("numericality with in: range", () => {
-  it("validates value is within range", async () => {
-    class User extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: { in: [18, 65] } });
-      }
-    }
+    Topic.validatesNumericalityOf("approved", { otherThan: 0 });
 
-    const u1 = new User({ age: 25 });
-    expect(await u1.isValid()).toBe(true);
-
-    const u2 = new User({ age: 10 });
-    expect(await u2.isValid()).toBe(false);
-    expect(u2.errors.fullMessages.length).toBeGreaterThan(0);
-
-    const u3 = new User({ age: 70 });
-    expect(await u3.isValid()).toBe(false);
+    await assertInvalidValues([0, 0.0]);
+    await assertValidValues([-1, 42]);
   });
 
-  it("accepts boundary values", async () => {
-    class User extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { numericality: { in: [0, 100] } });
-      }
-    }
+  it("validates numericality with in", async () => {
+    Topic.validatesNumericalityOf("approved", { in: new Range(1, 3) });
 
-    const u1 = new User({ score: 0 });
-    expect(await u1.isValid()).toBe(true);
-
-    const u2 = new User({ score: 100 });
-    expect(await u2.isValid()).toBe(true);
+    await assertInvalidValues([0, 4]);
+    await assertValidValues([1, 2, 3]);
   });
 
-  it("rejects blank and whitespace-only strings", async () => {
-    // Rails Kernel.Float raises ArgumentError on "" / whitespace, so
-    // is_number? returns false. JS Number("") would coerce to 0 and
-    // pass — explicit guard required.
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { numericality: true });
-      }
-    }
-    expect(await new User({ name: "" }).isValid()).toBe(false);
-    expect(await new User({ name: "   " }).isValid()).toBe(false);
+  it("validates numericality with other than using string value", async () => {
+    Topic.validatesNumericalityOf("approved", { otherThan: 0 });
+
+    await assertInvalidValues(["0", "0.0"]);
+    await assertValidValues(["-1", "1.1", "42"]);
   });
 
-  it("rejects JS binary and octal literal strings", async () => {
-    // Rails Kernel.Float rejects 0b… / 0o… (it only accepts decimal +
-    // optional exponent). JS Number("0b10") === 2 / Number("0o10") === 8
-    // would silently pass without an explicit guard.
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { numericality: true });
-      }
+  it("validates numericality with proc", async () => {
+    defineMinApproved();
+    Topic.validatesNumericalityOf("approved", {
+      greaterThanOrEqualTo: (topic: Topic) => (topic as unknown as MinApproved).minApproved(),
+    });
+
+    try {
+      await assertInvalidValues([3, 4], "must be greater than or equal to 5");
+      await assertValidValues([5, 6]);
+    } finally {
+      removeMinApproved();
     }
-    expect(await new User({ name: "0b10" }).isValid()).toBe(false);
-    expect(await new User({ name: "0o10" }).isValid()).toBe(false);
-    expect(await new User({ name: "  0b10" }).isValid()).toBe(false);
-    expect(await new User({ name: "+0o10" }).isValid()).toBe(false);
   });
 
-  it("rejects binary/octal compare-option values", async () => {
-    class User extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { numericality: { greaterThan: "0b10" } });
-      }
+  it("validates numericality with lambda", async () => {
+    Topic.validatesNumericalityOf("approved", { greaterThanOrEqualTo: () => 5 });
+
+    await assertInvalidValues([3, 4], "must be greater than or equal to 5");
+    await assertValidValues([5, 6]);
+  });
+
+  it("validates numericality with symbol", async () => {
+    defineMaxApproved();
+    Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: ":maxApproved" });
+
+    try {
+      await assertInvalidValues([6], "must be less than or equal to 5");
+      await assertValidValues([4, 5]);
+    } finally {
+      removeMaxApproved();
     }
-    await expect(new User({ score: 20 }).isValid()).rejects.toThrow(
-      /Resolved numericality option must be numeric/,
+  });
+
+  it("validates numericality with numeric message", async () => {
+    Topic.validatesNumericalityOf("approved", { lessThan: 4, message: "smaller than %{count}" });
+    let topic = new Topic({ title: "numeric test", approved: 10 });
+
+    assertNotPredicate(await topic.isValid(), (valid) => valid);
+    expect(topic.errors.get("approved")).toEqual(["smaller than 4"]);
+
+    Topic.validatesNumericalityOf("approved", { greaterThan: 4, message: "greater than %{count}" });
+    topic = new Topic({ title: "numeric test", approved: 1 });
+
+    assertNotPredicate(await topic.isValid(), (valid) => valid);
+    expect(topic.errors.get("approved")).toEqual(["greater than 4"]);
+  });
+
+  it("validates numericality of for ruby class", async () => {
+    Person.validatesNumericalityOf("karma", { allowNil: false });
+
+    try {
+      const p = new Person();
+      p.karma = "Pix";
+      assertPredicate(await p.isInvalid(), (invalid) => invalid);
+
+      expect(p.errors.get("karma")).toEqual(["is not a number"]);
+
+      p.karma = "1234";
+      assertPredicate(await p.isValid(), (valid) => valid);
+    } finally {
+      Person.clearValidatorsBang();
+    }
+  });
+
+  it("validates numericality using value before type cast if possible", async () => {
+    Topic.validatesNumericalityOf("price");
+
+    const topic = new Topic({ price: 50 });
+
+    expect(topic.price).toEqual("$50.00");
+    expect(topic.readAttributeBeforeTypeCast("price")).toEqual(50);
+    assertPredicate(await topic.isValid(), (valid) => valid);
+  });
+
+  // PERMANENT-SKIP: the assertion needs exact integer arithmetic past 2^53.
+  // Ruby's `"10000000000000001".to_i` is an arbitrary-precision Integer that
+  // compares greater than 10_000_000_000_000_000; every JS number is a double,
+  // so both sides round to the same 1e16 and the value is (correctly, for a
+  // double) less-than-or-equal. Only a BigInt-typed parse pipeline through
+  // Comparability could express this, which no other option needs.
+  it.skip("validates numericality with exponent number", async () => {
+    const base = 10_000_000_000_000_000;
+    Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: base });
+    const topic = new Topic();
+    topic.approved = String(base + 1);
+
+    assertPredicate(await topic.isInvalid(), (invalid) => invalid);
+  });
+
+  it("validates numericality with object acting as numeric", async () => {
+    Topic.validatesNumericalityOf("price");
+    const topic = new Topic({ price: new ActingAsNumeric() });
+
+    assertPredicate(await topic.isValid(), (valid) => valid);
+  });
+
+  it("validates numericality with invalid args", () => {
+    expect(() =>
+      Topic.validatesNumericalityOf("approved", { greaterThanOrEqualTo: "foo" }),
+    ).toThrow(ArgumentError);
+    expect(() => Topic.validatesNumericalityOf("approved", { lessThanOrEqualTo: "foo" })).toThrow(
+      ArgumentError,
     );
+    expect(() => Topic.validatesNumericalityOf("approved", { greaterThan: "foo" })).toThrow(
+      ArgumentError,
+    );
+    expect(() => Topic.validatesNumericalityOf("approved", { lessThan: "foo" })).toThrow(
+      ArgumentError,
+    );
+    expect(() => Topic.validatesNumericalityOf("approved", { equalTo: "foo" })).toThrow(
+      ArgumentError,
+    );
+    expect(() => Topic.validatesNumericalityOf("approved", { in: "foo" })).toThrow(ArgumentError);
   });
 
-  it("rejects hexadecimal literal strings (with or without leading whitespace)", async () => {
-    // Rails parse_as_number's elsif chain skips Kernel.Float when
-    // is_hexadecimal_literal?, so "0x10" is not-a-number even though
-    // JS Number("0x10") === 16.
-    class User extends Model {
-      static {
-        this.attribute("name", "string");
-        this.validates("name", { numericality: true });
-      }
+  it("validates numericality equality for float and big decimal", async () => {
+    Topic.validatesNumericalityOf("approved", { equalTo: new BigDecimal("65.6") });
+
+    await assertInvalidValues([Number("65.5"), new BigDecimal("65.7")], "must be equal to 65.6");
+    await assertValidValues([Number("65.6"), new BigDecimal("65.6")]);
+  });
+
+  // -- private --
+
+  async function assertInvalidValues(values: unknown[], error?: string): Promise<void> {
+    await withEachTopicApprovedValue(values, async (topic, value) => {
+      assertPredicate(
+        await topic.isInvalid(),
+        (invalid) => invalid,
+        `${value} not rejected as a number`,
+      );
+      assertPredicate(
+        topic.errors.get("approved"),
+        (errors) => errors.length > 0,
+        `FAILED for ${value}`,
+      );
+      if (error) expect(topic.errors.get("approved")[0]).toEqual(error);
+    });
+  }
+
+  async function assertValidValues(values: unknown[]): Promise<void> {
+    await withEachTopicApprovedValue(values, async (topic, value) => {
+      assertPredicate(
+        await topic.isValid(),
+        (valid) => valid,
+        `${value} not accepted as a number with validation error: ${topic.errors.get("approved")[0]}`,
+      );
+    });
+  }
+
+  async function withEachTopicApprovedValue(
+    values: unknown[],
+    block: (topic: Topic, value: unknown) => Promise<void>,
+  ): Promise<void> {
+    const topic = new Topic({ title: "numeric test", content: "whatever" });
+    for (const value of values) {
+      topic.approved = value;
+      await block(topic, value);
     }
-    expect(await new User({ name: "0x10" }).isValid()).toBe(false);
-    expect(await new User({ name: "  0x10" }).isValid()).toBe(false);
-    expect(await new User({ name: "+0x10" }).isValid()).toBe(false);
-  });
-
-  it("skips hexadecimal compare-option values (Rails option_as_number returns nil)", async () => {
-    // Rails parse_as_number's elsif chain falls through for hex literals
-    // (skips Kernel.Float when is_hexadecimal_literal? matches), so
-    // option_as_number returns nil and the comparison is silently
-    // skipped — neither raises nor coerces "0x10" to 16.
-    class User extends Model {
-      static {
-        this.attribute("score", "integer");
-        this.validates("score", { numericality: { greaterThan: "0x10" } });
-      }
-    }
-    expect(await new User({ score: 20 }).isValid()).toBe(true);
-    expect(await new User({ score: 5 }).isValid()).toBe(true);
-  });
-
-  it("rejects non-string/non-number values (boolean, Temporal.Instant, plain object)", async () => {
-    // Rails Kernel.Float raises TypeError for non-Numeric/non-String
-    // input, so is_number? returns false. In JS, Number(true) === 1
-    // and Number(<object with valueOf>) can coerce silently — the
-    // explicit string|number narrowing in isNumber prevents that.
-    // (Trails casts datetime attributes to Temporal.Instant, not JS
-    // Date, so the datetime case below exercises the
-    // non-string/non-number path for Temporal types specifically.)
-    class User extends Model {
-      static {
-        this.attribute("flag", "boolean");
-        this.attribute("when", "datetime");
-        this.validates("flag", { numericality: true });
-        this.validates("when", { numericality: true });
-      }
-    }
-    expect(await new User({ flag: true }).isValid()).toBe(false);
-    expect(await new User({ flag: false }).isValid()).toBe(false);
-    expect(await new User({ when: "2026-04-29T00:00:00Z" }).isValid()).toBe(false);
-  });
-
-  it("rejects plain object values via NumericalityValidator.validateEach directly", async () => {
-    // Direct exercise of the non-string/non-number narrowing in isNumber.
-    // Going through Model attributes wouldn't work — string-typed attrs
-    // cast objects to "[object Object]" before validation, value-typed
-    // attrs go through their own cast path. Bypass attribute infra and
-    // call the validator with a stub record so a real plain object
-    // reaches isNumber.
-    const { NumericalityValidator } = await import("./numericality.js");
-    const v = new NumericalityValidator({ attributes: ["x"] });
-    const errs = new Errors(null);
-    const stubRecord = { errors: errs };
-    v.validateEach(stubRecord, "x", { not: "a number" });
-    expect(errs.get("x")).toHaveLength(1);
-    expect(errs.where("x", ":not_a_number")).toHaveLength(1);
-  });
-
-  it("validates against the raw before-type-cast value (prepareValueForValidation)", async () => {
-    // Rails numericality validates what the user typed, not the cast
-    // value. In trails, IntegerType.cast returns null for non-numeric
-    // strings — so without prepareValueForValidation, 'abc' would read
-    // as null and slip past via the allowNil short-circuit. The raw
-    // read through readAttributeBeforeTypeCast surfaces the original
-    // 'abc' so it's caught as not_a_number.
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: true });
-      }
-    }
-    // "abc" can't cast through IntegerType (trails returns null), but
-    // the validator should see the raw "abc" via
-    // readAttributeBeforeTypeCast and reject it as not_a_number — NOT
-    // accidentally pass via the null-then-allow_nil branch.
-    const p = new Person({ age: "abc" });
-    expect(p.readAttributeBeforeTypeCast("age")).toBe("abc");
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("is not a number");
-  });
-
-  // Removed: two trails-only tests that pinned the now-deleted `validate`
-  // override's deviation (typed integer "abc" + allowNil asserted invalid).
-  // Rails skips that case (cast-based allow_nil), so the tests no longer
-  // describe real behaviour; the converged behaviour is covered by the AR
-  // "allow nil works for casted value" port and the "numericality: true"
-  // raw-read test above. Renaming them in place would violate the
-  // never-reword-test-names rule, so they are dropped rather than relabelled.
-
-  it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", async () => {
-    // Rails: allow_only_integer?(record) returns
-    // resolve_value(record, options[:only_integer]). A method name
-    // like 'strictMode' resolves to record.strictMode().
-    class Person extends Model {
-      static {
-        this.attribute("score", "string");
-        this.validates("score", { numericality: { onlyInteger: "strictMode" } });
-      }
-      strictMode(): boolean {
-        return true;
-      }
-    }
-    expect(await new Person({ score: "5" }).isValid()).toBe(true);
-    const f = new Person({ score: "5.5" });
-    expect(await f.isValid()).toBe(false);
-    expect(f.errors.get("score")).toContain("must be an integer");
-  });
-
-  it("odd/even truncates float via Math.trunc before checking parity (2.5 → 2, even)", async () => {
-    // Rails: value.to_i.even? — truncates toward zero, so 2.5.to_i == 2
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: { even: true } });
-      }
-    }
-    expect(await new Person({ score: 2.5 }).isValid()).toBe(true); // trunc(2.5)=2, even
-    expect(await new Person({ score: 3.5 }).isValid()).toBe(false); // trunc(3.5)=3, odd
-  });
-
-  it("odd/even truncates negative float via Math.trunc (-2.5 → -2, even)", async () => {
-    // Ruby: -2.5.to_i == -2 (toward zero), not -3 (Math.floor would give wrong answer)
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: { odd: true } });
-      }
-    }
-    expect(await new Person({ score: -3.5 }).isValid()).toBe(true); // trunc(-3.5)=-3, odd
-    expect(await new Person({ score: -2.5 }).isValid()).toBe(false); // trunc(-2.5)=-2, even
-  });
-
-  it("odd/even truncation: 2.9 is even (truncates to 2, not rounds to 3)", async () => {
-    class Person extends Model {
-      static {
-        this.attribute("score", "float");
-        this.validates("score", { numericality: { even: true } });
-      }
-    }
-    expect(await new Person({ score: 2.9 }).isValid()).toBe(true); // trunc(2.9)=2, even
-    expect(await new Person({ score: 3.9 }).isValid()).toBe(false); // trunc(3.9)=3, odd
-  });
-
-  it("cameFromUser absent (AM Model) → falls back to readAttributeBeforeTypeCast, catches raw string", async () => {
-    // AM's Model has no cameFromUser — prepareValueForValidation degrades to
-    // the readAttributeBeforeTypeCast path and still catches bad raw input.
-    class Person extends Model {
-      static {
-        this.attribute("age", "integer");
-        this.validates("age", { numericality: true });
-      }
-    }
-    const p = new Person({ age: "abc" });
-    // AM Model does not expose cameFromUser
-    expect(typeof (p as any).cameFromUser).toBe("undefined");
-    // Validator sees "abc" (raw via readAttributeBeforeTypeCast), reports not_a_number
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.get("age")).toContain("is not a number");
-  });
-
-  it("cameFromUser false → validates cast value (readAttribute)", () => {
-    // Mock: cameFromUser returns false, but cast value (readAttribute) is
-    // a valid number — validation should pass.
-    class MockRecord {
-      errors = { add: vi.fn() };
-      cameFromUser(_name: string) {
-        return false;
-      }
-      readAttribute(_name: string) {
-        return 42;
-      }
-      readAttributeBeforeTypeCast(_name: string) {
-        return "not-a-number-string";
-      }
-    }
-    const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "initial", rec as any, "score");
-    // Should return the cast value (42), not the raw string
-    expect(result).toBe(42);
-  });
-
-  it("cameFromUser absent → falls back to readAttributeBeforeTypeCast", () => {
-    // Non-AR hosts that don't implement cameFromUser degrade gracefully.
-    class MockRecord {
-      errors = { add: vi.fn() };
-      readAttributeBeforeTypeCast(_name: string) {
-        return "raw-value";
-      }
-    }
-    const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "fallback", rec as any, "score");
-    expect(result).toBe("raw-value");
-  });
-
-  it("cameFromUser false + no readAttributeBeforeTypeCast → readAttribute fallback", () => {
-    class MockRecord {
-      errors = { add: vi.fn() };
-      cameFromUser(_name: string) {
-        return false;
-      }
-      readAttribute(_name: string) {
-        return 99;
-      }
-    }
-    const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "initial", rec as any, "score");
-    expect(result).toBe(99);
-  });
+  }
 });
+
+interface AllowOnlyIntegers {
+  isAllowOnlyIntegers(): boolean;
+}
+
+interface MinApproved {
+  minApproved(): number;
+}
+
+interface MaxApproved {
+  maxApproved(): number;
+}
+
+/** Rails' `Topic.define_method(:allow_only_integers?) { false }`. */
+function defineIsAllowOnlyIntegers(): void {
+  (Topic.prototype as unknown as AllowOnlyIntegers).isAllowOnlyIntegers = () => false;
+}
+
+/** Rails' `Topic.define_method(:min_approved) { 5 }`. */
+function defineMinApproved(): void {
+  (Topic.prototype as unknown as MinApproved).minApproved = () => 5;
+}
+
+/** Rails' `ensure Topic.remove_method :min_approved`. */
+function removeMinApproved(): void {
+  delete (Topic.prototype as unknown as Partial<MinApproved>).minApproved;
+}
+
+/** Rails' `Topic.define_method(:max_approved) { 5 }`. */
+function defineMaxApproved(): void {
+  (Topic.prototype as unknown as MaxApproved).maxApproved = () => 5;
+}
+
+/** Rails' `ensure Topic.remove_method :max_approved`. */
+function removeMaxApproved(): void {
+  delete (Topic.prototype as unknown as Partial<MaxApproved>).maxApproved;
+}
