@@ -28,9 +28,9 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("delete — removes key", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.delete("a")).toBe(true);
+    expect(h.delete("a")).toBe(1);
     expect(h.hasKey("a")).toBe(false);
-    expect(h.delete("a")).toBe(false);
+    expect(h.delete("a")).toBeUndefined();
   });
 
   it("size — reports entry count", () => {
@@ -547,10 +547,13 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent deleting", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.delete("a")).toBe(true);
-    expect(h.hasKey("a")).toBe(false);
-    expect(h.delete("a")).toBe(false);
+    const getHash = () => new HashWithIndifferentAccess({ a: "foo" });
+    let hash = getHash();
+    expect(hash.delete("a")).toBe("foo");
+    expect(hash.delete("a")).toBeUndefined();
+    hash = getHash();
+    expect(hash.delete("a")).toBe("foo");
+    expect(hash.delete("a")).toBeUndefined();
   });
 
   it("indifferent select", () => {
