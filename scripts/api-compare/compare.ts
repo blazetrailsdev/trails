@@ -936,12 +936,34 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
   return `${tsFile}\u0000${tsClass}\u0000${tsName}`;
 }
 
-/** The TS class that owns `tsName` in the file a pair matched, given every
- *  class in that file declaring the name and the Ruby entity the pair came
- *  from. One declaration needs no disambiguation; several are resolved by the
- *  Ruby class's own short name (`ActiveRecord::ConnectionAdapters::NullPool` →
- *  `NullPool`), which the naming rules make the TS class name too. Unresolved
- *  (`undefined`) keeps the whole-file behaviour it replaced. */
+/**
+ * The TS class that owns `tsName` in the file a pair matched, given every
+ * class in that file declaring the name and the Ruby entity the pair came
+ * from. One declaration needs no disambiguation; several are resolved in three
+ * steps, each of which must name exactly ONE owner or fall through — an
+ * unresolved (`undefined`) result records nothing rather than pairing wrongly
+ * (see ambiguousTsOwner):
+ *
+ *  1. the Ruby class's own short name
+ *     (`ActiveRecord::ConnectionAdapters::NullPool` → `NullPool`), which the
+ *     naming rules make the TS class name too;
+ *  2. the include graph: Ruby flattens a mixin's methods onto the INCLUDING
+ *     class, so the Ruby module never names the TS owner — `FinderMethods#first`
+ *     lands in relation.ts, whose `Relation` records `extends: ["FinderMethods"]`
+ *     and whose sibling `ExplainProxy` does not (`hosts`, see includeGraphHosts);
+ *  3. the SEAT (`OwnerSeat`), for the file that ports both halves of one name:
+ *     persistence.ts spells `Persistence::ClassMethods#_update_record`
+ *     (persistence.rb:687-692) as the free export and the instance half
+ *     (`:900-916`) as `InstanceMethods`, so the class seat is the one owner
+ *     that is not the instance seat.
+ *
+ * Step 3 runs only where the RUBY file poses a seat question — the same name on
+ * both the singleton and the instance half. Where every Ruby owner sits on one
+ * seat the several TS declarations are not the two halves of anything, and
+ * picking one by seat is the mispairing this resolution exists to avoid:
+ * time-ext.ts's single `toTime` body answers `Time#to_time`, `Date#to_time` and
+ * `DateTime#to_time` alike (RFC 0108).
+ */
 export function resolveTsOwner(
   owners: ReadonlySet<string> | undefined,
   rubyModule: string,
@@ -951,28 +973,13 @@ export function resolveTsOwner(
   if (owners.size === 1) return [...owners][0];
   const short = rubyModule.split("::").at(-1) ?? rubyModule;
   if (owners.has(short)) return short;
-  // Ruby flattens a mixin's methods onto the INCLUDING class, so the Ruby
-  // module never names the TS owner: `FinderMethods#first` lands in relation.ts,
-  // whose `Relation` records `extends: ["FinderMethods"]` (RFC 0108). One host
-  // is a resolution; several is the same ambiguity as before.
   if (hosts) {
     const via = [...owners].filter((o) => hosts.has(o));
     if (via.length === 1) return via[0];
   }
-  // The seat arm answers a seat question only where the RUBY file poses one —
-  // the same name on both the singleton and the instance half
-  // (`persistence.rb:687-692` and `:900-916`). Where every Ruby owner sits on
-  // one seat, the several TS declarations are not the two halves of anything
-  // and the seat cannot say which class the module ported to: picking one is
-  // the mispairing this resolution exists to avoid (time-ext.ts's one `toTime`
-  // body answers `Time#to_time`, `Date#to_time` and `DateTime#to_time` alike).
   if (seatOf && rubySeats.size > 1) {
     const exact = [...owners].filter((o) => seatOf(o) === rubySeat);
     if (exact.length === 1) return exact[0];
-    // A seat the file states for no other declaration: persistence.ts ports
-    // `Persistence::ClassMethods#_update_record` (persistence.rb:687-692) as the
-    // free export and the instance half (`:900-916`) as `InstanceMethods`, so
-    // the class seat is "the one that is not the instance seat".
     const compatible = [...owners].filter((o) => (seatOf(o) ?? rubySeat) === rubySeat);
     if (compatible.length === 1) return compatible[0];
   }
@@ -1080,6 +1087,14 @@ export function ambiguousTsOwner(
  * call `attributesForUpdate` exactly as `persistence.rb:901` does could not
  * retire the row. Bidirectional too: a genuine omission in either body is
  * masked by the other.
+ *
+ * Resolved, and so NOT ambiguous, when exactly one of the Ruby owners sits on
+ * the seat the single TS member is declared on (`RubyOwnerResolution`): it is
+ * then that member's counterpart, and every other owner's counterpart is
+ * elsewhere or nowhere, so this arm compares and the others record nothing.
+ * Several owners sharing that seat says no more than the bare count did —
+ * routing/mapper.rb declares `add_route` on `Base`, `Resources` and `Scoping`,
+ * all instance (RFC 0108).
  */
 export function ambiguousRubyOwner(
   rubyOwners: ReadonlySet<string> | undefined,
@@ -1087,12 +1102,6 @@ export function ambiguousRubyOwner(
   { rubySeat, tsSeat, rubyOwnersOnTsSeat }: RubyOwnerResolution = {},
 ): boolean {
   if ((rubyOwners?.size ?? 0) <= 1 || (tsOwners?.size ?? 0) > 1) return false;
-  // The seats resolve the pairing only when exactly ONE of the Ruby owners sits
-  // on the TS member's seat: it is then that member's counterpart, and every
-  // other owner's is elsewhere (or nowhere), so this arm compares and the others
-  // record nothing. Several owners sharing that seat — routing/mapper.rb
-  // declares `add_route` on `Base`, `Resources` and `Scoping`, all instance —
-  // says no more than the bare count did (RFC 0108).
   if (tsSeat !== undefined && rubyOwnersOnTsSeat === 1) return rubySeat !== tsSeat;
   return true;
 }
@@ -2423,8 +2432,7 @@ export function main() {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsOwnersByFileName.set(file, owners);
-        // A top-level function (`owner === ""`) states no seat: the port spells
-        // a `ClassMethods` body and an instance mixin body the same way.
+        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
         if (owner !== "") {
           const bySeat =
             m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
@@ -2924,11 +2932,10 @@ export function main() {
         }
       };
 
-      // The one TS member a matched pair should be held to, or `undefined` when
-      // the pairing stays ambiguous and the gates must record nothing (RFC
-      // 0108). Resolution is by include-graph host and by SEAT — the two
-      // dimensions the extractors already carry — before falling back to the
-      // `ambiguousTsOwner` / `ambiguousRubyOwner` skips.
+      // The one TS member a matched pair is held to (see resolveTsOwner), and
+      // whether the pairing stayed ambiguous — in which case the gates record
+      // nothing rather than compare against a member this Ruby body did not
+      // port to.
       const resolveOwner = (
         rubyName: string,
         tsName: string,
