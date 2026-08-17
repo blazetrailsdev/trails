@@ -57,15 +57,13 @@ export class ParameterFilter {
    *
    * Ruby joins the escaped string patterns and the given Regexps into a single
    * Regexp per group, spelling each case-insensitive part with the inline
-   * `(?i:...)` group (parameter_filter.rb:58-65). JS has no inline flag group,
-   * so {@link ignoreCaseSource} spells the same matching case-sensitively —
-   * each cased character expanded to a `[aA]` class — and the group is joined
-   * into ONE Regexp exactly as Rails'.
+   * `(?i:...)` group (parameter_filter.rb:58-65). V8 ships the same inline
+   * modifier group, so each member is spelled exactly as Ruby spells it and the
+   * group is joined into ONE Regexp.
    */
   static precompileFilters(filters: Filter[]): Array<FilterProc | RegExp> {
     const patterns: Array<{
       source: string;
-      ignoreCase: boolean;
       unicode: boolean;
       unicodeSets: boolean;
     }> = [];
@@ -76,15 +74,13 @@ export class ParameterFilter {
         compiled.push(filter);
       } else if (filter instanceof RegExp) {
         patterns.push({
-          source: filter.source,
-          ignoreCase: filter.ignoreCase,
+          source: filter.ignoreCase ? `(?i:${filter.source})` : filter.source,
           unicode: filter.flags.includes("u"),
           unicodeSets: filter.flags.includes("v"),
         });
       } else {
         patterns.push({
-          source: escapeRegexp(String(filter)),
-          ignoreCase: true,
+          source: `(?i:${escapeRegexp(String(filter))})`,
           unicode: false,
           unicodeSets: false,
         });
@@ -97,11 +93,7 @@ export class ParameterFilter {
     }
 
     for (const group of [patterns, deepPatterns]) {
-      const sources = group.map((pattern) =>
-        pattern.ignoreCase
-          ? ignoreCaseSource(pattern.source, pattern.unicode || pattern.unicodeSets)
-          : pattern.source,
-      );
+      const sources = group.map((pattern) => pattern.source);
       // A `\p{...}` escape only means a Unicode property under `u`/`v`; without
       // it the escape is the letter `p`, which Ruby has no spelling for. Ruby's
       // Regexp is always Unicode-aware, so the joined Regexp carries `u`
@@ -239,147 +231,6 @@ export class ParameterFilter {
 function unicodeFlag(group: Array<{ unicode: boolean; unicodeSets: boolean }>): string {
   if (group.some((pattern) => pattern.unicodeSets)) return "v";
   return group.some((pattern) => pattern.unicode) ? "u" : "";
-}
-
-/** A cased character spelled as the class matching both of its cases, or the
- *  character unchanged when it has no other case. */
-function bothCases(char: string): string {
-  const lower = char.toLowerCase();
-  const upper = char.toUpperCase();
-  return lower === upper || lower.length !== 1 || upper.length !== 1 ? char : `[${lower}${upper}]`;
-}
-
-/**
- * A Unicode property escape as `(?i:...)` matches it: Ruby case-folds the
- * subject, so `\p{Lu}` matches a lowercase letter and `\p{Ll}` an uppercase one
- * — both are `\p{L}` — while the negated `\P{Lu}` is the complement of that,
- * `\P{L}`. Any other property is case-blind and passes through.
- */
-function ignoreCaseProperty(property: string): string {
-  return property === "Lu" || property === "Ll" ? "L" : property;
-}
-
-/** The index of the `]` closing the character class open at `start`, or the end
- *  of the source when it is unterminated. A `]` in the first member position is
- *  a literal, as is one preceded by a backslash. */
-function classEnd(source: string, start: number): number {
-  let i = start + 1;
-  if (source[i] === "^") i++;
-  if (source[i] === "]") i++;
-  for (; i < source.length; i++) {
-    if (source[i] === "\\") i++;
-    else if (source[i] === "]") return i;
-  }
-  return source.length - 1;
-}
-
-/**
- * A character class as `(?i:...)` matches it: each cased member gains its other
- * case, in place, so `[xy]` is `[xXyY]` and a cased range gains the range of
- * its folded endpoints, `[a-c]` → `[a-cA-C]`. Nesting `[aA]` is not an option
- * here, which is why the member expansion is written out rather than reusing
- * {@link bothCases}.
- */
-function ignoreCaseClass(klass: string, unicode: boolean): string {
-  const negated = klass.startsWith("[^");
-  const body = klass.slice(negated ? 2 : 1, -1);
-  let out = "";
-  for (let i = 0; i < body.length; i++) {
-    const char = body[i];
-    if (char === "\\") {
-      const next = body[i + 1];
-      if (unicode && (next === "p" || next === "P") && body[i + 2] === "{") {
-        const end = body.indexOf("}", i + 3);
-        if (end !== -1) {
-          out += `\\${next}{${ignoreCaseProperty(body.slice(i + 3, end))}}`;
-          i = end;
-          continue;
-        }
-      }
-      out += char + (next ?? "");
-      i++;
-      continue;
-    }
-    const to = body[i + 1] === "-" && i + 2 < body.length ? body[i + 2] : undefined;
-    if (to !== undefined) {
-      out += `${char}-${to}`;
-      const folded = `${swapCase(char)}-${swapCase(to)}`;
-      if (folded !== `${char}-${to}`) out += folded;
-      i += 2;
-      continue;
-    }
-    out += char;
-    const other = swapCase(char);
-    if (other !== char) out += other;
-  }
-  return `[${negated ? "^" : ""}${out}]`;
-}
-
-/** The character's other case, or the character itself when it has none. */
-function swapCase(char: string): string {
-  const lower = char.toLowerCase();
-  const upper = char.toUpperCase();
-  if (lower.length !== 1 || upper.length !== 1) return char;
-  return char === lower ? upper : lower;
-}
-
-/**
- * Ruby spells a case-insensitive alternative inline as `(?i:...)`
- * (parameter_filter.rb:59) so one Regexp can carry both case-sensitive and
- * case-insensitive parts. JS has no inline flag group, so the same matching is
- * spelled case-sensitively by expanding each cased character to a `[aA]` class.
- *
- * Total, so `precompileFilters` emits one Regexp per group for every input
- * exactly as `Regexp.new(patterns.join("|"))` does (parameter_filter.rb:64-65).
- * The spans where a letter is not a pattern letter are copied verbatim: the
- * `<name>` of a named group (`(?<name>`, but not the lookbehinds `(?<=` /
- * `(?<!`) or of a named backreference (`\k<name>`). A character class and a
- * Unicode property escape expand under their own rules
- * ({@link ignoreCaseClass}, {@link ignoreCaseProperty}).
- */
-function ignoreCaseSource(source: string, unicode: boolean): string {
-  let out = "";
-  for (let i = 0; i < source.length; i++) {
-    const char = source[i];
-    if (char === "\\") {
-      const next = source[i + 1];
-      if (unicode && (next === "p" || next === "P") && source[i + 2] === "{") {
-        const end = source.indexOf("}", i + 3);
-        if (end !== -1) {
-          out += `\\${next}{${ignoreCaseProperty(source.slice(i + 3, end))}}`;
-          i = end;
-          continue;
-        }
-      }
-      if (next === "k" && source[i + 2] === "<") {
-        const end = source.indexOf(">", i + 3);
-        if (end !== -1) {
-          out += source.slice(i, end + 1);
-          i = end;
-          continue;
-        }
-      }
-      out += char + (next ?? "");
-      i++;
-      continue;
-    }
-    if (char === "[") {
-      const end = classEnd(source, i);
-      out += ignoreCaseClass(source.slice(i, end + 1), unicode);
-      i = end;
-      continue;
-    }
-    if (source.startsWith("(?<", i) && source[i + 3] !== "=" && source[i + 3] !== "!") {
-      const end = source.indexOf(">", i + 3);
-      if (end !== -1) {
-        out += source.slice(i, end + 1);
-        i = end;
-        continue;
-      }
-    }
-    out += bothCases(char);
-  }
-  return out;
 }
 
 /** Mirrors Ruby's `Regexp.escape`, which JS has no built-in for. `-` is left
