@@ -6,11 +6,6 @@
 # NOT set $TASKS_DIR — which working tree the CLI acts on is resolved by
 # resolveTasksDir() in the CLI from the caller's cwd, and setting the env var
 # here would suppress the per-worktree branch that pushes `HEAD:main`.
-#
-# Resolution order mirrors bin/tasks:
-#   1. $TASKS_DIR / $RFCS_DIR
-#   2. <cwd>/tasks — the per-worktree symlink start-worktree.sh creates
-#   3. ~/github/blazetrailsdev/tasks
 set -euo pipefail
 
 has_bin() { [[ -n "${1:-}" && -x "$1/bin/tasks" ]]; }
