@@ -80,32 +80,15 @@ export interface ValidationsInternalsHost<TBase extends object = object> {
  * Lazy per-instance accessor for the active `ValidationContext`.
  * Mirrors Rails
  * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
- * (activemodel/lib/active_model/validations.rb:463-465). Trails stores
- * the active context as `_validationContext: string | string[] | null`
- * directly; this helper returns a `ValidationContext` whose
- * `.context` property is a live view of that field, so Rails' pattern
- * `context_for_validation.context = ctx` still works.
+ * (activemodel/lib/active_model/validations.rb:463-465). The returned object owns
+ * the active context — Rails keeps it here, not in a model ivar (:503-505, :361-368),
+ * which is what lets a frozen model be validated.
  *
  * @internal Rails-private helper.
  */
 export function contextForValidation(this: ContextForValidationHost): ValidationContext {
   if (this._contextForValidation) return this._contextForValidation;
-  // Construct via the real constructor so any future
-  // ValidationContext initialization runs, then replace the
-  // `context` and underlying `_context` slot with a live view of
-  // `_validationContext`. Both must be aliased so `vc.name` /
-  // `vc.toString()` stay consistent with the live field.
   const vc = new ValidationContext();
-  const accessor: PropertyDescriptor = {
-    get: (): string | string[] | null => this._validationContext,
-    set: (value: string | string[] | null): void => {
-      this._validationContext = value;
-    },
-    configurable: true,
-    enumerable: false,
-  };
-  Object.defineProperty(vc, "context", accessor);
-  Object.defineProperty(vc, "_context", accessor);
   this._contextForValidation = vc;
   return vc;
 }
@@ -154,8 +137,8 @@ export interface Validations {
  * Mirrors: ActiveModel::Validations::ClassMethods
  */
 export interface ValidationsClassMethods {
-  validates(attribute: string, rules: Record<string, unknown>): void;
-  validatesBang(attribute: string, rules: Record<string, unknown>): void;
+  validates(...args: [...attributes: string[], rules: Record<string, unknown>]): void;
+  validatesBang(...args: [...attributes: string[], rules: Record<string, unknown>]): void;
   validate(methodOrFn: string | ((record: unknown) => void), options?: ConditionalOptions): void;
   validatesWith(
     validatorClass: {
@@ -284,15 +267,7 @@ const _predicatesForValidationContexts = new Map<
  */
 export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
   this.errors = new Errors(this as unknown as TBase);
-  this._validationContext = null;
   this._contextForValidation = undefined;
-}
-
-/**
- * Host shape consumed by `predicateForValidationContext`.
- */
-export interface ValidationsContextHost {
-  readonly validationContext: string | string[] | null;
 }
 
 /**
@@ -309,11 +284,17 @@ export async function runValidationsBang(this: RunValidationsHost): Promise<bool
 }
 
 /**
- * Host shape consumed by `contextForValidation`.
+ * Mirrors Rails `VALID_OPTIONS_FOR_VALIDATE` (validations.rb:92). The keys carry
+ * their trails camelCase spelling (`exceptOn` for `:except_on`) — what a caller
+ * actually passes, so what the raised message must name back to them.
  */
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
+export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
+
+/**
+ * Host shape consumed by `predicateForValidationContext`.
+ */
+export interface ValidationsContextHost {
+  readonly validationContext: string | string[] | null;
 }
 
 /**
@@ -330,11 +311,11 @@ export function raiseValidationError<TBase extends object = object>(this: {
 }
 
 /**
- * Host shape consumed by `runValidationsBang`.
+ * Host shape consumed by `contextForValidation`.
  */
-export interface RunValidationsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _runValidateCallbacks(): void | Promise<void>;
+export interface ContextForValidationHost {
+  _validationContext: string | string[] | null;
+  _contextForValidation?: ValidationContext;
 }
 
 /**
@@ -366,9 +347,12 @@ export function predicateForValidationContext(
   return cached;
 }
 
-/** Host shape for the {@link readAttributeForValidation} mixin method. */
-export interface ReadAttributeForValidationHost {
-  [key: string]: unknown;
+/**
+ * Host shape consumed by `runValidationsBang`.
+ */
+export interface RunValidationsHost<TBase extends object = object> {
+  errors: Errors<TBase>;
+  _runValidateCallbacks(): void | Promise<void>;
 }
 
 /**
@@ -389,6 +373,27 @@ export function _mergeAttributes(attrNames: unknown[]): Record<string, unknown> 
   const flat = attrNames.flat(Infinity).map((n) => String(n));
   options.attributes = flat;
   return options;
+}
+
+/** Host shape for the {@link readAttributeForValidation} mixin method. */
+export interface ReadAttributeForValidationHost {
+  [key: string]: unknown;
+}
+
+/**
+ * Mirrors Rails `initialize_dup` (validations.rb:310-313), which nils `@errors`
+ * and lets `errors_or_create` rebuild it lazily; trails initializes `errors`
+ * eagerly, so this assigns the replacement, as {@link initInternals} does. Like
+ * Rails it leaves `@context_for_validation` aliased to the source's — `valid?`
+ * sets and restores the context per run, so the copy is never observed in flight.
+ *
+ * @internal Rails-private helper.
+ */
+export function initializeDup<TBase extends object>(
+  this: ValidationsInternalsHost<TBase>,
+  _other: unknown,
+): void {
+  this.errors = new Errors(this as unknown as TBase);
 }
 
 /**

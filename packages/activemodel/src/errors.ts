@@ -72,6 +72,15 @@ export class Errors<TBase extends object = object> {
    *     @errors = other.errors.deep_dup
    *     @errors.each { |error| error.instance_variable_set(:@base, @base) }
    *   end
+   *
+   * @missingRailsCall deep_dup — Language shortcoming: Rails dups the array and
+   * then rebases each copy with `instance_variable_set(:@base, ...)`, writing
+   * through `Error#base`'s reader. `base` is `readonly` in TS with no
+   * `instance_variable_set` escape hatch, so the rebase has to happen at
+   * construction — which is what `Error#dupWithBase` does, deep-dupping the
+   * options as it goes. The per-element dup Rails gets from `Array#deep_dup` is
+   * therefore fused into the same call rather than omitted; splitting them back
+   * out would dup every error twice to no effect.
    */
   copyBang<U extends object>(other: Errors<U>): void {
     this._errors = other._errors.map((e) => e.dupWithBase(this._base));

@@ -81,10 +81,31 @@ export function attributePreviousChange(
 }
 
 /**
+ * Mirrors: ActiveModel::Dirty#attribute_will_change!
+ *
+ * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
+ * an attribute as changed for in-place mutations (e.g. array push) where
+ * the object reference stays the same but the content has changed.
+ *
+ * @internal Rails-private helper.
+ */
+export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
+  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
+  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
+  // Record-shaped reader over it, not the tracker itself.
+  return this._dirty.forceChange(attrName);
+}
+
+/**
  * Host shape consumed by `initInternals`.
  */
 export interface DirtyInternalsHost {
   _dirty: DirtyTracker;
+}
+
+/** Host shape consumed by `initializeDup` — the duplicate, mid-`dup()`. */
+export interface DirtyDupHost extends DirtyInternalsHost {
+  _attributes: AttributeSet;
 }
 
 /**
@@ -106,6 +127,32 @@ export class DirtyTracker {
     attributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },
   ): void {
     this.snapshot(attributes);
+  }
+
+  /**
+   * An independent tracker carrying this one's state, with `_attrs` repointed at
+   * the duplicate's own AttributeSet.
+   *
+   * @noRailsEquivalent CONVERGEABLE — story
+   * `0023-surfaced-deviations/construction-time-dirty-baseline-hides-ctor-assignments`
+   * shares this root cause; making `DirtyTracker` derive from the AttributeSet
+   * retires this method with it. Rails' `initialize_dup` just nils
+   * `@mutations_from_database` and lets it rebuild from the already-deep-dup'd
+   * `@attributes`, so the copy reports the source's `changes` yet is a distinct
+   * object. This tracker snapshots eagerly and derives changes from recorded
+   * writes, so it cannot rebuild that way; copying reaches the same two properties.
+   * MRI-verified: `dup.changes` and `dup.previous_changes` equal the source's, and
+   * writes to the copy do not leak back.
+   */
+  deepDup(attrs: AttributeSet): DirtyTracker {
+    const copy = new DirtyTracker();
+    copy._originalAttributes = new Map(this._originalAttributes);
+    copy._originalHas = new Set(this._originalHas);
+    copy._changedAttributes = new Map(this._changedAttributes);
+    copy._previousChanges = new Map(this._previousChanges);
+    copy._forcedNames = new Set(this._forcedNames);
+    copy._attrs = attrs;
+    return copy;
   }
 
   // Rails `Dirty#as_json` (dirty.rb:264-268) exists only to hide the
@@ -580,22 +627,6 @@ export class DirtyTracker {
 }
 
 /**
- * Mirrors: ActiveModel::Dirty#attribute_will_change!
- *
- * Dispatch target for `*_will_change!` per-attribute methods. Force-marks
- * an attribute as changed for in-place mutations (e.g. array push) where
- * the object reference stays the same but the content has changed.
- *
- * @internal Rails-private helper.
- */
-export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: string): unknown {
-  // Rails' receiver is `mutations_from_database` (dirty.rb:409-411); trails
-  // spells the mutation tracker `_dirty` — `mutationsFromDatabase` here is the
-  // Record-shaped reader over it, not the tracker itself.
-  return this._dirty.forceChange(attrName);
-}
-
-/**
  * Mirrors: ActiveModel::Dirty#restore_attribute!
  *
  * Dispatch target for `restore_*!` per-attribute methods. Restores the
@@ -605,6 +636,20 @@ export function attributeWillChangeBang(this: DirtyDispatchHost, attrName: strin
  */
 export function restoreAttributeBang(this: DirtyDispatchHost, attrName: string): void {
   this._dirty.restoreAttribute(this._attributes, attrName);
+}
+
+/**
+ * Mirrors `Dirty#initialize_dup`'s `@mutations_from_database = nil`
+ * (activemodel/lib/active_model/dirty.rb:248-251): give the copy its own tracker,
+ * so writing to one no longer marks the other dirty. Rails nils the ivar and lets
+ * it rebuild from the deep-dup'd `@attributes`, which reproduces the source's
+ * `changes` on the copy; {@link DirtyTracker.deepDup} is that rebuild, since a
+ * fresh empty tracker would instead wipe pending changes.
+ *
+ * @internal Rails-private helper.
+ */
+export function initializeDup(this: DirtyDupHost, _other: unknown): void {
+  this._dirty = this._dirty.deepDup(this._attributes);
 }
 
 function resolveValue(value: unknown): unknown {

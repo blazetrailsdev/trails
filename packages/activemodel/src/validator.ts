@@ -43,6 +43,13 @@ export interface ConditionalOptions {
    * (activemodel/lib/active_model/validations.rb:294-306).
    */
   on?: string | string[];
+  /**
+   * Validation context(s) under which this condition is *skipped* — the inverse of
+   * `on:`. Mirrors Rails `except_on:` (validations.rb:175-182).
+   */
+  exceptOn?: string | string[];
+  /** Register ahead of the already-registered validate callbacks. */
+  prepend?: boolean;
 }
 
 export function evaluateCondition(record: ValidatableRecord, cond: ConditionFn): boolean {
