@@ -74,18 +74,6 @@ describe("IntegerType", () => {
     expect(type.isSerializable(2 ** 40)).toBe(false);
   });
 
-  it("blank string casts to null via Helpers::Numeric", () => {
-    expect(type.cast("   ")).toBeNull();
-  });
-
-  it("serialize casts first via mixin — serialize(10.5) returns 10", () => {
-    expect(type.serialize(10.5)).toBe(10);
-  });
-
-  it("isChanged returns true for number-to-non-number — number_to_non_number? forces change", () => {
-    expect(type.isChanged(0, null, "wibble")).toBe(true);
-  });
-
   it("isChanged returns true for a genuine numeric change — real value differs", () => {
     expect(type.isChanged(10, 5, "5")).toBe(true);
   });

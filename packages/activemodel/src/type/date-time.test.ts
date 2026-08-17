@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, strftime } from "@blazetrails/date";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeZone, setZoneDefault, toS } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
@@ -15,11 +15,8 @@ describe("DateTimeTest", () => {
     expect(type.cast("ABC")).toBeNull();
     expect(type.cast(" ".repeat(129))).toBeNull();
 
-    // Rails' `strftime("%FT%T")` is the ISO form truncated at seconds.
-    const datetimeString = Temporal.Now.instant().toString().slice(0, 19);
-    expect((type.cast(datetimeString) as Temporal.Instant).toString().slice(0, 19)).toBe(
-      datetimeString,
-    );
+    const datetimeString = strftime(Temporal.Now.instant(), "%FT%T");
+    expect(strftime(type.cast(datetimeString) as Temporal.Instant, "%FT%T")).toBe(datetimeString);
   });
 
   it("string with offset produces Instant", () => {
