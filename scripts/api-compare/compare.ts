@@ -963,11 +963,25 @@ export function callTagKey(tsFile: string, tsClass: string, tsName: string): str
  * picking one by seat is the mispairing this resolution exists to avoid:
  * time-ext.ts's single `toTime` body answers `Time#to_time`, `Date#to_time` and
  * `DateTime#to_time` alike (RFC 0108).
+ *
+ *  4. one BODY declared twice. The trails mixin convention (CLAUDE.md "Module
+ *     mixins") exports a top-level function and re-exports the very same
+ *     function through a grouping object — `export function toTime()` beside
+ *     `export const TimeExt = { toTime }` — so the file's owners are `""` and
+ *     `TimeExt` for one body. Where every owner declaring the name records the
+ *     SAME call-set the comparison is identical whichever is picked, so pick
+ *     one (`callSetOf`; the sorted first, which is the free export). Owners
+ *     whose call-sets differ are two bodies and stay unresolved. Equality of
+ *     the recorded sets is the whole test, so two genuinely different bodies
+ *     recording the same set (both empty, say) also resolve — harmless while
+ *     the resolved owner only gates `ambiguousTsOwner` / `ownerRecordsNothing`
+ *     and the comparison itself unions the file's declarations (checkCalls),
+ *     but a reader that consumed the owner's OWN set would need more here.
  */
 export function resolveTsOwner(
   owners: ReadonlySet<string> | undefined,
   rubyModule: string,
-  { hosts, seatOf, rubySeat, rubySeats = new Set() }: TsOwnerResolution = {},
+  { hosts, seatOf, rubySeat, rubySeats = new Set(), callSetOf }: TsOwnerResolution = {},
 ): string | undefined {
   if (!owners || owners.size === 0) return undefined;
   if (owners.size === 1) return [...owners][0];
@@ -982,6 +996,14 @@ export function resolveTsOwner(
     if (exact.length === 1) return exact[0];
     const compatible = [...owners].filter((o) => (seatOf(o) ?? rubySeat) === rubySeat);
     if (compatible.length === 1) return compatible[0];
+  }
+  if (callSetOf) {
+    const sorted = [...owners].sort();
+    const keys = sorted.map((o) => {
+      const sets = callSetOf(o);
+      return sets === undefined ? undefined : JSON.stringify(sets);
+    });
+    if (keys[0] !== undefined && keys.every((k) => k === keys[0])) return sorted[0];
   }
   return undefined;
 }
@@ -1005,6 +1027,9 @@ export interface TsOwnerResolution {
   /** The seats of EVERY Ruby owner declaring the name in this Ruby file. The
    *  seat arm runs only when they differ — see resolveTsOwner. */
   rubySeats?: ReadonlySet<OwnerSeat>;
+  /** The call-sets the file records for each TS owner declaring the name, for
+   *  the one-body-two-declarations arm — see resolveTsOwner step 4. */
+  callSetOf?: (tsOwner: string) => readonly string[][] | undefined;
 }
 
 /** The seat a Ruby owner FQN states, if any: `ActiveRecord::Persistence::ClassMethods`
@@ -2959,6 +2984,7 @@ export function main() {
           seatOf,
           rubySeat,
           rubySeats,
+          callSetOf: (tsOwner) => tsCallsByFileNameOwner.get(tsFile)?.get(tsName)?.get(tsOwner),
         });
         const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
         const ambiguous =

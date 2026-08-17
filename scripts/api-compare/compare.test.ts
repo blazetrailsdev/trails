@@ -1944,6 +1944,36 @@ describe("resolveTsOwner — include graph and seats", () => {
       }),
     ).toBeUndefined();
   });
+
+  it("resolves one body declared twice — the free export and the grouping", () => {
+    // The trails mixin convention: `export function toTime()` beside
+    // `export const TimeExt = { toTime }`, so both owners record the SAME
+    // call-set and the comparison is identical whichever is picked.
+    const calls = { "": [["getlocal"]], TimeExt: [["getlocal"]] };
+    expect(
+      resolveTsOwner(new Set(["", "TimeExt"]), "Date", {
+        callSetOf: (o: string) => calls[o as keyof typeof calls],
+      }),
+    ).toBe("");
+  });
+
+  it("refuses two owners whose call-sets differ", () => {
+    // relation.ts's `ExplainProxy#first` next to the `Relation` overload: two
+    // bodies, so picking one is the mispairing the resolution exists to avoid.
+    const calls = { Relation: [["findNth"]], ExplainProxy: [["execExplain"]] };
+    expect(
+      resolveTsOwner(new Set(["Relation", "ExplainProxy"]), "ActiveRecord::FinderMethods", {
+        callSetOf: (o: string) => calls[o as keyof typeof calls],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("refuses when an owner records no call-set at all", () => {
+    const calls: Record<string, string[][]> = { TimeExt: [["getlocal"]] };
+    expect(
+      resolveTsOwner(new Set(["", "TimeExt"]), "Date", { callSetOf: (o: string) => calls[o] }),
+    ).toBeUndefined();
+  });
 });
 
 describe("tsOwnerSeat", () => {

@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "array-utils.ts",
+    "rubyName": "extract!",
+    "call": "reject!",
+    "reason": "Ruby core Array#reject! (core_ext/array/extract.rb:15), not a ported trails method — the gate matched DescendantsTracker.rejectBang; the port splices in place."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "array-utils.ts",
+    "rubyName": "in_groups",
+    "call": "div",
+    "reason": "Ruby core Integer#div (core_ext/array/grouping.rb:66), not a ported trails method — the port uses Math.floor."
+  }
+]

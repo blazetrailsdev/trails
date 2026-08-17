@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "xml-mini/nokogiri.ts",
+    "rubyName": "parse",
+    "call": "first",
+    "reason": "Ruby core Enumerable#first on the parsed document (xml_mini/nokogiri.rb:19-30), not a ported trails method."
+  }
+]
