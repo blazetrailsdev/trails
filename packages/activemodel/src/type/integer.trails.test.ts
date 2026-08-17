@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 
 // Trails-only coverage for ActiveModel::Type::Integer — behavior with no
@@ -34,6 +35,20 @@ describe("IntegerType", () => {
     // `true.to_i` raises NoMethodError, rescued to null (integer.rb:90).
     expect(type.deserialize(false)).toBeNull();
     expect(type.deserialize(true)).toBeNull();
+  });
+
+  it("casts a driver numeric wrapper through its decimal string form", () => {
+    // MRI sees an Integer or a BigDecimal for a numeric column/aggregate and
+    // `value.to_i` (integer.rb:90) converts. node-postgres and mysql2 hand back
+    // wrapper objects carrying the decimal string instead, so that string is the
+    // conversion. Regression: dropping this arm made every PG/MariaDB `sum`
+    // deserialize to nil and report 0 — invisible on better-sqlite3, which
+    // returns plain numbers.
+    expect(type.cast({ toString: () => "15" })).toBe(15);
+    expect(type.cast({ toString: () => "7.9" })).toBe(7);
+    expect(type.cast(new BigDecimal("42"))).toBe(42);
+    // Still nil for the receivers Ruby has no `to_i` on (integer_test.rb:24-32).
+    expect(type.cast({ toString: () => "not a number" })).toBeNull();
   });
 
   it("serialize truncates a fractional number toward zero", () => {

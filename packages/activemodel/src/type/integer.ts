@@ -152,13 +152,32 @@ export class IntegerType extends NumericValueType {
       const parsed = parseInt(value, 10);
       return isNaN(parsed) ? 0 : parsed;
     }
-    // The `rescue nil` of integer.rb:90 is scoped to the conversion itself, so
-    // `cast` answers nil — never raises — for a receiver with no `to_i`: Ruby
-    // `Object.new.to_i`, `[1, 2].to_i`, `{ 1 => 2 }.to_i`, `(1..2).to_i` and
-    // `:sym.to_i` all raise NoMethodError (integer_test.rb:24-32). Anything that
-    // does answer `to_i` — a Duration, say (integer_test.rb:47-50) — converts.
+    // Anything that answers `to_i` converts — a Duration, say
+    // (integer_test.rb:47-50).
     const toI = (value as { toI?: unknown } | null)?.toI;
-    return typeof toI === "function" ? (toI.call(value) as number) : null;
+    if (typeof toI === "function") return toI.call(value) as number;
+    // Every Ruby `::Numeric` answers `to_i`, and that includes the values a
+    // driver hands back for a numeric column or aggregate: MRI sees an Integer
+    // or a BigDecimal, both of which convert. Their trails counterparts —
+    // `BigDecimal`, node-postgres/mysql2 numeric wrappers — carry the value in
+    // their decimal string form instead, so that string IS the conversion here.
+    // Restricted to non-Array objects because the `rescue nil` of integer.rb:90
+    // is real for the receivers Ruby genuinely has no `to_i` on: `Object.new`,
+    // `[1, 2]`, `{ 1 => 2 }`, `(1..2)` (integer_test.rb:24-32). A non-numeric
+    // string form therefore answers nil, not `String#to_i`'s 0.
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      let str: string;
+      try {
+        str = String(value);
+      } catch {
+        // A null-prototype object has no `toString`; Ruby's counterpart has no
+        // `to_i` either, so this is the same nil.
+        return null;
+      }
+      const parsed = parseInt(str, 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return null;
   }
 
   /**
