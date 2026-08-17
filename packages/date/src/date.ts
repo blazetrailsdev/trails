@@ -8851,9 +8851,6 @@ export class DateTime extends DateWithoutParseStatics {
    * @internal ruby/date's `iso8601_timediv(self, n)` (`date_core.c:8728-8742`),
    * which builds `"T%H:%M:%S"`, appends `".%<n>N"` only when `n > 0`, then
    * `"%:z"`, and runs the result through `strftimev`.
-   *
-   * @noRailsEquivalent PERMANENT — a file-static C helper with no Ruby name,
-   * extracted here exactly as the C extracts it.
    */
   #iso8601Timediv(n: number): string {
     let fmt = "T%H:%M:%S";

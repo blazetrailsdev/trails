@@ -12,10 +12,6 @@
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ordinalize } from "./inflector.js";
-// `time-ext.ts` declares its own `formattedOffset` over a JS `Date`
-// (`core_ext/time/conversions.rb`'s arm), so the DateTime arm — the one
-// `Time::DATE_FORMATS[:rfc822]`'s `time.formatted_offset(false)` reaches on a
-// `DateTime` receiver — comes in under an alias.
 import { formattedOffset as dateTimeFormattedOffset } from "./core-ext/date-time/conversions.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
@@ -678,6 +674,11 @@ export { secFraction as subsec };
  * `core-ext/date-time/conversions.ts`'s `toFs`, so the callables are typed over
  * that receiver; `time-ext.ts`'s own `toFs` below still answers a JS `Date`
  * through a hand-rolled `switch` and is converged separately.
+ *
+ * `rfc822`'s `time.formatted_offset(false)` is imported as
+ * `dateTimeFormattedOffset` because this file declares its own
+ * `formattedOffset` over a JS `Date` — `core_ext/time/conversions.rb`'s arm of
+ * the same Rails name — and a `DateTime` receiver reaches the other one.
  */
 export const DATE_FORMATS: Record<
   string,
