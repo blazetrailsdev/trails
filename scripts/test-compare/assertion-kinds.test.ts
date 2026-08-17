@@ -46,6 +46,11 @@ describe("normalizeTrailsKind", () => {
     expect(normalizeTrailsKind("not:toBeTruthy")).toBe("falsy");
   });
 
+  it("folds not.toThrow onto assert_nothing_raised", () => {
+    expect(normalizeTrailsKind("not:toThrow")).toBe("nothingRaised");
+    expect(normalizeTrailsKind("not:toThrow")).toBe(normalizeRailsKind("assert_nothing_raised"));
+  });
+
   it("maps helper callees that mirror a Rails name via snake-case", () => {
     expect(normalizeTrailsKind("refuteEqual")).toBe("notEqual");
     expect(normalizeTrailsKind("mustEqual")).toBe("equal");

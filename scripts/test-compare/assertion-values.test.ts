@@ -13,6 +13,18 @@ describe("assertionValueMismatch", () => {
     expect(deltas).toEqual([{ kind: "equal", rails: ["n:5"], trails: ["n:4"] }]);
   });
 
+  it("folds trails' colon-prefixed symbol spelling onto the Ruby symbol token", () => {
+    // Ruby `assert_equal :short, …` extracts as `s:short`; trails spells the
+    // same Symbol VALUE as the string `":short"`, which extracts as `s::short`.
+    expect(
+      assertionValueMismatch(["assert_equal"], ["s:short"], ["toBe"], ["s::short"], false),
+    ).toBeNull();
+    // A genuinely different symbol still diverges.
+    expect(
+      assertionValueMismatch(["assert_equal"], ["s:short"], ["toBe"], ["s::long"], false),
+    ).toEqual([{ kind: "equal", rails: ["s:short"], trails: ["s:long"] }]);
+  });
+
   it("compares as an order-independent multiset per kind", () => {
     // Same two equality values, asserted in a different order → no divergence.
     expect(

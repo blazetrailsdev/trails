@@ -1448,14 +1448,20 @@ export class Relation<T extends Base> {
     return this.structurallyIncompatibleValuesFor(other as never).length === 0;
   }
 
-  // ---- include Enumerable (relation.rb:67) — see ENUMERABLE_DELEGATES ----
-
-  /** `Enumerable#detect` / `#find` — `find` on a Relation is the AR PK finder. */
+  /**
+   * Return the number of loaded records — `delegate :length, to: :records`
+   * (delegation.rb:101), not an Enumerable member.
+   *
+   * Mirrors: ActiveRecord::Relation#length
+   */
   async length(): Promise<number> {
     const records = await this.toArray();
     return records.length;
   }
 
+  // ---- include Enumerable (relation.rb:67) — see ENUMERABLE_DELEGATES ----
+
+  /** `Enumerable#detect` / `#find` — `find` on a Relation is the AR PK finder. */
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
     return ENUMERABLE_DELEGATES.detect(await this.toArray(), fn);
   }
