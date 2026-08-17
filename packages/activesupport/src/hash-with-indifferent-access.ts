@@ -10,11 +10,36 @@
  * Rails' own name.
  */
 
-import { deepMerge as deepMergeObj, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
+import {
+  deepMerge as deepMergeObj,
+  deepSymbolizeKeysBang,
+  isPlainObject,
+  symbolizeKeysBang,
+} from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { KeyError } from "./core-ext/key-error.js";
 
 type AnyObject = Record<string, unknown>;
+
+/**
+ * `NOT_GIVEN = Object.new` (hash_with_indifferent_access.rb:336) — the sentinel
+ * `transform_keys`/`transform_keys!` compare against so an explicitly-passed
+ * `nil` is told apart from an omitted argument.
+ */
+const NOT_GIVEN: AnyObject = {};
+
+/**
+ * Mirror of Ruby's `TypeError` — what `Hash#transform_keys!` raises for a `nil`
+ * hash. Its throw site carries an eslint-disable because `rails-error-parity`
+ * matches on the native name.
+ * @internal
+ */
+class TypeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TypeError";
+  }
+}
 
 /**
  * The `update`/`merge!` duplicate-key block (hash_with_indifferent_access.rb:127-131):
@@ -269,6 +294,21 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
+   * Mirrors `slice!` (hash_with_indifferent_access.rb:366-369) — the keys are
+   * converted, then `Hash#slice!` (core_ext/hash/slice.rb:10-17) replaces the
+   * hash with the given keys and returns the removed pairs. The `default` /
+   * `default_proc` lines have no counterpart here: this class does not model a
+   * Hash default (see `initialize`).
+   */
+  sliceBang(...keys: string[]): HashWithIndifferentAccess<V> {
+    keys = keys.map((key) => this.convertKey(key));
+    const omit = this.slice(...[...this.keys()].filter((key) => !keys.includes(key)));
+    const hash = this.slice(...keys);
+    this.replace(hash);
+    return omit;
+  }
+
+  /**
    * Return a new HashWithIndifferentAccess without the specified keys.
    */
   except(...keys: string[]): HashWithIndifferentAccess<V> {
@@ -314,14 +354,72 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Transform keys — returns new HWIA with transformed keys.
+   * Mirrors `transform_keys` (hash_with_indifferent_access.rb:338-341) —
+   * `dup.tap { |h| h.transform_keys!(hash, &block) }`, so the mapping hash and
+   * the block arms are the ones `transform_keys!` documents below.
    */
-  transformKeys(fn: (key: string) => string): HashWithIndifferentAccess<V> {
-    const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this.data) {
-      result.set(fn(k), v);
+  transformKeys(block: (key: string) => string): HashWithIndifferentAccess<V>;
+  transformKeys(
+    hash: AnyObject | null,
+    block?: (key: string) => string,
+  ): HashWithIndifferentAccess<V>;
+  transformKeys(
+    hash: AnyObject | null | ((key: string) => string),
+    block?: (key: string) => string,
+  ): HashWithIndifferentAccess<V> {
+    const dup = new HashWithIndifferentAccess<V>(this);
+    dup.transformKeysBang(hash as AnyObject | null, block);
+    return dup;
+  }
+
+  /**
+   * Mirrors `transform_keys!` (hash_with_indifferent_access.rb:345-357). Ruby's
+   * block is syntactically separate from the optional `hash`; JS has no such
+   * separation, so a function passed in the `hash` slot is read as the block —
+   * the same reading `fetch` above gives a trailing function.
+   *
+   * Ruby's no-argument arm (`return to_enum(:transform_keys!) if
+   * NOT_GIVEN.equal?(hash) && !block_given?`, :346) has no JS analogue — there
+   * is no Enumerator to return — so, as at `Deprecators#each`
+   * (deprecators.rb:41), the overloads require either the block or the hash and
+   * a bare call is a compile-time error rather than an enumerator.
+   */
+  transformKeysBang(block: (key: string) => string): this;
+  transformKeysBang(hash: AnyObject | null, block?: (key: string) => string): this;
+  transformKeysBang(
+    hash: AnyObject | null | ((key: string) => string),
+    block?: (key: string) => string,
+  ): this {
+    if (typeof hash === "function") {
+      block = hash;
+      hash = NOT_GIVEN;
     }
-    return result;
+
+    if (hash === null) {
+      // `super` — `Hash#transform_keys!` takes no implicit conversion of nil.
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError("no implicit conversion of nil into Hash");
+    } else if (NOT_GIVEN === hash) {
+      for (const key of [...this.keys()]) {
+        const value = this.get(key)!;
+        this.delete(key);
+        this.set(block!(key), value);
+      }
+    } else if (block) {
+      for (const key of [...this.keys()]) {
+        const value = this.get(key)!;
+        this.delete(key);
+        this.set((hash[key] as string) || block(key), value);
+      }
+    } else {
+      for (const key of [...this.keys()]) {
+        const value = this.get(key)!;
+        this.delete(key);
+        this.set((hash[key] as string) || key, value);
+      }
+    }
+
+    return this;
   }
 
   /**
@@ -505,6 +603,29 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
+   * `alias_method :to_options, :symbolize_keys`
+   * (hash_with_indifferent_access.rb:319).
+   */
+  toOptions(): AnyObject {
+    return this.symbolizeKeys();
+  }
+
+  /**
+   * Mirrors `deep_symbolize_keys` (hash_with_indifferent_access.rb:320).
+   */
+  deepSymbolizeKeys(): AnyObject {
+    return deepSymbolizeKeysBang(this.toHash());
+  }
+
+  /**
+   * Mirrors `to_options!` (hash_with_indifferent_access.rb:321) — this hash is
+   * already indifferent, so it answers itself.
+   */
+  toOptionsBang(): this {
+    return this;
+  }
+
+  /**
    * Mirrors `nested_under_indifferent_access`
    * (hash_with_indifferent_access.rb:66-68) — already indifferent, so a hash
    * nested under one being converted is returned as-is.
@@ -523,6 +644,14 @@ export class HashWithIndifferentAccess<V = unknown> {
       copy[k] = this.convertValueToHash(v);
     }
     return copy;
+  }
+
+  /**
+   * Mirrors `to_proc` (hash_with_indifferent_access.rb:383-385) — a Ruby proc
+   * is a JS function, so the reader closure is returned as-is.
+   */
+  toProc(): (key: string) => V | undefined {
+    return (key: string) => this.get(key);
   }
 
   /**

@@ -6715,7 +6715,7 @@ export class Date {
    * `DateTime`.
    */
   newStart(start = DEFAULT_SG): this {
-    return new Date(
+    return new (this.constructor as typeof Date)(
       SEAT,
       this.nth,
       this.#getSJd(),
@@ -7086,8 +7086,9 @@ export class Date {
    * that branch, and {@link DateTime} overrides it with the complex arm.
    */
   dNewInternal(nth: bigint, rjd: number, df: number, sf: Rational, of: number): this {
-    if (!df && sf.isZero() && !of) return new Date(SEAT, nth, rjd, this.start) as this;
-    return new Date(SEAT, nth, rjd, this.start, df, sf, of) as this;
+    if (!df && sf.isZero() && !of)
+      return new (this.constructor as typeof Date)(SEAT, nth, rjd, this.start) as this;
+    return new (this.constructor as typeof Date)(SEAT, nth, rjd, this.start, df, sf, of) as this;
   }
 
   /**
@@ -8501,7 +8502,15 @@ export class DateTime extends DateWithoutParseStatics {
    * side of the `simple_dat_p` branch {@link Date#dNewInternal} documents.
    */
   override dNewInternal(nth: bigint, rjd: number, df: number, sf: Rational, of: number): this {
-    return new DateTime(SEAT, nth, rjd, df, sf, of, this.start) as this;
+    return new (this.constructor as typeof DateTime)(
+      SEAT,
+      nth,
+      rjd,
+      df,
+      sf,
+      of,
+      this.start,
+    ) as this;
   }
 
   /**
@@ -8561,7 +8570,7 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   override newStart(start = DEFAULT_SG): this {
-    return new DateTime(
+    return new (this.constructor as typeof DateTime)(
       SEAT,
       this.nth,
       this.#getCJd(),

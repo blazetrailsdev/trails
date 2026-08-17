@@ -2514,7 +2514,7 @@ describe("RelationTest", () => {
 
   it("locked should not build arel", () => {
     const postsRel = Post.all().lock();
-    expect(postsRel.isLocked).toBe(true);
+    expect(postsRel.isLocked).toBeTruthy();
     expect(() => postsRel.lock(false)).not.toThrow();
   });
 

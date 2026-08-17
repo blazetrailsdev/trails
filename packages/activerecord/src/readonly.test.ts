@@ -124,7 +124,7 @@ describe("ReadOnlyTest", () => {
     for (const d of await Developer.all()) {
       expect(d.isReadonly()).toBe(false);
     }
-    expect(Developer.all().isReadonly).toBe(false);
+    expect(Developer.all().isReadonly).toBeFalsy();
     for (const d of await Developer.all().readonly(false)) {
       expect(d.isReadonly()).toBe(false);
     }

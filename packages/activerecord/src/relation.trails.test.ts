@@ -1036,3 +1036,37 @@ describe("Relation Enumerable surface (trails)", () => {
     expect((await present!.toArray()).length).toBe(await CanonPost.all().count());
   });
 });
+
+// `AssociationRelation#==` is `other == records` (association_relation.rb:14-16)
+// and `CollectionProxy#==` is `load_target == other` (collection_proxy.rb:980-982):
+// both re-dispatch instead of hand-rolling a record loop, so the semantics come
+// from the OTHER side's `==` — a Relation runs `Relation#==` (relation.rb:1253-1262).
+describe("association equality re-dispatches to the other side", () => {
+  fixtures(["authors", "posts"]);
+
+  it("AssociationRelation#== asks other, passing its own records", async () => {
+    const author = await CanonAuthor.first();
+    const relation = (author!.posts as any).where({}) as AssociationRelation<any>;
+    const records = await relation.records();
+    const other = CanonPost.where({ id: records.map((r: any) => r.id) });
+
+    // `other == records`: Relation#=='s Array arm (relation.rb:1259-1260)
+    // compares OTHER's records against ours, so the answer is other's, not a
+    // loop over our own array.
+    expect(await relation.equals(other)).toBe(await other.equals(records));
+    expect(await relation.equals(CanonPost.where({ id: -1 }))).toBe(false);
+
+    // Anything with no `==` of its own is simply unequal.
+    expect(await relation.equals("posts")).toBe(false);
+  });
+
+  it("CollectionProxy#== compares its loaded target element-wise", async () => {
+    const author = await CanonAuthor.first();
+    const proxy = author!.posts as any;
+    const records = await proxy.records();
+
+    expect(await proxy.equals([...records])).toBe(true);
+    expect(await proxy.equals(records.slice(1))).toBe(false);
+    expect(await proxy.equals("posts")).toBe(false);
+  });
+});

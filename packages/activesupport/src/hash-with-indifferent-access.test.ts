@@ -103,6 +103,22 @@ describe("HashWithIndifferentAccessTest", () => {
     const transformed = h.transformKeys((k) => k.repeat(2));
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
     expect(transformed.toHash()).toEqual({ aa: 1, bb: 2 });
+
+    let hash = new HashWithIndifferentAccess({ a: 1, b: 2 }).transformKeys({ a: "x", y: "z" });
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("x")).toBe(1);
+    expect(hash.get("b")).toBe(2);
+    expect(hash.get("z")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["x", "b"]);
+
+    hash = new HashWithIndifferentAccess({ a: 1, b: 2 }).transformKeys({ a: "A", q: "Q" }, (k) =>
+      k.repeat(3),
+    );
+    expect(hash.get("A")).toBe(1);
+    expect(hash.get("bbb")).toBe(2);
+    expect([...hash.keys()]).toEqual(["A", "bbb"]);
+
+    expect(() => hash.transformKeys(null)).toThrow(/no implicit conversion of nil/);
   });
 
   it("indifferent transform_values — returns new HWIA", () => {
@@ -317,14 +333,16 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("to options for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.toHash()).toEqual({ a: 1, b: 2 });
+    expect(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions()).toEqual({ a: 1, b: 2 });
+    expect(new HashWithIndifferentAccess({ ":a": 1, b: 2 }).toOptions()).toEqual({ a: 1, b: 2 });
   });
 
   it("deep symbolize keys for hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.symbolizeKeys();
-    expect(plain).toEqual({ a: 1 });
+    const nestedSymbols = { a: { b: { c: 3 } } };
+    expect(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys()).toEqual(nestedSymbols);
+    expect(new HashWithIndifferentAccess({ a: { b: { c: 3 } } }).deepSymbolizeKeys()).toEqual(
+      nestedSymbols,
+    );
   });
 
   it("symbolize keys bang for hash with indifferent access", () => {
@@ -920,10 +938,62 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent to proc", () => {
-    // In Ruby, a hash can be converted to a proc (h.to_proc). Not applicable in TS.
-    // Verify basic HWIA functionality still works.
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const fn = (key: string) => h.get(key);
-    expect(fn("a")).toBe(1);
+    const strings = new HashWithIndifferentAccess({ a: 1, b: 2 });
+    const proc = strings.toProc();
+
+    expect(proc("a")).toBe(1);
+    expect(proc(":a")).toBe(1);
+    expect(proc(":no_such")).toBeUndefined();
+  });
+
+  it("indifferent transform_keys bang", () => {
+    const strings = { a: 1, b: 2 };
+
+    let indifferentStrings = new HashWithIndifferentAccess<number>(strings);
+    indifferentStrings.transformKeysBang((k) => k.repeat(2));
+    expect(indifferentStrings.toHash()).toEqual({ aa: 1, bb: 2 });
+    expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
+
+    indifferentStrings = new HashWithIndifferentAccess<number>(strings);
+    indifferentStrings.transformKeysBang((k) => `:${k}`);
+    expect(indifferentStrings.get(":a")).toBe(1);
+    expect(indifferentStrings.get("a")).toBe(1);
+
+    let hash = new HashWithIndifferentAccess<number>(strings);
+    hash.transformKeysBang({ a: "x", y: "z" });
+    expect(hash.get("a")).toBeUndefined();
+    expect(hash.get("x")).toBe(1);
+    expect(hash.get("b")).toBe(2);
+    expect(hash.get("z")).toBeUndefined();
+    expect([...hash.keys()]).toEqual(["x", "b"]);
+
+    hash = new HashWithIndifferentAccess<number>(strings);
+    hash.transformKeysBang({ a: "A", q: "Q" }, (k) => k.repeat(3));
+    expect(hash.get("A")).toBe(1);
+    expect(hash.get("bbb")).toBe(2);
+    expect([...hash.keys()]).toEqual(["A", "bbb"]);
+
+    expect(() => hash.transformKeysBang(null)).toThrow(/no implicit conversion of nil/);
+  });
+
+  it("indifferent slice inplace", () => {
+    const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
+    const expected = new HashWithIndifferentAccess({ c: 10 });
+
+    for (const keys of [
+      ["a", "b"],
+      [":a", ":b"],
+    ]) {
+      const copy = new HashWithIndifferentAccess(original);
+      expect(copy.sliceBang(...keys).toHash()).toEqual(expected.toHash());
+      expect(copy.toHash()).toEqual({ a: "x", b: "y" });
+    }
+  });
+
+  it("to options on indifferent preserves hash", () => {
+    const h = new HashWithIndifferentAccess<number>();
+    h.set("first", 1);
+    h.toOptionsBang();
+    expect(h.get("first")).toBe(1);
   });
 });

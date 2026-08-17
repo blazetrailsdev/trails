@@ -268,21 +268,26 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * Array-style equality — compares against the relation's loaded records.
-   * Mirrors Rails' `AssociationRelation#==(other)`, which is defined as
-   * `other == records` so that `blog.posts == [p1, p2]` works in user code.
+   * Mirrors `AssociationRelation#==` (association_relation.rb:14-16), which is
+   * `other == records` — the comparison semantics come from `other`'s own
+   * `==`, so an Array compares element-wise and a Relation runs
+   * `Relation#==` (relation.rb:1253-1262), which compares `to_sql`.
    *
    * TypeScript can't overload `==` / `===`, so this is surfaced as an
    * explicit `equals` method.
    */
-  async equals(other: Relation<T> | T[]): Promise<boolean> {
-    const ours = await this.toArray();
-    const theirs = Array.isArray(other) ? other : await other;
-    if (ours.length !== theirs.length) return false;
-    for (let i = 0; i < ours.length; i++) {
-      if (!ours[i].equals(theirs[i])) return false;
+  override async equals(other: unknown): Promise<boolean | undefined> {
+    const records = await this.records();
+    if (Array.isArray(other)) {
+      return (
+        other.length === records.length && other.every((record: T, i) => record.equals(records[i]))
+      );
     }
-    return true;
+    const otherEquals = (other as { equals?: (o: unknown) => unknown } | null)?.equals;
+    if (typeof otherEquals === "function") {
+      return (await otherEquals.call(other, records)) as boolean | undefined;
+    }
+    return false;
   }
 
   /**

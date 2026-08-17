@@ -72,6 +72,8 @@ describe("Relation value accessor Rails semantics", () => {
     rel.readonlyValue = false;
     expect(rel.readonlyValue).toBe(false);
     expect(rel.isReadonly).toBe(false);
+    // relation.rb:1278-1280 — `readonly?` IS `readonly_value`, so unset is nil.
+    expect(relation().isReadonly).toBeNull();
   });
 
   it("unscope(:readonly) clears readonly_value back to nil (null)", () => {
