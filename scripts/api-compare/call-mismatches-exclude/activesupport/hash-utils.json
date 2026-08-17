@@ -23,13 +23,6 @@
   {
     "package": "activesupport",
     "tsFile": "hash-utils.ts",
-    "rubyName": "deep_merge!",
-    "call": "merge!",
-    "reason": "`Hash#merge!(other) { |key, this_val, other_val| ... }` (deep_mergeable.rb:34-44) is Ruby's in-place merge with a conflict block. JS has no `merge!` and `Object.assign` takes no conflict block, so the port writes the same per-key conflict resolution as the loop that walks `other`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
     "rubyName": "deep_stringify_keys",
     "call": "deep_transform_keys",
     "kind": "args",

@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "begin_isolated_db_transaction",
-    "call": "fetch",
-    "reason": "Verified per-site (RFC 0106): Ruby core `Hash#fetch` (postgresql/database_statements.rb:69) on the plain object `transactionIsolationLevels()` returns; the port now reproduces `fetch`'s semantics exactly — an absent level raises `KeyError: key not found: :bogus` — but the JS spelling (`levels[isolation]` + the KeyError throw) emits no callee named `fetch`, so no TS call can credit the Ruby one."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "configure_connection",
     "call": "fetch",
     "reason": "The whole configure body lives in `_maybeConfigureConnection`, which reads the already-parsed frozen `_sessionVariables` instead of re-fetching `@config[:variables]` per call."
@@ -37,23 +30,9 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "disable_referential_integrity",
-    "call": "quote_table_name",
-    "reason": "The body lives in postgresql/referential-integrity.ts — Rails houses it in the ReferentialIntegrity module too (postgresql/referential_integrity.rb:5-36) — and makes both calls there; the adapter member is the include seam."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "get_database_version",
     "call": "with_raw_connection",
     "reason": "Rails' with_raw_connection is re-entrant on @raw_connection; ours is not, and this runs inside the very acquire configureConnection is warming, so it takes the published `_rawConnection` directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "lookup_cast_type_from_column",
-    "call": "lookup",
-    "reason": "The body lives in postgresql/quoting.ts, where Rails houses it too (postgresql/quoting.rb:189) and where the type_map lookup is made; the adapter member is the include seam."
   },
   {
     "package": "activerecord",
@@ -72,20 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quoted_binary",
-    "call": "escape_bytea",
-    "reason": "The escape_bytea call is made in postgresql/quoting.ts:149-153, the file matching Rails' PostgreSQL::Quoting module (postgresql/quoting.rb:152); the adapter member is the include seam."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "quoted_date",
-    "call": "format",
-    "reason": "The BC `format(\"%04d\", ...)` branch is in postgresql/quoting.ts:441, the file matching Rails' PostgreSQL::Quoting module (postgresql/quoting.rb:143); the adapter member is the include seam."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "reconfigure_connection_timezone",
     "call": "fetch",
     "reason": "Reads the already-parsed frozen `_sessionVariables` rather than re-fetching `@config[:variables]`, which the config parse resolved once at construction."
@@ -96,12 +61,5 @@
     "rubyName": "reconfigure_connection_timezone",
     "call": "raw_execute",
     "reason": "Runs as the first step of `_performQuery`, itself the block already executing inside withRawConnection, so the SET goes to the acquired client directly rather than re-entering rawExecute's leaf loop."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql-adapter.ts",
-    "rubyName": "returning_column_values",
-    "call": "first",
-    "reason": "The `rows.first` read is made in postgresql/database-statements.ts:333, the file matching Rails' PostgreSQL::DatabaseStatements module (postgresql/database_statements.rb:208); the adapter member is the include seam."
   }
 ]

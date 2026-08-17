@@ -2,34 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "any_authenticity_token_valid?",
-    "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "any_authenticity_token_valid?",
-    "call": "request_authenticity_tokens",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "any_authenticity_token_valid?",
-    "call": "valid_authenticity_token?",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:session",
-      "ref:token"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "compare_with_global_token",
     "call": "global_csrf_token",
     "kind": "args",

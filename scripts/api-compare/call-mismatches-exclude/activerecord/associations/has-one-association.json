@@ -44,27 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "attribute_present?",
-    "reason": "Satisfied via the extracted foreignKeyPresentFor helper (foreign-association.ts), which calls owner.attributePresent — same delegation as CollectionAssociation#foreignKeyPresent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "klass",
-    "reason": "Satisfied via the extracted foreignKeyPresentFor helper (foreign-association.ts), which reads reflection.klass — same delegation as CollectionAssociation#foreignKeyPresent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "foreign_key_present?",
-    "call": "primary_key",
-    "reason": "Satisfied via the extracted foreignKeyPresentFor helper (foreign-association.ts), which reads klass.primaryKey — same delegation as CollectionAssociation#foreignKeyPresent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
     "rubyName": "nullify_owner_attributes",
     "call": "foreign_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

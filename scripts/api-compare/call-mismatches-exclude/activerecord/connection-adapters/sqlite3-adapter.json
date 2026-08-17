@@ -37,13 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "explain",
-    "call": "to_sql",
-    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails database_statements.rb:19 renders `to_sql(arel, binds)` because its `explain` takes an Arel node; every trails adapter's `explain` (sqlite3-adapter.ts, postgresql-adapter.ts, mysql2-adapter.ts) takes an already-rendered SQL string because relation.ts#explain calls `toSql()` before dispatching, so the render happens at the call site, not in the body."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "get_database_version",
     "call": "query_value",
     "reason": "Per-entry verified (RFC 0106 sqlite3 introspection cluster), sqlite3_adapter.rb:477: Rails reads the version through `query_value(..., \"SCHEMA\")`, whose trails counterpart is `async`, while `getDatabaseVersion` must be able to answer synchronously for an in-process driver (the pool memo at pool_config.rb:39-41 fills `databaseVersion` on demand and callers read it synchronously). The query is therefore issued straight on the driver; the deviation is documented on the method's JSDoc."
@@ -76,20 +69,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "quote_string",
-    "call": "quote",
-    "reason": "Per-entry verified (RFC 0072 sqlite3 quoting cluster): Rails quoting.rb:66-68 delegates to the sqlite3 gem's C helper `::SQLite3::Database.quote`, which is exactly `'` -> `''`. There is no ported `SQLite3::Database` class (node:sqlite / better-sqlite3 expose no quote helper), so sqlite3-adapter.ts#quoteString spells that escape inline; it is the whole call's equivalent, not an omission."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "returning_column_values",
-    "call": "first",
-    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails database_statements.rb:136 reads `result.rows.first`; Ruby Array#first has no JS method analogue, so the ported body (sqlite3/database-statements.ts#returningColumnValues, which the adapter method is the include resolution point for) spells it `result.rows[0]`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
     "rubyName": "shared_cache?",
     "call": "fetch",
     "reason": "Per-entry verified (RFC 0106 sqlite3 construction cluster), sqlite3_adapter.rb:473: Rails reads `@config.fetch(:flags, 0).anybits?(SHAREDCACHE)`. There is no `flags` bitmask in trails' config — no JS sqlite driver exposes SQLITE_OPEN_SHAREDCACHE — so `isSharedCache` inspects the `cache=shared` query parameter of the database URI instead, which is the only way shared cache can be requested here. Tracked by RFC 0094."
@@ -107,12 +86,5 @@
     "rubyName": "table_structure_sql",
     "call": "union",
     "reason": "Per-entry verified (RFC 0106 sqlite3 introspection cluster), sqlite3_adapter.rb:786: `Regexp.union(column_names).source` builds an alternation from the column names. JS `RegExp` has no `union`, so the port escapes and joins the names with `|` inline — the same alternation source, spelled out."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/sqlite3-adapter.ts",
-    "rubyName": "virtual_table_exists?",
-    "call": "any?",
-    "reason": "Per-entry verified (RFC 0072 sqlite3 introspection cluster): Rails schema_statements.rb:88 ends the query_values probe with a block-less `.any?`; the port spells that emptiness test as `.length > 0` (JS arrays have no `any?`), same as the other `#any?` -> `.length > 0` entries in this baseline."
   }
 ]

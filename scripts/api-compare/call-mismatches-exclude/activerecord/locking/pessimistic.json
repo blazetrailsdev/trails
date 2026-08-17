@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "locking/pessimistic.ts",
-    "rubyName": "lock!",
-    "call": "has_changes_to_save?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

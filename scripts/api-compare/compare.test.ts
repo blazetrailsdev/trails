@@ -38,6 +38,9 @@ import {
   callTagKey,
   splitOverriddenFileBuckets,
   resolveTsOwner,
+  ambiguousTsOwner,
+  ambiguousRubyOwner,
+  writerPairedWithReader,
   staleCallTags,
   suppressTaggedCalls,
   tagsForOwner,
@@ -387,6 +390,30 @@ describe("significantMissingCalls", () => {
         new Set(["details_cache_key"]),
       );
       expect(missing).toEqual(["details_cache_key → detailsCacheKey"]);
+    });
+
+    it("does not walk into a same-file `length` an `xs.length` read recorded", () => {
+      // relation.ts: `_buildEagerOperandManager` reads `xs.length`, which the
+      // extractor records as a call named `length`; resolving it bridged
+      // `to_sql` into `Relation#length` (relation/delegation.rb:101) and on to
+      // `toArray`'s `withConnection`. Moving `length` to DelegationMethods —
+      // RFC 0107 — then reddened `to_sql`, `create_or_find_by` and
+      // `apply_join_dependency` with no edit to any of their bodies.
+      const sameFile = new Map<string, string[]>([
+        ["_buildEagerOperandManager", ["length", "toArel"]],
+        ["length", ["toArray"]],
+        ["toArray", ["withConnection", "execQueries"]],
+      ]);
+      const own = new Set(["_buildEagerOperandManager", "_conn", "toArel"]);
+      const calls = (n: string) => sameFile.get(n);
+      expect(reachedSameFileMethods("toSql", own, calls)).toEqual(
+        new Set(["_buildEagerOperandManager"]),
+      );
+      const tsCalls = effectiveTsCalls("toSql", own, () => undefined, calls);
+      expect(tsCalls.has("withConnection")).toBe(false);
+      // …and the same body reads identically once `length` leaves the file.
+      const moved = (n: string) => (n === "length" ? undefined : sameFile.get(n));
+      expect(effectiveTsCalls("toSql", own, () => undefined, moved)).toEqual(tsCalls);
     });
 
     it("still flags a call no helper in the chain makes", () => {
@@ -1800,6 +1827,76 @@ describe("resolveTsOwner", () => {
   });
 });
 
+describe("ambiguousTsOwner", () => {
+  it("records nothing when a nested class shares the outer class's method name", () => {
+    // relation.ts declares `first` on both `ExplainProxy` (relation.rb:24-26)
+    // and `Relation`; `FinderMethods#first` resolves to neither by name.
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect(ambiguousTsOwner(owners, resolveTsOwner(owners, "ActiveRecord::FinderMethods"))).toBe(
+      true,
+    );
+  });
+
+  it("compares as before once the Ruby entity names one of them", () => {
+    const owners = new Set(["Relation", "ExplainProxy"]);
+    expect(
+      ambiguousTsOwner(owners, resolveTsOwner(owners, "ActiveRecord::Relation::ExplainProxy")),
+    ).toBe(false);
+  });
+
+  it("compares as before when the file declares the name once", () => {
+    const owners = new Set(["Relation"]);
+    expect(ambiguousTsOwner(owners, resolveTsOwner(owners, "ActiveRecord::FinderMethods"))).toBe(
+      false,
+    );
+  });
+});
+
+describe("ambiguousRubyOwner", () => {
+  it("records nothing when two Ruby owners share one TS member", () => {
+    // persistence.rb defines `_update_record` on both `Persistence` (:900) and
+    // `Persistence::ClassMethods` (:687); persistence.ts exports one
+    // `_updateRecord`.
+    const rubyOwners = new Set([
+      "ActiveRecord::Persistence",
+      "ActiveRecord::Persistence::ClassMethods",
+    ]);
+    expect(ambiguousRubyOwner(rubyOwners, new Set([""]))).toBe(true);
+  });
+
+  it("compares when the TS side declares the name on several owners too", () => {
+    const rubyOwners = new Set([
+      "ActiveRecord::Persistence",
+      "ActiveRecord::Persistence::ClassMethods",
+    ]);
+    expect(ambiguousRubyOwner(rubyOwners, new Set(["Base", "ClassMethods"]))).toBe(false);
+  });
+
+  it("compares when only one Ruby owner declares the name", () => {
+    expect(ambiguousRubyOwner(new Set(["ActiveRecord::Persistence"]), new Set([""]))).toBe(false);
+  });
+});
+
+describe("writerPairedWithReader", () => {
+  const siblings = new Set(["current_scope", "current_scope="]);
+
+  it("records nothing when a Ruby writer lands on the reader's TS body", () => {
+    expect(writerPairedWithReader("current_scope=", "currentScope", siblings)).toBe(true);
+  });
+
+  it("compares a writer ported as the awaitable setX", () => {
+    expect(writerPairedWithReader("current_scope=", "setCurrentScope", siblings)).toBe(false);
+  });
+
+  it("compares a writer whose Ruby surface has no reader to collide with", () => {
+    expect(writerPairedWithReader("flash=", "flash", new Set(["flash="]))).toBe(false);
+  });
+
+  it("leaves non-writers alone", () => {
+    expect(writerPairedWithReader("current_scope", "currentScope", siblings)).toBe(false);
+  });
+});
+
 describe("tagsForOwner", () => {
   const byClass = new Map([
     ["ConnectionPool", new Set(["synchronize"])],
@@ -1897,6 +1994,26 @@ describe("mixinMethodCreditedToOwnFile", () => {
         tsMethodsByFile,
       ),
     ).toEqual({ tsName: "schemeFor", tsFile: "encryption/encryptable-record.ts" });
+  });
+
+  it("recognizes the include seam a host keeps beside the mixin's own port", () => {
+    // postgresql_adapter.rb flattens `PostgreSQL::Quoting#quoted_date`
+    // (postgresql/quoting.rb:143) onto the adapter; trails ports the body into
+    // postgresql/quoting.ts and leaves postgresql-adapter.ts a one-line
+    // forwarder. Non-null here is what tells checkCalls to hold the mixin's
+    // own bucket to the call set, not the seam.
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "quoted_date", mixinFile: "connection_adapters/postgresql/quoting.rb" },
+        "connection_adapters/postgresql_adapter.rb",
+        "activerecord",
+        (f) => f === "connection_adapters/postgresql/quoting.rb",
+        new Map([["connection-adapters/postgresql/quoting.ts", new Set(["quotedDate"])]]),
+      ),
+    ).toEqual({
+      tsName: "quotedDate",
+      tsFile: "connection-adapters/postgresql/quoting.ts",
+    });
   });
 
   it("does not credit a method the host declares itself", () => {

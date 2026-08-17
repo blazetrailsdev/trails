@@ -697,8 +697,18 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
  * flagging `details_cache_key` because `LookupContext`'s constructor was edited
  * to reach `detailsKey` (RFC 0025
  * `extractor-missing-set-perturbed-by-unrelated-edits`).
+ *
+ * `length` is the same shape from the other end: it is a JS PROPERTY, never a
+ * callable, so every `length` the TS extractor records came off an `xs.length`
+ * read — never off a call to a same-file member spelled `length`. Resolving it
+ * bridged 29 relation.ts bodies into `Relation#length` and, three hops on, into
+ * `toArray`'s `withConnection`: `to_sql` and `create_or_find_by` were credited
+ * with a `with_connection` neither body makes, and the credit evaporated the
+ * moment `length` moved to its faithful home in `DelegationMethods`
+ * (`relation/delegation.rb:101`) — RFC 0107's
+ * `converge-relation-length-onto-records-delegation`.
  */
-const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
+const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor", "length"]);
 
 /**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.
@@ -947,6 +957,71 @@ export function ownerRecordsNothing(
 ): boolean {
   if (tsClass === undefined || (owners?.size ?? 0) <= 1) return false;
   return byFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) === undefined;
+}
+
+/**
+ * True when the TS file declares `tsName` on SEVERAL owners and
+ * `resolveTsOwner` could not say which one this Ruby entity ported to.
+ *
+ * `ownerRecordsNothing` only covers the resolved case; unresolved, the call
+ * gates fell back to the whole-FILE union and compared a Ruby body against
+ * whichever same-named member happened to carry calls. `relation.rb`'s
+ * `ExplainProxy#first` / `#last` (`:24-30`) are one-line
+ * `exec_explain { @relation.first(limit) }` sitting in relation.ts next to the
+ * `Relation` overloads of the same names, so `FinderMethods#first`
+ * (`relation/finder_methods.rb:100-108`) was held to the proxy's body and
+ * reported `find_nth` / `find_nth_with_limit` / `find_last` / `limit` missing.
+ * Record nothing instead — the same answer `ownerRecordsNothing` gives.
+ */
+export function ambiguousTsOwner(
+  owners: ReadonlySet<string> | undefined,
+  tsClass: string | undefined,
+): boolean {
+  return tsClass === undefined && (owners?.size ?? 0) > 1;
+}
+
+/**
+ * True when SEVERAL Ruby owners in one file declare `rubyName` but the TS file
+ * ports it as a single member, so nothing says which Ruby method that member
+ * is.
+ *
+ * `persistence.rb` defines `_update_record` twice — `ClassMethods` (`:687-692`)
+ * and the instance (`:900-916`) — and persistence.ts exports one
+ * `_updateRecord` (the ClassMethods half; the instance half rides
+ * `InstanceMethods` under a distinct implementation name). The gate paired the
+ * Ruby INSTANCE body with the TS ClassMethods one, so making the instance body
+ * call `attributesForUpdate` exactly as `persistence.rb:901` does could not
+ * retire the row. Bidirectional too: a genuine omission in either body is
+ * masked by the other.
+ */
+export function ambiguousRubyOwner(
+  rubyOwners: ReadonlySet<string> | undefined,
+  tsOwners: ReadonlySet<string> | undefined,
+): boolean {
+  return (rubyOwners?.size ?? 0) > 1 && (tsOwners?.size ?? 0) <= 1;
+}
+
+/**
+ * True when a Ruby WRITER resolved to the TS READER's body.
+ *
+ * `rubyMethodToTs` offers `foo=` both the bare camel name and `setFoo`, bare
+ * first (conventions.ts). The bare name is the READER, so when the port spells
+ * the writer as the awaitable `setFoo()` — CLAUDE.md's sanctioned shape for a
+ * writer whose Rails body blocks on I/O — but the file has no `setFoo` the
+ * gate can see, the writer's Ruby call set is compared against the reader's
+ * body and every call the writer makes reads as missing (`current_scope=` →
+ * `currentScope`, losing `set_current_scope`). A reader body is not the
+ * writer's counterpart at all, so record nothing.
+ */
+export function writerPairedWithReader(
+  rubyName: string,
+  tsName: string,
+  siblingRubyNames: ReadonlySet<string>,
+): boolean {
+  if (!rubyName.endsWith("=")) return false;
+  const base = rubyName.slice(0, -1);
+  if (!siblingRubyNames.has(base)) return false;
+  return (rubyMethodToTs(base) ?? []).includes(tsName);
 }
 
 /** The tags that justify deviations for `owner`'s copy of a method. A resolved
@@ -2729,6 +2804,8 @@ export function main() {
         if (rubyCalls.length === 0) return;
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
         const tsClass = resolveTsOwner(tsOwners, rubyModule);
+        if (ambiguousTsOwner(tsOwners, tsClass)) return;
+        if (ambiguousRubyOwner(rubyOwnersByName.get(rubyName), tsOwners)) return;
         if (ownerRecordsNothing(tsCallsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) return;
         const tsCandidateSets = tsCallsByFileName.get(tsFile)?.get(tsName);
         if (!tsCandidateSets || tsCandidateSets.length === 0) return;
@@ -2860,6 +2937,8 @@ export function main() {
         // skeleton record, only an unambiguous TS body compares.
         const tsOwners = tsOwnersByFileName.get(tsFile)?.get(tsName);
         const tsClass = resolveTsOwner(tsOwners, rubyModule);
+        if (ambiguousTsOwner(tsOwners, tsClass)) return;
+        if (ambiguousRubyOwner(rubyOwnersByName.get(rubyName), tsOwners)) return;
         if (ownerRecordsNothing(tsCallArgsByFileNameOwner, tsFile, tsName, tsClass, tsOwners)) {
           return;
         }
@@ -2911,11 +2990,24 @@ export function main() {
         bodyHashRecords.push({ rubyFile, rubyName, tsFile, tsName, digest });
       };
 
-      const checkArity = (rubyName: string, tsName: string, tsFile: string, rubyModule = "") => {
+      const checkArity = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule = "",
+        // A pair whose TS side is not this Ruby method's counterpart at all —
+        // an `include` seam forwarding to the file that mirrors the mixin, or
+        // a Ruby writer that landed on the reader's body. Only the CALL gates
+        // read a body, so only they are skipped; arity, option keys, literals
+        // and the body pin all still compare the pair by signature.
+        skipCalls = false,
+      ) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
-        checkCalls(rubyName, tsName, tsFile, rubyModule);
-        checkCallArgs(rubyName, tsName, tsFile, rubyModule);
+        if (!skipCalls) {
+          checkCalls(rubyName, tsName, tsFile, rubyModule);
+          checkCallArgs(rubyName, tsName, tsFile, rubyModule);
+        }
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
         // Ruby writers (`foo=`) map to a TS setter/assignable property; the name
@@ -3003,7 +3095,27 @@ export function main() {
         const directMatch = tsCandidates.find((c) => tsMethods.has(c));
         if (directMatch) {
           fileMatched++;
-          checkArity(rubyName, directMatch, expectedTs, rubyModule);
+          // A method Ruby flattened onto this host through `include` is ported
+          // ONCE, in the file mirroring the mixin's own — `PostgreSQL::Quoting`
+          // (`postgresql/quoting.rb:143`) into postgresql/quoting.ts — and the
+          // host keeps only the `include` seam. The seam makes none of the
+          // mixin's calls, so holding it to them charges the port twice for one
+          // body; the mixin's own bucket compares the real one.
+          const seam =
+            mixinMethodCreditedToOwnFile(
+              { rubyName, mixinFile },
+              rubyFile,
+              pkg,
+              (f) => byFile.has(f),
+              tsMethodsByFile,
+            ) !== null;
+          checkArity(
+            rubyName,
+            directMatch,
+            expectedTs,
+            rubyModule,
+            seam || writerPairedWithReader(rubyName, directMatch, siblingRubyNames),
+          );
           continue;
         }
 
@@ -3029,7 +3141,13 @@ export function main() {
 
         if (foundViaInclude) {
           fileMatched++;
-          checkArity(rubyName, matchedCandidate!, foundViaInclude, rubyModule);
+          checkArity(
+            rubyName,
+            matchedCandidate!,
+            foundViaInclude,
+            rubyModule,
+            writerPairedWithReader(rubyName, matchedCandidate!, siblingRubyNames),
+          );
           moves.push({
             tsName: matchedCandidate!,
             rubyName,
