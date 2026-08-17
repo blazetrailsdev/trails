@@ -37,6 +37,8 @@ import {
 // Lowercase to match the rest of this file's header conventions; setHeader
 // is case-insensitive but call sites read `headers["content-type"]` directly.
 const CONTENT_TYPE = "content-type";
+// Rails spells this `SET_COOKIE = "Set-Cookie"` (response.rb:85); lowercase
+// here for the same reason as CONTENT_TYPE above.
 const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
@@ -292,7 +294,7 @@ export class Response {
 
   /**
    * Mirrors `Rack::Response::Helpers#set_cookie` (rack-3.1.12
-   * rack/response.rb:270-272). Rack's `add_header` keeps an Array of values;
+   * rack/response.rb:270-272, mixed into `Response` at response.rb:91). Rack's `add_header` keeps an Array of values;
    * our header hash is string-valued, so they are newline-joined — the shape
    * `cookies` reads back with `split("\n")`.
    *
@@ -304,7 +306,11 @@ export class Response {
     this.setHeader(SET_COOKIE, header === undefined ? cookie : `${header}\n${cookie}`);
   }
 
-  /** Mirrors `Rack::Response::Helpers#delete_cookie` (rack/response.rb:274-280). */
+  /**
+   * Mirrors `Rack::Response::Helpers#delete_cookie` (rack-3.1.12
+   * rack/response.rb:274-280), mixed into `Response` at response.rb:91.
+   * Newline-joined for the same reason as {@link setCookie}.
+   */
   deleteCookie(name: string, options: Partial<CookieOptions> = {}): void {
     const header = deleteSetCookieHeaderBang(
       this.getHeader(SET_COOKIE) ?? null,
