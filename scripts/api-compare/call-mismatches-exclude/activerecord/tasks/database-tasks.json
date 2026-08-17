@@ -30,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "schema_up_to_date?",
-    "call": "with_temporary_pool",
-    "reason": "Verified per-site (RFC 0106): `with_temporary_pool(db_config)` (`database_tasks.rb:403`) — the port reads internal_metadata off the already-established migration pool instead. Converging it re-establishes and restores a connection inside the `reconstruct_from_schema` fast path, so it is filed as its own story rather than folded in here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
     "rubyName": "target_version",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `ENV[\"VERSION\"].empty?` (database_tasks.rb:324) — `empty?` on a Ruby String, whose faithful JS spelling is `s === \"\"`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
