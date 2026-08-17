@@ -166,9 +166,8 @@ function valuesEqual(a: unknown, b: unknown): boolean {
     );
   }
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-  for (const method of ["equals", "eql"] as const) {
-    if (typeof (a as any)[method] === "function") return Boolean((a as any)[method](b));
-  }
+  if (typeof (a as any).equals === "function") return Boolean((a as any).equals(b));
+  if (typeof (a as any).eql === "function") return Boolean((a as any).eql(b));
   if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
