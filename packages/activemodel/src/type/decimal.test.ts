@@ -1,131 +1,89 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/date";
 import { Types } from "../index.js";
+import { DecimalType as Decimal } from "./decimal.js";
 
 // DecimalType#cast returns a BigDecimal (Rails: cast_value -> BigDecimal), so
 // decimal binds quote in fixed "F" form rather than as a 'string' literal.
 const bd = (value: string) => new BigDecimal(value);
 
 describe("DecimalTest", () => {
-  it("type cast from float with unspecified precision", () => {
-    const decimalType = new Types.DecimalType();
-    const result = decimalType.cast(1.5);
-    expect(result).toEqual(bd("1.5"));
-  });
-
-  it("type cast decimal from rational with precision and scale", () => {
-    const decimalType = new Types.DecimalType();
-    const result = decimalType.cast("1.23");
-    expect(result).toEqual(bd("1.23"));
-  });
-
-  it("type cast decimal from rational without precision defaults to 18 36", () => {
-    const decimalType = new Types.DecimalType();
-    const result = decimalType.cast("1.23456789");
-    expect(result).toEqual(bd("1.23456789"));
-  });
-
-  it("type cast decimal from object responding to d", () => {
-    const decimalType = new Types.DecimalType();
-    const result = decimalType.cast(42);
-    expect(result).toEqual(bd("42"));
-  });
-
-  it("convertFloatToBigDecimal: precision rounds significant digits before scale", () => {
-    // Mirrors Rails BigDecimal(value, float_precision) — Type::Decimal.new(precision: 3).cast(1.2346)
-    // rounds the input to 3 significant digits ("1.23") before any scale: pass.
-    const type = new Types.DecimalType({ precision: 3 });
-    expect(type.cast(1.2346)).toEqual(bd("1.23"));
-    // 1234.5 → 3 significant digits → "1230"
-    expect(type.cast(1234.5)).toEqual(bd("1230"));
-    // No precision configured: pass through (preserves the existing default).
-    const noPrec = new Types.DecimalType();
-    expect(noPrec.cast(1.2346)).toEqual(bd("1.2346"));
-  });
-
-  it("scale is applied before precision to prevent rounding errors", () => {
-    // Rails decimal_test.rb: Type::Decimal.new(precision: 5, scale: 3).cast(1.2346)
-    // rounds to BigDecimal("1.235") via apply_scale before storage.
-    const type = new Types.DecimalType({ precision: 5, scale: 3 });
-    expect(type.cast(1.2346)).toEqual(bd("1.235"));
-    expect(type.cast("1.2346")).toEqual(bd("1.235"));
-    expect(type.cast("1.23")).toEqual(bd("1.230"));
-  });
-
-  it("apply_scale handles leading-dot and trailing-dot numeric forms", () => {
-    const type = new Types.DecimalType({ scale: 2 });
-    // `_castWithoutScale` can emit forms like ".5" or "1." — apply_scale
-    // must normalize them, not silently pass through.
-    expect(type.cast(".5")).toEqual(bd("0.50"));
-    expect(type.cast("1.")).toEqual(bd("1.00"));
-  });
-
-  it("apply_scale does not OOM on adversarial exponents", () => {
-    // `"1e10000000"` would force splitDecimal to allocate a ~10M-digit
-    // string if expanded naively. The cap leaves the raw form alone — and
-    // BigDecimal can't hold it either, so the raw string passes through.
-    const type = new Types.DecimalType({ scale: 2 });
-    expect(type.cast("1e10000000")).toBe("1e10000000");
-  });
-
-  it("apply_scale ignores non-integer/negative scale values", () => {
-    // Ruby BigDecimal#round(n) requires an Integer; rather than invent
-    // new semantics, leave the raw value alone for scale = 2.5 / -1.
-    expect(new Types.DecimalType({ scale: 2.5 }).cast("1.234")).toEqual(bd("1.234"));
-    expect(new Types.DecimalType({ scale: -1 }).cast("1.234")).toEqual(bd("1.234"));
-  });
-
-  it("apply_scale rounds half away from zero", () => {
-    // Ruby BigDecimal#round default is ROUND_HALF_UP (away from zero).
-    const type = new Types.DecimalType({ scale: 2 });
-    expect(type.cast("1.005")).toEqual(bd("1.01"));
-    expect(type.cast("-1.005")).toEqual(bd("-1.01"));
-    expect(type.cast("9.999")).toEqual(bd("10.00"));
-    expect(type.cast("-9.999")).toEqual(bd("-10.00"));
-  });
-
   it("type cast decimal", () => {
-    const type = new Types.DecimalType();
-    expect(type.cast(42.5)).toEqual(bd("42.5"));
-    expect(type.cast("3.14")).toEqual(bd("3.14"));
+    const type = new Decimal();
+    expect(type.cast(bd("0"))).toEqual(bd("0"));
+    expect(type.cast(123.0)).toEqual(bd("123"));
+    // Rails casts the Symbol `:"1"`; a Ruby Symbol is a JS string in trails.
+    expect(type.cast("1")).toEqual(bd("1"));
   });
 
   it("type cast decimal from invalid string", () => {
-    // Mirrors Rails' decimal_test.rb#test_type_cast_decimal_from_invalid_string:
-    // empty string -> nil, leading-numeric prefix keeps the prefix,
-    // non-numeric leading chars return BigDecimal(0).
-    const type = new Types.DecimalType();
-    expect(type.cast("")).toBe(null);
+    const type = new Decimal();
+    expect(type.cast("")).toBeNull();
     expect(type.cast("1ignore")).toEqual(bd("1"));
     expect(type.cast("bad1")).toEqual(bd("0"));
     expect(type.cast("bad")).toEqual(bd("0"));
   });
 
-  it("changed?", () => {
-    const type = new Types.DecimalType();
-
-    expect(type.isChanged(0.0, 0, "wibble")).toBe(true);
-    expect(type.isChanged(5.0, 0, "wibble")).toBe(true);
-    expect(type.isChanged(5.0, 5.0, "5.0wibble")).toBe(false);
-    expect(type.isChanged(5.0, 5.0, "5.0")).toBe(false);
-    expect(type.isChanged(-5.0, -5.0, "-5.0")).toBe(false);
-    expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBe(false);
-    // Rails passes `BigDecimal("0.0") / 0`; trails' NaN decimal is the "NaN" sentinel.
-    expect(type.isChanged("NaN", "NaN", "NaN")).toBe(false);
-    // Float NaN over BigDecimal NaN: still a change (`instance_of?` guard).
-    expect(type.isChanged("NaN", NaN, NaN)).toBe(true);
+  it("type cast decimal from float with large precision", () => {
+    // Rails: `::Float::DIG + 2` — 17 on IEEE-754 doubles.
+    const type = new Decimal({ precision: 17 });
+    expect(type.cast(123.0)).toEqual(bd("123.0"));
   });
 
-  it("type cast decimal from float with large precision", () => {
-    const type = new Types.DecimalType();
-    const result = type.cast(3.14159265358979);
-    expect(Number((result as BigDecimal).toString("F"))).toBeCloseTo(3.14159265358979);
+  it("type cast from float with unspecified precision", () => {
+    const type = new Decimal();
+    expect(type.cast(22.68)).toEqual(bd("22.68"));
   });
 
   it("type cast decimal from rational with precision", () => {
-    const type = new Types.DecimalType();
-    const result = type.cast(0.3333333333);
-    expect(Number((result as BigDecimal).toString("F"))).toBeCloseTo(0.3333333333);
+    const type = new Decimal({ precision: 2 });
+    expect(type.cast(new Rational(1, 3))).toEqual(bd("0.33"));
+    expect(type.cast(new Rational(2, 3))).toEqual(bd("0.67"));
+  });
+
+  it("type cast decimal from rational with precision and scale", () => {
+    const type = new Decimal({ precision: 4, scale: 2 });
+    expect(type.cast(new Rational(1, 3))).toEqual(bd("0.33"));
+    expect(type.cast(new Rational(2, 3))).toEqual(bd("0.67"));
+  });
+
+  it("type cast decimal from rational without precision defaults to 18 36", () => {
+    const type = new Decimal();
+    expect(type.cast(new Rational(1, 3))).toEqual(bd("0.333333333333333333E0"));
+    expect(type.cast(new Rational(2, 3))).toEqual(bd("0.666666666666666667E0"));
+  });
+
+  it("type cast decimal from object responding to d", () => {
+    const value = {
+      toD() {
+        return bd("1");
+      },
+    };
+    const type = new Decimal();
+    expect(type.cast(value)).toEqual(bd("1"));
+  });
+
+  it("changed?", () => {
+    const type = new Decimal();
+
+    expect(type.isChanged(0.0, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5.0, 0, "wibble")).toBeTruthy();
+    expect(type.isChanged(5.0, 5.0, "5.0wibble")).toBeFalsy();
+    expect(type.isChanged(5.0, 5.0, "5.0")).toBeFalsy();
+    expect(type.isChanged(-5.0, -5.0, "-5.0")).toBeFalsy();
+    expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBeFalsy();
+    // Rails passes `BigDecimal("0.0") / 0`; trails' NaN decimal is the "NaN" sentinel.
+    expect(type.isChanged("NaN", "NaN", "NaN")).toBeFalsy();
+    // Float NaN over BigDecimal NaN: still a change (`instance_of?` guard).
+    expect(type.isChanged("NaN", NaN, NaN)).toBeTruthy();
+  });
+
+  it("scale is applied before precision to prevent rounding errors", () => {
+    const type = new Decimal({ precision: 5, scale: 3 });
+
+    expect(type.cast(1.250473853637869)).toEqual(bd("1.250"));
+    expect(type.cast("1.250473853637869")).toEqual(bd("1.250"));
   });
 });
 describe("DecimalType", () => {

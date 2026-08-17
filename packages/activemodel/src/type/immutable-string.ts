@@ -1,3 +1,4 @@
+import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {
@@ -23,8 +24,31 @@ export class ImmutableStringType extends ValueType<string> {
     return "string";
   }
 
+  /**
+   * Mirrors: ActiveModel::Type::ImmutableString#serialize
+   * (immutable_string.rb:52-58):
+   *
+   *   case value
+   *   when ::Numeric, ::Symbol, ActiveSupport::Duration then value.to_s
+   *   when true then @true
+   *   when false then @false
+   *   else super
+   *   end
+   *
+   * `super` is Value#serialize — identity — so an Object, an Array or a Hash
+   * comes straight back out (string_test.rb:17-23 pins that). A Ruby Symbol is
+   * a `":name"` string in trails, and the leading colon is the discriminator
+   * the `when ::Symbol` arm gets from the type: `:bob.to_s` is `"bob"`, so the
+   * Symbol arm is `.slice(1)` while a String falls through to `super`
+   * unchanged.
+   */
   serialize(value: unknown): unknown {
-    return this.cast(value);
+    if (typeof value === "number" || typeof value === "bigint") return String(value);
+    if (value instanceof BigDecimal || value instanceof Duration) return String(value);
+    if (typeof value === "string" && value.startsWith(":")) return value.slice(1);
+    if (value === true) return this.true;
+    if (value === false) return this.false;
+    return super.serialize(value);
   }
 
   serializeCastValue(value: string | null): string | null {

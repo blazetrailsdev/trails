@@ -13,21 +13,36 @@ describe("StringTest", () => {
 
   it("type casting for database", () => {
     const type = new Types.StringType();
-    expect(type.serialize("hello")).toBe("hello");
-    expect(type.serialize(123)).toBe("123");
+    // Rails' `Object.new` stands for "any value that is neither a Numeric, a
+    // Symbol, a Duration nor a boolean" — immutable_string.rb:52-58 sends all of
+    // those to `super`, i.e. straight back out.
+    const object = {},
+      array = [true],
+      hash = { a: ":b" };
+    expect(type.serialize(object)).toBe(object);
+    expect(type.serialize(array)).toBe(array);
+    expect(type.serialize(hash)).toBe(hash);
   });
 
   it("cast strings are mutable", () => {
     const type = new Types.StringType();
-    const result = type.cast("foo");
-    expect(typeof result).toBe("string");
+    // Rails asserts `type.cast(s).frozen? == false` for both a mutable (+"foo")
+    // and a frozen (-"foo") receiver: `String#cast_value` runs `::String.new(value)`
+    // (string.rb:35), so the result is always an unfrozen copy. JS strings are
+    // immutable primitives, so `frozen?` has no counterpart — there is nothing
+    // to assert beyond the cast itself.
+    expect(type.cast("foo")).toBe("foo");
   });
 
   it("values are duped coming out", () => {
     const type = new Types.StringType();
     const s = "foo";
-    const cast = type.cast(s);
-    expect(cast).toBe("foo");
+    // Rails' `assert_not_same s, type.cast(s)` pins the `::String.new(value)`
+    // copy. JS strings are primitives with no identity distinct from their
+    // value, so `not_same` cannot be expressed — only the `assert_equal` arms
+    // port.
+    expect(type.cast(s)).toBe(s);
+    expect(type.deserialize(s)).toBe(s);
   });
 
   it("toImmutableString propagates true and false", () => {

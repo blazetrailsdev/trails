@@ -1,8 +1,12 @@
 import { BigDecimal } from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/date";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
 const NumericValueType = applyNumericMixin(ValueType<BigDecimal | string>);
+
+/** Mirrors: ActiveModel::Type::Decimal::BIGDECIMAL_PRECISION (decimal.rb:46). */
+const BIGDECIMAL_PRECISION = 18;
 
 export class DecimalType extends NumericValueType {
   readonly name: string = "decimal";
@@ -57,23 +61,23 @@ export class DecimalType extends NumericValueType {
    *     end
    *   end
    *
-   * Trails keeps the same overall cast pipeline but applies `scale:`
-   * later via the outer `castValue() → applyScale(...)` step rather
-   * than inside this helper, so the inner `apply_scale(value)` call
-   * Rails makes here is intentionally elided. This helper runs on the
-   * digit-string stage of the pipeline (before `castValue` wraps the
-   * result in a BigDecimal), so the precision-sensitive portion
-   * translates to "round to `floatPrecision()` significant digits".
-   * When no precision is configured, fall through to `String(value)`
-   * (the same form `_castWithoutScale` would otherwise emit).
+   * This helper runs on the digit-string stage of the pipeline (before
+   * `castValue` wraps the result in a BigDecimal), so `BigDecimal(_,
+   * float_precision)` translates to "round to `floatPrecision()`
+   * significant digits". The inner `apply_scale` is load-bearing and runs
+   * first, exactly as Rails has it — that ordering is what
+   * `decimal_test.rb:81-86` pins. When no precision is configured, fall
+   * through to `String(value)` (the same form `_castWithoutScale` would
+   * otherwise emit).
    *
    * @internal Rails-private helper.
    */
   protected convertFloatToBigDecimal(value: number): string {
     if (this.precision === undefined) return String(value);
     const precision = this.floatPrecision();
-    if (precision <= 0) return String(value);
-    return roundFloatToSignificantDigits(value, precision);
+    const scaled = this.applyScale(String(value)) as string;
+    if (precision <= 0) return scaled;
+    return roundDecimalStringToSignificantDigits(scaled, precision);
   }
 
   /**
@@ -128,6 +132,14 @@ export class DecimalType extends NumericValueType {
     // it through `BigDecimal(value, precision)`.
     if (value instanceof BigDecimal) return value.toString("F");
     if (typeof value === "bigint") return value.toString();
+    // Mirrors decimal.rb:64-66 — a `::Numeric` that is not a `::Float` goes
+    // through `BigDecimal(value, precision || BIGDECIMAL_PRECISION)`. Rational
+    // is the case that distinguishes this arm from the Float one: it carries an
+    // exact fraction, so the significant-digit count is what decides the
+    // result (`Rational(1, 3)` is `0.333333333333333333E0` at the default 18).
+    if (value instanceof Rational) {
+      return rationalToSignificantDigits(value, this.precision ?? BIGDECIMAL_PRECISION);
+    }
     if (typeof value === "number") {
       // BigDecimal("NaN") / BigDecimal("Infinity") have no decimal string
       // form, so the non-finite values round-trip as sentinel strings (not
@@ -163,6 +175,12 @@ export class DecimalType extends NumericValueType {
       const match = trimmed.match(/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?/);
       return match ? match[0] : "0";
     }
+    // Mirrors decimal.rb:73-77 — `value.to_d` when the object answers it.
+    const toD = (value as { toD?: unknown }).toD;
+    if (typeof toD === "function") {
+      const d = toD.call(value) as unknown;
+      return d instanceof BigDecimal ? d.toString("F") : this._castWithoutScale(d);
+    }
     return null;
   }
 }
@@ -175,6 +193,40 @@ export class DecimalType extends NumericValueType {
  */
 export function roundFloatToSignificantDigits(value: number, precision: number): string {
   if (precision <= 0 || !Number.isFinite(value)) return String(value);
+  return roundDecimalStringToSignificantDigits(String(value), precision);
+}
+
+/**
+ * Ruby's `BigDecimal(value, precision)` on an exact `Rational`: the fraction is
+ * expanded by long division over `bigint`s — never through a float, which would
+ * lose digits well before the default precision of 18 — and the expansion is
+ * then rounded to `precision` significant digits, half-up.
+ */
+function rationalToSignificantDigits(value: Rational, precision: number): string {
+  if (precision <= 0) return String(value.toF());
+  const sign = value.numerator < 0n !== value.denominator < 0n ? "-" : "";
+  const n = value.numerator < 0n ? -value.numerator : value.numerator;
+  const d = value.denominator < 0n ? -value.denominator : value.denominator;
+  if (d === 0n || n === 0n) return `${n === 0n ? "0" : sign}0`;
+
+  const intDigits = n / d === 0n ? 0 : (n / d).toString().length;
+  let fracNeeded: number;
+  if (intDigits > 0) {
+    fracNeeded = Math.max(precision - intDigits, 0) + 2;
+  } else {
+    // Leading fractional zeros do not count as significant digits, so expand
+    // past them before asking for `precision` more.
+    let leadingZeros = 0;
+    for (let x = n * 10n; x < d && leadingZeros < MAX_EXPONENT_EXPANSION; x *= 10n) leadingZeros++;
+    fracNeeded = leadingZeros + precision + 2;
+  }
+  const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString().padStart(fracNeeded + 1, "0");
+  const raw = `${sign}${scaled.slice(0, scaled.length - fracNeeded)}.${scaled.slice(scaled.length - fracNeeded)}`;
+  return roundDecimalStringToSignificantDigits(raw, precision);
+}
+
+/** Round a decimal string to `precision` significant digits, half-up. */
+function roundDecimalStringToSignificantDigits(raw: string, precision: number): string {
   // Ruby's `BigDecimal(float, n)` (BigDecimal 3.1.4+, an Active Support
   // dependency) rounds the float's SHORTEST round-trip decimal string — what
   // `String(value)` yields — to `n` significant digits, half-up. JS
@@ -182,8 +234,8 @@ export function roundFloatToSignificantDigits(value: number, precision: number):
   // diverges on exact half-way decimals (`123.455` → `123.45` via the binary
   // form, but `123.46` per BigDecimal). Round the decimal string directly so
   // we match Ruby; see ruby/bigdecimal#70.
-  const parts = splitDecimal(String(value));
-  if (!parts) return String(value);
+  const parts = splitDecimal(raw);
+  if (!parts) return raw;
   const { sign, intPart, fracPart } = parts;
   // Significant-digit rounding maps to a fractional-scale round: subtract the
   // count of leading significant integer digits (for |x| >= 1), or add the
