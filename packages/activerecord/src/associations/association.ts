@@ -223,13 +223,15 @@ export class Association {
     return this.loaded && this._staleState !== this.staleState();
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::Association#reset
+   * (`association.rb:61-64`) — `@loaded = false; @stale_state = nil`. Rails
+   * leaves `@target` alone here; the subclasses that need it cleared do so
+   * themselves (`collection_association.rb:88-89`,
+   * `singular_association.rb`).
+   */
   reset(): void {
     this.loaded = false;
-    // Ruby's `@target` ivar write, not `self.target =`: Rails' collection
-    // `target=` (collection_association.rb:285) folds a record into the inverse
-    // and reads `reflection.klass`, which `reset` must not force — a habtm
-    // through-reflection resolves its class lazily.
-    this._targetStore = null;
     this._staleState = undefined;
     this._staleStateSnapshotted = false;
     this._explicitTarget = false;

@@ -139,11 +139,12 @@ export class CollectionAssociation extends Association {
    * `associationProxy` materializes the `CollectionProxy` first because RFC
    * 0022 makes the proxy the canonical has_many store — the trails analog of
    * Rails' `@target` — so the `replace_on_target` write lands where readers
-   * (`size()`/`load()`) look.
+   * (`size()`/`load()`) look. The `super` arms keep the pre-existing coercion
+   * of a lone record and of `null` to an array, which Rails leaves to Ruby's
+   * untyped `@target`.
    */
   override set target(records: Base | Base[] | null) {
-    if (!(this.klass as typeof Base | undefined)?.hasManyInversing) {
-      // `Association#reset` assigns `null`; a collection's empty target is `[]`.
+    if (!this.reflection.klass?.hasManyInversing) {
       this._writeTargetStore(records == null ? [] : Array.isArray(records) ? records : [records]);
       return;
     }
@@ -154,8 +155,6 @@ export class CollectionAssociation extends Association {
       this._writeTargetStore(records);
     } else {
       associationProxy(this.owner, this.reflection.name);
-      // Synchronous with `skipCallbacks: true`; the cast mirrors
-      // `CollectionProxy#_wireInverseTarget`'s.
       this.replaceOnTarget(records, true, { replace: true, inversing: true }) as Base | null;
     }
   }
