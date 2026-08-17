@@ -1420,10 +1420,14 @@ function orBang(this: QueryMethodsHost, other: any): any {
  */
 function having(
   this: QueryMethodsHost,
-  condition: string | Record<string, unknown> | Nodes.Node,
-  ...binds: unknown[]
+  opts: string | Record<string, unknown> | Nodes.Node,
+  ...rest: unknown[]
 ): any {
-  return havingBang.call(this.spawn(), condition, ...binds);
+  // `opts.blank? ? self : spawn.having!(opts, *rest)` (query_methods.rb:1198) —
+  // a blank condition (an empty hash included) is a no-op on the receiver, so it
+  // never reaches PredicateBuilder, which expands `{}` to the `1=0` contradiction.
+  if (opts == null || isBlankArgument(opts)) return this;
+  return havingBang.call(this.spawn(), opts, ...rest);
 }
 
 function havingBang(
@@ -1431,31 +1435,8 @@ function havingBang(
   opts: string | Record<string, unknown> | Nodes.Node,
   ...rest: unknown[]
 ): any {
-  // Rails' `having` no-ops on a blank condition (`opts.blank? ? self : …`,
-  // query_methods.rb:1198) — including an empty hash. Guard it here (mirroring
-  // the same check `where` applies) so `having({})` stays a no-op rather than
-  // routing an empty hash through PredicateBuilder, which now expands it to the
-  // `1=0` contradiction.
-  if (opts == null || isBlankArgument(opts)) return this;
-
-  if (typeof opts === "string") {
-    const sql = rest.length > 0 ? this._model.sanitizeSqlArray(opts, ...rest) : opts;
-    this.havingClause = this.havingClause.plus(new WhereClause([new Nodes.SqlLiteral(sql)]));
-    return this;
-  }
-
-  if (opts instanceof Nodes.Node) {
-    this.havingClause = this.havingClause.plus(new WhereClause([opts]));
-    return this;
-  }
-
-  if (typeof opts !== "object" || Array.isArray(opts)) {
-    throw argumentError(`Unsupported argument type for having: ${typeof opts} (${String(opts)})`);
-  }
-
-  this.havingClause = this.havingClause.plus(
-    new WhereClause([...this.predicateBuilder.buildFromHash(opts)]),
-  );
+  // `self.having_clause += build_having_clause(opts, rest)` (query_methods.rb:1202).
+  this.havingClause = this.havingClause.plus(buildWhereClause.call(this, opts, rest));
   return this;
 }
 
