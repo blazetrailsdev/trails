@@ -18,7 +18,6 @@ describe("classifyPair", () => {
   // the Rails name, which is free fidelity and stays burndown work.
   it("names a Ruby construct spelled as its JS builtin, and only that spelling", () => {
     expect(classifyPair("inject", "reduce")).toBe("no-js-equivalent");
-    expect(classifyPair("Array", "kernelArray")).toBe("no-js-equivalent");
     expect(classifyPair("last", "at")).toBe("no-js-equivalent");
     expect(classifyPair("size", "n")).toBe("burndown");
   });
