@@ -2984,10 +2984,8 @@ function collectCalls(
     if (!isNegatedOperand(expr)) return;
     for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
   };
-  // Per-name occurrence tallies backing the FOREIGN_READ_PREFIX marker: a name
-  // is marked only when every occurrence that credited it was a property read
-  // off a receiver other than `this`/`super`. Same shape as the Ruby side's
-  // `weak` tally (extract-ruby-api.rb#collect_method_calls).
+  // Marked only when EVERY occurrence that credited the name was a foreign
+  // read — the same shape as the Ruby side's `weak` tally.
   const occurrences = new Map<string, number>();
   const foreignReadOccurrences = new Map<string, number>();
   const tally = (map: Map<string, number>, name: string): void => {

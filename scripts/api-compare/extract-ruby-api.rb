@@ -2455,12 +2455,16 @@ class ApiExtractor
     end
   end
 
-  ATTR_DECLARATION_COMMANDS = %w[attr_reader attr_writer attr_accessor].freeze
+  # `attr_writer` is deliberately absent: it declares `foo=` and no `foo`, so a
+  # bare `foo` in the body is a real method the class defines some other way
+  # (the `@foo ||= …` lazy reader beside a writer is the common pair), and
+  # suppressing it would hide a call the port must make.
+  ATTR_DECLARATION_COMMANDS = %w[attr_reader attr_accessor].freeze
 
   # The attribute names a class body declares with `attr_reader` /
-  # `attr_writer` / `attr_accessor`, collected up front rather than as the walk
-  # reaches them: `association_scope.rb:52` declares `value_transformation`
-  # above its readers, but nothing in Ruby requires that order.
+  # `attr_accessor`, collected up front rather than as the walk reaches them:
+  # `association_scope.rb:52` declares `value_transformation` above its readers,
+  # but nothing in Ruby requires that order.
   #
   # Nested `class`/`module` bodies are NOT descended into — their declarations
   # belong to their own scope, which gets its own stack frame — but `class <<
