@@ -1,4 +1,8 @@
 #!/usr/bin/env tsx
+// SUPERSEDED — nothing invokes this file. The live CLI is `scripts/cli.ts` in
+// the tasks repo; fix bugs there, or the two silently diverge. Deleted by story
+// `delete-trails-copy-of-tasks-cli`.
+//
 // trails-side CLI for the sibling blazetrailsdev/tasks repo.
 //
 // All state lives in $TASKS_DIR (default ~/github/blazetrailsdev/tasks).

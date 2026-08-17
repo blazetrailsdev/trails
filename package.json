@@ -5,7 +5,7 @@
   "packageManager": "pnpm@11.5.1",
   "scripts": {
     "build": "tsc --build",
-    "tasks": "tsx scripts/tasks/cli.ts",
+    "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
