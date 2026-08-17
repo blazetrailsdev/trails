@@ -24,6 +24,7 @@ import { AssociationRelation } from "./association-relation.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 
 import { fixtures } from "./test-fixtures.js";
+import { Company as CanonCompany, Firm as CanonFirm } from "./test-helpers/models/company.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
   Comment as CanonComment,
@@ -1068,5 +1069,21 @@ describe("association equality re-dispatches to the other side", () => {
     expect(await proxy.equals([...records])).toBe(true);
     expect(await proxy.equals(records.slice(1))).toBe(false);
     expect(await proxy.equals("posts")).toBe(false);
+  });
+});
+
+describe("Relation#empty_scope? STI type_condition (trails)", () => {
+  fixtures(["companies"]);
+
+  beforeAll(() => {
+    registerModel(CanonCompany);
+    registerModel(CanonFirm);
+  });
+
+  it("reports an empty scope for an unscoped subclass relation carrying the type_condition", () => {
+    expect((CanonFirm as any).isFinderNeedsTypeCondition()).toBe(true);
+    expect((CanonFirm.all() as any).isEmptyScope).toBe(true);
+    expect((CanonFirm.where({ name: "x" }) as any).isEmptyScope).toBe(false);
+    expect((CanonCompany.all() as any).isEmptyScope).toBe(true);
   });
 });

@@ -148,21 +148,33 @@ function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | 
 }
 
 /**
- * Inline a WhereClause's predicates to SQL. Rails' WhereClause has no `to_sql`
- * — inline where-SQL is produced at the Relation level via
- * `conn.unprepared_statement { conn.to_sql(arel) }` — so this glue lives here,
- * routing the Arel AND/SqlLiteral-wrapped AST through the connection visitor.
- * Consumed by `isEmptyScope` to compare a relation's predicate SQL against the
- * unscoped baseline.
+ * Ruby's `Hash#==` — the comparison `empty_scope?` (relation.rb:1299) makes
+ * between two values hashes. JS has no value equality for objects at all, so
+ * the recursive walk Ruby gets from `==` is spelled out: each value is compared
+ * with its own `==` (`WhereClause#==` / `FromClause#==`, spelled `equals` in the
+ * port; an Arel node's `eql?`, spelled `eql`), arrays element by element, and
+ * anything else by identity.
  */
-function _whereClauseToSql(
-  whereClause: WhereClause,
-  connection: { toSql(arel: unknown): string },
-): string {
-  const wrapped = whereClause.predicatesWithWrappedSqlLiterals();
-  if (wrapped.length === 0) return "";
-  const node = wrapped.length === 1 ? wrapped[0] : new Nodes.And(wrapped);
-  return connection.toSql(node);
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((element, i) => valuesEqual(element, b[i]))
+    );
+  }
+  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
+  if (typeof (a as any).equals === "function") return Boolean((a as any).equals(b));
+  if (typeof (a as any).eql === "function") return Boolean((a as any).eql(b));
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
+  );
 }
 
 /**
@@ -1018,76 +1030,20 @@ export class Relation<T extends Base> {
   /**
    * Exclude specific records from the result.
    *
-   * Mirrors: ActiveRecord::QueryMethods#excluding (query_methods.rb:1574-1584).
+   * Mirrors: ActiveRecord::QueryMethods#excluding (query_methods.rb:1574-1584)
+   * and `alias :without :excluding` (query_methods.rb:1585). Ruby writes ONE
+   * body and lets `__callee__` (:1580) name whichever alias was invoked;
+   * TypeScript has no `__callee__` and a shared prototype function cannot
+   * recover the name it was reached under, so the one authored body lives in
+   * {@link excludingWithCallee} and each name is bound to a copy of it
+   * generated with its own callee — the ArgumentError then names `#excluding`
+   * or `#without` exactly as `excluding_test.rb:103-110`
+   * (`test_raises_on_record_from_different_class`) asserts, with no shared
+   * helper Rails does not have.
    */
-  excluding(...records: unknown[]): Relation<T> {
-    const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
-    records = records
-      .filter((r) => !(r instanceof Relation))
-      .flat(1)
-      .filter((r) => r != null);
+  declare excluding: (...records: unknown[]) => Relation<T>;
 
-    const model = this.model;
-    if (
-      !records.every((r) => r instanceof model) ||
-      !relations.every((relation) => relation.model === model)
-    ) {
-      throw new ArgumentError(
-        `You must only pass a single or collection of ${model.name} objects to #excluding.`,
-      );
-    }
-
-    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
-    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
-    // and re-queries otherwise. A loaded relation's records are already in
-    // memory, so spread them into the literal `records` collection to match
-    // Rails exactly (no extra query). An unloaded relation is deferred:
-    // `excludingBang` records a marker that the load pipeline materializes into a
-    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
-    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
-    const combined: unknown[] = [...records];
-    for (const relation of relations) {
-      if (relation.isLoaded) combined.push(...relation._records);
-      else combined.push(relation);
-    }
-    if (combined.length === 0) return this;
-    return this.spawn().excludingBang(combined);
-  }
-
-  /**
-   * Mirrors `alias :without :excluding` (query_methods.rb:1585). Ruby's alias
-   * shares one body and lets `__callee__` name whichever alias was called;
-   * TypeScript has no `__callee__`, so the body is materialized once per callee
-   * rather than routed through a helper Rails does not have — the ArgumentError
-   * has to name `#without` here, exactly as
-   * `excluding_test.rb:103-110` (`test_raises_on_record_from_different_class`)
-   * asserts.
-   */
-  without(...records: unknown[]): Relation<T> {
-    const relations = records.filter((r) => r instanceof Relation) as Relation<T>[];
-    records = records
-      .filter((r) => !(r instanceof Relation))
-      .flat(1)
-      .filter((r) => r != null);
-
-    const model = this.model;
-    if (
-      !records.every((r) => r instanceof model) ||
-      !relations.every((relation) => relation.model === model)
-    ) {
-      throw new ArgumentError(
-        `You must only pass a single or collection of ${model.name} objects to #without.`,
-      );
-    }
-
-    const combined: unknown[] = [...records];
-    for (const relation of relations) {
-      if (relation.isLoaded) combined.push(...relation._records);
-      else combined.push(relation);
-    }
-    if (combined.length === 0) return this;
-    return this.spawn().excludingBang(combined);
-  }
+  declare without: (...records: unknown[]) => Relation<T>;
 
   /**
    * Add ORDER BY. Accepts column name or { column: "asc"|"desc" }.
@@ -4127,73 +4083,13 @@ export class Relation<T extends Base> {
 
   /**
    * Mirrors: ActiveRecord::Relation#empty_scope? (relation.rb:1299) —
-   * `@values == model.unscoped.values`, compared value by value.
-   *
-   * In the WHERE half, the unscoped baseline may carry the STI
-   * `type_condition`, so a relation whose WHERE matches that baseline (rather
-   * than being literally empty) is still an empty scope. Only a
-   * finder-type-condition class has such a baseline — for anything else a
-   * non-empty WHERE means a real, non-empty scope — and the baseline is built
-   * against this relation's own table so an alias-qualified relation compares
-   * its type_condition against an identically-qualified one rather than the
-   * default arel_table.
+   * `@values == model.unscoped.values`. The STI `type_condition` needs no
+   * special case: a finder-type-condition class carries it in its own
+   * `unscoped` values too, so it compares equal (see {@link valuesEqual} for
+   * the `Hash#==` JS lacks).
    */
   get isEmptyScope(): boolean {
-    let whereMatchesUnscopedBaseline: boolean;
-    if (this.whereClause.isEmpty()) {
-      whereMatchesUnscopedBaseline = true;
-    } else {
-      const klass = this._model as any;
-      const connection = klass.isFinderNeedsTypeCondition?.() ? this._conn() : undefined;
-      const baseline = connection?.toSql
-        ? klass._buildUnscopedRelation?.(this._table ?? undefined)
-        : undefined;
-      if (!connection?.toSql || !baseline) {
-        whereMatchesUnscopedBaseline = false;
-      } else {
-        try {
-          whereMatchesUnscopedBaseline =
-            _whereClauseToSql(this.whereClause, connection) ===
-            _whereClauseToSql(baseline.whereClause, connection);
-        } catch {
-          whereMatchesUnscopedBaseline = false;
-        }
-      }
-    }
-
-    return (
-      whereMatchesUnscopedBaseline &&
-      this.orderValues.length === 0 &&
-      this.limitValue === null &&
-      this.offsetValue === null &&
-      this.selectValues.length === 0 &&
-      // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and a
-      // `readonly` relation carries `@values[:readonly]`, so it is NOT empty.
-      // Omitting this dropped a `readonly()` reflection scope on the preload
-      // through/HABTM source path (build_scope skips merging an empty scope).
-      this.readonlyValue !== true &&
-      // Rails' `empty_scope?` compares `@values` to the unscoped baseline, and
-      // `unscope_values` is a VALUE_METHOD, so a relation carrying only
-      // `unscope(where: ...)` is NOT empty. Omitting this dropped an
-      // `unscope(...)` reflection scope on the preload through/HABTM source path
-      // (build_scope skips merging an empty scope), so a target `default_scope`
-      // the association meant to unscope survived the eager load.
-      this.unscopeValues.length === 0 &&
-      !this.distinctValue &&
-      this.groupValues.length === 0 &&
-      this.havingClause.isEmpty() &&
-      this._joinClauses.length === 0 &&
-      this.joinsValues.length === 0 &&
-      this.leftOuterJoinsValues.length === 0 &&
-      this.includesValues.length === 0 &&
-      this.eagerLoadValues.length === 0 &&
-      this.preloadValues.length === 0 &&
-      this.lockValue === null &&
-      this.fromClause.isEmpty() &&
-      this.withValues.length === 0 &&
-      this.annotateValues.length === 0 &&
-      this.optimizerHintsValues.length === 0
-    );
+    return valuesEqual(this.values(), (this.model as any).unscoped().values());
   }
 
   get hasLimitOrOffset(): boolean {
@@ -5094,3 +4990,47 @@ async function computeCacheVersion(
 ): Promise<string> {
   return rel.computeCacheVersion(timestampColumn);
 }
+
+/**
+ * The one authored `excluding` body (query_methods.rb:1574-1584), generated per
+ * callee so `alias :without :excluding` (:1585) keeps its own `__callee__` in
+ * the ArgumentError. See {@link Relation.excluding}.
+ */
+function excludingWithCallee(callee: "excluding" | "without") {
+  return function (this: Relation<Base>, ...records: unknown[]): Relation<Base> {
+    const relations = records.filter((r) => r instanceof Relation) as Relation<Base>[];
+    records = records
+      .filter((r) => !(r instanceof Relation))
+      .flat(1)
+      .filter((r) => r != null);
+
+    const model = this.model;
+    if (
+      !records.every((r) => r instanceof model) ||
+      !relations.every((relation) => relation.model === model)
+    ) {
+      throw new ArgumentError(
+        `You must only pass a single or collection of ${model.name} objects to #${callee}.`,
+      );
+    }
+
+    // Rails `records + relations.flat_map(&:ids)`. `Relation#ids` returns the
+    // cached `records.map(&:id)` when the relation is loaded (calculations.rb:371)
+    // and re-queries otherwise. A loaded relation's records are already in
+    // memory, so spread them into the literal `records` collection to match
+    // Rails exactly (no extra query). An unloaded relation is deferred:
+    // `excludingBang` records a marker that the load pipeline materializes into a
+    // literal `id NOT IN (1, 2, 3)` via `Relation#ids` (a separate id-select),
+    // matching Rails' eager `flat_map(&:ids)` rather than emitting a subquery.
+    const combined: unknown[] = [...records];
+    for (const relation of relations) {
+      if (relation.isLoaded) combined.push(...(relation as any)._records);
+      else combined.push(relation);
+    }
+    if (combined.length === 0) return this;
+    return this.spawn().excludingBang(combined);
+  };
+}
+
+Relation.prototype.excluding = excludingWithCallee("excluding");
+Relation.prototype.without = excludingWithCallee("without");

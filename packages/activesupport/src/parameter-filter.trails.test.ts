@@ -34,10 +34,9 @@ describe("ParameterFilter (trails)", () => {
 
   it("folds a case-insensitive pattern the flag expansion must rewrite into the one group Regexp", () => {
     // Ruby folds every pattern of a group into ONE Regexp with an inline
-    // `(?i:...)` group (parameter_filter.rb:58-65). JS has no inline flag
-    // group, so the port expands each cased character to `[aA]` — inside a
-    // character class in place, and widening `\p{Lu}` / `\p{Ll}` to `\p{L}`,
-    // since `(?i:)` scopes the flag to any sub-pattern.
+    // `(?i:...)` group (parameter_filter.rb:58-65), which V8 also spells — so a
+    // case-insensitive member keeps its own flag inside the joined Regexp, down
+    // to case-folding a `\p{Lu}` property escape.
     for (const pattern of [/[xy]z/i, /\p{Lu}q/iu, /(?<tail>vw)/i, /[a-c]z/i]) {
       const precompiled = ParameterFilter.precompileFilters([/plain/, pattern]);
       expect(precompiled.length).toBe(1);
