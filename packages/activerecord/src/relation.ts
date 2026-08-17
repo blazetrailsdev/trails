@@ -1764,25 +1764,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Builds the eager-load JoinDependency in one shot, mirroring Rails'
-   * `construct_join_dependency(eager_load_values, ...)` — nested hashes and
-   * dotted paths become recursive JOINs. Polymorphic specs raise
-   * `EagerLoadPolymorphicError` out of the constructor (matching Rails), and an
-   * association that can't be JOINed raises rather than degrading to a preload.
-   *
-   * Alias resolution and `references` re-aliasing (`authors AS author`) are
-   * deferred to emit-time: the eager JD is folded into the single
-   * `build_joins` `emitJoinPlan` call (via `buildJoins`), whose one
-   * shared `AliasTracker` and `walk` fold handle collisions against the manual
-   * joins — there is no separate construction tracker to seed and no skip
-   * filter to compute.
-   * @internal
-   */
-  private _buildEagerJoinDependency(specs: AssociationSpec[]): JoinDependency {
-    return new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
-  }
-
-  /**
    * Async iterator support — allows `for await (const record of relation)`.
    *
    * @noRailsEquivalent PERMANENT
@@ -1868,7 +1849,11 @@ export class Relation<T extends Base> {
       Array.isArray(basePk) &&
       this.hasLimitOrOffset &&
       !this._eagerJoinDependencyIsLimitable(
-        this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
+        QueryMethodBangs.constructJoinDependency.call(
+          this as any,
+          this._deferredDistinctPkEagerSpecs() as any,
+          Nodes.OuterJoin,
+        ),
       );
     return compositePkBypass || this.withValues.length > 0 || !this.fromClause.isEmpty();
   }
@@ -2395,7 +2380,11 @@ export class Relation<T extends Base> {
     if (!this._eagerLoadingForSql()) return false;
     if (!this.hasLimitOrOffset) return false;
     return !this._eagerJoinDependencyIsLimitable(
-      this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs()),
+      QueryMethodBangs.constructJoinDependency.call(
+        this as any,
+        this._deferredDistinctPkEagerSpecs() as any,
+        Nodes.OuterJoin,
+      ),
     );
   }
 
@@ -2410,7 +2399,11 @@ export class Relation<T extends Base> {
    */
   _buildDeferredDistinctPkInlineSubquery(): SelectManager {
     const basePk = (this._model as any).primaryKey ?? "id";
-    const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
+    const jd = QueryMethodBangs.constructJoinDependency.call(
+      this as any,
+      this._deferredDistinctPkEagerSpecs() as any,
+      Nodes.OuterJoin,
+    );
     return this._buildEagerIdSubquery(jd, basePk);
   }
 
@@ -2423,7 +2416,11 @@ export class Relation<T extends Base> {
    */
   async _materializeDistinctPkIds(): Promise<unknown[]> {
     const basePk = (this._model as any).primaryKey ?? "id";
-    const jd = this._buildEagerJoinDependency(this._deferredDistinctPkEagerSpecs());
+    const jd = QueryMethodBangs.constructJoinDependency.call(
+      this as any,
+      this._deferredDistinctPkEagerSpecs() as any,
+      Nodes.OuterJoin,
+    );
     if (jd.nodes.length === 0) return [];
     return this.withConnection(() => this._materializeLimitedIds(jd, basePk));
   }
@@ -2764,7 +2761,11 @@ export class Relation<T extends Base> {
 
     const basePk = (this._model as any).primaryKey ?? "id";
 
-    const jd = this._buildEagerJoinDependency(allEager);
+    const jd = QueryMethodBangs.constructJoinDependency.call(
+      this as any,
+      allEager as any,
+      Nodes.OuterJoin,
+    );
     if (jd.nodes.length === 0) return null;
 
     const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
