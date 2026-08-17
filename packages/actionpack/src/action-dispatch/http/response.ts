@@ -290,13 +290,17 @@ export class Response {
 
   // --- Cookies ---
 
-  /** @internal Mirrors `Rack::Response::Helpers#set_cookie` (rack/response.rb:270-272). */
+  /**
+   * Mirrors `Rack::Response::Helpers#set_cookie` (rack-3.1.12
+   * rack/response.rb:270-272). Rack's `add_header` keeps an Array of values;
+   * our header hash is string-valued, so they are newline-joined — the shape
+   * `cookies` reads back with `split("\n")`.
+   *
+   * @internal
+   */
   setCookie(name: string, value: string | CookieOptions): void {
     const header = this.getHeader(SET_COOKIE);
     const cookie = setCookieHeader(name, rackCookieValue(value));
-    // Rack joins multiple Set-Cookie values with a newline on the way out
-    // (`Rack::Response#add_header` keeps an Array; our header hash is
-    // string-valued, and `cookies` below splits on "\n" to read it back).
     this.setHeader(SET_COOKIE, header === undefined ? cookie : `${header}\n${cookie}`);
   }
 
@@ -310,7 +314,11 @@ export class Response {
     this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
-  /** Mirrors `Response#cookies` (response.rb:418-430). */
+  /**
+   * Mirrors `Response#cookies` (response.rb:418-430). Ruby's `"k=".split("=")`
+   * drops the trailing empty field so a deleted cookie reads back as `nil`;
+   * JS keeps it, so the same pair reads back as `""`.
+   */
   get cookies(): Record<string, string> {
     const cookies: Record<string, string> = {};
     let header = this.getHeader(SET_COOKIE) as string | string[] | undefined;
