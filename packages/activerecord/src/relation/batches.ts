@@ -323,7 +323,7 @@ export async function ensureValidOptionsForBatchingBang(
     }
   }
 
-  if (kernelArray(order).filter((o) => o !== "asc" && o !== "desc").length > 0) {
+  if (kernelArray(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
     throw new ArgumentError(
       `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${rubyInspect(order)}`,
     );
