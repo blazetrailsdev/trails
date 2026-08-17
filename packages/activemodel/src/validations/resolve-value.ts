@@ -4,9 +4,9 @@
  * Mirrors: ActiveModel::Validations::ResolveValue
  *
  * Rails accepts a Proc (callable) or a Symbol (method name on the record).
- * TS has no Symbol/String distinction, so a string is only treated as a
- * method reference when the record actually responds to it; otherwise the
- * string is returned as a literal value.
+ * A Ruby Symbol reaches us as a colon-prefixed string (`":five"`); a bare
+ * string is also taken as a method reference when the record responds to it,
+ * and is otherwise returned as a literal value.
  */
 export interface ResolveValue {
   resolveValue(record: unknown, value: unknown): unknown;
