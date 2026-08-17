@@ -35,6 +35,7 @@ import {
   isDelegatingWrapper,
   effectiveTsCalls,
   reachedSameFileMethods,
+  SAME_FILE_CLOSURE_DEPTH,
   callTagKey,
   splitOverriddenFileBuckets,
   resolveTsOwner,
@@ -414,6 +415,24 @@ describe("significantMissingCalls", () => {
       // …and the same body reads identically once `length` leaves the file.
       const moved = (n: string) => (n === "length" ? undefined : sameFile.get(n));
       expect(effectiveTsCalls("toSql", own, () => undefined, moved)).toEqual(tsCalls);
+    });
+
+    it("does not walk into a same-file method a `obj.foo` property read recorded", () => {
+      const sameFile = new Map<string, string[]>([
+        ["locale", ["detailsCacheKey"]],
+        ["detailArgsForAny", ["locale", "formats"]],
+      ]);
+      const own = new Set(["locale", "formats"]);
+      const calls = (n: string) => sameFile.get(n);
+      const foreign = new Map<string, string[]>([["detailArgsForAny", ["locale", "formats"]]]);
+      expect(
+        reachedSameFileMethods("detailArgsForAny", own, calls, SAME_FILE_CLOSURE_DEPTH, (owner) =>
+          foreign.get(owner),
+        ),
+      ).toEqual(new Set());
+      // The same name called on `this` in the SAME body is the body's own again,
+      // so the extractor never marks it and the closure resolves it as before.
+      expect(reachedSameFileMethods("detailArgsForAny", own, calls)).toEqual(new Set(["locale"]));
     });
 
     it("still flags a call no helper in the chain makes", () => {

@@ -67,7 +67,7 @@ import {
 } from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
-import { NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
+import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
 import { TAG as MISSING_RAILS_CALL_TAG, suppressedCallsIn } from "./missing-rails-call-tags.js";
 
 // Per-package cache: extracting all packages with the TS Compiler API
@@ -2984,6 +2984,15 @@ function collectCalls(
     if (!isNegatedOperand(expr)) return;
     for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
   };
+  // Per-name occurrence tallies backing the FOREIGN_READ_PREFIX marker: a name
+  // is marked only when every occurrence that credited it was a property read
+  // off a receiver other than `this`/`super`. Same shape as the Ruby side's
+  // `weak` tally (extract-ruby-api.rb#collect_method_calls).
+  const occurrences = new Map<string, number>();
+  const foreignReadOccurrences = new Map<string, number>();
+  const tally = (map: Map<string, number>, name: string): void => {
+    map.set(name, (map.get(name) ?? 0) + 1);
+  };
   const visit = (n: ts.Node): void => {
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
@@ -2993,7 +3002,10 @@ function collectCalls(
       // constructor arguments (`new Foo(typeCast(x))`) are credited regardless
       // of body shape.
       ts.forEachChild(n, visit);
-      if (!(skipHoistedClosures && isThrownConstruction(n))) names.add("constructor");
+      if (!(skipHoistedClosures && isThrownConstruction(n))) {
+        names.add("constructor");
+        tally(occurrences, "constructor");
+      }
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
@@ -3042,7 +3054,10 @@ function collectCalls(
       // are evaluated before the call.
       const blocks = n.arguments.filter(isFunctionArgument);
       for (const arg of n.arguments) if (!isFunctionArgument(arg)) visit(arg);
-      for (const name of called) names.add(name);
+      for (const name of called) {
+        names.add(name);
+        tally(occurrences, name);
+      }
       for (const block of blocks) visit(block);
       addNegated(n, ...negated);
       return;
@@ -3073,6 +3088,8 @@ function collectCalls(
       if (n.name.text === "constructor") return;
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
+        tally(occurrences, n.name.text);
+        if (isForeignReadReceiver(n.expression)) tally(foreignReadOccurrences, n.name.text);
         addNegated(n, n.name.text);
       }
     }
@@ -3082,8 +3099,33 @@ function collectCalls(
   // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_calls covers it.
   visit(node);
   if (hoisted) for (const name of hoisted) names.delete(name);
+  // Call SET only: the ORDER stream (extractCallSeq) is compared position by
+  // position against Ruby's, and a marker has no position.
+  if (!skipHoistedClosures) {
+    for (const [name, count] of foreignReadOccurrences) {
+      if (names.has(name) && occurrences.get(name) === count) {
+        names.add(`${FOREIGN_READ_PREFIX}${name}`);
+      }
+    }
+  }
   if (names.size === 0) return undefined;
   return [...names];
+}
+
+/**
+ * Whether a property read's receiver names some OTHER object — so the member it
+ * reads is not this file's member of that name. `this` and `super` are the
+ * body's own receiver, and a capitalized identifier is a class/namespace
+ * reference (`Base.connection`), whose static of the same name is a same-file
+ * member when the class is declared here. Everything else — a parameter, a
+ * local, a chain (`details.locale`, `record.klass.table`) — is foreign.
+ */
+function isForeignReadReceiver(receiver: ts.Node): boolean {
+  if (receiver.kind === ts.SyntaxKind.ThisKeyword || receiver.kind === ts.SyntaxKind.SuperKeyword) {
+    return false;
+  }
+  if (ts.isIdentifier(receiver)) return !/^[A-Z]/.test(receiver.text);
+  return true;
 }
 
 /** `const block = () => { … }` / `= function () { … }` — see collectCalls. */

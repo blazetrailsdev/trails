@@ -719,26 +719,47 @@ const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor", "lengt
  * which an unrelated same-named method can satisfy). `tsName` seeds the visited
  * set, so self-recursion and longer cycles terminate. Names in
  * SYNTHETIC_CALL_NAMES are never resolved or expanded.
+ *
+ * Neither are the names a body recorded ONLY as a property read off another
+ * object (FOREIGN_READ_PREFIX): `details.locale` names a member of `details`,
+ * not the same-file method `locale`, so resolving it would union an unrelated
+ * method's call-set — and everything it reaches — into a body that read a plain
+ * property, making this body's `missing` set move when that method is edited
+ * (RFC 0108; the constructor half of the same receiver-blindness is
+ * SYNTHETIC_CALL_NAMES). `foreignReads` answers that population per OWNER —
+ * the body itself is `tsName` — because a name foreign to this body may well
+ * be a genuine `this.` call in the helper one hop out.
  */
 export function reachedSameFileMethods(
   tsName: string,
   tsCalls: Iterable<string>,
   sameFileCalls: (name: string) => Iterable<string> | undefined,
   depth = SAME_FILE_CLOSURE_DEPTH,
+  foreignReads: (owner: string) => Iterable<string> | undefined = () => undefined,
 ): Set<string> {
   const reached = new Set<string>();
   const visited = new Set<string>([tsName]);
-  let frontier = [...tsCalls];
+  const foreignOf = new Map<string, Set<string>>();
+  const foreign = (owner: string): Set<string> => {
+    let set = foreignOf.get(owner);
+    if (set === undefined) {
+      set = new Set(foreignReads(owner) ?? []);
+      foreignOf.set(owner, set);
+    }
+    return set;
+  };
+  let frontier: Array<[name: string, owner: string]> = [...tsCalls].map((n) => [n, tsName]);
   for (let hop = 0; hop < depth && frontier.length > 0; hop++) {
-    const next: string[] = [];
-    for (const name of frontier) {
+    const next: Array<[string, string]> = [];
+    for (const [name, owner] of frontier) {
       if (SYNTHETIC_CALL_NAMES.has(name)) continue;
+      if (foreign(owner).has(name)) continue;
       if (visited.has(name)) continue;
       visited.add(name);
       const calls = sameFileCalls(name);
       if (calls === undefined) continue; // not defined in this file
       reached.add(name);
-      next.push(...calls);
+      for (const c of calls) next.push([c, name]);
     }
     frontier = next;
   }
@@ -2815,7 +2836,13 @@ export function main() {
         const own = partitionNegatedCalls(tsCandidateSets.flat());
         const sameFile = sameFilePartition(tsFile);
         const sameFileCalls = (n: string) => sameFile.get(n)?.calls;
-        const reached = reachedSameFileMethods(tsName, own.calls, sameFileCalls);
+        const reached = reachedSameFileMethods(
+          tsName,
+          own.calls,
+          sameFileCalls,
+          SAME_FILE_CLOSURE_DEPTH,
+          (n) => (n === tsName ? own.foreignReads : sameFile.get(n)?.foreignReads),
+        );
         const effective = effectiveTsCalls(
           tsName,
           own.calls,
