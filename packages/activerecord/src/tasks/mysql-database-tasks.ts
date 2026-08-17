@@ -145,12 +145,14 @@ export class MySQLDatabaseTasks {
   }
 
   private creationOptions(): { charset?: string; collation?: string } {
+    // `Hash#include?` is key presence, not a defined value, so a key stored
+    // with an explicit nil still emits its option.
     const options: { charset?: string; collation?: string } = {};
-    if (this.configurationHash.encoding !== undefined) {
-      options.charset = String(this.configurationHash.encoding);
+    if (Object.keys(this.configurationHash).includes("encoding")) {
+      options.charset = this.configurationHash.encoding as string;
     }
-    if (this.configurationHash.collation !== undefined) {
-      options.collation = String(this.configurationHash.collation);
+    if (Object.keys(this.configurationHash).includes("collation")) {
+      options.collation = this.configurationHash.collation as string;
     }
     return options;
   }

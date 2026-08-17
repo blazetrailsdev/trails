@@ -181,12 +181,25 @@ export class PostgreSQLDatabaseTasks {
 
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     const childProcess = await getChildProcessAsync();
-    const result = childProcess.spawnSync(cmd, args, {
+    const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       env: this.psqlEnv(),
       encoding: "utf8",
     });
     if (result.error || result.status !== 0 || result.signal) {
-      throw new Error(formatCmdError(cmd, args, result, action));
+      const details: string[] = [];
+      if (result.error) details.push(`Error: ${result.error.message}`);
+      if (result.status !== null && result.status !== 0) {
+        details.push(`Exit status: ${result.status}`);
+      }
+      if (result.signal) details.push(`Signal: ${result.signal}`);
+      if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
+      if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
+      // Rails leaves the child's own output on the terminal because
+      // `Kernel.system` does; `spawnSync` captures it, so the captured streams
+      // follow the ported message rather than replacing it.
+      throw new Error(
+        runCmdError(cmd, args, action) + (details.length ? `${details.join("\n\n")}\n` : ""),
+      );
     }
   }
 
@@ -230,28 +243,6 @@ export class PostgreSQLDatabaseTasks {
   }
 }
 
-function formatCmdError(
-  cmd: string,
-  args: string[],
-  result: SpawnSyncResult,
-  action: string,
-): string {
-  const details: string[] = [];
-  if (result.error) details.push(`Error: ${result.error.message}`);
-  if (result.status !== null && result.status !== 0) {
-    details.push(`Exit status: ${result.status}`);
-  }
-  if (result.signal) details.push(`Signal: ${result.signal}`);
-  if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
-  if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-  return (
-    `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    (details.length ? `${details.join("\n\n")}\n\n` : "") +
-    `Make sure \`${cmd}\` is installed in your PATH and has proper permissions.\n` +
-    `(action: ${action})`
-  );
-}
-
 /**
  * Normalize a PG schema_search_path string into an array of schema
  * names suitable for pg_dump `--schema=` args. Strips surrounding
@@ -283,6 +274,6 @@ export function normalizeSchemaSearchPath(raw: string): string[] {
 export function runCmdError(cmd: string, args: string[], _action: string): string {
   return (
     `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
   );
 }
