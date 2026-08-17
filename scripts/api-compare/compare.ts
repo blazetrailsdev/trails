@@ -532,21 +532,6 @@ export const ORDER_PREFIX = "order:";
  * position for either ({@link ambiguousTsNames}), so it is skipped here; the
  * membership check still sees it.
  *
- * ONE class of order flag is a known extractor artifact and is NOT handled
- * here, recorded once rather than re-derived per file (RFC 0084
- * `extractor-predicate-and-closure-order-artifacts`): a call nested in ANOTHER
- * call's ARGUMENTS. Both extractors emit lexical order — receiver, then the
- * call, then its arguments (extract-ruby-api.rb#walk_for_calls,
- * extract-ts-api.ts#collectCalls, whose comments pin the two to each other) —
- * so Rails' `add_to_target(build_record(attributes, &block), replace: true)`
- * (collection_association.rb:121) records `add_to_target` BEFORE `build_record`
- * even though `build_record` is what runs first. A port that hoists the nested
- * call into a local — which an `await` forces — then reads as an inversion.
- * Ruby EVALUATION order (arguments before the enclosing call) is the sequence
- * both sides should record; changing it is a matched change to two extractors
- * with its own whole-artifact re-measure, so it is its own story rather than a
- * special case here.
- *
  * `bodyRubyCalls` is the body's call list BEFORE `dropWeakCalls` — the
  * disambiguation above is about what the Ruby body NAMES, and a call the weak
  * filter drops (an inert receiver, `reflection.validate?`) still names a TS
