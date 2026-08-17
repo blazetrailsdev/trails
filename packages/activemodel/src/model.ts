@@ -703,16 +703,16 @@ export class Model {
   /**
    * Validates each of the specified attributes with a block.
    *
-   * Mirrors: ActiveModel::Validations.validates_each
+   * Mirrors: ActiveModel::Validations.validates_each —
+   * `validates_with BlockValidator, _merge_attributes(attr_names), &block`
+   * (activemodel/lib/active_model/validations.rb:161). `_merge_attributes`
+   * flattens, so a nested `[:title, :content]` contributes its members again.
    */
   static validatesEach<T extends ValidatableRecord = ValidatableRecord>(
     attrNames: Array<string | string[]>,
     fn: (record: T, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
-    // Rails: `validates_with BlockValidator, _merge_attributes(attr_names), &block`
-    // (activemodel/lib/active_model/validations.rb:161) — `_merge_attributes`
-    // flattens, so a nested `[:title, :content]` contributes its members again.
     const validator = new BlockValidator(
       { ...this._mergeAttributes([...attrNames]), ...options },
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
@@ -882,8 +882,6 @@ export class Model {
    * independent arrays).
    */
   static validatorsOn(...attributes: string[]): Array<ValidatorLike> {
-    // Rails: `attributes.flat_map { |attribute| _validators[attribute.to_sym] }`
-    // (activemodel/lib/active_model/validations.rb:268).
     return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
   }
 

@@ -486,9 +486,7 @@ describe("ValidationsTest", () => {
       (messages) => messages.length > 0,
       "A reply without content should mark that attribute as invalid",
     );
-    expect(r.errors.get("content")).toEqual([
-      "is Empty",
-    ]); /* A reply without content should contain an error */
+    expect(r.errors.get("content")).toEqual(["is Empty"]);
     expect(r.errors.count).toBe(1);
   });
 
@@ -501,18 +499,14 @@ describe("ValidationsTest", () => {
       (messages) => messages.length > 0,
       "A reply without title should mark that attribute as invalid",
     );
-    expect(r.errors.get("title")).toEqual([
-      "is Empty",
-    ]); /* A reply without title should contain an error */
+    expect(r.errors.get("title")).toEqual(["is Empty"]);
 
     assertPredicate(
       r.errors.get("content"),
       (messages) => messages.length > 0,
       "A reply without content should mark that attribute as invalid",
     );
-    expect(r.errors.get("content")).toEqual([
-      "is Empty",
-    ]); /* A reply without content should contain an error */
+    expect(r.errors.get("content")).toEqual(["is Empty"]);
 
     expect(r.errors.count).toBe(2);
   });
