@@ -41,13 +41,16 @@ export class HashWithIndifferentAccess<V = unknown> {
   private _default?: V;
   private _defaultProc?: DefaultProc<V>;
 
+  /**
+   * Mirrors `initialize` (hash_with_indifferent_access.rb:70-83). The
+   * `respond_to?(:to_hash)` arm goes through `update`, so every key gets
+   * `convert_key` and every value `convert_value`, then carries the source
+   * hash's `default` / `default_proc` over; the `else` arm is `Hash.new(obj)`,
+   * which sets the default value.
+   */
   constructor(constructor?: AnyObject | HashWithIndifferentAccess<V> | NoInfer<V>) {
     this.data = new Map();
-    // Mirrors `initialize` (hash_with_indifferent_access.rb:70-83).
     if (constructor instanceof HashWithIndifferentAccess || isPlainObject(constructor)) {
-      // The `respond_to?(:to_hash)` arm: the populated hash goes through
-      // `update`, so every key gets `convert_key` and every value
-      // `convert_value`, then the source hash's defaults are carried over.
       this.update(constructor);
 
       const hash = constructor;
@@ -58,7 +61,6 @@ export class HashWithIndifferentAccess<V = unknown> {
     } else if (constructor == null) {
       // super()
     } else {
-      // `super(constructor)` — `Hash.new(obj)` sets the default value.
       this._default = constructor as V;
     }
   }
@@ -73,12 +75,12 @@ export class HashWithIndifferentAccess<V = unknown> {
 
   /**
    * Mirrors `[]` (hash_with_indifferent_access.rb:166-168) — the reader that
-   * takes either spelling of the key.
+   * takes either spelling of the key. On a miss `Hash#[]` yields to the
+   * default_proc, else returns the default.
    */
   get(key: string): V | undefined {
     const convertedKey = this.convertKey(key);
     if (this.data.has(convertedKey)) return this.data.get(convertedKey);
-    // `Hash#[]` on a miss yields to the default_proc, else returns the default.
     return this.default(convertedKey);
   }
 

@@ -55,17 +55,20 @@ export class ComparisonValidator extends EachValidator {
     }
   }
 
+  /**
+   * The `<=>` behind `value.public_send(COMPARE_CHECKS[option], option_value)`
+   * (comparison.rb:27). Ruby dispatches the operator off the value, so any
+   * object that `include Comparable` and defines `<=>` compares — `compareTo`
+   * is trails' spelling of `<=>` (date/src/date.ts:5147) and is tried first.
+   * A Date and a DateTime compare through the same astronomical Julian day,
+   * a Date being that day at midnight.
+   */
   private compare(a: unknown, b: unknown): number {
-    // Ruby dispatches the operator off the value, so any object that
-    // `include Comparable` and defines `<=>` compares. `compareTo` is trails'
-    // spelling of `<=>` (see date/src/date.ts:5147).
     if (hasCompareTo(a)) {
       const cmp = a.compareTo(b);
       if (cmp === null || cmp === undefined) throw new ArgumentError(comparisonFailed(a, b));
       return cmp;
     }
-    // Ruby's Date and DateTime compare against each other through the same
-    // astronomical Julian day; a Date is that day at midnight.
     if (a instanceof Temporal.PlainDate && b instanceof Temporal.PlainDateTime)
       return Temporal.PlainDateTime.compare(a.toPlainDateTime(), b);
     if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDate)
