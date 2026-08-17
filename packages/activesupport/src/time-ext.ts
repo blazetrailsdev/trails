@@ -679,6 +679,16 @@ export { secFraction as subsec };
  * `dateTimeFormattedOffset` because this file declares its own
  * `formattedOffset` over a JS `Date` — `core_ext/time/conversions.rb`'s arm of
  * the same Rails name — and a `DateTime` receiver reaches the other one.
+ *
+ * That import closes a cycle with `core-ext/date-time/conversions.ts`, which
+ * reads `DATE_FORMATS` back for its `to_fs`. Neither side touches the other at
+ * module-eval time — the read is inside a lambda here and inside `toFs` there,
+ * and neither file declares a `class ... extends` across the edge — so no
+ * binding is in TDZ when either module body runs. Verified by importing the
+ * built `dist/time-ext.js`, `dist/core-ext/date-time/conversions.js` and
+ * `dist/index.js` as entry modules under plain node, per CLAUDE.md's
+ * call-time-constant section; a vitest run enters through a funnel module and
+ * would mask it.
  */
 export const DATE_FORMATS: Record<
   string,

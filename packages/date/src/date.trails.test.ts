@@ -2415,9 +2415,13 @@ describe("the instance formatters", () => {
     // ruby 3.3.11:
     //   Date.new(2001,2,3).iso8601  #=> "2001-02-03"
     //   Date.new(2001,2,3).rfc2822  #=> "Sat, 3 Feb 2001 00:00:00 +0000"
+    //   Date.new(2001,2,3).xmlschema #=> "2001-02-03"
+    //   Date.new(2001,2,3).rfc822    #=> "Sat, 3 Feb 2001 00:00:00 +0000"
     const d = new RubyDate(2001, 2, 3);
     expect(d.iso8601()).toBe("2001-02-03");
     expect(d.rfc2822()).toBe("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(d.xmlschema()).toBe(d.iso8601());
+    expect(d.rfc822()).toBe(d.rfc2822());
   });
 
   it("carries the time of day and the offset into a DateTime's, as dt_lite_iso8601 does", () => {
@@ -2429,6 +2433,7 @@ describe("the instance formatters", () => {
     expect(dt.iso8601()).toBe("2001-02-03T00:00:00+00:00");
     expect(dt.xmlschema()).toBe("2001-02-03T00:00:00+00:00");
     expect(dt.rfc2822()).toBe("Sat, 3 Feb 2001 00:00:00 +0000");
+    expect(dt.rfc822()).toBe(dt.rfc2822());
   });
 
   it("takes n digits of fractional seconds through iso8601_timediv", () => {

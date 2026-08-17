@@ -7555,6 +7555,14 @@ export class Date {
   }
 
   /**
+   * Ruby `Date#xmlschema`, which `date_core.c:9810` binds to the same
+   * `d_lite_iso8601` as `iso8601` (`:9809`).
+   */
+  xmlschema(): string {
+    return this.iso8601();
+  }
+
+  /**
    * Ruby `Date#rfc2822` (ruby/date, `date_core.c` `d_lite_rfc2822`,
    * `date_core.c:7330-7334`) — `strftimev("%a, %-d %b %Y %T %z", self,
    * set_tmx)`. `::DateTime` does not override it (`date_core.c:10020-10025`
@@ -7564,6 +7572,14 @@ export class Date {
    */
   rfc2822(): string {
     return this.strftime("%a, %-d %b %Y %T %z");
+  }
+
+  /**
+   * Ruby `Date#rfc822`, which `date_core.c:9813` binds to the same
+   * `d_lite_rfc2822` as `rfc2822` (`:9812`). `::DateTime` inherits both.
+   */
+  rfc822(): string {
+    return this.rfc2822();
   }
 
   /**
