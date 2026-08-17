@@ -12,7 +12,7 @@ import type { RackEnv } from "@blazetrails/rack";
  *
  * @internal
  */
-export const FLASH_KEY = "action_dispatch.request.flash_hash";
+export const KEY = "action_dispatch.request.flash_hash";
 
 /**
  * Host shape used by {@link flash} / {@link flashHash} / {@link commitFlash}
@@ -23,6 +23,8 @@ export const FLASH_KEY = "action_dispatch.request.flash_hash";
  */
 export interface FlashRequestHost {
   env: RackEnv;
+  /** Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby. */
+  getHeader(name: string): any;
   session: {
     isEnabled?(): boolean;
     isLoaded(): boolean;
@@ -43,13 +45,13 @@ export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHa
     // Normalize `undefined` to `null` so the env key is never left in
     // a non-Railsy "absent vs cleared" limbo state.
     const normalized = value ?? null;
-    this.env[FLASH_KEY] = normalized;
+    this.env[KEY] = normalized;
     return normalized;
   }
   const existing = flashHash.call(this);
   if (existing) return existing;
   const built = FlashHash.fromSessionValue(this.session.get("flash"));
-  this.env[FLASH_KEY] = built;
+  this.env[KEY] = built;
   return built;
 }
 
@@ -60,7 +62,7 @@ export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHa
  * @internal
  */
 export function flashHash(this: FlashRequestHost): FlashHash | null {
-  return (this.env[FLASH_KEY] as FlashHash | null | undefined) ?? null;
+  return (this.getHeader(KEY) as FlashHash | null | undefined) ?? null;
 }
 
 /**
@@ -84,7 +86,7 @@ export function commitFlash(this: FlashRequestHost): void {
     }
     // Rails: `self.flash = flash_hash.dup` so further mutations don't
     // bleed into the just-stored session value.
-    this.env[FLASH_KEY] = hash.dup();
+    this.env[KEY] = hash.dup();
   }
 
   // Rails guards this with `session.loaded?` to avoid forcing a session
@@ -106,7 +108,7 @@ export function commitFlash(this: FlashRequestHost): void {
  * @internal
  */
 export function resetSession(this: FlashRequestHost): void {
-  this.env[FLASH_KEY] = null;
+  this.env[KEY] = null;
 }
 
 export class FlashHash {

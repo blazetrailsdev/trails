@@ -133,6 +133,9 @@ const CGI_VARIABLES: ReadonlySet<string> = new Set([
   "SERVER_SOFTWARE",
 ]);
 
+/** Rails: `TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"` (request.rb:58). */
+const TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING";
+
 function envName(key: string): string {
   if (HTTP_HEADER_NAME.test(key)) {
     const upper = key.toUpperCase().replace(/-/g, "_");
@@ -163,7 +166,7 @@ export class Request {
     // Check for method override via _method parameter or X-Http-Method-Override header
     if (this.requestMethod === "POST") {
       const override =
-        (this.env["HTTP_X_HTTP_METHOD_OVERRIDE"] as string) ?? this.params?.["_method"];
+        (this.getHeader("HTTP_X_HTTP_METHOD_OVERRIDE") as string) ?? this.params?.["_method"];
       if (override) {
         const upper = String(override).toUpperCase();
         if (["GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(upper)) {
@@ -175,7 +178,7 @@ export class Request {
   }
 
   get requestMethod(): string {
-    return ((this.env["REQUEST_METHOD"] as string) || "GET").toUpperCase();
+    return ((this.getHeader("REQUEST_METHOD") as string) || "GET").toUpperCase();
   }
 
   /** Mirrors: `alias raw_request_method request_method` (request.rb:145). */
@@ -244,7 +247,8 @@ export class Request {
       return parts[parts.length - 1];
     }
     return (
-      (this.env["HTTP_HOST"] as string) || `${this.env["SERVER_NAME"]}:${this.env["SERVER_PORT"]}`
+      (this.getHeader("HTTP_HOST") as string) ||
+      `${this.getHeader("SERVER_NAME")}:${this.getHeader("SERVER_PORT")}`
     );
   }
 
@@ -278,7 +282,7 @@ export class Request {
   }
 
   get serverPort(): number {
-    return parseInt((this.env["SERVER_PORT"] as string) || "80", 10);
+    return parseInt((this.getHeader("SERVER_PORT") as string) || "80", 10);
   }
 
   // --- Path ---
@@ -297,7 +301,7 @@ export class Request {
   }
 
   get originalFullpath(): string {
-    return (this.env["ORIGINAL_FULLPATH"] as string) || this.fullpath;
+    return (this.getHeader("ORIGINAL_FULLPATH") as string) || this.fullpath;
   }
 
   get originalUrl(): string {
@@ -340,8 +344,13 @@ export class Request {
     return this.contentType;
   }
 
+  /**
+   * Rails: `content_length` (request.rb:292-295). A chunked body carries no
+   * `CONTENT_LENGTH`, so the drained body is measured instead.
+   */
   get contentLength(): number | undefined {
-    const cl = this.env["CONTENT_LENGTH"] as string | undefined;
+    if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
+    const cl = this.getHeader("CONTENT_LENGTH") as string | undefined;
     if (!cl) return undefined;
     const n = parseInt(cl, 10);
     return isNaN(n) ? undefined : n;
@@ -415,16 +424,19 @@ export class Request {
   // --- Permissions Policy (ActionDispatch::PermissionsPolicy::Request) ---
 
   get permissionsPolicy(): PermissionsPolicy | null | undefined {
-    return this.env["action_dispatch.permissions_policy"] as PermissionsPolicy | null | undefined;
+    return this.getHeader("action_dispatch.permissions_policy") as
+      | PermissionsPolicy
+      | null
+      | undefined;
   }
   set permissionsPolicy(policy: PermissionsPolicy | null) {
-    this.env["action_dispatch.permissions_policy"] = policy;
+    this.setHeader("action_dispatch.permissions_policy", policy);
   }
 
   // --- Request type checks ---
 
   get isXmlHttpRequest(): boolean {
-    return (this.env["HTTP_X_REQUESTED_WITH"] as string)?.toLowerCase() === "xmlhttprequest";
+    return (this.getHeader("HTTP_X_REQUESTED_WITH") as string)?.toLowerCase() === "xmlhttprequest";
   }
 
   get xhr(): boolean {
@@ -434,18 +446,18 @@ export class Request {
   // --- IP addresses ---
 
   get remoteIp(): string | null {
-    const v = this.env["action_dispatch.remote_ip"];
+    const v = this.getHeader("action_dispatch.remote_ip");
     if (v != null) {
       if (typeof v === "object" && typeof (v as { calculate?: unknown }).calculate === "function") {
         return (v as { calculate(): string | null }).calculate();
       }
       return typeof v === "string" ? v : String(v);
     }
-    return (this.env["REMOTE_ADDR"] as string) || "127.0.0.1";
+    return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
   }
 
   set remoteIp(value: string | null) {
-    this.env["action_dispatch.remote_ip"] = value;
+    this.setHeader("action_dispatch.remote_ip", value);
   }
 
   get ip(): string | null {
@@ -454,32 +466,23 @@ export class Request {
 
   // --- Body ---
 
+  /** Rails: `body` (request.rb:357-364) — a cached `RAW_POST_DATA` wins over the live stream. */
   get body(): string {
-    const input = this.env["rack.input"];
-    if (typeof input === "string") return input;
-    if (input && typeof (input as { read?: unknown }).read === "function") {
-      const buf = (input as { read(): string }).read();
-      const rewind = (input as { rewind?: unknown }).rewind;
-      if (typeof rewind === "function") {
-        try {
-          (rewind as () => void).call(input);
-        } catch {
-          // ignore
-        }
-      }
-      return typeof buf === "string" ? buf : "";
-    }
-    return "";
+    const rawPost = this.getHeader("RAW_POST_DATA");
+    if (rawPost != null) return String(rawPost);
+    return this.readBodyStream();
   }
 
+  /**
+   * Rails: `raw_post` (request.rb:348-353). The body is cached under
+   * `RAW_POST_DATA` so repeated reads of a stream-backed `rack.input` don't
+   * yield "" after the first drain.
+   */
   get rawPost(): string {
-    const cached = this.env["RAW_POST_DATA"];
-    if (cached != null) return String(cached);
-    // Rails caches raw_post under RAW_POST_DATA so repeated reads of a
-    // stream-backed rack.input don't yield "" after the first drain.
-    const body = this.body;
-    this.env["RAW_POST_DATA"] = body;
-    return body;
+    if (!this.hasHeader("RAW_POST_DATA")) {
+      this.setHeader("RAW_POST_DATA", this.readBodyStream());
+    }
+    return String(this.getHeader("RAW_POST_DATA"));
   }
 
   // --- Parameters ---
@@ -489,31 +492,31 @@ export class Request {
   }
 
   get queryParameters(): Record<string, unknown> {
-    const qs = this.queryString;
-    if (!qs) return {};
-    return RequestUtils.normalizeEncodeParams(parseNestedQuery(qs) as ParamValue) as Record<
-      string,
-      unknown
-    >;
+    return this.fetchHeader("action_dispatch.request.query_parameters", (k) => {
+      const qs = this.queryString;
+      const params = qs
+        ? (RequestUtils.normalizeEncodeParams(parseNestedQuery(qs) as ParamValue) as Record<
+            string,
+            unknown
+          >)
+        : {};
+      return this.setHeader(k, params);
+    }) as Record<string, unknown>;
   }
 
   get requestParameters(): Record<string, unknown> {
-    const cached = this.env["action_dispatch.request.request_parameters"];
-    if (cached && typeof cached === "object") {
-      return cached as Record<string, unknown>;
-    }
+    return this.fetchHeader("action_dispatch.request.request_parameters", (k) => {
+      const host = this._paramsHost;
+      const params = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
+        this._fallbackRequestParameters(),
+      );
 
-    const host = this._paramsHost;
-    const params = _parseFormattedParameters.call(host, _paramsParsers.call(host), () =>
-      this._fallbackRequestParameters(),
-    );
-
-    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
-      string,
-      unknown
-    >;
-    this.env["action_dispatch.request.request_parameters"] = normalized;
-    return normalized;
+      const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
+        string,
+        unknown
+      >;
+      return this.setHeader(k, normalized);
+    }) as Record<string, unknown>;
   }
 
   get pathParameters(): Record<string, unknown> {
@@ -584,7 +587,7 @@ export class Request {
   // --- Server software ---
 
   get serverSoftware(): string {
-    return ((this.env["SERVER_SOFTWARE"] as string) || "").split("/")[0] || "";
+    return ((this.getHeader("SERVER_SOFTWARE") as string) || "").split("/")[0] || "";
   }
 
   // --- Header access ---
@@ -596,9 +599,12 @@ export class Request {
    * — to mirror `ActionDispatch::Http::Headers#[]`. Keys that don't match the
    * pattern (e.g. `"action_dispatch.parameter_filter"`) pass through to the
    * env unchanged, mirroring `Request#get_header`.
+   *
+   * Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby: an
+   * env slot holds a String as often as a routes set, a logger or a RemoteIp.
    */
-  getHeader(name: string): string | undefined {
-    return this.env[envName(name)] as string | undefined;
+  getHeader(name: string): any {
+    return this.env[envName(name)];
   }
 
   /**
@@ -620,7 +626,7 @@ export class Request {
 
   /** @internal Rails: `request.controller_instance` (request.rb:190-192). */
   get controllerInstance(): unknown {
-    return this.env["action_controller.instance"];
+    return this.getHeader("action_controller.instance");
   }
 
   /** @internal Rails: `request.controller_instance=` (request.rb:194-196). */
@@ -742,7 +748,7 @@ export class Request {
 
   /** Rails: `request.route_uri_pattern` (env: `action_dispatch.route_uri_pattern`). */
   get routeUriPattern(): string | undefined {
-    return this.env["action_dispatch.route_uri_pattern"] as string | undefined;
+    return this.getHeader("action_dispatch.route_uri_pattern") as string | undefined;
   }
   set routeUriPattern(pattern: string | undefined) {
     this.env["action_dispatch.route_uri_pattern"] = pattern;
@@ -750,7 +756,7 @@ export class Request {
 
   /** @internal Rails: `request.routes` (env: `action_dispatch.routes`). */
   get routes(): unknown {
-    return this.env["action_dispatch.routes"];
+    return this.getHeader("action_dispatch.routes");
   }
   /** @internal */
   set routes(routes: unknown) {
@@ -759,7 +765,7 @@ export class Request {
 
   /** @internal Rails: `engine_script_name(_routes)` — env key from `_routes.env_key`. */
   engineScriptName(routes: { envKey: string }): unknown {
-    return this.env[routes.envKey];
+    return this.getHeader(routes.envKey);
   }
 
   /** Rails: `key_generator` — reads `action_dispatch.key_generator` from env. */
@@ -771,12 +777,12 @@ export class Request {
 
   /** Rails: `http_auth_salt` env getter. */
   get httpAuthSalt(): unknown {
-    return this.env["action_dispatch.http_auth_salt"];
+    return this.getHeader("action_dispatch.http_auth_salt");
   }
 
   /** Rails: `request_id` — set by `ActionDispatch::RequestId` middleware. */
   get requestId(): string | undefined {
-    return this.env[ACTION_DISPATCH_REQUEST_ID] as string | undefined;
+    return this.getHeader(ACTION_DISPATCH_REQUEST_ID) as string | undefined;
   }
   set requestId(id: string | undefined) {
     this.env[ACTION_DISPATCH_REQUEST_ID] = id;
@@ -789,7 +795,7 @@ export class Request {
 
   /** Rails: `logger` — `action_dispatch.logger` env entry. */
   get logger(): unknown {
-    return this.env["action_dispatch.logger"];
+    return this.getHeader("action_dispatch.logger");
   }
 
   // --- Predicates / utility ---
@@ -814,27 +820,27 @@ export class Request {
 
   /** Rails: `authorization` — checks 4 env keys in order. */
   get authorization(): string | undefined {
-    return (this.env["HTTP_AUTHORIZATION"] ??
-      this.env["X-HTTP_AUTHORIZATION"] ??
-      this.env["X_HTTP_AUTHORIZATION"] ??
-      this.env["REDIRECT_X_HTTP_AUTHORIZATION"]) as string | undefined;
+    return (this.getHeader("HTTP_AUTHORIZATION") ??
+      this.getHeader("X-HTTP_AUTHORIZATION") ??
+      this.getHeader("X_HTTP_AUTHORIZATION") ??
+      this.getHeader("REDIRECT_X_HTTP_AUTHORIZATION")) as string | undefined;
   }
 
   // --- Body ---
 
   /** Rails: `body_stream` — raw `rack.input`. */
   get bodyStream(): unknown {
-    return this.env["rack.input"];
+    return this.getHeader("rack.input");
   }
 
   /** @internal Rails: `read_body_stream` — drain `rack.input` with rewind guard. */
   protected readBodyStream(): string {
-    const stream = this.bodyStream as
-      | { read?: (n?: number) => string; rewind?: () => void }
-      | undefined;
+    const input = this.bodyStream;
+    if (typeof input === "string") return input;
+    const stream = input as { read?: (n?: number) => string; rewind?: () => void } | undefined;
     if (!stream || typeof stream.read !== "function") return "";
     return this.resetStream(stream, () =>
-      this.hasHeader("HTTP_TRANSFER_ENCODING") ? stream.read!() : stream.read!(this.contentLength),
+      this.hasHeader(TRANSFER_ENCODING) ? stream.read!() : stream.read!(this.contentLength),
     );
   }
 
@@ -1079,6 +1085,9 @@ function mimeHost(req: Request): MimeHost {
           req.env[k] = v;
           return v;
         },
+      },
+      fetchHeader: {
+        value: <T>(k: string, fallback: (key: string) => T) => req.fetchHeader(k, fallback),
       },
       parameters: { get: () => req.params },
       accept: { get: () => req.accept },

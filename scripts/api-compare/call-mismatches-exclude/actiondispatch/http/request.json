@@ -10,22 +10,8 @@
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
-    "call": "fetch_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "GET",
     "call": "from_query_string",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request.rb:395-404 parses query params through CustomParamEncoder.action_encoding_template + ParamBuilder.from_query_string under fetch_header memoization; trails request.ts:944-946 returns `this.queryParameters` — trails parses query strings in that accessor without the encoding-template/ParamBuilder machinery (unported by design; plain UTF-8 params only)."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "GET",
-    "call": "set_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "actiondispatch",
@@ -33,13 +19,6 @@
     "rubyName": "POST",
     "call": "action_encoding_template",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request.rb:408-434 runs the body through parse_formatted_parameters/params_parsers and ParamBuilder.from_pairs/from_hash with encoding templates; trails request.ts:949-951 returns `this.requestParameters` — body parsing happens in that accessor without the encoding-template/ParamBuilder machinery (unported by design)."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "POST",
-    "call": "fetch_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "actiondispatch",
@@ -58,72 +37,9 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
-    "rubyName": "authorization",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "body",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "body",
-    "call": "new",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "body_stream",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "content_length",
-    "call": "has_header?",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "controller_instance",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "engine_script_name",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "http_auth_salt",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
     "rubyName": "initialize",
     "call": "new",
     "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/http/request.rb:64-75) builds `@rack_request = Rack::Request.new(env)` and exposes it via `attr_reader :rack_request` (:77). The port (http/request.ts:148-158) copies `env` and fills in Rack defaults Rails does not set; the wrapper is built lazily by an invented `get rackRequest()` that caches it in `env[\"action_dispatch.rack_request\"]` (http/request.ts:925-931), so the constructor never constructs one. Not tracked by a story: actionpack is outside the project's stated focus (activerecord and its dependencies), which is why the convergence story filed for this row was closed as out of scope."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "logger",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "actiondispatch",
@@ -137,74 +53,11 @@
     "tsFile": "http/request.ts",
     "rubyName": "method",
     "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "original_fullpath",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "permissions_policy",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "raw_host_with_port",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "raw_post",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "raw_post",
-    "call": "has_header?",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "raw_post",
-    "call": "set_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "read_body_stream",
-    "call": "has_header?",
     "kind": "args",
     "rubyArgs": [
-      "const:TRANSFER_ENCODING"
+      "str:rack.methodoverride.original_method"
     ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "remote_ip",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "request_id",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "request.rb:212-221 makes `method` the PRE-override HTTP method, read from `rack.methodoverride.original_method` before `REQUEST_METHOD`; trails inverts the pair — `method` applies an override it reads from `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline, and `requestMethod` is the raw value. Converging needs both readers and the override site moved, tracked as story converge-request-method-onto-methodoverride-original-method."
   },
   {
     "package": "actiondispatch",
@@ -223,37 +76,9 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
-    "rubyName": "route_uri_pattern",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "routes",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
     "rubyName": "send_early_hints",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "server_port",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "server_software",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "actiondispatch",
@@ -268,13 +93,6 @@
     "rubyName": "session_options=",
     "call": "set",
     "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "xml_http_request?",
-    "call": "get_header",
-    "reason": "Rack header accessor (`get_header`/`set_header`/`fetch_header`/`has_header?`). trails' request/response objects expose headers as direct property/map access instead of the Rack accessor pair, so the accessor call name is absent by design. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "actiondispatch",

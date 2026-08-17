@@ -9,6 +9,7 @@ function makeHost(parameters: () => unknown): MimeNegotiationHost {
   return {
     getHeader: () => undefined,
     setHeader: () => undefined,
+    fetchHeader: <T>(key: string, fallback: (key: string) => T) => fallback(key),
     get parameters() {
       return parameters() as Record<string, unknown>;
     },
