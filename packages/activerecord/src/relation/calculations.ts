@@ -10,7 +10,7 @@
 
 import { Nodes, Table, SelectManager } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
-import { any, many, tryCall } from "@blazetrails/activesupport";
+import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import { exceedsBindParamsLimit } from "../connection-adapters/abstract/database-limits.js";
@@ -226,7 +226,7 @@ interface CalculationRelation {
   /** Mirrors `Relation#limit_or_offset?`. */
   hasLimitOrOffset: boolean;
   /** @internal Relation#eager_loading? (relation.ts). */
-  _eagerLoadingForSql(): boolean;
+  readonly isEagerLoading: boolean;
   /** Mirrors `Relation#except`. */
   except(...values: string[]): CalculationRelation;
   /** Mirrors `Relation#group`. */
@@ -399,7 +399,7 @@ export async function executeGroupedCalculation(
   // relation out of the block because a `Relation` is thenable; `eager_loading:
   // false`, since this arm only ever runs grouped.
   let joined = rel;
-  if (rel._eagerLoadingForSql()) {
+  if (rel.isEagerLoading) {
     await rel.applyJoinDependency({ eagerLoading: false }, (r) => {
       joined = r;
     });
@@ -1208,18 +1208,12 @@ export function hasInclude(
   rel: CalculationRelation,
   columnName: string | Nodes.Node | number | null,
 ): boolean {
-  const anyRel = rel as any;
-  // eager_load_values.any? → always triggers (part of eager_loading?)
-  if (anyRel.eagerLoadValues?.length > 0) return true;
-  // includes_values with references → triggers via references_eager_loaded_tables?
-  const promoted = anyRel._includesToPromoteFromReferences?.() as string[] | undefined;
-  if (promoted && promoted.length > 0) return true;
-  // Plain includes: triggers when a non-:all column is specified.
-  // Rails excludes only the :all symbol (calculations.rb:94); explicit "*" is not excluded.
-  if (anyRel.includesValues?.length > 0) {
-    return columnName != null && columnName !== "all";
-  }
-  return false;
+  // Rails excludes only the `:all` symbol (calculations.rb:431); an explicit
+  // `"*"` is not excluded.
+  return (
+    rel.isEagerLoading ||
+    (isPresent(rel.includesValues) && columnName != null && columnName !== "all")
+  );
 }
 
 /**
@@ -1353,7 +1347,7 @@ export async function executeSimpleCalculation(
     // raising EagerLoadPolymorphicError for polymorphic specs (calculations.rb).
     rel._checkEagerLoadable();
     let joined = rel;
-    if (rel._eagerLoadingForSql()) {
+    if (rel.isEagerLoading) {
       await rel.applyJoinDependency({ eagerLoading: rel.groupValues.length === 0 }, (r) => {
         joined = r;
       });

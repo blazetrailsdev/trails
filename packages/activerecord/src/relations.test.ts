@@ -2028,43 +2028,43 @@ describe("RelationTest", () => {
 
   it("references triggers eager loading", () => {
     const scope = Post.includes("comments");
-    expect((scope as any)._eagerLoadingForSql()).toBe(false);
-    expect((scope.references("comments") as any)._eagerLoadingForSql()).toBe(true);
+    expect(scope.isEagerLoading).toBe(false);
+    expect(scope.references("comments").isEagerLoading).toBe(true);
   });
 
   it("references doesnt trigger eager loading if reference not included", () => {
     const scope = Post.references("comments");
-    expect((scope as any)._eagerLoadingForSql()).toBe(false);
+    expect(scope.isEagerLoading).toBe(false);
   });
 
   it("order triggers eager loading", () => {
     const scope = Post.includes("comments").order("comments.label ASC");
-    expect((scope as any)._eagerLoadingForSql()).toBe(true);
+    expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using the owner table", () => {
     const scope = Post.includes("comments").order("posts.title ASC");
-    expect((scope as any)._eagerLoadingForSql()).toBe(false);
+    expect(scope.isEagerLoading).toBe(false);
   });
 
   it("order triggers eager loading when ordering using symbols", () => {
     const scope = Post.includes("comments").order("comments.label");
-    expect((scope as any)._eagerLoadingForSql()).toBe(true);
+    expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using owner table and symbols", () => {
     const scope = Post.includes("comments").order("posts.title");
-    expect((scope as any)._eagerLoadingForSql()).toBe(false);
+    expect(scope.isEagerLoading).toBe(false);
   });
 
   it("order triggers eager loading when ordering using hash syntax", () => {
     const scope = Post.includes("comments").order({ "comments.label": "ASC" });
-    expect((scope as any)._eagerLoadingForSql()).toBe(true);
+    expect(scope.isEagerLoading).toBe(true);
   });
 
   it("order doesnt trigger eager loading when ordering using the owner table and hash syntax", () => {
     const scope = Post.includes("comments").order({ "posts.title": "ASC" });
-    expect((scope as any)._eagerLoadingForSql()).toBe(false);
+    expect(scope.isEagerLoading).toBe(false);
   });
 
   it("automatically added where references", () => {

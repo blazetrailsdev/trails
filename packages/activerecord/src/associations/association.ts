@@ -1016,7 +1016,7 @@ export class Association {
     //        klass.scope_attributes? || reflection.source_reflection.active_record.default_scopes.any?
     const refl = this.reflection as any;
     const hasReflScope = !!(refl.hasScope?.() ?? refl.scope);
-    const eagerLoading = !!scope?.eagerLoading?.();
+    const eagerLoading = !!scope?.isEagerLoading;
     const scopeAttrs = !!(this.klass as any)?.hasScopeAttributes?.();
     const sourceDefaultScopes = !!refl.sourceReflection?.()?.activeRecord?.defaultScopes?.length;
     return hasReflScope || eagerLoading || scopeAttrs || sourceDefaultScopes;

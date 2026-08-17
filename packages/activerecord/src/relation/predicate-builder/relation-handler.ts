@@ -59,7 +59,7 @@ export class RelationHandler {
     // relation_handler.rb:7 — `if value.eager_loading?`. Without it a plain
     // `includes(...)` subquery (no `references`, so not eager-loading) would be
     // join-converted here where Rails leaves it alone.
-    if (value._eagerLoadingForSql?.() !== true) return value;
+    if (value.isEagerLoading !== true) return value;
     // finder_methods.rb:457-481 is synchronous in Ruby; trails' is async because
     // `distinct_relation_for_primary_key` executes a query. Everything before
     // that query is synchronous, so the block runs during the call and this
