@@ -450,27 +450,33 @@ describe("TestDateParse", () => {
   });
 
   /**
-   * Ruby's list runs `_parse`, `_iso8601`, `_rfc3339`, `_xmlschema`, `_rfc2822`,
-   * `_rfc822` and `_jisx0301` — and no `httpdate` arm at all. The `_iso8601`,
-   * `_xmlschema` and `_jisx0301` arms wait on their own `test__` tests, which
-   * normalize to the same compare path as `test_iso8601` and friends and so
-   * have to land with them (RFC 0088).
+   * Ruby's list has no `httpdate` arm at all; the four this port carried were
+   * an over-port, and go here.
    */
   it("length limit", () => {
     expect(() => Date._parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._iso8601("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date._jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => Date.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.iso8601("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date.rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date.rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => Date.jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => DateTime.parse("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.iso8601("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => DateTime.rfc3339("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.xmlschema("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => DateTime.rfc2822("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => DateTime.rfc822("1".repeat(1000))).toThrow(ArgumentError);
+    expect(() => DateTime.jisx0301("1".repeat(1000))).toThrow(ArgumentError);
 
     expect(() => Date._parse("Jan " + "9".repeat(1000000))).toThrow(ArgumentError);
   });
