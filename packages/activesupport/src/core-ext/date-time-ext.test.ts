@@ -1,20 +1,29 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { current } from "./date-time/calculations.js";
-import { setFrozenTime } from "../time-travel.js";
-import { setZone } from "../time-zone-config.js";
+import { DateTime, Rational, Temporal } from "@blazetrails/date";
 import {
   advance,
-  civilFromFormat,
   ago,
   beginningOfDay,
   beginningOfHour,
   beginningOfMinute,
-  beginningOfQuarter,
   change,
+  current,
   endOfDay,
   endOfHour,
   endOfMinute,
+  middleOfDay,
+  secondsSinceMidnight,
+  secondsUntilEndOfDay,
+  since,
+  subsec,
+} from "./date-time/calculations.js";
+import { setFrozenTime } from "../time-travel.js";
+import { setZone } from "../time-zone-config.js";
+import { ArgumentError } from "../hash-utils.js";
+import {
+  advance as timeAdvance,
+  civilFromFormat,
+  beginningOfQuarter,
   endOfMonth,
   formattedOffset,
   isFuture,
@@ -23,13 +32,9 @@ import {
   isTomorrow,
   isYesterday,
   lastWeek,
-  middleOfDay,
   nextDay,
   nsec,
   prevDay,
-  secondsSinceMidnight,
-  secondsUntilEndOfDay,
-  since,
   toDate,
   toFs,
   toTime,
@@ -49,6 +54,21 @@ function asDate(instant: Temporal.Instant): Date {
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
 }
+
+/** `DateTime.civil`, the receiver every `date_time/calculations.rb` member takes. */
+function dt(
+  year: number,
+  month = 1,
+  day = 1,
+  hour = 0,
+  min = 0,
+  sec: number | Rational = 0,
+): Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  return DateTime.civil(year, month, day, hour, min, sec);
+}
+
+/** The end-of-period second `Rational(999999999, 1000)` usec lands on. */
+const END_OF_PERIOD_SEC = new Rational(59999999999, 1000000000);
 
 describe("DateTimeExtCalculationsTest", () => {
   it("to fs", () => {
@@ -113,22 +133,21 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("middle of day", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = asDate(middleOfDay(dt));
-    expect(result.getHours()).toBe(12);
-    expect(result.getMinutes()).toBe(0);
+    expect(middleOfDay(dt(2005, 2, 4, 10, 10, 10)).toString()).toBe(
+      dt(2005, 2, 4, 12, 0, 0).toString(),
+    );
   });
 
   it("beginning of minute", () => {
-    const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = asDate(beginningOfMinute(dt));
-    expect(result.getSeconds()).toBe(0);
+    expect(beginningOfMinute(dt(2005, 2, 4, 19, 30, 10)).toString()).toBe(
+      dt(2005, 2, 4, 19, 30, 0).toString(),
+    );
   });
 
   it("end of minute", () => {
-    const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = asDate(endOfMinute(dt));
-    expect(result.getSeconds()).toBe(59);
+    expect(endOfMinute(dt(2005, 2, 4, 19, 30, 10)).toString()).toBe(
+      dt(2005, 2, 4, 19, 30, END_OF_PERIOD_SEC).toString(),
+    );
   });
 
   it("end of month", () => {
@@ -138,23 +157,74 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("change", () => {
-    const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(change(dt, { year: 2006 }));
-    expect(result.getFullYear()).toBe(2006);
+    const receiver = dt(2005, 2, 22, 15, 15, 10);
+    expect(change(receiver, { year: 2006 }).toString()).toBe(
+      dt(2006, 2, 22, 15, 15, 10).toString(),
+    );
+    expect(change(receiver, { month: 6 }).toString()).toBe(dt(2005, 6, 22, 15, 15, 10).toString());
+    expect(change(receiver, { year: 2012, month: 9 }).toString()).toBe(
+      dt(2012, 9, 22, 15, 15, 10).toString(),
+    );
+    expect(change(receiver, { hour: 16 }).toString()).toBe(dt(2005, 2, 22, 16).toString());
+    expect(change(receiver, { hour: 16, min: 45 }).toString()).toBe(
+      dt(2005, 2, 22, 16, 45).toString(),
+    );
+    expect(change(receiver, { min: 45 }).toString()).toBe(dt(2005, 2, 22, 15, 45).toString());
+
+    // datetime with non-zero offset
+    expect(change(dt(2005, 2, 22, 15, 15, 10), { offset: new Rational(-5, 24) }).toString()).toBe(
+      DateTime.civil(2005, 2, 22, 15, 15, 10, new Rational(-5, 24)).toString(),
+    );
+
+    // datetime with fractions of a second
+    expect(change(dt(2005, 2, 22, 15, 15, 10.7), { day: 1 }).toString()).toBe(
+      dt(2005, 2, 1, 15, 15, 10.7).toString(),
+    );
+    expect(change(dt(2005, 1, 2, 11, 22, 33), { usec: 8 }).toString()).toBe(
+      dt(2005, 1, 2, 11, 22, new Rational(33000008, 1000000)).toString(),
+    );
+    expect(change(dt(2005, 1, 2, 11, 22, 33), { nsec: 8000 }).toString()).toBe(
+      dt(2005, 1, 2, 11, 22, new Rational(33000008, 1000000)).toString(),
+    );
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 1, nsec: 1 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 1000000 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { nsec: 1000000000 })).toThrow(ArgumentError);
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { usec: 999999 })).not.toThrow();
+    expect(() => change(dt(2005, 1, 2, 11, 22, 0), { nsec: 999999999 })).not.toThrow();
   });
 
   it("advance partial days", () => {
-    const dt = d(2005, 2, 22, 15, 15, 10);
-    const result = asDate(advance(dt, { hours: 12 }));
-    expect(result.getDate()).toBe(23);
-    expect(result.getHours()).toBe(3);
+    expect(advance(dt(2012, 9, 28, 1, 15, 10), { days: 1.5 }).toString()).toBe(
+      dt(2012, 9, 29, 13, 15, 10).toString(),
+    );
+    expect(advance(dt(2012, 9, 28, 1, 15, 10), { days: 0.5 }).toString()).toBe(
+      dt(2012, 9, 28, 13, 15, 10).toString(),
+    );
+    expect(advance(dt(2012, 9, 28, 1, 15, 10), { days: 1.5, months: 1 }).toString()).toBe(
+      dt(2012, 10, 29, 13, 15, 10).toString(),
+    );
   });
 
   it("advanced processes first the date deltas and then the time deltas", () => {
-    const dt = d(2005, 2, 28, 15, 15, 10);
-    const result = asDate(advance(dt, { months: 1, days: 1 }));
-    expect(result.getMonth()).toBe(2); // March
-    expect(result.getDate()).toBe(29);
+    // If the time deltas were processed first, the following datetimes would be
+    // advanced to 2010/04/01 instead.
+    expect(advance(dt(2010, 2, 28, 23, 59, 59), { months: 1, seconds: 1 }).toString()).toBe(
+      dt(2010, 3, 29).toString(),
+    );
+    expect(advance(dt(2010, 2, 28, 23, 59), { months: 1, minutes: 1 }).toString()).toBe(
+      dt(2010, 3, 29).toString(),
+    );
+    expect(advance(dt(2010, 2, 28, 23), { months: 1, hours: 1 }).toString()).toBe(
+      dt(2010, 3, 29).toString(),
+    );
+    expect(
+      advance(dt(2010, 2, 28, 22, 58, 59), {
+        months: 1,
+        hours: 1,
+        minutes: 1,
+        seconds: 1,
+      }).toString(),
+    ).toBe(dt(2010, 3, 29).toString());
   });
 
   it("last week", () => {
@@ -174,7 +244,7 @@ describe("DateTimeExtCalculationsTest", () => {
   it("last quarter on 31st", () => {
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
-    const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
+    const lastQuarterStart = asDate(timeAdvance(asDate(quarterStart), { months: -3 }));
     expect(lastQuarterStart.getMonth()).toBe(6); // July
   });
 
@@ -388,33 +458,35 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("subsec", () => {
-    const dt = new Date(2005, 1, 22, 10, 10, 10, 500);
-    const subsec = dt.getMilliseconds() / 1000;
-    expect(subsec).toBeCloseTo(0.5);
+    expect(subsec(dt(2000))).toBe(0);
+    expect(subsec(dt(2000, 1, 1, 0, 0, new Rational(1, 2)))).toBe(0.5);
   });
 
   it("seconds since midnight", () => {
-    const dt = d(2005, 2, 4, 1, 30, 0);
-    expect(secondsSinceMidnight(dt)).toBe(5400);
+    expect(secondsSinceMidnight(dt(2005, 1, 1, 0, 0, 1))).toBe(1);
+    expect(secondsSinceMidnight(dt(2005, 1, 1, 0, 1, 0))).toBe(60);
+    expect(secondsSinceMidnight(dt(2005, 1, 1, 1, 1, 0))).toBe(3660);
+    expect(secondsSinceMidnight(dt(2005, 1, 1, 23, 59, 59))).toBe(86399);
   });
 
   it("seconds until end of day", () => {
-    const dt = d(2005, 2, 4, 23, 59, 59);
-    expect(secondsUntilEndOfDay(dt)).toBe(0);
+    expect(secondsUntilEndOfDay(dt(2005, 1, 1, 23, 59, 59))).toBe(0);
+    expect(secondsUntilEndOfDay(dt(2005, 1, 1, 23, 59, 58))).toBe(1);
+    expect(secondsUntilEndOfDay(dt(2005, 1, 1, 23, 58, 59))).toBe(60);
+    expect(secondsUntilEndOfDay(dt(2005, 1, 1, 22, 58, 59))).toBe(3660);
+    expect(secondsUntilEndOfDay(dt(2005, 1, 1, 0, 0, 0))).toBe(86399);
   });
 
   it("beginning of hour", () => {
-    const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = asDate(beginningOfHour(dt));
-    expect(result.getHours()).toBe(19);
-    expect(result.getMinutes()).toBe(0);
+    expect(beginningOfHour(dt(2005, 2, 4, 19, 30, 10)).toString()).toBe(
+      dt(2005, 2, 4, 19, 0, 0).toString(),
+    );
   });
 
   it("end of hour", () => {
-    const dt = d(2005, 2, 4, 19, 30, 10);
-    const result = asDate(endOfHour(dt));
-    expect(result.getHours()).toBe(19);
-    expect(result.getMinutes()).toBe(59);
+    expect(endOfHour(dt(2005, 2, 4, 19, 30, 10)).toString()).toBe(
+      dt(2005, 2, 4, 19, 59, END_OF_PERIOD_SEC).toString(),
+    );
   });
 
   it("prev day with offset", () => {
@@ -432,30 +504,92 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("beginning of day", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = asDate(beginningOfDay(dt));
-    expect(result.getHours()).toBe(0);
+    expect(beginningOfDay(dt(2005, 2, 4, 10, 10, 10)).toString()).toBe(
+      dt(2005, 2, 4, 0, 0, 0).toString(),
+    );
   });
 
   it("end of day", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10);
-    const result = asDate(endOfDay(dt));
-    expect(result.getHours()).toBe(23);
-    expect(result.getMinutes()).toBe(59);
+    expect(endOfDay(dt(2005, 2, 4, 10, 10, 10)).toString()).toBe(
+      dt(2005, 2, 4, 23, 59, END_OF_PERIOD_SEC).toString(),
+    );
   });
 
   it("ago", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(asDate(ago(dt, 1))).toEqual(d(2005, 2, 22, 10, 10, 9));
+    const receiver = dt(2005, 2, 22, 10, 10, 10);
+    expect(ago(receiver, 1).toString()).toBe(dt(2005, 2, 22, 10, 10, 9).toString());
+    expect(ago(receiver, 3600).toString()).toBe(dt(2005, 2, 22, 9, 10, 10).toString());
+    expect(ago(receiver, 86400 * 2).toString()).toBe(dt(2005, 2, 20, 10, 10, 10).toString());
+    expect(ago(receiver, 86400 * 2 + 3600 + 25).toString()).toBe(
+      dt(2005, 2, 20, 9, 9, 45).toString(),
+    );
   });
 
   it("since", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    expect(asDate(since(dt, 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
+    const receiver = dt(2005, 2, 22, 10, 10, 10);
+    expect(since(receiver, 1).toString()).toBe(dt(2005, 2, 22, 10, 10, 11).toString());
+    expect(since(receiver, 3600).toString()).toBe(dt(2005, 2, 22, 11, 10, 10).toString());
+    expect(since(receiver, 86400 * 2).toString()).toBe(dt(2005, 2, 24, 10, 10, 10).toString());
+    expect(since(receiver, 86400 * 2 + 3600 + 25).toString()).toBe(
+      dt(2005, 2, 24, 11, 10, 35).toString(),
+    );
+    expect(since(receiver, 1.333).toString()).not.toBe(dt(2005, 2, 22, 10, 10, 11).toString());
+    expect(since(receiver, 1.667).toString()).not.toBe(dt(2005, 2, 22, 10, 10, 12).toString());
   });
 
   it("advance", () => {
-    const dt = d(2005, 2, 22, 15, 15, 10);
-    expect(asDate(advance(dt, { years: 1 }))).toEqual(d(2006, 2, 22, 15, 15, 10));
+    const receiver = () => dt(2005, 2, 28, 15, 15, 10);
+    expect(advance(receiver(), { years: 1 }).toString()).toBe(
+      dt(2006, 2, 28, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { months: 4 }).toString()).toBe(
+      dt(2005, 6, 28, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { weeks: 3 }).toString()).toBe(
+      dt(2005, 3, 21, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { days: 5 }).toString()).toBe(dt(2005, 3, 5, 15, 15, 10).toString());
+    expect(advance(receiver(), { years: 7, months: 7 }).toString()).toBe(
+      dt(2012, 9, 28, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { years: 7, months: 19, days: 5 }).toString()).toBe(
+      dt(2013, 10, 3, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { years: 7, months: 19, weeks: 2, days: 5 }).toString()).toBe(
+      dt(2013, 10, 17, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { years: -3, months: -2, days: -1 }).toString()).toBe(
+      dt(2001, 12, 27, 15, 15, 10).toString(),
+    );
+    // leap day plus one year
+    expect(advance(dt(2004, 2, 29, 15, 15, 10), { years: 1 }).toString()).toBe(
+      dt(2005, 2, 28, 15, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { hours: 5 }).toString()).toBe(
+      dt(2005, 2, 28, 20, 15, 10).toString(),
+    );
+    expect(advance(receiver(), { minutes: 7 }).toString()).toBe(
+      dt(2005, 2, 28, 15, 22, 10).toString(),
+    );
+    expect(advance(receiver(), { seconds: 9 }).toString()).toBe(
+      dt(2005, 2, 28, 15, 15, 19).toString(),
+    );
+    expect(advance(receiver(), { hours: 5, minutes: 7, seconds: 9 }).toString()).toBe(
+      dt(2005, 2, 28, 20, 22, 19).toString(),
+    );
+    expect(advance(receiver(), { hours: -5, minutes: -7, seconds: -9 }).toString()).toBe(
+      dt(2005, 2, 28, 10, 8, 1).toString(),
+    );
+    expect(
+      advance(receiver(), {
+        years: 7,
+        months: 19,
+        weeks: 2,
+        days: 5,
+        hours: 5,
+        minutes: 7,
+        seconds: 9,
+      }).toString(),
+    ).toBe(dt(2013, 10, 17, 20, 22, 19).toString());
   });
 });

@@ -196,7 +196,13 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // bucket off `date/acts_like.rb` (Date's first reopening); the path it names
   // is the one the default rule would produce anyway.
   "activesupport:core_ext/date/calculations.rb": "core-ext/date/calculations.ts",
-  "activesupport:core_ext/date_time/calculations.rb": "time-ext.ts",
+  // The `DateTime` arm answers a DateTime — a civil date at an offset — where
+  // the `Time` arm answers an instant, so it has its own receiver
+  // (`Temporal.PlainDateTime | Temporal.ZonedDateTime`) and its own file. As
+  // with the `Date` entry above, the path it names is the one the default rule
+  // would produce anyway; the entry is what splits the bucket off
+  // `date_time/acts_like.rb` (DateTime's first reopening).
+  "activesupport:core_ext/date_time/calculations.rb": "core-ext/date-time/calculations.ts",
   // The activesupport `core_ext/*` reopenings. Ruby splits one class's extensions
   // across a file per concern and reopens the class in each; the extractor stamps
   // the entity with whichever reopening came first (`object/blank.rb` for String,
