@@ -17,8 +17,6 @@ describe("MethodCallAssertionsTest", () => {
       return 1;
     }
     decrement(): void {}
-    // Ruby's `def <<(arg); end` — an operator method, which JS spells as an
-    // ordinary property whose name is the operator.
     "<<"(_arg: unknown): void {}
   }
 
@@ -219,10 +217,11 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert changes when assertions are included", async () => {
     let counter = 1;
-    // Rails builds a `Minitest::Test` subclass that `include`s
-    // `ActiveSupport::Testing::Assertions`, runs it, and asserts the result
-    // passed. trails has no test-case runner to instantiate, so the "did it
-    // pass" flag is the block completing without the assertion raising.
+    // Rails builds a `Minitest::Test` subclass, runs it, and asserts
+    // `test_results.passed?` (method_call_assertions_test.rb:189-201). trails
+    // has no runnable test-case class — vitest owns the run loop and exposes no
+    // "run this test and hand me its result" entry point — so the result object
+    // is the block completing without the assertion raising.
     const testResults = { passed: false };
     await assertChanges(
       () => counter,
