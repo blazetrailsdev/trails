@@ -468,10 +468,16 @@ export class CheckConstraintDefinition {
     // ...): it matches on name (and validate) only — the expression is accepted
     // but never compared (it is used upstream to derive the name). A raw-string
     // expression compare would spuriously fail against the adapter's normalized
-    // form (e.g. PostgreSQL's `pg_get_constraintdef`).
+    // form (e.g. PostgreSQL's `pg_get_constraintdef`). The validate arm mirrors
+    // `validate.nil? || validate == self.options.fetch(:validate, validate)`
+    // (schema_definitions.rb:193): with `:validate` unstored the fetch falls back
+    // to the lookup value, so the comparison is trivially true — the getter's
+    // `true` default must not stand in for it.
     return (
       this.name === (options.name == null ? "" : options.name.toString()) &&
-      (options.validate == null || options.validate === this.validate)
+      (options.validate == null ||
+        !("validate" in this.options) ||
+        options.validate === this.validate)
     );
   }
 }

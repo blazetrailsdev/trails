@@ -68,6 +68,19 @@ describe("CheckConstraintDefinition#validate?", () => {
     expect(new CheckConstraintDefinition("t", "e", { validate: false }).validate).toBe(false);
     expect(new CheckConstraintDefinition("t", "e", { validate: null }).validate).toBe(null);
   });
+
+  it("ignores a validate lookup when the definition stores no :validate", () => {
+    const definition = new CheckConstraintDefinition("t", "e", { name: "chk" });
+
+    expect(definition.isDefinedFor({ name: "chk", validate: false })).toBe(true);
+    expect(definition.isDefinedFor({ name: "chk", validate: true })).toBe(true);
+    expect(
+      new CheckConstraintDefinition("t", "e", { name: "chk", validate: false }).isDefinedFor({
+        name: "chk",
+        validate: true,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("TableDefinition#remove_column", () => {

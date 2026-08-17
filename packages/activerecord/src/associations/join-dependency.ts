@@ -401,7 +401,8 @@ export class JoinDependency {
    * the Enumerable walk of the join tree, root dropped, reading the reflection
    * each node already carries.
    *
-   * `_through_` hops are trails-only tree nodes (`JoinLeaf`): Rails keeps a
+   * `_through_` hops are trails-only tree nodes (`JoinLeaf`, declared below in
+   * this file): Rails keeps a
    * through association's whole chain inside the one JoinAssociation, so the
    * hops carry no reflection of their own and Rails never lists one here.
    */

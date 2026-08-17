@@ -998,6 +998,12 @@ export class CollectionAssociation extends Association {
    * proxy object take it from `record.<name>` (the generated accessor), which is
    * the same cached instance this returns. `reset_scope` is likewise called for
    * effect: it returns the raw proxy, not the JS Proxy wrapper callers hold.
+   *
+   * It is called here, not left to `association()`: that factory resets only on
+   * its own cache-hit path (the trails generated accessor's reader, RFC 0022),
+   * so without this line a second `reader` would skip Rails' fourth line. The
+   * cost is one redundant reset on the read that first builds the proxy;
+   * `reset_scope` is idempotent.
    */
   override get reader(): Promise<Base[]> {
     this.ensureKlassExists();
