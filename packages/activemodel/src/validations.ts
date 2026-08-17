@@ -164,7 +164,7 @@ export interface ValidationsClassMethods {
     options?: Record<string, unknown>,
   ): void;
   validators(): unknown[];
-  validatorsOn(attribute: string): unknown[];
+  validatorsOn(...attributes: string[]): unknown[];
   clearValidatorsBang(): void;
   isAttributeMethod(attribute: string): boolean;
   inherited(subclass: unknown): void;

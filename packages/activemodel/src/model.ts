@@ -703,15 +703,18 @@ export class Model {
   /**
    * Validates each of the specified attributes with a block.
    *
-   * Mirrors: ActiveModel::Validations.validates_each
+   * Mirrors: ActiveModel::Validations.validates_each —
+   * `validates_with BlockValidator, _merge_attributes(attr_names), &block`
+   * (activemodel/lib/active_model/validations.rb:161). `_merge_attributes`
+   * flattens, so a nested `[:title, :content]` contributes its members again.
    */
   static validatesEach<T extends ValidatableRecord = ValidatableRecord>(
-    attributes: string[],
+    attrNames: Array<string | string[]>,
     fn: (record: T, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
     const validator = new BlockValidator(
-      { attributes, ...options },
+      { ...this._mergeAttributes([...attrNames]), ...options },
       fn as (record: ValidatableRecord, attribute: string, value: unknown) => void,
     );
     this._registerValidator(validator);
@@ -863,8 +866,9 @@ export class Model {
   }
 
   /**
-   * Return validators registered for a specific attribute. O(1) bucket
-   * lookup — Rails `_validators[attribute.to_sym]`
+   * Return validators registered for the given attributes. O(1) bucket
+   * lookup per attribute — Rails
+   * `attributes.flat_map { |attribute| _validators[attribute.to_sym] }`
    * (activemodel/lib/active_model/validations.rb:266-270).
    *
    * Returns a detached copy each call (same shape whether the bucket is
@@ -877,9 +881,8 @@ export class Model {
    * mutation can't leak into internals; consecutive calls return
    * independent arrays).
    */
-  static validatorsOn(attribute: string): Array<ValidatorLike> {
-    const bucket = this._validators.get(attribute);
-    return bucket ? [...bucket] : [];
+  static validatorsOn(...attributes: string[]): Array<ValidatorLike> {
+    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
   }
 
   // -- Individual validator helper methods --
