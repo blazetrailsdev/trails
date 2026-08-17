@@ -39,7 +39,7 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "export_name_on_schema_dump?",
     "call": "match?",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `!ActiveRecord::SchemaDumper.fk_ignore_pattern.match?(name) if name` (`connection_adapters/schema_definitions.rb:158`). Ruby's `Regexp#match?` is stateless; JS `RegExp#test` advances `lastIndex` on a `/g` pattern, and `fk_ignore_pattern` is user-assignable (`schema-definitions.trails.test.ts` pins a `/g` pattern giving two different answers on consecutive reads). The `statelessTest` wrapper is that language shortcoming, and `test` is the only JS analogue the gate credits for `match?`."
   },
   {
     "package": "activerecord",
@@ -102,6 +102,6 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "validate?",
     "call": "fetch",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `options.fetch(:validate, true)` (`connection_adapters/schema_definitions.rb:153`) — `options` is a plain TS object, not a Hash, so the default-substituting read has no `fetch` call spelling; the body is `this.options.validate ?? true`."
   }
 ]

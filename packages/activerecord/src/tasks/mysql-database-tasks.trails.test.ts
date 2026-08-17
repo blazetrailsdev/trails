@@ -19,7 +19,7 @@ describe("MySQLDatabaseTasks", () => {
   it("test_registers_mysql_and_trilogy_patterns", () => {
     DatabaseTasks.clearRegisteredTasks();
     MySQLDatabaseTasks.register();
-    expect(DatabaseTasks.resolveTask("mysql2")).toBeDefined();
+    expect(DatabaseTasks["classForAdapter"]("mysql2")).toBeDefined();
   });
 
   it("test_purge_preserves_existing_database_charset_and_collation", async () => {

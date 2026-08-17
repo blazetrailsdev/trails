@@ -180,23 +180,8 @@ export class DatabaseTasks {
     this._registeredTasks.push({ pattern, handler });
   }
 
-  static resolveTask(adapter: string): DatabaseTaskHandler | undefined {
-    for (let i = this._registeredTasks.length - 1; i >= 0; i--) {
-      const { pattern, handler } = this._registeredTasks[i];
-      if (typeof pattern === "string") {
-        if (adapter.startsWith(pattern)) return handler;
-      } else {
-        pattern.lastIndex = 0;
-        if (pattern.test(adapter)) return handler;
-      }
-    }
-    return undefined;
-  }
-
   /**
    * @internal Mirrors: `class_for_adapter` (`tasks/database_tasks.rb:574-580`).
-   * Ruby's `@tasks.reverse_each.detect { |pattern, _| adapter[pattern] }` is
-   * `resolveTask` above, which walks the same registrations newest-first;
    * `task.is_a?(String) ? task.constantize : task` has no analogue because
    * `registerTask` takes the handler itself, never its name.
    *
@@ -206,7 +191,17 @@ export class DatabaseTasks {
    * error class and message exact.
    */
   private static classForAdapter(adapter: string | undefined): DatabaseTaskHandler {
-    const task = adapter === undefined ? undefined : this.resolveTask(adapter);
+    const task =
+      adapter === undefined
+        ? undefined
+        : this._registeredTasks
+            .slice()
+            .reverse()
+            .find(({ pattern }) => {
+              if (typeof pattern === "string") return adapter.includes(pattern);
+              pattern.lastIndex = 0;
+              return pattern.test(adapter);
+            })?.handler;
     if (!task) {
       throw new DatabaseNotSupported(`Rake tasks not supported by '${adapter}' adapter`);
     }

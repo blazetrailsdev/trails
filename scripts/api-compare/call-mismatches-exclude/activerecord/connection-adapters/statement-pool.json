@@ -32,7 +32,7 @@
     "tsFile": "connection-adapters/statement-pool.ts",
     "rubyName": "length",
     "call": "cache",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `cache.length` (`connection_adapters/statement_pool.rb:28`), where private `cache` is `@cache[Process.pid]` (`statement_pool.rb:60-62`). trails has no `process.*` access by construction, so the pool holds one un-keyed `Map` and there is no `cache` member for the body to call."
   },
   {
     "package": "activerecord",

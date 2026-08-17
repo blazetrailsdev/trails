@@ -32,7 +32,7 @@
     "tsFile": "database-configurations.ts",
     "rubyName": "default_env",
     "call": "call",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s` (`database_configurations.rb:189`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; porting it is filed as `port-connection-handling-default-env-proc`."
   },
   {
     "package": "activerecord",

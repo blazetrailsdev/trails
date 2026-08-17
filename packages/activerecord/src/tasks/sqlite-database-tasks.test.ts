@@ -75,7 +75,7 @@ describe("SQLiteDatabaseTasks", () => {
   it("test_registers_with_database_tasks", () => {
     DatabaseTasks.clearRegisteredTasks();
     SQLiteDatabaseTasks.register();
-    expect(DatabaseTasks.resolveTask("sqlite3")).toBeDefined();
+    expect(DatabaseTasks["classForAdapter"]("sqlite3")).toBeDefined();
   });
 
   it("test_structure_dump_and_load_round_trip_via_adapter", async () => {

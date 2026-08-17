@@ -15,13 +15,11 @@ export class PoolManager {
   }
 
   get shardNames(): string[] {
-    const shards = new Set<string>();
-    for (const shardMap of this._roleToShardMapping.values()) {
-      for (const shard of shardMap.keys()) {
-        shards.add(shard);
-      }
-    }
-    return [...shards];
+    return [
+      ...new Set(
+        [...this._roleToShardMapping.values()].flatMap((shardMap) => [...shardMap.keys()]),
+      ),
+    ];
   }
 
   get roleNames(): string[] {
