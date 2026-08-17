@@ -4,7 +4,7 @@
     "tsFile": "testing/test-response.ts",
     "rubyName": "parsed_body",
     "call": "call",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `response_parser.call(body)` (test_response.rb:51) invokes a Proc; the TS parser is a function value invoked directly as `this.responseParser(this.body)` — `Proc#call` has no distinct JS call form."
   },
   {
     "package": "actiondispatch",

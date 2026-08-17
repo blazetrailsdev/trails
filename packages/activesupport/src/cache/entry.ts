@@ -46,7 +46,7 @@ export class Entry {
   }
 
   get value(): unknown {
-    return this._compressed ? this.uncompress(this._value as string) : this._value;
+    return this.isCompressed() ? this.uncompress(this._value as string) : this._value;
   }
 
   get expiresAt(): number | null {

@@ -11,14 +11,14 @@
     "tsFile": "associations/collection-association.ts",
     "rubyName": "reader",
     "call": "create",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `@proxy ||= CollectionProxy.create(klass, self)` (collection_association.rb:41) — RFC 0022 makes the `CollectionProxy` the canonical has_many store, created and cached by `associationProxy(owner, name)` rather than constructed inside `reader`; `reader` returns the shared target it already owns."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "reader",
     "call": "reload",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `reload` on a stale target (collection_association.rb:37-39) issues the load query, so it is `await`-only in trails while `reader` is a synchronous property read; the stale-reload arm lives in `asyncReader`, which every awaited call site uses."
   },
   {
     "package": "activerecord",
@@ -32,41 +32,41 @@
     "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
     "call": "count_records",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `count_records` (collection_association.rb:218, :220) issues a COUNT query, so it cannot run inside the synchronous `size` getter; the counted arms live on the awaitable `CollectionProxy#size`."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
     "call": "empty?",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `target.empty?` / `association_scope.group_values.empty?` (collection_association.rb:214, :216) are `.length === 0` property reads, which the gate deliberately does not credit as calls (JS_ENUMERABLE_ALIASES, RFC 0092)."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
     "call": "find_target?",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `!find_target? || loaded?` (collection_association.rb:210) IS ported — as `findTargetNeeded()`, the trails spelling of `find_target?` — so what the gate misses is the name, not the branch."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
     "call": "select",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `target.select(&:new_record?)` (collection_association.rb:217) belongs to the un-loaded `count_records` arm, which is async in trails and lives on `CollectionProxy#size`; the synchronous getter never reaches it."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "target=",
     "call": "klass",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `reflection.klass.has_many_inversing` (collection_association.rb:286) — the whole `target=` body is the inverse-wiring arm, ported in `inversedFrom` (collection-association.ts), which is where trails' `set_inverse_instance` → `inversed_from` chain lands; the `target` setter itself is only the holder write Rails reaches via `super`."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "target=",
     "call": "replace_on_target",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `replace_on_target(record, true, replace: true, inversing: true)` (collection_association.rb:294) is likewise ported in `inversedFrom`, which routes the inverse record into the canonical `CollectionProxy` store (RFC 0022); the `target` setter is the plain `super` holder write."
   }
 ]

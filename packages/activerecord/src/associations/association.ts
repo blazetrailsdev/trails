@@ -497,9 +497,25 @@ export class Association {
   }
 
   get extensions(): any[] {
-    const ext = this.reflection.options.extend;
-    if (!ext) return [];
-    return Array.isArray(ext) ? ext : [ext];
+    // Ruby `|` is an order-preserving set union (association.rb:170, :173).
+    let extensions = [
+      ...new Set([
+        ...(this.klass as any).defaultExtensions(),
+        ...(this.reflection as any).extensions(),
+      ]),
+    ];
+
+    if (this.reflection.scope) {
+      extensions = [
+        ...new Set([
+          ...extensions,
+          ...(this.reflection as any).scopeFor((this.klass as any).unscoped(), this.owner)
+            .extensions,
+        ]),
+      ];
+    }
+
+    return extensions;
   }
 
   /**

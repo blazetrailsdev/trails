@@ -18,7 +18,7 @@ export class Key {
   }
 
   get id(): string {
-    return getCrypto().createHash("sha256").update(this.secret).digest("hex").slice(0, 8);
+    return getCrypto().createHash("sha1").update(this.secret).digest("hex").slice(0, 4);
   }
 
   static deriveFrom(password: string): Key {

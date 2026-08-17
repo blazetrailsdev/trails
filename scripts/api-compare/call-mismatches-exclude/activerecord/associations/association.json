@@ -2,20 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
-    "rubyName": "extensions",
-    "call": "scope_for",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association.ts",
-    "rubyName": "extensions",
-    "call": "unscoped",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/association.ts",
     "rubyName": "marshal_dump",
     "call": "map",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails association.rb:206-209 maps over instance_variables to build the ivar list; trails association.ts:529-537 dumps the fixed `{loaded, target}` shape — Marshal introspection has no JS analogue, the shape is explicit."

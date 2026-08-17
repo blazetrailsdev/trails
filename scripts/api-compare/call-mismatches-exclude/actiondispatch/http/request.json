@@ -46,7 +46,7 @@
     "tsFile": "http/request.ts",
     "rubyName": "method",
     "call": "check_method",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `method` still reads `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline instead of Rails' `check_method(get_header(\"rack.methodoverride.original_method\") || get_header(\"REQUEST_METHOD\"))` (request.rb:212-220). Convergence is owned by the wave-2 follow-up story `converge-request-method-onto-methodoverride-original-method`; `check_method` lands with the `original_method` header read, not before it."
   },
   {
     "package": "actiondispatch",
@@ -58,13 +58,6 @@
       "str:rack.methodoverride.original_method"
     ],
     "reason": "request.rb:212-221 makes `method` the PRE-override HTTP method, read from `rack.methodoverride.original_method` before `REQUEST_METHOD`; trails inverts the pair — `method` applies an override it reads from `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline, and `requestMethod` is the raw value. Converging needs both readers and the override site moved, tracked as story converge-request-method-onto-methodoverride-original-method."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "request_method",
-    "call": "check_method",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
   },
   {
     "package": "actiondispatch",
@@ -85,20 +78,20 @@
     "tsFile": "http/request.ts",
     "rubyName": "session=",
     "call": "set",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `Session.set self, session` (request.rb:387) writes `env[\"rack.session\"]`; trails' setter performs that env write directly because there is no ported `Session.set` class method to delegate to."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "session_options=",
     "call": "set",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `Session::Options.set self, options` (request.rb:391) writes `env[\"rack.session.options\"]`; trails' setter performs that env write directly, there being no ported `Session::Options.set`."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "xml_http_request?",
     "call": "match?",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+    "reason": "Verified per-site (RFC 0106): `/XMLHttpRequest/i.match?(get_header(\"HTTP_X_REQUESTED_WITH\"))` (request.rb:301) is spelled as a case-insensitive equality on the header value; a `Regexp#match?` against a literal-only pattern has no separate JS call form the gate credits."
   }
 ]

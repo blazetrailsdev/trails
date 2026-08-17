@@ -162,6 +162,9 @@ export class Request {
 
   // --- HTTP method ---
 
+  /** Rails' `@request_method` memo (request.rb:153). */
+  private _requestMethod?: string;
+
   get method(): string {
     // Check for method override via _method parameter or X-Http-Method-Override header
     if (this.requestMethod === "POST") {
@@ -178,7 +181,9 @@ export class Request {
   }
 
   get requestMethod(): string {
-    return ((this.getHeader("REQUEST_METHOD") as string) || "GET").toUpperCase();
+    return (this._requestMethod ??= this.checkMethod(
+      ((this.getHeader("REQUEST_METHOD") as string) || "GET").toUpperCase(),
+    )!);
   }
 
   /** Mirrors: `alias raw_request_method request_method` (request.rb:145). */
