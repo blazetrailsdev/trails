@@ -11,6 +11,7 @@ import type { ExplainOption } from "../abstract/database-statements.js";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
+import { isEmpty } from "../../ruby-empty.js";
 
 // Mirrors: PostgreSQL::DatabaseStatements::READ_QUERY (database_statements.rb:19-21)
 // Mirrors Rails' build_read_query_regexp which combines the default read list
@@ -226,7 +227,8 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
  */
 export async function castResult(this: CastResultHost, result: pg.QueryResult): Promise<Result> {
   const fields = result.fields ?? [];
-  if (fields.length === 0) {
+  // Rails: `if result.fields.empty?` (database_statements.rb:172).
+  if (isEmpty(fields)) {
     return Result.empty();
   }
 

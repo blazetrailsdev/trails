@@ -8,6 +8,7 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
+import { isEmpty } from "./ruby-empty.js";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -129,7 +130,8 @@ export class InsertAll {
     // (insert_all.rb#initialize validates uniqueBy in the constructor before
     // any inserts.empty? check) still fires on upsertAll([], { uniqueBy }).
     await this._populateUpdatableColumns();
-    if (this.inserts.length === 0) return Result.empty();
+    // Rails: `return ActiveRecord::Result.empty if inserts.empty?` (insert_all.rb:49).
+    if (isEmpty(this.inserts)) return Result.empty();
     // Mirrors Rails InsertAll#execute: build the log/instrumentation label
     // ("Book Bulk Insert" / "Book Upsert") and route through exec_insert_all
     // so the RETURNING rows are captured into an ActiveRecord::Result rather

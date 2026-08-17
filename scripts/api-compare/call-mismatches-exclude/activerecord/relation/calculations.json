@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "all_attributes?",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `(column_names.map(&:to_s) - model.attribute_names - model.attribute_aliases.keys).empty?` (calculations.rb:427) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -47,13 +40,6 @@
     "rubyName": "lookup_cast_type_from_join_dependencies",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "empty?",
-    "reason": "Verified per-site (RFC 0106): `select_values.empty?` (calculations.rb:646) — `empty?` on a Ruby Array, whose faithful JS spelling is `xs.length === 0`. That emits no callee, so no TS call can ever credit the Ruby one. The gate flags it only because `empty?` maps onto the unrelated `ActiveRecord::Result.empty`, which takes arguments since it gained Rails' `async:` kwarg (result.rb:94-100) — nothing in the TS body was dropped."
   },
   {
     "package": "activerecord",
