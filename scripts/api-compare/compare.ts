@@ -683,17 +683,16 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
  * to reach `detailsKey` (RFC 0025
  * `extractor-missing-set-perturbed-by-unrelated-edits`).
  *
- * `length` is the same shape from the other end: it is a JS PROPERTY, never a
- * callable, so every `length` the TS extractor records came off an `xs.length`
- * read — never off a call to a same-file member spelled `length`. Resolving it
- * bridged 29 relation.ts bodies into `Relation#length` and, three hops on, into
- * `toArray`'s `withConnection`: `to_sql` and `create_or_find_by` were credited
- * with a `with_connection` neither body makes, and the credit evaporated the
- * moment `length` moved to its faithful home in `DelegationMethods`
- * (`relation/delegation.rb:101`) — RFC 0107's
- * `converge-relation-length-onto-records-delegation`.
+ * `length` used to be listed here for the same reason from the other end — an
+ * `xs.length` read bridged 29 relation.ts bodies into `Relation#length` and, three
+ * hops on, into `toArray`'s `withConnection` (`relation/delegation.rb:101`; RFC
+ * 0107). It is gone because the FOREIGN_READ_PREFIX marker now covers it and
+ * every other read off a non-`this` receiver, by receiver rather than by name:
+ * removing the entry moves no row in the whole artifact, and keeping it would
+ * silence a genuine call to a same-file helper that happens to be spelled
+ * `length`.
  */
-const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor", "length"]);
+const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
 
 /**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.

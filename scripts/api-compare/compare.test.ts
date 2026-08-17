@@ -407,14 +407,24 @@ describe("significantMissingCalls", () => {
       ]);
       const own = new Set(["_buildEagerOperandManager", "_conn", "toArel"]);
       const calls = (n: string) => sameFile.get(n);
-      expect(reachedSameFileMethods("toSql", own, calls)).toEqual(
-        new Set(["_buildEagerOperandManager"]),
-      );
-      const tsCalls = effectiveTsCalls("toSql", own, () => undefined, calls);
+      // `xs` is a local, so the extractor marks the read foreign for the owner
+      // that made it — which is what stops the walk, no name-list needed.
+      const foreign = (owner: string) =>
+        owner === "_buildEagerOperandManager" ? ["length"] : undefined;
+      const reached = reachedSameFileMethods("toSql", own, calls, SAME_FILE_CLOSURE_DEPTH, foreign);
+      expect(reached).toEqual(new Set(["_buildEagerOperandManager"]));
+      const tsCalls = effectiveTsCalls("toSql", own, () => undefined, calls, reached);
       expect(tsCalls.has("withConnection")).toBe(false);
       // …and the same body reads identically once `length` leaves the file.
       const moved = (n: string) => (n === "length" ? undefined : sameFile.get(n));
-      expect(effectiveTsCalls("toSql", own, () => undefined, moved)).toEqual(tsCalls);
+      const movedReached = reachedSameFileMethods(
+        "toSql",
+        own,
+        moved,
+        SAME_FILE_CLOSURE_DEPTH,
+        foreign,
+      );
+      expect(effectiveTsCalls("toSql", own, () => undefined, moved, movedReached)).toEqual(tsCalls);
     });
 
     it("does not walk into a same-file method a `obj.foo` property read recorded", () => {
