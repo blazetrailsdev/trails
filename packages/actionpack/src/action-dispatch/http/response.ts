@@ -325,10 +325,15 @@ export class Response {
    * drops the trailing empty field so a deleted cookie reads back as `nil`;
    * JS keeps it, so the same pair reads back as `""`. A pair with no `=` at
    * all yields `nil` in Ruby and `undefined` here, hence the value type.
+   *
+   * The array arm mirrors Rails' `header.respond_to?(:to_str)` branch, which
+   * exists because Rack stores `Set-Cookie` as an Array of values. Our header
+   * hash is string-valued, so `getHeader` only ever returns the split arm — the
+   * branch is kept so the body reads as the same method.
    */
   get cookies(): Record<string, string | undefined> {
     const cookies: Record<string, string | undefined> = {};
-    let header = this.getHeader(SET_COOKIE) as string | string[] | undefined;
+    let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
     if (header != null) {
       if (typeof header === "string") header = header.split("\n");
       for (const cookie of header) {
