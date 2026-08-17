@@ -5,10 +5,12 @@ import { NoMethodError } from "../attribute-assignment.js";
  *
  * Mirrors: ActiveModel::Validations::ResolveValue
  *
- * Rails accepts a Proc (callable) or a Symbol (method name on the record).
- * A Ruby Symbol reaches us as a colon-prefixed string (`":five"`); a bare
- * string is also taken as a method reference when the record responds to it,
- * and is otherwise returned as a literal value.
+ * Rails' three `case value` branches are a Proc, a Symbol (a method to `send`
+ * to the record) and everything else, returned literally unless it responds to
+ * `call` (resolve_value.rb:7-22). A Ruby Symbol reaches us as a colon-prefixed
+ * string (`":five"`); a bare string is a String, so it takes the `else` branch
+ * and stays a literal, and a JS callable is already the Proc branch — which
+ * leaves nothing for the `respond_to?(:call)` arm to match.
  */
 export interface ResolveValue {
   resolveValue(record: unknown, value: unknown): unknown;
@@ -35,10 +37,6 @@ export function resolveValue(record: unknown, value: unknown): unknown {
         );
       }
       const method = (record as Record<string, unknown>)[name];
-      return typeof method === "function" ? (method as () => unknown).call(record) : method;
-    }
-    if (value in record) {
-      const method = (record as Record<string, unknown>)[value];
       return typeof method === "function" ? (method as () => unknown).call(record) : method;
     }
   }

@@ -321,7 +321,7 @@ describe("ComparisonValidationTest", () => {
 
   it("validates comparison with method", async () => {
     defineRequested();
-    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: "requested" });
+    Topic.validatesComparisonOf("approved", { greaterThanOrEqualTo: ":requested" });
 
     try {
       await assertInvalidValues(

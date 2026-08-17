@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isBlank, underscore, RoundingHelper, BigDecimal, Range } from "@blazetrails/activesupport";
+import { underscore, RoundingHelper, BigDecimal, Range } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -56,8 +56,6 @@ export class NumericalityValidator extends EachValidator {
     precision = 15,
     scale?: number,
   ): void {
-    if (this.options.allowBlank && isBlank(value)) return;
-
     if (!this.isNumber(value, precision, scale)) {
       record.errors.add(attribute, ":not_a_number", this.filteredOptions(value));
       return;
@@ -85,30 +83,34 @@ export class NumericalityValidator extends EachValidator {
       count,
     });
 
-    // Rails walks one `options.slice(*RESERVED_OPTIONS)` loop whose branches go
-    // NUMBER_CHECKS → RANGE_CHECKS → COMPARE_CHECKS (numericality.rb:49-63);
-    // the three loops below keep that order.
-    if (this.options.odd && Math.trunc(num) % 2 === 0) {
-      record.errors.add(attribute, ":odd", this.filteredOptions(value));
-    }
-    if (this.options.even && Math.trunc(num) % 2 !== 0) {
-      record.errors.add(attribute, ":even", this.filteredOptions(value));
-    }
-    if (this.options.in !== undefined) {
-      // Rails: value.public_send(:in?, range) — Object#in? delegates to
-      // Range#include?, and :count interpolates the range's own to_s.
-      const range = this.options.in as Range<number>;
-      if (!range.isInclude(num)) {
-        record.errors.add(attribute, ":in", withCount(range.toS()));
-      }
-    }
-    for (const option of Object.keys(COMPARE_CHECKS) as CompareKey[]) {
+    // Ruby `Hash#slice(*keys)` yields the entries in the ARGUMENT order, not the
+    // receiver's, so `options.slice(*RESERVED_OPTIONS)` walks the options in
+    // RESERVED_OPTIONS order — COMPARE, then NUMBER, then RANGE (numericality.rb:16).
+    // Iterating the constant reproduces that, which is what fixes the order errors
+    // land in when one attribute fails several checks at once.
+    for (const option of RESERVED_OPTIONS) {
       let optionValue = this.options[option] as NumericValue | undefined;
       if (optionValue === undefined) continue;
-      optionValue = this.optionAsNumber(record, optionValue, precision, scale);
-      if (optionValue === undefined) continue;
-      if (!compareOperator(COMPARE_CHECKS[option], num, optionValue)) {
-        record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+      if (option in NUMBER_CHECKS) {
+        // Rails: value.to_i.public_send(NUMBER_CHECKS[option]) — TS has no
+        // public_send, so the check Symbol selects the parity test.
+        const odd = Math.trunc(num) % 2 !== 0;
+        if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
+          record.errors.add(attribute, `:${option}`, this.filteredOptions(value));
+        }
+      } else if (option in RANGE_CHECKS) {
+        // Rails: value.public_send(:in?, range) — Object#in? delegates to
+        // Range#include?, and :count interpolates the range's own to_s.
+        const range = optionValue as unknown as Range<number>;
+        if (!range.isInclude(num)) {
+          record.errors.add(attribute, `:${option}`, withCount(range.toS()));
+        }
+      } else if (option in COMPARE_CHECKS) {
+        optionValue = this.optionAsNumber(record, optionValue, precision, scale);
+        if (optionValue === undefined) continue;
+        if (!compareOperator(COMPARE_CHECKS[option as CompareKey], num, optionValue)) {
+          record.errors.add(attribute, `:${underscore(option)}`, withCount(optionValue));
+        }
       }
     }
   }
