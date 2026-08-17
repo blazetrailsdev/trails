@@ -1,8 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, existsSync, symlinkSync, realpathSync } from "node:fs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+  symlinkSync,
+  realpathSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { FileStore } from "../file-store.js";
+import { basename, dirname, join } from "node:path";
+import { FileStore, FILENAME_MAX_SIZE } from "../file-store.js";
+import { assert, assertEmpty, assertNot, assertPredicate } from "../../testing/assertions.js";
+import { Store } from "../store.js";
+import { getFs } from "../../fs-adapter.js";
+import { isPresent } from "../../core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
@@ -15,6 +28,12 @@ import type { StoreOptions } from "../store.js";
 // (file_store_test.rb:63).
 function pathFor(store: FileStore, key: string): string {
   return (store as unknown as { normalizeKey(k: string, o: object): string }).normalizeKey(key, {});
+}
+
+// Rails reaches the private key helper with `@cache.send(:file_path_key, key)`
+// (file_store_test.rb:64).
+function filePathKey(store: FileStore, path: string): string {
+  return (store as unknown as { filePathKey(p: string): string }).filePathKey(path);
 }
 
 describe("FileStoreTest", () => {
@@ -36,38 +55,61 @@ describe("FileStoreTest", () => {
   });
 
   it("long uri encoded keys", () => {
-    const longKey = "a".repeat(300);
-    store.write(longKey, "value");
-    expect(store.read(longKey)).toBe("value");
+    store.write("%".repeat(870), 1);
+    expect(store.read("%".repeat(870))).toEqual(1);
   });
 
   it("key transformation", () => {
-    store.write("my/key", "val");
-    expect(store.read("my/key")).toBe("val");
+    const key = pathFor(store, "views/index?id=1");
+    expect(filePathKey(store, key)).toEqual("views/index?id=1");
   });
 
+  // Rails builds `@cache_with_pathname` from `Pathname.new(cache_dir)`
+  // (file_store_test.rb:21); Ruby's Pathname is stdlib with no trails
+  // counterpart, so the store is built from the same directory as a String and
+  // the round-trip through `file_path_key` is what the test pins.
   it("key transformation with pathname", () => {
-    store.write("path/to/key", "value");
-    expect(store.read("path/to/key")).toBe("value");
+    writeFileSync(join(cacheDir, "foo"), "");
+    const cacheWithPathname = new FileStore(cacheDir, { expiresIn: 60 });
+    const key = pathFor(cacheWithPathname, "views/index?id=1");
+    expect(filePathKey(cacheWithPathname, key)).toEqual("views/index?id=1");
   });
 
+  // Test that generated cache keys are short enough to have Tempfile stuff added to them and
+  // remain valid
   it("filename max size", () => {
-    // Keys with 228+ char segments should be stored without throwing
-    const bigSegment = "x".repeat(250);
-    expect(() => store.write(bigSegment, "v")).not.toThrow();
+    const key = "A".repeat(FILENAME_MAX_SIZE);
+    const path = pathFor(store, key);
+    // Ruby wraps the assertion in `Dir::Tmpname.create(basename, …)`
+    // (file_store_test.rb:80), which appends the timestamp/pid/random suffix
+    // `atomic_write`'s Tempfile would; trails' atomicWrite spells that suffix
+    // itself, so the budget is measured against the same worst case.
+    const tmpname = `${basename(path)}.20260817-123456-abcdef`;
+    assert(
+      basename(`${tmpname}.lock`).length <= 255,
+      `Temp filename too long: ${basename(`${tmpname}.lock`).length}`,
+    );
   });
 
+  // Because file systems have a maximum filename size, filenames > max size should be split in to directories
+  // If filename is 'AAAAB', where max size is 4, the returned path should be AAAA/B
   it("key transformation max filename size", () => {
-    const bigKey = "x".repeat(500);
-    store.write(bigKey, "v");
-    expect(store.read(bigKey)).toBe("v");
+    const key = `${"A".repeat(FILENAME_MAX_SIZE)}B`;
+    const path = pathFor(store, key);
+    assert(path.split("/").every((dirName) => dirName.length <= FILENAME_MAX_SIZE));
+    expect(basename(path)).toEqual("B");
   });
 
   it("delete matched when key exceeds max filename size", () => {
-    const bigKey = "x".repeat(500);
-    store.write(bigKey, "v");
-    store.deleteMatched(/x{10}/);
-    expect(store.read(bigKey)).toBeNull();
+    const submaximalKey = "_".repeat(FILENAME_MAX_SIZE - 1);
+
+    store.write(submaximalKey + "AB", "value");
+    store.deleteMatched(/AB/);
+    assertNot(store.exist(submaximalKey + "AB"));
+
+    store.write(submaximalKey + "/A", "value");
+    store.deleteMatched(/A/);
+    assertNot(store.exist(submaximalKey + "/A"));
   });
 
   it("delete matched when cache directory does not exist", () => {
@@ -76,9 +118,15 @@ describe("FileStoreTest", () => {
   });
 
   it("delete does not delete empty parent dir", () => {
-    store.write("a/b", "val");
-    store.delete("a/b");
-    expect(existsSync(cacheDir)).toBe(true);
+    const subCacheDir = join(cacheDir, "subdir/");
+    const subCacheStore = new FileStore(subCacheDir);
+    expect(() => {
+      assert(subCacheStore.write("foo", "bar"));
+      assert(subCacheStore.delete("foo"));
+    }).not.toThrow();
+    assert(existsSync(cacheDir), "Parent of top level cache dir was deleted!");
+    assert(existsSync(subCacheDir), "Top level cache dir was deleted!");
+    assertEmpty(readdirSync(subCacheDir));
   });
 
   it("delete prunes empty parent directories", () => {
@@ -115,39 +163,69 @@ describe("FileStoreTest", () => {
   });
 
   it("log exception when cache read fails", () => {
-    // Corrupted cache files should return null gracefully
-    expect(store.read("nonexistent_key")).toBeNull();
+    // Rails' `@buffer = StringIO.new` + `@cache.logger = Logger.new(@buffer)`
+    // (file_store_test.rb:23-24); the logger is class-level in trails.
+    const buffer = { string: "" };
+    const previousLogger = Store.logger;
+    Store.logger = {
+      warn: (message: string) => (buffer.string += message),
+      error: (message: string) => (buffer.string += message),
+    };
+    // Rails' `File.stub(:exist?, -> { raise StandardError.new("failed") })`
+    // (file_store_test.rb:127).
+    const existsSync = vi.spyOn(getFs(), "existsSync").mockImplementation(() => {
+      throw new Error("failed");
+    });
+    try {
+      (store as unknown as { readEntry(k: string, o: object): unknown }).readEntry("winston", {});
+      assertPredicate(buffer.string, isPresent);
+    } finally {
+      existsSync.mockRestore();
+      Store.logger = previousLogger;
+    }
   });
 
-  it("cleanup removes all expired entries", async () => {
-    store.write("foo", "bar", { expiresIn: 0.01 });
+  it("cleanup removes all expired entries", () => {
+    const time = Date.now();
+    store.write("foo", "bar", { expiresIn: 10 });
     store.write("baz", "qux");
-    await new Promise((r) => setTimeout(r, 20));
-    store.cleanup();
-    expect(store.exist("foo")).toBe(false);
-    expect(store.exist("baz")).toBe(true);
+    store.write("quux", "corge", { expiresIn: 20 });
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(time + 15_000);
+      store.cleanup();
+      assertNot(store.exist("foo"));
+      assert(store.exist("baz"));
+      assert(store.exist("quux"));
+      expect(readdirSync(cacheDir).length).toEqual(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("cleanup when non active support cache file exists", () => {
-    // Non-JSON files in cache dir should not cause errors during cleanup
-    writeFileSync(join(cacheDir, "not_a_cache_file.txt"), "plain text");
+    const cacheFilePath = pathFor(store, "foo");
+    mkdirSync(dirname(cacheFilePath), { recursive: true });
+    writeFileSync(cacheFilePath, cacheDir);
     expect(() => store.cleanup()).not.toThrow();
+    expect(readdirSync(cacheDir).length).toEqual(1);
   });
 
   it("write with unless exist", () => {
-    store.write("1", "aaaaaaaaaa");
-    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toBe(false);
-    expect(store.write("new_k", "val", { unlessExist: true })).toBe(true);
+    expect(store.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    store.write("1", null);
+    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
   it("clear", () => {
-    writeFileSync(join(cacheDir, ".gitkeep"), "");
-    writeFileSync(join(cacheDir, ".keep"), "");
-    store.write("foo", "bar");
+    const gitkeep = join(cacheDir, ".gitkeep");
+    const keep = join(cacheDir, ".keep");
+    writeFileSync(gitkeep, "");
+    writeFileSync(keep, "");
     store.clear();
-    expect(existsSync(join(cacheDir, ".gitkeep"))).toBe(true);
-    expect(existsSync(join(cacheDir, ".keep"))).toBe(true);
-    expect(store.read("foo")).toBeNull();
+    assert(existsSync(gitkeep));
+    assert(existsSync(keep));
   });
 
   // Inherited Store#fetch_multi routes through the readEntry hook, which must
