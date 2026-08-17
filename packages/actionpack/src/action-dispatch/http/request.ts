@@ -73,7 +73,7 @@ const ACTION_DISPATCH_REQUEST_ID = "action_dispatch.request_id";
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"] as const;
 const LOCALHOST_RE = /^(?:127(?:\.\d{1,3}){3}|::1|0:0:0:0:0:0:0:1(?:%.*)?)$/;
 
-const RFC_METHODS = [
+const HTTP_METHODS = [
   "OPTIONS",
   "GET",
   "HEAD",
@@ -110,7 +110,7 @@ const RFC_METHODS = [
 // prototype-chain lookups into apparent membership in `checkMethod`.
 const HTTP_METHOD_LOOKUP: Record<string, string> = Object.assign(
   Object.create(null) as Record<string, string>,
-  Object.fromEntries(RFC_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
+  Object.fromEntries(HTTP_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
 );
 
 const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
@@ -757,7 +757,7 @@ export class Request {
     if (name != null) {
       if (!Object.hasOwn(HTTP_METHOD_LOOKUP, name)) {
         throw new UnknownHttpMethod(
-          `${name}, accepted HTTP methods are ${toSentence([...RFC_METHODS], { locale: false })}`,
+          `${name}, accepted HTTP methods are ${toSentence([...HTTP_METHODS], { locale: false })}`,
         );
       }
     }
