@@ -154,10 +154,10 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
    *   end
    *
    * Both `#{}` interpolations are Ruby `to_s`, which for a Hash and an Array
-   * alike is `inspect` — `{:a=>1}` and `[1, 2, 3]`, not JSON. `toS` from
-   * ActiveSupport is that function; the one residual is that a Ruby Symbol key
-   * is a plain JS string in trails, so `{ a: 1 }` renders `{"a"=>1}` where MRI
-   * 3.3 gives `{:a=>1}` — the key's Symbol-ness is not recoverable at runtime.
+   * alike is `inspect` — `{:a=>1}` and `[1, 2, 3]`, not JSON. ActiveSupport's
+   * `toS` is that function, and it reads a Symbol key off the leading colon
+   * trails spells one with (CLAUDE.md), so `{ ":a": 1 }` renders the `{:a=>1}`
+   * MRI 3.3 emits.
    *
    * Validates that year/mon/mday (multiparameter keys 1, 2, 3) are
    * present, then defers to the multiparameter wrapper. Trails routes

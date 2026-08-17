@@ -48,16 +48,13 @@ export class QueryAttribute extends Attribute {
   }
 
   /**
-   * `query_attribute.rb:22-24` is `def type_cast(value) = value` — a
-   * QueryAttribute never puts its raw value through the type. Trails casts
-   * here instead, which is why the `Substitute` arm has to be spelled out: a
-   * StatementCache placeholder stands in for a value not supplied yet, and
-   * Rails' own constructor names it as the one value it will not route through
-   * the type (query_attribute.rb:13-14). `nil?` below carries the same guard.
+   * Mirrors: ActiveRecord::Relation::QueryAttribute#type_cast
+   * (query_attribute.rb:22-24) — `def type_cast(value) = value`. A
+   * QueryAttribute never puts its raw value through the type; `value` stays the
+   * raw one and `_value_for_database` is what routes it through `serialize`.
    */
   typeCast(value: unknown): unknown {
-    if (value instanceof Substitute) return value;
-    return this.type.cast(value);
+    return value;
   }
 
   static override withCastValue(name: string, value: unknown, type: CastType): QueryAttribute {

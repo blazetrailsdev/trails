@@ -24,13 +24,15 @@ const stringType = new StringType();
 const intType = new IntType();
 
 describe("QueryAttribute", () => {
-  it("casts value via type", () => {
+  it("does not cast value via type", () => {
+    // query_attribute.rb:22-24 is `def type_cast(value) = value` — the type is
+    // applied by `value_for_database`, never on the way in.
     const attr = new QueryAttribute("age", "25", intType);
-    expect(attr.value).toBe(25);
-    expect(attr.typeCast("25")).toBe(25);
+    expect(attr.value).toBe("25");
+    expect(attr.typeCast("25")).toBe("25");
   });
 
-  it("memoizes cast value", () => {
+  it("never calls cast for its value", () => {
     let callCount = 0;
     const countingType = {
       cast: (v: unknown) => {
@@ -43,7 +45,7 @@ describe("QueryAttribute", () => {
     void attr.value;
     void attr.value;
     void attr.value;
-    expect(callCount).toBe(1);
+    expect(callCount).toBe(0);
   });
 
   it("memoizes serialized value", () => {
@@ -131,7 +133,7 @@ describe("QueryAttribute", () => {
   it("valueBeforeTypeCast preserves original value", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
-    expect(attr.value).toBe(25);
+    expect(attr.value).toBe("25");
   });
 
   it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {

@@ -113,14 +113,16 @@ describe("DateTimeTest", () => {
     let error: unknown;
     expect(() => {
       try {
-        type.cast({ a: 1 });
+        type.cast({ ":a": 1 });
       } catch (e) {
         error = e;
         throw e;
       }
     }).toThrow(expect.objectContaining({ name: "ArgumentError" }));
+    // MRI 3.3: `"Provided hash #{{ a: 1 }} ..."` renders the hash as `{:a=>1}`
+    // — the Symbol-key rendering `inspect.trails.test.ts` pins against MRI.
     expect((error as Error).message).toBe(
-      `Provided hash ${toS({ a: 1 })} doesn't contain necessary keys: [1, 2, 3]`,
+      `Provided hash ${toS({ ":a": 1 })} doesn't contain necessary keys: [1, 2, 3]`,
     );
   });
 
