@@ -45,13 +45,6 @@
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "method",
-    "call": "check_method",
-    "reason": "Verified per-site (RFC 0106): `method` still reads `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline instead of Rails' `check_method(get_header(\"rack.methodoverride.original_method\") || get_header(\"REQUEST_METHOD\"))` (request.rb:212-220). Convergence is owned by the wave-2 follow-up story `converge-request-method-onto-methodoverride-original-method`; `check_method` lands with the `original_method` header read, not before it."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "method",
     "call": "get_header",
     "kind": "args",
     "rubyArgs": [
