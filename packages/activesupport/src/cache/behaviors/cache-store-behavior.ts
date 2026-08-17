@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { ArgumentError, type Store, type StoreOptions } from "../store.js";
+import { assert, assertNot, assertSame } from "../../testing/assertions.js";
 
 // Mirrors Rails `CacheStoreBehavior`
 // (activesupport/test/cache/behaviors/cache_store_behavior.rb) — "the base
@@ -192,6 +193,8 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     );
 
     expect(values).toEqual({ [key]: key + key, [otherKey]: otherKey + otherKey });
+    expect(cache.read(key)).toEqual(key + key);
+    expect(cache.read(otherKey)).toEqual(otherKey + otherKey);
   });
 
   it("exist", () => {
@@ -204,32 +207,32 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("nil exist", () => {
     const key = crypto.randomUUID();
     cache.write(key, null);
-    expect(cache.exist(key)).toBe(true);
+    assert(cache.exist(key));
   });
 
   it("delete", () => {
     const key = crypto.randomUUID();
     cache.write(key, "bar");
-    expect(cache.exist(key)).toBe(true);
-    expect(cache.delete(key)).toBe(true);
-    expect(cache.exist(key)).toBe(false);
+    assert(cache.exist(key));
+    assertSame(true, cache.delete(key));
+    assertNot(cache.exist(key));
   });
 
   it("delete returns false if not exist", () => {
     const key = crypto.randomUUID();
-    expect(cache.delete(key)).toBe(false);
+    assertSame(false, cache.delete(key));
   });
 
   it("delete multi", () => {
     const key = crypto.randomUUID();
     cache.write(key, "bar");
-    expect(cache.exist(key)).toBe(true);
+    assert(cache.exist(key));
     const otherKey = crypto.randomUUID();
     cache.write(otherKey, "world");
-    expect(cache.exist(otherKey)).toBe(true);
-    expect(cache.deleteMulti([key, crypto.randomUUID(), otherKey])).toBe(2);
-    expect(cache.exist(key)).toBe(false);
-    expect(cache.exist(otherKey)).toBe(false);
+    assert(cache.exist(otherKey));
+    expect(cache.deleteMulti([key, crypto.randomUUID(), otherKey])).toEqual(2);
+    assertNot(cache.exist(key));
+    assertNot(cache.exist(otherKey));
   });
 
   it("delete multi empty list", () => {

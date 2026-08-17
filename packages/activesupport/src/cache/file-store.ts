@@ -9,7 +9,7 @@ import { registerStoreClass } from "./store-registry.js";
 
 // max filename size on file system is 255, minus room for timestamp, pid, and
 // random characters appended by Tempfile (file_store.rb:16)
-const FILENAME_MAX_SIZE = 226;
+export const FILENAME_MAX_SIZE = 226;
 // max is 1024, plus some room (file_store.rb:17)
 const FILEPATH_MAX_SIZE = 900;
 const GITKEEP_FILES = [".gitkeep", ".keep"];

@@ -92,11 +92,11 @@ describe("ParsingTest", () => {
   it("boolean", () => {
     const parser = parsing["boolean"];
     for (const value of [1, true, "1"]) {
-      expect(parser(value)).toBe(true);
+      expect(parser(value)).toBeTruthy();
     }
 
     for (const value of [0, false, "0"]) {
-      expect(parser(value)).toBe(false);
+      expect(parser(value)).toBeFalsy();
     }
   });
 
@@ -163,57 +163,62 @@ describe("ParsingTest", () => {
 
 describe("RenameKeyTest", () => {
   it("rename key dasherizes by default", () => {
-    expect(renameKey("hello_world")).toBe("hello-world");
+    expect(renameKey("my_key")).toBe("my-key");
   });
 
   it("rename key dasherizes with dasherize true", () => {
-    expect(renameKey("hello_world", { dasherize: true })).toBe("hello-world");
+    expect(renameKey("my_key", { dasherize: true })).toBe("my-key");
   });
 
   it("rename key does nothing with dasherize false", () => {
-    expect(renameKey("hello_world", { dasherize: false })).toBe("hello_world");
+    expect(renameKey("my_key", { dasherize: false })).toBe("my_key");
   });
 
   it("rename key camelizes with camelize true", () => {
-    expect(renameKey("hello_world", { camelize: true })).toBe("HelloWorld");
+    expect(renameKey("my_key", { camelize: true })).toBe("MyKey");
   });
 
   it("rename key lower camelizes with camelize lower", () => {
-    expect(renameKey("hello_world", { camelize: "lower" })).toBe("helloWorld");
+    expect(renameKey("my_key", { camelize: "lower" })).toBe("myKey");
   });
 
   it("rename key lower camelizes with camelize upper", () => {
-    expect(renameKey("hello_world", { camelize: "upper" })).toBe("HelloWorld");
+    expect(renameKey("my_key", { camelize: "upper" })).toBe("MyKey");
   });
 
   it("rename key does not dasherize leading underscores", () => {
-    expect(renameKey("__hello_world")).toBe("__hello-world");
+    expect(renameKey("_id")).toBe("_id");
   });
 
   it("rename key with leading underscore dasherizes interior underscores", () => {
-    expect(renameKey("_hello_world")).toBe("_hello-world");
+    expect(renameKey("_my_key")).toBe("_my-key");
   });
 
   it("rename key does not dasherize trailing underscores", () => {
-    expect(renameKey("hello_world__")).toBe("hello-world__");
+    expect(renameKey("id_")).toBe("id_");
   });
 
   it("rename key with trailing underscore dasherizes interior underscores", () => {
-    expect(renameKey("hello_world_")).toBe("hello-world_");
+    expect(renameKey("my_key_")).toBe("my-key_");
   });
 
   it("rename key does not dasherize multiple leading underscores", () => {
-    expect(renameKey("___hello_world")).toBe("___hello-world");
+    expect(renameKey("__id")).toBe("__id");
   });
 
   it("rename key does not dasherize multiple trailing underscores", () => {
-    expect(renameKey("hello_world___")).toBe("hello-world___");
+    expect(renameKey("id__")).toBe("id__");
   });
 });
 
 describe("ToTagTest", () => {
   let builder: XmlStringBuilder;
   let options: ToTagOptions;
+
+  /** Mirrors `assert_xml` (xml_mini_test.rb:64-66). */
+  function assertXml(xml: string): void {
+    expect(builder.target()).toBe(xml);
+  }
 
   beforeEach(() => {
     builder = new XmlStringBuilder();
@@ -222,12 +227,12 @@ describe("ToTagTest", () => {
 
   it("#to_tag accepts a callable object and passes options with the builder", () => {
     toTag("some_tag", (o: ToTagOptions) => o.builder.tag("br"), options);
-    expect(builder.target()).toBe("<br/>");
+    assertXml("<br/>");
   });
 
   it("#to_tag accepts a callable object and passes options and tag name", () => {
     toTag("tag", (o: ToTagOptions, t: string) => o.builder.tag("b", t), options);
-    expect(builder.target()).toBe("<b>tag</b>");
+    assertXml("<b>tag</b>");
   });
 
   it("#to_tag accepts an object responding to #to_xml and passes the options, where :root is key", () => {
@@ -237,52 +242,52 @@ describe("ToTagTest", () => {
       },
     };
     toTag("tag", obj, options);
-    expect(builder.target()).toBe("<yo>tag</yo>");
+    assertXml("<yo>tag</yo>");
   });
 
   it("#to_tag accepts arbitrary objects responding to #to_str", () => {
     toTag("b", "Howdy", options);
-    expect(builder.target()).toBe("<b>Howdy</b>");
+    assertXml("<b>Howdy</b>");
   });
 
   it("#to_tag should use the type value in the options hash", () => {
     toTag("b", "blue", { ...options, type: "color" });
-    expect(builder.target()).toBe('<b type="color">blue</b>');
+    assertXml('<b type="color">blue</b>');
   });
 
   it("#to_tag accepts symbol types", () => {
     toTag("b", Symbol("name"), options);
-    expect(builder.target()).toBe('<b type="symbol">name</b>');
+    assertXml('<b type="symbol">name</b>');
   });
 
   it("#to_tag accepts boolean types", () => {
     toTag("b", true, options);
-    expect(builder.target()).toBe('<b type="boolean">true</b>');
+    assertXml('<b type="boolean">true</b>');
   });
 
   it("#to_tag accepts float types", () => {
     toTag("b", 3.14, options);
-    expect(builder.target()).toBe('<b type="float">3.14</b>');
+    assertXml('<b type="float">3.14</b>');
   });
 
   it("#to_tag accepts decimal types", () => {
     toTag("b", new BigDecimal("1.2"), options);
-    expect(builder.target()).toBe('<b type="decimal">1.2</b>');
+    assertXml('<b type="decimal">1.2</b>');
   });
 
   it("#to_tag accepts date types", () => {
     toTag("b", Temporal.PlainDate.from("2001-02-03"), options);
-    expect(builder.target()).toBe('<b type="date">2001-02-03</b>');
+    assertXml('<b type="date">2001-02-03</b>');
   });
 
   it("#to_tag accepts datetime types", () => {
     toTag("b", Temporal.ZonedDateTime.from("2001-02-03T04:05:06+07:00[+07:00]"), options);
-    expect(builder.target()).toBe('<b type="dateTime">2001-02-03T04:05:06+07:00</b>');
+    assertXml('<b type="dateTime">2001-02-03T04:05:06+07:00</b>');
   });
 
   it("#to_tag accepts time types", () => {
     toTag("b", Temporal.ZonedDateTime.from("1993-02-24T12:00:00+09:00[+09:00]"), options);
-    expect(builder.target()).toBe('<b type="dateTime">1993-02-24T12:00:00+09:00</b>');
+    assertXml('<b type="dateTime">1993-02-24T12:00:00+09:00</b>');
   });
 
   it("#to_tag accepts ActiveSupport::TimeWithZone types", () => {
@@ -295,7 +300,7 @@ describe("ToTagTest", () => {
       }
     }
     toTag("b", new TimeWithZone(), options);
-    expect(builder.target()).toBe('<b type="dateTime">1993-02-24T13:00:00+01:00</b>');
+    assertXml('<b type="dateTime">1993-02-24T13:00:00+01:00</b>');
   });
 
   it("#to_tag accepts duration types", () => {
@@ -304,46 +309,44 @@ describe("ToTagTest", () => {
       Temporal.Duration.from({ years: 3, months: 6, days: 4, hours: 12, minutes: 30, seconds: 5 }),
       options,
     );
-    expect(builder.target()).toBe('<b type="duration">P3Y6M4DT12H30M5S</b>');
+    assertXml('<b type="duration">P3Y6M4DT12H30M5S</b>');
   });
 
   it("#to_tag accepts array types", () => {
     toTag("b", ["first_name", "last_name"], options);
-    expect(builder.target()).toBe('<b type="array"><b>first_name</b><b>last_name</b></b>');
+    assertXml('<b type="array"><b>first_name</b><b>last_name</b></b>');
   });
 
   it("#to_tag accepts hash types", () => {
     toTag("b", { first_name: "Bob", last_name: "Marley" }, options);
-    expect(builder.target()).toBe(
-      "<b><first-name>Bob</first-name><last-name>Marley</last-name></b>",
-    );
+    assertXml("<b><first-name>Bob</first-name><last-name>Marley</last-name></b>");
   });
 
   it("#to_tag should not add type when skip types option is set", () => {
     toTag("b", "Bob", { ...options, skipTypes: 1 });
-    expect(builder.target()).toBe("<b>Bob</b>");
+    assertXml("<b>Bob</b>");
   });
 
   it("#to_tag should dasherize the space when passed a string with spaces as a key", () => {
     toTag("New   York", 33, options);
-    expect(builder.target()).toBe('<New---York type="integer">33</New---York>');
+    assertXml('<New---York type="integer">33</New---York>');
   });
 
   it("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {
     toTag(Symbol("New   York"), 33, options);
-    expect(builder.target()).toBe('<New---York type="integer">33</New---York>');
+    assertXml('<New---York type="integer">33</New---York>');
   });
 
   // trails coverage beyond Rails' ToTagTest, exercising the XmlMini `binary`
   // formatter/encoding and the empty-array self-closing form.
   it("#to_tag base64-encodes binary types and sets the encoding attribute", () => {
     toTag("b", "hello", { ...options, type: "binary" });
-    expect(builder.target()).toBe('<b type="binary" encoding="base64">aGVsbG8=\n</b>');
+    assertXml('<b type="binary" encoding="base64">aGVsbG8=\n</b>');
   });
 
   it("#to_tag emits an empty array as a self-closing tag", () => {
     toTag("b", [], options);
-    expect(builder.target()).toBe('<b type="array"/>');
+    assertXml('<b type="array"/>');
   });
 });
 
