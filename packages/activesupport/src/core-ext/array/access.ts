@@ -71,8 +71,6 @@ export class Array {
    */
   static excluding<T>(self: T[], ...elements: (T | T[])[]): T[] {
     const removed = elements.flat(1) as T[];
-    // Ruby's `Array#-` compares with `eql?`/`hash`, so a nested array is removed
-    // by value; `Array#includes` is identity-only and would keep it.
     return self.filter((element) => !removed.some((other) => eql(element, other)));
   }
 
@@ -160,11 +158,9 @@ export class Array {
 }
 
 /**
- * Ruby's `eql?` for the values `Array#-` compares: identity, or element-wise
- * equality for nested arrays.
- *
- * @noRailsEquivalent Ruby gets value equality on nested arrays from `Array#eql?`;
- * JS `===` is identity-only, so `Array#-` has to spell it out.
+ * The comparison Ruby's `Array#-` makes — `eql?`/`hash`, which is element-wise
+ * on a nested array. `Array#includes` is identity-only and would keep a nested
+ * array that `self - elements` removes.
  */
 function eql(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;

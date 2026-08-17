@@ -43,13 +43,19 @@ describe("ValidationsContextTest", () => {
   it("with a class that adds errors on update and validating a new model", async () => {
     Topic.validatesWith(ValidatorThatAddsErrors, { on: "update" });
     const topic = new Topic();
-    expect(await topic.isValid("create")).toBeTruthy(); // Validation doesn't run on create if 'on' is set to update
+    expect(
+      await topic.isValid("create"),
+      "Validation doesn't run on create if 'on' is set to update",
+    ).toBeTruthy();
   });
 
   it("with a class that adds errors on create and validating a new model", async () => {
     Topic.validatesWith(ValidatorThatAddsErrors, { on: "create" });
     const topic = new Topic();
-    expect(await topic.isInvalid("create")).toBeTruthy(); // Validation does run on create if 'on' is set to create
+    expect(
+      await topic.isInvalid("create"),
+      "Validation does run on create if 'on' is set to create",
+    ).toBeTruthy();
     expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
   });
 
@@ -63,10 +69,16 @@ describe("ValidationsContextTest", () => {
       "Validation ran with no context given when 'on' is set to context1 and context2",
     );
 
-    expect(await topic.isInvalid("context1")).toBeTruthy(); // Validation did not run on context1
+    expect(
+      await topic.isInvalid("context1"),
+      "Validation did not run on context1 when 'on' is set to context1 and context2",
+    ).toBeTruthy();
     expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
 
-    expect(await topic.isInvalid("context2")).toBeTruthy(); // Validation did not run on context2
+    expect(
+      await topic.isInvalid("context2"),
+      "Validation did not run on context2 when 'on' is set to context1 and context2",
+    ).toBeTruthy();
     expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
   });
 
@@ -81,7 +93,10 @@ describe("ValidationsContextTest", () => {
       "Validation ran with no context given when 'on' is set to context1 and context2",
     );
 
-    expect(await topic.isInvalid(["context1", "context2"])).toBeTruthy();
+    expect(
+      await topic.isInvalid(["context1", "context2"]),
+      "Validation did not run on context1 when 'on' is set to context1 and context2",
+    ).toBeTruthy();
     expect(topic.errors.get("base")).toContain(ERROR_MESSAGE);
     expect(topic.errors.get("base")).toContain(ANOTHER_ERROR_MESSAGE);
   });

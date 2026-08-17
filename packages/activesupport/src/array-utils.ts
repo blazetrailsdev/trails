@@ -8,15 +8,15 @@ import { camelize } from "./inflector.js";
 import { inspect, toS } from "./core-ext/object/inspect.js";
 
 /**
- * Wraps a value in an array. `null`/`undefined` → `[]`, arrays pass through,
- * scalars become `[value]`.
+ * Wraps its argument in an array unless it is already an array (or array-like).
+ *
+ * Mirrors: `Array.wrap` (`core_ext/array/wrap.rb:39-46`) — the
+ * `respond_to?(:to_ary)` arm is `object.to_ary || [object]`, so a `to_ary`
+ * answering nil still wraps and one answering a non-array is returned as-is.
  */
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
   if (Array.isArray(object)) return object;
-  // Ruby's `object.respond_to?(:to_ary)` arm: `to_ary || [object]`, so a
-  // `to_ary` answering nil still wraps, and one answering a non-array is
-  // returned as-is.
   const toAry = (object as { toAry?: () => T[] | null }).toAry;
   if (typeof toAry === "function") return toAry.call(object) ?? ([object] as T[]);
   return [object] as T[];
@@ -47,7 +47,12 @@ export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
 }
 
 /**
- * Split an array into groups of `n`, padding the last group with `fillWith`.
+ * Splits or iterates over the array in groups of size +number+, padding any
+ * remaining slots with +fill_with+ unless it is +false+.
+ *
+ * Mirrors: `Array#in_groups_of` (`core_ext/array/grouping.rb:21-49`). The guard
+ * is Ruby's `number.to_i <= 0`, whose `to_i` answers 0 for nil and for anything
+ * non-numeric.
  */
 export function inGroupsOf<T>(
   array: T[],
@@ -55,7 +60,8 @@ export function inGroupsOf<T>(
   fillWith: T | null | false = null,
   block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
-  if (!(Number(number) > 0)) {
+  const numberToI = Number(number) || 0;
+  if (numberToI <= 0) {
     throw new ArgumentError(`Group size must be a positive integer, was ${inspect(number)}`);
   }
   const result: (T | null | false)[][] = [];
@@ -118,30 +124,37 @@ export function toSentence(
 }
 
 /**
- * Split an array into `n` groups of roughly equal size, padding with `fillWith`.
- * Mirrors Rails' `Array#in_groups`.
+ * Splits or iterates over the array in +number+ of groups, padding any
+ * remaining slots with +fill_with+ unless it is +false+.
+ *
+ * Mirrors: `Array#in_groups` (`core_ext/array/grouping.rb:57-84`). `division`
+ * is Ruby's `size.div number`, floor division as a method — JS has only the
+ * operator, so it is `Math.floor` here.
  */
 export function inGroups<T>(
   array: T[],
-  n: number,
+  number: number,
   fillWith: T | null | false = null,
   block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
-  const quotient = Math.floor(array.length / n);
-  const remainder = array.length % n;
+  // size.div number gives minor group size;
+  // size % number gives how many objects need extra accommodation;
+  // each group hold either division or division + 1 items.
+  const division = Math.floor(array.length / number);
+  const modulo = array.length % number;
+
+  // create a new array avoiding dup
   const groups: (T | null | false)[][] = [];
   let start = 0;
-  for (let i = 0; i < n; i++) {
-    const size = i < remainder ? quotient + 1 : quotient;
-    const group: (T | null | false)[] = array.slice(start, start + size);
-    if (fillWith !== false) {
-      while (group.length < quotient + (remainder > 0 ? 1 : 0)) {
-        group.push(fillWith);
-      }
-    }
-    groups.push(group);
-    start += size;
+
+  for (let index = 0; index < number; index++) {
+    const length = division + (modulo > 0 && modulo > index ? 1 : 0);
+    const lastGroup: (T | null | false)[] = array.slice(start, start + length);
+    groups.push(lastGroup);
+    if (fillWith !== false && modulo > 0 && length === division) lastGroup.push(fillWith);
+    start += length;
   }
+
   if (block) groups.forEach(block);
   return groups;
 }

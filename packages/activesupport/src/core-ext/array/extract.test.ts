@@ -26,7 +26,7 @@ describe("ExtractTest", () => {
     const emptyArray: number[] = [];
     const arrayId = emptyArray;
 
-    const newEmptyArray = extractBang(emptyArray, () => undefined as unknown as boolean);
+    const newEmptyArray = extractBang(emptyArray, () => false);
 
     expect(newEmptyArray).toEqual([]);
     expect(emptyArray).toEqual([]);
