@@ -352,6 +352,17 @@ describe("TS extractor assertion-value collection", () => {
     expect(tsAssertionValues(src)["neg"]).toEqual(["n:-3"]);
   });
 
+  it("keeps a numeric literal's source spelling so a Rails float still matches", () => {
+    const src = `
+      it("nums", () => {
+        expect(a).toEqual(946684800.0);
+        expect(b).toEqual(1_000);
+        expect(c).toEqual(-1.50);
+      });
+    `;
+    expect(tsAssertionValues(src)["nums"]).toEqual(["n:946684800.0", "n:1000", "n:-1.50"]);
+  });
+
   it("folds null and undefined matcher args to the x:nil token", () => {
     const src = `
       it("nils", () => {

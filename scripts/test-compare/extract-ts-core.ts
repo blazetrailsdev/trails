@@ -184,6 +184,19 @@ function expectChainMatcher(call: ts.CallExpression): string | null {
 }
 
 /**
+ * The SOURCE spelling of a numeric literal, underscores stripped — the same
+ * shape extract-ruby-tests.rb's `literal_token` emits from Ripper's `@int` /
+ * `@float` leaves (`node[1].delete('_')`). `NumericLiteral.text` is the
+ * scanner's normalized value (`946684800.0` → `946684800`, `0xff` → `255`), so
+ * reading it would make a faithful port of `assert_equal 946684800.0, …` look
+ * like a value divergence against a Rails float that TypeScript has no separate
+ * literal type for.
+ */
+function numericText(node: ts.NumericLiteral, sourceFile: ts.SourceFile): string {
+  return node.getText(sourceFile).replaceAll("_", "");
+}
+
+/**
  * Normalize a matcher-argument node to a tagged literal token (see
  * assertion-values.ts for the encoding and its Ruby twin), or `null` when the
  * argument is a computed expression/variable we can't statically compare.
@@ -191,9 +204,9 @@ function expectChainMatcher(call: ts.CallExpression): string | null {
  * literal in the AST) and folds `null`/`undefined` to the `x:nil` token so a TS
  * `toBeNull()`/`toBeUndefined()` lines up with a Ruby `nil`.
  */
-function literalToken(node: ts.Node | undefined): string | null {
+function literalToken(node: ts.Node | undefined, sourceFile: ts.SourceFile): string | null {
   if (!node) return null;
-  if (ts.isNumericLiteral(node)) return `n:${node.text}`;
+  if (ts.isNumericLiteral(node)) return `n:${numericText(node, sourceFile)}`;
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return `s:${node.text}`;
   if (node.kind === ts.SyntaxKind.TrueKeyword) return "b:true";
   if (node.kind === ts.SyntaxKind.FalseKeyword) return "b:false";
@@ -204,7 +217,7 @@ function literalToken(node: ts.Node | undefined): string | null {
     node.operator === ts.SyntaxKind.MinusToken &&
     ts.isNumericLiteral(node.operand)
   ) {
-    return `n:-${node.operand.text}`;
+    return `n:-${numericText(node.operand, sourceFile)}`;
   }
   return null;
 }
@@ -218,11 +231,15 @@ function literalToken(node: ts.Node | undefined): string | null {
  * (`includes`/`excludes`) checks its second argument (the member), every other
  * value-bearing kind its first.
  */
-function helperCalleeValue(name: string, args: readonly ts.Expression[]): string | null {
+function helperCalleeValue(
+  name: string,
+  args: readonly ts.Expression[],
+  sourceFile: ts.SourceFile,
+): string | null {
   const kind = normalizeTrailsKind(name);
   if (!kind || !VALUE_BEARING_KINDS.has(kind)) return null;
   const idx = kind === "includes" || kind === "excludes" ? 1 : 0;
-  return literalToken(args[idx]);
+  return literalToken(args[idx], sourceFile);
 }
 
 /** Lockstep assertion-kind tokens and their captured literal expected values. */
@@ -248,6 +265,7 @@ interface AssertionKinds {
 function collectAssertionKinds(
   node: ts.Node,
   helpers: HelperMap,
+  sourceFile: ts.SourceFile,
   depth = 0,
   visiting: Set<string> = new Set(),
 ): AssertionKinds {
@@ -259,7 +277,7 @@ function collectAssertionKinds(
         const matcher = expectChainMatcher(n);
         if (matcher) {
           kinds.push(matcher);
-          values.push(literalToken(n.arguments[0]));
+          values.push(literalToken(n.arguments[0], sourceFile));
         }
       } else if (ts.isIdentifier(n.expression)) {
         const name = n.expression.text;
@@ -268,13 +286,13 @@ function collectAssertionKinds(
           // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
           if (name !== "expect") {
             kinds.push(name);
-            values.push(helperCalleeValue(name, n.arguments));
+            values.push(helperCalleeValue(name, n.arguments, sourceFile));
           }
         } else if (depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
           const body = resolveHelper(helpers, name, n.pos);
           if (body) {
             visiting.add(name);
-            const sub = collectAssertionKinds(body, helpers, depth + 1, visiting);
+            const sub = collectAssertionKinds(body, helpers, sourceFile, depth + 1, visiting);
             kinds.push(...sub.kinds);
             values.push(...sub.values);
             visiting.delete(name);
@@ -341,7 +359,11 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
-    const { kinds: assertionKinds, values: assertionValues } = collectAssertionKinds(node, helpers);
+    const { kinds: assertionKinds, values: assertionValues } = collectAssertionKinds(
+      node,
+      helpers,
+      sourceFile,
+    );
     fileInfo.testCases.push({
       path: [...currentAncestors, title].join(" > "),
       description: title,
