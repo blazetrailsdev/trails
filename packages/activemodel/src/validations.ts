@@ -80,16 +80,14 @@ export interface ValidationsInternalsHost<TBase extends object = object> {
  * Lazy per-instance accessor for the active `ValidationContext`.
  * Mirrors Rails
  * `def context_for_validation; @context_for_validation ||= ValidationContext.new; end`
- * (activemodel/lib/active_model/validations.rb:463-465). The returned object
- * owns the active context; the model's `_validationContext` reads through it.
+ * (activemodel/lib/active_model/validations.rb:463-465). The returned object owns
+ * the active context — Rails keeps it here, not in a model ivar (:503-505, :361-368),
+ * which is what lets a frozen model be validated.
  *
  * @internal Rails-private helper.
  */
 export function contextForValidation(this: ContextForValidationHost): ValidationContext {
   if (this._contextForValidation) return this._contextForValidation;
-  // Rails keeps the active context *here*, not on the model
-  // (validations.rb:503-505 + :361-368) — which is what lets a frozen model be
-  // validated: `valid?` writes `context_for_validation.context`, never an ivar.
   const vc = new ValidationContext();
   this._contextForValidation = vc;
   return vc;
@@ -287,12 +285,9 @@ export async function runValidationsBang(this: RunValidationsHost): Promise<bool
 }
 
 /**
- * The only option keys `validate` accepts. Anything else is the common
- * mistake of reaching for `validate` when `validates` was meant, and raises
- * `ArgumentError`. Mirrors Rails `VALID_OPTIONS_FOR_VALIDATE`
- * (activemodel/lib/active_model/validations.rb:92) — the keys carry their trails
- * camelCase spelling (`exceptOn` for `:except_on`), which is what a caller
- * actually passes and so what the raised message has to name back to them.
+ * Mirrors Rails `VALID_OPTIONS_FOR_VALIDATE` (validations.rb:92). The keys carry
+ * their trails camelCase spelling (`exceptOn` for `:except_on`) — what a caller
+ * actually passes, so what the raised message must name back to them.
  */
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
 
@@ -387,10 +382,11 @@ export interface ReadAttributeForValidationHost {
 }
 
 /**
- * Give the duplicate a fresh, empty `Errors` rather than sharing the source's.
  * Mirrors Rails `initialize_dup` (validations.rb:310-313), which nils `@errors`
  * and lets `errors_or_create` rebuild it lazily; trails initializes `errors`
- * eagerly, so this assigns the replacement here — as {@link initInternals} does.
+ * eagerly, so this assigns the replacement, as {@link initInternals} does. Like
+ * Rails it leaves `@context_for_validation` aliased to the source's — `valid?`
+ * sets and restores the context per run, so the copy is never observed in flight.
  *
  * @internal Rails-private helper.
  */
@@ -399,8 +395,6 @@ export function initializeDup<TBase extends object>(
   _other: unknown,
 ): void {
   this.errors = new Errors(this as unknown as TBase);
-  this._validationContext = null;
-  this._contextForValidation = undefined;
 }
 
 /**

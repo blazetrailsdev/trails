@@ -752,8 +752,7 @@ describe("ValidationsTest", () => {
     const hash: Record<string, string[]> = {};
     hash.title = ["can't be blank"];
     hash.content = ["can't be blank"];
-    // Rails' `to_json` is the `Object#to_json` core_ext (`as_json.to_json` for
-    // Errors); trails has no port of it, so both sides serialize the JS way.
+    // Deviation: Rails' `to_json` is the `Object#to_json` core_ext, unported.
     expect(JSON.stringify(t.errors.asJson())).toEqual(JSON.stringify(hash));
   });
 
