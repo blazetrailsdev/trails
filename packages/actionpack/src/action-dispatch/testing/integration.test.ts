@@ -580,8 +580,9 @@ describe("ActionDispatch::IntegrationTest", () => {
   });
 
   describe("_mock_session", () => {
-    it("_mock_session returns the integration session", () => {
-      expect(app._mockSession).toBe(app);
+    it("_mock_session owns the session's cookie jar", () => {
+      expect(app._mockSession).toBe(app._mockSession);
+      expect(app.cookies).toBe(app._mockSession.cookieJar);
     });
   });
 

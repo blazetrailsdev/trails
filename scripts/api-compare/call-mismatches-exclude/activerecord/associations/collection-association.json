@@ -31,29 +31,8 @@
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "size",
-    "call": "count_records",
-    "reason": "Verified per-site (RFC 0106): `count_records` (collection_association.rb:218, :220) issues a COUNT query, so it cannot run inside the synchronous `size` getter; the counted arms live on the awaitable `CollectionProxy#size`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "size",
     "call": "empty?",
     "reason": "Verified per-site (RFC 0106): `target.empty?` / `association_scope.group_values.empty?` (collection_association.rb:214, :216) are `.length === 0` property reads, which the gate deliberately does not credit as calls (JS_ENUMERABLE_ALIASES, RFC 0092)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "size",
-    "call": "find_target?",
-    "reason": "Verified per-site (RFC 0106): `!find_target? || loaded?` (collection_association.rb:210) IS ported — as `findTargetNeeded()`, the trails spelling of `find_target?` — so what the gate misses is the name, not the branch."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "size",
-    "call": "select",
-    "reason": "Verified per-site (RFC 0106): `target.select(&:new_record?)` (collection_association.rb:217) belongs to the un-loaded `count_records` arm, which is async in trails and lives on `CollectionProxy#size`; the synchronous getter never reaches it."
   },
   {
     "package": "activerecord",

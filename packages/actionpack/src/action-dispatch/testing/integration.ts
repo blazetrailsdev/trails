@@ -39,7 +39,6 @@ import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
 import {
-  cookies as testProcessCookies,
   flash as testProcessFlash,
   redirectToUrl as testProcessRedirectToUrl,
   fileFixtureUpload as testProcessFileFixtureUpload,
@@ -153,8 +152,10 @@ export class IntegrationTest {
    */
   resetBang(): void {
     this.session = {};
-    this._persistentCookies = {};
-    this._cookieJar = undefined;
+    // Rails' `reset!` drops the memoized mock session (integration.rb:159), and
+    // with it the cookie jar — that IS how an integration session forgets its
+    // cookies.
+    this._mockSessionMemo = undefined;
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this.controller = undefined!;
@@ -325,17 +326,8 @@ export class IntegrationTest {
     return this.status;
   }
 
-  /** Accumulated cookies across requests (simple key/value), seeds the jar. */
-  private _persistentCookies: Record<string, string> = {};
-
-  /**
-   * Memoized CookieJar slot consumed by `ActionDispatch::TestProcess#cookies`.
-   * Cleared at the start of each request so the jar reflects the current
-   * request's `HTTP_COOKIE` header.
-   *
-   * @internal
-   */
-  _cookieJar?: CookieJar;
+  /** Backing store for the memoized `_mockSession` (Rails' `@_mock_session`). */
+  _mockSessionMemo?: MockSession;
 
   /** The controller instance from the last request. */
   controller!: Metal;
@@ -378,17 +370,16 @@ export class IntegrationTest {
   }
 
   /**
-   * Cookies from the last request as a Rails-shaped `CookieJar`. Delegates
-   * to `ActionDispatch::TestProcess#cookies`, which builds the jar from
-   * `this.request.cookies` (parsed from `HTTP_COOKIE`) and memoizes it on
-   * `_cookieJar`. The slot is cleared on every new request and on `reset()`.
+   * A map of the cookies returned by the last response, and which will be sent
+   * with the next request.
+   *
+   * Mirrors `ActionDispatch::Integration::Session#cookies`
+   * (integration.rb:114-116) — `_mock_session.cookie_jar`, the one jar the whole
+   * session shares. This overrides `ActionDispatch::TestProcess#cookies`, which
+   * would build a per-request jar off `request.cookies` instead.
    */
   get cookies(): CookieJar {
-    if (!this.request) {
-      this._cookieJar ??= CookieJar.build(undefined, this._persistentCookies);
-      return this._cookieJar;
-    }
-    return testProcessCookies.call(this as unknown as TestProcessHost);
+    return this._mockSession.cookieJar;
   }
 
   /** Mirror of `ActionDispatch::TestProcess#redirectToUrl`. */
@@ -422,14 +413,16 @@ export class IntegrationTest {
   }
 
   /**
-   * The underlying mock session used to dispatch requests. In Rails this is a
-   * `Rack::MockSession`; in Trails the `IntegrationTest` itself plays that
-   * role, so this returns `this`. Mirrors `Integration::Session#_mock_session`.
+   * The underlying mock session used to dispatch requests, memoized as in
+   * `Integration::Session#_mock_session` (integration.rb:318-320):
+   * `@_mock_session ||= Rack::MockSession.new(@app, host)`. It owns the
+   * session's single cookie jar; `reset!` drops it.
    *
    * @internal
    */
-  get _mockSession(): this {
-    return this;
+  get _mockSession(): MockSession {
+    this._mockSessionMemo ??= new MockSession(this.app, this.host);
+    return this._mockSessionMemo;
   }
 
   /** Mirror of `ActionDispatch::TestProcess#session` (no-op delegation). */
@@ -864,7 +857,6 @@ export class IntegrationTest {
     this.requestCount += 1;
     // Clear per-request memos up front so they don't leak across requests,
     // including down the no-route 404 path.
-    this._cookieJar = undefined;
     this._urlOptions = undefined;
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
@@ -898,10 +890,9 @@ export class IntegrationTest {
         HTTP_ACCEPT: this.accept,
         ...(options.env ?? {}),
       };
-      if (Object.keys(this._persistentCookies).length > 0) {
-        noRouteEnv.HTTP_COOKIE = Object.entries(this._persistentCookies)
-          .map(([k, v]) => `${k}=${v}`)
-          .join("; ");
+      const noRouteCookieHeader = this.cookieHeader();
+      if (noRouteCookieHeader !== undefined) {
+        noRouteEnv.HTTP_COOKIE = noRouteCookieHeader;
       }
       if (options.headers) {
         for (const [name, value] of Object.entries(options.headers)) {
@@ -967,11 +958,11 @@ export class IntegrationTest {
       (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
     env.REQUEST_URI = this.buildFullUri(finalPath, env);
 
-    // Cookies from persistent jar
-    if (Object.keys(this._persistentCookies).length > 0) {
-      env.HTTP_COOKIE = Object.entries(this._persistentCookies)
-        .map(([k, v]) => `${k}=${v}`)
-        .join("; ");
+    // Cookies the mock session's jar will send with this request — Rack::Test
+    // builds `HTTP_COOKIE` from `cookie_jar.for(uri)`.
+    const cookieHeader = this.cookieHeader();
+    if (cookieHeader !== undefined) {
+      env.HTTP_COOKIE = cookieHeader;
     }
 
     // Format / content type
@@ -1042,7 +1033,9 @@ export class IntegrationTest {
     // (and the `flash` getter above) can find it.
     this.request.flash = (this.controller as any).flash ?? new FlashHash();
 
-    // Collect cookies from response
+    // Merge the response's Set-Cookies into the session's jar — Rack::Test's
+    // MockSession does this in `#request` via `cookie_jar.merge(last_response)`.
+    const cookieJar = this._mockSession.cookieJar;
     const setCookies = this.response.getHeader("set-cookie");
     if (setCookies) {
       for (const cookie of setCookies.split(",")) {
@@ -1051,22 +1044,52 @@ export class IntegrationTest {
         if (eqIdx > 0) {
           const name = parts.slice(0, eqIdx).trim();
           const value = parts.slice(eqIdx + 1).trim();
-          this._persistentCookies[name] = value;
+          cookieJar.set(name, value);
         }
       }
     }
 
-    // Reflect the up-to-date persistent jar on the request so subsequent
-    // reads of `app.cookies` (which delegates to `TestProcess#cookies`)
-    // see Set-Cookies from the just-finished response, not just the
-    // cookies that were sent in.
-    if (Object.keys(this._persistentCookies).length > 0) {
-      this.request.env.HTTP_COOKIE = Object.entries(this._persistentCookies)
-        .map(([k, v]) => `${k}=${v}`)
-        .join("; ");
+    // The jar outlives the request, but its signed/encrypted sub-jars read their
+    // secrets off the request that built them, so re-point it at the request
+    // just dispatched.
+    cookieJar._request = this.request as unknown as CookieJar["_request"];
+
+    // Reflect the up-to-date jar on the request so reads that go through
+    // `request.cookies` see Set-Cookies from the just-finished response, not
+    // just the cookies that were sent in.
+    const updatedCookieHeader = this.cookieHeader();
+    if (updatedCookieHeader !== undefined) {
+      this.request.env.HTTP_COOKIE = updatedCookieHeader;
     }
-    this._cookieJar = undefined;
   }
+
+  /**
+   * `HTTP_COOKIE` for the next request, from the mock session's jar — Rack::Test
+   * spells this `Rack::Test::CookieJar#for(uri)`. `undefined` when the jar is
+   * empty, so the header is omitted rather than sent blank.
+   */
+  private cookieHeader(): string | undefined {
+    const entries = Object.entries(this._mockSession.cookieJar.toHash());
+    if (entries.length === 0) return undefined;
+    return entries.map(([k, v]) => `${k}=${v}`).join("; ");
+  }
+}
+
+/**
+ * The mock session `Integration::Session#_mock_session` memoizes
+ * (integration.rb:318-320, `Rack::MockSession.new(@app, host)`). Rack::Test
+ * lives outside Rails so there is no file to port; what fidelity turns on is
+ * that the mock session owns THE cookie jar for the session — `#cookies` is
+ * `_mock_session.cookie_jar` (integration.rb:114-116) — so cookies sent,
+ * cookies received and cookies read back by a test are one store.
+ */
+class MockSession {
+  readonly cookieJar: CookieJar = CookieJar.build(undefined, {});
+
+  constructor(
+    readonly app: unknown,
+    readonly host: string,
+  ) {}
 }
 
 // --- Mixin attachments ---------------------------------------------------
