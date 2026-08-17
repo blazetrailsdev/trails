@@ -527,11 +527,13 @@ export function getLocalComponents(
  * one is resolved off {@link TimeZone} at the instant the period covers, which
  * is what `time_zone.period_for_utc(@utc)` hands back.
  *
- * @noRailsEquivalent TZInfo is a gem, not Rails — `TimezonePeriod` and its
- * `observed_utc_offset` reader have no counterpart under vendor/rails, but
- * `TimeWithZone#period` (time_with_zone.rb:72-74) is the Rails method that
- * returns one and `dst?`/`abbreviation`/`observed_utc_offset` are the three
- * members the Rails source reads off it.
+ * @noRailsEquivalent PERMANENT — TZInfo is a gem, not Rails, so
+ *   `TimezonePeriod` and its `observed_utc_offset` reader have no counterpart
+ *   under vendor/rails and no amount of further porting produces one. Rails
+ *   names the object (`TimeWithZone#period`, time_with_zone.rb:72-74) and reads
+ *   exactly three members off it — `dst?` (:95), `observed_utc_offset` (:112),
+ *   `abbreviation` (:134) — so the port needs a stand-in for it, the same
+ *   position `InvalidTimezoneIdentifier` above is in.
  */
 export class TimezonePeriod {
   readonly abbreviation: string;
