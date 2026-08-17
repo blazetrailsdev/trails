@@ -1622,8 +1622,6 @@ export class Relation<T extends Base> {
     // Rails' `eager_loading?`, which `exec_main_query` reads for itself
     // (relation.rb:1428) exactly as `exec_queries` does for its preload list.
     if (this.isEagerLoading) {
-      // `apply_join_dependency`'s spec list (finder_methods.rb:458-460), needed
-      // up front only because the bypass arm below preloads them instead.
       const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
       return this.skipQueryCacheIfNecessary(async () => {
         // trails' remaining capability gap: a composite-PK/CTE/FROM-override
@@ -1658,11 +1656,6 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#references_eager_loaded_tables?
    */
   private referencesEagerLoadedTables(): boolean {
-    // relation.rb:1241 gates this behind `includes_values.any?` inside
-    // `eager_loading?`; trails split that reader across two promoters, so the
-    // guard rides here.
-    if (this.includesValues.length === 0) return false;
-
     // relation.rb:1475 `build_joins([])`. Rails' `build_joins` appends to the
     // joins array it is handed and the caller reads it back; trails' appends to
     // an Arel `SelectManager`, so the throwaway manager is the `[]`.
@@ -1803,6 +1796,11 @@ export class Relation<T extends Base> {
    * without raising, so the calculation/exists paths must stay consistent and
    * not raise either.
    *
+   * Gated on `eager_loading?`, the condition its Rails counterparts reach
+   * `apply_join_dependency` behind (finder_methods.rb:369, calculations.rb:431),
+   * so a bare `includes(:polymorphic)` with no reference does not raise here
+   * either.
+   *
    * Only the calculation/exists entry points call this — the `toArray` eager
    * path builds its real JoinDependency in `exec_main_query`/`toSql`,
    * which raises there, so re-checking from the shared `buildJoins`
@@ -1815,10 +1813,6 @@ export class Relation<T extends Base> {
    */
   _checkEagerLoadable(): void {
     if (this._eagerLoadBypassesJoinDependency()) return;
-    // Rails only ever builds the JoinDependency from inside
-    // `apply_join_dependency`, which its callers reach behind `eager_loading?`
-    // (finder_methods.rb:369) / `has_include?` (calculations.rb:431) — so a bare
-    // `includes(:polymorphic)` with no reference never raises there either.
     if (!this.isEagerLoading) return;
     const specs = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     new JoinDependency(this._model, this.table, specs, Nodes.OuterJoin);
@@ -2644,6 +2638,12 @@ export class Relation<T extends Base> {
    * OUTER JOINs), or null when this relation has no resolvable eager loading.
    * Shared by `toSql` (string path) and the set-operation operand
    * builder, which composes it into the compound's single collector.
+   *
+   * Also null for the one composite-PK case left after
+   * `distinct_relation_for_primary_key` took over the async path: this builder is
+   * synchronous, so it substitutes an inline `pk IN (SELECT DISTINCT …)` for the
+   * executed limited-ids query, and a composite key has no single column to nest
+   * that under. The plain arel is closer than a broken per-column `IN ()`.
    */
   private _buildEagerOperandManager(): SelectManager | null {
     if (this._eagerLoadBypassesJoinDependency()) return null;
@@ -2660,15 +2660,10 @@ export class Relation<T extends Base> {
     );
     if (jd.nodes.length === 0) return null;
 
-    // The one composite-PK gap left after `distinct_relation_for_primary_key`
-    // took over the async path: this builder is synchronous, so it substitutes
-    // an inline `pk IN (SELECT DISTINCT …)` for the executed limited-ids query,
-    // and a composite key has no single column to nest that under. Fall back to
-    // the plain arel rather than emit a broken per-column `IN ()`.
     if (
       Array.isArray(basePk) &&
       this.hasLimitOrOffset &&
-      !this._eagerJoinDependencyIsLimitable(jd as unknown as JoinDependency)
+      !this._eagerJoinDependencyIsLimitable(jd)
     ) {
       return null;
     }

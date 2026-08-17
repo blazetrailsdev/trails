@@ -66,10 +66,10 @@ export class BinaryType extends ValueType<unknown> {
    *   old_value != value
    *
    * Rails does not coerce `value`; it relies on Ruby's `!=`. JS cannot compare
-   * byte arrays with `!=`, so the bytes are walked, and `cast` supplies the
-   * `Uint8Array` that walk needs. It is identity in practice: the only callers
-   * (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`) pass
-   * `this.value`, which is already cast.
+   * byte arrays with `!=`, so the bytes are walked when both sides are bytes and
+   * `!==` carries the rest, as Ruby's `!=` does. `cast` is identity in practice:
+   * the only callers (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`)
+   * pass `this.value`, which is already cast.
    */
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const old = this.deserialize(rawOldValue);

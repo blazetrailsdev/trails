@@ -1203,13 +1203,16 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
   return columnNames.map(String).every((c) => known.has(c));
 }
 
-/** @internal */
+/**
+ * Mirrors: ActiveRecord::Calculations#has_include? (calculations.rb:430-432) —
+ * `eager_loading? || (includes_values.present? && column_name && column_name != :all)`.
+ * Only the `:all` Symbol is excluded; an explicit `"*"` is not.
+ * @internal
+ */
 export function hasInclude(
   rel: CalculationRelation,
   columnName: string | Nodes.Node | number | null,
 ): boolean {
-  // Rails excludes only the `:all` symbol (calculations.rb:431); an explicit
-  // `"*"` is not excluded.
   return (
     rel.isEagerLoading ||
     (isPresent(rel.includesValues) && columnName != null && columnName !== "all")
