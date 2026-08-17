@@ -121,15 +121,15 @@ describe("TestDate", () => {
     expect(RubyDate.ABBR_DAYNAMES[0]).toEqual("Sun");
     expect(RubyDate.ABBR_DAYNAMES.length).toEqual(7);
 
-    expect(Object.isFrozen(RubyDate.MONTHNAMES)).toEqual(true);
-    expect(Object.isFrozen(RubyDate.MONTHNAMES[1])).toEqual(true);
-    expect(Object.isFrozen(RubyDate.DAYNAMES)).toEqual(true);
-    expect(Object.isFrozen(RubyDate.DAYNAMES[0])).toEqual(true);
+    expect(Object.isFrozen(RubyDate.MONTHNAMES)).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.MONTHNAMES[1])).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.DAYNAMES)).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.DAYNAMES[0])).toBeTruthy();
 
-    expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES)).toEqual(true);
-    expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES[1])).toEqual(true);
-    expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES)).toEqual(true);
-    expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES[0])).toEqual(true);
+    expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES)).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.ABBR_MONTHNAMES[1])).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES)).toBeTruthy();
+    expect(Object.isFrozen(RubyDate.ABBR_DAYNAMES[0])).toBeTruthy();
   });
 
   it("eql p", () => {
@@ -139,10 +139,10 @@ describe("TestDate", () => {
     const dt2 = dtNewByFrags({ jd: 0 });
 
     expect(d.equals(d2)).toEqual(true);
-    expect(d.equals(0)).toEqual(false);
+    expect(d.equals(0)).not.toBe(true);
 
     expect(dt.equals(dt2)).toEqual(true);
-    expect(dt.equals(0)).toEqual(false);
+    expect(dt.equals(0)).not.toBe(true);
 
     expect(d.equals(dt)).toEqual(true);
     expect(d2.equals(dt2)).toEqual(true);
@@ -167,15 +167,19 @@ describe("TestDate", () => {
     expect(h.get(new RubyDate(1999, 5, 25))).toEqual(9);
     expect(h.get(new RubyDateTime(1999, 5, 25))).toEqual(9);
 
-    expect(typeof String(new RubyDate(1999, 5, 25).hash())).toEqual("string");
+    // A JS string primitive is not `instanceof String`; `Object()` boxes it to
+    // the one the Ruby `assert_instance_of(String, ...)` names.
+    expect(Object(String(new RubyDate(1999, 5, 25).hash()))).toBeInstanceOf(String);
   });
 
   it("freeze", () => {
     const d = new RubyDate();
     Object.freeze(d);
     expect(Object.isFrozen(d)).toEqual(true);
-    expect(Number.isInteger(d.yday)).toEqual(true);
-    expect(typeof d.toS()).toEqual("string");
+    // See `hash` above: a JS number/string primitive is boxed to the class the
+    // Ruby `assert_instance_of` names.
+    expect(Object(d.yday)).toBeInstanceOf(Number);
+    expect(Object(d.toS())).toBeInstanceOf(String);
   });
 
   it("submillisecond comparison", () => {

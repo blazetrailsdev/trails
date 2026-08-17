@@ -4957,6 +4957,13 @@ function getLimit(opt: ParseOpt | undefined): number {
  */
 function checkLimit(str: string | null | undefined, opt: ParseOpt | undefined): void {
   if (str == null) return;
+  // `StringValue(str)`: anything that is not a String and has no `to_str` is a
+  // `TypeError` here, before the length is ever measured.
+  if (typeof str !== "string") {
+    throw new TypeError(
+      `no implicit conversion of ${(str as object)?.constructor?.name ?? String(str)} into String`,
+    );
+  }
   const slen = new TextEncoder().encode(str).length;
   const limit = getLimit(opt);
   if (slen > limit) {

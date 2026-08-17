@@ -320,12 +320,12 @@ describe("TestDateParse", () => {
     expect(() => DateTime.parse("")).toThrow(Date.Error);
     expect(() => Date.parse("2001-02-29")).toThrow(Date.Error);
     expect(() => DateTime.parse("2001-02-29T23:59:60")).toThrow(Date.Error);
-    expect(() => DateTime.parse("2001-03-01T23:59:60")).not.toThrow();
+    assertNothingRaised(() => DateTime.parse("2001-03-01T23:59:60"));
     expect(() => DateTime.parse("2001-03-01T23:59:61")).toThrow(Date.Error);
     expect(() => Date.parse("23:55")).toThrow(Date.Error);
 
-    expect(() => Date.parse("")).toThrow(ArgumentError);
-    expect(() => DateTime.parse("")).toThrow(ArgumentError);
+    expect(rescueArgumentError(() => Date.parse("")) instanceof Date.Error).toBeTruthy();
+    expect(rescueArgumentError(() => DateTime.parse("")) instanceof Date.Error).toBeTruthy();
   });
 
   it(" rfc2822", () => {
@@ -354,6 +354,12 @@ describe("TestDateParse", () => {
 
     h = Date._rfc2822(null as unknown as string);
     expect(h).toEqual({});
+
+    // Ruby hands `_rfc2822` the `Symbol` form of the string, which `StringValue`
+    // in `check_limit` (date_core.c:4468-4479) rejects. A Ruby Symbol is a JS
+    // string here (CLAUDE.md), so the argument that is not a `String` is spelled
+    // as the nearest JS value that is not one.
+    expect(() => Date._rfc2822(1 as unknown as string)).toThrow(TypeError);
   });
 
   it(" httpdate", () => {
@@ -373,6 +379,9 @@ describe("TestDateParse", () => {
 
     h = Date._httpdate(null as unknown as string);
     expect(h).toEqual({});
+
+    // See ` rfc2822` above for why the Ruby Symbol is spelled as a non-string.
+    expect(() => Date._httpdate(1 as unknown as string)).toThrow(TypeError);
   });
 
   it("rfc2822", () => {
@@ -390,8 +399,10 @@ describe("TestDateParse", () => {
 
     let dt = DateTime.rfc2822("Sat, 3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._rfc2822("Sat, 3 Feb 2001 04:05:06 +0700"))).toBe(Date.ITALY + 10);
     dt = DateTime.rfc2822("3 Feb 2001 04:05:06 +0700", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+07:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._rfc2822("3 Feb 2001 04:05:06 +0700"))).toBe(Date.ITALY + 10);
   });
 
   it("httpdate", () => {
@@ -404,6 +415,7 @@ describe("TestDateParse", () => {
 
     const dt = DateTime.httpdate("Sat, 03 Feb 2001 04:05:06 GMT", Date.ITALY + 10);
     expect(dt.equals(new DateTime(2001, 2, 3, 4, 5, 6, "+00:00").toDatetime())).toBe(true);
+    expect(dtStartOf(Date._httpdate("Sat, 03 Feb 2001 04:05:06 GMT"))).toBe(Date.ITALY + 10);
   });
 
   /**
@@ -440,6 +452,22 @@ function dtParse(str: string): DateTime {
   return dtNewByFrags(Date._parse(str));
 }
 
+/** Ruby `begin ... rescue ArgumentError => e`, answering the rescued `e`. */
+function rescueArgumentError(block: () => unknown): unknown {
+  try {
+    block();
+  } catch (e) {
+    if (e instanceof ArgumentError) return e;
+    throw e;
+  }
+  return null;
+}
+
+/** minitest `assert_nothing_raised`, which vitest has no matcher for. */
+function assertNothingRaised<T>(block: () => T): T {
+  return block();
+}
+
 /** Ruby `h.values_at(:year, :mon, :mday, :hour, :min, :sec, :offset)`. */
 function ymdhms(h: DateParts): unknown[] {
   return valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "offset");
@@ -451,6 +479,11 @@ function ymdhms(h: DateParts): unknown[] {
  */
 function startOf(h: DateParts): number {
   return dNewByFrags(h, Date.ITALY + 10).start;
+}
+
+/** {@link startOf}, for the `DateTime` arms. */
+function dtStartOf(h: DateParts): number {
+  return dtNewByFrags(h, Date.ITALY + 10).start;
 }
 
 /** Ruby `h.values_at(:hour, :min, :sec, :sec_fraction)`. */

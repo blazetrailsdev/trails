@@ -19,9 +19,9 @@ describe("TestDateCompat", () => {
       new DateTime(2002, 3, 19, 0, 0, 0, 0, Date.JULIAN).equals(new Date(2002, 3, 19, Date.JULIAN)),
     ).toBe(true);
 
-    expect(new Date(2002, 3, 19).equals(new DateTime(2002, 3, 19, 12, 0, 0))).toBe(false);
-    expect(new Date(2002, 3, 19).equals(new DateTime(2002, 3, 19, 0, 0, 1))).toBe(false);
-    expect(new Date(2002, 3, 19).caseEquals(new DateTime(2002, 3, 19, 12, 0, 0))).toBe(true);
-    expect(new Date(2002, 3, 19).caseEquals(new DateTime(2002, 3, 19, 0, 0, 1))).toBe(true);
+    expect(!new Date(2002, 3, 19).equals(new DateTime(2002, 3, 19, 12, 0, 0))).toBeTruthy();
+    expect(!new Date(2002, 3, 19).equals(new DateTime(2002, 3, 19, 0, 0, 1))).toBeTruthy();
+    expect(new Date(2002, 3, 19).caseEquals(new DateTime(2002, 3, 19, 12, 0, 0))).toBeTruthy();
+    expect(new Date(2002, 3, 19).caseEquals(new DateTime(2002, 3, 19, 0, 0, 1))).toBeTruthy();
   });
 });

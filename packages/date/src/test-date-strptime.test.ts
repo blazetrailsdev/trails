@@ -798,7 +798,7 @@ describe("TestDateStrptime", () => {
     expect(() => DateTime.strptime("")).toThrow(Date.Error);
     expect(() => Date.strptime("2001-02-29", "%F")).toThrow(Date.Error);
     expect(() => DateTime.strptime("2001-02-29T23:59:60", "%FT%T")).toThrow(Date.Error);
-    expect(() => DateTime.strptime("2001-03-01T23:59:60", "%FT%T")).not.toThrow();
+    assertNothingRaised(() => DateTime.strptime("2001-03-01T23:59:60", "%FT%T"));
     expect(() => DateTime.strptime("2001-03-01T23:59:61", "%FT%T")).toThrow(Date.Error);
     expect(() => Date.strptime("23:55", "%H:%M")).toThrow(Date.Error);
     expect(() => Date.strptime("01-31-2011", "%m/%d/%Y")).toThrow(Date.Error);
@@ -828,3 +828,8 @@ describe("TestDateStrptime", () => {
     expect((d as Temporal.ZonedDateTime).offset).toBe("+02:00");
   });
 });
+
+/** minitest `assert_nothing_raised`, which vitest has no matcher for. */
+function assertNothingRaised<T>(block: () => T): T {
+  return block();
+}
