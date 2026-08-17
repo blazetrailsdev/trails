@@ -11,21 +11,22 @@ import {
   endOfDay,
   endOfHour,
   endOfMinute,
+  isUtc,
   middleOfDay,
   secondsSinceMidnight,
   secondsUntilEndOfDay,
   since,
   subsec,
+  utcOffset,
 } from "./date-time/calculations.js";
+import { civilFromFormat, formattedOffset, nsec, toF, toI, usec } from "./date-time/conversions.js";
 import { setFrozenTime } from "../time-travel.js";
 import { setZone } from "../time-zone-config.js";
 import { ArgumentError } from "../hash-utils.js";
 import {
   advance as timeAdvance,
-  civilFromFormat,
   beginningOfQuarter,
   endOfMonth,
-  formattedOffset,
   isFuture,
   isPast,
   isToday,
@@ -33,12 +34,10 @@ import {
   isYesterday,
   lastWeek,
   nextDay,
-  nsec,
   prevDay,
   toDate,
   toFs,
   toTime,
-  usec,
   xmlschema,
 } from "../time-ext.js";
 
@@ -368,15 +367,18 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("utc?", () => {
-    const utcDate = new Date(Date.UTC(2005, 1, 22, 10, 10, 10));
-    expect(utcDate.getUTCHours()).toBe(10);
-    expect(utcDate.toISOString()).toContain("T10:10:10");
+    expect(isUtc(dt(2005, 2, 21, 10, 11, 12))).toBe(true);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBe(true);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, 0.25))).toBe(false);
+    expect(isUtc(DateTime.civil(2005, 2, 21, 10, 11, 12, -0.25))).toBe(false);
   });
 
   it("utc offset", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const offsetMin = -dt.getTimezoneOffset();
-    expect(typeof offsetMin).toBe("number");
+    expect(utcOffset(dt(2005, 2, 21, 10, 11, 12))).toBe(0);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBe(0);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, 0.25))).toBe(21600);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, -0.25))).toBe(-21600);
+    expect(utcOffset(DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-5, 24)))).toBe(-18000);
   });
 
   it("utc", () => {
@@ -385,15 +387,15 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("formatted offset with utc", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const offset = formattedOffset(dt);
-    expect(offset).toMatch(/^[+-]\d{2}:\d{2}$/);
+    expect(formattedOffset(dt(2000))).toBe("+00:00");
+    expect(formattedOffset(dt(2000), false)).toBe("+0000");
+    expect(formattedOffset(dt(2000), true, "UTC")).toBe("UTC");
   });
 
   it("formatted offset with local", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const offset = formattedOffset(dt);
-    expect(typeof offset).toBe("string");
+    const receiver = DateTime.civil(2005, 2, 21, 10, 11, 12, new Rational(-5, 24));
+    expect(formattedOffset(receiver)).toBe("-05:00");
+    expect(formattedOffset(receiver, false)).toBe("-0500");
   });
 
   it("compare with time", () => {
@@ -432,15 +434,14 @@ describe("DateTimeExtCalculationsTest", () => {
   it.skip("compare with rational");
 
   it("to f", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const asFloat = dt.getTime() / 1000;
-    expect(typeof asFloat).toBe("number");
+    expect(toF(dt(2000))).toBe(946684800.0);
+    expect(toF(DateTime.civil(1999, 12, 31, 19, 0, 0, new Rational(-5, 24)))).toBe(946684800.0);
+    expect(toF(DateTime.civil(1999, 12, 31, 19, 0, 0.5, new Rational(-5, 24)))).toBe(946684800.5);
   });
 
   it("to i", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
-    const asInt = Math.floor(dt.getTime() / 1000);
-    expect(Number.isInteger(asInt)).toBe(true);
+    expect(toI(dt(2000))).toBe(946684800);
+    expect(toI(DateTime.civil(1999, 12, 31, 19, 0, 0, new Rational(-5, 24)))).toBe(946684800);
   });
 
   it("usec", () => {

@@ -1198,6 +1198,30 @@ function iGcd(x: bigint, y: bigint): bigint {
 }
 
 /**
+ * @internal `rational.c` `float_to_r`, which decodes a Float into the exact
+ * `f * 2 ** e` its bits already hold (`numeric.c` `float_decode_internal`, i.e.
+ * `frexp`) and answers `f` over `2 ** -e`. A double IS a binary fraction, so
+ * doubling until the value is whole is that decode with no rounding in it, and
+ * it stops inside `Number.MAX_SAFE_INTEGER` because a mantissa is 53 bits wide.
+ * An Integer — a `bigint`, or a `number` `Integer#===` would accept — is itself
+ * over one, the `nurat_s_convert` Integer arm. `float_decode_internal` refuses a
+ * non-finite Float with a `FloatDomainError`.
+ */
+function floatToR(x: number | bigint): { numerator: bigint; denominator: bigint } {
+  if (typeof x === "bigint" || Number.isInteger(x)) {
+    return { numerator: BigInt(x), denominator: 1n };
+  }
+  if (!Number.isFinite(x)) throw new FloatDomainError(String(x));
+  let f = x;
+  let e = 1n;
+  while (!Number.isInteger(f)) {
+    f *= 2;
+    e *= 2n;
+  }
+  return { numerator: BigInt(f), denominator: e };
+}
+
+/**
  * Ruby's `Rational` (`rational.c`), as much of it as `date_zone_to_diff`'s
  * fractional-hour offset needs: `rb_rational_new` canonicalizes to lowest terms
  * (`rational.c` `nurat_s_canonicalize_internal`), `+` adds an Integer
@@ -1229,9 +1253,18 @@ export class Rational {
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   readonly denominator: bigint;
 
+  /**
+   * `rational.c` `nurat_s_convert` (`Rational()`), which takes each argument to
+   * a Rational and divides one by the other. A Float argument goes through
+   * `float_to_r` ({@link floatToR}) — `Rational(0.5, 86400)` is `(1/172800)` on
+   * ruby 3.3.11 — and an Integer one is itself over one, which is the
+   * `BigInt(num) / BigInt(den)` this constructor used to be limited to.
+   */
   constructor(num: number | bigint, den: number | bigint) {
-    const n = BigInt(num);
-    const d = BigInt(den);
+    const a = floatToR(num);
+    const b = floatToR(den);
+    const n = a.numerator * b.denominator;
+    const d = a.denominator * b.numerator;
     const g = iGcd(n, d);
     this.numerator = n / g;
     this.denominator = d / g;

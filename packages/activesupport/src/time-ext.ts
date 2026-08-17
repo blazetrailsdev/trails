@@ -9,7 +9,7 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Rational, Temporal, Time as RubyTime, cCivilToJd } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { findZoneBang, zone as timeZone } from "./time-zone-config.js";
@@ -18,7 +18,6 @@ import { TimeZone } from "./values/time-zone.js";
 import { toTime as stringToTime } from "./core-ext/string/conversions.js";
 import { preserveTimezone as compatibilityPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 import { currentTime } from "./time-travel.js";
-import { secondsSinceMidnight as dateTimeSecondsSinceMidnight } from "./core-ext/date-time/calculations.js";
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
@@ -745,104 +744,6 @@ export function toDate(date: Date): Temporal.PlainDate {
 }
 
 /**
- * Returns DateTime with local offset for given year if format is local else
- * offset is zero.
- *
- * Mirrors: `DateTime.civil_from_format`
- * (`core_ext/date_time/conversions.rb:69-76`). Ruby's `offset` is a Rational
- * fraction of a day, which is how `civil` takes it; `Temporal` takes the same
- * offset as the zone the wall clock is read in, so the `:local` arm reads
- * `Time.local(year, month, day).utc_offset` off a bare ruby/date `Time`,
- * exactly as Ruby does.
- */
-export function civilFromFormat(
-  utcOrLocal: string,
-  year: number,
-  month = 1,
-  day = 1,
-  hour = 0,
-  min = 0,
-  sec = 0,
-): Temporal.ZonedDateTime {
-  let offset: number;
-  if (utcOrLocal === "local") {
-    offset = RubyTime.local(year, month, day).utcOffset;
-  } else {
-    offset = 0;
-  }
-  const offsetHours = String(Math.trunc(Math.abs(offset) / 3600)).padStart(2, "0");
-  const offsetMinutes = String(Math.trunc((Math.abs(offset) % 3600) / 60)).padStart(2, "0");
-  const offsetId = `${offset < 0 ? "-" : "+"}${offsetHours}:${offsetMinutes}`;
-  return Temporal.PlainDateTime.from({
-    year,
-    month,
-    day,
-    hour,
-    minute: min,
-    second: sec,
-  }).toZonedDateTime(offsetId);
-}
-
-/**
- * Returns the fraction of a second as microseconds.
- *
- * Mirrors: `DateTime#usec` (`core_ext/date_time/conversions.rb:89-91`) —
- * `(sec_fraction * 1_000_000).to_i`.
- */
-export function usec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
-  return Math.trunc(secFraction(datetime) * 1_000_000);
-}
-
-/**
- * Returns the fraction of a second as nanoseconds.
- *
- * Mirrors: `DateTime#nsec` (`core_ext/date_time/conversions.rb:94-96`) —
- * `(sec_fraction * 1_000_000_000).to_i`.
- */
-export function nsec(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
-  return Math.trunc(secFraction(datetime) * 1_000_000_000);
-}
-
-/**
- * Ruby `DateTime#offset` (ruby/date, `date_core.c` `d_lite_offset`) over the
- * `PlainDateTime | ZonedDateTime` receiver this file's `DateTime` methods take:
- * the offset as a Rational fraction of a day, built from `of` in seconds.
- * `@blazetrails/date`'s `DateTime#offset` is the same reader over the ruby/date
- * receiver; a `PlainDateTime` stands in for the `+00:00` a `DateTime` defaults
- * to (date.rb's `civil`).
- */
-function offset(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): Rational {
-  const of =
-    datetime instanceof Temporal.PlainDateTime
-      ? 0
-      : Math.trunc(datetime.offsetNanoseconds / 1_000_000_000);
-  return new Rational(of, 86_400);
-}
-
-/**
- * Mirrors: `DateTime#offset_in_seconds`
- * (`core_ext/date_time/conversions.rb:99-101`) — `(offset * 86400).to_i`,
- * where Ruby's `offset` is the fraction of a day.
- */
-export function offsetInSeconds(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number {
-  return offset(datetime).mul(86400).toI();
-}
-
-/**
- * Mirrors: `DateTime#seconds_since_unix_epoch`
- * (`core_ext/date_time/conversions.rb:103-105`) — `(jd - 2440588) * 86400 -
- * offset_in_seconds + seconds_since_midnight`.
- */
-export function secondsSinceUnixEpoch(
-  datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): number {
-  const jd = cCivilToJd(datetime.year, datetime.month, datetime.day);
-  return (
-    (jd - 2440588) * 86400 - offsetInSeconds(datetime) + dateTimeSecondsSinceMidnight(datetime)
-  );
-}
-
-/**
  * Either return `self` or the time in the local system timezone depending on
  * the setting of `ActiveSupport.to_time_preserves_timezone`.
  *
@@ -948,13 +849,22 @@ export function instantToS(instant: Temporal.Instant): string {
 }
 
 /**
- * formattedOffset — returns the UTC offset formatted as ±HH:MM.
+ * Returns a formatted string of the offset from UTC, or an alternative string
+ * if the time zone is already UTC.
+ *
+ * Mirrors: `Time#formatted_offset` (`core_ext/time/conversions.rb:69-71`) —
+ * `utc? && alternate_utc_string || ActiveSupport::TimeZone.seconds_to_utc_offset(utc_offset, colon)`.
+ * A `Date` is an instant read in the system zone, so `utc?` is that zone's
+ * offset being zero and `utc_offset` is the offset itself, in seconds.
+ * Ruby's `alternate_utc_string` is any non-nil String — `""` included — so the
+ * arm is chosen on presence rather than on truthiness.
  */
-export function formattedOffset(date: Date): string {
-  const offsetMin = -date.getTimezoneOffset();
-  const sign = offsetMin >= 0 ? "+" : "-";
-  const absMin = Math.abs(offsetMin);
-  const h = String(Math.floor(absMin / 60)).padStart(2, "0");
-  const m = String(absMin % 60).padStart(2, "0");
-  return `${sign}${h}:${m}`;
+export function formattedOffset(
+  date: Date,
+  colon = true,
+  alternateUtcString: string | null = null,
+): string {
+  const utcOffset = -date.getTimezoneOffset() * 60;
+  if (utcOffset === 0 && alternateUtcString != null) return alternateUtcString;
+  return TimeZone.secondsToUtcOffset(utcOffset, colon);
 }

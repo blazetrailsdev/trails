@@ -247,7 +247,11 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // only `date/calculations.rb`'s Date arm has its own receiver and file.
   "activesupport:core_ext/time/conversions.rb": "time-ext.ts",
   "activesupport:core_ext/date/conversions.rb": "time-ext.ts",
-  "activesupport:core_ext/date_time/conversions.rb": "time-ext.ts",
+  // The DateTime arm reads the receiver's own `offset` and Julian day rather
+  // than an instant, so it sits on the DateTime receiver next to
+  // `date_time/calculations.rb`'s members, at the path the default rule
+  // already produces.
+  "activesupport:core_ext/date_time/conversions.rb": "core-ext/date-time/conversions.ts",
   "activesupport:core_ext/time/compatibility.rb": "time-ext.ts",
   "activesupport:core_ext/date_time/compatibility.rb": "time-ext.ts",
   // `date_time/acts_like.rb:6` is DateTime's FIRST reopening, so the whole
@@ -606,15 +610,17 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
       "DateTime's offset-shifting conversions (date_time/calculations.rb:169-" +
-      "200): `localtime`/`getlocal`, `utc`/`getgm`/`getutc`/`gmtime`, `utc?` and " +
-      "`utc_offset`. A Ruby DateTime is a civil date paired with an offset, so " +
-      "each returns a `Time` at a different offset for the same instant. trails " +
+      "193): `localtime`/`getlocal` and `utc`/`getgm`/`getutc`/`gmtime`. Each " +
+      "answers a `Time` for the same instant at a different offset, and trails " +
       "represents a time as a `Date`/`Temporal.Instant` — an absolute instant " +
-      "carrying no offset — so there is nothing for these to convert; the " +
+      "carrying no offset — so there is nothing for them to convert; the " +
       "offset-carrying surface is TimeWithZone (`utc`, `utcOffset`, `isUtc` in " +
       "time-with-zone.ts). Scoped to date_time/calculations.rb so it cannot " +
-      "silence the genuine Time/TimeWithZone members of the same names.",
-    names: ["localtime", "getlocal", "utc", "getgm", "getutc", "gmtime", "utc?", "utc_offset"],
+      "silence the genuine Time/TimeWithZone members of the same names. " +
+      "`utc?` and `utc_offset` came off this list once the DateTime receiver " +
+      "existed to read an offset off: both are ported in " +
+      "core-ext/date-time/calculations.ts.",
+    names: ["localtime", "getlocal", "utc", "getgm", "getutc", "gmtime"],
     rubyFiles: ["core_ext/date_time/calculations.rb"],
   },
   {

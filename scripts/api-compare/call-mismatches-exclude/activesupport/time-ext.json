@@ -9,6 +9,34 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
+    "rubyName": "change",
+    "call": "utc?",
+    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "change",
+    "call": "utc_offset",
+    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "formatted_offset",
+    "call": "utc?",
+    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "formatted_offset",
+    "call": "utc_offset",
+    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
     "rubyName": "sec_fraction",
     "call": "subsec",
     "reason": "`Time#sec_fraction` is `subsec` (time/calculations.rb:107-109) and `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38) — the two are each other's body in Ruby only because the receivers differ. trails has one `secFraction` function exported under both names, so neither call site exists."
@@ -54,6 +82,13 @@
     "rubyName": "to_time",
     "call": "month",
     "reason": "`month` here is Date#month, a calendar-field read on the ruby/date receiver `Time#to_time`/`DateTime#to_time` never make: both bodies are the `preserve_timezone` switch (time/compatibility.rb:13-15, date_time/compatibility.rb:15-17), and the field reads belong to `Date#to_time` (date/compatibility.rb), which is a different receiver. (Surfaced only because `Duration.month` newly joined the ported-name population.)"
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "time-ext.ts",
+    "rubyName": "to_time",
+    "call": "utc_offset",
+    "reason": "`utc?` and `utc_offset` are Ruby core `Time` readers — no Rails definition to port — and this file's `Time` arm is a JS `Date`, an instant that carries no offset of its own, so every body Ruby writes through them reads `getTimezoneOffset()` instead. Surfaced, not introduced, by taking `utc?`/`utc_offset` off the date_time/calculations.rb skip group: both are now ported on the DateTime receiver in core-ext/date-time/calculations.ts."
   },
   {
     "package": "activesupport",
