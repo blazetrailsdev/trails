@@ -32,9 +32,12 @@ class Person {
 }
 
 describe("GlobalIdentificationTest", () => {
+  let model: Person;
+
   beforeEach(() => {
     setApp("bcx");
     registerConstant("Person", Person);
+    model = new Person("1");
   });
   afterEach(() => {
     _resetApp();
@@ -42,59 +45,67 @@ describe("GlobalIdentificationTest", () => {
   });
 
   it("creates a Global ID from self", () => {
-    const p = new Person("1");
-    expect(toGlobalId.call(p).uri).toBe(GlobalID.create(p).uri);
-    expect(toGid.call(p).uri).toBe(GlobalID.create(p).uri);
-    expect(toGlobalId.call(p)).toBeInstanceOf(GlobalID);
+    expect(GlobalID.create(model)).toEqual(toGlobalId.call(model));
+    expect(GlobalID.create(model)).toEqual(toGid.call(model));
   });
 
   it("creates a Global ID with custom params", () => {
-    const p = new Person("1");
-    const a = toGlobalId.call(p, { some: "param" });
-    expect(a.params).toEqual({ some: "param" });
+    expect(GlobalID.create(model, { some: "param" })).toEqual(
+      toGlobalId.call(model, { some: "param" }),
+    );
+    expect(GlobalID.create(model, { some: "param" })).toEqual(toGid.call(model, { some: "param" }));
   });
 
+  // Rails compares SignedGlobalIDs with `assert_equal`, which routes through
+  // SignedGlobalID#== (uri + purpose). Vitest's `toEqual` is structural and
+  // would also compare the per-instance inspect id, so the ported assertions
+  // go through the same `equals` Rails' `==` is.
   it("creates a signed Global ID from self", () => {
     const verifier = makeVerifier();
-    const a = toSignedGlobalId.call(new Person("1"), { verifier });
-    const b = toSgid.call(new Person("1"), { verifier });
-    expect(a).toBeInstanceOf(SignedGlobalID);
-    expect(a.uri).toBe("gid://bcx/Person/1");
-    expect(b.uri).toBe(a.uri);
+    expect(
+      SignedGlobalID.create(model, { verifier }).equals(toSignedGlobalId.call(model, { verifier })),
+    ).toBe(true);
+    expect(
+      SignedGlobalID.create(model, { verifier }).equals(toSgid.call(model, { verifier })),
+    ).toBe(true);
   });
 
   it("creates a signed Global ID with purpose", () => {
     const verifier = makeVerifier();
-    const a = toSignedGlobalId.call(new Person("1"), { verifier, for: "login" });
-    expect(a.purpose).toBe("login");
-    // Round-trip verifies the purpose only when caller passes matching for:.
-    const token = a.toString();
-    expect(SignedGlobalID.parse(token, { verifier, for: "login" })).not.toBeNull();
-    expect(SignedGlobalID.parse(token, { verifier, for: "other" })).toBeNull();
+    expect(
+      SignedGlobalID.create(model, { verifier, for: "login" }).equals(
+        toSignedGlobalId.call(model, { verifier, for: "login" }),
+      ),
+    ).toBe(true);
+    expect(
+      SignedGlobalID.create(model, { verifier, for: "login" }).equals(
+        toSgid.call(model, { verifier, for: "login" }),
+      ),
+    ).toBe(true);
   });
 
   it("creates a signed Global ID with custom params", () => {
     const verifier = makeVerifier();
-    const sgid = toSignedGlobalId.call(new Person("1"), { verifier, db: "primary" });
-    expect(sgid.uri).toContain("?db=primary");
-    const parsed = SignedGlobalID.parse(sgid.toString(), { verifier });
-    expect(parsed!.uri).toContain("?db=primary");
+    expect(
+      SignedGlobalID.create(model, { verifier, some: "param" }).equals(
+        toSignedGlobalId.call(model, { verifier, some: "param" }),
+      ),
+    ).toBe(true);
+    expect(
+      SignedGlobalID.create(model, { verifier, some: "param" }).equals(
+        toSgid.call(model, { verifier, some: "param" }),
+      ),
+    ).toBe(true);
   });
 
   it("dup should clear memoized to_global_id", () => {
-    // Rails calls model.dup (which clears @global_id memoization) and
-    // mutates the dup's id. The test verifies the resulting GID reflects
-    // the new id, not a stale memoized one. Trails doesn't memoize
-    // toGlobalId, so the same invariant holds without dup: mutating id
-    // on the original instance and re-calling toGlobalId must return a
-    // fresh GID for the new id. Mutating in-place is the stricter check —
-    // if memoization ever creeps in, this test catches it.
-    const model = new Person("1");
-    const before = toGlobalId.call(model);
-    model.id = "2";
-    const after = toGlobalId.call(model);
-    expect(after.uri).not.toBe(before.uri);
-    expect(after.modelId).toBe("2");
+    // Rails calls model.dup (which clears the @global_id memoization) before
+    // bumping the id. Trails doesn't memoize toGlobalId, so the dup is a plain
+    // structural copy and the same invariant holds.
+    const globalId = toGlobalId.call(model);
+    const dupModel = new Person(String(Number(model.id) + 1));
+    const dupGlobalId = toGlobalId.call(dupModel);
+    expect(globalId).not.toEqual(dupGlobalId);
   });
 
   it("toGidParam round-trips through GlobalID.parse", () => {

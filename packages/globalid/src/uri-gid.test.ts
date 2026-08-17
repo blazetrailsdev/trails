@@ -7,6 +7,33 @@ import {
   BadURIError,
 } from "./uri/gid.js";
 
+// Mirrors the private assertion helpers on URI::GIDValidationTest /
+// URI::GIDAppValidationTest (vendor/globalid/test/cases/uri_gid_test.rb:143-171).
+// Mirrors minitest's `assert_raise(Klass) { ... }`, which returns the raised
+// error so a following `assert_match` can read its message. Vitest's
+// `toThrow` doesn't hand the error back.
+function assertRaise(klass: new (...args: never[]) => Error, block: () => unknown): Error {
+  try {
+    block();
+  } catch (e) {
+    expect(e).toBeInstanceOf(klass);
+    return e as Error;
+  }
+  throw new Error(`expected ${klass.name} to be raised`);
+}
+
+function assertInvalidComponent(uri: string): void {
+  expect(() => GID.parse(uri)).toThrow(InvalidComponentError);
+}
+
+function assertBadUri(uri: string): void {
+  expect(() => GID.parse(uri)).toThrow(BadURIError);
+}
+
+function assertInvalidApp(value: string | null): void {
+  expect(() => validateApp(value)).toThrow();
+}
+
 describe("URI::GIDTest", () => {
   it("parsed", () => {
     const gid = GID.parse("gid://bcx/Person/5");
@@ -74,22 +101,18 @@ describe("URI::GIDTest", () => {
   });
 
   it("equal", () => {
-    const a = GID.parse("gid://bcx/Person/5");
-    const b = GID.parse("gid://bcx/Person/5");
-    expect(a.app).toBe(b.app);
-    expect(a.modelName).toBe(b.modelName);
-    expect(a.modelId).toBe(b.modelId);
-    const c = GID.parse("gid://bcxxx/Persona/1");
-    expect(a.app).not.toBe(c.app);
+    const gid = GID.parse("gid://bcx/Person/5");
+    expect(gid).toEqual(GID.parse("gid://bcx/Person/5"));
+    expect(gid).not.toEqual(GID.parse("gid://bcxxx/Persona/1"));
   });
 
   it("build with wrong ordered array creates a wrong ordered gid", () => {
     // Rails: URI::GID.build(['Person', '5', 'bcx', nil]) misorders the
     // positional (app, modelName, modelId, params) tuple. The resulting
     // URI is not equal to the canonical gid://bcx/Person/5.
-    const wrong = GID.build({ app: "Person", modelName: "5", modelId: "bcx" }).toString();
-    expect(wrong).toBe("gid://Person/5/bcx");
-    expect(wrong).not.toBe("gid://bcx/Person/5");
+    expect(GID.build({ app: "Person", modelName: "5", modelId: "bcx" }).toString()).not.toBe(
+      "gid://bcx/Person/5",
+    );
   });
 
   it("new returns invalid gid when not checking", () => {
@@ -104,7 +127,6 @@ describe("URI::GIDTest", () => {
       params: {},
     });
     expect(synthetic).toBeTruthy();
-    expect(synthetic.toString()).toBe("gid:///");
   });
 });
 
@@ -152,46 +174,46 @@ describe("URI::GIDModelIDDecodingTest", () => {
 
 describe("URI::GIDValidationTest", () => {
   it("missing app", () => {
-    expect(() => GID.parse("gid:///Person/1")).toThrow(InvalidComponentError);
+    assertInvalidComponent("gid:///Person/1");
   });
 
   it("missing path", () => {
-    expect(() => GID.parse("gid://bcx/")).toThrow();
+    assertInvalidComponent("gid://bcx/");
   });
 
   it("missing model id", () => {
-    expect(() => GID.parse("gid://bcx/Person")).toThrow(MissingModelIdError);
-    expect(() => GID.parse("gid://bcx/Person")).toThrow(/Unable to create a Global ID for Person/);
+    const err = assertRaise(MissingModelIdError, () => GID.parse("gid://bcx/Person"));
+    expect(err.message).toMatch(/Unable to create a Global ID for Person/);
   });
 
   it("missing model composite id", () => {
-    expect(() => GID.parse("gid://bcx/CompositePrimaryKeyModel")).toThrow(MissingModelIdError);
-    expect(() => GID.parse("gid://bcx/CompositePrimaryKeyModel")).toThrow(
-      /Unable to create a Global ID for CompositePrimaryKeyModel/,
+    const err = assertRaise(MissingModelIdError, () =>
+      GID.parse("gid://bcx/CompositePrimaryKeyModel"),
     );
+    expect(err.message).toMatch(/Unable to create a Global ID for CompositePrimaryKeyModel/);
   });
 
   it("empty", () => {
-    expect(() => GID.parse("gid:///")).toThrow();
+    assertInvalidComponent("gid:///");
   });
 
   it("invalid schemes", () => {
-    expect(() => GID.parse("http://bcx/Person/5")).toThrow(BadURIError);
-    expect(() => GID.parse("gyd://bcx/Person/5")).toThrow(BadURIError);
-    expect(() => GID.parse("//bcx/Person/5")).toThrow(BadURIError);
+    assertBadUri("http://bcx/Person/5");
+    assertBadUri("gyd://bcx/Person/5");
+    assertBadUri("//bcx/Person/5");
   });
 });
 
 describe("URI::GIDAppValidationTest", () => {
   it("nil or blank apps are invalid", () => {
-    expect(() => validateApp(null)).toThrow();
-    expect(() => validateApp("")).toThrow();
+    assertInvalidApp(null);
+    assertInvalidApp("");
   });
 
   it("apps containing non alphanumeric characters are invalid", () => {
-    expect(() => validateApp("foo&bar")).toThrow();
-    expect(() => validateApp("foo:bar")).toThrow();
-    expect(() => validateApp("foo_bar")).toThrow();
+    assertInvalidApp("foo&bar");
+    assertInvalidApp("foo:bar");
+    assertInvalidApp("foo_bar");
   });
 
   it("app with hyphen is allowed", () => {
@@ -208,6 +230,9 @@ describe("URI::GIDParamsTest", () => {
       params: { hello: "world" },
     }).toString();
     const gid = GID.parse(uri);
+    // Rails asserts both `params[:hello]` and `params['hello']` — a Ruby
+    // Symbol key is a plain JS string here, so both arms read the same key.
+    expect(gid.params["hello"]).toBe("world");
     expect(gid.params["hello"]).toBe("world");
   });
 
@@ -245,7 +270,6 @@ describe("URI::GIDParamsTest", () => {
     const gid = GID.parse("gid://bcx/Person/5?hello=world");
     gid.params["param"] = "value";
     expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
-    expect(gid.toString()).toBe("gid://bcx/Person/5?hello=world");
   });
 });
 

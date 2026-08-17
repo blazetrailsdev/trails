@@ -9,29 +9,62 @@ import { type LocatorModel } from "./locator.js";
 // GlobalIDModel's `readonly constructor: { readonly name: string }`.
 const fakeModel = (id: unknown, name = "Person") => ({ id, constructor: { name } });
 
-// ─── Fixture models for find / model_class tests ───────────────────────────
+// ─── Fixture models — vendor/globalid/test/models/*.rb ─────────────────────
 
 class Person {
-  static primaryKey = "id";
-  id: string;
-  constructor(id: string) {
+  static HARDCODED_ID_FOR_MISSING_PERSON = "1000";
+  static primaryKey: string | string[] = "id";
+  id: unknown;
+  constructor(id: unknown = 1) {
     this.id = id;
   }
-  static async find(id: unknown): Promise<Person> {
-    return new this(String(id));
+  static find(idOrIds: unknown): unknown {
+    if (Array.isArray(idOrIds)) return idOrIds.map((id) => this.find(id));
+    if (idOrIds === Person.HARDCODED_ID_FOR_MISSING_PERSON) throw new Error("Person missing");
+    return new this(idOrIds);
   }
 }
-class PersonUuid extends Person {}
+class PersonUuid extends Person {
+  static primaryKey = "uuid";
+}
+// Rails' `Person::Child`. A TS class name can't contain `::`, so the Rails
+// spelling is stamped on `name` — that is what GlobalID#model_name renders
+// and what the constant registry resolves.
 class PersonChild extends Person {}
-class PersonModel extends Person {}
-class CompositePrimaryKeyModel {
-  static primaryKey: string[] = ["tenant", "key"];
-  id: string[];
-  constructor(id: string[]) {
-    this.id = id;
+Object.defineProperty(PersonChild, "name", { value: "Person::Child" });
+
+class PersonModel {
+  static primaryKey = "id";
+  id: unknown;
+  constructor(attrs: { id: unknown }) {
+    this.id = attrs.id;
   }
-  static async find(id: unknown): Promise<CompositePrimaryKeyModel> {
-    return new CompositePrimaryKeyModel((id as unknown[]).map(String));
+  static find(id: unknown): PersonModel {
+    return new PersonModel({ id });
+  }
+}
+
+class CompositePrimaryKeyModel {
+  static primaryKey: string[] = ["tenant_key", "id"];
+  id: unknown;
+  constructor(attrs: { id: unknown }) {
+    this.id = attrs.id;
+  }
+  static find(idOrIds: unknown[]): unknown {
+    if (!Array.isArray(idOrIds)) throw new Error("id is not composite");
+    const multiRecordFetch = Array.isArray(idOrIds[0]);
+    if (multiRecordFetch) {
+      return idOrIds.map((id) => {
+        if ((id as unknown[]).length !== CompositePrimaryKeyModel.primaryKey.length) {
+          throw new Error("id doesn't match primary key");
+        }
+        return new CompositePrimaryKeyModel({ id });
+      });
+    }
+    if (idOrIds.length !== CompositePrimaryKeyModel.primaryKey.length) {
+      throw new Error("id doesn't match primary key");
+    }
+    return new CompositePrimaryKeyModel({ id: idOrIds });
   }
 }
 
@@ -44,19 +77,27 @@ function registerConstants(registry: Record<string, LocatorModel>): void {
 const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
   Person: Person as unknown as LocatorModel,
   PersonUuid: PersonUuid as unknown as LocatorModel,
-  // Rails 'Person::Child' — TS class can't have :: in its name, so the
-  // registered name uses the namespaced spelling that GlobalID.modelName
-  // round-trips, mapped to a flat PersonChild class.
   "Person::Child": PersonChild as unknown as LocatorModel,
   PersonModel: PersonModel as unknown as LocatorModel,
   CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
 
+// Ruby's `Array#uniq` folds on the hash/eql? protocol; a JS Set folds on
+// identity. This mirrors GlobalID#hash / #eql?
+// (vendor/globalid/lib/global_id/global_id.rb:88-94): same class, same URI.
+function uniq<T>(items: T[]): T[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${(item as object).constructor.name}:${String(item)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 describe("GlobalIDTest", () => {
   it("value equality", () => {
-    const a = GlobalID.parse("gid://app/Person/5")!;
-    const b = GlobalID.parse("gid://app/Person/5")!;
-    expect(a.equals(b)).toBe(true);
+    expect(new GlobalID("gid://app/Person/5")).toEqual(new GlobalID("gid://app/Person/5"));
   });
 
   it("invalid app name", () => {
@@ -78,9 +119,7 @@ describe("GlobalIDParamEncodedTest", () => {
 
   it("parsing", () => {
     const gid = GlobalID.create(fakeModel("id"));
-    const parsed = GlobalID.parse(gid.toParam());
-    expect(parsed).not.toBeNull();
-    expect(parsed!.equals(gid)).toBe(true);
+    expect(GlobalID.parse(gid.toParam())).toEqual(gid);
   });
 
   it("finding", async () => {
@@ -97,174 +136,244 @@ describe("GlobalIDParamEncodedTest", () => {
 
 describe("GlobalIDCreationTest", () => {
   const uuid = "7ef9b614-353c-43a1-a203-ab2307851990";
+  let personGid: GlobalID;
+  let personUuidGid: GlobalID;
+  let personNamespacedGid: GlobalID;
+  let personModelGid: GlobalID;
+  let cpkModelGid: GlobalID;
 
   beforeEach(() => {
     setApp("bcx");
     registerConstants(FIXTURE_REGISTRY);
+    personGid = GlobalID.create(new Person(5));
+    personUuidGid = GlobalID.create(new PersonUuid(uuid));
+    personNamespacedGid = GlobalID.create(new PersonChild(4));
+    personModelGid = GlobalID.create(new PersonModel({ id: 1 }));
+    cpkModelGid = GlobalID.create(
+      new CompositePrimaryKeyModel({ id: ["tenant-key-value", "id-value"] }),
+    );
   });
   afterEach(() => {
     _resetApp();
     _resetConstants();
   });
 
-  it("as string", () => {
-    expect(GlobalID.create(fakeModel(5)).toString()).toBe("gid://bcx/Person/5");
-    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).toString()).toBe(
-      `gid://bcx/PersonUuid/${uuid}`,
+  it("find", async () => {
+    expect(Person.find(personGid.modelId)).toEqual(await personGid.find());
+    expect(Person.find(personUuidGid.modelId)).toEqual(await personUuidGid.find());
+    expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(await personNamespacedGid.find());
+    expect(PersonModel.find(personModelGid.modelId)).toEqual(await personModelGid.find());
+    expect(CompositePrimaryKeyModel.find(cpkModelGid.modelId as unknown[])).toEqual(
+      await cpkModelGid.find(),
     );
-    expect(GlobalID.create(fakeModel(4, "Person::Child")).toString()).toBe(
-      "gid://bcx/Person::Child/4",
+  });
+
+  it("find with class", async () => {
+    expect(Person.find(personGid.modelId)).toEqual(
+      await personGid.find({ only: Person as unknown as LocatorModel }),
     );
-    expect(GlobalID.create(fakeModel(1, "PersonModel")).toString()).toBe("gid://bcx/PersonModel/1");
+    expect(Person.find(personUuidGid.modelId)).toEqual(
+      await personUuidGid.find({ only: Person as unknown as LocatorModel }),
+    );
+    expect(PersonModel.find(personModelGid.modelId)).toEqual(
+      await personModelGid.find({ only: PersonModel as unknown as LocatorModel }),
+    );
+    expect(CompositePrimaryKeyModel.find(cpkModelGid.modelId as unknown[])).toEqual(
+      await cpkModelGid.find({ only: CompositePrimaryKeyModel as unknown as LocatorModel }),
+    );
+  });
+
+  it("find with class no match", async () => {
+    // Rails' Hash is `Map` here, not `Object`: every JS class extends Object,
+    // so `only: Object` would match where Ruby's Hash rejects. Ruby's Integer /
+    // Float / Numeric all collapse onto `Number`, which JS has only one of.
+    expect(await personGid.find({ only: Map as unknown as LocatorModel })).toBeNull();
+    expect(await personUuidGid.find({ only: Array as unknown as LocatorModel })).toBeNull();
+    expect(await personNamespacedGid.find({ only: String as unknown as LocatorModel })).toBeNull();
+    expect(await personModelGid.find({ only: Number as unknown as LocatorModel })).toBeNull();
+    expect(await cpkModelGid.find({ only: Map as unknown as LocatorModel })).toBeNull();
+  });
+
+  it("find with subclass", async () => {
+    expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(
+      await personNamespacedGid.find({ only: Person as unknown as LocatorModel }),
+    );
+  });
+
+  it("find with subclass no match", async () => {
+    expect(await personNamespacedGid.find({ only: String as unknown as LocatorModel })).toBeNull();
+  });
+
+  it("find with multiple class", async () => {
+    expect(Person.find(personGid.modelId)).toEqual(
+      await personGid.find({
+        only: [Number as unknown as LocatorModel, Person as unknown as LocatorModel],
+      }),
+    );
+    expect(Person.find(personUuidGid.modelId)).toEqual(
+      await personUuidGid.find({
+        only: [Number as unknown as LocatorModel, Person as unknown as LocatorModel],
+      }),
+    );
+    expect(PersonModel.find(personModelGid.modelId)).toEqual(
+      await personModelGid.find({
+        only: [Number as unknown as LocatorModel, PersonModel as unknown as LocatorModel],
+      }),
+    );
+    expect(PersonChild.find(personNamespacedGid.modelId)).toEqual(
+      await personNamespacedGid.find({
+        only: [Person as unknown as LocatorModel, PersonChild as unknown as LocatorModel],
+      }),
+    );
+  });
+
+  it("find with multiple class no match", async () => {
     expect(
-      GlobalID.create(
-        fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
-      ).toString(),
-    ).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
+      await personGid.find({
+        only: [Number as unknown as LocatorModel, Number as unknown as LocatorModel],
+      }),
+    ).toBeNull();
+    expect(
+      await personUuidGid.find({
+        only: [Number as unknown as LocatorModel, String as unknown as LocatorModel],
+      }),
+    ).toBeNull();
+    expect(
+      await personModelGid.find({
+        only: [Array as unknown as LocatorModel, Map as unknown as LocatorModel],
+      }),
+    ).toBeNull();
+    expect(
+      await personNamespacedGid.find({
+        only: [String as unknown as LocatorModel, Set as unknown as LocatorModel],
+      }),
+    ).toBeNull();
+  });
+
+  it("as string", () => {
+    expect(personGid.toString()).toBe("gid://bcx/Person/5");
+    expect(personUuidGid.toString()).toBe(`gid://bcx/PersonUuid/${uuid}`);
+    expect(personNamespacedGid.toString()).toBe("gid://bcx/Person::Child/4");
+    expect(personModelGid.toString()).toBe("gid://bcx/PersonModel/1");
+    expect(cpkModelGid.toString()).toBe(
+      "gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value",
+    );
   });
 
   it("as param", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    expect(gid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbi81");
-    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbi81")!.equals(gid)).toBe(true);
+    expect(personGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbi81");
+    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbi81")).toEqual(personGid);
 
-    const uuidGid = GlobalID.create(fakeModel(uuid, "PersonUuid"));
-    expect(GlobalID.parse(uuidGid.toParam())!.equals(uuidGid)).toBe(true);
-
-    const cpkGid = GlobalID.create(
-      fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+    expect(personUuidGid.toParam()).toBe(
+      "Z2lkOi8vYmN4L1BlcnNvblV1aWQvN2VmOWI2MTQtMzUzYy00M2ExLWEyMDMtYWIyMzA3ODUxOTkw",
     );
-    expect(GlobalID.parse(cpkGid.toParam())!.equals(cpkGid)).toBe(true);
+    expect(
+      GlobalID.parse(
+        "Z2lkOi8vYmN4L1BlcnNvblV1aWQvN2VmOWI2MTQtMzUzYy00M2ExLWEyMDMtYWIyMzA3ODUxOTkw",
+      ),
+    ).toEqual(personUuidGid);
+
+    expect(personNamespacedGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbjo6Q2hpbGQvNA");
+    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbjo6Q2hpbGQvNA")).toEqual(personNamespacedGid);
+
+    expect(personModelGid.toParam()).toBe("Z2lkOi8vYmN4L1BlcnNvbk1vZGVsLzE");
+    expect(GlobalID.parse("Z2lkOi8vYmN4L1BlcnNvbk1vZGVsLzE")).toEqual(personModelGid);
+
+    const expectedEncoded =
+      "Z2lkOi8vYmN4L0NvbXBvc2l0ZVByaW1hcnlLZXlNb2RlbC90ZW5hbnQta2V5LXZhbHVlL2lkLXZhbHVl";
+    expect(cpkModelGid.toParam()).toBe(expectedEncoded);
+    expect(GlobalID.parse(expectedEncoded)).toEqual(cpkModelGid);
   });
 
   it("as URI", () => {
-    expect(GlobalID.create(fakeModel(5)).uri).toBe("gid://bcx/Person/5");
-    expect(GlobalID.create(fakeModel(4, "Person::Child")).uri).toBe("gid://bcx/Person::Child/4");
+    // Rails compares URI objects; GlobalID#uri is its string form here.
+    expect(personGid.uri).toBe("gid://bcx/Person/5");
+    expect(personUuidGid.uri).toBe(`gid://bcx/PersonUuid/${uuid}`);
+    expect(personNamespacedGid.uri).toBe("gid://bcx/Person::Child/4");
+    expect(personModelGid.uri).toBe("gid://bcx/PersonModel/1");
+    expect(cpkModelGid.uri).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
   });
 
   it("as JSON", () => {
-    const gid = GlobalID.create(fakeModel(5));
-    expect(gid.asJson()).toBe("gid://bcx/Person/5");
-    // Rails' `to_json`; here JSON.stringify(gid) routes through toJSON().
-    expect(JSON.stringify(gid)).toBe('"gid://bcx/Person/5"');
+    // Rails' `to_json`; here JSON.stringify routes through toJSON().
+    expect(personGid.asJson()).toBe("gid://bcx/Person/5");
+    expect(JSON.stringify(personGid)).toBe('"gid://bcx/Person/5"');
 
-    const uuidGid = GlobalID.create(fakeModel(uuid, "PersonUuid"));
-    expect(uuidGid.asJson()).toBe(`gid://bcx/PersonUuid/${uuid}`);
-    expect(JSON.stringify(uuidGid)).toBe(`"gid://bcx/PersonUuid/${uuid}"`);
+    expect(personUuidGid.asJson()).toBe(`gid://bcx/PersonUuid/${uuid}`);
+    expect(JSON.stringify(personUuidGid)).toBe(`"gid://bcx/PersonUuid/${uuid}"`);
 
-    const namespacedGid = GlobalID.create(fakeModel(4, "Person::Child"));
-    expect(namespacedGid.asJson()).toBe("gid://bcx/Person::Child/4");
-    expect(JSON.stringify(namespacedGid)).toBe('"gid://bcx/Person::Child/4"');
+    expect(personNamespacedGid.asJson()).toBe("gid://bcx/Person::Child/4");
+    expect(JSON.stringify(personNamespacedGid)).toBe('"gid://bcx/Person::Child/4"');
 
-    const cpkGid = GlobalID.create(
-      fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"),
+    expect(personModelGid.asJson()).toBe("gid://bcx/PersonModel/1");
+    expect(JSON.stringify(personModelGid)).toBe('"gid://bcx/PersonModel/1"');
+
+    expect(cpkModelGid.asJson()).toBe(
+      "gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value",
     );
-    expect(cpkGid.asJson()).toBe("gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value");
-    expect(JSON.stringify(cpkGid)).toBe(
+    expect(JSON.stringify(cpkModelGid)).toBe(
       '"gid://bcx/CompositePrimaryKeyModel/tenant-key-value/id-value"',
     );
   });
 
   it("model id", () => {
-    expect(GlobalID.create(fakeModel(5)).modelId).toBe("5");
-    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).modelId).toBe(uuid);
-    expect(GlobalID.create(fakeModel(4, "Person::Child")).modelId).toBe("4");
-    expect(
-      GlobalID.create(fakeModel(["tenant-key-value", "id-value"], "CompositePrimaryKeyModel"))
-        .modelId,
-    ).toEqual(["tenant-key-value", "id-value"]);
+    expect(personGid.modelId).toBe("5");
+    expect(personUuidGid.modelId).toBe(uuid);
+    expect(personNamespacedGid.modelId).toBe("4");
+    expect(personModelGid.modelId).toBe("1");
+    expect(cpkModelGid.modelId).toEqual(["tenant-key-value", "id-value"]);
   });
 
   it("model name", () => {
-    expect(GlobalID.create(fakeModel(5)).modelName).toBe("Person");
-    expect(GlobalID.create(fakeModel(uuid, "PersonUuid")).modelName).toBe("PersonUuid");
-    expect(GlobalID.create(fakeModel(4, "Person::Child")).modelName).toBe("Person::Child");
-    expect(GlobalID.create(fakeModel(["t", "i"], "CompositePrimaryKeyModel")).modelName).toBe(
-      "CompositePrimaryKeyModel",
-    );
-  });
-
-  it(":app option", () => {
-    expect(GlobalID.create(fakeModel(5)).toString()).toBe("gid://bcx/Person/5");
-    expect(GlobalID.create(fakeModel(5), { app: "foo" }).toString()).toBe("gid://foo/Person/5");
-    _resetApp();
-    expect(() => GlobalID.create(fakeModel(5), { app: null as unknown as string })).toThrow();
-  });
-
-  it("equality", () => {
-    const gid1 = GlobalID.create(fakeModel(5));
-    const gid2 = GlobalID.create(fakeModel(5));
-    const gid3 = GlobalID.create(fakeModel(10));
-    expect(gid1.equals(gid2)).toBe(true);
-    expect(gid1.equals(gid3)).toBe(false);
+    expect(personGid.modelName).toBe("Person");
+    expect(personUuidGid.modelName).toBe("PersonUuid");
+    expect(personNamespacedGid.modelName).toBe("Person::Child");
+    expect(personModelGid.modelName).toBe("PersonModel");
+    expect(cpkModelGid.modelName).toBe("CompositePrimaryKeyModel");
   });
 
   it("model class", () => {
-    expect(GlobalID.create(new Person("5")).modelClass).toBe(Person);
-    expect(GlobalID.create(new PersonUuid(uuid)).modelClass).toBe(PersonUuid);
-    expect(GlobalID.create(fakeModel(1, "PersonModel")).modelClass).toBe(PersonModel);
-    expect(GlobalID.create(fakeModel(["t", "i"], "CompositePrimaryKeyModel")).modelClass).toBe(
-      CompositePrimaryKeyModel,
-    );
+    expect(personGid.modelClass).toBe(Person);
+    expect(personUuidGid.modelClass).toBe(PersonUuid);
+    expect(personNamespacedGid.modelClass).toBe(PersonChild);
+    expect(personModelGid.modelClass).toBe(PersonModel);
+    expect(cpkModelGid.modelClass).toBe(CompositePrimaryKeyModel);
+    // Rails: `GlobalID.find 'gid://bcx/SignedGlobalID/5'` — the raise comes
+    // from #model_class, which trails reaches through the parsed GID.
+    expect(() => GlobalID.parse("gid://bcx/SignedGlobalID/5")!.modelClass).toThrow();
   });
 
-  it("find", async () => {
-    const personGid = GlobalID.create(new Person("5"));
-    const found = (await personGid.find()) as Person;
-    expect(found).toBeInstanceOf(Person);
-    expect(found.id).toBe("5");
+  it(":app option", () => {
+    expect(GlobalID.create(new Person(5)).toString()).toBe("gid://bcx/Person/5");
+    expect(GlobalID.create(new Person(5), { app: "foo" }).toString()).toBe("gid://foo/Person/5");
+    _resetApp();
+    expect(() => GlobalID.create(new Person(5), { app: null as unknown as string })).toThrow();
   });
 
-  it("find with class", async () => {
-    const personGid = GlobalID.create(new Person("5"));
-    const found = (await personGid.find({ only: Person as unknown as LocatorModel })) as Person;
-    expect(found).toBeInstanceOf(Person);
-    expect(found.id).toBe("5");
-  });
+  it("equality", () => {
+    const p1 = new Person(5);
+    const p2 = new Person(5);
+    const p3 = new Person(10);
+    expect(p1).toEqual(p2);
+    expect(p2).not.toEqual(p3);
 
-  it("find with class no match", async () => {
-    const personGid = GlobalID.create(new Person("5"));
-    class Unrelated {}
-    expect(await personGid.find({ only: Unrelated as unknown as LocatorModel })).toBeNull();
-  });
+    const gid1 = GlobalID.create(p1);
+    const gid2 = GlobalID.create(p2);
+    const gid3 = GlobalID.create(p3);
+    expect(gid1).toEqual(gid2);
+    expect(gid2).not.toEqual(gid3);
 
-  it("find with subclass", async () => {
-    // Rails: a PersonChild GID with only: Person succeeds because
-    // PersonChild < Person. findAllowed uses `instanceof prototype`.
-    // Use the namespaced 'Person::Child' GID directly — that's how
-    // GlobalID.create(new PersonChild(...)) renders the modelName when
-    // the class is registered under the Rails namespaced spelling.
-    const namespacedGid = GlobalID.parse(`gid://bcx/Person::Child/4`)!;
-    const found = (await namespacedGid.find({
-      only: Person as unknown as LocatorModel,
-    })) as PersonChild;
-    expect(found).toBeInstanceOf(PersonChild);
-  });
+    // hash and eql? to match for two GlobalID's pointing to the same object
+    expect([gid1]).toEqual(uniq([gid1, gid2]));
+    expect([gid1, gid3]).toEqual(uniq([gid1, gid2, gid3]));
 
-  it("find with subclass no match", async () => {
-    const namespacedGid = GlobalID.parse(`gid://bcx/Person::Child/4`)!;
-    class Unrelated {}
-    expect(await namespacedGid.find({ only: Unrelated as unknown as LocatorModel })).toBeNull();
-  });
+    // Rails asserts GlobalID#hash differs from its URI's hash. JS has no hash
+    // protocol, so assert what that difference encodes: a GlobalID is never
+    // equal to its bare URI.
+    expect(gid1).not.toEqual(gid1.uri);
 
-  it("find with multiple class", async () => {
-    const personGid = GlobalID.create(new Person("5"));
-    class Other {}
-    const found = (await personGid.find({
-      only: [Other as unknown as LocatorModel, Person as unknown as LocatorModel],
-    })) as Person;
-    expect(found).toBeInstanceOf(Person);
-  });
-
-  it("find with multiple class no match", async () => {
-    const personGid = GlobalID.create(new Person("5"));
-    class A {}
-    class B {}
-    expect(
-      await personGid.find({
-        only: [A as unknown as LocatorModel, B as unknown as LocatorModel],
-      }),
-    ).toBeNull();
+    // verify that URI and GlobalID do not pass the uniq test
+    expect([gid1, gid1.uri]).toEqual(uniq([gid1, gid1.uri]));
   });
 });
 
