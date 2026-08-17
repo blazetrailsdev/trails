@@ -135,7 +135,7 @@ describe("ConfigurableActiveSupport", () => {
     assertMethodNotDefined(child.config(), "bar");
     assertMethodNotDefined(new child().config(), "bar");
 
-    parent.config().compileMethods();
+    parent.config().compileMethodsBang();
     expect(parent.config().bar).toBe("foo");
     expect(new child().config().bar).toBe("foo");
 

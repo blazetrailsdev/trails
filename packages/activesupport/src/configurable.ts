@@ -6,14 +6,14 @@ import { InheritableOptions } from "./ordered-options.js";
  */
 export class Configuration extends InheritableOptions {
   /** Mirrors `compile_methods!` (configurable.rb:15-17). */
-  compileMethods(): void {
+  compileMethodsBang(): void {
     // `this.constructor` goes through the Proxy that stands in for Ruby's
     // `method_missing` (ordered_options.rb:49-58), which hands back a *bound*
     // function — and a bound function carries no `prototype` to define the
     // compiled readers on. The prototype's `constructor` is the same class
     // Ruby's `self.class` answers.
     const klass = Object.getPrototypeOf(this).constructor as typeof Configuration;
-    klass.compileMethods(this.keys());
+    klass.compileMethodsBang(this.keys());
   }
 
   /**
@@ -24,7 +24,7 @@ export class Configuration extends InheritableOptions {
    * spells as a getter: a plain value property would answer the function itself
    * where `config.bar` has to answer the value.
    */
-  static compileMethods(keys: string[]): void {
+  static compileMethodsBang(keys: string[]): void {
     for (const key of keys.filter((m) => !(m in this.prototype))) {
       Object.defineProperty(this.prototype, key, {
         get(this: Configuration): unknown {
@@ -91,7 +91,11 @@ export namespace Configurable {
       this: any,
       ...namesAndOptions: (string | ConfigAccessorOptions)[]
     ): void {
-      const options = popConfigAccessorOptions(namesAndOptions);
+      const last = namesAndOptions[namesAndOptions.length - 1];
+      const options: ConfigAccessorOptions =
+        typeof last === "object" && last !== null
+          ? (namesAndOptions.pop() as ConfigAccessorOptions)
+          : {};
       const names = namesAndOptions as string[];
       const instanceReader = options.instanceReader !== false;
       const instanceWriter = options.instanceWriter !== false;
@@ -111,8 +115,15 @@ export namespace Configurable {
         Object.defineProperty(this, name, { get: reader, set: writer, configurable: true });
 
         if (instanceAccessor) {
+          // Rails' two `class_eval`s define two independent methods; JavaScript
+          // holds both halves on one property, so each half is merged onto
+          // whatever the other already defined.
           if (instanceReader) {
-            Object.defineProperty(this.prototype, name, { get: reader, configurable: true });
+            Object.defineProperty(this.prototype, name, {
+              ...Object.getOwnPropertyDescriptor(this.prototype, name),
+              get: reader,
+              configurable: true,
+            });
           }
           if (instanceWriter) {
             Object.defineProperty(this.prototype, name, {
@@ -135,15 +146,4 @@ export namespace Configurable {
     }
     return this._config;
   }
-}
-
-function popConfigAccessorOptions(
-  namesAndOptions: (string | Configurable.ConfigAccessorOptions)[],
-): Configurable.ConfigAccessorOptions {
-  const last = namesAndOptions[namesAndOptions.length - 1];
-  if (typeof last === "object" && last !== null) {
-    namesAndOptions.pop();
-    return last;
-  }
-  return {};
 }
