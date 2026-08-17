@@ -37,13 +37,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
-    "rubyName": "body",
-    "call": "new",
-    "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
     "rubyName": "initialize",
     "call": "new",
     "reason": "Missing construction, not a constructor idiom: Rails' `initialize` (actionpack/lib/action_dispatch/http/request.rb:64-75) builds `@rack_request = Rack::Request.new(env)` and exposes it via `attr_reader :rack_request` (:77). The port (http/request.ts:148-158) copies `env` and fills in Rack defaults Rails does not set; the wrapper is built lazily by an invented `get rackRequest()` that caches it in `env[\"action_dispatch.rack_request\"]` (http/request.ts:925-931), so the constructor never constructs one. Not tracked by a story: actionpack is outside the project's stated focus (activerecord and its dependencies), which is why the convergence story filed for this row was closed as out of scope."
@@ -54,6 +47,17 @@
     "rubyName": "method",
     "call": "check_method",
     "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
+    "rubyName": "method",
+    "call": "get_header",
+    "kind": "args",
+    "rubyArgs": [
+      "str:rack.methodoverride.original_method"
+    ],
+    "reason": "request.rb:212-221 makes `method` the PRE-override HTTP method, read from `rack.methodoverride.original_method` before `REQUEST_METHOD`; trails inverts the pair — `method` applies an override it reads from `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline, and `requestMethod` is the raw value. Converging needs both readers and the override site moved, tracked as story converge-request-method-onto-methodoverride-original-method."
   },
   {
     "package": "actiondispatch",
@@ -96,16 +100,5 @@
     "rubyName": "xml_http_request?",
     "call": "match?",
     "reason": "Baseline (RFC 0108): call-set divergence inside a `get`/`set` accessor body, newly VISIBLE to the gate now that extract-ts-api records accessor call sets. Pre-existing divergence in the ported body, not introduced by the extractor change; pending per-body convergence review. Cluster-vetted: representative entries were read against the vendored Rails body and the rest were classified by the same mechanism — surfacing an accessor's call set for the first time — not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "method",
-    "call": "get_header",
-    "kind": "args",
-    "rubyArgs": [
-      "str:rack.methodoverride.original_method"
-    ],
-    "reason": "request.rb:212-221 makes `method` the PRE-override HTTP method, read from `rack.methodoverride.original_method` before `REQUEST_METHOD`; trails inverts the pair — `method` applies an override it reads from `HTTP_X_HTTP_METHOD_OVERRIDE`/`_method` inline, and `requestMethod` is the raw value. Converging needs both readers and the override site moved, tracked as story converge-request-method-onto-methodoverride-original-method."
   }
 ]

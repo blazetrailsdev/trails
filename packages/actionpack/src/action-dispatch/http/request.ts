@@ -470,21 +470,7 @@ export class Request {
   get body(): string {
     const rawPost = this.getHeader("RAW_POST_DATA");
     if (rawPost != null) return String(rawPost);
-    const input = this.bodyStream;
-    if (typeof input === "string") return input;
-    if (input && typeof (input as { read?: unknown }).read === "function") {
-      const buf = (input as { read(): string }).read();
-      const rewind = (input as { rewind?: unknown }).rewind;
-      if (typeof rewind === "function") {
-        try {
-          (rewind as () => void).call(input);
-        } catch {
-          // ignore
-        }
-      }
-      return typeof buf === "string" ? buf : "";
-    }
-    return "";
+    return this.readBodyStream();
   }
 
   /**
@@ -494,7 +480,7 @@ export class Request {
    */
   get rawPost(): string {
     if (!this.hasHeader("RAW_POST_DATA")) {
-      this.setHeader("RAW_POST_DATA", this.body);
+      this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
     return String(this.getHeader("RAW_POST_DATA"));
   }
@@ -849,9 +835,9 @@ export class Request {
 
   /** @internal Rails: `read_body_stream` — drain `rack.input` with rewind guard. */
   protected readBodyStream(): string {
-    const stream = this.bodyStream as
-      | { read?: (n?: number) => string; rewind?: () => void }
-      | undefined;
+    const input = this.bodyStream;
+    if (typeof input === "string") return input;
+    const stream = input as { read?: (n?: number) => string; rewind?: () => void } | undefined;
     if (!stream || typeof stream.read !== "function") return "";
     return this.resetStream(stream, () =>
       this.hasHeader(TRANSFER_ENCODING) ? stream.read!() : stream.read!(this.contentLength),
