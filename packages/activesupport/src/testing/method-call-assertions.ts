@@ -7,9 +7,20 @@
  * `assert_called_with` is the recorded call list compared against `args`.
  */
 
-/** Mirrors `Minitest::Assertion` — the error a failed assertion raises. */
-class Assertion extends Error {
-  override name = "Assertion";
+import { Assertion } from "./assertions.js";
+
+/**
+ * Mirrors `Minitest::MockExpectationError` (minitest/mock.rb) — what a
+ * `Minitest::Mock` raises when a call does not match what was expected, and so
+ * what `assert_called_with` raises through `assert_mock`.
+ *
+ * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
+ * through `Minitest::Mock` (method_call_assertions.rb:20-27) but the class is
+ * defined in the minitest gem, which has no vendored Rails file for the
+ * comparator to map onto.
+ */
+export class MockExpectationError extends Assertion {
+  override name = "MockExpectationError";
 }
 
 interface Mock {
@@ -199,7 +210,7 @@ function assertMock(mock: Mock): void {
   for (const [index, expected] of mock.expected.entries()) {
     const actual = mock.calls[index];
     if (!actual) {
-      throw new Assertion(
+      throw new MockExpectationError(
         `Expected call with ${JSON.stringify(expected)}, but it was never called`,
       );
     }
@@ -207,7 +218,7 @@ function assertMock(mock: Mock): void {
       actual.length !== expected.length ||
       expected.some((arg, i) => !Object.is(arg, actual[i]))
     ) {
-      throw new Assertion(
+      throw new MockExpectationError(
         `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
       );
     }
@@ -215,5 +226,6 @@ function assertMock(mock: Mock): void {
 }
 
 function assertEqual(expected: unknown, actual: unknown, message: string): void {
-  if (!Object.is(expected, actual)) throw new Assertion(message);
+  if (!Object.is(expected, actual))
+    throw new Assertion(`${message}.\nExpected: ${expected}\n  Actual: ${actual}`);
 }

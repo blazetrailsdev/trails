@@ -1,230 +1,239 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
+import { Assertion, assertChanges, assertPredicate, assertRaises } from "./assertions.js";
 import {
+  MockExpectationError,
   assertCalled,
-  assertNotCalled,
-  assertCalledOnInstanceOf,
-  assertNotCalledOnInstanceOf,
   assertCalledWith,
+  assertCalledOnInstanceOf,
+  assertNotCalled,
+  assertNotCalledOnInstanceOf,
   stubAnyInstance,
 } from "./method-call-assertions.js";
 
 describe("MethodCallAssertionsTest", () => {
+  class Level {
+    increment(): number {
+      return 1;
+    }
+    decrement(): void {}
+    // Ruby's `def <<(arg); end` — an operator method, which JS spells as an
+    // ordinary property whose name is the operator.
+    "<<"(_arg: unknown): void {}
+  }
+
+  let object: Level;
+
+  beforeEach(() => {
+    object = new Level();
+  });
+
   it("assert called with defaults to expect once", () => {
-    const obj = { greet: (name: string) => `hello ${name}` };
-    assertCalled(obj, "greet", null, {}, () => {
-      obj.greet("world");
+    assertCalled(object, "increment", null, {}, () => {
+      object.increment();
     });
-    // passes if called at least once (default)
   });
 
   it("assert called more than once", () => {
-    const obj = { inc: () => 1 };
-    assertCalled(obj, "inc", null, { times: 3 }, () => {
-      obj.inc();
-      obj.inc();
-      obj.inc();
+    assertCalled(object, "increment", null, { times: 2 }, () => {
+      object.increment();
+      object.increment();
     });
   });
 
   it("assert called method with arguments", () => {
-    const obj = { add: (a: number, b: number) => a + b };
-    assertCalled(obj, "add", null, {}, () => {
-      obj.add(1, 2);
+    assertCalled(object, "<<", null, {}, () => {
+      object["<<"](2);
     });
   });
 
   it("assert called returns", () => {
-    const obj = { val: () => 42 };
-    let result: unknown;
-    assertCalled(obj, "val", null, { returns: 42 }, () => {
-      result = obj.val();
+    assertCalled(object, "increment", null, { returns: 10 }, () => {
+      expect(object.increment()).toBe(10);
     });
-    expect(result).toBe(42);
+
+    expect(object.increment()).toBe(1);
   });
 
-  it("assert called failure", () => {
-    const obj = { noop: () => {} };
-    expect(() =>
-      assertCalled(obj, "noop", null, { times: 1 }, () => {
-        /* not called */
-      }),
-    ).toThrow();
+  it("assert called failure", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertCalled(object, "increment", null, {}, () => {
+        // Call nothing...
+      });
+    });
+
+    expect(error.message).toBe(
+      "Expected increment to be called 1 times, but was called 0 times.\nExpected: 1\n  Actual: 0",
+    );
   });
 
-  it("assert called with message", () => {
-    const obj = { fn: () => {} };
-    expect(() => assertCalled(obj, "fn", null, {}, () => {})).toThrow(/fn.*called/);
+  it("assert called with message", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertCalled(object, "increment", "dang it", {}, () => {
+        // Call nothing...
+      });
+    });
+
+    expect(error.message).toMatch(/dang it.\nExpected increment/);
   });
 
   it("assert called with arguments", () => {
-    const obj = { log: (msg: string) => msg };
-    assertCalled(obj, "log", null, {}, () => {
-      obj.log("hello");
+    assertCalledWith(object, "<<", [2], {}, () => {
+      object["<<"](2);
     });
   });
 
   it("assert called with arguments and returns", () => {
-    const obj = { calc: (x: number) => x * 2 };
-    let r: unknown;
-    assertCalled(obj, "calc", null, { returns: 10 }, () => {
-      r = obj.calc(5);
+    assertCalledWith(object, "<<", [2], { returns: 10 }, () => {
+      expect(object["<<"](2)).toBe(10);
     });
-    expect(r).toBe(10);
+
+    expect(object["<<"](2)).toBeUndefined();
   });
 
-  it("assert called with failure", () => {
-    const obj = { fn: () => {} };
-    expect(() =>
-      assertCalled(obj, "fn", null, { times: 2 }, () => {
-        obj.fn();
-      }),
-    ).toThrow();
+  it("assert called with failure", async () => {
+    await assertRaises([MockExpectationError], {}, () => {
+      assertCalledWith(object, "<<", [4567], {}, () => {
+        object["<<"](2);
+      });
+    });
   });
 
   it("assert called on instance of with defaults to expect once", () => {
-    class Greeter {
-      greet() {
-        return "hi";
-      }
-    }
-    assertCalledOnInstanceOf(Greeter, "greet", null, { times: 1 }, () => {
-      new Greeter().greet();
+    assertCalledOnInstanceOf(Level, "increment", null, {}, () => {
+      object.increment();
     });
   });
 
   it("assert called on instance of more than once", () => {
-    class Counter {
-      count() {}
-    }
-    assertCalledOnInstanceOf(Counter, "count", null, { times: 2 }, () => {
-      new Counter().count();
-      new Counter().count();
+    assertCalledOnInstanceOf(Level, "increment", null, { times: 2 }, () => {
+      object.increment();
+      object.increment();
     });
   });
 
   it("assert called on instance of with arguments", () => {
-    class Calc {
-      add(a: number, b: number) {
-        return a + b;
-      }
-    }
-    assertCalledOnInstanceOf(Calc, "add", null, { times: 1 }, () => {
-      new Calc().add(1, 2);
+    assertCalledOnInstanceOf(Level, "<<", null, {}, () => {
+      object["<<"](2);
     });
   });
 
   it("assert called on instance of returns", () => {
-    class Calculator {
-      multiply(x: number) {
-        return x * 3;
-      }
-    }
-    let result: unknown;
-    assertCalledOnInstanceOf(Calculator, "multiply", null, { times: 1, returns: 12 }, () => {
-      result = new Calculator().multiply(4);
+    assertCalledOnInstanceOf(Level, "increment", null, { returns: 10 }, () => {
+      expect(object.increment()).toBe(10);
     });
-    expect(result).toBe(12);
+
+    expect(object.increment()).toBe(1);
   });
 
-  it("assert called on instance of failure", () => {
-    class MyClass {
-      doThing() {}
-    }
-    expect(() =>
-      assertCalledOnInstanceOf(MyClass, "doThing", null, { times: 1 }, () => {}),
-    ).toThrow();
+  it("assert called on instance of failure", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertCalledOnInstanceOf(Level, "increment", null, {}, () => {
+        // Call nothing...
+      });
+    });
+
+    expect(error.message).toBe(
+      "Expected increment to be called 1 times, but was called 0 times.\nExpected: 1\n  Actual: 0",
+    );
   });
 
-  it("assert called on instance of with message", () => {
-    class MyClass {
-      action() {}
-    }
-    expect(() =>
-      assertCalledOnInstanceOf(MyClass, "action", null, { times: 1 }, () => {}),
-    ).toThrow();
+  it("assert called on instance of with message", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertCalledOnInstanceOf(Level, "increment", "dang it", {}, () => {
+        // Call nothing...
+      });
+    });
+
+    expect(error.message).toMatch(/dang it.\nExpected increment/);
   });
 
-  it.skip("assert called on instance of nesting");
+  it("assert called on instance of nesting", () => {
+    assertCalledOnInstanceOf(Level, "increment", null, { times: 3 }, () => {
+      assertCalledOnInstanceOf(Level, "decrement", null, { times: 2 }, () => {
+        object.increment();
+        object.decrement();
+        object.increment();
+        object.decrement();
+        object.increment();
+      });
+    });
+  });
 
   it("assert not called", () => {
-    const obj = { fn: () => {} };
-    assertNotCalled(obj, "fn", null, () => {
-      /* fn never called */
+    assertNotCalled(object, "decrement", null, () => {
+      object.increment();
     });
   });
 
-  it("assert not called failure", () => {
-    const obj = { fn: () => {} };
-    expect(() =>
-      assertNotCalled(obj, "fn", null, () => {
-        obj.fn();
-      }),
-    ).toThrow();
+  it("assert not called failure", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertNotCalled(object, "increment", null, () => {
+        object.increment();
+      });
+    });
+
+    expect(error.message).toBe(
+      "Expected increment to be called 0 times, but was called 1 times.\nExpected: 0\n  Actual: 1",
+    );
   });
 
   it("assert not called on instance of", () => {
-    class Widget {
-      render() {}
-    }
-    assertNotCalledOnInstanceOf(Widget, "render", null, () => {
-      /* render not called */
+    assertNotCalledOnInstanceOf(Level, "decrement", null, () => {
+      object.increment();
     });
   });
 
-  it("assert not called on instance of failure", () => {
-    class Widget {
-      render() {}
-    }
-    expect(() =>
-      assertNotCalledOnInstanceOf(Widget, "render", null, () => {
-        new Widget().render();
-      }),
-    ).toThrow();
+  it("assert not called on instance of failure", async () => {
+    const error = await assertRaises([Assertion], {}, () => {
+      assertNotCalledOnInstanceOf(Level, "increment", null, () => {
+        object.increment();
+      });
+    });
+
+    expect(error.message).toBe(
+      "Expected increment to be called 0 times, but was called 1 times.\nExpected: 0\n  Actual: 1",
+    );
   });
 
-  it.skip("assert not called on instance of nesting");
+  it("assert not called on instance of nesting", () => {
+    assertNotCalledOnInstanceOf(Level, "increment", null, () => {
+      assertNotCalledOnInstanceOf(Level, "decrement", null, () => {
+        // Call nothing...
+      });
+    });
+  });
+
   it("stub any instance", () => {
-    class Widget {}
-    let yielded: Widget | undefined;
-    stubAnyInstance(Widget, {}, (instance) => {
-      yielded = instance;
-      expect((Widget as unknown as { new: () => Widget }).new()).toBe(instance);
+    stubAnyInstance(Level, {}, (instance) => {
+      expect((Level as unknown as { new: () => Level }).new()).toBe(instance);
     });
-    expect(yielded).toBeInstanceOf(Widget);
   });
 
   it("stub any instance with instance", () => {
-    class Widget {}
-    const instance = new Widget();
-    stubAnyInstance(Widget, { instance }, (yielded) => {
-      expect(yielded).toBe(instance);
-      expect((Widget as unknown as { new: () => Widget }).new()).toBe(instance);
+    stubAnyInstance(Level, { instance: object }, (instance) => {
+      expect(object).toBe(instance);
+      expect((Level as unknown as { new: () => Level }).new()).toBe(instance);
     });
   });
 
-  it("assert called with", () => {
-    const obj = { log: (_msg: string) => "" };
-    assertCalledWith(obj, "log", ["hello"], {}, () => {
-      obj.log("hello");
-    });
-  });
+  it("assert changes when assertions are included", async () => {
+    let counter = 1;
+    // Rails builds a `Minitest::Test` subclass that `include`s
+    // `ActiveSupport::Testing::Assertions`, runs it, and asserts the result
+    // passed. trails has no test-case runner to instantiate, so the "did it
+    // pass" flag is the block completing without the assertion raising.
+    const testResults = { passed: false };
+    await assertChanges(
+      () => counter,
+      null,
+      {},
+      () => {
+        counter = 2;
+      },
+    );
+    testResults.passed = true;
 
-  it("assert called with arguments and returns value", () => {
-    const obj = { calc: (_x: number) => 0 };
-    let r: unknown;
-    assertCalledWith(obj, "calc", [5], { returns: 10 }, () => {
-      r = obj.calc(5);
-    });
-    expect(r).toBe(10);
-  });
-  it("assert changes when assertions are included", () => {
-    let counter = 0;
-    const before = counter;
-    (() => {
-      counter += 1;
-    })();
-    expect(counter).not.toBe(before);
-    expect(counter).toBe(1);
+    assertPredicate(testResults, (results) => results.passed);
   });
 });
