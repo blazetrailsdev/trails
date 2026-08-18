@@ -6,13 +6,13 @@
  * are excluded from the presence check.
  */
 import { PresenceValidator as BasePresenceValidator } from "@blazetrails/activemodel";
+import { wrap } from "@blazetrails/activesupport";
 
 export class PresenceValidator extends BasePresenceValidator {
   validateEach(record: any, attribute: string, value: unknown): void {
     let associationOrValue = value;
     if (record.constructor._reflectOnAssociation?.(attribute)) {
-      const arr = Array.isArray(value) ? value : value != null ? [value] : [];
-      associationOrValue = arr.filter(
+      associationOrValue = wrap(value).filter(
         (v: any) => !(typeof v?.markedForDestruction === "function" && v.markedForDestruction()),
       );
     }

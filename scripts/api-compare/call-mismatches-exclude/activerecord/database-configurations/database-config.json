@@ -4,7 +4,7 @@
     "tsFile": "database-configurations/database-config.ts",
     "rubyName": "adapter_class",
     "call": "resolve",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionAdapters.resolve(adapter)` (`database_config.rb:18`) — `database-config.ts` cannot import the adapter registry (it would close a module-eval cycle through `connection-adapters`), so `resolve` is reached through the `_setAdapterClassResolver` late-binding hook the registry installs."
   },
   {
     "package": "activerecord",

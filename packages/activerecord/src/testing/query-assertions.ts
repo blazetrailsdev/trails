@@ -52,8 +52,16 @@ export class SQLCounter {
     this.logAll.push(sql);
 
     if (payload.name !== "SCHEMA") {
-      const binds = payload.binds ?? [];
-      this.logFull.push([sql, binds]);
+      // `value.value_for_database if value.respond_to?(:value_for_database)`
+      // (query_assertions.rb:111). trails' QueryAttribute spells it as a
+      // getter, so the respond_to? test is a property check.
+      const boundValues = (payload.binds ?? []).map((value: unknown) =>
+        value != null && "valueForDatabase" in Object(value)
+          ? (value as { valueForDatabase: unknown }).valueForDatabase
+          : value,
+      );
+
+      this.logFull.push([sql, boundValues]);
     }
   }
 }

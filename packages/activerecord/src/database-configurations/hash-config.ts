@@ -67,7 +67,7 @@ export class HashConfig extends DatabaseConfig {
       if (val === false || val === null) return null;
       return val;
     }
-    const typeFile = this._schemaFileType(format);
+    const typeFile = this.schemaFileType(format);
     if (!typeFile) return null;
     return this.isPrimary() ? typeFile : `${this.name}_${typeFile}`;
   }
@@ -102,7 +102,11 @@ export class HashConfig extends DatabaseConfig {
     return val === undefined ? true : !!val;
   }
 
-  private _schemaFileType(format: string): string | null {
+  /**
+   * Mirrors: HashConfig#schema_file_type (hash_config.rb:170-177, private).
+   * The "ts" arm is trails' own schema format.
+   */
+  private schemaFileType(format: string): string | null {
     switch (format) {
       case "ruby":
         return "schema.rb";
@@ -114,17 +118,4 @@ export class HashConfig extends DatabaseConfig {
         return null;
     }
   }
-}
-
-/**
- * Map a schema format symbol to its filename extension.
- *
- * Mirrors: ActiveRecord::DatabaseConfigurations::HashConfig#schema_file_type (private)
- *
- * @internal
- */
-export function schemaFileType(format: "ruby" | "sql" | string): string | null {
-  if (format === "ruby") return "schema.rb";
-  if (format === "sql") return "structure.sql";
-  return null;
 }

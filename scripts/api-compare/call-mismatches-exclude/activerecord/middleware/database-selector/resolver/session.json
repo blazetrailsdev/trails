@@ -4,6 +4,6 @@
     "tsFile": "middleware/database-selector/resolver/session.ts",
     "rubyName": "convert_timestamp_to_time",
     "call": "at",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `Time.at(timestamp / 1000, (timestamp % 1000) * 1000)` (`resolver/session.rb:25`) — trails' time type is `Temporal.Instant`, whose epoch constructor is `fromEpochMilliseconds`; there is no `at` to call."
   }
 ]

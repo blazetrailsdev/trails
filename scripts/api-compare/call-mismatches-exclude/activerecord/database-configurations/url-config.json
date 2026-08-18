@@ -4,13 +4,6 @@
     "tsFile": "database-configurations/url-config.ts",
     "rubyName": "initialize",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/url-config.ts",
-    "rubyName": "initialize",
-    "call": "to_boolean!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `@configuration_hash.merge(build_url_hash)` (`url_config.rb:43`) — a non-mutating Hash merge is an object spread in TS."
   }
 ]

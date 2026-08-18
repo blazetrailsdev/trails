@@ -6,7 +6,7 @@
  * with the same value, optionally scoped to other columns.
  */
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, except } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
@@ -189,14 +189,6 @@ export class UniquenessValidator extends EachValidator {
 
     const opts = this.options as any;
 
-    const errorOpts: Record<string, unknown> = { value };
-    if (opts?.message != null) errorOpts.message = opts.message;
-    // `strict` does not arrive in options — validatesWith strips it and enforces
-    // it via its own wrapper (now async-aware, so it raises StrictValidationFailed
-    // for this async validator too). This line stays for parity with any caller
-    // that constructs the validator directly with a strict option.
-    if (opts?.strict != null) errorOpts.strict = opts.strict;
-
     let [relation] = await this.buildRelation(finderClass, attribute, value);
 
     if (record.isPersisted?.()) {
@@ -237,6 +229,19 @@ export class UniquenessValidator extends EachValidator {
 
     const exists = await relation.exists();
     if (exists) {
+      // uniqueness.rb:46-47. `:class` is trails' threading of the declaring
+      // class (Rails reads it off the validator's own `@klass`), so it is
+      // excluded here alongside Rails' three keys rather than leaking into the
+      // i18n options.
+      const errorOpts: Record<string, unknown> = except(
+        opts ?? {},
+        "caseSensitive",
+        "scope",
+        "conditions",
+        "class",
+      );
+      errorOpts.value = value;
+
       record.errors.add(attribute, ":taken", errorOpts);
     }
   }

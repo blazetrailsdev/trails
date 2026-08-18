@@ -4,13 +4,13 @@
     "tsFile": "disable-joins-association-relation.ts",
     "rubyName": "first",
     "call": "limit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `records.limit(limit).first` (`disable_joins_association_relation.rb:18`) — in loaded-chain mode `records` is already an Array, so the slice is in memory; the deferred-chain arm routes through `findNthWithLimit` so Relation#first's ORDER BY is applied before the LIMIT."
   },
   {
     "package": "activerecord",
     "tsFile": "disable-joins-association-relation.ts",
     "rubyName": "limit",
     "call": "take",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `records.take(value)` (`disable_joins_association_relation.rb:14`) — `Array#take` is `slice(0, n)` in JS, which emits no `take` callee."
   }
 ]

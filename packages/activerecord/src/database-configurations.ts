@@ -167,7 +167,7 @@ export class DatabaseConfigurations {
       // merges DATABASE_URL via environment_url_config + merge_db_environment_variables.
       // Uses DatabaseConfigurations.defaultEnv (set by app bootstrap from RAILS_ENV/RACK_ENV),
       // not NODE_ENV — matching Rails' env resolution semantics.
-      this._configurations = this._buildConfigs(configurations, DatabaseConfigurations.defaultEnv);
+      this._configurations = this.buildConfigs(configurations);
     }
     // Register this instance as the current one for HashConfig.isPrimary lookup
     _currentConfigurations = this;
@@ -182,10 +182,7 @@ export class DatabaseConfigurations {
   // Used by merge-and-resolve tests that set DatabaseConfigurations.defaultEnv.
   static fromRaw(configurations: RawConfigurations = {}): DatabaseConfigurations {
     const instance = new DatabaseConfigurations([]);
-    instance._configurations = instance._buildConfigs(
-      configurations,
-      DatabaseConfigurations.defaultEnv,
-    );
+    instance._configurations = instance.buildConfigs(configurations);
     _currentConfigurations = instance;
     return instance;
   }
@@ -229,11 +226,8 @@ export class DatabaseConfigurations {
       includeHidden?: boolean;
     } = {},
   ): DatabaseConfig[] {
-    let configs = this._configurations;
+    let configs = this.envWithConfigs(options.envName);
 
-    if (options.envName) {
-      configs = configs.filter((c) => c.envName === options.envName);
-    }
     if (!options.includeHidden) {
       configs = configs.filter((c) => {
         if (c.configuration._hidden === true) return false;
@@ -285,21 +279,22 @@ export class DatabaseConfigurations {
   resolve(config: unknown): DatabaseConfig {
     if (config instanceof DatabaseConfig) return config;
     if (typeof config === "string") {
-      // Mirrors Rails: resolve(symbol) → resolve_symbol_connection → find_db_config
-      // Strings with a URI scheme (e.g. "postgres://", "sqlite3:") are treated as URLs.
-      // Strings without a scheme are treated as env names (mirrors Ruby symbol lookup).
+      // Ruby dispatches `when Symbol` / `when Hash, String`
+      // (database_configurations.rb:177-182). A Ruby Symbol is a JS string, so
+      // the two String arms are told apart here: a string with a URI scheme
+      // ("postgres://", "sqlite3:") is the String arm, one without is the
+      // Symbol arm.
       if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
       }
-      return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", config);
+      return this.buildDbConfigFromRawConfig(DatabaseConfigurations.defaultEnv, "primary", config);
     }
     if (typeof config === "object" && config !== null) {
-      const opts = config as DatabaseConfigOptions;
-      if (opts.url) {
-        const { url, ...configWithoutUrl } = opts;
-        return new UrlConfig(DatabaseConfigurations.defaultEnv, "primary", url, configWithoutUrl);
-      }
-      return new HashConfig(DatabaseConfigurations.defaultEnv, "primary", opts);
+      return this.buildDbConfigFromRawConfig(
+        DatabaseConfigurations.defaultEnv,
+        "primary",
+        config as DatabaseConfigOptions,
+      );
     }
     throw new TypeError(
       `Invalid type for configuration. Expected string, hash, or DatabaseConfig. Got ${typeof config}`,
@@ -319,7 +314,7 @@ export class DatabaseConfigurations {
     // runtime config selectors in `connection-handling` use, so the synthesized
     // `DATABASE_URL` config is built under exactly the env it's later looked up
     // by. DATABASE_URL merges into whichever environment is active.
-    instance._configurations = instance._buildConfigs(raw, DatabaseConfigurations.currentEnv());
+    instance._configurations = instance.buildConfigs(raw, DatabaseConfigurations.currentEnv());
     return instance;
   }
 
@@ -329,51 +324,48 @@ export class DatabaseConfigurations {
    * Builds DatabaseConfig objects from the raw config, adds a primary URL
    * config for the current env if none matches, then merges the per-name
    * `*_DATABASE_URL` / `DATABASE_URL` environment variables.
+   *
+   * Rails reads `default_env` inline; `currentEnv` defaults to it and is only
+   * passed explicitly by `fromEnv`, which builds under the env the runtime
+   * config selectors look configs up by.
    */
-  private _buildConfigs(raw: RawConfigurations, currentEnv: string): DatabaseConfig[] {
-    const configs: DatabaseConfig[] = [];
+  private buildConfigs(
+    configs: RawConfigurations | DatabaseConfig[],
+    currentEnv: string = DatabaseConfigurations.defaultEnv,
+  ): DatabaseConfig[] {
+    if (Array.isArray(configs)) return configs;
 
-    for (const [envName, envConfig] of Object.entries(raw)) {
-      // Mirrors Rails: build_db_config_from_raw_config — string must have a URI scheme
-      if (typeof envConfig === "string") {
-        if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(envConfig)) {
-          // Redact credentials before including in error message
-          const safe = envConfig.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
-          throw new InvalidConfigurationError(
-            `'{ ${envName} => ${safe} }' is not a valid configuration. Expected a URL string or a Hash.`,
-          );
-        }
-        configs.push(
-          this._buildConfig(envName, "primary", { url: envConfig } as DatabaseConfigOptions),
-        );
-        continue;
-      }
-      if (typeof envConfig !== "object" || envConfig === null) {
-        throw new InvalidConfigurationError(
-          `'{ ${envName} => [${typeof envConfig}] }' is not a valid configuration. Expected a URL string or a Hash.`,
-        );
-      }
-      if (this._isThreeLevelConfig(envConfig)) {
-        for (const [name, dbConfig] of Object.entries(
-          envConfig as Record<string, DatabaseConfigOptions>,
-        )) {
-          configs.push(this._buildConfig(envName, name, dbConfig));
-        }
-      } else {
-        configs.push(this._buildConfig(envName, "primary", envConfig as DatabaseConfigOptions));
-      }
-    }
+    const dbConfigs = Object.entries(configs).flatMap(([envName, config]) =>
+      this._isThreeLevelConfig(config)
+        ? this.walkConfigs(String(envName), config as Record<string, DatabaseConfigOptions>)
+        : this.buildDbConfigFromRawConfig(
+            String(envName),
+            "primary",
+            config as string | DatabaseConfigOptions,
+          ),
+    );
 
-    // Mirrors Rails: unless db_configs.find(&:for_current_env?) → add a primary
-    // URL config built from DATABASE_URL (or PRIMARY_DATABASE_URL) for the env.
-    if (!configs.some((c) => c.envName === currentEnv)) {
+    // `unless db_configs.find(&:for_current_env?)` (database_configurations.rb:212).
+    // `currentEnv` stands in for Rails' `default_env` so `fromEnv` can build under
+    // the env the runtime selectors actually look configs up by.
+    if (!dbConfigs.some((c) => c.envName === currentEnv)) {
       const urlConfig = this.environmentUrlConfig(currentEnv, "primary", {});
-      if (urlConfig) configs.push(urlConfig);
+      if (urlConfig) dbConfigs.push(urlConfig);
     }
 
-    return this.mergeDbEnvironmentVariables(currentEnv, configs);
+    return this.mergeDbEnvironmentVariables(
+      currentEnv,
+      dbConfigs.filter((c) => c != null),
+    );
   }
 
+  /**
+   * `config.is_a?(Hash) && config.values.all?(Hash)`
+   * (database_configurations.rb:203) — the three-tier test `build_configs`
+   * inlines. trails additionally rejects a hash carrying `adapter`/`url`/
+   * `database` (and an empty hash), because a TS config object with only
+   * object-valued keys is otherwise indistinguishable from a two-tier one.
+   */
   private _isThreeLevelConfig(config: unknown): boolean {
     if (typeof config !== "object" || config === null || Array.isArray(config)) return false;
     const obj = config as Record<string, unknown>;
@@ -383,24 +375,10 @@ export class DatabaseConfigurations {
     return values.every((v) => typeof v === "object" && v !== null && !Array.isArray(v));
   }
 
-  private _buildConfig(
-    envName: string,
-    name: string,
-    config: DatabaseConfigOptions,
-  ): DatabaseConfig {
-    return this.buildDbConfigFromHash(envName, name, config);
-  }
-
   /** @internal */
   private envWithConfigs(env?: string): DatabaseConfig[] {
     if (env) return this._configurations.filter((c) => c.envName === env);
     return this._configurations;
-  }
-
-  /** @internal */
-  private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
-    if (Array.isArray(configs)) return configs;
-    return this._buildConfigs(configs, DatabaseConfigurations.defaultEnv);
   }
 
   /** @internal */
