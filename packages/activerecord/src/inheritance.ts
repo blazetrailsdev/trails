@@ -1112,25 +1112,22 @@ function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Ba
  * column-aware `_has_attribute?` ({@link classHasAttribute}) — or, for a
  * receiver that is explicitly STI-enabled ({@link stiEnabled}), on that
  * assignment, which is the same structural fact Rails reads off
- * `_has_attribute?` and, unlike trails' schema reflection, never goes cold.
- * Without that arm an STI *leaf* whose `type` column had not reflected yet and
- * which tracks no descendants of its own built as-is where Rails raises.
- * Returns null (no dispatch) when no source names an inheritance value at
- * all.
+ * `_has_attribute?`. Rails reads `_has_attribute?` alone because
+ * `attribute_types` loads the schema synchronously on first touch; trails
+ * cannot query the database from a synchronous constructor, so reflection can
+ * still be cold at `new` and the `stiEnabled` arm covers exactly that window
+ * (an STI *leaf* whose `type` column had not reflected yet otherwise built
+ * as-is where Rails raises). Returns null (no dispatch) when no source names
+ * an inheritance value at all.
  *
- * Matching Rails' `subclass_from_attributes` → `find_sti_class`: when an
- * explicitly STI-enabled receiver carries a *present* inheritance value that
- * names no subclass of it, this raises {@link SubclassNotFound} (e.g.
- * `Company.new(type: "Account")` or an unknown `"InvalidType"`) rather than
- * silently building the receiver as-is. The no-match handling mirrors the row
- * path ({@link findStiClassForRow}): the subtree walk resolves in-hierarchy
- * types registry-safely, then only an explicitly STI-enabled hierarchy defers to
- * the global `find_sti_class` (which also resolves a registered subclass not tracked
- * as a descendant, and raises for a genuine out-of-hierarchy/unknown type). A
- * model that merely reflects a `type` column without an explicit
- * `inheritanceColumn` assignment degrades to build-as-is — trails has no
- * autoloader to tell an unloaded-but-valid subclass from a bad type, the same
- * graceful deviation the row path takes.
+ * Matching Rails' `subclass_from_attributes` → `find_sti_class`: a receiver
+ * carrying a *present* inheritance value that names no subclass of it raises
+ * {@link SubclassNotFound} (e.g. `Company.new(type: "Account")` or an unknown
+ * `"InvalidType"`) rather than silently building the receiver as-is. The
+ * subtree walk resolves in-hierarchy types registry-safely first, then defers
+ * to the global `find_sti_class`, which also resolves a registered subclass not
+ * tracked as a descendant and raises for a genuine out-of-hierarchy/unknown
+ * type.
  *
  * @internal Used by Base's constructor to dispatch `new` to a subclass.
  */
@@ -1139,25 +1136,17 @@ export function subclassFromAttributesForNew(
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
   // Rails gates the whole `new` dispatch on `_has_attribute?(inheritance_column)`
-  // so a stray `type` key on a non-STI model can never dispatch. `inheritance_column`
-  // defaults to "type"; the column-aware `_has_attribute?` (declared attribute or
-  // reflected DB column) is the primary guard. But trails' schema reflection is
-  // not always warm at construction — a canonical STI base like `Company` declares
-  // no `attribute("type")` and its `type` column only reflects once the schema
-  // loads — so an explicit `stiEnabled` assignment or a tracked STI subtree stands
-  // in as the trails-reliable signal that `findStiClassInHierarchy` could resolve.
-  // A plain model with none of the three can never dispatch (it has no in-subtree
-  // match), so short-circuit the source probing — including the non-memoized
-  // columnDefaults build — on the hot path.
+  // (inheritance.rb:61) so a stray `type` key on a non-STI model can never
+  // dispatch. `inheritance_column` defaults to "type"; the column-aware
+  // `_has_attribute?` (declared attribute or reflected DB column) is the guard.
+  // Rails' `attribute_types` loads the schema synchronously on first touch and so
+  // is never cold; trails cannot query from a synchronous constructor, so an
+  // explicit `stiEnabled` assignment stands in over the window where a canonical
+  // STI class's `type` column has not reflected yet.
   // `inheritance_column = nil` disables STI even when a real `type` column exists.
   const col = modelClass.inheritanceColumn;
   if (col === null) return null;
-  if (
-    !classHasAttribute(modelClass, col) &&
-    !stiEnabled(modelClass) &&
-    descendants(modelClass).length === 0
-  )
-    return null;
+  if (!classHasAttribute(modelClass, col) && !stiEnabled(modelClass)) return null;
 
   const resolve = (source: unknown, fromScope = false): typeof Base | null => {
     if (!source || typeof source !== "object") return null;
@@ -1171,17 +1160,11 @@ export function subclassFromAttributesForNew(
     // rule — the receiver already is that type, and its own STI column wins). Rails
     // raises here too (self + descendants), so this is confined to the scope path.
     if (fromScope && namesSelfOrStiAncestor(modelClass, typeName)) return null;
-    // No-match handling mirrors the row path ({@link findStiClassForRow}): only an
-    // explicitly STI-enabled hierarchy defers to the global find_sti_class, which
-    // resolves a registered subclass (incl. one not tracked as a descendant) or
-    // raises SubclassNotFound for an out-of-hierarchy/unknown type — matching Rails'
-    // Inheritance#new → subclass_from_attributes → find_sti_class. A model that
-    // merely reflects a `type` column without an explicit inheritanceColumn
-    // assignment degrades to build-as-is: trails has no autoloader, so an
-    // unloaded-but-valid subclass is indistinguishable
-    // from a genuinely bad type, and raising would break unrelated construction.
-    if (stiEnabled(modelClass)) return findStiClass(modelClass, typeName);
-    return null;
+    // Rails' subclass_from_attributes calls find_sti_class unconditionally
+    // (inheritance.rb:331-340), which resolves a registered subclass — including
+    // one not tracked as a descendant — or raises SubclassNotFound for an
+    // out-of-hierarchy/unknown type.
+    return findStiClass(modelClass, typeName);
   };
 
   // Rails Inheritance::ClassMethods#new tries each source in turn, stopping at
