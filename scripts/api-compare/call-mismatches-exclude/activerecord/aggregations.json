@@ -3,15 +3,16 @@
     "package": "activerecord",
     "tsFile": "aggregations.ts",
     "rubyName": "composed_of",
-    "call": "add_aggregate_reflection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "aggregations.ts",
-    "rubyName": "composed_of",
     "call": "create",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "kind": "args",
+    "rubyArgs": [
+      "str:composedOf",
+      "ref:partId",
+      "nil",
+      "ref:options",
+      "ref:this"
+    ],
+    "reason": "aggregations.rb:265 forwards its own `options` hash; trails' ComposedOfOptions holds `className` as the value-object class rather than a Ruby class-name String, so composed_of rebuilds the reflection options (className/mapping/anonymousClass) at the call site instead of passing the caller's hash through."
   },
   {
     "package": "activerecord",

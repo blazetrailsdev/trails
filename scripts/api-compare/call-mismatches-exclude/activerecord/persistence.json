@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "persistence.ts",
-    "rubyName": "destroy",
-    "call": "readonly?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
     "rubyName": "instantiate",
     "call": "instantiate_instance_of",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -47,54 +40,5 @@
     "rubyName": "reload",
     "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "strict_loaded_associations",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "strict_loaded_associations",
-    "call": "strict_loading?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "toggle!",
-    "call": "update_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "update_attribute",
-    "call": "verify_readonly_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "update_attribute!",
-    "call": "verify_readonly_attribute",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "update_columns",
-    "call": "readonly?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "persistence.ts",
-    "rubyName": "verify_readonly_attribute",
-    "call": "readonly_attribute?",
-    "reason": "Unmasked by alias-arity resolution (story arity-resolve-ts-alias-bindings-to-target-params): the TS body reads `_readonlyAttributes` directly instead of delegating to `readonlyAttributeQ`. Real gap, tracked as story converge-readonly-attribute-predicate-callers."
   }
 ]
