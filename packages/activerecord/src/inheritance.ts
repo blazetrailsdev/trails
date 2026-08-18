@@ -521,6 +521,13 @@ export function getStiBase(modelClass: object): typeof Base {
  * @internal
  */
 export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
+  // Rails casts through `base_class`, not the receiver (inheritance.rb:312), so a
+  // subclass that overrides the inheritance column's attribute type still resolves
+  // against the hierarchy's own type.
+  typeName = baseClass.baseClass
+    .typeForAttribute(baseClass.inheritanceColumn as string)
+    .cast(typeName) as string;
+
   // Rails' find_sti_class delegates the constant resolution to sti_class_for,
   // which branches on the store_full_* flags: constantize when storing the full
   // STI class name, else namespace-relative compute_type. Routing through
@@ -530,13 +537,6 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
   // candidate is found via the model's own module nesting rather than the bare
   // (unregistered) demodulized name. With the default flags on, sti_class_for
   // falls back to the bare registry lookup, preserving the prior behavior.
-  // Rails: `type_name = base_class.type_for_attribute(inheritance_column).cast(type_name)`.
-  // The String() keeps a numeric/boolean type column resolving against the
-  // registry, which is keyed by primitive strings.
-  const cast = baseClass.baseClass
-    .typeForAttribute(baseClass.inheritanceColumn as string)
-    .cast(typeName);
-  typeName = cast == null ? (cast as unknown as string) : String(cast);
   const subclass = baseClass.stiClassFor(typeName);
 
   if (!(subclass === baseClass || baseClass.descendants.includes(subclass))) {

@@ -1813,8 +1813,7 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
   return [...(this._associationInstances ?? [])]
     .filter(
       ([, assoc]) =>
-        assoc?.owner?.isStrictLoading?.() === true &&
-        assoc?.owner?.isStrictLoadingNPlusOneOnly?.() !== true,
+        assoc?.owner?.isStrictLoading?.() && !assoc?.owner?.isStrictLoadingNPlusOneOnly?.(),
     )
     .map(([name]) => name);
 }
