@@ -7,8 +7,7 @@
 
 import { toSentence } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_SESSION } from "@blazetrails/rack";
-import { parseNestedQuery, Request as RackRequest } from "@blazetrails/rack";
+import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { Session } from "../request/session.js";
 import {
@@ -893,7 +892,7 @@ export class Request {
 
   // --- Session ---
 
-  /** Rails: `reset_session` — destroys session and resets CSRF token. */
+  /** Rails: `reset_session` (request.rb:381-384) — `session.destroy; reset_csrf_token`. */
   resetSession(): void {
     this.session.destroy();
     this.resetCsrfToken();
