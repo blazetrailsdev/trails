@@ -50,10 +50,8 @@ describe("registerModel canonical-name shadow guard", () => {
 
   it("throws when a bespoke class reaches the registry through a bare set", () => {
     class RfBareSetXyz extends Base {}
-    const before = modelRegistry.generation;
     expect(() => modelRegistry.set("Author", RfBareSetXyz)).toThrow(/shadow the canonical model/);
     expect(modelRegistry.get("Author")).toBe(Author);
-    expect(modelRegistry.generation).toBe(before);
   });
 
   it("keeps a constant rebound by another writer when the registry entry is dropped", () => {

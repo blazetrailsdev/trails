@@ -444,7 +444,7 @@ describe("CalculationsTest", () => {
   it("distinct joins count with group by", async () => {
     // Rails: Post.left_joins(:comments).group(:post_id).distinct.count(:author_id)
     // Groups by comments.post_id; posts with no comments get null key.
-    const result = (await Post.leftJoins("comments")
+    const result = (await Post.leftJoins(":comments")
       .group("comments.post_id")
       .distinct()
       .count("author_id")) as Map<unknown, number>;
@@ -1054,7 +1054,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck type cast with left joins without table name qualified column", async () => {
-    const rows = await Author.leftJoins("topics").limit(1).pluck("id");
+    const rows = await Author.leftJoins(":topics").limit(1).pluck("id");
     expect(Array.isArray(rows)).toBe(true);
   });
 

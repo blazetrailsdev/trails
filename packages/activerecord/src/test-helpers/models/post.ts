@@ -202,7 +202,9 @@ export class Post extends Base {
       q.joins(":comments").group("posts.id").having("count(comments.id) >= ?", commentsCount),
     );
 
-    this.scope("noComments", (q: any) => q.leftJoins("comments").where({ comments: { id: null } }));
+    this.scope("noComments", (q: any) =>
+      q.leftJoins(":comments").where({ comments: { id: null } }),
+    );
     this.scope("withSpecialComments", (q: any) =>
       q.joins(":comments").where({ comments: { type: "SpecialComment" } }),
     );

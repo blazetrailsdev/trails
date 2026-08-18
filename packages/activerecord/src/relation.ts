@@ -18,14 +18,7 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import {
-  isPlainObject as _isPlainObject,
-  wrap,
-  any,
-  compactBlank,
-  groupBy,
-  indexBy,
-} from "@blazetrails/activesupport";
+import { wrap, any, compactBlank, groupBy, indexBy } from "@blazetrails/activesupport";
 
 import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
@@ -523,21 +516,6 @@ export class Relation<T extends Base> {
     // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
     aliasBase?: string;
   }> = [];
-  // A `joins_values` entry is a "named" inner association join (resolved through
-  // JoinDependency) when it is a nested-association hash, a Symbol — spelled as
-  // a leading-colon string, trails' signal for an association/CTE name, e.g.
-  // `joins(":name")` — or a string naming an association; everything else (Arel
-  // join nodes, raw SQL strings) is a raw join value. The two derived getters
-  // below partition `joinsValues` by this rule — the same rule `joins` uses at
-  // insert time. A raw Symbol routed to the raw-join bucket would reach the arel
-  // visitor and raise "Unknown node type: Symbol", so Symbols must be named.
-  private _isNamedJoinValue(v: unknown): boolean {
-    return (
-      _isPlainObject(v) ||
-      v instanceof JoinDependency ||
-      (typeof v === "string" && (v.startsWith(":") || this._isAssociationName(v)))
-    );
-  }
   /** Mirrors: `attr_accessor :skip_preloading_value` (relation.rb:72). */
   skipPreloadingValue = false;
   private _loaded = false;
@@ -701,19 +679,6 @@ export class Relation<T extends Base> {
   }
 
   // merge and spawn are mixed in from spawn-methods.ts
-
-  /**
-   * True when `name` is a declared association on this relation's model. A
-   * named `joins(:assoc)` routes through JoinDependency (mirroring Rails'
-   * joins_values → build_join_dependencies); anything else is a raw SQL join
-   * fragment stored verbatim in joins_values.
-   *
-   * @internal
-   */
-  private _isAssociationName(name: string): boolean {
-    const modelClass = this._model as any;
-    return (modelClass._associations ?? []).some((a: any) => a.name === name);
-  }
 
   // -- Relation state --
 

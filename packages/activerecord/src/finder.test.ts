@@ -2508,8 +2508,8 @@ describe("FinderTest", () => {
   });
 
   it("exists with distinct and offset and joins", async () => {
-    expect(await Post.leftJoins("comments").distinct().offset(10).exists()).toBe(true);
-    expect(await Post.leftJoins("comments").distinct().offset(11).exists()).toBe(false);
+    expect(await Post.leftJoins(":comments").distinct().offset(10).exists()).toBe(true);
+    expect(await Post.leftJoins(":comments").distinct().offset(11).exists()).toBe(false);
   });
 
   it("exists with distinct and offset and select", async () => {
@@ -2553,7 +2553,7 @@ describe("FinderTest", () => {
 
   it("exists with left joins", async () => {
     expect(
-      await Topic.leftJoins("replies")
+      await Topic.leftJoins(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
         .exists(),

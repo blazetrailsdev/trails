@@ -211,7 +211,7 @@ describe("WhereChainTest", () => {
 
   // Self-join `children` — see the self-join note above.
   it("associated with add left joins before", async () => {
-    const relation = await Comment.leftJoins("children").where().associated("children");
+    const relation = await Comment.leftJoins(":children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
@@ -464,7 +464,7 @@ describe("WhereChainTest", () => {
       .where()
       .missing("comments")
       .rewhere({ "comments.id": comments("does_it_hurt").id });
-    const expected = Post.leftJoins("comments").where({
+    const expected = Post.leftJoins(":comments").where({
       "comments.id": comments("does_it_hurt").id,
     });
     expect(ids(await relation)).toEqual(ids(await expected));

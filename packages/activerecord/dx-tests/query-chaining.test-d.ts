@@ -165,9 +165,9 @@ describe("query chaining DX", () => {
   });
 
   it("Post.joins / distinct / none / unscoped all return Relation<Post>", () => {
-    expectTypeOf(Post.joins("comments")).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.leftJoins("comments")).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.leftOuterJoins("comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.joins(":comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.leftJoins(":comments")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.leftOuterJoins(":comments")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.distinct()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.none()).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.unscoped()).toMatchTypeOf<Relation<Post>>();

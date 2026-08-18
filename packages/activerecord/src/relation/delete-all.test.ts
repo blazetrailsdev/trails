@@ -123,7 +123,7 @@ describe("DeleteAllTest", () => {
   });
 
   it("delete all with left joins", async () => {
-    const pets = Pet.leftJoins("toys").where({ toys: { name: "Bone" } });
+    const pets = Pet.leftJoins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await pets.exists()).toBe(true);
     const countBefore = await pets.count();

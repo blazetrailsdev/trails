@@ -107,8 +107,12 @@ export class WhereChain<R = any> {
       const associationConditions = Object.fromEntries(
         wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
       );
+      // query_methods.rb:96-99 — the `class_name:` branch keys the hash with the
+      // association Symbol, the `else` branch with the table-name String.
       if (reflection.options.className) {
-        this.not({ [association]: associationConditions });
+        this.not({
+          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
+        });
       } else {
         this.not({ [reflection.tableName]: associationConditions });
       }
@@ -128,8 +132,12 @@ export class WhereChain<R = any> {
       const associationConditions = Object.fromEntries(
         wrap(reflection.associationPrimaryKey).map((pk) => [pk, null]),
       );
+      // query_methods.rb:130-133 — Symbol key for the `class_name:` branch, the
+      // table-name String otherwise.
       if (reflection.options.className) {
-        whereBang.call(scope, { [association]: associationConditions });
+        whereBang.call(scope, {
+          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
+        });
       } else {
         whereBang.call(scope, { [reflection.tableName]: associationConditions });
       }
@@ -344,11 +352,6 @@ interface QueryMethodsHost {
   // Converged Rails `Relation#alias_tracker(joins, aliases)` (relation.rb:1307);
   // `buildJoins` reads it to build the shared `build_joins` tracker.
   aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
-  // A `joins_values` entry is a "named" inner association join (resolved through
-  // JoinDependency) when it is a nested-association hash, a Symbol — spelled as a
-  // leading-colon string — or a string naming an association; everything else
-  // (Arel join nodes, raw SQL strings) is a raw join value.
-  _isNamedJoinValue(v: unknown): boolean;
   /** Rails' `clone` behind `spawn` (spawn_methods.rb:9-11). */
   clone(): any;
   /** Mirrors: ActiveRecord::SpawnMethods#spawn (spawn_methods.rb:9-11). */
@@ -1163,19 +1166,27 @@ export function buildWhereClause(
     // Mirrors build_where_clause (query_methods.rb:1640): a hash condition
     // auto-adds references for its nested-hash / dotted-key tables, so an
     // includes(...) with a WHERE on the joined table promotes to eager JOIN.
-    referencesBang.call(this, ...referencesFromConditions(opts));
     const mc = this.model;
     const aliases: Record<string, string> = mc?._attributeAliases ?? {};
     // Rails never pre-casts hash values here — build_where_clause hands them
     // raw to PredicateBuilder, whose QueryAttribute bind casts/serializes at
     // compile time (predicate_builder.rb:57-69 → build_bind_attribute →
     // value_for_database).
+    // Rails `opts.transform_keys { |key| key = key.to_s; attribute_aliases[key]
+    // || key }` (query_methods.rb:1632-1638) — `to_s` on a Symbol key drops the
+    // leading colon trails spells it with, so an association-named key and a
+    // table-named key are one string from here on, and `references` /
+    // `build_from_hash` both see the bare name.
     const transformed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(opts)) {
-      const resolved = aliases[key] ?? key;
+      const name = isRubySymbol(key) ? symbolToName(key) : key;
+      const resolved = aliases[name] ?? name;
       transformed[resolved] = value;
     }
     opts = transformed;
+    // query_methods.rb:1640-1641 — references are taken from the TRANSFORMED
+    // hash, after key stringification.
+    referencesBang.call(this, ...referencesFromConditions(opts));
     const parts = this.predicateBuilder.buildFromHash(
       opts as Record<string, unknown>,
       (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),
@@ -3257,10 +3268,9 @@ export function selectNamedJoins(
  * Mirrors `select_association_list` (query_methods.rb:1810-1823).
  *
  * Its `when Hash, Symbol, Array` arm keeps association specs and drops a raw
- * SQL String through the `else`. TypeScript collapses Ruby's Symbol and String
- * onto one type, so that `when` cannot be spelled by type: a string is a Symbol
- * here only when it names an association (or carries the leading colon), the
- * same discriminator `joins()` applies at insert time.
+ * SQL String through the `else`. A Ruby Symbol is a leading-colon string in
+ * trails (CLAUDE.md), which is the discriminator the Ruby `when` gets from the
+ * type.
  *
  * @internal
  */
@@ -3272,11 +3282,7 @@ export function selectAssociationList(
 ): unknown[] {
   const result: unknown[] = [];
   for (const association of associations) {
-    if (
-      Array.isArray(association) ||
-      isPlainObject(association) ||
-      (typeof association === "string" && this._isNamedJoinValue(association))
-    ) {
+    if (Array.isArray(association) || isPlainObject(association) || isRubySymbol(association)) {
       result.push(association);
     } else if (association instanceof JoinDependency) {
       stashedJoins?.push(association);
@@ -3406,11 +3412,10 @@ export function buildJoinBuckets(
   // query_methods.rb:1856-1862: `stashed_eager_load || stashed_left_joins`.
   const hasStashed = Boolean(stashedEagerLoad) || stashedLeft.length > 0;
 
-  // query_methods.rb:1851-1853. Rails wraps every String; trails collapses
-  // Ruby's Symbol and String into one type, so an association-name string
-  // stays a named join value instead of becoming a raw SQL fragment.
+  // query_methods.rb:1851-1853. A Ruby Symbol is a leading-colon string in
+  // trails, so a String join value is one without the colon.
   for (const [i, v] of joins.entries()) {
-    if (typeof v === "string" && !this._isNamedJoinValue(v)) {
+    if (typeof v === "string" && !v.startsWith(":")) {
       joins[i] = new Nodes.StringJoin(Arel.sql(v.trim()) as any) as Nodes.Join;
     }
   }

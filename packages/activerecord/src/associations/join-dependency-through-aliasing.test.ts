@@ -236,7 +236,7 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // The canonical alias is addressable in the emitted SQL. Match either
     // quote style (PG/SQLite double-quote, MySQL backtick) so the assertion
     // isn't tied to the test adapter's quoting.
-    const sql = (StjAuthor as any).all().leftJoins("similarPosts").toSql();
+    const sql = (StjAuthor as any).all().leftJoins(":similarPosts").toSql();
     expect(sql).toMatch(/["`]taggings["`]\s+["`]taggings_authors_join["`]/);
     expect(sql).toMatch(/["`]posts["`]\s+["`]posts_authors_join["`]/);
   });

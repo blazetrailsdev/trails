@@ -351,4 +351,23 @@ describe("AttributeMethodsTest (trails)", () => {
 
     expect(() => Employee.aliasAttribute("save", "name")).toThrow(DangerousAttributeError);
   });
+
+  it("an ordinary class-body method is not overridden by a generated attribute method", () => {
+    // attribute_methods.rb:326 — `instance_method_already_implemented?` is the
+    // ONLY guard, and ActiveRecord's override answers it from the class's own
+    // methods (activerecord/attribute_methods.rb:170-178), so a method written
+    // in the class body survives attribute-method generation.
+    class Employee extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+      nameChanged(): boolean {
+        return true;
+      }
+    }
+    (Employee as unknown as { defineAttributeMethods(): boolean }).defineAttributeMethods();
+
+    const employee = new Employee({ name: "David" });
+    expect(employee.nameChanged()).toBe(true);
+  });
 });
