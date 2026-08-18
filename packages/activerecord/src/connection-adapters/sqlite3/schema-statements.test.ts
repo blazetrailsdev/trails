@@ -41,7 +41,7 @@ describe("SQLite3::SchemaStatements", () => {
       const fakeAdapter = { queryValues: vi.fn().mockResolvedValue([]) } as any;
       await virtualTableExists(fakeAdapter, "my_vtab");
       expect(fakeAdapter.queryValues).toHaveBeenCalledWith(
-        dataSourceSql("my_vtab", "VIRTUAL TABLE"),
+        dataSourceSql("my_vtab", { type: "VIRTUAL TABLE" }),
         "SCHEMA",
       );
     });
@@ -118,15 +118,15 @@ describe("SQLite3::SchemaStatements", () => {
     });
 
     it("filters by BASE TABLE type", () => {
-      expect(dataSourceSql(undefined, "BASE TABLE")).toContain("'table'");
+      expect(dataSourceSql(undefined, { type: "BASE TABLE" })).toContain("'table'");
     });
 
     it("filters by VIEW type", () => {
-      expect(dataSourceSql(undefined, "VIEW")).toContain("'view'");
+      expect(dataSourceSql(undefined, { type: "VIEW" })).toContain("'view'");
     });
 
     it("filters by VIRTUAL TABLE type", () => {
-      expect(dataSourceSql(undefined, "VIRTUAL TABLE")).toContain("'virtual'");
+      expect(dataSourceSql(undefined, { type: "VIRTUAL TABLE" })).toContain("'virtual'");
     });
   });
 
@@ -144,11 +144,11 @@ describe("SQLite3::SchemaStatements", () => {
     });
 
     it("maps BASE TABLE to table", () => {
-      expect(quotedScope(undefined, "BASE TABLE")).toMatchObject({ type: "'table'" });
+      expect(quotedScope(undefined, { type: "BASE TABLE" })).toMatchObject({ type: "'table'" });
     });
 
     it("maps VIEW to view", () => {
-      expect(quotedScope(undefined, "VIEW")).toMatchObject({ type: "'view'" });
+      expect(quotedScope(undefined, { type: "VIEW" })).toMatchObject({ type: "'view'" });
     });
   });
 

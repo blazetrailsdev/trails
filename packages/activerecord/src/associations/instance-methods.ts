@@ -77,7 +77,7 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
       // loadedBang (inside setTarget) after a FK change would reset the
       // detector and mask stale-target detection. Update the target directly
       // without re-marking loaded.
-      instance.target = (cached.target as Base | Base[] | null) ?? null;
+      instance._writeTargetStore((cached.target as Base | Base[] | null) ?? null);
     } else {
       instance._setTargetFromLoader((cached.target as Base | Base[] | null) ?? null);
     }

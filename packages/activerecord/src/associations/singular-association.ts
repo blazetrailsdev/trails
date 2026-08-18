@@ -47,7 +47,7 @@ export class SingularAssociation extends Association {
 
   override reset(): void {
     super.reset();
-    this.target = null;
+    this._writeTargetStore(null);
   }
 
   // has_one overrides this with an awaitable immediate-persist path that may
@@ -208,7 +208,6 @@ export class SingularAssociation extends Association {
     const cached = this.doFindTarget();
     if (cached !== undefined) {
       this.target = cached as Base | null;
-      this.loadedBang();
       return this.target;
     }
 
@@ -453,7 +452,6 @@ export class SingularAssociation extends Association {
       this.removeInverseInstance(this.target);
     }
     this.target = record;
-    this.loadedBang();
   }
 
   protected setNewRecord(record: Base): void {

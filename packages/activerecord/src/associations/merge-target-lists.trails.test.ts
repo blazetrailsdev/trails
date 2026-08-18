@@ -42,8 +42,10 @@ describe("mergeTargetLists", () => {
     // The database moves under the in-memory record.
     await Post.where({ id: posts("welcome").id }).updateAll({ title: "changed in the database" });
 
-    assoc.loaded = false;
+    // `target=` marks the association loaded (association.rb:100-103), so the
+    // unloaded flag is set after it, as Ruby's bare `@target =` leaves it.
     assoc.target = [memRecord];
+    assoc.loaded = false;
     const merged = await assoc.loadTarget();
 
     const reloaded = merged.find((post) => post.id === posts("welcome").id)!;
@@ -62,8 +64,10 @@ describe("mergeTargetLists", () => {
     memRecord.set("title", "dirty in memory");
     await Post.where({ id: posts("welcome").id }).updateAll({ body: "changed in the database" });
 
-    assoc.loaded = false;
+    // `target=` marks the association loaded (association.rb:100-103), so the
+    // unloaded flag is set after it, as Ruby's bare `@target =` leaves it.
     assoc.target = [memRecord];
+    assoc.loaded = false;
     const merged = await assoc.loadTarget();
     const reloaded = merged.find((post) => post.id === posts("welcome").id)!;
 

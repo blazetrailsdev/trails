@@ -54,7 +54,27 @@ export class Association {
     return this._targetStore;
   }
 
+  /**
+   * Mirrors: ActiveRecord::Associations::Association#target=
+   * (`association.rb:100-103`) — the ivar write, then `loaded!`. Callers that
+   * want the ivar write WITHOUT marking loaded spell it as Ruby does, a direct
+   * `_writeTargetStore` (`association.rb:189`'s `@target = find_target`).
+   */
   set target(value: Base | Base[] | null) {
+    this._writeTargetStore(value);
+    this.loadedBang();
+  }
+
+  /**
+   * Ruby's bare `@target = …` ivar write — what `target=` does before
+   * `loaded!`, and what `load_target` (`association.rb:189`), `marshal_load`
+   * (:207) and `CollectionAssociation#reset` / `replace_records`
+   * (`collection_association.rb:88, 471`) do without going through `target=`.
+   * A method because the field is protected and those writers include free
+   * functions and other objects' holders.
+   * @internal
+   */
+  _writeTargetStore(value: Base | Base[] | null): void {
     this._targetStore = value;
   }
 
@@ -281,7 +301,6 @@ export class Association {
    */
   _setTargetFromLoader(target: Base | Base[] | null): void {
     this.target = target;
-    this.loadedBang();
   }
 
   /**
@@ -454,13 +473,11 @@ export class Association {
 
   inversedFrom(record: Base | null): void {
     this.target = record;
-    this.loadedBang();
   }
 
   inversedFromQueries(record: Base | null): void {
     if (this.inversable(record)) {
       this.target = record;
-      this.loadedBang();
     }
   }
 
@@ -556,7 +573,7 @@ export class Association {
     } else if (this.findTargetNeeded()) {
       const cached = this.doFindTarget();
       if (cached !== undefined) {
-        this.target = cached;
+        this._writeTargetStore(cached);
       } else {
         return this._findTarget().then(loaded);
       }
@@ -592,10 +609,10 @@ export class Association {
       // execute block — only freshly loaded records, never cached ones.
       if (result !== null) this.setStrictLoading(result as Base);
       if (this.loaded && this.staleState() !== staleStateBeforeLoad) return;
-      // Deliberately a direct assignment, not `setTarget`: this is the loader
+      // Deliberately the bare ivar write, not `setTarget`: this is the loader
       // storing what it just fetched, not a caller replacing the target, so it
       // must not trip `setTarget`'s in-flight guard.
-      this.target = result;
+      this._writeTargetStore(result);
     }
   }
 
@@ -633,7 +650,7 @@ export class Association {
   marshalLoad(data: [string, Record<string, unknown>]): void {
     const [, ivars] = data;
     this.loaded = ivars.loaded as boolean;
-    this.target = ivars.target as Base | Base[] | null;
+    this._writeTargetStore(ivars.target as Base | Base[] | null);
     if (this.loaded) {
       this._staleState = this.staleState();
     }

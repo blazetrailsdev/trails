@@ -1317,7 +1317,6 @@ export class JoinDependency {
       if (isCollection) {
         if (!proxy.loaded) {
           proxy.target = [];
-          proxy.loadedBang();
         }
         if (Array.isArray(proxy.target)) {
           proxy.target.push(child);
@@ -1346,7 +1345,6 @@ export class JoinDependency {
       const proxy = parent.association(node.immediateAssocName);
       if (!proxy || proxy.loaded) return;
       proxy.target = [];
-      proxy.loadedBang?.();
       proxy._loadedFromPreload = true;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;

@@ -350,7 +350,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
               inverseAssoc.syncWrite(built.throughRecord);
             } else {
               inverseAssoc.target = built.throughRecord;
-              inverseAssoc.loadedBang?.();
             }
             inverseAssoc.setInverseInstance?.(built.throughRecord);
           } else if (typeof inverseAssoc.writer === "function") {
@@ -1009,7 +1008,7 @@ function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | nu
       return oo.target;
     },
     set target(v: Base[] | Base | null) {
-      oo.target = v;
+      oo._writeTargetStore(v);
     },
   };
 }
@@ -1112,10 +1111,7 @@ function ensureNotNested(this: HasManyThroughAssociation): void {
     isNested?: () => boolean;
   } | null;
   if (refl?.isNested?.()) {
-    throw new HasManyThroughNestedAssociationsAreReadonly(
-      (this.owner.constructor as { name: string }).name,
-      this.reflection.name,
-    );
+    throw new HasManyThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
   }
 }
 

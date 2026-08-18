@@ -672,7 +672,7 @@ describe("NestedThroughAssociationsTest", () => {
     const david = authors("david");
     const subscriber = subscribers("first");
     await expect((david.subscribers as any).push(subscriber)).rejects.toThrow(
-      /nested through association/i,
+      /goes through more than one other association/,
     );
   });
 
@@ -680,7 +680,9 @@ describe("NestedThroughAssociationsTest", () => {
     const groucho = members("groucho");
     const founding = memberTypes("founding");
     const proxy = groucho.association("nestedMemberType") as any;
-    await expect(proxy.writer(founding)).rejects.toThrow(/nested through association/i);
+    await expect(proxy.writer(founding)).rejects.toThrow(
+      /goes through more than one other association/,
+    );
   });
 
   it("nested has many through with conditions on through associations", async () => {
