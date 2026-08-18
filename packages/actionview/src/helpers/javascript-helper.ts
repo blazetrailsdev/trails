@@ -80,5 +80,5 @@ export function javascriptTag(
     opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 
-  return contentTag("script", javascriptCdataSection(content), opts, true);
+  return contentTag("script", javascriptCdataSection(content), opts);
 }
