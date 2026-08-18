@@ -4420,6 +4420,16 @@ function encodeYear(nth: bigint, y: number, style: number): number | bigint {
  * MRI narrows it. Ruby's `RangeError` is JS's, and the message is MRI's own
  * (`bignum too big to convert into 'long'`, `numeric.c`).
  */
+/**
+ * @internal MRI's `NUM2LONG` where `dt_lite_iso8601` (`date_core.c:8754-8766`)
+ * and `dt_lite_jisx0301` (`:8794-8805`) apply it to the fractional-digit
+ * argument: a Float converts by truncating toward zero, which is why Ruby's
+ * `iso8601(3.5)` renders three digits, not four.
+ */
+function num2long(n: number): number {
+  return Math.trunc(n);
+}
+
 function realYearToLong(year: number | bigint): number {
   if (typeof year === "number") return year;
   if (year < BigInt(Number.MIN_SAFE_INTEGER) || year > BigInt(Number.MAX_SAFE_INTEGER)) {
@@ -4663,6 +4673,53 @@ function plainDateFromJd(jd: number | bigint, sg = DEFAULT_SG): Temporal.PlainDa
  * Symbol — nothing reads it as a value.
  */
 export const SEAT: unique symbol = Symbol("d_simple_new_internal");
+
+/**
+ * @internal `date_core.c` `dup_obj_with_new_offset` (`date_core.c:5899-5908`),
+ * which promotes the receiver to a ComplexDateData and runs `set_of` on the
+ * copy. TS has no `dup_obj_as_complex`: a `::Date` already reads `of == 0`, so
+ * the promotion changes nothing a formatter can see, and a `::DateTime` is
+ * complex already and reaches `set_of` through
+ * {@link DateTime#newOffset} — the reader `Init_date_core` gives to
+ * `::DateTime` alone (`:10018`).
+ */
+function dupObjWithNewOffset(obj: Date, of: number): Date {
+  return obj instanceof DateTime ? obj.newOffset(of) : obj;
+}
+
+/**
+ * @internal `date_core.c` `jisx0301_date_format` (`date_core.c:7358-7381`),
+ * which picks the era letter and the year offset off the Julian day and writes
+ * `"%c%02ld.%%m.%%d"` into the caller's buffer. A day outside a Fixnum — a
+ * `nth` away from zero — takes the C's non-`FIXNUM_P` arm and renders plain
+ * ISO, as does any day before Meiji 6 (jd 2405160, 1873-01-01).
+ */
+function jisx0301DateFormat(jd: number | bigint, y: number | bigint): string {
+  if (typeof jd === "number") {
+    const d = jd;
+    let s: number;
+    let c: string;
+    if (d < 2405160) return "%Y-%m-%d";
+    if (d < 2419614) {
+      c = "M";
+      s = 1867;
+    } else if (d < 2424875) {
+      c = "T";
+      s = 1911;
+    } else if (d < 2447535) {
+      c = "S";
+      s = 1925;
+    } else if (d < 2458605) {
+      c = "H";
+      s = 1988;
+    } else {
+      c = "R";
+      s = 2018;
+    }
+    return `${c}${String(Number(y) - s).padStart(2, "0")}.%m.%d`;
+  }
+  return "%Y-%m-%d";
+}
 
 /**
  * @internal `date_core.c` `c_valid_time_p` (`date_core.c:870-886`), which folds
@@ -8024,6 +8081,23 @@ export class Date {
   }
 
   /**
+   * Ruby `Date#asctime` (ruby/date, `date_core.c` `d_lite_asctime`,
+   * `date_core.c:7281-7285`) — `strftimev("%a %b %e %H:%M:%S %Y", self,
+   * set_tmx)`.
+   */
+  asctime(): string {
+    return this.strftime("%a %b %e %H:%M:%S %Y");
+  }
+
+  /**
+   * Ruby `Date#ctime`, which `date_core.c:9808` binds to the same
+   * `d_lite_asctime` as `asctime` (`:9807`).
+   */
+  ctime(): string {
+    return this.asctime();
+  }
+
+  /**
    * Ruby `Date#iso8601` (ruby/date, `date_core.c` `d_lite_iso8601`,
    * `date_core.c:7298-7302`) — `strftimev("%Y-%m-%d", self, set_tmx)`.
    */
@@ -8037,6 +8111,16 @@ export class Date {
    */
   xmlschema(): string {
     return this.iso8601();
+  }
+
+  /**
+   * Ruby `Date#rfc3339` (ruby/date, `date_core.c` `d_lite_rfc3339`,
+   * `date_core.c:7314-7318`) — `strftimev("%Y-%m-%dT%H:%M:%S%:z", self,
+   * set_tmx)`. `::DateTime` overrides it (`date_core.c:10026`) only to take
+   * the fractional-second `n`; see {@link DateTime#rfc3339}.
+   */
+  rfc3339(): string {
+    return this.strftime("%Y-%m-%dT%H:%M:%S%:z");
   }
 
   /**
@@ -8057,6 +8141,29 @@ export class Date {
    */
   rfc822(): string {
     return this.rfc2822();
+  }
+
+  /**
+   * Ruby `Date#httpdate` (ruby/date, `date_core.c` `d_lite_httpdate`,
+   * `date_core.c:7346-7351`) — the receiver is first moved to a zero offset by
+   * `dup_obj_with_new_offset`, so a `DateTime` in another zone still renders
+   * `GMT`. `::DateTime` does not override it (`date_core.c:10004` defines only
+   * the singleton), so it reaches this body.
+   */
+  httpdate(): string {
+    const dup = dupObjWithNewOffset(this, 0);
+    return dup.strftime("%a, %d %b %Y %T GMT");
+  }
+
+  /**
+   * Ruby `Date#jisx0301` (ruby/date, `date_core.c` `d_lite_jisx0301`,
+   * `date_core.c:7403-7414`), which picks the format with
+   * {@link jisx0301DateFormat} off the real local Julian day and the real year
+   * before handing it to `strftimev`.
+   */
+  jisx0301(): string {
+    const fmt = jisx0301DateFormat(encodeJd(this.nth, this.mLocalJd()), this.year);
+    return this.strftime(fmt);
   }
 
   /**
@@ -9416,6 +9523,7 @@ export class DateTime extends DateWithoutParseStatics {
    * digits of fractional seconds.
    */
   iso8601(n = 0): string {
+    n = num2long(n);
     return this.strftime("%Y-%m-%d") + this.#iso8601Timediv(n);
   }
 
@@ -9425,6 +9533,24 @@ export class DateTime extends DateWithoutParseStatics {
    */
   xmlschema(n = 0): string {
     return this.iso8601(n);
+  }
+
+  /**
+   * Ruby `DateTime#rfc3339(n = 0)`, whose C body `dt_lite_rfc3339`
+   * (`date_core.c:8778-8782`) forwards straight to `dt_lite_iso8601`.
+   */
+  override rfc3339(n = 0): string {
+    return this.iso8601(n);
+  }
+
+  /**
+   * Ruby `DateTime#jisx0301(n = 0)` (ruby/date, `date_core.c`
+   * `dt_lite_jisx0301`, `date_core.c:8794-8805`) — `d_lite_jisx0301(self)`,
+   * which is `super` here, appended with {@link DateTime.#iso8601Timediv}.
+   */
+  override jisx0301(n = 0): string {
+    n = num2long(n);
+    return super.jisx0301() + this.#iso8601Timediv(n);
   }
 
   /**
