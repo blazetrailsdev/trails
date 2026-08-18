@@ -1082,6 +1082,11 @@ export class CallbackChain {
   // with @mutex.synchronize for thread safety, but JS is single-threaded so
   // runCallbacks never re-enters compile() concurrently — the lock is moot.
   private _allCallbacks: CallbackSequence | undefined;
+  // Rails' @single_callbacks (callbacks.rb:580), the per-type memo beside
+  // @all_callbacks: compile(type) folds only the callbacks of that one kind, so
+  // its sequence cannot be shared with the unfiltered one. Every site that
+  // clears @all_callbacks clears this alongside it.
+  private _singleCallbacks: Map<CallbackKind, CallbackSequence> = new Map();
 
   constructor(name: string, config: DefineCallbacksOptions = {}) {
     this.name = name;
@@ -1106,11 +1111,13 @@ export class CallbackChain {
 
   insert(idx: number, cb: Callback): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.chain.splice(idx, 0, cb);
   }
 
   delete(cb: Callback): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     const i = this.chain.indexOf(cb);
     if (i !== -1) this.chain.splice(i, 1);
   }
@@ -1125,43 +1132,68 @@ export class CallbackChain {
 
   private appendOne(callback: Callback): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.removeDuplicates(callback);
     this.chain.push(callback);
   }
 
   private prependOne(callback: Callback): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.removeDuplicates(callback);
     this.chain.unshift(callback);
   }
 
   private removeDuplicates(callback: Callback): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.chain = this.chain.filter((c) => !callback.isDuplicates(c));
   }
 
   remove(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
   }
 
   clear(): void {
     this._allCallbacks = undefined;
+    this._singleCallbacks.clear();
     this.chain = [];
   }
 
-  compile(): CallbackSequence {
-    if (this._allCallbacks) return this._allCallbacks;
-    // Mirrors Rails CallbackChain#compile: fold the chain in reverse, applying
-    // each callback's compiled filter onto the sequence. before/after mutate the
-    // (single) final sequence's lists; around wraps it in a new nested sequence.
+  /**
+   * Mirrors: ActiveSupport::Callbacks::CallbackChain#compile (callbacks.rb:614-630).
+   *
+   * `type` nil folds the whole chain into `@all_callbacks`; a `type` folds only
+   * the callbacks whose `kind` it is — the rest pass the sequence through
+   * untouched — and memoizes per type in `@single_callbacks`. No mutex: Rails
+   * guards both rebuilds with @mutex.synchronize for thread safety, but JS is
+   * single-threaded so runCallbacks never re-enters compile() concurrently.
+   */
+  compile(type?: CallbackKind): CallbackSequence {
+    if (type == null) {
+      if (this._allCallbacks) return this._allCallbacks;
+      const finalSequence = new CallbackSequence();
+      let callbackSequence = finalSequence;
+      for (let i = this.chain.length - 1; i >= 0; i--) {
+        callbackSequence = this.chain[i].compiled.apply(callbackSequence);
+      }
+      callbackSequence._callbackChain = this;
+      this._allCallbacks = callbackSequence;
+      return callbackSequence;
+    }
+
+    const memo = this._singleCallbacks.get(type);
+    if (memo) return memo;
     const finalSequence = new CallbackSequence();
     let callbackSequence = finalSequence;
     for (let i = this.chain.length - 1; i >= 0; i--) {
-      callbackSequence = this.chain[i].compiled.apply(callbackSequence);
+      const callback = this.chain[i];
+      if (type === callback.kind) callbackSequence = callback.compiled.apply(callbackSequence);
     }
     callbackSequence._callbackChain = this;
-    this._allCallbacks = callbackSequence;
+    this._singleCallbacks.set(type, callbackSequence);
     return callbackSequence;
   }
 
@@ -1441,11 +1473,21 @@ export namespace Callbacks {
     if (chain) chain.clear();
   }
 
+  /**
+   * Mirrors: ActiveSupport::Callbacks#run_callbacks (callbacks.rb:96-104).
+   *
+   * Ruby's `run_callbacks(kind, type = nil)` takes the block as a block; TS has
+   * to spell it positionally, and `opts` is trails' async-strictness argument,
+   * so Ruby's second positional lands after both rather than after `name`.
+   * It is forwarded straight into `chain.compile(type)` as it is there: a
+   * `type` runs only that kind's callbacks.
+   */
   export function runCallbacks(
     target: object,
     name: string,
     block?: () => unknown,
     opts?: RunCallbacksOptions,
+    type?: CallbackKind,
   ): unknown {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
@@ -1459,7 +1501,7 @@ export namespace Callbacks {
       }
       return r;
     }
-    const sequence = chain.compile();
+    const sequence = chain.compile(type);
     return sequence.invoke(target, block, opts);
   }
 }
@@ -1497,8 +1539,9 @@ export function runCallbacks(
   name: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
+  type?: CallbackKind,
 ): unknown {
-  return Callbacks.runCallbacks(target, name, block, opts);
+  return Callbacks.runCallbacks(target, name, block, opts, type);
 }
 
 export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
@@ -1552,8 +1595,13 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       resetCallbacks(this.prototype, name);
     }
 
-    runCallbacks(name: string, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
-      return runCallbacks(this, name, block, opts);
+    runCallbacks(
+      name: string,
+      block?: () => unknown,
+      opts?: RunCallbacksOptions,
+      type?: CallbackKind,
+    ): unknown {
+      return runCallbacks(this, name, block, opts, type);
     }
 
     // A hook invoked every time a before callback is halted. Overridable in

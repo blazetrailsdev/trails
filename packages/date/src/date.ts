@@ -7214,7 +7214,9 @@ export class Date {
    * nothing forces `get_c_jd`/`get_c_df` or clears the civil seat.
    */
   dup(): this {
-    return (new Date(SEAT, 0n, 0, DEFAULT_SG) as this).initializeCopy(this);
+    return (new (this.constructor as typeof Date)(SEAT, 0n, 0, DEFAULT_SG) as this).initializeCopy(
+      this,
+    );
   }
 
   /**
@@ -8068,6 +8070,74 @@ export class Date {
    */
   deconstructKeys(keys: string[] | null): Record<string, unknown> {
     return deconstructKeys(this, keys, false);
+  }
+
+  /**
+   * Ruby `Date#marshal_dump` (ruby/date, `date_core.c` `d_lite_marshal_dump`,
+   * `date_core.c:7529-7550`, registered at `:9822`), the six-element Array
+   * `Marshal.dump` writes: `m_nth`, `m_jd`, `m_df`, `m_sf`, `m_of` and `m_sg`,
+   * in that order. The readers are the STORED ones — `m_jd`, not
+   * `m_local_jd` — so a `DateTime`'s day and day-fraction go out in UTC and
+   * come back beside the offset that names their zone.
+   *
+   * `rb_copy_generic_ivar` (`:7544-7547`) carries the receiver's generic ivars
+   * onto the Array; a TS instance has no such side table, so there is nothing
+   * to copy.
+   */
+  marshalDump(): [bigint, number, number, Rational, number, number] {
+    return [this.nth, this.mJd(), this.mDf(), this.mSf(), this.mOf(), this.sg];
+  }
+
+  /**
+   * Ruby `Date#marshal_load(a)` (ruby/date, `date_core.c`
+   * `d_lite_marshal_load`, `date_core.c:7553-7625`, registered at `:9823`),
+   * which writes the dumped Array back into the receiver `Marshal.load`
+   * allocated — so it is the receiver's own class that comes back out, which is
+   * what `test_sub` asserts.
+   *
+   * The C's `case 2` / `case 3` arms load the 1.6.x and 1.8.x/1.9.2 dumps
+   * through `old_to_new` (`:3105-3137`); `decode_day` and its `div_day` /
+   * `div_df` are not ported, so those two arms are not here yet — story
+   * `port-date-marshal-legacy-dump-arms` (RFC 0088) carries them. `case 6` and
+   * the `default:` raise are.
+   *
+   * `simple_dat_p`'s promotion (`:7603-7612`) — a fractional dump reallocating
+   * the receiver's `SimpleDateData` into a `ComplexDateData` — is a field write
+   * here, as it is at {@link Date#initializeCopy}: `Date` declares the complex
+   * fields and {@link DateTime} overrides this method for its own.
+   */
+  marshalLoad(a: unknown[]): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
+    }
+    if (!Array.isArray(a)) throw new TypeError("expected an array");
+    if (a.length !== 6) throw new TypeError("invalid size");
+
+    const nth = a[0] as bigint;
+    const jd = Number(a[1]);
+    const df = Number(a[2]);
+    const sf = a[3] as Rational;
+    const of = Number(a[4]);
+    const sg = Number(a[5]);
+
+    this.nth = nth;
+    this.#jd = jd;
+    this.sg = sg;
+    this.#civil = undefined;
+    if (df || !sf.isZero() || of) {
+      this.#df = df;
+      this.#sf = sf;
+      this.#of = of;
+    } else {
+      // `set_to_simple` (`:7613`) with `HAVE_JD`: the simple struct has no
+      // `df`/`sf`/`of` at all, and here their absence IS `simple_dat_p`
+      // ({@link Date#complexDatP}), so a non-fractional dump must clear them
+      // rather than write zeroes a complex receiver would be read off.
+      this.#df = undefined;
+      this.#sf = undefined;
+      this.#of = undefined;
+    }
+    return this;
   }
 
   /**
@@ -9248,13 +9318,47 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   /**
+   * The complex receiver's half of `d_lite_marshal_load` (`:7602-7615`): a
+   * `DateTime` is always complex, so it takes `set_to_complex` (`:7614`)
+   * whatever the dump held and the promotion branch cannot be reached. One C
+   * function, but the two arms write different data and TS class fields are
+   * private to the class that declares them, so the write is spelled where the
+   * fields live — as at {@link DateTime#initializeCopy}.
+   */
+  override marshalLoad(a: unknown[]): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${objClassName(this)}: ${this.inspect()}`);
+    }
+    if (!Array.isArray(a)) throw new TypeError("expected an array");
+    if (a.length !== 6) throw new TypeError("invalid size");
+
+    this.nth = a[0] as bigint;
+    this.#jd = Number(a[1]);
+    this.#df = Number(a[2]);
+    this.#sf = a[3] as Rational;
+    this.#of = Number(a[4]);
+    this.sg = Number(a[5]);
+    this.#civil = undefined;
+    this.#time = undefined;
+    return this;
+  }
+
+  /**
    * `::DateTime`'s allocator is `d_lite_s_alloc_complex` (`date_core.c:9969`),
    * where `::Date`'s is the simple one; see {@link Date#dup}.
    */
   override dup(): this {
-    return (new DateTime(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG) as this).initializeCopy(
-      this,
-    );
+    return (
+      new (this.constructor as typeof DateTime)(
+        SEAT,
+        0n,
+        0,
+        0,
+        new Rational(0, 1),
+        0,
+        DEFAULT_SG,
+      ) as this
+    ).initializeCopy(this);
   }
 
   /**
