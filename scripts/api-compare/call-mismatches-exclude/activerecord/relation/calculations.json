@@ -11,41 +11,41 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_simple_calculation",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `result.cast_values.first` (calculations.rb:510) — Ruby `Array#first` on the cast-values Array, which TS indexes as `castValues()[0]`."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_simple_calculation",
     "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): calculations.rb:491 is `FutureResult.wrap(ActiveRecord::Result.empty)`, the async arm of the contradiction short-circuit. trails has no FutureResult (see the same row on relation.ts `exec_main_query`), so both arms return `Result.empty()`."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "lookup_cast_type_from_join_dependencies",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `join.base_klass.attribute_types.fetch(name, nil)` (calculations.rb:604) — a Hash#fetch whose default is `nil`, i.e. a plain missing-key read; the TS spelling is the `castTypeFromKlass` own-property lookup (calculations.ts:1444), not a `fetch` call."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "type_cast_pluck_values",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `model.attribute_types.fetch(name) { ... }` (calculations.rb:617) — Hash#fetch WITH A BLOCK, whose TS spelling is the miss test `pluckCastTypeForKnownColumn(...)` followed by the block body (calculations.ts:1490-1497); JS has no fetch-with-block call to make."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "type_cast_pluck_values",
     "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `result.columns.size != columns.size` (calculations.rb:611) — Ruby `Array#size` on two plain Arrays, spelled `.length` in TS."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "type_for",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `field.to_s.split(\".\").last` (calculations.rb:598) — Ruby `Array#last` on the split parts, spelled by indexing the final element in TS."
   }
 ]

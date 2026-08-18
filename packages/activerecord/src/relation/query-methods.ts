@@ -1157,7 +1157,9 @@ export function buildWhereClause(
     } else if (opts.includes("?")) {
       parts = [buildBoundSqlLiteral.call(this, opts, rest)];
     } else {
-      parts = [new Nodes.SqlLiteral(this.model.sanitizeSqlArray(opts, ...rest))];
+      parts = [
+        new Nodes.SqlLiteral(this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!),
+      ];
     }
     return new WhereClause(parts);
   }

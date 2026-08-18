@@ -104,7 +104,9 @@ export class GeneratedRelationMethods {
   private _methods: Map<string, AnyCallable> = new Map();
   private _carriers: { carrier: object; priority: number }[] = [];
 
-  generate(name: string, fn: AnyCallable): void {
+  generateMethod(name: string, fn: AnyCallable): void {
+    // Rails: `return if method_defined?(method)` (delegation.rb:74).
+    if (this._methods.has(name)) return;
     this._methods.set(name, fn);
     for (const { carrier, priority } of this._carriers) {
       installOnCarrier(carrier, name, fn, priority);
@@ -115,7 +117,7 @@ export class GeneratedRelationMethods {
    * `include` this module into a delegate prototype carrier at `priority` (its
    * position in the carrier's STI module chain — higher = more derived): install
    * every already-generated method as a real own property, respecting per-name
-   * priority, and register the carrier so future {@link generate}s propagate to
+   * priority, and register the carrier so future {@link generateMethod}s propagate to
    * it. Mirrors Rails' `DelegateCache#include_relation_methods`
    * (delegation.rb:57-60).
    */
@@ -509,7 +511,7 @@ export function generateRelationMethod(
   name: string,
   fn: AnyCallable,
 ): void {
-  modelClass.generatedRelationMethods().generate(name, fn);
+  modelClass.generatedRelationMethods().generateMethod(name, fn);
 }
 
 /**

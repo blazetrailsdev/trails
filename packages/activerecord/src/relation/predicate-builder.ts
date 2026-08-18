@@ -1,4 +1,5 @@
-import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Nodes, sql } from "@blazetrails/arel";
+import { wrap } from "@blazetrails/activesupport";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -63,7 +64,7 @@ export class PredicateBuilder {
     // positive: `where.not(...)` inverts the assembled WhereClause one level
     // up (WhereClause#invert), so `where.not(sink: {})` becomes `NOT (1=0)`.
     if (Object.keys(attributes).length === 0) {
-      return [arelSql("1=0")];
+      return [sql("1=0")];
     }
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(attributes)) {
@@ -118,8 +119,7 @@ export class PredicateBuilder {
     const reflection = this.table.reflectOnAggregation(key);
     const mapping: [string, string][] = reflection.mapping();
     // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
-    const values =
-      value === null || value === undefined ? [null] : Array.isArray(value) ? value : [value];
+    const values = value === null || value === undefined ? [null] : wrap(value);
     if (mapping.length === 1 || values.length === 0) {
       const [columnName, aggregateAttr] = mapping[0];
       // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
@@ -483,11 +483,11 @@ export class PredicateBuilder {
       : Object.entries(conditions);
     for (const [key, value] of entries) {
       if (isPlainObject(value)) {
-        refs.push(arelSql(key, { retryable: true }));
+        refs.push(sql(key, { retryable: true }));
       } else {
         const dot = key.lastIndexOf(".");
         if (dot !== -1) {
-          refs.push(arelSql(key.slice(0, dot), { retryable: true }));
+          refs.push(sql(key.slice(0, dot), { retryable: true }));
         }
       }
     }

@@ -11,14 +11,14 @@
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_last",
     "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `records.last(limit)` / `records.last` (finder_methods.rb:637) — Ruby `Array#last`, whose TS spelling is a tail slice / final-index read, not a call."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_nth",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `find_nth_with_limit(index, 1).first` (finder_methods.rb:600) — Ruby `Array#first` on the returned Array, spelled `[0]` in TS."
   },
   {
     "package": "activerecord",
@@ -32,14 +32,14 @@
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_take",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `records.first` (finder_methods.rb:584, :586) — Ruby `Array#first`, spelled `[0]` in TS."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_take_with_limit",
     "call": "take",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `records.take(limit)` (finder_methods.rb:592) — Ruby `Array#take`, spelled `.slice(0, limit)` in TS. The homonymous `Relation#take` is a different method and is not what this line calls."
   },
   {
     "package": "activerecord",
