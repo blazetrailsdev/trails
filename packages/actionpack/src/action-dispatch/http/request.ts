@@ -7,7 +7,7 @@
 
 import { toSentence } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-import { parseNestedQuery, Request as RackRequest } from "@blazetrails/rack";
+import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { Session } from "../request/session.js";
 import {
@@ -676,8 +676,17 @@ export class Request {
 
   // --- Session ---
 
-  get session(): Record<string, unknown> {
-    return (this.env["rack.session"] as Record<string, unknown>) || {};
+  /**
+   * Mirrors: `Rack::Request::Helpers#session` (`rack/request.rb:207-211`) —
+   * `fetch_header(RACK_SESSION) { |k| set_header RACK_SESSION, default_session }`.
+   * ActionDispatch supplies `default_session` (`request.rb:505-507`) as
+   * `Session.disabled(self)`, so a request with no session middleware answers a
+   * disabled `Session` and seeds `Session::Options` as a side effect.
+   */
+  get session(): Session {
+    return this.fetchHeader(RACK_SESSION, (k) =>
+      this.setHeader(k, this.defaultSession()),
+    ) as Session;
   }
 
   // --- Flash ---
@@ -883,16 +892,14 @@ export class Request {
 
   // --- Session ---
 
-  /** Rails: `reset_session` — destroys session and resets CSRF token. */
+  /** Rails: `reset_session` (request.rb:381-384) — `session.destroy; reset_csrf_token`. */
   resetSession(): void {
-    const session = this.env["rack.session"] as { destroy?: () => void } | undefined;
-    if (session && typeof session.destroy === "function") session.destroy();
-    else this.env["rack.session"] = {};
+    this.session.destroy();
     this.resetCsrfToken();
   }
 
   /** Rails: `session=` (request.rb:385-387) — `Session.set self, session`. */
-  set session(session: Record<string, unknown>) {
+  set session(session: Session) {
     Session.set(this, session);
   }
 

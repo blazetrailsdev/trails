@@ -454,12 +454,14 @@ export class Request {
     return undefined;
   }
 
+  /** Mirrors: `Rack::Request::Helpers#session` (`rack/request.rb:207-211`). */
   get session(): Record<string, any> {
-    return this.env[RACK_SESSION] || (this.env[RACK_SESSION] = {});
+    return this.fetchHeader(RACK_SESSION, (k) => this.setHeader(k, this.defaultSession()));
   }
 
+  /** Mirrors: `Rack::Request::Helpers#session_options` (`rack/request.rb:213-217`). */
   get sessionOptions(): Record<string, any> {
-    return this.env[RACK_SESSION_OPTIONS] || (this.env[RACK_SESSION_OPTIONS] = {});
+    return this.fetchHeader(RACK_SESSION_OPTIONS, (k) => this.setHeader(k, {}));
   }
 
   get ip(): string {
@@ -664,6 +666,11 @@ export class Request {
     const err = new Error(`key not found: "${name}"`);
     err.name = "KeyError";
     throw err;
+  }
+
+  /** Mirrors: `Rack::Request::Env#set_header` (`rack/request.rb:116-118`). */
+  setHeader(name: string, v: any): any {
+    return (this.env[name] = v);
   }
 
   eachHeader(callback: (key: string, value: any) => void): void {

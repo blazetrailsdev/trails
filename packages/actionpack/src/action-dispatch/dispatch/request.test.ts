@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request, PassNotFound } from "../request.js";
+import { Session } from "../request/session.js";
 import { MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
@@ -699,13 +700,11 @@ describe("RequestInspectTest", () => {
 
 describe("RequestSession", () => {
   it("#session", () => {
-    const req = new Request({ "rack.session": { user_id: 1 } });
-    expect(req.session).toEqual({ user_id: 1 });
-  });
-
-  it("#session returns empty hash when not set", () => {
     const req = new Request({});
-    expect(req.session).toEqual({});
+    void req.session;
+
+    expect(Session.find(req)!.isEnabled()).toBe(false);
+    expect(Session.Options.find(req)).toBeInstanceOf(Session.Options);
   });
 });
 

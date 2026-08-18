@@ -195,9 +195,9 @@ describe("Request", () => {
 
 // ==========================================================================
 // No Rails counterpart: `Session::Options` (request/session.rb:47-73) has no
-// test of its own in session_test.rb — request_test.rb's `RequestSession#session`
-// only asserts `Options.find(req)` is an Options instance, through a
-// `Request#session` reader trails has not converged yet.
+// test of its own in session_test.rb. request_test.rb's `RequestSession#session`
+// covers `Options.find(req)` being an `Options` instance; what is left here is
+// the reader behaviour it does not reach.
 // ==========================================================================
 describe("Options", () => {
   it("create stores an Options instance", () => {
@@ -212,9 +212,7 @@ describe("Options", () => {
   it("disabled stores an Options instance whose id is nil", () => {
     const req = makeReq();
     Session.disabled(req);
-    const options = Options.find(req) as Options;
-    expect(options).toBeInstanceOf(Options);
-    expect(options.id(req)).toBeNull();
+    expect((Options.find(req) as Options).id(req)).toBeNull();
   });
 
   it("id falls back to the store when no id is stored", () => {
