@@ -345,7 +345,7 @@ export class HasManyAssociation extends CollectionAssociation {
         null,
       retainOnlyNewRecords: () => {
         const self = this as CollectionAssociation;
-        self.target = self.target.filter((r) => r.isNewRecord());
+        self._writeTargetStore(self.target.filter((r) => r.isNewRecord()));
       },
       markLoaded: () => (this as CollectionAssociation).loadedBang(),
     });

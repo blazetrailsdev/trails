@@ -2096,14 +2096,16 @@ export function associationInstanceGet(this: Base, name: string): unknown {
     !!existing?.isLoaded?.();
   if (!hasCachedData) return null;
   try {
-    const inst = record.association(name) as { isLoaded?(): boolean; target?: unknown } | undefined;
+    const inst = record.association(name) as
+      | { isLoaded?(): boolean; target?: unknown; _writeTargetStore?(t: unknown): void }
+      | undefined;
     if (inst?.isLoaded?.()) return inst;
     // In-memory built records (no preload, no DB load). Surface them on the
-    // Association instance's `target` by direct assignment (not `setTarget`,
+    // Association instance's `target` by the bare ivar write (not `target=`,
     // which flips `loadedBang`) so the Association stays unloaded — matching
     // the `@_was_loaded` ephemeral flag semantics above.
     if (proxyHasBuiltRecords && inst && Array.isArray(inst.target)) {
-      inst.target = proxy.target;
+      inst._writeTargetStore?.(proxy.target);
       return inst;
     }
     // Association-side build (`record.association(name).build(...)`) populates

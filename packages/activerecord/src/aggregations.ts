@@ -71,10 +71,10 @@ export function composedOf(
   writerMethod(
     modelClass,
     name,
-    options.mapping,
     options.className,
-    options.converter,
+    options.mapping,
     options.allowNil,
+    options.converter,
   );
 }
 
@@ -138,10 +138,10 @@ function _decompose(
 function writerMethod(
   modelClass: typeof Base,
   name: string,
-  mapping: [string, string][],
   klass: new (...args: any[]) => any,
-  converter?: (value: unknown) => unknown,
+  mapping: [string, string][],
   allowNil?: boolean,
+  converter?: (value: unknown) => unknown,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
   Object.defineProperty(modelClass.prototype, name, {

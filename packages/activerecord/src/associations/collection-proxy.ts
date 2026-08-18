@@ -987,9 +987,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       (throughAssoc.type as string) === "hasOneThrough";
     if (isNestedThrough) {
       if (this._assocDef.type === "hasOne" || (this._assocDef.type as string) === "hasOneThrough") {
-        throw new HasOneThroughNestedAssociationsAreReadonly(ctor.name, this._assocName);
+        throw new HasOneThroughNestedAssociationsAreReadonly(this._record, this._assocDef);
       }
-      throw new HasManyThroughNestedAssociationsAreReadonly(ctor.name, this._assocName);
+      throw new HasManyThroughNestedAssociationsAreReadonly(this._record, this._assocDef);
     }
   }
 

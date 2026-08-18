@@ -142,9 +142,8 @@ export class Encryptor {
         ? { encryptionKey: () => ({ secret: options.key! }), decryptionKeys: () => [] }
         : this.defaultKeyProvider());
     if (!keyProvider) throw new Configuration("No encryption key provided");
-    return this.serializeMessage(
-      this.buildEncryptedMessage(text, keyProvider, { deterministic: options?.deterministic }),
-    );
+    const cipherOptions = { deterministic: options?.deterministic };
+    return this.serializeMessage(this.buildEncryptedMessage(text, { keyProvider, cipherOptions }));
   }
 
   decrypt(
@@ -264,8 +263,10 @@ export class Encryptor {
   /** @internal */
   private buildEncryptedMessage(
     clearText: string,
-    keyProvider: KeyProviderLike,
-    cipherOptions?: { deterministic?: boolean },
+    {
+      keyProvider,
+      cipherOptions,
+    }: { keyProvider: KeyProviderLike; cipherOptions?: { deterministic?: boolean } },
   ): Message {
     const encKeyObj = keyProvider.encryptionKey();
     const key = encKeyObj.secret;

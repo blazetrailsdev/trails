@@ -2097,8 +2097,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    *
    * Wired onto the adapter so SchemaStatements#viewExists dispatches here
    * (via this.adapter.dataSourceSql) instead of hitting the abstract
-   * NotImplementedError stub. The helper uses (name, type) positional args;
-   * we translate the Rails-shaped { type } options object here.
+   * NotImplementedError stub.
    *
    * @internal
    */
@@ -2119,7 +2118,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
     const name = kwargsOnly ? null : nameOrOptions;
     const opts = kwargsOnly ? nameOrOptions : options;
-    return sqliteDataSourceSql(name ?? undefined, opts.type);
+    return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
   }
 
   /**

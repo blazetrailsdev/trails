@@ -342,7 +342,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       }
     }
     this.target = record;
-    this.loadedBang();
     if (record) this.constructThroughRecordInMemory(record, save);
   }
 
@@ -750,10 +749,7 @@ function ensureNotNested(this: HasOneThroughAssociation): void {
     isNested?: () => boolean;
   } | null;
   if (refl?.isNested?.()) {
-    throw new HasOneThroughNestedAssociationsAreReadonly(
-      (this.owner.constructor as { name: string }).name,
-      this.reflection.name,
-    );
+    throw new HasOneThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
   }
 }
 

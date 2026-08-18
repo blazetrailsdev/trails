@@ -335,7 +335,6 @@ export class HasOneAssociation extends SingularAssociation {
           });
         }
         this.target = record;
-        this.loadedBang();
       })();
     }
     {
@@ -373,7 +372,6 @@ export class HasOneAssociation extends SingularAssociation {
         }
       }
       this.target = record;
-      this.loadedBang();
       return;
     }
   }

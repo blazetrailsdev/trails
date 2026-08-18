@@ -1591,7 +1591,7 @@ function replaceRecords(
   const deleted = assoc.delete(...diff.difference(assoc.target, newTarget));
   const restoreAndRaise = (e?: unknown): never => {
     if (e !== undefined && !(e instanceof Rollback)) throw e;
-    (assoc as any).target = originalTarget;
+    assoc._writeTargetStore(originalTarget);
     throw new RecordNotSaved(
       `Failed to replace ${assoc.reflection.name} because one or more of the new records ` +
         `could not be saved.`,

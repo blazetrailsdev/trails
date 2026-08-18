@@ -180,7 +180,8 @@ export async function virtualTableExists(
   tableName: string,
 ): Promise<boolean> {
   return (
-    (await adapter.queryValues(dataSourceSql(tableName, "VIRTUAL TABLE"), "SCHEMA")).length > 0
+    (await adapter.queryValues(dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
+      .length > 0
   );
 }
 
@@ -265,8 +266,8 @@ export function isColumnTheRowid(
 }
 
 /** @internal */
-export function dataSourceSql(name?: string, type?: string): string {
-  const scope = quotedScope(name, type);
+export function dataSourceSql(name?: string, { type }: { type?: string } = {}): string {
+  const scope = quotedScope(name, { type });
   if (!scope.type) scope.type = "'table','view'";
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
   sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
@@ -276,7 +277,10 @@ export function dataSourceSql(name?: string, type?: string): string {
 }
 
 /** @internal */
-export function quotedScope(name?: string, type?: string): { name?: string; type?: string } {
+export function quotedScope(
+  name?: string,
+  { type }: { type?: string } = {},
+): { name?: string; type?: string } {
   const resolvedType =
     type === "BASE TABLE"
       ? "'table'"

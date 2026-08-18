@@ -387,25 +387,34 @@ export class AmbiguousSourceReflectionForThroughAssociation extends ActiveRecord
   }
 }
 
+/**
+ * Mirrors: `ThroughNestedAssociationsAreReadonly` (associations/errors.rb:224-232)
+ * — built from the `(owner, reflection)` pair, deriving the message from
+ * `owner.class.name` and `reflection.name`, with the argument-less fallback.
+ */
 export class ThroughNestedAssociationsAreReadonly extends ActiveRecordError {
-  constructor(owner: string, association: string) {
-    super(
-      `Cannot modify association '${association}' on ${owner} because it goes through a nested through association.`,
-    );
+  constructor(owner?: object | null, reflection?: { name: string } | null) {
+    if (owner && reflection) {
+      super(
+        `Cannot modify association '${(owner.constructor as { name: string }).name}#${reflection.name}' because it goes through more than one other association.`,
+      );
+    } else {
+      super("Through nested associations are read-only.");
+    }
     this.name = "ThroughNestedAssociationsAreReadonly";
   }
 }
 
 export class HasManyThroughNestedAssociationsAreReadonly extends ThroughNestedAssociationsAreReadonly {
-  constructor(owner: string, association: string) {
-    super(owner, association);
+  constructor(owner?: object | null, reflection?: { name: string } | null) {
+    super(owner, reflection);
     this.name = "HasManyThroughNestedAssociationsAreReadonly";
   }
 }
 
 export class HasOneThroughNestedAssociationsAreReadonly extends ThroughNestedAssociationsAreReadonly {
-  constructor(owner: string, association: string) {
-    super(owner, association);
+  constructor(owner?: object | null, reflection?: { name: string } | null) {
+    super(owner, reflection);
     this.name = "HasOneThroughNestedAssociationsAreReadonly";
   }
 }

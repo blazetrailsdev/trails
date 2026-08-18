@@ -1,4 +1,8 @@
 import type { Base } from "../base.js";
+import {
+  HasManyThroughNestedAssociationsAreReadonly,
+  HasOneThroughNestedAssociationsAreReadonly,
+} from "./errors.js";
 
 /**
  * Shared module for through associations (has_many :through, has_one :through).
@@ -113,12 +117,14 @@ function ensureMutable(assoc: { owner: Base; reflection: any }): void {
 
 /** @internal */
 function ensureNotNested(assoc: { owner: Base; reflection: any }): void {
-  if (assoc.reflection.options.through) {
-    const throughRefl = (assoc.owner.constructor as any)._reflectOnAssociation?.(
-      assoc.reflection.options.through,
-    );
-    if (throughRefl?.options?.through) {
-      throw new Error(`Nested through associations are read-only.`);
+  const throughRefl = assoc.reflection.options.through
+    ? (assoc.owner.constructor as any)._reflectOnAssociation?.(assoc.reflection.options.through)
+    : null;
+  if (throughRefl?.options?.through) {
+    if ((assoc.reflection.macro ?? assoc.reflection.type) === "hasOne") {
+      throw new HasOneThroughNestedAssociationsAreReadonly(assoc.owner, assoc.reflection);
+    } else {
+      throw new HasManyThroughNestedAssociationsAreReadonly(assoc.owner, assoc.reflection);
     }
   }
 }
