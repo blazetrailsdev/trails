@@ -7,7 +7,7 @@ export class BooleanType extends ValueType<boolean> {
   // (activemodel/lib/active_model/type/boolean.rb:15-24). Rails' Symbol
   // variants carry their leading colon here, the trails spelling for a Ruby
   // Symbol value.
-  private static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
+  static readonly FALSE_VALUES: ReadonlySet<unknown> = new Set([
     false,
     0,
     0n, // safeIntegers mode returns bigint 0n for SQLite boolean columns

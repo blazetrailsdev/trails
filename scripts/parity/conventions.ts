@@ -1387,8 +1387,13 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *   - Bare predicates (`valid?`, `blank?`) return both forms with the
  *     isPrefixed form first (`valid?` → ["isValid", "valid"]).
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
- *     the native JS spelling as a final candidate
+ *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
+ *   - EVERY predicate additionally offers the `Q` suffix as its LAST
+ *     candidate (`active_connections?` → […, "activeConnectionsQ"]) — the
+ *     spelling trails uses when the bare camel name is already taken on the
+ *     same TS object and the quoted literal cannot be reached by dot
+ *     notation. Being last, it never moves an existing pairing.
  */
 export function rubyMethodToTs(
   name: string,
@@ -1435,6 +1440,21 @@ export function rubyMethodToTsIgnoringSkip(
     // moves.
     const collides = siblingRubyNames?.has(base) === true;
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
+    // `Q` — Ruby's own word for a `?` method is a *query* method, and `Q` is
+    // the one letter of `?` that a TS identifier may carry. It is offered as
+    // the LAST candidate for every predicate, so it only ever widens what
+    // counts and can never move an existing pairing (same contract as
+    // `CONTAINMENT_PREDICATE_ALIASES` below). It exists because the quoted
+    // literal `"debug?"` is only usable through bracket access — legal on an
+    // instance getter, unusable as a `static` called by name across the
+    // package (`Base.primaryClassQ()`), and unusable as a named `export` — and
+    // because `is*` is wrong for the many predicates whose bare camel name is
+    // already taken on the same TS object by an unrelated Rails member
+    // (`connection_class` reader next to `connection_class?`,
+    // `ActiveRecord.application_record_class` next to
+    // `application_record_class?`). Around 17 members ship this spelling
+    // today; the rule credits them rather than reading them as unported.
+    const query = camel + "Q";
     const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
@@ -1446,7 +1466,7 @@ export function rubyMethodToTsIgnoringSkip(
     // which camelizes to `isolationLevel` — is NOT swept into this
     // branch.
     if (base.startsWith("is_")) {
-      return [...literal, camel];
+      return [...literal, camel, query];
     }
     // Other already-predicate Ruby prefixes (has_one?, supports_x?,
     // can_y?, …) keep both candidates: the canonical camel form
@@ -1456,13 +1476,13 @@ export function rubyMethodToTsIgnoringSkip(
     // exposes `isHasOne()` as a predicate alongside the `Model.hasOne`
     // association declaration).
     if (ALREADY_PREDICATE_RE.test(camel)) {
-      return [...literal, camel, isPrefixed];
+      return [...literal, camel, isPrefixed, query];
     }
     const containment = CONTAINMENT_PREDICATE_ALIASES.get(name);
     if (containment !== undefined) {
-      return [...literal, isPrefixed, camel, containment];
+      return [...literal, isPrefixed, camel, containment, query];
     }
-    return [...literal, isPrefixed, camel];
+    return [...literal, isPrefixed, camel, query];
   }
 
   if (name.endsWith("!")) {
@@ -1579,10 +1599,10 @@ matches the first candidate present in the target file), not a call expression.
 
 | Ruby | TypeScript | Example |
 | ---- | ---------- | ------- |
-| \`predicate?\` (bare) | \`is*\` prefix, camel fallback | \`valid?\` → ${example("valid?")} |
-| \`is_*?\` | camel form only (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
-| ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
-| ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
+| \`predicate?\` (bare) | \`is*\` prefix, camel then \`Q\` fallback | \`valid?\` → ${example("valid?")} |
+| \`is_*?\` | camel form (no doubled \`isIs*\`), \`Q\` fallback | \`is_number?\` → ${example("is_number?")} |
+| ${predicatePrefixes} | camel form + \`is*\` / \`Q\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
+| ${containmentPredicates} | \`is*\` / camel / native JS spelling / \`Q\` | \`include?\` → ${example("include?")} |
 | \`name!\` (bang) | \`*Bang\` suffix | \`save!\` → ${example("save!")} |
 | \`name=\` (setter) | bare camel name, \`set*\` fallback | \`table_name=\` → ${example("table_name=")} |
 | \`initialize\` / \`new\` | \`constructor\` | \`initialize\` → ${example("initialize")} |
@@ -1595,7 +1615,14 @@ matches the first candidate present in the target file), not a call expression.
 Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
 (\`Logger#debug\` next to \`Logger#debug?\`) offers the QUOTED LITERAL spelling
 first — \`get "debug?"\` — because its camel candidate names the sibling, not the
-predicate. \`is_*?\` collapses to a single candidate so trails can't
+predicate. Every predicate also offers the \`Q\` suffix as its LAST candidate
+(\`active_connections?\` → \`activeConnectionsQ\`): \`Q\` is the query-method
+letter, and it is the spelling trails uses wherever the bare camel name is
+already taken on the same TS object by an unrelated Rails member
+(\`connection_class\` next to \`connection_class?\`) — cases where \`is*\` reads
+wrong and the quoted literal is unreachable by dot notation, as a \`static\` or
+as a named \`export\`. It is offered last, so it only widens what counts and
+never moves an existing pairing. \`is_*?\` collapses to a single camel candidate so trails can't
 land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
 \`is*\` fallback because the disambiguating alias is sometimes needed when the bare
 name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`

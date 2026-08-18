@@ -1,15 +1,15 @@
 /**
  * Access attribute values before type casting.
  *
- * The actual implementation lives on Model (from @blazetrails/activemodel)
- * as readAttributeBeforeTypeCast() and attributesBeforeTypeCast getter,
- * which read valueBeforeTypeCast from the AttributeSet.
+ * `read_attribute_before_type_cast` / `read_attribute_for_database` resolve the
+ * alias and hand off to the private `attribute_before_type_cast` /
+ * `attribute_for_database` readers at the bottom of this file, exactly as
+ * before_type_cast.rb:48-69 does.
  *
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast
  */
 
-interface BeforeTypeCastRecord {
-  readAttributeBeforeTypeCast(name: string): unknown;
+interface BeforeTypeCastRecord extends AttributeOwner {
   readonly attributesBeforeTypeCast: Record<string, unknown>;
 }
 
@@ -18,8 +18,13 @@ interface BeforeTypeCastRecord {
  *
  * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#read_attribute_before_type_cast
  */
-export function readAttributeBeforeTypeCast(record: BeforeTypeCastRecord, name: string): unknown {
-  return record.readAttributeBeforeTypeCast(name);
+export function readAttributeBeforeTypeCast(
+  record: BeforeTypeCastRecord,
+  attrName: string,
+): unknown {
+  const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
+
+  return attributeBeforeTypeCast.call(record, name);
 }
 
 /**
@@ -46,15 +51,8 @@ interface DatabaseRecord {
  */
 export function readAttributeForDatabase(record: DatabaseRecord, attrName: string): unknown {
   const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
-  const attr = record._attributes.getAttribute?.(name);
-  // `valueForDatabase` is a getter (Attribute), so read it as a property — the
-  // enum column serializes its label to the stored integer here (e.g. 2).
-  if (attr && "valueForDatabase" in attr) return attr.valueForDatabase;
-  // Fallback: use valuesForDatabase bulk method
-  if (record._attributes.valuesForDatabase) {
-    return record._attributes.valuesForDatabase()[name];
-  }
-  return record.readAttribute(name);
+
+  return attributeForDatabase.call(record as unknown as AttributeOwner, name);
 }
 
 /**
