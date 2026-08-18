@@ -10,15 +10,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "compute_cache_version",
-    "call": "first",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "relation.rb:472 reads `.first` off the fetched row; the port calls a `first(selectRows)` free function over the driver rows, threading the receiver as argument 1."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "compute_cache_version",
     "call": "to_fs",
     "kind": "args",
     "rubyArgs": [
