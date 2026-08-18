@@ -154,8 +154,15 @@ export class Request {
   #requestMethod?: string;
 
   constructor(env: RackEnv = {}) {
-    this.env = { ...env };
-    // Set defaults
+    // `Rack::Request::Env#initialize` (`rack/request.rb:47-49`) holds the env by
+    // reference, and Rails depends on that: every `set_header` in
+    // action_dispatch/http/** is a mutation the next middleware observes — e.g.
+    // HostAuthorization#mark_as_authorized (host_authorization.rb:167) writes
+    // through a throwaway Request into the env the downstream app receives.
+    this.env = env;
+    // Rails' request tests build their env through `Rack::MockRequest.env_for`,
+    // which supplies these; trails has no equivalent, so the constructor fills
+    // the same Rack minimums in.
     this.env["REQUEST_METHOD"] ??= "GET";
     this.env["SERVER_NAME"] ??= "localhost";
     this.env["SERVER_PORT"] ??= "80";
@@ -235,13 +242,13 @@ export class Request {
     return this.scheme === "https";
   }
 
+  /**
+   * Returns the host for this request, such as "example.com".
+   *
+   * Mirrors: `ActionDispatch::Http::URL#host` (`url.rb:228-230`).
+   */
   get host(): string {
-    const httpHost = this.env["HTTP_HOST"] as string | undefined;
-    if (httpHost) {
-      // Strip port from host if present
-      return httpHost.replace(/:\d+$/, "");
-    }
-    return (this.env["SERVER_NAME"] as string) || "localhost";
+    return this.rawHostWithPort.replace(/:\d+$/, "");
   }
 
   get rawHost(): string {
