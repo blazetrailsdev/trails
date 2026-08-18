@@ -6658,9 +6658,17 @@ export class Date {
    * `date_s__parse_internal` (`date_core.c:4481-4498`) {@link checkLimit}s the
    * string against the `limit:` kwarg first, so a string past the limit raises
    * `ArgumentError` before `date__parse` runs at all.
+   *
+   * `date__parse` then collapses every run of characters outside
+   * `[-+',./:@[:alnum:]\[\]]` to a single space before any sub-parser runs
+   * (`date_parse.c:2152-2165`), which is what makes
+   * `"Sat Aug 28 02:29:34 W.  Central  Africa  Standard  Time 2000"` answer the
+   * single-spaced zone, and what turns the NUL and CRLF of a folded rfc 2822
+   * header into separators.
    */
   static _parse(str: string, comp = true, opt?: ParseOpt): DateParts {
     checkLimit(str, opt);
+    str = str.replace(/[^-+',./:@\p{Alphabetic}\p{Nd}[\]]+/gu, " ");
     const hash: DateParts = {};
     str = parseDay(str, hash) ?? str;
     str = parseTime(str, hash) ?? str;
