@@ -241,7 +241,7 @@ describe("StaticTest", () => {
 
   it("non default static index", async () => {
     fs.writeFileSync(path.join(tmpDir, "default.html"), "<html>custom index</html>");
-    const mw = new Static(dynamicApp, tmpDir, { index: "default.html" });
+    const mw = new Static(dynamicApp, tmpDir, { index: "default" });
     const [status, _, body] = await mw.call({ PATH_INFO: "/", REQUEST_METHOD: "GET" });
     expect(status).toBe(200);
     expect(await bodyToString(body)).toContain("custom index");

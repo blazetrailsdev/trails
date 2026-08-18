@@ -43,9 +43,7 @@ export class DefaultMiddlewareStack {
 
   /**
    * Mirrors `DefaultMiddlewareStack#build_stack`
-   * (`application/default_middleware_stack.rb:11`). `ActionDispatch::Static`
-   * takes `path` positionally in Rails (`static.rb:21`); trails' `Static`
-   * takes it as the `root` option key (`middleware/static.ts:47`).
+   * (`application/default_middleware_stack.rb:11`).
    */
   buildStack(): MiddlewareStack {
     const stack = new MiddlewareStack();
@@ -65,8 +63,7 @@ export class DefaultMiddlewareStack {
 
     if (config.publicFileServer.enabled) {
       const headers = config.publicFileServer.headers ?? {};
-      stack.use(Static as never, {
-        root: this.paths.get("public")?.toAry()[0],
+      stack.use(Static as never, this.paths.get("public")?.toAry()[0], {
         index: config.publicFileServer.indexName,
         headers,
       });

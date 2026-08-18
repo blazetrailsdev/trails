@@ -41,11 +41,7 @@ export class Static {
   /** @internal */
   private fileHandler: FileHandler;
 
-  constructor(
-    app: RackApp,
-    path: string,
-    { index = "index.html", headers = {} }: StaticOptions = {},
-  ) {
+  constructor(app: RackApp, path: string, { index = "index", headers = {} }: StaticOptions = {}) {
     this.app = app;
     this.fileHandler = new FileHandler(path, { index, headers });
   }
@@ -69,7 +65,7 @@ export class FileHandler {
 
   constructor(root: string, options: FileHandlerOptions = {}) {
     this.root = getPath().resolve(root.replace(/\/$/, ""));
-    this.index = options.index ?? "index.html";
+    this.index = options.index ?? "index";
     this.headers = options.headers ?? {};
     const enabled: string[] = [];
     if (options.brotli !== false) enabled.push("br");
@@ -212,9 +208,7 @@ export class FileHandler {
         const defaultContentType = MIME_TYPES[defaultExt] ?? "text/plain";
         if (block(`${path}${defaultExt}`, defaultContentType)) return;
         const sep = path.endsWith("/") ? "" : "/";
-        const indexCt =
-          MIME_TYPES[getPath().extname(this.index).toLowerCase()] ?? defaultContentType;
-        if (block(`${path}${sep}${this.index}`, indexCt)) return;
+        if (block(`${path}${sep}${this.index}${defaultExt}`, defaultContentType)) return;
       }
     }
   }
