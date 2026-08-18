@@ -155,7 +155,7 @@ export class CollectionAssociation extends Association {
       this._writeTargetStore(records);
     } else {
       associationProxy(this.owner, this.reflection.name);
-      this.replaceOnTarget(records, true, { replace: true, inversing: true }) as Base | null;
+      void this.replaceOnTarget(records, true, { replace: true, inversing: true });
     }
   }
 
