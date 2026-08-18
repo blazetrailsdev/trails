@@ -10,7 +10,7 @@
       "ref:uuidNamespace",
       "ref:name"
     ],
-    "reason": "digest/uuid.rb:42 names the digest class `::Digest::MD5`; the port selects it by the string `\"md5\"` the Web Crypto/Node digest API takes."
+    "reason": "digest/uuid.rb:42 passes the digest CLASS `OpenSSL::Digest::MD5`. TypeScript has no such class to pass: the port's digest comes from Web Crypto / node:crypto, whose `createHash` selects the algorithm by its OpenSSL NAME, so the only value that exists at this call site is the string `\"md5\"`. `uuidFromHash` switches on it exactly where Rails switches on the class (uuid.rb:20-26)."
   },
   {
     "package": "activesupport",
@@ -23,6 +23,6 @@
       "ref:uuidNamespace",
       "ref:name"
     ],
-    "reason": "digest/uuid.rb:47 names the digest class `::Digest::SHA1`; the port selects it by the string `\"sha1\"` the Web Crypto/Node digest API takes."
+    "reason": "digest/uuid.rb:47 passes the digest CLASS `OpenSSL::Digest::SHA1`. TypeScript has no such class to pass: the port's digest comes from Web Crypto / node:crypto, whose `createHash` selects the algorithm by its OpenSSL NAME, so the only value that exists at this call site is the string `\"sha1\"`. `uuidFromHash` switches on it exactly where Rails switches on the class (uuid.rb:20-26)."
   }
 ]

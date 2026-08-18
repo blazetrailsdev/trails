@@ -65,6 +65,12 @@ const HOST_PARAM_TYPES = new Set([
   "Time",
   "DateTime",
   "DateOrTime",
+  // Local import aliases the core_ext ports use for the date gem's classes
+  // (`import { Time as RubyTime }`) — the same receivers under the spelling the
+  // importing file declares.
+  "RubyTime",
+  "RubyDate",
+  "RubyDateTime",
   "Numeric",
   "Duration",
   "PlainDate",

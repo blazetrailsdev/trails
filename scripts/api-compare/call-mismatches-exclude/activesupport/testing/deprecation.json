@@ -8,6 +8,6 @@
     "rubyArgs": [
       "ref:escape"
     ],
-    "reason": "testing/deprecation.rb:30 builds the matcher from `escape`; the port's `new` at this site constructs the \"No deprecator given\" error the same guard raises."
+    "reason": "testing/deprecation.rb:34 is `raise ArgumentError, \"No deprecator given\"` — Ruby's `raise` CONSTRUCTS the error from the class and message, emitting no `new` of its own. JavaScript has no such form: `throw new ArgumentError(\"No deprecator given\")` is the only spelling, so the port carries one `new` site more than the Ruby body and the pairing lands on it rather than on the `new RegExp(...)` that mirrors `Regexp.new` (deprecation.rb:40)."
   }
 ]

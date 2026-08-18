@@ -36,7 +36,7 @@
     "rubyArgs": [
       "ref:dup"
     ],
-    "reason": "rack multipart/parser.rb:49 builds the buffer from `dup`; the port seeds it with the empty string."
+    "reason": "multipart/parser.rb:209 is `StringScanner.new(\"\".dup)` — the `dup` exists only to hand the scanner an UNFROZEN copy of the frozen string literal (the file is `# frozen_string_literal: true`). JS strings are immutable and have no frozen/unfrozen distinction, so there is no `dup` to call and `new SBuf(\"\")` is the same value."
   },
   {
     "package": "rack",
@@ -59,7 +59,7 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+    "reason": "multipart/parser.rb:161 is `body = String.new` — the empty body of a BufferPart, built before `klass.new(body, head, filename, content_type, name)` at parser.rb:164. The port has one `Part` class instead of MimePart/BufferPart/TempfilePart and constructs it up-front with an empty body (parser.ts:197), so the argumentless `String.new` pairs against that construction. Converging is the Collector class hierarchy, tracked by story `converge-rack-multipart-collector-mimepart-hierarchy` (RFC 0106)."
   },
   {
     "package": "rack",

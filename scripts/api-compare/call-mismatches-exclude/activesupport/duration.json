@@ -52,6 +52,6 @@
       "kwargs{seconds=ref:value}",
       "bool:false"
     ],
-    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`; the port drops the leading raw value and passes ({ seconds: n }, false) — Duration carries its value off the parts."
+    "reason": "duration.rb:155 is `new(value, { seconds: value }, false)`: Rails' Duration constructor carries the total seconds in its own seat (`initialize(value, parts, variable)`, duration.rb:280). trails' constructor is `(parts, variable)` and derives the total from the parts, so no factory can pass the leading value. Converging is the ctor seat itself, tracked by story `converge-duration-constructor-value-seat` (RFC 0106)."
   }
 ]
