@@ -13,12 +13,6 @@ import { constantize } from "./inflector.js";
  * Usage:
  *   delegate(MyClass.prototype, "street", "city", { to: "place" });
  *   delegate(MyClass.prototype, "name", { to: "place", prefix: true });
- *
- * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
- * into the generated definition (module/delegation.rb:160-165) so an error raised inside it points at the
- * declaring line rather than at the framework file. trails generates real JS functions,
- * which carry a real stack, and there is no `module_eval` file/line to attribute.
- * Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations.
  */
 export function delegate(
   target: object,
@@ -225,12 +219,6 @@ export const cattrWriter = mattrWriter;
  * guard (attribute_accessors.rb:135) sees the value the reader already stored;
  * trails drops `default` before the writer call instead, which is the same
  * no-op reached without evaluating a function-valued default a second time.
- *
- * @missingRailsCall caller_locations — Rails passes `location: caller_locations(1, 1).first`
- * into the generated definition (module/attribute_accessors.rb:208-211) so an error raised inside it points at the
- * declaring line rather than at the framework file. trails generates real JS functions,
- * which carry a real stack, and there is no `module_eval` file/line to attribute.
- * Converging is story 0023-surfaced-deviations/converge-module-ext-generated-method-locations.
  */
 export function mattrAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
   const options = popMattrOptions(namesAndOptions);

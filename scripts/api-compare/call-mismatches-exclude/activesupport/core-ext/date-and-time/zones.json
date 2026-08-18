@@ -17,14 +17,5 @@
       "ref:timeZone"
     ],
     "reason": "core_ext/date_and_time/zones.rb:20 calls `time_with_zone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/zones.ts",
-    "rubyName": "in_time_zone",
-    "call": "to_time",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/zones.rb:20 calls `to_time` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
   }
 ]

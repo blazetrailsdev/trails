@@ -2,73 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "active_support_local_zone",
-    "call": "new",
-    "reason": "Ruby core Time.new to read the system zone (core_ext/time/compatibility.rb:32-40), not a ported trails constructor."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "integer?",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/time/calculations.rb:123 calls `integer?` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "local",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:newSec",
-      "ref:newMin",
-      "ref:newHour",
-      "ref:newDay",
-      "ref:newMonth",
-      "ref:newYear",
-      "nil",
-      "nil",
-      "ref:isdst",
-      "nil"
-    ],
-    "reason": "time/calculations.rb:123-155 calls `::Time.local(sec, min, hour, day, month, year, nil, nil, isdst, nil)`; the port passes only the six date/time components, the trailing four having no Temporal analogue."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:newYear",
-      "ref:newMonth",
-      "ref:newDay",
-      "ref:newHour",
-      "ref:newMin",
-      "ref:newSec",
-      "ref:zone"
-    ],
-    "reason": "time/calculations.rb:123-155 builds the changed value with `::Time.new(year, month, day, hour, min, sec, zone)`; the port's `new` at this site constructs the ArgumentError Ruby raises from the same guard."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "utc?",
-    "reason": "Ruby core Time#utc? read off the receiver (core_ext/time/calculations.rb:123-155), not a ported trails method — Temporal carries the zone on the value."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "change",
-    "call": "utc_offset",
-    "reason": "Ruby core Time#utc_offset read off the receiver (core_ext/time/calculations.rb:123-155), not a ported trails method — Temporal carries the offset on the value."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "preserve_timezone",
     "call": "system_local_time?",
     "kind": "args",
@@ -78,67 +11,11 @@
   {
     "package": "activesupport",
     "tsFile": "time-ext.ts",
-    "rubyName": "sec_fraction",
-    "call": "subsec",
-    "reason": "Ruby core Time#subsec on the receiver (core_ext/time/calculations.rb:107-109), not a ported trails method — the port reads Temporal's sub-second fields."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "since",
-    "call": "to_datetime",
-    "reason": "Ruby core Time#to_datetime in the TypeError rescue arm (core_ext/time/calculations.rb:225-233); TS has no TypeError arm to enter."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "since",
-    "call": "warn",
-    "reason": "ActiveSupport.deprecator.warn in the same TypeError rescue arm (core_ext/time/calculations.rb:228-232), unreachable in the port."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "day",
-    "reason": "Ruby core Date#day read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "getlocal",
-    "reason": "Ruby core Time#getlocal on the receiver (core_ext/time/compatibility.rb:13-15), not a ported trails method — the port reads the zone off the Temporal value."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "month",
-    "reason": "Ruby core Date#month read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
     "rubyName": "to_time",
     "call": "preserve_timezone",
     "kind": "args",
     "rubyArgs": [],
     "reason": "core_ext/date_time/compatibility.rb:15 calls `preserve_timezone` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "utc_offset",
-    "reason": "Ruby core Time#utc_offset read off the receiver (core_ext/date_time/compatibility.rb:15-17), not a ported trails method — Temporal carries the offset on the value."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "time-ext.ts",
-    "rubyName": "to_time",
-    "call": "year",
-    "reason": "Ruby core Date#year read off the receiver (core_ext/date/conversions.rb:83-85), not a ported trails method."
   },
   {
     "package": "activesupport",

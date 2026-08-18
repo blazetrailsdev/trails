@@ -19,12 +19,5 @@
     "rubyName": "remove_sql_header_comments",
     "call": "open",
     "reason": "Verified per-site (RFC 0106): `Tempfile.open(\"uncommented_structure.sql\")` (`postgresql_database_tasks.rb:132`) — the fs port has no Tempfile analogue, so the body makes a temp dir with `mkdtempSync` and writes into it. `open` has no TS call spelling here."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "open",
-    "reason": "Verified per-site (RFC 0106): `File.open(filename, \"a\") { |f| f << ... }` (`postgresql_database_tasks.rb:77`) — the fs port spells an append `appendFileSync`, with no open-file handle to model the block form."
   }
 ]

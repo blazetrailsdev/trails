@@ -2,27 +2,6 @@
   {
     "package": "activesupport",
     "tsFile": "hash-utils.ts",
-    "rubyName": "_deep_transform_keys_in_object",
-    "call": "new",
-    "reason": "Ruby's `self.class.new` builds the empty accumulator of the receiver's Hash subclass; a plain JS object literal `{}` is that accumulator and there is no constructor to call."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "compact_blank",
-    "call": "reject",
-    "reason": "`Hash#reject` (core_ext/enumerable.rb:222-224) is Ruby's Enumerable primitive returning a new Hash without the matching pairs. JS objects have no `reject`, so the port builds the result with the `Object.keys` loop every other member of this file uses."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "compact_blank!",
-    "call": "delete_if",
-    "reason": "`Hash#delete_if` (core_ext/enumerable.rb:232-235) is Ruby's in-place Enumerable primitive — Rails picks it over `reject!` precisely because it always returns self. JS objects have neither, so the port deletes the blank keys directly and returns the receiver, which is the behaviour `delete_if` is there for."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
     "rubyName": "deep_stringify_keys",
     "call": "deep_transform_keys",
     "kind": "args",
@@ -46,27 +25,6 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "Ruby receiver becomes the first TS argument: the method is a Ruby instance method on a core class, ported as a standalone function (or a JS built-in) whose leading parameter is `self`."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "except!",
-    "call": "delete",
-    "reason": "Ruby's `Hash#delete(key)` is a method call; JS's key removal is the `delete obj[key]` operator, which is the same operation with no callee to record."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "extract_options!",
-    "call": "last",
-    "reason": "`last` is Ruby's Array#last; `args[args.length - 1]` is an index expression, not a call node, so the read has no call to match."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "hash-utils.ts",
-    "rubyName": "reverse_merge!",
-    "call": "replace",
-    "reason": "Ruby's `Hash#replace` swaps a hash's contents in place; JS objects have no such method, so the port clears the own keys and `Object.assign`s the merged result — the same in-place replacement."
   },
   {
     "package": "activesupport",

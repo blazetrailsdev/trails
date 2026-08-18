@@ -301,6 +301,55 @@ describe("Ruby extractor inert-receiver call suppression", () => {
     expect(c["Baz#c"].weakCalls ?? []).not.toContain("save");
   });
 
+  it("drops a Ruby core method call in a core_ext body but keeps a ported one", () => {
+    const c = rubyWeakCalls({
+      "lib/active_support/core_ext/array/access.rb": `
+        class Array
+          def sole
+            case count
+            when 1 then return first
+            end
+            in_groups_of(2)
+          end
+        end
+      `,
+    });
+    // `count`/`first` are Ruby core on the reopened receiver; `in_groups_of` is
+    // an ActiveSupport extension the port really does have to call.
+    expect(c["Array#sole"].weakCalls?.sort()).toEqual(["count", "first"]);
+    expect(c["Array#sole"].calls).toContain("in_groups_of");
+  });
+
+  it("keeps a Ruby core method name significant outside core_ext", () => {
+    const c = rubyWeakCalls({
+      "lib/active_record/relation.rb": `
+        class Relation
+          def sole
+            count
+            first
+          end
+        end
+      `,
+    });
+    expect(c["Relation#sole"].weakCalls ?? []).toEqual([]);
+  });
+
+  it("drops a call on a Ruby core class constant receiver", () => {
+    const c = rubyWeakCalls({
+      "lib/active_support/file_utils.rb": `
+        class Writer
+          def write(path)
+            File.stat(path)
+            Module.new
+            Baz.stat(path)
+          end
+        end
+      `,
+    });
+    expect(c["Writer#write"].weakCalls?.sort()).toEqual(["new"]);
+    expect(c["Writer#write"].calls).toContain("stat");
+  });
+
   it("drops new at a Proc receiver while keeping it at a constant receiver", () => {
     const c = rubyWeakCalls({
       "qux.rb": `

@@ -31,15 +31,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "beginning_of_quarter",
-    "call": "month",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:139 calls `month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "beginning_of_week",
     "call": "acts_like?",
     "kind": "args",
@@ -82,33 +73,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "copy_time_to",
-    "call": "hour",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:370 calls `hour` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "copy_time_to",
-    "call": "min",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:370 calls `min` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "copy_time_to",
-    "call": "sec",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:370 calls `sec` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "days_since",
     "call": "advance",
     "kind": "args",
@@ -120,89 +84,11 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "days_span",
-    "call": "fetch",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:beginningOfWeek"
-    ],
-    "reason": "core_ext/date_and_time/calculations.rb:366 calls `fetch` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "days_span",
-    "call": "fetch",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:day"
-    ],
-    "reason": "core_ext/date_and_time/calculations.rb:366 calls `fetch` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "days_to_week_start",
-    "call": "fetch",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:startDay"
-    ],
-    "reason": "core_ext/date_and_time/calculations.rb:258 calls `fetch` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "days_to_week_start",
-    "call": "wday",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:258 calls `wday` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "end_of_month",
-    "call": "day",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:296 calls `day` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "end_of_month",
-    "call": "month",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:296 calls `month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "end_of_month",
-    "call": "year",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:296 calls `year` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "end_of_quarter",
     "call": "end_of_month",
     "kind": "args",
     "rubyArgs": [],
     "reason": "core_ext/date_and_time/calculations.rb:154 calls `end_of_month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "end_of_quarter",
-    "call": "month",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:154 calls `month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
   },
   {
     "package": "activesupport",
@@ -260,26 +146,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "next_occurring",
-    "call": "fetch",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:dayOfWeek"
-    ],
-    "reason": "core_ext/date_and_time/calculations.rb:340 calls `fetch` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "next_occurring",
-    "call": "wday",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:340 calls `wday` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "next_week",
     "call": "beginning_of_week",
     "kind": "args",
@@ -307,53 +173,6 @@
       "ref:daysSpan"
     ],
     "reason": "core_ext/date_and_time/calculations.rb:200 calls `days_since` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "next_weekday",
-    "call": "next_day",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:206 calls `next_day` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "on_weekday?",
-    "call": "wday",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:62 calls `wday` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "on_weekend?",
-    "call": "wday",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:57 calls `wday` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "prev_occurring",
-    "call": "fetch",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:dayOfWeek"
-    ],
-    "reason": "core_ext/date_and_time/calculations.rb:351 calls `fetch` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "prev_occurring",
-    "call": "wday",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:351 calls `wday` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
   },
   {
     "package": "activesupport",
@@ -400,33 +219,6 @@
   {
     "package": "activesupport",
     "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "prev_weekday",
-    "call": "prev_day",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:230 calls `prev_day` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "quarter",
-    "call": "month",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:166 calls `month` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "today?",
-    "call": "to_date",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:30 calls `to_date` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
     "rubyName": "tomorrow",
     "call": "advance",
     "kind": "args",
@@ -434,15 +226,6 @@
       "kwargs{days=num:1}"
     ],
     "reason": "core_ext/date_and_time/calculations.rb:25 calls `advance` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "tomorrow?",
-    "call": "to_date",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:35 calls `to_date` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
   },
   {
     "package": "activesupport",
@@ -474,15 +257,6 @@
       "kwargs{years=ref:years}"
     ],
     "reason": "core_ext/date_and_time/calculations.rb:112 calls `advance` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "core-ext/date-and-time/calculations.ts",
-    "rubyName": "yesterday?",
-    "call": "to_date",
-    "kind": "args",
-    "rubyArgs": [],
-    "reason": "core_ext/date_and_time/calculations.rb:41 calls `to_date` on implicit self; DateAndTime::Calculations is a module mixed into Date/Time/DateTime, receivers TS cannot monkey-patch, so the port is a free function taking the receiver as argument 1."
   },
   {
     "package": "activesupport",

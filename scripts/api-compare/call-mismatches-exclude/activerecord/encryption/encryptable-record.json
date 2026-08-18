@@ -51,13 +51,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "override_accessors_to_preserve_original",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "preserve_original_encrypted",
     "call": "encrypts",
     "reason": "Rails' bare `encrypts original_attribute_name` is realized via `encryptAttribute(originalName, {}, buildScheme({}))` so the original_<name> scheme reuses buildScheme's legacy-encryptor shim + defaultEncryptor fallback; the declaration still happens, just not through the public `encrypts` entry."
