@@ -16,6 +16,7 @@ import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Firm } from "./test-helpers/models/company.js";
+import { Contract } from "./test-helpers/models/contract.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -67,6 +68,11 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   registerModel(Ship);
   registerModel(Project);
   registerModel(Firm);
+  // Firm inherits `has_many :developers, through: :contracts`, and
+  // `automatic_inverse_of` (reflection.rb:758-780) resolves that through
+  // reflection while inverting `Developer#firm`. Rails autoloads Contract at
+  // that moment; trails needs it registered.
+  registerModel(Contract);
   registerModel([Author, Post, Comment, Member, Membership, CurrentMembership, Club]);
 
   const optionsFor = (name: string) =>

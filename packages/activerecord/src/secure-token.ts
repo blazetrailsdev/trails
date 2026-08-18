@@ -78,6 +78,11 @@ export function hasSecureToken(
       });
     }
   };
+  // ActiveSupport::Callbacks' `setCallback(target, name, type, filter)` cannot
+  // stand in for the Ruby `set_callback` here: AR's callbacks in trails are
+  // registered on their own per-prototype registry (`callbacks.ts`
+  // `registerCallback`), not on an ActiveSupport `CallbackChain`, so there is no
+  // chain named "create"/"initialize" for it to reach.
   if (options?.on === "initialize") {
     this.afterInitialize(generateIfBlank);
   } else {

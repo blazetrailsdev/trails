@@ -1601,21 +1601,6 @@ export class ThroughReflection extends AbstractReflection {
     return this.options.through as string;
   }
 
-  get source(): string {
-    if (this.options.source) return this.options.source as string;
-    const throughRef = this.throughReflection;
-    if (throughRef) {
-      try {
-        const singular = singularize(this.nameString);
-        if (throughRef.klass._reflectOnAssociation(singular)) return singular;
-        if (throughRef.klass._reflectOnAssociation(this.name)) return this.name;
-      } catch {
-        /* klass resolution may fail */
-      }
-    }
-    return this._delegate.isCollection() ? singularize(this.nameString) : this.name;
-  }
-
   /**
    * Mirrors: `source_reflection` (reflection.rb:1010-1014) — computed on every
    * read, never memoized.
@@ -1625,11 +1610,7 @@ export class ThroughReflection extends AbstractReflection {
     if (!srcName) return null;
     const throughRef = this.throughReflection;
     if (!throughRef) return null;
-    try {
-      return throughRef.klass._reflectOnAssociation(srcName) ?? null;
-    } catch {
-      return null;
-    }
+    return throughRef.klass._reflectOnAssociation(srcName) ?? null;
   }
 
   /** Mirrors: `through_reflection` (reflection.rb:1028-1030) — not memoized. */
@@ -1768,7 +1749,9 @@ export class ThroughReflection extends AbstractReflection {
    * Mirrors: `source_reflection_name` (reflection.rb:1112-1130). The Ruby memo
    * is `@source_reflection_name ||=`, so a run that finds no name writes
    * nothing and the next read tries again — which is what makes a name resolved
-   * against a still-incomplete model registry recoverable.
+   * against a still-incomplete model registry recoverable. Rails has no rescue
+   * here: a NameError out of `through_reflection.klass` propagates naming the
+   * missing model, rather than resurfacing later as a missing source association.
    */
   sourceReflectionName(): string | null {
     if (this._sourceReflectionNameCache) return this._sourceReflectionNameCache;
@@ -1781,23 +1764,18 @@ export class ThroughReflection extends AbstractReflection {
     const throughRef = this.throughReflection;
     if (!throughRef) return null;
 
-    try {
-      const singular = singularize(this.nameString);
-      const candidates = [...new Set([singular, this.name])];
-      const matching = candidates.filter((n) => throughRef.klass._reflectOnAssociation(n) != null);
+    const singular = singularize(this.nameString);
+    let names = [...new Set([singular, this.name])];
+    names = names.filter((n) => throughRef.klass._reflectOnAssociation(n) != null);
 
-      if (matching.length > 1) {
-        throw new AmbiguousSourceReflectionForThroughAssociation(
-          this.activeRecord.name,
-          this.name,
-          this.sourceReflectionNames(),
-        );
-      }
-      this._sourceReflectionNameCache = matching[0] ?? null;
-    } catch (e: unknown) {
-      if (e instanceof AmbiguousSourceReflectionForThroughAssociation) throw e;
-      this._sourceReflectionNameCache = null;
+    if (names.length > 1) {
+      throw new AmbiguousSourceReflectionForThroughAssociation(
+        this.activeRecord.name,
+        this.name,
+        this.sourceReflectionNames(),
+      );
     }
+    this._sourceReflectionNameCache = names[0] ?? null;
     return this._sourceReflectionNameCache ?? null;
   }
 

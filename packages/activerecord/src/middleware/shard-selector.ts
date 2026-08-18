@@ -64,7 +64,10 @@ export class ShardSelector {
 
   private async setShard<T>(shard: string, block: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ shard }, () =>
-      Base.prohibitShardSwapping(() => block(), this.options.lock ?? true),
+      // `options.fetch(:lock, true)` (shard_selector.rb:66) returns the STORED
+      // value whenever the key is present — including an explicit nil — so the
+      // stored-key test is spelled out rather than written as `?? true`.
+      Base.prohibitShardSwapping(() => block(), "lock" in this.options ? this.options.lock : true),
     ) as Promise<T>;
   }
 }

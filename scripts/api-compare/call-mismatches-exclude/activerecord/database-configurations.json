@@ -2,30 +2,9 @@
   {
     "package": "activerecord",
     "tsFile": "database-configurations.ts",
-    "rubyName": "build_configs",
-    "call": "build_db_config_from_raw_config",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
-    "rubyName": "build_configs",
-    "call": "walk_configs",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
     "rubyName": "build_db_config_from_string",
     "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
-    "rubyName": "configs_for",
-    "call": "env_with_configs",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `URI.parse(url)` (`database_configurations.rb:255`) — the body only needs the scheme, and Ruby's `URI.parse` raises on what `new URL()` accepts (and vice versa), so the scheme test is a regex. `parse` has no TS call spelling here."
   },
   {
     "package": "activerecord",
@@ -33,19 +12,5 @@
     "rubyName": "default_env",
     "call": "call",
     "reason": "Verified per-site (RFC 0106): `ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s` (`database_configurations.rb:189`) — `DEFAULT_ENV` is an unported Proc constant, so there is no receiver to send `call` to; porting it is filed as `port-connection-handling-default-env-proc`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
-    "rubyName": "initialize",
-    "call": "build_configs",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations.ts",
-    "rubyName": "resolve",
-    "call": "build_db_config_from_raw_config",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

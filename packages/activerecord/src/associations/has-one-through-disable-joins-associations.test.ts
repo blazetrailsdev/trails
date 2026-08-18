@@ -27,6 +27,7 @@ import {
   SelectedMembership,
   TenantMembership,
 } from "../test-helpers/models/membership.js";
+import { Contract } from "../test-helpers/models/contract.js";
 import { fixtures } from "../test-fixtures.js";
 
 registerModel(Member);
@@ -39,6 +40,10 @@ registerModel(CurrentMembership);
 registerModel(SuperMembership);
 registerModel(SelectedMembership);
 registerModel(TenantMembership);
+// `Company` declares `has_many :developers, through: :contracts`, whose through
+// reflection resolves Contract during automatic-inverse resolution
+// (reflection.rb:758-780). Rails autoloads it there; trails needs it registered.
+registerModel(Contract);
 registerModel(Company);
 registerModel(Firm);
 registerModel(DependentFirm);

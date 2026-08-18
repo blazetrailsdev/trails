@@ -21,12 +21,28 @@ export class UrlConfig extends HashConfig {
     super(envName, name, configuration);
 
     this.url = url;
-    // `url_config.rb:43` — `@configuration_hash = @configuration_hash.merge(build_url_hash)`.
-    // The base class freezes its hash, so the merge goes through the internal
-    // writer rather than assigning the (readonly) accessor.
-    const urlHash = this.buildUrlHash();
-    normalizeUrlHash(urlHash);
-    _setConfigurationHash(this, { ...this.configurationHash, ...urlHash });
+    // `@configuration_hash = @configuration_hash.merge(build_url_hash)`
+    // (url_config.rb:43) — a non-mutating Hash merge is an object spread in TS,
+    // and the base class freezes its hash, so the result goes through the
+    // internal writer rather than assigning the (readonly) accessor.
+    const configurationHash: Record<string, unknown> = {
+      ...this.configurationHash,
+      ...this.buildUrlHash(),
+    };
+    camelizeUrlKeys(configurationHash);
+
+    if (configurationHash.schemaDump === "false") {
+      configurationHash.schemaDump = false;
+    }
+
+    if (configurationHash.queryCache === "false") {
+      configurationHash.queryCache = false;
+    }
+
+    toBooleanBang(configurationHash, "replica");
+    toBooleanBang(configurationHash, "databaseTasks");
+
+    _setConfigurationHash(this, configurationHash as DatabaseConfigOptions);
   }
 
   // Mirrors: UrlConfig#build_url_hash
@@ -101,28 +117,20 @@ function databaseFromUrl(url: string): string | undefined {
   }
 }
 
-// Mirrors: UrlConfig#initialize coercions — rename snake_case URL params to
-// camelCase and coerce string booleans, matching Rails' post-merge fixups.
-function normalizeUrlHash(hash: Record<string, unknown>): void {
-  if ("schema_dump" in hash) {
-    hash.schemaDump = hash.schema_dump === "false" ? false : hash.schema_dump;
-    delete hash.schema_dump;
-  } else if (hash.schemaDump === "false") {
-    hash.schemaDump = false;
-  }
-  if ("query_cache" in hash) {
-    hash.queryCache = hash.query_cache === "false" ? false : hash.query_cache;
-    delete hash.query_cache;
-  } else if (hash.queryCache === "false") {
-    hash.queryCache = false;
-  }
-  if ("database_tasks" in hash) {
-    const raw = hash.database_tasks;
-    hash.databaseTasks = typeof raw === "string" ? raw !== "false" : raw;
-    delete hash.database_tasks;
-  }
-  if (typeof hash.replica === "string") {
-    hash.replica = hash.replica !== "false";
+// A URL query string carries the Ruby key spelling verbatim
+// (`?schema_dump=false`), so the config keys it produces are renamed to the
+// camelCase spellings `url_config.rb:45-56` reads before Rails' own coercions
+// run. Rails has no counterpart: its keys are already symbols.
+function camelizeUrlKeys(hash: Record<string, unknown>): void {
+  for (const [snake, camel] of [
+    ["schema_dump", "schemaDump"],
+    ["query_cache", "queryCache"],
+    ["database_tasks", "databaseTasks"],
+  ] as const) {
+    if (snake in hash) {
+      hash[camel] = hash[snake];
+      delete hash[snake];
+    }
   }
 }
 

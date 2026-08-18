@@ -36,7 +36,7 @@ import { Room } from "../test-helpers/models/room.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
-import { SpecialContract } from "../test-helpers/models/contract.js";
+import { Contract, SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
@@ -118,6 +118,9 @@ describe("AutomaticInverseFindingTests", () => {
       Room,
       Company,
       SpecialContract,
+      // Company#developers is `through: :contracts`; automatic-inverse
+      // resolution reaches Contract, which Rails autoloads.
+      Contract,
       Book,
       Subscription,
       Subscriber,

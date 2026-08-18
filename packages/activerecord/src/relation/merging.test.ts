@@ -20,8 +20,13 @@ import { Post, PostThatLoadsCommentsInAnAfterSaveHook } from "../test-helpers/mo
 import { Rating } from "../test-helpers/models/rating.js";
 import { Computer } from "../test-helpers/models/computer.js";
 import { Project } from "../test-helpers/models/project.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 
+// `Post` declares `has_many :categories, through: :categorizations`, whose
+// through reflection resolves Categorization during automatic-inverse /
+// class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel([
+  Categorization,
   Author,
   Developer,
   Comment,

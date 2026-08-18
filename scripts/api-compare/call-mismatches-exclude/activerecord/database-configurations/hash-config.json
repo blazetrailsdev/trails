@@ -11,14 +11,7 @@
     "tsFile": "database-configurations/hash-config.ts",
     "rubyName": "primary?",
     "call": "configurations",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "database-configurations/hash-config.ts",
-    "rubyName": "schema_dump",
-    "call": "schema_file_type",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `Base.configurations.primary?(name)` (`hash_config.rb:130`) — `hash-config.ts` cannot import `base.js` (base → database-configurations → hash-config is a module-eval cycle), so the current `DatabaseConfigurations` reaches this file through the `_setPrimaryChecker` late-binding hook installed at the bottom of `database-configurations.ts`."
   },
   {
     "package": "activerecord",

@@ -122,19 +122,19 @@ export class ConnectionUrlResolver {
 
   /** @internal */
   private queryHash(): Record<string, string> {
-    if (!this._query) return {};
-    const result: Record<string, string> = {};
-    for (const pair of this._query.split("&")) {
-      const eqIdx = pair.indexOf("=");
-      if (eqIdx === -1) {
-        if (pair) result[pair] = "";
-      } else {
-        const k = pair.slice(0, eqIdx);
-        const v = pair.slice(eqIdx + 1);
-        if (k) result[k] = v;
-      }
-    }
-    return result;
+    // `Hash[(@query || "").split("&").map { |pair| pair.split("=", 2) }]`
+    // (connection_url_resolver.rb:61). Ruby's two-argument `String#split` keeps
+    // the remainder in the last field, where JS' `split("=", 2)` discards it, so
+    // the pair split is spelled with `indexOf`.
+    return Object.fromEntries(
+      (this._query ?? "")
+        .split("&")
+        .map((pair): [string, string] => {
+          const eqIdx = pair.indexOf("=");
+          return eqIdx === -1 ? [pair, ""] : [pair.slice(0, eqIdx), pair.slice(eqIdx + 1)];
+        })
+        .filter(([key]) => key !== ""),
+    );
   }
 
   /** @internal */

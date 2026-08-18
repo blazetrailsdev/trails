@@ -217,7 +217,6 @@ describe("ReflectionTest", () => {
       NilThroughOwner,
     ) as ThroughReflection;
     expect(through.sourceReflectionNames()).toEqual(["", null]);
-    expect(() => through.source).not.toThrow();
   });
 
   it("plural_name honors pluralize_table_names", () => {
@@ -262,5 +261,27 @@ describe("ReflectionTest", () => {
     } finally {
       restoreEncryptionConfig(configSnapshot);
     }
+  });
+
+  it("source_reflection_name lets a missing model class NameError propagate", () => {
+    // reflection.rb:1112-1130 has no rescue: `through_reflection.klass` raising
+    // NameError for an unregistered model propagates naming that model. trails
+    // used to swallow every error here and memoize a nil source name, which
+    // resurfaced from check_validity! as
+    // HasManyThroughSourceAssociationNotFoundError — an error naming the wrong
+    // cause.
+    class NeMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("neMemberships", {});
+        this.hasMany("neClubs", { through: "neMemberships" });
+      }
+    }
+    registerModel("NeMember", NeMember);
+
+    const ref = reflectOnAssociation(NeMember, "neClubs") as ThroughReflection;
+    expect(() => ref.sourceReflectionName()).toThrow(
+      "Missing model class NeMembership for the NeMember#neMemberships association.",
+    );
   });
 });

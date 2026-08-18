@@ -14,9 +14,14 @@ import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Customer } from "../test-helpers/models/customer.js";
 import { Company } from "../test-helpers/models/company.js";
+import { Categorization } from "../test-helpers/models/categorization.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
+// `Post` declares `has_many :categories, through: :categorizations`, whose
+// through reflection resolves Categorization during automatic-inverse /
+// class-name derivation. Rails autoloads it there; trails needs it registered.
 registerModel(Post);
+registerModel(Categorization);
 registerModel(Author);
 registerModel(Comment);
 

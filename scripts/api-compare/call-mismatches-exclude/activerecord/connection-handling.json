@@ -11,6 +11,6 @@
     "tsFile": "connection-handling.ts",
     "rubyName": "establish_connection",
     "call": "connection_handler",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Verified per-site (RFC 0106): `connection_handler.establish_connection(...)` (`connection_handling.rb:53`) — the TS `establishConnection` resolves the adapter class asynchronously first and makes the handler call from the helper it delegates to, so the call is outside the method the comparator scopes to."
   }
 ]

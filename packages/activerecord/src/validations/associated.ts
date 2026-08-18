@@ -9,6 +9,7 @@
  *   }
  */
 import { EachValidator } from "@blazetrails/activemodel";
+import { kernelArray } from "@blazetrails/activesupport";
 
 /**
  * Registers an AssociatedValidator for the named associations, delegating
@@ -32,20 +33,23 @@ export function validatesAssociated(
 export class AssociatedValidator extends EachValidator {
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
-    const values = Array.isArray(value) ? value : value != null ? [value] : [];
+    const values = kernelArray(value);
 
-    // Rails `Array(value).reject { |r| valid_object?(r, context) }`
-    // (associated.rb:6-10) runs sequentially: `valid?` clears errors and
-    // swaps the validation context around each run, so concurrent validation
-    // would race on a repeated/shared associated record and reorder
-    // callbacks. Await each in order to preserve that observable behavior.
+    // Rails `Array(value).reject { |r| valid_object?(r, context) }.any?`
+    // (associated.rb:9) runs sequentially: `valid?` clears errors and swaps
+    // the validation context around each run, so concurrent validation would
+    // race on a repeated/shared associated record and reorder callbacks.
+    // `valid_object?` is async in trails (RFC 0063), and neither `reject` nor
+    // `any?` has an async-predicate spelling in JS, so the `reject`/`any?`
+    // pair is an ordered loop over the same predicate.
     let anyInvalid = false;
     for (const association of values) {
       if (!(await isValidObject(association, context))) anyInvalid = true;
     }
     if (anyInvalid) {
-      const { attributes: _, ...errorOpts } = this.options;
-      record.errors.add(attribute, ":invalid", { ...errorOpts, value });
+      // `options.merge(value: value)` (associated.rb:10) — a non-mutating Hash
+      // merge is an object spread in TS.
+      record.errors.add(attribute, ":invalid", { ...this.options, value });
     }
   }
 }
