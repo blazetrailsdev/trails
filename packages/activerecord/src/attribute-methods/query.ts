@@ -77,8 +77,9 @@ export function queryCastAttribute(this: QueryHost, attrName: string, value: unk
     if (BooleanType.FALSE_VALUES.has(value)) return false;
     return !isBlank(value);
   } else if (typeof value === "number" || typeof value === "bigint") {
-    // Ruby `value.respond_to?(:zero?)` — the Numeric protocol.
-    return value != 0;
+    // Ruby `value.respond_to?(:zero?)` — the Numeric protocol, and the only
+    // JS values that answer it.
+    return value !== 0 && value !== 0n;
   } else {
     return !isBlank(value);
   }

@@ -36,40 +36,30 @@ export function attributesBeforeTypeCast(record: BeforeTypeCastRecord): Record<s
   return record.attributesBeforeTypeCast;
 }
 
-interface DatabaseRecord {
-  _attributes: {
-    valuesForDatabase?(): Record<string, unknown>;
-    getAttribute?(name: string): { valueForDatabase?: unknown } | undefined;
-    keys?(): Iterable<string>;
+interface DatabaseRecord extends AttributeOwner {
+  _attributes: AttributeOwner["_attributes"] & {
+    valuesForDatabase(): Record<string, unknown>;
   };
-  readAttribute(name: string): unknown;
-  constructor: { _attributeAliases?: Record<string, string> };
 }
 
 /**
- * Rails: resolves alias, then calls @attributes[name].value_for_database
+ * Read the attribute value after serialization.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#read_attribute_for_database
  */
 export function readAttributeForDatabase(record: DatabaseRecord, attrName: string): unknown {
   const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
 
-  return attributeForDatabase.call(record as unknown as AttributeOwner, name);
+  return attributeForDatabase.call(record, name);
 }
 
 /**
- * Rails: @attributes.values_for_database
+ * Return all attribute values for assignment to the database.
+ *
+ * Mirrors: ActiveRecord::AttributeMethods::BeforeTypeCast#attributes_for_database
  */
 export function attributesForDatabase(record: DatabaseRecord): Record<string, unknown> {
-  if (record._attributes.valuesForDatabase) {
-    return record._attributes.valuesForDatabase();
-  }
-  const result: Record<string, unknown> = {};
-  const keys = record._attributes.keys?.();
-  if (keys) {
-    for (const key of keys) {
-      result[key] = readAttributeForDatabase(record, key);
-    }
-  }
-  return result;
+  return record._attributes.valuesForDatabase();
 }
 
 interface AttributeOwner {
