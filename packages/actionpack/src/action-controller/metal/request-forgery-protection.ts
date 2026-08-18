@@ -325,12 +325,14 @@ export function verifySameOriginRequest(this: CsrfController): void {
  * `ProtectionMethods::Exception` carries the accessor (rb:307), and it is the
  * strategy that turns the message into the raised `InvalidAuthenticityToken`.
  *
+ * `forgery_protection_strategy` gets no fallback here: rb:104 declares it with
+ * no default (unlike `csrf_token_storage_strategy`, rb:100-101), so
+ * `protect_from_forgery` (rb:203) is what puts a class there and Ruby raises on
+ * nil — hence the non-null assertion rather than an invented default.
+ *
  * @internal
  */
 export function handleUnverifiedRequest(this: CsrfController): void {
-  // No fallback: rb:104 declares `forgery_protection_strategy` with no default
-  // (unlike `csrf_token_storage_strategy`, rb:100), so `protect_from_forgery`
-  // (rb:203) is what puts a class there and Ruby would raise on nil.
   const protectionStrategy = new this.forgeryProtectionStrategy!(this);
 
   if ("warningMessage" in protectionStrategy) {
@@ -406,7 +408,7 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer 
   if (encoded == null) {
     // Rails: csrf_token_storage_strategy defaults to SessionStore.new at the
     // class level (line 100 of request_forgery_protection.rb); mirror that
-    // here so a session-backed this without explicit config still
+    // here so a session-backed controller without explicit config still
     // verifies tokens against its session-stored real token.
     const strategy = (this.csrfTokenStorageStrategy ??= storageStrategy("session"));
     encoded = strategy.fetch(this) ?? generateCsrfToken();

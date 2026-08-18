@@ -1036,18 +1036,19 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // column-backed enum whose name is later aliased is unaffected. Mirrors Rails
   // routing type casting through `type_for_attribute(name)`, whose
   // `decorate_attributes` block raises (type_caster/map.rb:10-16, enum.rb:240-245).
+  //
+  // Reflect synchronously from the warm schema cache FIRST — the SAME path
+  // `Base.typeForAttribute` uses (base.ts). The public `Base.loadSchema()` is
+  // async and would fire-and-forget, letting a caller read the pre-reflection
+  // (mapping-inferred) EnumType; this sync reflection seeds the reflected column
+  // type and rebuilds `_defaultAttributes` before either the guard or the read
+  // below, so the reflected subtype is already in place.
   reflectSchemaSync.call(klass);
   assertEnumTypeDeclared(klass, attribute);
   // `defined_enums` is keyed by the *declared* enum name, alias or not
   // (enum.rb:232); only the attribute-set lookup resolves the alias.
   if (!host._enums?.has(attribute)) return null;
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
-  // Reflect synchronously from the warm schema cache before reading the
-  // attribute set — the SAME path `Base.typeForAttribute` uses (base.ts). The
-  // public `Base.loadSchema()` is async and would fire-and-forget, letting a
-  // caller read the pre-reflection (mapping-inferred) EnumType; this sync
-  // reflection seeds the reflected column type and rebuilds `_defaultAttributes`
-  // before we read it, so the reflected subtype is already in place.
   // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,
   // no explicit `attribute` type) must raise rather than silently serialize
   // through the pre-reflection fallback (Rails raises from the enum

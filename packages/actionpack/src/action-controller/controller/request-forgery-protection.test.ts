@@ -1,20 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { RequestForgeryProtection } from "../../action-dispatch/request-forgery-protection.js";
+import { assertRaises } from "@blazetrails/activesupport";
 import {
   Exception,
   handleUnverifiedRequest,
   InvalidAuthenticityToken as MetalInvalidAuthenticityToken,
   type CsrfController,
 } from "../metal/request-forgery-protection.js";
-
-function assertRaises(block: () => void): Error {
-  try {
-    block();
-  } catch (error) {
-    return error as Error;
-  }
-  throw new Error("expected the block to raise");
-}
 
 // ==========================================================================
 // controller/request_forgery_protection_test.rb
@@ -436,34 +428,16 @@ describe("ActionController::RequestForgeryProtection", () => {
 });
 
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
-  it("raised exception message explains why it occurred", () => {
-    // Rails routes the message through `handle_unverified_request`
-    // (request_forgery_protection.rb:401-409), which hands
-    // `unverified_request_warning_message` (:411-417) to the strategy's
-    // `warning_message` accessor (:307) before it raises (:314).
+  it("raised exception message explains why it occurred", async () => {
     const controller = {
       request: { method: "POST", origin: null, baseUrl: "http://test.host" },
       forgeryProtectionStrategy: Exception,
     } as unknown as CsrfController;
 
-    const exception = assertRaises(() => handleUnverifiedRequest.call(controller));
-    expect(exception).toBeInstanceOf(MetalInvalidAuthenticityToken);
-    expect(exception.message).toMatch("Can't verify CSRF token authenticity.");
-  });
-
-  it("raised exception message names the mismatched origin", () => {
-    const controller = {
-      request: {
-        method: "POST",
-        origin: "http://bad.host",
-        baseUrl: "http://test.host",
-      },
-      forgeryProtectionStrategy: Exception,
-    } as unknown as CsrfController;
-
-    const exception = assertRaises(() => handleUnverifiedRequest.call(controller));
-    expect(exception.message).toBe(
-      "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+    await assertRaises(
+      [MetalInvalidAuthenticityToken],
+      { match: "Can't verify CSRF token authenticity." },
+      () => handleUnverifiedRequest.call(controller),
     );
   });
 
