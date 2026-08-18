@@ -318,7 +318,10 @@ export class Branch {
         `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
       );
     }
-    return association;
+    // Ruby `association.to_sym` (branch.rb:11-18): a Symbol and the equivalent
+    // String name the same association, so a Symbol — spelled `":comments"` —
+    // drops its colon here, as JoinDependency.walkTree does for joins.
+    return association.startsWith(":") ? association.slice(1) : association;
   }
 
   private preloaderFor(
