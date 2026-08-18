@@ -20,12 +20,6 @@ export class KeyGenerator {
     return this._hashDigestClass;
   }
 
-  deriveKeyFrom(password: string, length?: number): string {
-    const salt = this.keyDerivationSalt();
-    const generator = new AsKeyGenerator(password, { hashDigestClass: this.hashDigestClass });
-    return generator.generateKey(salt, length ?? this.keyLength()).toString("base64");
-  }
-
   generateRandomKey({ length = this.keyLength() }: { length?: number } = {}): string {
     return getCrypto().randomBytes(length).toString("base64");
   }
@@ -37,13 +31,10 @@ export class KeyGenerator {
     return Buffer.from(this.generateRandomKey({ length }), "base64").toString("hex");
   }
 
-  deriveKey(password: string, length?: number, salt?: string): string {
-    const effectiveLength = length ?? this.keyLength();
-    const crypto = getCrypto();
-    const effectiveSalt = salt ?? "";
-    const digest = this._hashDigestClass.toLowerCase().replace(/-/g, "");
-    const derived = crypto.pbkdf2Sync(password, effectiveSalt, 2 ** 16, effectiveLength, digest);
-    return derived.toString("base64");
+  deriveKeyFrom(password: string, { length = this.keyLength() }: { length?: number } = {}): string {
+    const salt = this.keyDerivationSalt();
+    const generator = new AsKeyGenerator(password, { hashDigestClass: this.hashDigestClass });
+    return generator.generateKey(salt, length).toString("base64");
   }
 
   /** @internal */
