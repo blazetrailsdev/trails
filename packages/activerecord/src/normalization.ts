@@ -44,7 +44,7 @@ export class NormalizedValueType {
 
   cast(value: unknown): unknown {
     const castValue = this.castType.cast(value);
-    return this._normalize(castValue);
+    return normalize(this, castValue);
   }
 
   serialize(value: unknown): unknown {
@@ -62,13 +62,6 @@ export class NormalizedValueType {
       this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
       value,
     );
-  }
-
-  private _normalize(value: unknown): unknown {
-    if (value === null || value === undefined) {
-      if (!this.normalizeNil) return value;
-    }
-    return this.normalizer(value);
   }
 }
 

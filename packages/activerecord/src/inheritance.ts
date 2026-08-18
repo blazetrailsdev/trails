@@ -530,7 +530,22 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
   // candidate is found via the model's own module nesting rather than the bare
   // (unregistered) demodulized name. With the default flags on, sti_class_for
   // falls back to the bare registry lookup, preserving the prior behavior.
-  return baseClass.stiClassFor(typeName);
+  // Rails: `type_name = base_class.type_for_attribute(inheritance_column).cast(type_name)`.
+  // The String() keeps a numeric/boolean type column resolving against the
+  // registry, which is keyed by primitive strings.
+  const cast = baseClass.baseClass
+    .typeForAttribute(baseClass.inheritanceColumn as string)
+    .cast(typeName);
+  typeName = cast == null ? (cast as unknown as string) : String(cast);
+  const subclass = baseClass.stiClassFor(typeName);
+
+  if (!(subclass === baseClass || baseClass.descendants.includes(subclass))) {
+    throw new SubclassNotFound(
+      `Invalid single-table inheritance type: ${subclass.name} is not a subclass of ${baseClass.name}`,
+    );
+  }
+
+  return subclass;
 }
 
 /**
@@ -755,12 +770,6 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
     storeFullStiClass?: boolean;
     storeFullClassName?: boolean;
   };
-  // Rails splits this across find_sti_class (the subclass check) and
-  // sti_class_for (the constant resolution, with a `rescue NameError`):
-  // inheritance.rb:311-320, 242-265. Mirror that split so each failure keeps its
-  // Rails message — a name that resolves to no constant becomes "failed to
-  // locate the subclass" (rescued NameError), while a resolved-but-non-subclass
-  // keeps "Invalid single-table inheritance type" (raised *outside* the rescue).
   let subclass: typeof Base;
   try {
     if (klass.storeFullStiClass && klass.storeFullClassName) {
@@ -774,12 +783,6 @@ export function stiClassFor(modelClass: typeof Base, typeName: string): typeof B
       `The single-table inheritance mechanism failed to locate the subclass: '${typeName}'. ` +
         `This error is raised because the column '${modelClass.inheritanceColumn}' is reserved for storing the class in case of inheritance.`,
       { cause },
-    );
-  }
-  // find_sti_class: `unless subclass == self || descendants.include?(subclass)`.
-  if (subclass !== modelClass && !(subclass.prototype instanceof modelClass)) {
-    throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${subclass.name} is not a subclass of ${modelClass.name}`,
     );
   }
   return subclass;

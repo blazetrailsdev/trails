@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { AggregateReflection } from "./reflection.js";
+import { addAggregateReflection, create } from "./reflection.js";
 
 /**
  * Aggregation cache and composed-of value-object support.
@@ -48,24 +48,24 @@ export function composedOf(
   options: ComposedOfOptions,
 ): void {
   includeAggregations(modelClass);
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_aggregateReflections")) {
-    const parent: Map<string, AggregateReflection> | undefined = (modelClass as any)
-      ._aggregateReflections;
-    (modelClass as any)._aggregateReflections = parent ? new Map(parent) : new Map();
-  }
-  (modelClass as any)._aggregateReflections.set(
+
+  // Rails passes its own `options` hash straight to Reflection.create; trails'
+  // ComposedOfOptions carries `className` as the value-object CLASS rather than a
+  // Ruby class-name String, so the reflection options are rebuilt here into the
+  // string-name + anonymousClass shape AggregateReflection reads. Baselined as a
+  // call-argument row on aggregations.json.
+  const reflection = create(
+    "composedOf",
     name,
-    new AggregateReflection(
-      name,
-      null,
-      {
-        className: options.className.name,
-        mapping: options.mapping,
-        anonymousClass: options.className,
-      },
-      modelClass,
-    ),
+    null,
+    {
+      className: options.className.name,
+      mapping: options.mapping,
+      anonymousClass: options.className,
+    },
+    modelClass,
   );
+  addAggregateReflection(modelClass, name, reflection);
 
   readerMethod(modelClass, name, options.mapping, options.className, options.constructorFn);
   writerMethod(

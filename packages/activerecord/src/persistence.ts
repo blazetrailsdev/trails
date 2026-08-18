@@ -454,7 +454,7 @@ interface CounterBangRecord extends AttributeIO {
 
 /** Save path used by toggleBang. */
 interface ToggleBangRecord extends AttributeIO {
-  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
+  updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
 }
 
 /** Mirrors: ActiveRecord::Persistence#increment */
@@ -567,15 +567,7 @@ export async function toggleBang<T extends ToggleBangRecord>(
   this: T & { toggle(attribute: string): T },
   attribute: string,
 ): Promise<boolean | undefined> {
-  this.toggle(attribute);
-  // Rails' `update_attribute(name, value)` is effectively `self[name] = value;
-  // save(validate: false)`. Our toggle() already wrote the toggled value;
-  // calling updateAttribute would re-write the same value (potentially
-  // clearing dirty tracking). Save directly to preserve the dirty change and
-  // still run callbacks. Returns the same boolean Rails' toggle! exposes
-  // through update_attribute — `false` when a before/around save callback
-  // aborted, `true` otherwise.
-  return this.save({ validate: false });
+  return this.toggle(attribute).updateAttribute(attribute, this.readAttribute(attribute));
 }
 
 // ---------------------------------------------------------------------------
@@ -841,13 +833,13 @@ export async function saveBang<
 }
 
 interface DestroyRecord {
-  _readonly: boolean;
+  isReadonly(): boolean;
   constructor: { name: string };
 }
 
 /** Mirrors: ActiveRecord::Base#destroy */
 export async function destroy<T extends DestroyRecord>(this: T): Promise<T | false> {
-  if (this._readonly) {
+  if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
@@ -1166,6 +1158,8 @@ export async function updateAttribute<T extends AttributeSingleSave>(
   name: string,
   value: unknown,
 ): Promise<boolean | undefined> {
+  name = String(name);
+  verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   this.writeAttribute(name, value);
   return this.save({ validate: false });
 }
@@ -1182,12 +1176,14 @@ export async function updateAttributeBang<T extends AttributeSingleSave>(
   name: string,
   value: unknown,
 ): Promise<true | undefined> {
+  name = String(name);
+  verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   this.writeAttribute(name, value);
   return this.saveBang({ validate: false });
 }
 
 interface UpdateColumnsRecord {
-  _readonly: boolean;
+  isReadonly(): boolean;
   _attributes: {
     get(name: string): unknown;
     set(name: string, value: unknown): void;
@@ -1248,7 +1244,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<boolean> {
-  if (this._readonly) {
+  if (this.isReadonly()) {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
   if (!this.isPersisted()) {
@@ -1764,14 +1760,14 @@ interface PersistencePrivateHost {
   attributeInDatabase?(col: string): unknown;
   _associationInstances?: Map<
     string,
-    { owner?: { _strictLoading?: boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
+    { owner?: { isStrictLoading?(): boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
   >;
   constructor: {
     name: string;
     primaryKey: string | string[];
     currentScope?: unknown | (() => unknown);
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
-    readonlyAttributeQ?(name: string): boolean;
+    isReadonlyAttribute?(name: string): boolean;
     withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
     connection: { execDelete(sql: string, name: string): Promise<number> };
   };
@@ -1814,34 +1810,13 @@ function initInternals(this: PersistencePrivateHost): void {
 
 /** @internal */
 export function strictLoadedAssociations(this: PersistencePrivateHost): string[] {
-  const names = new Set<string>();
-  const cache = this._associationInstances;
-  if (cache) {
-    for (const [name, assoc] of cache) {
-      const owner = assoc?.owner;
-      if (owner?._strictLoading && !owner?.isStrictLoadingNPlusOneOnly?.()) {
-        names.add(name);
-      }
-    }
-  }
-  // Preloaded/cached/collection associations are also loaded entries of Rails'
-  // @association_cache; their owner is this record, so gate on its own
-  // strict-loading state.
-  const self = this as unknown as {
-    _strictLoading?: boolean;
-    isStrictLoadingNPlusOneOnly?(): boolean;
-    _associationInstances?: Map<string, { isLoaded?(): boolean }>;
-    _collectionProxies?: Map<string, { loaded?: boolean }>;
-  };
-  if (self._strictLoading && !self.isStrictLoadingNPlusOneOnly?.()) {
-    for (const [name, instance] of self._associationInstances ?? []) {
-      if (instance?.isLoaded?.()) names.add(name);
-    }
-    for (const [name, proxy] of self._collectionProxies ?? []) {
-      if (proxy?.loaded) names.add(name);
-    }
-  }
-  return [...names];
+  return [...(this._associationInstances ?? [])]
+    .filter(
+      ([, assoc]) =>
+        assoc?.owner?.isStrictLoading?.() === true &&
+        assoc?.owner?.isStrictLoadingNPlusOneOnly?.() !== true,
+    )
+    .map(([name]) => name);
 }
 
 /** @internal */
@@ -2157,7 +2132,7 @@ export async function _createRecord(
 
 /** @internal */
 export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
-  if ((this.constructor as any).readonlyAttributeQ?.(name)) {
+  if ((this.constructor as any).isReadonlyAttribute?.(name)) {
     throw new ReadonlyAttributeError(name);
   }
 }

@@ -6,27 +6,23 @@
 
 import type { Base } from "./base.js";
 
-const _noTouchingDepth = new Map<typeof Base, number>();
+/**
+ * Mirrors: ActiveRecord::NoTouching.klasses — Rails keeps the stack in
+ * `ActiveSupport::IsolatedExecutionState[:active_record_no_touching_classes]`.
+ */
+const _klasses: Array<typeof Base> = [];
+
+function klasses(): Array<typeof Base> {
+  return _klasses;
+}
 
 /**
  * Execute a block with touch callbacks suppressed for the given model class.
- * Re-entrant safe: nested calls increment a depth counter.
  *
- * Mirrors: ActiveRecord::NoTouching.no_touching
+ * Mirrors: ActiveRecord::NoTouching::ClassMethods#no_touching
  */
-export async function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
-  const depth = _noTouchingDepth.get(modelClass) ?? 0;
-  _noTouchingDepth.set(modelClass, depth + 1);
-  try {
-    return await fn();
-  } finally {
-    const current = _noTouchingDepth.get(modelClass) ?? 1;
-    if (current <= 1) {
-      _noTouchingDepth.delete(modelClass);
-    } else {
-      _noTouchingDepth.set(modelClass, current - 1);
-    }
-  }
+export function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
+  return applyTo(modelClass, fn);
 }
 
 /**
@@ -34,13 +30,17 @@ export async function noTouching<R>(modelClass: typeof Base, fn: () => R | Promi
  *
  * Mirrors: ActiveRecord::NoTouching.applied_to?
  */
-export function isAppliedTo(modelClass: typeof Base): boolean {
-  let current: typeof Base | null = modelClass;
-  while (current && typeof current === "function") {
-    if ((_noTouchingDepth.get(current) ?? 0) > 0) return true;
-    current = Object.getPrototypeOf(current);
-  }
-  return false;
+export function isAppliedTo(klass: typeof Base): boolean {
+  // Rails: `klasses.any? { |k| k >= klass }` — `k >= klass` is true when k is
+  // klass or one of its ancestors.
+  return klasses().some((k) => {
+    let current: unknown = klass;
+    while (typeof current === "function") {
+      if (current === k) return true;
+      current = Object.getPrototypeOf(current);
+    }
+    return false;
+  });
 }
 
 /**
@@ -55,28 +55,22 @@ export function isNoTouching(this: Base): boolean {
 /**
  * Mirrors: ActiveRecord::NoTouching.apply_to
  */
-export function applyTo<R>(klass: any, fn: () => R | Promise<R>): R | Promise<R> {
-  const prev = _noTouchingDepth.get(klass) ?? 0;
-  _noTouchingDepth.set(klass, prev + 1);
+export function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
+  klasses().push(klass);
 
-  const cleanup = () => {
-    const current = _noTouchingDepth.get(klass) ?? 1;
-    if (current <= 1) {
-      _noTouchingDepth.delete(klass);
-    } else {
-      _noTouchingDepth.set(klass, current - 1);
-    }
-  };
-
+  // Ruby's `ensure` pops once the block returns; an async block only returns a
+  // promise there, so the pop has to ride the promise to cover the same window.
   try {
     const result = fn();
     if (result && typeof (result as any).then === "function") {
-      return Promise.resolve(result).finally(cleanup) as Promise<R>;
+      return Promise.resolve(result).finally(() => {
+        klasses().pop();
+      }) as Promise<R>;
     }
-    cleanup();
+    klasses().pop();
     return result;
   } catch (error) {
-    cleanup();
+    klasses().pop();
     throw error;
   }
 }
