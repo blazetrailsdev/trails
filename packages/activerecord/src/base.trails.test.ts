@@ -410,13 +410,16 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     );
   });
 
-  it("a declared-then-ignored column not projected does not respond after reload", async () => {
+  it("a declared-then-ignored column not projected keeps its declared slot after reload", async () => {
     const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
     const dev = await AttributedDeveloper.create();
     await dev.updateColumn("name", "name");
     await dev.reload();
-    // reload's default select omits the ignored column, so its declared slot
-    // narrows to uninitialized — Rails' key? is false, no accessor responds.
-    expect("name" in dev).toBe(false);
+    // A declared attribute IS in `types`, so an unprojected slot takes
+    // `default_attribute`'s `types.key?` arm and dups the initialized default
+    // (attribute_set/builder.rb:82-87, `Attribute::Null#with_type` →
+    // `with_cast_value`, attribute.rb:231-233) rather than landing on
+    // `Attribute.null`. Only a plain ignored column (the case above) drops out.
+    expect("name" in dev).toBe(true);
   });
 });
