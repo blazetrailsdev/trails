@@ -2203,7 +2203,9 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
         export * from "./transliterate.js";
       `,
     });
-    expect(fileFunctionsOf(info, "index.ts").map((f) => f.name)).not.toContain("parameterize");
+    expect((info.fileFunctions?.["index.ts"] ?? []).map((f) => f.name)).not.toContain(
+      "parameterize",
+    );
   });
 
   it("reads a renamed export's own reason instead of the declaration's", () => {
