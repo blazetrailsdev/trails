@@ -25,6 +25,13 @@ import { ParseError } from "./parameters.js";
  */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 /**
  * Raised when a `Content-Type` or `Accept` header cannot be parsed as a
  * valid MIME type. Mirrors `ActionDispatch::Http::MimeNegotiation::InvalidType`,
@@ -122,7 +129,7 @@ export class MimeNegotiation {
   set variant(value: string | string[] | null | undefined) {
     const arr = Array.isArray(value) ? value : value == null ? [] : [value];
     if (!arr.every((v) => typeof v === "string")) {
-      throw new Error("request.variant must be set to a Symbol or an Array of Symbols.");
+      throw new ArgumentError("request.variant must be set to a Symbol or an Array of Symbols.");
     }
     this._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
       Record<string, () => boolean>;
@@ -153,8 +160,8 @@ const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
 /** The MIME type of the HTTP request (parsed from `CONTENT_TYPE`). */
 export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
   return this.fetchHeader("action_dispatch.request.content_type", (k) => {
-    const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
     try {
+      const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
       const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
       return this.setHeader(k, v);
     } catch (e) {
@@ -171,8 +178,8 @@ export function hasContentType(this: MimeNegotiationHost): boolean {
 /** Accepted MIME types parsed from `HTTP_ACCEPT`. */
 export function accepts(this: MimeNegotiationHost): MimeType[] {
   return this.fetchHeader("action_dispatch.request.accepts", (k) => {
-    const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
     try {
+      const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
       // Rails: `[content_mime_type]` — array of one element even when nil. The
       // subsequent `validAcceptHeader` gate prevents `accepts` from being used in
       // the all-blank branch, so a `[null]` payload never reaches the formats

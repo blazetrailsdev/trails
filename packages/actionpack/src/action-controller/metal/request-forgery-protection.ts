@@ -113,9 +113,11 @@ export class ResetSession implements ProtectionMethods {
 }
 
 export class Exception implements ProtectionMethods {
+  /** Mirrors `attr_accessor :warning_message` (request_forgery_protection.rb:307). */
+  warningMessage?: string;
   constructor(_controller: Controller) {}
   handleUnverifiedRequest(): void {
-    throw new InvalidAuthenticityToken();
+    throw new InvalidAuthenticityToken(this.warningMessage);
   }
 }
 

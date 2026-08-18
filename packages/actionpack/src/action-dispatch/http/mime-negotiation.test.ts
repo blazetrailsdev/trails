@@ -51,7 +51,35 @@ describe("MimeNegotiation.paramsReadable", () => {
   });
 });
 
+describe("MimeNegotiation.contentMimeType", () => {
+  it("caches through fetchHeader so a second read does not reparse", () => {
+    const req = new Request({ CONTENT_TYPE: "application/xml" });
+    expect(req.contentMimeType?.toString()).toBe("application/xml");
+    expect(req.getHeader("action_dispatch.request.content_type")).toBe(req.contentMimeType);
+  });
+
+  it("looks up the empty media type when CONTENT_TYPE is blank", () => {
+    const req = new Request({ CONTENT_TYPE: "" });
+    expect(req.contentMimeType?.toString()).toBe("");
+  });
+});
+
+describe("MimeNegotiation.accepts", () => {
+  it("caches through fetchHeader so a second read does not reparse", () => {
+    const req = new Request({ HTTP_ACCEPT: "application/xml,text/html" });
+    expect(req.accepts.map((m) => m.toString())).toEqual(["application/xml", "text/html"]);
+    expect(req.getHeader("action_dispatch.request.accepts")).toBe(req.accepts);
+  });
+});
+
 describe("MimeNegotiation writers", () => {
+  it("variant= raises ArgumentError for a non-Symbol", () => {
+    const req = new Request({});
+    expect(() => {
+      (req as unknown as { variant: unknown }).variant = [1];
+    }).toThrow("request.variant must be set to a Symbol or an Array of Symbols.");
+  });
+
   it("format= forces the format regardless of the path extension", () => {
     const req = new Request({ PATH_INFO: "/posts/5.html" });
     req.format = "xml";
