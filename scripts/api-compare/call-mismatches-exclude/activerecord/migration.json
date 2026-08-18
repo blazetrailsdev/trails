@@ -65,13 +65,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration.ts",
-    "rubyName": "generate_migrator_advisory_lock_id",
-    "call": "crc32",
-    "reason": "`Zlib.crc32` (migration.rb:1617) is Ruby stdlib; the port calls the trails CRC-32 helper `_crc32` (migration.ts:2642), whose underscored name cannot match the Ruby callee."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
     "rubyName": "migrate",
     "call": "with_connection",
     "reason": "`DatabaseTasks.migration_connection.pool.with_connection` (migration.rb:973) checks a connection out for the exec_migration block; trails migrations run against the already-seated `this.connection` (RFC 0073's permanent-checkout flip is where this converges)."
@@ -89,13 +82,6 @@
     "rubyName": "parse_migration_filename",
     "call": "first",
     "reason": "Ruby `Array#first` on the `scan` result (migration.rb:1374); JS indexes with `[0]`, which records no callee."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration.ts",
-    "rubyName": "revert",
-    "call": "run",
-    "reason": "Rails' `run(*migration_classes.reverse, revert: true)` (migration.rb:853); the port spells the same method `_run` (migration.ts:1168), so the underscored callee does not match."
   },
   {
     "package": "activerecord",

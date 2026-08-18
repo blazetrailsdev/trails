@@ -172,11 +172,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       const m = new HstoreMigration();
       await m.suppressMessages(async () => {
-        await m.run(connection, "up");
+        await m.execMigration(connection, "up");
         const upCols = (await connection.columns("hstores")).map((c: any) => c.name);
         expect(upCols).toContain("keys");
 
-        await new HstoreMigration().run(connection, "down");
+        await new HstoreMigration().execMigration(connection, "down");
         const downCols = (await connection.columns("hstores")).map((c: any) => c.name);
         expect(downCols).not.toContain("keys");
       });

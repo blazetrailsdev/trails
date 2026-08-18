@@ -166,6 +166,40 @@ describe("SchemaDumper trails-only cases", () => {
     expect(parts.join(", ")).toContain(`opclass: "varchar_pattern_ops"`);
   });
 
+  it("indexParts routes using: through the connection's defaultIndexType predicate", async () => {
+    // Rails' `index_parts` prints `using:` unless
+    // `@connection.default_index_type?(index)` (schema_dumper.rb:275). The
+    // abstract adapter's body is nil-only (abstract_adapter.rb:834-836), which
+    // SQLite inherits, so a `btree` index still dumps `using: "btree"` there;
+    // PostgreSQL and MySQL override to treat `:btree` as the default
+    // (postgresql_adapter.rb:646, abstract_mysql_adapter.rb:634) and omit it.
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
+    const { AbstractAdapter } = await import("./connection-adapters/abstract-adapter.js");
+    const { AbstractMysqlAdapter } =
+      await import("./connection-adapters/abstract-mysql-adapter.js");
+    const index = { columns: ["name"], unique: false, using: "btree" };
+
+    const mkDumper = (adapter: unknown) =>
+      new (TopLevelDumper as any)({
+        tables: () => [],
+        columns: () => [],
+        indexes: () => [],
+        adapter,
+      });
+
+    const sqliteLike = mkDumper({
+      defaultIndexType: AbstractAdapter.prototype.defaultIndexType,
+    });
+    expect(sqliteLike.indexParts(index).join(", ")).toContain(`using: "btree"`);
+
+    const mysqlLike = mkDumper({
+      defaultIndexType: AbstractMysqlAdapter.prototype.defaultIndexType,
+    });
+    expect(mysqlLike.indexParts(index).join(", ")).not.toContain("using:");
+    expect(mysqlLike.indexParts({ ...index, using: "hash" }).join(", ")).toContain(`using: "hash"`);
+  });
+
   it("fkIgnorePattern suppresses name for matching FK names, includes name for non-matching", async () => {
     const mkSource = (fkName: string) => ({
       tables: async () => ["books"],

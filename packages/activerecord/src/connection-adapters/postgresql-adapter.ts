@@ -3180,8 +3180,8 @@ export class PostgreSQLAdapter
     return true;
   }
   // Rails: `index.using == :btree || super` (postgresql_adapter.rb#default_index_type?).
-  override defaultIndexType(using?: string): boolean {
-    return using === "btree" || super.defaultIndexType(using);
+  override defaultIndexType(index: IndexDefinition): boolean {
+    return index.using === "btree" || super.defaultIndexType(index);
   }
   async supportsPartitionedIndexes(): Promise<boolean> {
     return (await this.databaseVersion) >= 110000;

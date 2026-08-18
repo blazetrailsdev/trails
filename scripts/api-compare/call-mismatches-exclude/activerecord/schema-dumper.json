@@ -30,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
-    "rubyName": "index_parts",
-    "call": "default_index_type?",
-    "reason": "`!@connection.default_index_type?(index)` (schema_dumper.rb:275) is inlined as `index.using !== \"btree\"`; the adapter predicate exists (abstract-adapter.ts:1975) but is nil-only on SQLite, so routing through it changes the SQLite dump — RFC 0051 schema-dumper territory."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "schema-dumper.ts",
     "rubyName": "indexes_in_create",
     "call": "any?",
     "reason": "Ruby's block-less `any?` (schema_dumper.rb:245,246,252) is an emptiness test on the fetched array; the port spells it `.length > 0`, which records no callee."
@@ -67,62 +60,62 @@
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "column_spec",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "column_spec_for_primary_key",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "exclusion_constraints_in_create",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "format_colspec",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "format_options",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "indexes_in_create",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "table_options",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "unique_constraints_in_create",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   },
   {
     "package": "activerecord",
     "tsFile": "schema-dumper.ts",
     "rubyName": "table",
     "call": "valid_type?",
-    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence belongs to RFC 0051's schema-dumper stories."
+    "reason": "verified at schema_dumper.rb:158-243 — Rails' `table` emits the columns inline; the port's `table` hands that half to `emitTable` (connection-adapters/abstract/schema-dumper.ts:238-351), which makes this call. The gate credits same-FILE helpers only, so the delegation reads as an omission. Convergence is RFC 0051 story `inline-schema-dumper-table-retire-emit-table`."
   }
 ]

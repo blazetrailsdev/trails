@@ -70,6 +70,7 @@ import type {
   AddIndexOptions,
   ColumnOptions,
   ColumnType,
+  IndexDefinition,
   RemoveForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import type { CommentOrChanges } from "./abstract/schema-statements.js";
@@ -357,8 +358,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   // Rails: `index.using == :btree || super` (abstract_mysql_adapter.rb#default_index_type?).
-  override defaultIndexType(using?: string): boolean {
-    return using === "btree" || super.defaultIndexType(using);
+  override defaultIndexType(index: IndexDefinition): boolean {
+    return index.using === "btree" || super.defaultIndexType(index);
   }
 
   async supportsIndexSortOrder(): Promise<boolean> {

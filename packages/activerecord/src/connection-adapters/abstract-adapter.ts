@@ -1965,15 +1965,13 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  // Mirrors Rails' `abstract_adapter.rb#default_index_type?` (`index.using.nil?`),
-  // the predicate the schema dumper uses to decide whether to print `using:`
-  // (schema_dumper.rb#indexes: `... if !default_index_type?(index)`). PostgreSQL
-  // and MySQL override to also treat `:btree` as the default; SQLite inherits
-  // this nil-only check (so a non-nil `using` on sqlite still dumps). Surfaced
-  // here so `addIndex` gates the stored `using` on the same
-  // per-adapter predicate the dumper reads, rather than an adapter-name check.
-  defaultIndexType(using?: string): boolean {
-    return using == null;
+  // Mirrors Rails' `abstract_adapter.rb:834#default_index_type?`
+  // (`index.using.nil?`), the predicate `SchemaDumper#index_parts` reads to
+  // decide whether to print `using:` (schema_dumper.rb:275). PostgreSQL and
+  // MySQL override to also treat `:btree` as the default; SQLite inherits this
+  // nil-only check, so a non-nil `using` on sqlite still dumps.
+  defaultIndexType(index: IndexDefinition): boolean {
+    return index.using == null;
   }
 
   supportsConcurrentConnections(): boolean {

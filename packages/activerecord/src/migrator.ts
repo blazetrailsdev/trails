@@ -71,7 +71,7 @@ export class MigrationRunner {
     for (const entry of this.migrations) {
       if (applied.has(entry.version)) continue;
 
-      await entry.migration.run(this.adapter, "up");
+      await entry.migration.execMigration(this.adapter, "up");
       const im = new InsertManager(this.arelTable);
       im.insert([[this.arelTable.get("version"), entry.version]]);
       await this.adapter.execute(this.adapter.toSql(im));
@@ -93,7 +93,7 @@ export class MigrationRunner {
     const toRollback = appliedMigrations.slice(0, steps);
 
     for (const entry of toRollback) {
-      await entry.migration.run(this.adapter, "down");
+      await entry.migration.execMigration(this.adapter, "down");
       const dm = new DeleteManager();
       dm.from(this.arelTable);
       dm.where(this.arelTable.get("version").eq(entry.version));

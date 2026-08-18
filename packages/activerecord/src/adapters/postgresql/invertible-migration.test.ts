@@ -29,9 +29,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new CreateHorses();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       expect(await adapter.tableExists("settings")).toBe(true);
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       expect(await adapter.tableExists("settings")).toBe(false);
     });
     it("migrate revert add index with expression", async () => {
@@ -47,14 +47,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new ExpressionIndexMigration();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
 
       expect(await adapter.tableExists("settings")).toBe(true);
       expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
         true,
       );
 
-      await new ExpressionIndexMigration().run(adapter, "down");
+      await new ExpressionIndexMigration().execMigration(adapter, "down");
 
       expect(await adapter.tableExists("settings")).toBe(false);
       expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new CreateEnumMig();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       // Add an actual enum-typed column so reversal must drop the table before
       // dropping the enum type (otherwise DROP TYPE fails with dependency error)
       await adapter.execute(
@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(enumsBefore.some(([name]) => name === "color")).toBe(true);
 
       // Down: drops table first (containing enum column), then drops enum type
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       const enumsAfter = await adapter.enumTypes();
       expect(enumsAfter.some(([name]) => name === "color")).toBe(false);
       expect(await adapter.tableExists("enums")).toBe(false);
@@ -93,11 +93,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new DropEnumMig();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       const enumsAfterDrop = await adapter.enumTypes();
       expect(enumsAfterDrop.some(([name]) => name === "color")).toBe(false);
 
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       const enumsRestored = await adapter.enumTypes();
       expect(enumsRestored.some(([name]) => name === "color")).toBe(true);
     });
@@ -110,13 +110,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new RenameEnumMig();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       const afterRename = await adapter.enumTypes();
       const colorValues = afterRename.find(([name]) => name === "color")?.[1] ?? [];
       expect(colorValues).toContain("red");
       expect(colorValues).not.toContain("blue");
 
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       const afterRevert = await adapter.enumTypes();
       const revertedValues = afterRevert.find(([name]) => name === "color")?.[1] ?? [];
       expect(revertedValues).toContain("blue");
@@ -135,11 +135,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new AddAndValidateCheckMig();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       const before = await adapter.checkConstraints("settings");
       expect(before.some((c: any) => c.name === "positive_value")).toBe(true);
 
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       const after = await adapter.checkConstraints("settings");
       expect(after.some((c: any) => c.name === "positive_value")).toBe(false);
     });
@@ -158,10 +158,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       const m = new AddAndValidateFKMig();
-      await m.run(adapter, "up");
+      await m.execMigration(adapter, "up");
       expect(await adapter.foreignKeyExists("bars", "foos")).toBe(true);
 
-      await m.run(adapter, "down");
+      await m.execMigration(adapter, "down");
       expect(await adapter.foreignKeyExists("bars", "foos")).toBe(false);
     });
   });
