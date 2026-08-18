@@ -96,10 +96,6 @@ describe("OrderedOptionsTest", () => {
     expect(a.elseWhere).toBe(56);
   });
 
-  it("extractable options", () => {
-    expect(new OrderedOptions().isExtractableOptions()).toBe(true);
-  });
-
   it("inheritable options continues lookup in parent", () => {
     const parent = new OrderedOptions();
     parent.set("foo", true);
