@@ -1,35 +1,32 @@
 import { describe, it, expect } from "vitest";
 
+import { lookupStore } from "../cache.js";
+import { ArgumentError } from "../cache/store.js";
 import { MemoryStore } from "../cache/memory-store.js";
 import { NullStore } from "../cache/null-store.js";
 import { FileStore } from "../cache/file-store.js";
 
 describe("CacheStoreSettingTest", () => {
   it("memory store gets created if no arguments passed to lookup store method", () => {
-    const store = new MemoryStore();
-    expect(store).toBeDefined();
-    store.write("key", "value");
-    expect(store.read("key")).toBe("value");
+    const store = lookupStore();
+    expect(store).toBeInstanceOf(MemoryStore);
   });
 
   it("memory store", () => {
-    const store = new MemoryStore();
-    store.write("test", 42);
-    expect(store.read("test")).toBe(42);
-    store.delete("test");
-    expect(store.read("test")).toBeNull();
+    const store = lookupStore(":memory_store");
+    expect(store).toBeInstanceOf(MemoryStore);
   });
 
   it("file fragment cache store", () => {
-    // FileStore with a path
-    const store = new FileStore("/tmp/test-cache");
-    expect(store).toBeDefined();
+    const store = lookupStore(":file_store", "/path/to/cache/directory");
+    expect(store).toBeInstanceOf(FileStore);
+    expect((store as FileStore).cachePath).toBe("/path/to/cache/directory");
   });
 
   it("file store requires a path", () => {
-    // FileStore accepts any string path; empty string creates store with empty dir
-    const store = new FileStore("/tmp/valid-cache");
-    expect(store).toBeDefined();
+    expect(() => {
+      lookupStore(":file_store");
+    }).toThrow(ArgumentError);
   });
 
   it("mem cache fragment cache store", () => {
@@ -56,9 +53,9 @@ describe("CacheStoreSettingTest", () => {
   });
 
   it("object assigned fragment cache store", () => {
-    const store = new MemoryStore();
-    expect(typeof store.write).toBe("function");
-    expect(typeof store.read).toBe("function");
+    const store = lookupStore(new FileStore("/path/to/cache/directory"));
+    expect(store).toBeInstanceOf(FileStore);
+    expect((store as FileStore).cachePath).toBe("/path/to/cache/directory");
   });
 
   it("redis cache store with single array object", () => {

@@ -16,17 +16,6 @@
   {
     "package": "activesupport",
     "tsFile": "current-attributes.ts",
-    "rubyName": "reset",
-    "call": "run_callbacks",
-    "kind": "args",
-    "rubyArgs": [
-      "str:reset"
-    ],
-    "reason": "Ruby `include ActiveSupport::Callbacks` makes `run_callbacks` an instance method; trails' `runCallbacks` is a standalone function whose first parameter is the Ruby receiver, and the Ruby block is the trailing function parameter."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "current-attributes.ts",
     "rubyName": "set",
     "call": "with",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
