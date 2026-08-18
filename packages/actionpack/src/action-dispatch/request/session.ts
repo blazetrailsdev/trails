@@ -114,6 +114,24 @@ function classNameOf(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
+/**
+ * Ruby's `object_id` — a per-object identity number JS does not expose, handed
+ * out lazily and remembered on a WeakMap, shifted and hexed the way
+ * `(object_id << 1).to_s(16)` renders it. Same spelling as
+ * `KeyGenerator#inspect` (`activesupport/src/key-generator.ts:69`).
+ */
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+
+function objectIdHex(object: object): string {
+  let id = objectIds.get(object);
+  if (id == null) {
+    id = nextObjectId++;
+    objectIds.set(object, id);
+  }
+  return ((id << 1) >>> 0).toString(16).padStart(14, "0");
+}
+
 export class Session {
   private by: SessionStore | null;
   private req: Req;
@@ -357,6 +375,22 @@ export class Session {
       if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
       if (block) return block(k);
       return defaultValue;
+    }
+  }
+
+  /**
+   * Mirrors: `Session#inspect` (`request/session.rb:222-228`).
+   *
+   * The loaded arm is Ruby's `super`, i.e. `Object#inspect`. JS has no
+   * equivalent that lists instance variables, so it renders the identity form
+   * `#<Class:0x…>` — the same spelling `KeyGenerator#inspect` uses in
+   * activesupport for `(object_id << 1).to_s(16)`.
+   */
+  inspect(): string {
+    if (this.isLoaded()) {
+      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
+    } else {
+      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 

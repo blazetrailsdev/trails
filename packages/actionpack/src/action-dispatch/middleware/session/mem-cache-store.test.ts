@@ -43,7 +43,7 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
       "makeRequest", // Compatibility
       "staleSessionCheckBang", // StaleSessionCheck
       "prepareSession", // SessionObject
-      "loadedSession", // SessionObject
+      "isLoadedSession", // SessionObject
       "generateSid", // class-defined override; not the Compatibility hex form
     ];
     for (const name of ownNames) {

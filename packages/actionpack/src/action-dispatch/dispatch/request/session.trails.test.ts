@@ -67,4 +67,25 @@ describe("Session", () => {
     Session.delete(req);
     expect(Session.find(req)).toBeNull();
   });
+
+  it("inspect reports a not yet loaded session without loading it", () => {
+    const req = makeReq();
+    const loadSession = vi.fn(() => [1, {}] as [unknown, Record<string, unknown>]);
+    const store = {
+      loadSession,
+      sessionExists: () => true,
+      deleteSession: () => null,
+      extractSessionId: () => 1,
+    };
+    const session = Session.create(store, req, {});
+
+    expect(session.inspect()).toMatch(
+      /^#<ActionDispatch::Request::Session:0x[0-9a-f]+ not yet loaded>$/,
+    );
+    expect(loadSession).not.toHaveBeenCalled();
+    expect(session.isLoaded()).toBe(false);
+
+    session.get("foo");
+    expect(session.inspect()).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+>$/);
+  });
 });
