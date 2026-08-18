@@ -221,11 +221,7 @@ export class Duration {
 
   minus(other: Duration | number): Duration {
     if (typeof other === "number") {
-      return new Duration(
-        this.value - other,
-        mergeParts(this.parts, this._partKeys, { seconds: -other }),
-        this._variable,
-      );
+      return this.plus(-other);
     }
     return this.plus(other.negate());
   }
@@ -257,7 +253,6 @@ export class Duration {
     return result;
   }
 
-  // Mirrors Rails `Duration#-@` (duration.rb:322-324).
   negate(): Duration {
     return new Duration(
       -this.value,
