@@ -219,8 +219,6 @@ export class SelectManager extends TreeManager {
       klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
 
-    if (typeof relation === "string") relation = new SqlLiteral(relation);
-
     this.core.source.right.push(this.createJoin(relation, null, klass));
     return this;
   }
